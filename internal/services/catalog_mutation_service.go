@@ -145,7 +145,7 @@ func (s *CatalogMutationService) CreatePriority(actor AuditActor, item models.Pr
 	}
 	created, err := s.priorities.GetByID(id)
 	if err == nil {
-		emitServiceAudit(s.db, actor, "priority.create", "priority", &id, created.Name, nil)
+		emitServiceAudit(s.db, actor, logger.ActionPriorityCreate, logger.ResourcePriority, &id, created.Name, nil)
 	}
 	return created, err
 }
@@ -167,7 +167,7 @@ func (s *CatalogMutationService) PatchPriority(actor AuditActor, id int, patch P
 	}
 	updated, err := s.priorities.GetByID(id)
 	if err == nil {
-		emitServiceAudit(s.db, actor, "priority.update", "priority", &id, updated.Name, nil)
+		emitServiceAudit(s.db, actor, logger.ActionPriorityUpdate, logger.ResourcePriority, &id, updated.Name, nil)
 	}
 	return updated, err
 }
@@ -190,7 +190,7 @@ func (s *CatalogMutationService) DeletePriority(actor AuditActor, id int) error 
 	if err := s.priorities.Delete(id); err != nil {
 		return err
 	}
-	emitServiceAudit(s.db, actor, "priority.delete", "priority", &id, item.Name, nil)
+	emitServiceAudit(s.db, actor, logger.ActionPriorityDelete, logger.ResourcePriority, &id, item.Name, nil)
 	return nil
 }
 
@@ -207,7 +207,7 @@ func (s *CatalogMutationService) CreateStatus(actor AuditActor, item models.Stat
 	if !ok {
 		return nil, fmt.Errorf("create status returned %T", entity)
 	}
-	emitServiceAudit(s.db, actor, "status.create", "status", &created.ID, created.Name, nil)
+	emitServiceAudit(s.db, actor, logger.ActionStatusCreate, logger.ResourceStatus, &created.ID, created.Name, nil)
 	return created, nil
 }
 
@@ -244,7 +244,7 @@ func (s *CatalogMutationService) PatchStatus(actor AuditActor, id int, patch Sta
 	if !ok {
 		return nil, fmt.Errorf("update status returned %T", entity)
 	}
-	emitServiceAudit(s.db, actor, "status.update", "status", &id, updated.Name, nil)
+	emitServiceAudit(s.db, actor, logger.ActionStatusUpdate, logger.ResourceStatus, &id, updated.Name, nil)
 	return updated, nil
 }
 
@@ -259,7 +259,7 @@ func (s *CatalogMutationService) DeleteStatus(actor AuditActor, id int) error {
 	if err := s.statuses.Delete(id, nil); err != nil {
 		return err
 	}
-	emitServiceAudit(s.db, actor, "status.delete", "status", &id, entity.GetName(), nil)
+	emitServiceAudit(s.db, actor, logger.ActionStatusDelete, logger.ResourceStatus, &id, entity.GetName(), nil)
 	return nil
 }
 
@@ -276,7 +276,7 @@ func (s *CatalogMutationService) CreateStatusCategory(actor AuditActor, item mod
 	if !ok {
 		return nil, fmt.Errorf("create status category returned %T", entity)
 	}
-	emitServiceAudit(s.db, actor, "status_category.create", "status_category", &created.ID, created.Name, nil)
+	emitServiceAudit(s.db, actor, logger.ActionStatusCategoryCreate, logger.ResourceStatusCategory, &created.ID, created.Name, nil)
 	return created, nil
 }
 
@@ -316,7 +316,7 @@ func (s *CatalogMutationService) PatchStatusCategory(actor AuditActor, id int, p
 	if !ok {
 		return nil, fmt.Errorf("update status category returned %T", entity)
 	}
-	emitServiceAudit(s.db, actor, "status_category.update", "status_category", &id, updated.Name, nil)
+	emitServiceAudit(s.db, actor, logger.ActionStatusCategoryUpdate, logger.ResourceStatusCategory, &id, updated.Name, nil)
 	return updated, nil
 }
 
@@ -331,7 +331,7 @@ func (s *CatalogMutationService) DeleteStatusCategory(actor AuditActor, id int) 
 	if err := s.categories.Delete(id, nil); err != nil {
 		return err
 	}
-	emitServiceAudit(s.db, actor, "status_category.delete", "status_category", &id, entity.GetName(), nil)
+	emitServiceAudit(s.db, actor, logger.ActionStatusCategoryDelete, logger.ResourceStatusCategory, &id, entity.GetName(), nil)
 	return nil
 }
 

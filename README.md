@@ -56,7 +56,6 @@ It ships as a single Go binary with the Svelte frontend built in, SQLite by defa
 | Jira Automation | Built-in event-driven actions |
 | Jira Service Management | SLAs, queues, approvals, and a customer portal |
 | Jira Assets / Insight | Asset and CMDB register |
-| Confluence | Workspace knowledge base pages |
 | Xray / Zephyr | Test cases, test sets, test runs, and reports |
 | Marketplace apps | Built-in modules, packs, and plugins (extensible via WASM runtime) |
 
@@ -145,7 +144,7 @@ We are especially interested in early bug reports and real-world feedback about 
 
 - Backend: Go
 - Frontend: Svelte, Vite, and Tailwind CSS
-- Database: SQLite by default, with PostgreSQL support
+- Database: SQLite by default, with PostgreSQL 15+ support
 
 ## Documentation
 
@@ -153,6 +152,7 @@ We are especially interested in early bug reports and real-world feedback about 
 - [Contributing guide](CONTRIBUTING.md)
 - [Logging configuration](LOGGING.md)
 - [Docker backup and restore](deploy/backup-restore.md)
+- [Kubernetes deployment](deploy/kubernetes.md)
 - [Product documentation](https://windshift.sh/docs)
 
 ## License

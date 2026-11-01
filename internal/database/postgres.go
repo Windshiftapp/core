@@ -218,6 +218,31 @@ type schemaFile struct {
 	content string
 }
 
+// minimumPostgresVersionNum is the lowest supported PostgreSQL version, encoded
+// the way the server reports server_version_num (15.0 => 150000).
+const minimumPostgresVersionNum = 150000
+
+// requirePostgresVersion refuses a server older than the supported minimum.
+// Kept separate from the query so the comparison is unit-testable.
+func requirePostgresVersion(versionNum int) error {
+	if versionNum < minimumPostgresVersionNum {
+		return fmt.Errorf(
+			"unsupported PostgreSQL %d.%d; Windshift requires PostgreSQL %d or newer",
+			versionNum/10000, versionNum%10000, minimumPostgresVersionNum/10000,
+		)
+	}
+	return nil
+}
+
+// checkPostgresVersion reads the server version and applies the minimum gate.
+func checkPostgresVersion(db *sql.DB) error {
+	var versionNum int
+	if err := db.QueryRow(`SELECT current_setting('server_version_num')::int`).Scan(&versionNum); err != nil {
+		return fmt.Errorf("read postgres server version: %w", err)
+	}
+	return requirePostgresVersion(versionNum)
+}
+
 // NewPostgresDB creates a new PostgreSQL database connection.
 // maxConns sizes the pool (idle pool = maxConns/2, min 1).
 func NewPostgresDB(connectionString string, maxConns int) (Database, error) {
@@ -232,6 +257,12 @@ func NewPostgresDB(connectionString string, maxConns int) (Database, error) {
 
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping postgres database: %w", err)
+	}
+
+	// Refuse an unsupported server before any schema or migration work runs.
+	if err := checkPostgresVersion(db); err != nil {
+		_ = db.Close()
+		return nil, err
 	}
 
 	idle := maxConns / 2

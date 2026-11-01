@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,9 +20,20 @@ type Pinger interface {
 	PingContext(context.Context) error
 }
 
+// AttachmentProbe is the attachment-storage capability required by the
+// readiness probe. Disabled storage is reported as healthy. Implementations own
+// the short-lived result cache.
+type AttachmentProbe interface {
+	Enabled() bool
+	CachedHealthCheck(context.Context) error
+}
+
 // Handler serves the liveness and readiness contracts.
 type Handler struct {
-	database Pinger
+	database    Pinger
+	attachments AttachmentProbe
+
+	mu sync.Mutex
 }
 
 type livenessResponse struct {
@@ -29,16 +41,33 @@ type livenessResponse struct {
 }
 
 type readinessResponse struct {
-	Status   string `json:"status"`
-	Database string `json:"database"`
+	Status      string `json:"status"`
+	Database    string `json:"database"`
+	Attachments string `json:"attachments,omitempty"`
 }
 
-// NewHandler creates health handlers backed by the supplied database.
-func NewHandler(database Pinger) *Handler {
-	return &Handler{database: database}
+// NewHandler creates health handlers backed by the supplied database and an
+// optional attachment backend. The attachment probe is deliberately optional
+// so callers that only care about process/database health keep working.
+func NewHandler(database Pinger, attachments ...AttachmentProbe) *Handler {
+	var probe AttachmentProbe
+	if len(attachments) > 0 {
+		probe = attachments[0]
+	}
+	return &Handler{database: database, attachments: probe}
+}
+
+// SetAttachmentProbe wires the attachment backend after construction. Safe to
+// call before the HTTP server starts serving.
+func (h *Handler) SetAttachmentProbe(probe AttachmentProbe) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.attachments = probe
 }
 
 // Liveness reports whether the HTTP process and router are serving requests.
+// It intentionally does not touch the database or object storage: a liveness
+// failure should restart the container, not react to a dependency outage.
 //
 // @Summary      Check server liveness
 // @Description  Reports whether the Windshift HTTP process and router are serving requests. Public; no authentication required.
@@ -50,10 +79,12 @@ func (h *Handler) Liveness(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, livenessResponse{Status: "ok"})
 }
 
-// Readiness reports whether the application can reach its database.
+// Readiness reports whether the application can reach its database and
+// attachment storage. A failure here removes the replica from traffic without
+// restarting it.
 //
 // @Summary      Check server readiness
-// @Description  Reports whether Windshift can serve requests and reach its database. Public; no authentication required.
+// @Description  Reports whether Windshift can serve requests, reach its database, and reach attachment storage. Public; no authentication required.
 // @Tags         operations
 // @Produce      json
 // @Success      200  {object}  readinessResponse
@@ -61,27 +92,53 @@ func (h *Handler) Liveness(w http.ResponseWriter, _ *http.Request) {
 // @Router       /readyz [get]
 func (h *Handler) Readiness(w http.ResponseWriter, r *http.Request) {
 	if h.database == nil {
-		writeUnavailable(w)
+		writeUnavailable(w, "unavailable", "unknown")
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), readinessTimeout)
 	defer cancel()
 	if err := h.database.PingContext(ctx); err != nil {
-		writeUnavailable(w)
+		attachmentStatus, _ := h.attachmentStatus(ctx)
+		writeUnavailable(w, "unavailable", attachmentStatus)
+		return
+	}
+
+	attachmentStatus, attachmentOK := h.attachmentStatus(ctx)
+	if !attachmentOK {
+		writeUnavailable(w, "ok", attachmentStatus)
 		return
 	}
 
 	writeJSON(w, http.StatusOK, readinessResponse{
-		Status:   "ready",
-		Database: "ok",
+		Status:      "ready",
+		Database:    "ok",
+		Attachments: attachmentStatus,
 	})
 }
 
-func writeUnavailable(w http.ResponseWriter) {
+// attachmentStatus maps the shared cached attachment-storage state to the
+// readiness payload. The cache lives on the store so /readyz, the settings
+// status endpoint, and shell bootstrap all share one probe result.
+func (h *Handler) attachmentStatus(ctx context.Context) (string, bool) {
+	h.mu.Lock()
+	probe := h.attachments
+	h.mu.Unlock()
+
+	if probe == nil || !probe.Enabled() {
+		return "disabled", true
+	}
+	if err := probe.CachedHealthCheck(ctx); err != nil {
+		return "unavailable", false
+	}
+	return "ok", true
+}
+
+func writeUnavailable(w http.ResponseWriter, database, attachments string) {
 	writeJSON(w, http.StatusServiceUnavailable, readinessResponse{
-		Status:   "not_ready",
-		Database: "unavailable",
+		Status:      "not_ready",
+		Database:    database,
+		Attachments: attachments,
 	})
 }
 

@@ -81,7 +81,9 @@
           
           return {
             ...result,
-            format: testCase?.format || 'steps',
+            // The API carries the case format on each result; fall back to
+            // the run's test cases for responses from before the field.
+            format: result.test_case_format || testCase?.format || 'steps',
             test_steps: testCase?.test_steps || [],
             stepResults: caseStepResults
           };

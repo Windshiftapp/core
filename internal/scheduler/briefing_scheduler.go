@@ -124,11 +124,11 @@ func (bs *BriefingScheduler) safeGenerateAllBriefings(stop <-chan struct{}) {
 // last review: ser, 300526
 func (bs *BriefingScheduler) generateAllBriefings(stop <-chan struct{}) {
 	start := time.Now()
-	var usersProcessed int
-	var runErr error
-	defer recordSchedulerRun(bs.runRepo, "briefing", start, &usersProcessed, &runErr, bs.now)
 
-	// Check per-feature config for daily_briefing
+	// Check per-feature config for daily_briefing. A disabled feature or an
+	// unavailable provider means this tick did nothing, so skip recording a run:
+	// a "successful" row with zero users would make an idle scheduler look like
+	// it generated briefings.
 	llmClient, err := bs.llmManager.ResolveForFeature("daily_briefing")
 	if err != nil {
 		slog.Info("briefing: generation skipped", slog.Any("reason", err))
@@ -138,6 +138,10 @@ func (bs *BriefingScheduler) generateAllBriefings(stop <-chan struct{}) {
 		slog.Info("briefing: generation skipped, AI not available")
 		return
 	}
+
+	var usersProcessed int
+	var runErr error
+	defer recordSchedulerRun(bs.runRepo, "briefing", start, &usersProcessed, &runErr, bs.now)
 
 	// Check schedule: "every_6h" allows regeneration on the same day
 	regenerate := false

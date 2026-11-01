@@ -119,25 +119,6 @@ export default {
       "missingHistory": "{count} los elementos actualmente completados se excluyeron porque falta su historial de finalización."
     }
   },
-  "users": {
-    "labels": {
-      "tabLabel": "Etiquetas",
-      "tabDescription": "Administre sus etiquetas personales.",
-      "searchPlaceholder": "Buscar etiquetas",
-      "new": "Nueva etiqueta",
-      "createTitle": "Crear etiqueta",
-      "editTitle": "Editar etiqueta",
-      "namePlaceholder": "p.e. urgente",
-      "mine": "Mis etiquetas",
-      "empty": "Aún no hay etiquetas",
-      "emptyHint": "Crea tu primera etiqueta para organizar artículos.",
-      "created": "Etiqueta creada",
-      "updated": "Etiqueta actualizada",
-      "deleted": "Etiqueta eliminada",
-      "deleteTitle": "¿Eliminar etiqueta?",
-      "deleteMessage": "¿Eliminar \"{name}\"? Esto lo eliminará de cualquier elemento al que esté adjunto."
-    }
-  },
   "channel": {
     "channelConfigCorrupted": "La configuración del canal está dañada y no se puede editar de forma segura. Por favor contacte a un administrador.",
     "portalSlugInvalid": "Slug debe tener entre 1 y 40 letras minúsculas, números o guiones, y no puede comenzar ni terminar con un guión ni contener guiones consecutivos.",
@@ -369,11 +350,6 @@ export default {
     "libCharmbracelet": "Acceso TUI y SSH (Bubble Tea, Wish)"
   },
   "testing": {
-    "generateWithAI": "Generar con AI",
-    "overwriteDescriptionTitle": "¿Sobrescribir descripción?",
-    "overwriteDescriptionConfirm": "¿Reemplazar la descripción existente con un resumen generado por IA?",
-    "overwrite": "Sobrescribir",
-    "generateFailed": "No se pudo generar la descripción.",
     "actualResult": "Resultado real",
     "editTestPlan": "Editar plan de prueba",
     "execute": "Ejecutar",

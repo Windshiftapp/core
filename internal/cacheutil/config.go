@@ -79,6 +79,6 @@ func New(name string, opts BigCacheOptions) (*bigcache.BigCache, error) {
 		return nil, err
 	}
 	registration.cache = cache
-	registerCache(registration)
+	registerCache(name, registration)
 	return cache, nil
 }

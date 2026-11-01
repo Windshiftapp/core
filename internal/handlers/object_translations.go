@@ -4,17 +4,20 @@ import (
 	"errors"
 	"net/http"
 
+	"windshift/internal/logger"
 	"windshift/internal/objecttranslation"
+	"windshift/internal/utils"
 )
 
 // ObjectTranslationHandler exposes administrator-managed instance translations.
 type ObjectTranslationHandler struct {
 	service *objecttranslation.Service
+	auditor *logger.Auditor
 }
 
 // NewObjectTranslationHandler creates the instance translation handler.
-func NewObjectTranslationHandler(service *objecttranslation.Service) *ObjectTranslationHandler {
-	return &ObjectTranslationHandler{service: service}
+func NewObjectTranslationHandler(service *objecttranslation.Service, auditor *logger.Auditor) *ObjectTranslationHandler {
+	return &ObjectTranslationHandler{service: service, auditor: auditor}
 }
 
 // ListDefinitions returns the allowlisted configurable object types and fields.
@@ -57,6 +60,16 @@ func (h *ObjectTranslationHandler) Upsert(w http.ResponseWriter, r *http.Request
 		h.respondError(w, r, err)
 		return
 	}
+	if h.auditor != nil {
+		if user := utils.GetCurrentUser(r); user != nil {
+			h.auditor.LogWithDetails(r, user, logger.ActionObjectTranslationUpdate, logger.ResourceObjectTranslation, &objectID, r.PathValue("object_type"), map[string]any{
+				"object_type": r.PathValue("object_type"),
+				"field":       r.PathValue("field"),
+				"locale":      r.PathValue("locale"),
+				"value":       request.Value,
+			})
+		}
+	}
 	respondJSONOK(w, translation)
 }
 
@@ -72,6 +85,15 @@ func (h *ObjectTranslationHandler) Delete(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		h.respondError(w, r, err)
 		return
+	}
+	if h.auditor != nil {
+		if user := utils.GetCurrentUser(r); user != nil {
+			h.auditor.LogWithDetails(r, user, logger.ActionObjectTranslationDelete, logger.ResourceObjectTranslation, &objectID, r.PathValue("object_type"), map[string]any{
+				"object_type": r.PathValue("object_type"),
+				"field":       r.PathValue("field"),
+				"locale":      r.PathValue("locale"),
+			})
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

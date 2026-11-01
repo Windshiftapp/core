@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
@@ -98,7 +99,7 @@ func (s *ActionApplicationService) ApplyTemplate(ctx context.Context, userID, wo
 	if s.runtime != nil {
 		s.runtime.InvalidateWorkspaceCache(workspaceID)
 	}
-	emitServiceAudit(s.db, actor, "automation.create", "automation", &result.ActionID, result.Name, map[string]any{
+	emitServiceAudit(s.db, actor, logger.ActionAutomationCreate, logger.ResourceAutomation, &result.ActionID, result.Name, map[string]any{
 		"template_key": result.TemplateKey, "context": "from_template",
 	})
 	return result, nil
@@ -217,7 +218,12 @@ func (s *ActionApplicationService) Create(userID, workspaceID int, actor AuditAc
 		return nil, &ActionValidationError{Errors: validation}
 	}
 	if err == nil {
-		emitServiceAudit(s.db, actor, "automation.create", "automation", &created.ID, created.Name, nil)
+		emitServiceAudit(s.db, actor, logger.ActionAutomationCreate, logger.ResourceAutomation, &created.ID, created.Name, nil)
+		if input.ActorUserID != nil {
+			emitServiceAudit(s.db, actor, logger.ActionAutomationSetActor, logger.ResourceAutomation, &created.ID, created.Name, map[string]any{
+				"new_actor_user_id": *input.ActorUserID,
+			})
+		}
 	}
 	return created, err
 }
@@ -295,7 +301,21 @@ func (s *ActionApplicationService) Update(userID, workspaceID, actionID int, act
 			return nil, err
 		}
 	}
-	emitServiceAudit(s.db, actor, "automation.update", "automation", &updated.ID, updated.Name, nil)
+	emitServiceAudit(s.db, actor, logger.ActionAutomationUpdate, logger.ResourceAutomation, &updated.ID, updated.Name, nil)
+	if actorChanging {
+		oldActor := 0
+		if previousActor != nil {
+			oldActor = *previousActor
+		}
+		newActor := 0
+		if input.ActorUserID.Value != nil {
+			newActor = *input.ActorUserID.Value
+		}
+		emitServiceAudit(s.db, actor, logger.ActionAutomationSetActor, logger.ResourceAutomation, &updated.ID, updated.Name, map[string]any{
+			"old_actor_user_id": oldActor,
+			"new_actor_user_id": newActor,
+		})
+	}
 	return updated, nil
 }
 
@@ -310,7 +330,7 @@ func (s *ActionApplicationService) Delete(userID, workspaceID, actionID int, act
 	if err := s.definitions.Delete(action.ID, workspaceID); err != nil {
 		return err
 	}
-	emitServiceAudit(s.db, actor, "automation.delete", "automation", &action.ID, action.Name, nil)
+	emitServiceAudit(s.db, actor, logger.ActionAutomationDelete, logger.ResourceAutomation, &action.ID, action.Name, nil)
 	return nil
 }
 

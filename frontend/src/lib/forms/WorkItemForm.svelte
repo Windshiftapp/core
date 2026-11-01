@@ -26,6 +26,7 @@
   import WorkspaceLabelCombobox from '../pickers/WorkspaceLabelCombobox.svelte';
   import Label from '../components/Label.svelte';
   import Input from '../components/Input.svelte';
+  import TextField from '../components/TextField.svelte';
   import NativeSelect from '../components/NativeSelect.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import { createPopover, melt } from '@melt-ui/svelte'; // used for dueDateTrigger/dueDateContent
@@ -45,6 +46,12 @@
   // Derived state for UI
   // Additional fields toggle
   let showAdditionalFields = $state(false);
+
+  // A milestone created inline must invalidate the form store's cached
+  // milestone options so reopening the picker does not show a stale list.
+  function handleMilestoneCreated() {
+    void store.loadMilestones(store.formData.workspace_id, true);
+  }
 
   // Due date popover
   const {
@@ -538,6 +545,7 @@
         milestones={store.milestones}
         loading={store.milestonesLoading}
         placeholder={t('createModal.noMilestone')}
+        onCreated={handleMilestoneCreated}
       >
         {#snippet children()}
           {@const selectedIds = Array.isArray(store.formData.milestone_ids) ? store.formData.milestone_ids : []}
@@ -653,41 +661,41 @@
             {/if}
           </div>
         {:else if field.field_identifier === 'due_date'}
-          <div class="space-y-1">
-            <Label color="default" for="work-item-due-date-required">
-              {t('createModal.dueDate')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
-            </Label>
-            <Input
-              type="date"
-              id="work-item-due-date-required"
-              bind:value={store.formData.due_date}
-              size="medium"
-            />
-          </div>
+          <TextField
+            class="space-y-1"
+            label={t('createModal.dueDate')}
+            requiredMark
+            labelColor="default"
+            labelClass=""
+            type="date"
+            id="work-item-due-date-required"
+            bind:value={store.formData.due_date}
+            size="medium"
+          />
         {:else if field.field_identifier === 'start_date'}
-          <div class="space-y-1">
-            <Label color="default" for="work-item-start-date-required">
-              {t('common.startDate')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
-            </Label>
-            <Input
-              type="date"
-              id="work-item-start-date-required"
-              bind:value={store.formData.start_date}
-              size="medium"
-            />
-          </div>
+          <TextField
+            class="space-y-1"
+            label={t('common.startDate')}
+            requiredMark
+            labelColor="default"
+            labelClass=""
+            type="date"
+            id="work-item-start-date-required"
+            bind:value={store.formData.start_date}
+            size="medium"
+          />
         {:else if field.field_identifier === 'end_date'}
-          <div class="space-y-1">
-            <Label color="default" for="work-item-end-date-required">
-              {t('common.endDate')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
-            </Label>
-            <Input
-              type="date"
-              id="work-item-end-date-required"
-              bind:value={store.formData.end_date}
-              size="medium"
-            />
-          </div>
+          <TextField
+            class="space-y-1"
+            label={t('common.endDate')}
+            requiredMark
+            labelColor="default"
+            labelClass=""
+            type="date"
+            id="work-item-end-date-required"
+            bind:value={store.formData.end_date}
+            size="medium"
+          />
         {:else if field.field_identifier === 'milestone'}
           <div class="space-y-1">
             <Label color="default">
@@ -700,6 +708,7 @@
               milestones={store.milestones}
               loading={store.milestonesLoading}
               placeholder={t('createModal.noMilestone')}
+              onCreated={handleMilestoneCreated}
             />
           </div>
         {:else if field.field_identifier === 'assignee'}
@@ -764,32 +773,32 @@
             />
           </div>
         {:else if field.field_identifier === 'story_points'}
-          <div class="space-y-1">
-            <Label color="default" for="work-item-story-points-required">
-              {t('items.storyPoints')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
-            </Label>
-            <Input
-              id="work-item-story-points-required"
-              type="number"
-              min="0"
-              step="0.5"
-              bind:value={store.formData.story_points}
-              size="medium"
-            />
-          </div>
+          <TextField
+            class="space-y-1"
+            label={t('items.storyPoints')}
+            requiredMark
+            labelColor="default"
+            labelClass=""
+            id="work-item-story-points-required"
+            type="number"
+            min="0"
+            step="0.5"
+            bind:value={store.formData.story_points}
+            size="medium"
+          />
         {:else if field.field_identifier === 'estimate' || field.field_identifier === 'estimate_minutes'}
-          <div class="space-y-1">
-            <Label color="default" for="work-item-estimate-required">
-              {t('items.estimate') || 'Estimate'} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
-            </Label>
-            <Input
-              id="work-item-estimate-required"
-              type="text"
-              bind:value={store.formData.estimate}
-              placeholder="3d 4h"
-              size="medium"
-            />
-          </div>
+          <TextField
+            class="space-y-1"
+            label={t('items.estimate') || 'Estimate'}
+            requiredMark
+            labelColor="default"
+            labelClass=""
+            id="work-item-estimate-required"
+            type="text"
+            bind:value={store.formData.estimate}
+            placeholder="3d 4h"
+            size="medium"
+          />
         {/if}
       {/each}
     </div>

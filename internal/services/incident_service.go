@@ -285,11 +285,17 @@ func (s *IncidentService) dispatchNotification(incident *models.Incident, rule m
 	// role; recipients are resolved from the policy, not workspace membership.
 	// System scope forbids workspace provenance, so the item link travels in
 	// the action URL only.
+	itemID := incident.ItemID
 	_, err := s.notifications.notifyUsersAtURL(
-		userIDs, 0, "incident", title, message,
-		itemActionURL(incident.WorkspaceID, incident.ItemID),
-		models.NotificationScopeSystem, nil, nil,
-		"incident", &incident.ItemID, nil,
+		userIDs, 0, directNotificationSpec{
+			Type:               "incident",
+			Title:              title,
+			Message:            message,
+			ActionURL:          itemActionURL(incident.WorkspaceID, incident.ItemID),
+			AuthorizationScope: models.NotificationScopeSystem,
+			SourceType:         "incident",
+			SourceID:           &itemID,
+		}, nil,
 	)
 	return err
 }

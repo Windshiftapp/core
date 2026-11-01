@@ -60,13 +60,15 @@ export function loadAuthenticatedShellUI(userId, { force = false, timeout = 0 } 
   const generation = ++shellUILoadGeneration;
   shellUILoadAudience = audience;
 
-  // Warm the per-user view preferences alongside the shell bootstrap so
-  // collection views read the server value on their first render.
-  void collectionPreferences.ensureLoaded(userId);
+  // Load the per-user view preferences before the shell mounts so collection
+  // views read the server value on their first render. Bound the wait by the
+  // same deadline as the shell bootstrap.
+  const preferencesReady = collectionPreferences.ensureLoaded(userId, { timeout });
 
   const request = shellBootstrap
     .get({ timeout })
-    .then((bootstrap) => {
+    .then(async (bootstrap) => {
+      await preferencesReady;
       if (generation !== shellUILoadGeneration) return false;
       const hydrated = hydrateAuthenticatedShellUI(bootstrap);
       shellUISettledAudience = audience;

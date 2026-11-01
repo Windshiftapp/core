@@ -119,25 +119,6 @@ export default {
       "missingHistory": "{count} 当前完成的项目已被排除，因为缺少完成历史记录。"
     }
   },
-  "users": {
-    "labels": {
-      "tabLabel": "标签",
-      "tabDescription": "管理您的个人标签。",
-      "searchPlaceholder": "搜索标签",
-      "new": "新标签",
-      "createTitle": "创建标签",
-      "editTitle": "编辑标签",
-      "namePlaceholder": "例如紧急",
-      "mine": "我的标签",
-      "empty": "还没有标签",
-      "emptyHint": "创建您的第一个标签来组织项目。",
-      "created": "已创建标签",
-      "updated": "已更新标签",
-      "deleted": "已删除标签",
-      "deleteTitle": "删除标签？",
-      "deleteMessage": "删除“{name}”？这会将其从所附加的任何项目中删除。"
-    }
-  },
   "channel": {
     "channelConfigCorrupted": "通道配置已损坏，无法安全编辑。请联系管理员。",
     "portalSlugInvalid": "Slug 必须是 1–40 个小写字母、数字或连字符，并且不能以连字符开头或结尾，也不能包含连续的连字符。",
@@ -367,11 +348,6 @@ export default {
     }
   },
   "testing": {
-    "generateWithAI": "使用 AI 生成",
-    "overwriteDescriptionTitle": "覆盖描述？",
-    "overwriteDescriptionConfirm": "用 AI 生成的摘要替换现有描述？",
-    "overwrite": "覆盖",
-    "generateFailed": "无法生成描述。",
     "actualResult": "实际结果",
     "editTestPlan": "编辑测试计划",
     "execute": "执行",
@@ -750,8 +726,8 @@ export default {
     "completedLastDayDescription": "最近 24 小时内有活动的已完成事项",
     "completedLastWeek": "最近一周",
     "completedLastWeekDescription": "最近 7 天内有活动的已完成事项",
-    "completedCurrentIteration": "当前迭代",
-    "completedCurrentIterationDescription": "当前活动迭代中的已完成事项",
+    "completedLimit": "限制为",
+    "completedLimitDescription": "仅加载最新的已完成事项",
     "completedNone": "隐藏已完成",
     "completedNoneDescription": "不在此看板加载已完成工作",
     "completedLatestFifty": "最近 50 项",

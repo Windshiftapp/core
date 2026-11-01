@@ -93,8 +93,13 @@ type UserPermissionCache struct {
 	RoleAssignments      map[int][]int             `json:"role_assignments"`      // workspace_id -> role_ids
 	DirectPermissions    map[int][]string          `json:"direct_permissions"`    // workspace_id -> permission_keys (direct assignments)
 	PermissionSources    map[int]map[string]string `json:"permission_sources"`    // workspace_id -> permission_key -> source (role/direct/group)
-	CachedAt             time.Time                 `json:"cached_at"`
-	ExpiresAt            time.Time                 `json:"expires_at"`
+	// UsesSharedEveryone marks a snapshot whose Everyone fallback is served by
+	// the process-wide everyone table rather than an embedded WorkspaceEveryone
+	// map. Snapshots that leave it false keep the embedded map as the only
+	// source, which is what white-box fixtures rely on.
+	UsesSharedEveryone bool      `json:"uses_shared_everyone,omitempty"`
+	CachedAt           time.Time `json:"cached_at"`
+	ExpiresAt          time.Time `json:"expires_at"`
 }
 
 // UserPreferences represents user-specific preferences stored as JSON
@@ -119,6 +124,9 @@ type UserPreferencesData struct {
 	ViewState map[string]map[string]any `json:"view_state,omitempty"`
 	// SavedFilters holds the user's personal named filters keyed by scope id.
 	SavedFilters map[string]any `json:"saved_filters,omitempty"`
+	// CommentSortOrder is the user's preferred comment thread order, either
+	// "oldest" or "newest". Empty means the default (oldest first).
+	CommentSortOrder string `json:"comment_sort_order,omitempty"`
 }
 
 // UserTUIPreferences is the SSH TUI's persisted state sub-document. Pointer

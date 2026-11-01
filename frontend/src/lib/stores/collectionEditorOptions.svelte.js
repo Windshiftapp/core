@@ -1,7 +1,6 @@
 import { assets } from '../api/assets.js';
 import { priorities } from '../api/configuration.js';
 import { iterations, milestones } from '../api/milestones.js';
-import { personalLabels } from '../api/misc.js';
 import { customerOrganisations, portalCustomers } from '../api/portal.js';
 import { teams } from '../api/teams.js';
 import { getAssignableUsers } from '../api/users.js';
@@ -18,7 +17,6 @@ const EMPTY_OPTIONS = Object.freeze({
   projects: [],
   portalCustomers: [],
   customerOrganisations: [],
-  personalLabels: [],
   loaded: {},
   loading: {},
   fetchedAt: {},
@@ -51,7 +49,6 @@ const OPTION_LOADERS = {
   projects: (workspaceId) => workspaces.getProjects(workspaceId),
   portalCustomers: () => portalCustomers.getAll(),
   customerOrganisations: async () => realCustomers(await customerOrganisations.getAll()),
-  personalLabels: () => personalLabels.getAll(null),
 };
 
 /**

@@ -3,6 +3,7 @@
   import Checkbox from '../../components/Checkbox.svelte';
   import Input from '../../components/Input.svelte';
   import Label from '../../components/Label.svelte';
+  import FormField from '../../components/FormField.svelte';
   import NativeSelect from '../../components/NativeSelect.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import CustomFieldRenderer from '../items/CustomFieldRenderer.svelte';
@@ -30,20 +31,19 @@
 <div class="space-y-4" data-testid={`${idPrefix}-fields`}>
   {#if currentStepFields.some((field) => field.field_identifier === 'title')}
     {@const titleField = currentStepFields.find((field) => field.field_identifier === 'title')}
-    <div>
-	  <Label for={`${idPrefix}-title`} required={true} class="mb-1.5" color="default">
-        {titleField.display_name || t('requestForm.title')}
-      </Label>
+    <FormField
+      label={titleField.display_name || t('requestForm.title')}
+      id={`${idPrefix}-title`}
+      required
+      helper={titleField.description}
+    >
       <Input
         id={`${idPrefix}-title`}
         bind:value={formData.title}
         placeholder={t('requestForm.enterTitle')}
-		required={true}
+        required={true}
       />
-      {#if titleField.description}
-        <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">{titleField.description}</p>
-      {/if}
-    </div>
+    </FormField>
   {/if}
 
   {#if currentStepFields.some((field) => field.field_identifier === 'description')}

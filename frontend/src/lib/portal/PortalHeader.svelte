@@ -1,7 +1,7 @@
 <script>
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import BookOpen from '@lucide/svelte/icons/book-open';
-  import CheckSquare from '@lucide/svelte/icons/check-square';
+  import CheckSquare from '@lucide/svelte/icons/square-check';
   import FileText from '@lucide/svelte/icons/file-text';
   import Home from '@lucide/svelte/icons/home';
   import KeyRound from '@lucide/svelte/icons/key-round';

@@ -20,6 +20,7 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/objecttranslation"
+	"windshift/internal/ratelimit"
 	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/services/actioncatalog"
@@ -64,17 +65,43 @@ const (
 	ResponseEmpty        ResponseShape = "empty"
 )
 
+// AuditKind classifies how a mutating route reaches the audit log. Every
+// mutating route must be classified; TestMutatingRoutesHaveAuditSpec enforces
+// it against auditSpecRegistry.
+type AuditKind string
+
+const (
+	// AuditUnspecified means the route is not classified. The coverage test
+	// fails on it.
+	AuditUnspecified AuditKind = ""
+	// AuditRecorder means the handler records the event with logger.Record and
+	// the request middleware flushes it.
+	AuditRecorder AuditKind = "recorder"
+	// AuditService means the application service emits the central audit event
+	// with the request actor.
+	AuditService AuditKind = "service"
+	// AuditExempt means the mutation was reviewed and intentionally does not
+	// write a central audit event; the registry comment records why.
+	AuditExempt AuditKind = "exempt"
+)
+
 // Route describes one canonical operation and its authentication boundaries.
 type Route struct {
-	Method            string
-	Path              string
-	OperationID       string
-	Tag               string
-	Summary           string
-	Description       string
-	Auth              AuthClass
-	Exposure          Exposure
-	Scopes            []string
+	Method      string
+	Path        string
+	OperationID string
+	Tag         string
+	Summary     string
+	Description string
+	Auth        AuthClass
+	Exposure    Exposure
+	Scopes      []string
+	// ScopesAny lists alternative token scopes: a bearer token satisfies the
+	// route when it satisfies every scope in Scopes and at least one scope in
+	// ScopesAny. Empty means Scopes is the whole requirement. It exists for
+	// shared resources whose owning entity type is only known after the handler
+	// resolves it (e.g. attachment binaries that may belong to an item or a page).
+	ScopesAny         []string
 	RequestType       reflect.Type
 	ResponseType      reflect.Type
 	MetadataType      reflect.Type
@@ -84,6 +111,9 @@ type Route struct {
 	ResponseShape     ResponseShape
 	Parameters        []ParameterMetadata
 	DocumentedErrors  []int
+	// Audit classifies how a mutating route reaches the audit log. It is set
+	// from auditSpecRegistry for mutating methods and empty for reads.
+	Audit AuditKind
 }
 
 // ParameterMetadata is the public contract for one operation parameter.
@@ -217,7 +247,18 @@ func (b *routeBuilder) JSON[Request, Response any](method, path string, status i
 // RawResponse registers a handler that writes a direct response without the
 // standard data envelope while retaining its public contract metadata.
 func (b *routeBuilder) RawResponse[Response any](method, path string, status int, mediaType string, auth AuthClass, scopes []string, handler Handler) {
+	b.rawResponse[Response](method, path, status, mediaType, auth, scopes, nil, handler)
+}
+
+// RawResponseAnyScope is RawResponse with an alternative scope set: a bearer
+// token is admitted when it satisfies scopes or any single scope in anyScopes.
+func (b *routeBuilder) RawResponseAnyScope[Response any](method, path string, status int, mediaType string, auth AuthClass, scopes, anyScopes []string, handler Handler) {
+	b.rawResponse[Response](method, path, status, mediaType, auth, scopes, anyScopes, handler)
+}
+
+func (b *routeBuilder) rawResponse[Response any](method, path string, status int, mediaType string, auth AuthClass, scopes, anyScopes []string, handler Handler) {
 	metadata := b.metadata(method, path, auth, scopes)
+	metadata.ScopesAny = slices.Clone(anyScopes)
 	metadata.ResponseType = reflect.TypeFor[Response]()
 	metadata.ResponseMediaType = mediaType
 	metadata.SuccessStatus = status
@@ -283,6 +324,14 @@ type concurrencyLimiter interface {
 	Acquire(int) (func(), bool)
 }
 
+// requestLimiter is the shared rate-limit engine. Satisfied by
+// *ratelimit.Limiter. v2 uses Decide rather than Limit so the 429 keeps the
+// v2 error envelope while still carrying the shared Retry-After and
+// X-RateLimit-* headers.
+type requestLimiter interface {
+	Decide(*http.Request) (ratelimit.Result, bool)
+}
+
 type objectLocalizer interface {
 	LocalizeResponse(context.Context, string, string, any) error
 }
@@ -295,6 +344,7 @@ type labelApplication interface {
 	SetForItem(services.AuditActor, int, []int) ([]models.Label, error)
 	AddToItem(services.AuditActor, int, int) ([]models.Label, error)
 	RemoveFromItem(services.AuditActor, int, int) error
+	BulkApply(services.AuditActor, services.BulkLabelOperation, func(int) (bool, error)) (services.BulkLabelResult, error)
 }
 
 type participantApplication interface {
@@ -346,6 +396,7 @@ type pageReader interface {
 type pageApplication interface {
 	List(int, int) ([]models.Page, error)
 	ListTitlesAcrossWorkspaces(int, []int) ([]services.PageTitleRow, error)
+	ListSummariesAcrossWorkspaces(int, []int, string, int) ([]services.PageSummaryRow, error)
 	EffectiveLevels(int, int) (map[int]string, error)
 	Get(int, int, int) (*models.Page, error)
 	Search(int, int, string, int) ([]models.Page, error)
@@ -365,10 +416,10 @@ type pageApplication interface {
 }
 
 type pageDiagramApplication interface {
-	Create(services.AuditActor, services.CreatePageDiagramInput) (*services.PageDiagram, error)
-	List(services.AuditActor, int) ([]services.PageDiagram, error)
-	Get(services.AuditActor, int, int) (*services.PageDiagram, error)
-	Update(services.AuditActor, services.UpdatePageDiagramInput) (*services.PageDiagram, error)
+	Create(context.Context, services.AuditActor, services.CreatePageDiagramInput) (*services.PageDiagram, error)
+	List(context.Context, services.AuditActor, int) ([]services.PageDiagram, error)
+	Get(context.Context, services.AuditActor, int, int) (*services.PageDiagram, error)
+	Update(context.Context, services.AuditActor, services.UpdatePageDiagramInput) (*services.PageDiagram, error)
 }
 
 type pageAccess interface {
@@ -465,13 +516,14 @@ type attachmentApplication interface {
 	UploadPolicy() (services.ItemAttachmentUploadPolicy, error)
 	ListItemAttachments(int, int, int, int) ([]models.Attachment, int, error)
 	GetItemAttachment(int, int) (*models.Attachment, error)
-	OpenItemAttachment(int, int, bool) (*services.ItemAttachmentBinary, error)
-	UploadItemAttachment(services.ItemAttachmentUploadInput) (models.AttachmentUploadResponse, error)
-	DeleteItemAttachment(int, int) error
+	OpenItemAttachment(context.Context, int, int, bool) (*services.ItemAttachmentBinary, error)
+	UploadItemAttachment(context.Context, services.ItemAttachmentUploadInput) (models.AttachmentUploadResponse, error)
+	DeleteItemAttachment(context.Context, int, int) error
 }
 
 type pageAttachmentApplication interface {
-	UploadPageAttachment(services.PageAttachmentUploadInput) (models.AttachmentUploadResponse, error)
+	UploadPageAttachment(context.Context, services.PageAttachmentUploadInput) (models.AttachmentUploadResponse, error)
+	OpenPageAttachment(context.Context, int, int, bool) (*services.ItemAttachmentBinary, error)
 }
 
 type collectionApplication interface {
@@ -645,6 +697,9 @@ type Deps struct {
 	CORS                         Middleware
 	CSRF                         csrfValidator
 	Concurrency                  concurrencyLimiter
+	// RateLimiter is the per-user request-rate backstop for authenticated v2
+	// routes. Optional: nil leaves v2 unthrottled.
+	RateLimiter requestLimiter
 	// SLA serves the read-only item SLA state and compliance report. Optional:
 	// nil keeps the routes registered but answering not-found.
 	SLA *sla.Engine
@@ -852,6 +907,7 @@ func Inventory() []Route {
 	for i, item := range routes {
 		inventory[i] = item.Route
 		inventory[i].Scopes = slices.Clone(item.Scopes)
+		inventory[i].ScopesAny = slices.Clone(item.ScopesAny)
 	}
 	return inventory
 }
@@ -918,7 +974,20 @@ func buildRoutes(deps Deps) []route {
 	registerSLAMetricRoutes(&builder, deps)
 	registerTicketImportRoutes(&builder, deps.TicketImport)
 	applyEmbeddedContractMetadata(builder.routes, contractMetadataJSON)
+	applyAuditSpecs(builder.routes)
 	return builder.routes
+}
+
+// applyAuditSpecs classifies every mutating route from auditSpecRegistry. A
+// route absent from the registry keeps AuditUnspecified so the coverage test
+// fails until it is reviewed and classified.
+func applyAuditSpecs(routes []route) {
+	for index := range routes {
+		if isSafeMethod(routes[index].Method) {
+			continue
+		}
+		routes[index].Audit = auditSpecRegistry[routes[index].OperationID]
+	}
 }
 
 func applyEmbeddedContractMetadata(routes []route, document []byte) {
@@ -1221,6 +1290,15 @@ func applyParameterCorrections(route *Route) {
 	case "GET /items":
 		upsertParameter(route, booleanQuery("exclude_personal", "Exclude personal-workspace items before pagination and totals, including search, ql and collection_id selections. Values true and 1 enable exclusion; omitted or other values leave visibility unchanged.", false))
 		upsertParameter(route, ParameterMetadata{Name: "completed_activity_days", In: "query", Description: "For completed items, include only those active within this many days. Incomplete items remain included.", Schema: map[string]any{"type": "integer", "minimum": 1, "maximum": 3650}})
+		upsertParameter(route, booleanQuery("include_has_children", "Attach has_children to each row, true when the caller can view at least one child. Values true and 1 enable; omitted or other values leave the payload unchanged.", false))
+	case "GET /items/level-counts":
+		route.Tag = "Work items"
+		route.Summary = "Count visible items per hierarchy level"
+		route.Description = "Returns the filtered item count for each item-type hierarchy level, applying the same collection, sub-filter, and workspace scope as the item list. Sub-task (-1) is reported but is not a valid level-picker root."
+	case "POST /items/hierarchy":
+		route.Tag = "Work items"
+		route.Summary = "Read the hierarchy below a set of roots"
+		route.Description = "Returns the matching descendants of up to 500 root items, grouped by root and capped per root. The collection and sub-filter apply to the descendants; the recursive walk is not pruned by the filter, so a matching descendant under a filtered-out intermediate is still returned. Rows are ordered breadth-first so a truncated root keeps complete shallow levels. Inaccessible items and cross-workspace descendants the caller cannot view are omitted."
 	case "POST /milestones/{milestone_id}/release":
 		upsertParameter(route, ParameterMetadata{Name: "Idempotency-Key", In: "header", Description: "Caller-generated key that makes retries return the original release result.", Schema: map[string]any{"type": "string", "minLength": 1}})
 	case "GET /openapi.json":
@@ -1347,14 +1425,14 @@ func validateRouteScopes(routes []route) error {
 				return fmt.Errorf("v2: public route %s %s declares token scopes", item.Method, item.Path)
 			}
 		case AuthAuthenticated:
-			if !bearerExposed && len(item.Scopes) != 0 {
+			if !bearerExposed && (len(item.Scopes) != 0 || len(item.ScopesAny) != 0) {
 				return fmt.Errorf("v2: session-only route %s %s declares token scopes", item.Method, item.Path)
 			}
-			if bearerExposed && len(item.Scopes) == 0 {
+			if bearerExposed && len(item.Scopes) == 0 && len(item.ScopesAny) == 0 {
 				return fmt.Errorf("v2: authenticated route %s %s declares no token scope", item.Method, item.Path)
 			}
 			if bearerExposed {
-				if err := tokenauth.ValidateScopes(item.Scopes); err != nil {
+				if err := tokenauth.ValidateScopes(append(slices.Clone(item.Scopes), item.ScopesAny...)); err != nil {
 					return fmt.Errorf("v2: route %s %s: %w", item.Method, item.Path, err)
 				}
 			}
@@ -1413,6 +1491,9 @@ func registerMount(mux *http.ServeMux, prefix string, routes []route, deps Deps,
 				}
 			}
 			if selected.Auth == AuthAuthenticated {
+				if deps.RateLimiter != nil {
+					handler = limitRequests(deps.RateLimiter)(handler)
+				}
 				if session {
 					handler = limitConcurrency(deps.Concurrency)(handler)
 					if deps.CSRF != nil && !isSafeMethod(selected.Method) {
@@ -1421,10 +1502,17 @@ func registerMount(mux *http.ServeMux, prefix string, routes []route, deps Deps,
 					handler = requireSession(handler)
 				} else {
 					handler = limitConcurrency(deps.Concurrency)(handler)
-					handler = requireBearer(deps.Tokens, selected.Scopes)(handler)
+					handler = requireBearer(deps.Tokens, selected.Scopes, selected.ScopesAny)(handler)
 				}
 			}
-			return handler(w, r)
+			// One recorder per request: handlers append, and the middleware
+			// flushes after the handler returns so HTTP audit has a single
+			// writer. Success events are gated on the handler outcome.
+			recorder := logger.NewAuditRecorder()
+			r = r.WithContext(logger.WithAuditRecorder(r.Context(), recorder))
+			handlerErr := handler(w, r)
+			deps.AdminAuditor.Flush(recorder, handlerErr == nil)
+			return handlerErr
 		}
 		if len(allowed) > 0 {
 			return methodNotAllowed(allowed)(w, r)
@@ -1497,6 +1585,30 @@ func requireCSRF(validator csrfValidator) Middleware {
 	}
 }
 
+// limitRequests enforces the shared rate-limit engine on a v2 handler chain.
+// The decision runs inside the auth middleware, so the user key is available.
+func limitRequests(limiter requestLimiter) Middleware {
+	return func(next Handler) Handler {
+		return func(w http.ResponseWriter, r *http.Request) error {
+			result, ok := limiter.Decide(r)
+			if !ok {
+				return next(w, r)
+			}
+			for name, values := range result.HeaderValues() {
+				for _, value := range values {
+					w.Header().Set(name, value)
+				}
+			}
+			if !result.Allowed {
+				apiErr := newError(http.StatusTooManyRequests, "rate_limited", "Rate limit exceeded")
+				apiErr.Headers = http.Header{"Retry-After": {strconv.Itoa(result.RetryAfterSeconds())}}
+				return apiErr
+			}
+			return next(w, r)
+		}
+	}
+}
+
 func limitConcurrency(limiter concurrencyLimiter) Middleware {
 	return func(next Handler) Handler {
 		return func(w http.ResponseWriter, r *http.Request) error {
@@ -1534,7 +1646,7 @@ func hasCRWBearer(header string) bool {
 	return strings.HasPrefix(header, "Bearer crw_")
 }
 
-func requireBearer(tokens tokenAuthenticator, scopes []string) Middleware {
+func requireBearer(tokens tokenAuthenticator, scopes, anyScopes []string) Middleware {
 	return func(next Handler) Handler {
 		return func(w http.ResponseWriter, r *http.Request) error {
 			header := r.Header.Get("Authorization")
@@ -1552,9 +1664,13 @@ func requireBearer(tokens tokenAuthenticator, scopes []string) Middleware {
 			if err != nil || user == nil || token == nil {
 				return bearerError("invalid_token", "Bearer token is invalid")
 			}
-			if !tokens.CheckTokenPermissions(token, scopes) {
+			if !bearerScopesSatisfied(tokens, token, scopes, anyScopes) {
 				apiErr := newError(http.StatusForbidden, "insufficient_permission", "Token lacks a required scope")
-				apiErr.Details = map[string]any{"required": slices.Clone(scopes)}
+				details := map[string]any{"required": slices.Clone(scopes)}
+				if len(anyScopes) > 0 {
+					details["required_any"] = slices.Clone(anyScopes)
+				}
+				apiErr.Details = details
 				return apiErr
 			}
 			ctx := context.WithValue(r.Context(), contextkeys.User, user)
@@ -1563,6 +1679,24 @@ func requireBearer(tokens tokenAuthenticator, scopes []string) Middleware {
 			return next(w, r.WithContext(ctx))
 		}
 	}
+}
+
+// bearerScopesSatisfied applies the route's scope requirement: every scope in
+// scopes must be held, and when anyScopes is non-empty at least one of them
+// must be held as well.
+func bearerScopesSatisfied(tokens tokenAuthenticator, token *models.APIToken, scopes, anyScopes []string) bool {
+	if !tokens.CheckTokenPermissions(token, scopes) {
+		return false
+	}
+	if len(anyScopes) == 0 {
+		return true
+	}
+	for _, scope := range anyScopes {
+		if tokens.CheckTokenPermissions(token, []string{scope}) {
+			return true
+		}
+	}
+	return false
 }
 
 func bearerError(code, message string) *Error {

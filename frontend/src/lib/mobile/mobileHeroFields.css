@@ -1,0 +1,39 @@
+/* Linear-style borderless hero fields shared by the mobile create and edit
+   pages. The title textarea wraps and grows with its content (the autoGrow
+   action) so long titles stay fully visible. Pages set their own min-height and
+   resize on .hero-desc. */
+.hero-title {
+  width: 100%;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ds-text);
+  font-family: inherit;
+  font-size: 1.35rem;
+  font-weight: var(--font-semibold, 600);
+  line-height: 1.25;
+  overflow: hidden;
+  resize: none;
+}
+.hero-title::placeholder {
+  color: var(--ds-text-subtlest, var(--ds-text-subtle));
+  font-weight: var(--font-semibold, 600);
+}
+.hero-desc {
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ds-text);
+  font-family: inherit;
+  font-size: max(1rem, 16px);
+  line-height: 1.5;
+}
+.hero-desc::placeholder {
+  color: var(--ds-text-subtlest, var(--ds-text-subtle));
+}
+.hero-title:focus,
+.hero-desc:focus {
+  outline: none;
+}

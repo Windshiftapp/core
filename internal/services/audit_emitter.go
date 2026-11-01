@@ -14,6 +14,7 @@ func emitServiceAudit(db database.Database, actor AuditActor, actionType, resour
 		Username:     actor.Username,
 		IPAddress:    actor.IPAddress,
 		UserAgent:    actor.UserAgent,
+		Source:       actor.Source,
 		ActionType:   actionType,
 		ResourceType: resourceType,
 		ResourceID:   resourceID,

@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -55,6 +56,13 @@ type SecuritySettings struct {
 
 // GetSecuritySettings returns current security settings
 func (h *SecuritySettingsHandler) GetSecuritySettings(w http.ResponseWriter, r *http.Request) {
+	respondJSONOK(w, h.loadSecuritySettings())
+}
+
+// loadSecuritySettings reads the persisted security settings with the same
+// defaults the API returns. UpdateSecuritySettings uses it to capture the
+// previous values for the audit trail.
+func (h *SecuritySettingsHandler) loadSecuritySettings() SecuritySettings {
 	settings := SecuritySettings{
 		CalendarFeedEnabled:    true,              // Default enabled
 		PluginCLIExecEnabled:   false,             // Default disabled for security
@@ -97,7 +105,7 @@ func (h *SecuritySettingsHandler) GetSecuritySettings(w http.ResponseWriter, r *
 		settings.WorkspaceManagedAgents = strings.EqualFold(v, "true")
 	}
 
-	respondJSONOK(w, settings)
+	return settings
 }
 
 // UpdateSecuritySettings updates security settings
@@ -109,6 +117,8 @@ func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, 
 	// Policy is identifier-shaped ("all_users"/"groups_only"/"disabled")
 	// and persisted + echoed verbatim in the settings UI and audit log.
 	sanitize.Apply(&settings.APIKeyCreationPolicy, sanitize.ShortIdentifier)
+
+	before := h.loadSecuritySettings()
 
 	if err := h.settings.Upsert(
 		"calendar_feed_enabled", boolToString(settings.CalendarFeedEnabled),
@@ -195,20 +205,46 @@ func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, 
 			logger.ActionSecuritySettingsUpdate,
 			logger.ResourceSecuritySettings,
 			nil, "security_settings",
-			map[string]any{
-				"calendar_feed_enabled":     settings.CalendarFeedEnabled,
-				"plugin_cli_exec_enabled":   settings.PluginCLIExecEnabled,
-				"allow_external_images":     settings.AllowExternalImages,
-				"api_key_creation_policy":   settings.APIKeyCreationPolicy,
-				"api_key_allowed_group_ids": settings.APIKeyAllowedGroupIDs,
-				"allow_user_managed_agents": settings.AllowUserManagedAgents,
-				"max_agents_per_user":       settings.MaxAgentsPerUser,
-				"workspace_managed_agents":  settings.WorkspaceManagedAgents,
-			},
+			securitySettingsChanges(before, settings),
 		)
 	}
 
 	respondJSONOK(w, settings)
+}
+
+// securitySettingsChanges reports each changed security setting with its old
+// and new value, so the audit row shows what changed instead of only the final
+// state.
+func securitySettingsChanges(before, after SecuritySettings) map[string]any {
+	changes := map[string]any{}
+	add := func(field string, old, new any) {
+		changes[field] = map[string]any{"old": old, "new": new}
+	}
+	if before.CalendarFeedEnabled != after.CalendarFeedEnabled {
+		add("calendar_feed_enabled", before.CalendarFeedEnabled, after.CalendarFeedEnabled)
+	}
+	if before.PluginCLIExecEnabled != after.PluginCLIExecEnabled {
+		add("plugin_cli_exec_enabled", before.PluginCLIExecEnabled, after.PluginCLIExecEnabled)
+	}
+	if before.AllowExternalImages != after.AllowExternalImages {
+		add("allow_external_images", before.AllowExternalImages, after.AllowExternalImages)
+	}
+	if before.APIKeyCreationPolicy != after.APIKeyCreationPolicy {
+		add("api_key_creation_policy", before.APIKeyCreationPolicy, after.APIKeyCreationPolicy)
+	}
+	if !slices.Equal(before.APIKeyAllowedGroupIDs, after.APIKeyAllowedGroupIDs) {
+		add("api_key_allowed_group_ids", before.APIKeyAllowedGroupIDs, after.APIKeyAllowedGroupIDs)
+	}
+	if before.AllowUserManagedAgents != after.AllowUserManagedAgents {
+		add("allow_user_managed_agents", before.AllowUserManagedAgents, after.AllowUserManagedAgents)
+	}
+	if before.MaxAgentsPerUser != after.MaxAgentsPerUser {
+		add("max_agents_per_user", before.MaxAgentsPerUser, after.MaxAgentsPerUser)
+	}
+	if before.WorkspaceManagedAgents != after.WorkspaceManagedAgents {
+		add("workspace_managed_agents", before.WorkspaceManagedAgents, after.WorkspaceManagedAgents)
+	}
+	return changes
 }
 
 func boolToString(b bool) string {

@@ -481,7 +481,16 @@ func (h *PermissionHandler) getUserPermissionSummary(userID int) (*models.UserPe
 				}
 			}
 			mergeKeys(effectiveCache.WorkspacePermissions)
-			mergeKeys(effectiveCache.WorkspaceEveryone)
+			// The Everyone fallback is no longer embedded in the snapshot; merge it
+			// from the shared table so open workspaces still appear in the profile.
+			if everyonePerms, everyoneErr := h.permissionService.EveryonePermissions(); everyoneErr == nil {
+				mergeKeys(everyonePerms)
+			} else {
+				slog.Warn("failed to load everyone permissions for profile",
+					slog.String("component", "permissions"),
+					slog.Int("user_id", userID),
+					slog.Any("error", everyoneErr))
+			}
 		}
 	}
 

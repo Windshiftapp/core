@@ -116,23 +116,6 @@ export default {
     "connectedAccounts": "연결된 계정",
     "connectedAccountsTab": "계정",
     "connectedAccountsDesc": "브랜치와 풀 리퀘스트를 만들려면 소스 관리 계정을 연결하세요",
-    "labels": {
-      "tabLabel": "개인 라벨",
-      "tabDescription": "개인 라벨을 관리합니다.",
-      "searchPlaceholder": "라벨 검색",
-      "new": "새 라벨",
-      "createTitle": "라벨 만들기",
-      "editTitle": "라벨 편집",
-      "namePlaceholder": "예: 긴급",
-      "mine": "내 라벨",
-      "empty": "아직 라벨이 없습니다",
-      "emptyHint": "작업을 정리할 첫 라벨을 만드세요.",
-      "created": "라벨을 만들었습니다",
-      "updated": "라벨을 수정했습니다",
-      "deleted": "라벨을 삭제했습니다",
-      "deleteTitle": "라벨을 삭제하시겠습니까?",
-      "deleteMessage": "\"{name}\"을(를) 삭제하시겠습니까? 연결된 모든 작업에서도 제거됩니다."
-    },
     "agents": {
       "title": "에이전트",
       "description": "에이전트는 소유자의 권한을 상속하며 API 토큰으로만 인증하는 비인간 사용자입니다. 대화형 로그인을 할 수 없습니다.",

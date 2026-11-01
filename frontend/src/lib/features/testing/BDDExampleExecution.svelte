@@ -52,9 +52,16 @@
   let expanded = $state({});
   let saving = $state({});
   let loadError = $state(null);
+  // The results/expanded state belongs to one case's execution. Rehydrating
+  // on every incoming results array would clobber local state with the
+  // parent's copy of our own saves (and collapse the expanders), so the
+  // snapshot below is only taken when a different case's data arrives.
+  let hydratedCaseId = $state(null);
 
   $effect(() => {
-    // Re-hydrate whenever the parent hands us a different case's results.
+    const caseId = testCase?.id ?? null;
+    if (caseId === hydratedCaseId) return;
+    hydratedCaseId = caseId;
     const next = {};
     for (const result of initialResults) {
       next[result.example_index] = {
@@ -101,6 +108,8 @@
       ...results,
       [exampleIndex]: { ...(results[exampleIndex] || { row_values: {} }), status },
     };
+    // Merge-patch: only the status changes; notes and actual result are kept
+    // server-side, and an in-flight notes write cannot revert the status.
     saveExample(exampleIndex, { status });
   }
 
@@ -113,11 +122,9 @@
 
   function commitExampleNotes(exampleIndex, value) {
     setExampleField(exampleIndex, 'notes', value);
-    saveExample(exampleIndex, {
-      notes: value,
-      status: results[exampleIndex]?.status || 'not_run',
-      actual_result: results[exampleIndex]?.actual_result || '',
-    });
+    // Merge-patch: only the notes change, so this cannot race a status
+    // click into reverting it.
+    saveExample(exampleIndex, { notes: value });
   }
 
   function toggleSteps(exampleIndex) {
@@ -156,10 +163,9 @@
   }
 
   function setExampleStepStatus(exampleIndex, stepNumber, status) {
-    saveExampleStep(exampleIndex, stepNumber, {
-      status,
-      item_id: results[exampleIndex]?.step_results?.[stepNumber]?.item_id ?? null,
-    });
+    // Merge-patch: only the status changes; a previously linked item and any
+    // notes are preserved server-side.
+    saveExampleStep(exampleIndex, stepNumber, { status });
   }
 
   /** @type {Array<{ status: 'passed' | 'failed' | 'blocked' | 'skipped', label: string }>} */
@@ -193,7 +199,12 @@
         <div class="flex items-center justify-between gap-3 flex-wrap">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="text-sm font-semibold" style="color: var(--ds-text);">
-              {t('testing.exampleN', { n: row.exampleIndex + 1 })}
+              {#if row.blockIndex === -1}
+                <!-- Plain scenario: the implicit execution row is the whole scenario. -->
+                {spec.scenario_keyword}: {spec.scenario_name}
+              {:else}
+                {t('testing.exampleN', { n: row.exampleIndex + 1 })}
+              {/if}
             </span>
             {#each row.header as column, i (column)}
               <Badge size="xs">{column}: {row.row[i] ?? ''}</Badge>

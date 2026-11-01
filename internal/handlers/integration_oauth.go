@@ -91,7 +91,7 @@ func (h *IntegrationOAuthHandler) StartSystemOAuth(w http.ResponseWriter, r *htt
 		return
 	}
 	if registration.auditor != nil {
-		registration.auditor.LogWithDetails(r, user, logger.ActionIntegrationProviderUpdate, logger.ResourceIntegrationProvider, nil, providerID, map[string]any{
+		registration.auditor.LogWithDetails(r, user, logger.ActionIntegrationProviderOAuthStart, logger.ResourceIntegrationProvider, nil, providerID, map[string]any{
 			"provider_id": providerID, "provider_type": providerType, "oauth_started": true,
 		})
 	}

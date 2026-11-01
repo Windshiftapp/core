@@ -40,7 +40,10 @@
     optionTestid = null,
     onOpen = null,
     onSelect = () => {},
-    onCancel = () => {}
+    onCancel = () => {},
+    // Fired after an inline create succeeds so callers can invalidate any
+    // cached milestone options they own (e.g. the work-item form store).
+    onCreated = null
   } = $props();
 
   const resolvedPlaceholder = $derived(
@@ -195,6 +198,7 @@
 
       const created = await milestonesStore.add(data);
       createdMilestones = [...createdMilestones, created];
+      onCreated?.(created);
       // A successful planning mutation invalidates the selectable family so a
       // later open reloads the directory. Global creations touch every scope.
       if (data.is_global) {

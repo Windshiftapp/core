@@ -33,7 +33,6 @@
   import { useMainAppLifecycle } from './useMainAppLifecycle.js';
   import {
     CREATE_MODAL_WORKSPACE_VIEWS,
-    isMainAppFooterView,
     MAIN_APP_COMPONENT_LOADERS,
     MAIN_APP_TEST_VIEWS,
     prefetchIdleMainAppComponents,
@@ -272,12 +271,6 @@
   const showCollectionNav = $derived(
     !$uiStore.reviewFullscreen && GLOBAL_COLLECTION_VIEWS.has($currentRoute.view)
   );
-  // The scroll column only needs to be a flex column so the page footer can sit
-  // at the bottom of short pages; leave other routes on the original block
-  // layout to avoid disturbing full-height app surfaces.
-  const showFooterLayout = $derived(
-    !$uiStore.reviewFullscreen && isMainAppFooterView(effectiveView)
-  );
 
   let previousRoutePath = $state(null);
   $effect(() => {
@@ -431,8 +424,6 @@
           <main
             data-testid="main-content-scroll"
             class="flex-1 min-h-0 overflow-y-auto overscroll-contain"
-            class:flex={showFooterLayout}
-            class:flex-col={showFooterLayout}
           >
             <MainRouteContent view={effectiveView} route={$currentRoute} {lazyComponents} />
           </main>

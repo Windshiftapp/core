@@ -91,6 +91,11 @@ func generate(data []byte) ([]byte, error) {
 		} else {
 			delete(operation, "x-required-scopes")
 		}
+		if len(route.ScopesAny) > 0 {
+			operation["x-required-any-scopes"] = slices.Clone(route.ScopesAny)
+		} else {
+			delete(operation, "x-required-any-scopes")
+		}
 		operation["parameters"] = parameterDocuments(route.Parameters)
 		delete(pathItem, "parameters")
 		if route.RequestType != nil {

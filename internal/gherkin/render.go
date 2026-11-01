@@ -88,7 +88,7 @@ func writeStep(out *strings.Builder, step Step) {
 		out.WriteString("\n")
 		for _, line := range strings.Split(step.DocString.Content, "\n") {
 			out.WriteString("      ")
-			out.WriteString(line)
+			out.WriteString(escapeDocStringContent(line, "```"))
 			out.WriteString("\n")
 		}
 		out.WriteString("      ```\n")
@@ -167,4 +167,16 @@ func writeExampleRow(out *strings.Builder, cells []string, widths []int) {
 func escapeTableCell(cell string) string {
 	replacer := strings.NewReplacer("\\", "\\\\", "|", "\\|", "\n", "\\n")
 	return replacer.Replace(cell)
+}
+
+// escapeDocStringContent applies the doc string escapes so re-parsing the
+// rendered source reproduces the stored content: backslashes double and the
+// delimiter's opening character is backslash-escaped, so an embedded fence
+// line round-trips instead of terminating the block.
+func escapeDocStringContent(content, delimiter string) string {
+	if !strings.Contains(content, "\\") && !strings.Contains(content, delimiter[:1]) {
+		return content
+	}
+	open := delimiter[:1]
+	return strings.NewReplacer("\\", "\\\\", open, "\\"+open).Replace(content)
 }

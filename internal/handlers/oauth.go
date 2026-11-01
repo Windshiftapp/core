@@ -266,7 +266,7 @@ func (h *OAuthHandler) AuthorizeApprove(w http.ResponseWriter, r *http.Request) 
 
 	// Match the CLI gate so disabled token creation cannot mint OAuth tokens.
 	if err := h.apiToken.checkCreationPolicy(user.ID); err != nil {
-		h.audit(r, user, "oauth.approve", &client.ID, client.DisplayName, false,
+		h.audit(r, user, logger.ActionOAuthApprove, &client.ID, client.DisplayName, false,
 			map[string]any{"reason": "token_policy_disabled"})
 		respondForbidden(w, r)
 		return
@@ -303,7 +303,7 @@ func (h *OAuthHandler) AuthorizeApprove(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	h.audit(r, user, "oauth.approve", &client.ID, client.DisplayName, true, map[string]any{
+	h.audit(r, user, logger.ActionOAuthApprove, &client.ID, client.DisplayName, true, map[string]any{
 		"client_id": client.ClientID,
 		"scopes":    granted,
 		"agent_id":  agent.ID,
@@ -346,7 +346,7 @@ func (h *OAuthHandler) AuthorizeDeny(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.audit(r, user, "oauth.deny", &client.ID, client.DisplayName, true, map[string]any{
+	h.audit(r, user, logger.ActionOAuthDeny, &client.ID, client.DisplayName, true, map[string]any{
 		"client_id": client.ClientID,
 	})
 
@@ -1118,7 +1118,7 @@ func (h *OAuthHandler) audit(r *http.Request, user *models.User, action string, 
 		IPAddress:    utils.GetClientIP(r),
 		UserAgent:    r.UserAgent(),
 		ActionType:   action,
-		ResourceType: "oauth_client",
+		ResourceType: logger.ResourceOAuthClient,
 		ResourceID:   resourceID,
 		ResourceName: resourceName,
 		Details:      details,
@@ -1134,7 +1134,7 @@ func (h *OAuthHandler) auditClient(r *http.Request, client *oauthClientRow, acti
 		IPAddress:    utils.GetClientIP(r),
 		UserAgent:    r.UserAgent(),
 		ActionType:   action,
-		ResourceType: "oauth_client",
+		ResourceType: logger.ResourceOAuthClient,
 		ResourceID:   &client.ID,
 		ResourceName: client.DisplayName,
 		Details:      details,

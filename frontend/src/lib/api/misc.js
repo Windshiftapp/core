@@ -195,53 +195,6 @@ export const getCalendarFeedToken = calendarFeed.getToken;
 export const createCalendarFeedToken = calendarFeed.createToken;
 export const revokeCalendarFeedToken = calendarFeed.revokeToken;
 
-// Personal Labels
-//
-// Calling getAll() with no argument returns the unified set: the caller's
-// own labels (user_id = me) plus shared labels (user_id IS NULL). Pass an
-// explicit userId only when you need the legacy filtered behavior.
-export const personalLabels = {
-  getAll: (userId = undefined) => {
-    const params = new URLSearchParams();
-    if (userId !== null && userId !== undefined && userId !== '') {
-      params.append('user_id', userId);
-    }
-    const queryString = params.toString();
-    return fetchAPI(`/personal-labels${queryString ? `?${queryString}` : ''}`);
-  },
-  get: (id) => fetchAPI(`/personal-labels/${id}`),
-  create: (data) =>
-    fetchAPI('/personal-labels', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  update: (id, data) =>
-    fetchAPI(`/personal-labels/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  delete: (id) =>
-    fetchAPI(`/personal-labels/${id}`, {
-      method: 'DELETE',
-    }),
-
-  getForItem: (itemId) => fetchAPI(`/items/${itemId}/personal-labels`),
-  setForItem: (itemId, labelIds) =>
-    fetchAPI(`/items/${itemId}/personal-labels`, {
-      method: 'PUT',
-      body: JSON.stringify({ label_ids: labelIds }),
-    }),
-  addToItem: (itemId, labelId) =>
-    fetchAPI(`/items/${itemId}/personal-labels`, {
-      method: 'POST',
-      body: JSON.stringify({ label_id: labelId }),
-    }),
-  removeFromItem: (itemId, labelId) =>
-    fetchAPI(`/items/${itemId}/personal-labels/${labelId}`, {
-      method: 'DELETE',
-    }),
-};
-
 // Global item labels
 export const labels = {
   getAll: (workspaceId) => fetchV2Data(`/workspaces/${workspaceId}/labels`),
@@ -266,6 +219,13 @@ export const labels = {
     fetchV2Data(`/items/${itemId}/labels`, {
       method: 'PUT',
       body: JSON.stringify({ label_ids: labelIds }),
+    }),
+  // Apply one add/remove delta to many items in a single server-side request.
+  // Returns per-item failures instead of fanning out one PUT per item.
+  bulkSetLabels: (itemIds, { add = [], remove = [] } = {}) =>
+    fetchV2Data('/items/bulk-labels', {
+      method: 'POST',
+      body: JSON.stringify({ item_ids: itemIds, add, remove }),
     }),
 };
 

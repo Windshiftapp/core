@@ -3,7 +3,6 @@ package reporting
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -268,14 +267,3 @@ type assetSeed struct {
 
 func itemNodeID(id int) string  { return fmt.Sprintf("item-%d", id) }
 func assetNodeID(id int) string { return fmt.Sprintf("asset-%d", id) }
-
-// SortGraphEdges orders edges deterministically so a truncated graph is stable
-// across reloads.
-func SortGraphEdges(edges []GraphEdge) {
-	sort.SliceStable(edges, func(i, j int) bool {
-		if edges[i].Source != edges[j].Source {
-			return edges[i].Source < edges[j].Source
-		}
-		return edges[i].Target < edges[j].Target
-	})
-}

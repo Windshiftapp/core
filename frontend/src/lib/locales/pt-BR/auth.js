@@ -112,6 +112,15 @@ export default {
     languageHint: 'Seu idioma preferido para a interface do aplicativo',
     saveSettings: 'Salvar Configurações',
     settingsSaved: 'Configurações salvas com sucesso',
+    notificationsTab: 'Notificações',
+    dueDateReminders: 'Lembretes de vencimento',
+    dueDateRemindersDesc:
+      'Receba uma notificação quando seus itens abertos se aproximarem da data de vencimento. Isso também cobre itens do seu espaço de trabalho pessoal.',
+    dueDateRemindersEnable: 'Ativar lembretes de vencimento',
+    dueDateRemindersEnableHint:
+      'Os lembretes só são enviados quando você os ativa aqui; nunca são automáticos.',
+    dueDateReminderDays: 'Dias antes do vencimento',
+    dueDateReminderDaysHint: 'Escolha entre 1 e 30 dias.',
     connectedAccounts: 'Contas Conectadas',
     connectedAccountsTab: 'Contas',
     connectedAccountsDesc: 'Conecte suas contas de controle de versão para criar branches e pull requests',

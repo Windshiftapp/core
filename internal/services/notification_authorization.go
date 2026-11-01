@@ -39,6 +39,10 @@ type NotificationAuthorizationSnapshot struct {
 	userID       int
 	active       bool
 	workspaceIDs map[int]struct{}
+	// permissions is the recipient's already-resolved workspace permission
+	// snapshot. Event fan-out reuses it for the referenced-entity check so a
+	// recipient's snapshot is resolved once per event instead of per check.
+	permissions *models.UserPermissionCache
 }
 
 func (a *NotificationAuthorizer) Snapshot(userID int) (*NotificationAuthorizationSnapshot, error) {
@@ -68,6 +72,22 @@ func (a *NotificationAuthorizer) Snapshot(userID int) (*NotificationAuthorizatio
 		snapshot.workspaceIDs[workspaceID] = struct{}{}
 	}
 	return snapshot, nil
+}
+
+// snapshotForRecipient builds a recipient authorization snapshot from a
+// batched active flag and an already-resolved permission snapshot. Event
+// fan-out uses it so the is_active probe is batched and one snapshot serves
+// both the workspace view check and the referenced-entity check. The returned
+// snapshot carries no workspace scope, so it is only valid for scope-independent
+// checks (the fan-out's system-scope reference check).
+func (a *NotificationAuthorizer) snapshotForRecipient(userID int, active bool, permissions *models.UserPermissionCache) *NotificationAuthorizationSnapshot {
+	return &NotificationAuthorizationSnapshot{
+		authorizer:   a,
+		userID:       userID,
+		active:       active,
+		workspaceIDs: map[int]struct{}{},
+		permissions:  permissions,
+	}
 }
 
 // Visible reports whether the notification may be disclosed to the snapshot's
@@ -186,6 +206,9 @@ func (s *NotificationAuthorizationSnapshot) workspaceEntityVisible(table string,
 	}
 	if currentWorkspaceID != *notification.ReferencedWorkspaceID {
 		return false, nil
+	}
+	if s.permissions != nil {
+		return a.workspacePermissions.workspacePermission(s.permissions, currentWorkspaceID, expectedPermission), nil
 	}
 	allowed, err := a.workspacePermissions.HasWorkspacePermission(s.userID, currentWorkspaceID, expectedPermission)
 	if err != nil {

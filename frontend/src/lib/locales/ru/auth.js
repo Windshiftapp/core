@@ -121,28 +121,19 @@ export default {
     languageHint: 'Предпочитаемый язык интерфейса',
     saveSettings: 'Сохранить настройки',
     settingsSaved: 'Настройки сохранены',
+    notificationsTab: 'Уведомления',
+    dueDateReminders: 'Напоминания о сроках',
+    dueDateRemindersDesc:
+      'Получайте уведомление, когда срок ваших открытых элементов приближается. Это также касается элементов в вашем личном рабочем пространстве.',
+    dueDateRemindersEnable: 'Включить напоминания о сроках',
+    dueDateRemindersEnableHint:
+      'Напоминания отправляются только после включения здесь; они никогда не автоматические.',
+    dueDateReminderDays: 'Дней до срока',
+    dueDateReminderDaysHint: 'Выберите от 1 до 30 дней.',
     connectedAccounts: 'Учётные записи Git',
     connectedAccountsTab: 'Учётные записи',
     connectedAccountsDesc:
       'Подключите учётную запись GitHub, GitLab или другого Git-сервиса, чтобы создавать ветки и запросы на слияние',
-    labels: {
-      tabLabel: 'Метки',
-      tabDescription: 'Личные метки для ваших рабочих элементов',
-      searchPlaceholder: 'Поиск меток',
-      new: 'Новая метка',
-      createTitle: 'Создать метку',
-      editTitle: 'Изменить метку',
-      namePlaceholder: 'Например, срочно',
-      mine: 'Мои метки',
-      empty: 'Меток пока нет',
-      emptyHint: 'Создайте первую метку, чтобы упорядочить элементы.',
-      created: 'Метка создана',
-      updated: 'Метка обновлена',
-      deleted: 'Метка удалена',
-      deleteTitle: 'Удалить метку?',
-      deleteMessage:
-        'Удалить метку «{name}»? Она будет удалена со всех связанных элементов.',
-    },
     agents: {
       title: 'Агенты',
       description:

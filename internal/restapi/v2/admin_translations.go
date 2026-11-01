@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"windshift/internal/logger"
 	"windshift/internal/objecttranslation"
 )
 
@@ -65,6 +66,14 @@ func registerAdminTranslationRoutes(b *routeBuilder, deps Deps) {
 			return objecttranslation.Translation{}, err
 		}
 		result, err := deps.AdminTranslations.UpsertInstance(r.Context(), r.PathValue("object_type"), id, r.PathValue("field"), r.PathValue("locale"), input.Value)
+		if err == nil {
+			logger.Record(r, logger.ActionObjectTranslationUpdate, logger.ResourceObjectTranslation, &id, r.PathValue("object_type"), map[string]any{
+				"object_type": r.PathValue("object_type"),
+				"field":       r.PathValue("field"),
+				"locale":      r.PathValue("locale"),
+				"value":       input.Value,
+			})
+		}
 		return result, translationError(err)
 	})
 	b.Command(http.MethodDelete, "/admin/object-translations/{object_type}/{object_id}/{field}/{locale}", AuthAuthenticated, write, func(r *http.Request) error {
@@ -75,7 +84,15 @@ func registerAdminTranslationRoutes(b *routeBuilder, deps Deps) {
 		if err != nil {
 			return err
 		}
-		return translationError(deps.AdminTranslations.DeleteInstance(r.Context(), r.PathValue("object_type"), id, r.PathValue("field"), r.PathValue("locale")))
+		if err := deps.AdminTranslations.DeleteInstance(r.Context(), r.PathValue("object_type"), id, r.PathValue("field"), r.PathValue("locale")); err != nil {
+			return translationError(err)
+		}
+		logger.Record(r, logger.ActionObjectTranslationDelete, logger.ResourceObjectTranslation, &id, r.PathValue("object_type"), map[string]any{
+			"object_type": r.PathValue("object_type"),
+			"field":       r.PathValue("field"),
+			"locale":      r.PathValue("locale"),
+		})
+		return nil
 	})
 }
 

@@ -77,14 +77,14 @@ export const SYSTEM_FIELDS = [
     name: 'Start Date',
     type: 'date',
     cardSelectable: true,
-    listColumn: null,
+    listColumn: { required: false },
   },
   {
     identifier: 'end_date',
     name: 'End Date',
     type: 'date',
     cardSelectable: true,
-    listColumn: null,
+    listColumn: { required: false },
   },
   {
     identifier: 'labels',

@@ -3,7 +3,7 @@
   import { currentRoute } from '../router.js';
   import { currentWorkspace, workspacesStore } from '../stores/workspaces.svelte.js';
   import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
-  import CheckSquare from '@lucide/svelte/icons/check-square';
+  import CheckSquare from '@lucide/svelte/icons/square-check';
   import TodoList from '../features/items/TodoList.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
 

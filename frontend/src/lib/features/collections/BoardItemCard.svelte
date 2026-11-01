@@ -1,6 +1,6 @@
 <script>
   import CalendarDays from '@lucide/svelte/icons/calendar-days';
-  import CheckSquare from '@lucide/svelte/icons/check-square';
+  import CheckSquare from '@lucide/svelte/icons/square-check';
   import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
   import Square from '@lucide/svelte/icons/square';
   import Avatar from '../../components/Avatar.svelte';
@@ -41,6 +41,9 @@
     refreshToken = 0,
     focused = false,
     selected = false,
+    // Board-wide selection mode: cards dim until selected and expose their
+    // checkbox. Outside this mode no selection control is rendered at all.
+    selectionMode = false,
     visible = true,
     onvisibilitychange = null,
     registerElement = null,
@@ -140,8 +143,14 @@
     onopen?.(item.id, event);
   }
 
-  // Shift-click extends the board selection instead of opening the card.
+  // In selection mode the whole card toggles its selection; otherwise
+  // shift-click extends the board selection and a plain click opens the card.
   function handleCardClick(event) {
+    if (selectionMode && onselect) {
+      event.preventDefault();
+      onselect(item.id, event);
+      return;
+    }
     if (event.shiftKey && onshiftselect) {
       event.preventDefault();
       onshiftselect(item.id, event);
@@ -173,6 +182,7 @@
   data-swimlane-dimension={swimlaneDimension}
   data-swimlane-key={swimlaneKey}
   data-selected={selected ? 'true' : 'false'}
+  data-selection-mode={selectionMode ? 'true' : 'false'}
   role="button"
   tabindex={focused ? 0 : -1}
   onclick={handleCardClick}
@@ -185,11 +195,11 @@
   <div class={canDrag ? 'cursor-grab active:cursor-grabbing' : ''}>
     <div class="min-w-0">
       <div class="flex items-start gap-2">
-        {#if onselect}
+        {#if onselect && selectionMode}
           <button
             type="button"
-            class="board-card-select -ml-0.5 mt-0.5 shrink-0 rounded p-0.5 transition-opacity"
-            style="color: {selected ? 'var(--ds-icon-brand)' : 'var(--ds-icon-subtle)'};"
+            class="board-card-select -ml-0.5 mt-0.5 shrink-0 rounded p-0.5"
+            style="color: {selected ? 'var(--ds-border-focused)' : 'var(--ds-icon-subtle)'};"
             data-testid={`board-card-select-${item.id}`}
             aria-pressed={selected}
             aria-label={t('collections.toggleSelection')}
@@ -262,6 +272,7 @@
             href={itemHref}
             onClick={(event) => {
               event.preventDefault();
+              event.stopPropagation();
               open(event);
             }}
             size="compact"
@@ -336,15 +347,19 @@
     opacity: 1;
   }
 
-  /* The selection control stays hidden until the card is hovered or selected,
-     so a board at rest reads as cards rather than a checklist. */
-  .board-card-select {
-    opacity: 0;
+  /* Selection mode dims every card so the selected subset stands out. The
+     selected card stays fully opaque and carries the focus accent. */
+  .board-card[data-selection-mode='true']:not([data-selected='true']) {
+    opacity: 0.5;
   }
 
-  .board-card:hover .board-card-select,
-  .board-card:focus-within .board-card-select,
-  .board-card-select[aria-pressed='true'] {
+  .board-card[data-selection-mode='true']:not([data-selected='true']):hover {
+    opacity: 0.8;
+  }
+
+  .board-card[data-selected='true'] {
     opacity: 1;
+    border-color: var(--ds-border-focused) !important;
+    box-shadow: 0 0 0 1px var(--ds-border-focused);
   }
 </style>

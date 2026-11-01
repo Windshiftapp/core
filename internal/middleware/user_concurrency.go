@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"windshift/internal/models"
+	"windshift/internal/ratelimit"
 )
 
 // UserConcurrencyLimiter caps each authenticated user's simultaneous work to
@@ -24,7 +25,7 @@ func NewUserConcurrencyLimiter(limit int) *UserConcurrencyLimiter {
 
 // Limit returns 429 once a user reaches the in-flight request cap.
 func (l *UserConcurrencyLimiter) Limit(next http.Handler) http.Handler {
-	if l == nil || l.limit <= 0 || e2eRateLimitsDisabled() {
+	if l == nil || l.limit <= 0 || ratelimit.E2EDisabled() {
 		return next
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -47,7 +48,7 @@ func (l *UserConcurrencyLimiter) Limit(next http.Handler) http.Handler {
 
 // Acquire reserves one per-user slot and returns its release function.
 func (l *UserConcurrencyLimiter) Acquire(userID int) (func(), bool) {
-	if l == nil || l.limit <= 0 || e2eRateLimitsDisabled() {
+	if l == nil || l.limit <= 0 || ratelimit.E2EDisabled() {
 		return func() {}, true
 	}
 	if !l.acquire(userID) {

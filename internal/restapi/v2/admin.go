@@ -6,9 +6,11 @@ import (
 	"sort"
 	"time"
 
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 func registerAdminRoutes(builder *routeBuilder, deps Deps) {
@@ -125,6 +127,8 @@ func createAdminGroup(deps Deps) jsonOperation[adminGroupCreateRequest, adminGro
 		if err != nil {
 			return adminGroupDTO{}, adminGroupError(err)
 		}
+		groupID := result.Group.ID
+		logger.Record(r, logger.ActionGroupCreate, logger.ResourceGroup, &groupID, result.Group.Name, nil)
 		return adminGroupFromModel(result.Group, result.Warnings), nil
 	}
 }
@@ -142,6 +146,10 @@ func updateAdminGroup(deps Deps) jsonOperation[adminGroupPatchRequest, adminGrou
 		if err != nil {
 			return adminGroupDTO{}, err
 		}
+		before, err := deps.Groups.Get(groupID, true)
+		if err != nil {
+			return adminGroupDTO{}, adminGroupError(err)
+		}
 		result, err := deps.Groups.Update(groupID, services.GroupUpdateInput{
 			Name: optionalValue(input.Name), Description: optionalValue(input.Description), IsActive: optionalValue(input.IsActive),
 			MemberIDs: optionalValue(input.MemberIDs), ActorID: &actor.ID,
@@ -153,6 +161,7 @@ func updateAdminGroup(deps Deps) jsonOperation[adminGroupPatchRequest, adminGrou
 		if err != nil {
 			return adminGroupDTO{}, adminGroupError(err)
 		}
+		auditAdminGroupUpdate(r, before, group)
 		return adminGroupFromModel(group, result.Warnings), nil
 	}
 }
@@ -166,9 +175,66 @@ func deleteAdminGroup(deps Deps) commandOperation {
 		if err != nil {
 			return err
 		}
-		_, err = deps.Groups.Delete(groupID)
-		return adminGroupError(err)
+		snapshot, err := deps.Groups.Delete(groupID)
+		if err != nil {
+			return adminGroupError(err)
+		}
+		logger.Record(r, logger.ActionGroupDelete, logger.ResourceGroup, &groupID, snapshot.Name, nil)
+		return nil
 	}
+}
+
+// auditAdminGroupUpdate records field changes and, separately, each group
+// membership addition and removal so the two can be filtered independently.
+func auditAdminGroupUpdate(r *http.Request, before, after *models.TeamGroup) {
+	groupID := after.ID
+	details := map[string]any{}
+	if before.Name != after.Name {
+		details["name"] = map[string]any{"old": before.Name, "new": after.Name}
+	}
+	if before.Description != after.Description {
+		details["description"] = map[string]any{"old": before.Description, "new": after.Description}
+	}
+	if before.IsActive != after.IsActive {
+		details["is_active"] = map[string]any{"old": before.IsActive, "new": after.IsActive}
+	}
+	if len(details) > 0 {
+		logger.Record(r, logger.ActionGroupUpdate, logger.ResourceGroup, &groupID, after.Name, details)
+	}
+
+	beforeIDs := groupMemberIDSet(before)
+	afterIDs := groupMemberIDSet(after)
+	for _, id := range sortedGroupMemberIDs(afterIDs) {
+		if _, ok := beforeIDs[id]; ok {
+			continue
+		}
+		memberID := id
+		logger.Record(r, logger.ActionGroupAddMember, logger.ResourceGroup, &groupID, after.Name, map[string]any{"user_id": memberID})
+	}
+	for _, id := range sortedGroupMemberIDs(beforeIDs) {
+		if _, ok := afterIDs[id]; ok {
+			continue
+		}
+		memberID := id
+		logger.Record(r, logger.ActionGroupRemoveMember, logger.ResourceGroup, &groupID, after.Name, map[string]any{"user_id": memberID})
+	}
+}
+
+func groupMemberIDSet(group *models.TeamGroup) map[int]struct{} {
+	ids := make(map[int]struct{}, len(group.Members))
+	for _, member := range group.Members {
+		ids[member.UserID] = struct{}{}
+	}
+	return ids
+}
+
+func sortedGroupMemberIDs(ids map[int]struct{}) []int {
+	out := make([]int, 0, len(ids))
+	for id := range ids {
+		out = append(out, id)
+	}
+	sort.Ints(out)
+	return out
 }
 
 func listAdminUsers(deps Deps) pageOperation[adminUserDTO] {
@@ -238,7 +304,52 @@ func updateAdminUser(deps Deps) jsonOperation[adminUserPatchRequest, adminUserDT
 		if err != nil {
 			return adminUserDTO{}, adminUserError(err)
 		}
+		auditAdminUserUpdate(r, result)
 		return adminUserFromModel(deps.AdminUsers, result.User)
+	}
+}
+
+// auditAdminUserUpdate records profile field changes and, separately, an
+// activation or deactivation so the latter cannot be hidden inside a generic
+// profile edit.
+func auditAdminUserUpdate(r *http.Request, result *services.AdminUserUpdateResult) {
+	before, after := result.Before, result.User
+	details := map[string]any{}
+	if before.Email != after.Email {
+		details["email"] = map[string]any{"old": before.Email, "new": after.Email}
+	}
+	if before.Username != after.Username {
+		details["username"] = map[string]any{"old": before.Username, "new": after.Username}
+	}
+	if before.FirstName != after.FirstName {
+		details["first_name"] = map[string]any{"old": before.FirstName, "new": after.FirstName}
+	}
+	if before.LastName != after.LastName {
+		details["last_name"] = map[string]any{"old": before.LastName, "new": after.LastName}
+	}
+	if before.AvatarURL.String != after.AvatarURL {
+		details["avatar_url"] = map[string]any{"old": before.AvatarURL.String, "new": after.AvatarURL}
+	}
+	if before.Timezone.String != after.Timezone {
+		details["timezone"] = map[string]any{"old": before.Timezone.String, "new": after.Timezone}
+	}
+	if before.Language.String != after.Language {
+		details["language"] = map[string]any{"old": before.Language.String, "new": after.Language}
+	}
+
+	userID := after.ID
+	if len(details) > 0 {
+		logger.Record(r, logger.ActionUserUpdate, logger.ResourceUser, &userID, after.Username, details)
+	}
+	if before.IsActive != after.IsActive {
+		action := logger.ActionUserActivate
+		if !after.IsActive {
+			action = logger.ActionUserDeactivate
+		}
+		logger.Record(r, action, logger.ResourceUser, &userID, after.Username, map[string]any{
+			"previous_state": before.IsActive,
+			"new_state":      after.IsActive,
+		})
 	}
 }
 
@@ -252,6 +363,11 @@ func requireSystemAdmin(r *http.Request, deps Deps) (*models.User, error) {
 		return nil, internalError(err)
 	}
 	if !allowed {
+		if utils.IsMutationMethod(r.Method) {
+			logger.RecordDenied(r, logger.ActionAccessDenied, logger.ResourceRoute, nil, r.URL.Path, models.PermissionSystemAdmin, map[string]any{
+				"auth_method": "session",
+			})
+		}
 		return nil, newError(http.StatusForbidden, "insufficient_permission", "System administrator permission is required")
 	}
 	return user, nil

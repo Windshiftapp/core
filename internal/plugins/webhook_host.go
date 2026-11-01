@@ -123,26 +123,3 @@ func (m *Manager) UnregisterPluginWebhooks(ctx context.Context, db database.Data
 
 	return nil
 }
-
-// GetPluginWebhookHandler returns the handler function name for a plugin webhook
-func GetPluginWebhookHandler(ctx context.Context, db database.Database, pluginName, webhookID string) (string, error) {
-	var configJSON string
-	err := db.QueryRowContext(ctx,
-		"SELECT COALESCE(config, '{}') FROM channels WHERE plugin_name = ? AND plugin_webhook_id = ?",
-		pluginName, webhookID,
-	).Scan(&configJSON)
-	if err != nil {
-		return "", fmt.Errorf("webhook not found: %w", err)
-	}
-
-	var config models.ChannelConfig
-	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
-		return "", fmt.Errorf("failed to parse webhook config: %w", err)
-	}
-
-	if config.WebhookPluginHandler == "" {
-		return "", fmt.Errorf("no handler defined for webhook")
-	}
-
-	return config.WebhookPluginHandler, nil
-}

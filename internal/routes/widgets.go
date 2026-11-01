@@ -15,9 +15,10 @@ func RegisterCustomWidgetRoutes(deps *Deps) {
 	api.HandleH("GET /custom-widgets", auth(http.HandlerFunc(handler.GetCustomWidgets)))
 	api.HandleH("POST /custom-widgets", auth(http.HandlerFunc(handler.CreateCustomWidget)))
 	api.HandleH("POST /custom-widgets/validate", auth(http.HandlerFunc(handler.ValidateCustomWidget)))
-	// Generation is rate limited because it calls an LLM.
+	// Generation calls an LLM and produces a persisted artifact, so it uses a
+	// tighter per-user bucket than the general AI limiter.
 	api.HandleH("POST /custom-widgets/generate",
-		auth(deps.AIRateLimiter.Limit(http.HandlerFunc(deps.Widgets.Generate.GenerateCustomWidget))))
+		auth(deps.WidgetGenerateLimiter.Limit(http.HandlerFunc(deps.Widgets.Generate.GenerateCustomWidget))))
 	api.HandleH("GET /custom-widgets/{id}", auth(http.HandlerFunc(handler.GetCustomWidget)))
 	api.HandleH("PUT /custom-widgets/{id}", auth(http.HandlerFunc(handler.UpdateCustomWidget)))
 	api.HandleH("DELETE /custom-widgets/{id}", auth(http.HandlerFunc(handler.DeleteCustomWidget)))

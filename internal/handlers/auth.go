@@ -32,7 +32,7 @@ type AuthHandler struct {
 	credentialRepo           *repository.CredentialRepository
 	auditor                  *logger.Auditor
 	sessionManager           *auth.SessionManager
-	rateLimiter              *middleware.RateLimiter
+	loginLockout             *middleware.LoginLockout
 	permissionService        *services.PermissionService
 	emailVerificationService *services.EmailVerificationService
 	ipExtractor              *utils.IPExtractor
@@ -83,13 +83,13 @@ type SessionInfo struct {
 // NewAuthHandler creates a new authentication handler
 // emailVerificationService can be nil if SMTP is not configured
 // authPolicyHandler and adminRateLimiter can be nil for backwards compatibility
-func NewAuthHandler(userRepo *repository.UserRepository, credentialRepo *repository.CredentialRepository, auditor *logger.Auditor, sessionManager *auth.SessionManager, rateLimiter *middleware.RateLimiter, permissionService *services.PermissionService, emailVerificationService *services.EmailVerificationService, ipExtractor *utils.IPExtractor, authPolicyHandler *AuthPolicyHandler, adminRateLimiter *middleware.AdminFallbackRateLimiter) *AuthHandler {
+func NewAuthHandler(userRepo *repository.UserRepository, credentialRepo *repository.CredentialRepository, auditor *logger.Auditor, sessionManager *auth.SessionManager, loginLockout *middleware.LoginLockout, permissionService *services.PermissionService, emailVerificationService *services.EmailVerificationService, ipExtractor *utils.IPExtractor, authPolicyHandler *AuthPolicyHandler, adminRateLimiter *middleware.AdminFallbackRateLimiter) *AuthHandler {
 	return &AuthHandler{
 		userRepo:                 userRepo,
 		credentialRepo:           credentialRepo,
 		auditor:                  auditor,
 		sessionManager:           sessionManager,
-		rateLimiter:              rateLimiter,
+		loginLockout:             loginLockout,
 		permissionService:        permissionService,
 		emailVerificationService: emailVerificationService,
 		ipExtractor:              ipExtractor,
@@ -124,7 +124,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	ipAddress := h.getClientIP(r)
 
-	if locked, duration := h.rateLimiter.IsLockedOut(ipAddress); locked {
+	if locked, duration := h.loginLockout.IsLockedOut(ipAddress); locked {
 		respondTooManyRequests(w, r, fmt.Sprintf("Too many failed login attempts. Please try again in %s", middleware.FormatLockoutDuration(duration)))
 		return
 	}
@@ -156,13 +156,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		h.rateLimiter.RecordFailedLogin(ipAddress)
+		h.loginLockout.RecordFailedLogin(ipAddress)
 		h.logFailedLogin(r, req.EmailOrUsername)
 		respondUnauthorized(w, r)
 		return
 	}
 
-	h.rateLimiter.RecordSuccessfulLogin(ipAddress)
+	h.loginLockout.RecordSuccessfulLogin(ipAddress)
 
 	if err = h.populateIsSystemAdmin(user); err != nil {
 		slog.Warn("failed to populate system admin status", slog.String("component", "auth"), slog.Any("error", err))
@@ -436,7 +436,7 @@ func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 // accounting, audit shape, and public response to unknown, inactive, agent, and
 // malformed-password-hash accounts.
 func (h *AuthHandler) rejectPasswordLogin(w http.ResponseWriter, r *http.Request, identifier, password, storedHash string) {
-	h.rateLimiter.RecordFailedLogin(h.getClientIP(r))
+	h.loginLockout.RecordFailedLogin(h.getClientIP(r))
 
 	hash := dummyPasswordHash
 	if candidate := []byte(storedHash); len(candidate) > 0 {

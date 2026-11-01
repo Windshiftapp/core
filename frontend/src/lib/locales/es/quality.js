@@ -46,9 +46,6 @@ export default {
     "lastSynced": "Última sincronizacion",
     "regenerateUrlNote": "Regenerar la URL invalidará su URL actual. Los calendarios que usen la URL anterior deberán actualizarse.",
     "appleCalendarInstructions": "Archivo > Nueva suscripción de calendario > Pegue la URL",
-    "labels": {
-      "emptyHint": "Cree su primera etiqueta para organizar artículos."
-    }
   },
   "security": {
     "subtitle": "Administrar su configuración de seguridad",

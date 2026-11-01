@@ -8,6 +8,7 @@
   import Inbox from '@lucide/svelte/icons/inbox';
   import Settings from '@lucide/svelte/icons/settings';
   import Globe from '@lucide/svelte/icons/globe';
+  import ButtonGroup from '../../components/ButtonGroup.svelte';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
 
   // Props
@@ -39,9 +40,6 @@
     collectionId ? isCollectionCreator : workspacePermissions.canAdminWorkspace(workspaceId)
   );
 
-  // Styles use --ctx-* CSS vars cascaded from parent collection view
-  const containerStyle = 'background-color: var(--ctx-surface, var(--ds-background-neutral)); backdrop-filter: var(--ctx-backdrop, none);';
-
   // Navigation functions
   function goToBoard() {
     const url = workspaceId
@@ -63,106 +61,64 @@
       : `/collections/${collectionId}/board/configure`;
     navigate(url);
   }
-
-  function goToNavConfig() {
-    const url = workspaceId
-      ? `/workspaces/${workspaceId}/collections/${collectionId}/nav-config`
-      : `/collections/${collectionId}/nav-config`;
-    navigate(url);
-  }
 </script>
 
-<div class="flex rounded p-1" style={containerStyle} data-testid="board-view-switcher">
-  <!-- Board Button -->
-  {#if boardEnabled}
-  <button
-    class="view-btn px-3 py-1.5 text-sm font-medium rounded transition-colors"
-    class:shadow-sm={activeView === 'board'}
-    class:active={activeView === 'board'}
-    data-testid="switcher-view-board"
-    onclick={activeView !== 'board' ? goToBoard : undefined}
-  >
-    <div class="flex items-center gap-2">
-      <SquareKanban class="w-4 h-4" />
-      {t('collections.board')}
-    </div>
-  </button>
-  {/if}
+<ButtonGroup testid="board-view-switcher">
+  {#snippet children(segment)}
+    <!-- Board Button -->
+    {#if boardEnabled}
+      <button
+        class={segment}
+        data-active={activeView === 'board'}
+        aria-current={activeView === 'board' ? 'page' : undefined}
+        data-testid="switcher-view-board"
+        onclick={activeView !== 'board' ? goToBoard : undefined}
+      >
+        <SquareKanban class="w-4 h-4" />
+        {t('collections.board')}
+      </button>
+    {/if}
 
-  <!-- Backlog Button -->
-  {#if backlogEnabled}
-  <button
-    class="view-btn px-3 py-1.5 text-sm font-medium rounded transition-colors"
-    class:shadow-sm={activeView === 'backlog'}
-    class:active={activeView === 'backlog'}
-    data-testid="switcher-view-backlog"
-    onclick={activeView !== 'backlog' ? goToBacklog : undefined}
-  >
-    <div class="flex items-center gap-2">
-      <Inbox class="w-4 h-4" />
-      {t('collections.backlog')}
-    </div>
-  </button>
-  {/if}
+    <!-- Backlog Button -->
+    {#if backlogEnabled}
+      <button
+        class={segment}
+        data-active={activeView === 'backlog'}
+        aria-current={activeView === 'backlog' ? 'page' : undefined}
+        data-testid="switcher-view-backlog"
+        onclick={activeView !== 'backlog' ? goToBacklog : undefined}
+      >
+        <Inbox class="w-4 h-4" />
+        {t('collections.backlog')}
+      </button>
+    {/if}
 
-  <!-- Configure Button -->
-  {#if canConfigure}
-    <button
-      class="view-btn px-3 py-1.5 text-sm font-medium rounded transition-colors"
-      class:shadow-sm={activeView === 'configure'}
-      class:active={activeView === 'configure'}
-      onclick={activeView !== 'configure' ? goToConfigure : undefined}
-    >
-      <div class="flex items-center gap-2">
+    <!-- Configure Button -->
+    {#if canConfigure}
+      <button
+        class={segment}
+        data-active={activeView === 'configure'}
+        aria-current={activeView === 'configure' ? 'page' : undefined}
+        onclick={activeView !== 'configure' ? goToConfigure : undefined}
+      >
         <Settings class="w-4 h-4" />
         {t('collections.configure')}
-      </div>
-    </button>
-  {/if}
+      </button>
+    {/if}
 
-  <!-- Navigation visibility entry point for collection scopes. -->
-  {#if collectionId && canConfigure}
-    <button
-      class="view-btn px-2 py-1.5 text-sm font-medium rounded transition-colors"
-      title={t('navConfig.configureTitle')}
-      aria-label={t('navConfig.configureTitle')}
-      data-testid="collection-nav-config-button"
-      onclick={goToNavConfig}
-    >
-      <div class="flex items-center gap-2">
-        <Settings class="w-4 h-4" />
-        <span class="sr-only">{t('navConfig.configureTitle')}</span>
-      </div>
-    </button>
-  {/if}
-
-  {#if publicSlug}
-    <a
-      href="/board/{publicSlug}"
-      target="_blank"
-      rel="noopener noreferrer"
-      class="view-btn px-3 py-1.5 text-sm font-medium rounded transition-colors"
-      title={t('collections.publicBoard')}
-      onclick={(e) => { e.stopPropagation(); window.open(`/board/${publicSlug}`, '_blank'); e.preventDefault(); }}
-    >
-      <div class="flex items-center gap-2">
+    {#if publicSlug}
+      <a
+        href="/board/{publicSlug}"
+        target="_blank"
+        rel="noopener noreferrer"
+        class={segment}
+        title={t('collections.publicBoard')}
+        onclick={(e) => { e.stopPropagation(); window.open(`/board/${publicSlug}`, '_blank'); e.preventDefault(); }}
+      >
         <Globe class="w-4 h-4" />
         {t('collections.publicBoard')}
-      </div>
-    </a>
-  {/if}
-</div>
+      </a>
+    {/if}
+  {/snippet}
+</ButtonGroup>
 
-<style>
-  .view-btn {
-    color: var(--ds-text);
-  }
-
-  .view-btn:hover:not(.active) {
-    background-color: var(--ctx-surface, var(--ds-background-neutral-hovered));
-  }
-
-  .view-btn.active {
-    background-color: var(--ctx-surface-raised, var(--ds-surface-raised));
-  }
-</style>

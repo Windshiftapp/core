@@ -125,28 +125,19 @@ export default {
     languageHint: 'Votre langue préférée pour l’interface de l’application',
     saveSettings: 'Enregistrer les paramètres',
     settingsSaved: 'Paramètres enregistrés avec succès',
+    notificationsTab: 'Notifications',
+    dueDateReminders: "Rappels d'échéance",
+    dueDateRemindersDesc:
+      "Recevez une notification lorsque vos éléments ouverts approchent de leur échéance. Cela couvre aussi les éléments de votre espace de travail personnel.",
+    dueDateRemindersEnable: "Activer les rappels d'échéance",
+    dueDateRemindersEnableHint:
+      "Les rappels ne sont envoyés que si vous les activez ici ; ils ne sont jamais automatiques.",
+    dueDateReminderDays: "Jours avant l'échéance",
+    dueDateReminderDaysHint: 'Choisissez entre 1 et 30 jours.',
     connectedAccounts: 'Comptes connectés',
     connectedAccountsTab: 'Comptes',
     connectedAccountsDesc:
       'Connectez vos comptes de gestion de code source pour créer des branches et des pull requests',
-    labels: {
-      tabLabel: 'Étiquettes personnelles',
-      tabDescription: 'Gérer vos étiquettes personnelles.',
-      searchPlaceholder: 'Rechercher des étiquettes',
-      new: 'Nouvelle étiquette',
-      createTitle: 'Créer une étiquette',
-      editTitle: 'Modifier l’étiquette',
-      namePlaceholder: 'ex. urgent',
-      mine: 'Mes étiquettes',
-      empty: 'Aucune étiquette pour le moment',
-      emptyHint: 'Créez votre première étiquette pour organiser vos éléments.',
-      created: 'Étiquette créée',
-      updated: 'Étiquette mise à jour',
-      deleted: 'Étiquette supprimée',
-      deleteTitle: 'Supprimer l’étiquette ?',
-      deleteMessage:
-        'Supprimer « {name} » ? Cela la retirera de tous les éléments auxquels elle est associée.',
-    },
     agents: {
       title: 'Agents',
       description:

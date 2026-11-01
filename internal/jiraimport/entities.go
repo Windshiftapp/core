@@ -605,26 +605,15 @@ func (s *Service) EnsureLinkType(name, forwardLabel, reverseLabel string) (int, 
 	return entity.GetID(), nil
 }
 
-func (s *Service) TimeProjectCustomerID(projectID int) (int64, error) {
-	info, err := s.timeProjects.GetBookingInfo(projectID)
-	if err != nil {
-		return 0, err
-	}
-	if info.CustomerID == nil {
-		return 0, repository.ErrNotFound
-	}
-	return *info.CustomerID, nil
-}
-
 func (s *Service) UpsertImportedWorklog(input repository.ImportedWorklog, previous *PreviousMapping) (int64, error) {
 	if previous != nil {
 		result, err := s.db.ExecWrite(`
 			UPDATE time_worklogs
-			SET project_id = ?, customer_id = ?, user_id = ?, item_id = ?,
+			SET project_id = ?, user_id = ?, item_id = ?,
 			    description = ?, date = ?, start_time = ?, end_time = ?,
 			    duration_minutes = ?, created_at = ?, updated_at = ?
 			WHERE id = ?
-		`, input.ProjectID, input.CustomerID, input.UserID, input.ItemID,
+		`, input.ProjectID, input.UserID, input.ItemID,
 			input.Description, input.DateUnix, input.StartTimeUnix, input.EndTimeUnix,
 			input.DurationMinutes, input.CreatedAtUnix, input.UpdatedAtUnix, previous.WindshiftID)
 		if err != nil {
@@ -640,21 +629,6 @@ func (s *Service) UpsertImportedWorklog(input repository.ImportedWorklog, previo
 func (s *Service) ItemLinkExists(linkID int) bool {
 	var exists bool
 	return s.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM item_links WHERE id = ?)`, linkID).Scan(&exists) == nil && exists
-}
-
-func (s *Service) AttachmentPath() (string, bool) {
-	var attachmentPath string
-	err := s.db.QueryRow(`
-		SELECT attachment_path
-		FROM attachment_settings
-		WHERE enabled = true
-		ORDER BY id DESC
-		LIMIT 1
-	`).Scan(&attachmentPath)
-	if err != nil || strings.TrimSpace(attachmentPath) == "" {
-		return "", false
-	}
-	return attachmentPath, true
 }
 
 func (s *Service) PreserveAttachmentCreatedAt(attachmentID int64, createdAt time.Time) error {

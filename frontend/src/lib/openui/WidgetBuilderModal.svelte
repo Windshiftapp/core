@@ -1,6 +1,6 @@
 <script>
   import { createParser } from '@openuidev/svelte-lang';
-  import Sparkles from '@lucide/svelte/icons/sparkles';
+  import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
   import Button from '../components/Button.svelte';
   import SelectField from '../components/SelectField.svelte';
   import TextField from '../components/TextField.svelte';
@@ -293,7 +293,7 @@
   <ModalHeader
     title={isEditing ? t('dashboard.widgetBuilder.editTitle') : t('dashboard.widgetBuilder.createTitle')}
     subtitle={t('dashboard.widgetBuilder.subtitle')}
-    icon={Sparkles}
+    icon={IconMessageChatbot}
     onclose={() => {
       isOpen = false;
       onclose?.();

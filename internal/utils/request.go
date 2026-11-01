@@ -241,3 +241,14 @@ func GetCurrentUser(r *http.Request) *models.User {
 
 	return user
 }
+
+// IsMutationMethod reports whether an HTTP method changes state. Denial
+// auditing uses this to avoid flooding the log with high-volume reads.
+func IsMutationMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return false
+	default:
+		return true
+	}
+}

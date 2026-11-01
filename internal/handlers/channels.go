@@ -248,6 +248,26 @@ func (h *ChannelHandler) GetChannels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Intakes are opt-in: callers resolving portal linkage get them in this one
+	// request instead of one request per channel. A failed load fails the whole
+	// list, so it is distinguishable from a channel with no intakes.
+	if q.Get("include_intakes") == "true" && len(channels) > 0 {
+		ids := make([]int, len(channels))
+		for i := range channels {
+			ids[i] = channels[i].ID
+		}
+		byMailbox, err := repository.NewIntakeRepository(h.channelRepo.DB()).ListByMailboxes(ctx, ids)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		for i := range channels {
+			if intakes := byMailbox[channels[i].ID]; len(intakes) > 0 {
+				channels[i].Intakes = intakes
+			}
+		}
+	}
+
 	respondJSONOK(w, channels)
 }
 
@@ -1186,7 +1206,7 @@ func (h *ChannelHandler) AddChannelManager(w http.ResponseWriter, r *http.Reques
 
 	for _, managerID := range insertedManagerIDs {
 		h.auditor.LogWithDetails(r, user,
-			logger.ActionChannelAddManager, logger.ResourceChannelManager,
+			logger.ActionChannelAddManager, logger.ResourceChannel,
 			&channelID, channel.Name,
 			map[string]any{
 				"manager_type": request.ManagerType,
@@ -1269,7 +1289,7 @@ func (h *ChannelHandler) RemoveChannelManager(w http.ResponseWriter, r *http.Req
 	}
 
 	h.auditor.LogWithDetails(r, user,
-		logger.ActionChannelRemoveManager, logger.ResourceChannelManager,
+		logger.ActionChannelRemoveManager, logger.ResourceChannel,
 		&channelID, channel.Name,
 		map[string]any{
 			"manager_type": managerType,

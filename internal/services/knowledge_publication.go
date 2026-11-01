@@ -91,13 +91,6 @@ func (s *KnowledgePublicationService) sourcesForWorkspace(workspaceID int) ([]Pu
 	return out, nil
 }
 
-// IsPagePubliclyViewable reports whether the page is published through any
-// enabled portal knowledge base (whole-workspace wiring or subtree wiring).
-func (s *KnowledgePublicationService) IsPagePubliclyViewable(page *models.Page) (bool, error) {
-	viewable, _, err := s.PagePublication(page)
-	return viewable, err
-}
-
 // PagePublication reports whether the page is published through enabled
 // portal knowledge bases and which portals expose it.
 func (s *KnowledgePublicationService) PagePublication(page *models.Page) (published bool, portals []string, err error) {

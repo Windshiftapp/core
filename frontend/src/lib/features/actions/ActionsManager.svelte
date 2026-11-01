@@ -9,7 +9,7 @@
   import Plus from '@lucide/svelte/icons/plus';
   import Play from '@lucide/svelte/icons/play';
   import Zap from '@lucide/svelte/icons/zap';
-  import Sparkles from '@lucide/svelte/icons/sparkles';
+  import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
   import PageHeader from '../../layout/PageHeader.svelte';
   import Badge from '../../components/Badge.svelte';
 
@@ -98,7 +98,7 @@
       {#if onfromtemplate}
         <Button
           variant="ghost"
-          icon={Sparkles}
+          icon={IconMessageChatbot}
           dataTestid="actions-from-template"
           onclick={handleFromTemplate}
         >

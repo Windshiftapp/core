@@ -29,6 +29,7 @@
     canManageGlobal = false,
     canManageWorkspace = false,
     saving = false,
+    zIndexClass = 'z-[70]',
     onclose = null,
     onSubmit = null
   } = $props();
@@ -73,6 +74,7 @@
   onSubmit={submit}
   submitDisabled={saving || !formData.name.trim()}
   maxWidth="max-w-2xl"
+  {zIndexClass}
   dataTestid="milestone-form-dialog"
 >
   {#snippet children(submitHint)}

@@ -22,6 +22,7 @@
 {/snippet}
 
 <ScrollableSidebar
+  data-testid="navigation-sidebar"
   {...restProps}
   class="navigation-sidebar h-full min-h-0 w-64 min-w-64 flex-shrink-0 border-r {className}"
   style="border-color: var(--ds-border); background-color: var(--ds-surface-raised);"

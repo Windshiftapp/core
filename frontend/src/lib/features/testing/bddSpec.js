@@ -23,10 +23,16 @@ export function parseScenarioSpec(specJson) {
  * Flatten a spec's Examples blocks into a single ordered list. The backend
  * indexes example results across blocks in document order, so the global
  * index here matches the example_index used by the run endpoints.
- * @param {object} spec parsed ScenarioSpec
+ *
+ * A plain Scenario has no Examples blocks; the backend still creates one
+ * implicit execution row (index 0) for it, so an empty spec yields that row
+ * to keep plain scenarios executable in the run views.
+ *
+ * @param {object | null | undefined} spec parsed ScenarioSpec
  */
 export function flattenExamples(spec) {
-  const blocks = Array.isArray(spec?.examples) ? spec.examples : [];
+  if (!spec) return [];
+  const blocks = Array.isArray(spec.examples) ? spec.examples : [];
   const rows = [];
   blocks.forEach((block, blockIndex) => {
     const header = Array.isArray(block.header) ? block.header : [];
@@ -42,6 +48,17 @@ export function flattenExamples(spec) {
       });
     });
   });
+  if (rows.length === 0) {
+    rows.push({
+      exampleIndex: 0,
+      blockIndex: -1,
+      rowIndex: -1,
+      blockName: '',
+      tags: [],
+      header: [],
+      row: [],
+    });
+  }
   return rows;
 }
 

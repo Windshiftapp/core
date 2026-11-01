@@ -1,0 +1,32 @@
+# Edit the host, TLS secret, and ingressClassName for your cluster, or delete
+# this file if you expose Windshift another way.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: windshift
+  namespace: windshift
+  labels:
+    app.kubernetes.io/name: windshift
+  annotations:
+    # Item detail views hold a server-sent-events connection open. nginx's
+    # default 60s read timeout drops them; raise it past your longest idle
+    # stream. Adjust the annotation names for your ingress controller.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - windshift.example.com
+      secretName: windshift-tls
+  rules:
+    - host: windshift.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: windshift
+                port:
+                  name: http

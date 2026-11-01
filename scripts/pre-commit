@@ -55,6 +55,13 @@ if [[ "$RUN_GO" -eq 1 ]]; then
         FAILED=1
     fi
 
+    # Blocks raw action/resource strings in audit calls; taxonomy lives in
+    # internal/logger/audit.go.
+    echo "  Running audit literal guard..."
+    if ! node "$REPO_ROOT/scripts/check-audit-literals.mjs" "$REPO_ROOT/internal"; then
+        FAILED=1
+    fi
+
     if command -v golangci-lint >/dev/null 2>&1; then
         echo "  Running golangci-lint..."
         if ! "$REPO_ROOT/scripts/run-golangci-lint.sh" run --timeout=5m; then

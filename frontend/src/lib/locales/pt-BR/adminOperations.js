@@ -16,7 +16,7 @@ export default withEnglishAdminOperations({
   workspaceMembers: {
     invalidWorkspace: 'Espaço de trabalho inválido.', loadFailed: 'Não foi possível carregar os membros do espaço de trabalho.', addMemberFailed: 'Não foi possível adicionar o membro: {error}', addGroupFailed: 'Não foi possível adicionar o grupo: {error}',
     removeRoleTitle: 'Remover a função {role} de {name}?', removeRoleMessage: 'Isso removerá a atribuição da função e suas permissões.', removeRoleFailed: 'Não foi possível remover a função: {error}',
-    summaryTitle: 'Resumo de acesso', summaryDescription: 'Mostra como as funções são atribuídas neste espaço. Uma função sem membros ou grupos atribuídos fica disponível para todos. Hierarquia de permissões: {viewer} → {editor} → {tester}.',
+    summaryTitle: 'Resumo de acesso', summaryDescription: 'Mostra como as funções são atribuídas neste espaço. Uma função sem membros ou grupos atribuídos fica disponível para todos. Atribuir a função {viewer} a alguém restringe o espaço para que apenas usuários e grupos atribuídos possam vê-lo. Hierarquia de permissões: {viewer} → {editor} → {tester}.',
     role: 'Função', effectiveAccess: 'Acesso', assignments: 'Atribuições', memberOrGroup: 'Membro ou grupo', rolesLabel: 'Funções', actions: 'Ações',
     roles: {
       viewer: { name: 'Visualizador', description: 'Ver o conteúdo do espaço e participar de discussões' },

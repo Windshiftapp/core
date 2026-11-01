@@ -1,44 +1,31 @@
 <script>
-  import { onMount } from 'svelte';
-  import StateDisplay from '../components/StateDisplay.svelte';
   import { actionCapabilities as actionCapabilitiesApi, llmConnections, llmProviders } from '../api/ai.js';
-  import Plus from '@lucide/svelte/icons/plus';
   import Edit from '@lucide/svelte/icons/edit';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import TestTube from '@lucide/svelte/icons/test-tube';
   import CheckCircle from '@lucide/svelte/icons/check-circle';
-  import Star from '@lucide/svelte/icons/star';
   import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
   import Eye from '@lucide/svelte/icons/eye';
   import EyeOff from '@lucide/svelte/icons/eye-off';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import Checkbox from '../components/Checkbox.svelte';
-  import PageHeader from '../layout/PageHeader.svelte';
   import Lozenge from '../components/Lozenge.svelte';
-  import DataTable from '../components/DataTable.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import Select from '../components/Select.svelte';
   import Textarea from '../components/Textarea.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
-  import { confirm } from '../composables/useConfirm.js';
   import { llmConnectionTestErrorMessage } from './llmConnectionErrors.js';
   import { t } from '../stores/i18n.svelte.js';
-  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import EnabledStatus from './EnabledStatus.svelte';
-  import EntityFormModal from './EntityFormModal.svelte';
+  import EntityManagerPage from './EntityManagerPage.svelte';
   import EntityRowActions from './EntityRowActions.svelte';
 
-  let connections = $state([]);
   let providers = $state([]);
   let actionCapabilities = $state([]);
-  let loading = $state(true);
-  let showCreateModal = $state(false);
-  let showEditModal = $state(false);
   let editingConnection = $state(null);
   let testResult = $state(null);
   let testingConnectionId = $state(null);
-  let saving = $state(false);
 
   // Form state
   let form = $state({
@@ -176,7 +163,7 @@
   async function refreshModels() {
     if (!selectedProvider || !isDynamicProvider || refreshModelsDisabled) return;
     refreshingModels = true;
-    const refreshConnectionId = showEditModal && editingConnection?.provider_type === form.provider_type
+    const refreshConnectionId = editingConnection?.provider_type === form.provider_type
       ? editingConnection.id
       : null;
     try {
@@ -198,12 +185,12 @@
   }
 
   async function loadConnections() {
-    try {
-      connections = await llmConnections.getAll();
-    } catch (err) {
-      console.error('Failed to load connections:', err);
-      errorToast(t('settings.adminOperations.llmConnections.loadFailed'));
-    }
+    const [connections] = await Promise.all([
+      llmConnections.getAll(),
+      loadProviders(),
+      loadActionCapabilities(),
+    ]);
+    return connections;
   }
 
   async function loadProviders() {
@@ -223,15 +210,9 @@
     }
   }
 
-  onMount(async () => {
-    await Promise.all([loadConnections(), loadProviders(), loadActionCapabilities()]);
-    loading = false;
-  });
-
   function openCreate() {
     editingConnection = null;
     resetForm();
-    showCreateModal = true;
   }
 
   function llmCapabilitiesForConnection(connectionId) {
@@ -275,25 +256,21 @@
       is_enabled: conn.is_enabled,
     };
     testResult = null;
-    showEditModal = true;
+  }
+
+  function deleteConfirmMessage(conn) {
+    const impacted = enabledLLMCapabilitiesForConnection(conn.id);
+    return (
+      t('settings.adminOperations.llmConnections.deleteMessage', { name: conn.name }) +
+      (impacted.length
+        ? `\n\n${t('settings.adminOperations.llmConnections.deleteImpact', { capabilities: capabilityUsageLabel(impacted) })}`
+        : '')
+    );
   }
 
   async function deleteConnection(conn) {
-    const impacted = enabledLLMCapabilitiesForConnection(conn.id);
-    const ok = await confirm({
-      title: t('settings.adminOperations.llmConnections.deleteTitle'),
-      message: t('settings.adminOperations.llmConnections.deleteMessage', { name: conn.name }) + (impacted.length ? `\n\n${t('settings.adminOperations.llmConnections.deleteImpact', { capabilities: capabilityUsageLabel(impacted) })}` : ''),
-      confirmText: t('common.delete'),
-      variant: 'danger',
-    });
-    if (!ok) return;
-    try {
-      await llmConnections.delete(conn.id);
-      successToast(t('settings.adminOperations.llmConnections.deleted'));
-      await reloadAfterConnectionChange();
-    } catch (err) {
-      errorToast(err.message || t('settings.adminOperations.llmConnections.deleteFailed'));
-    }
+    await llmConnections.delete(conn.id);
+    successToast(t('settings.adminOperations.llmConnections.deleted'));
   }
 
   function validateProviderConfig() {
@@ -316,35 +293,32 @@
     }
   }
 
+  // validateProviderConfig already surfaces its own toast; the scaffold should
+  // keep the modal open without a second message.
+  class ConfigValidationError extends Error {}
+
   async function handleCreate() {
-    if (!validateProviderConfig()) return;
-    saving = true;
-    try {
-      await llmConnections.create({ ...form, provider_config: composeProviderConfig() });
-      successToast(t('settings.adminOperations.llmConnections.created'));
-      showCreateModal = false;
-      await reloadAfterConnectionChange();
-    } catch (err) {
-      errorToast(err.message || t('settings.adminOperations.llmConnections.createFailed'));
-    } finally {
-      saving = false;
-    }
+    if (!validateProviderConfig()) throw new ConfigValidationError();
+    await llmConnections.create({ ...form, provider_config: composeProviderConfig() });
+    successToast(t('settings.adminOperations.llmConnections.created'));
   }
 
-  async function handleUpdate() {
-    if (!editingConnection) return;
-    if (!validateProviderConfig()) return;
-    saving = true;
-    try {
-      await llmConnections.update(editingConnection.id, { ...form, provider_config: composeProviderConfig() });
-      successToast(t('settings.adminOperations.llmConnections.updated'));
-      showEditModal = false;
-      await reloadAfterConnectionChange();
-    } catch (err) {
-      errorToast(err.message || t('settings.adminOperations.llmConnections.updateFailed'));
-    } finally {
-      saving = false;
-    }
+  async function handleUpdate(id) {
+    if (!validateProviderConfig()) throw new ConfigValidationError();
+    await llmConnections.update(id, { ...form, provider_config: composeProviderConfig() });
+    successToast(t('settings.adminOperations.llmConnections.updated'));
+  }
+
+  function handleError(err, phase, item) {
+    if (err instanceof ConfigValidationError) return;
+    const key = {
+      load: 'settings.adminOperations.llmConnections.loadFailed',
+      save: item
+        ? 'settings.adminOperations.llmConnections.updateFailed'
+        : 'settings.adminOperations.llmConnections.createFailed',
+      delete: 'settings.adminOperations.llmConnections.deleteFailed',
+    }[phase];
+    errorToast(err.message || t(key));
   }
 
 
@@ -371,129 +345,79 @@
   ]);
 </script>
 
-<div class="space-y-4">
-  <PageHeader title={t('settings.adminOperations.llmConnections.title')} subtitle={t('settings.adminOperations.llmConnections.subtitle')}>
-    {#snippet actions()}
-      <Button id="llm-connection-add" variant="primary" onclick={openCreate} icon={Plus} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('llmConnections', 'add') }}>
-        {t('settings.adminOperations.llmConnections.addConnection')}
-      </Button>
-    {/snippet}
-  </PageHeader>
+<EntityManagerPage
+  title={t('settings.adminOperations.llmConnections.title')}
+  subtitle={t('settings.adminOperations.llmConnections.subtitle')}
+  addLabel={t('settings.adminOperations.llmConnections.addConnection')}
+  addId="llm-connection-add"
+  hotkeyScope="llmConnections"
+  emptyMessage={t('settings.adminOperations.llmConnections.empty')}
+  {columns}
+  load={loadConnections}
+  create={handleCreate}
+  update={handleUpdate}
+  remove={deleteConnection}
+  onOpenCreate={openCreate}
+  onOpenEdit={openEdit}
+  confirmDeleteMessage={deleteConfirmMessage}
+  rowTestid={(conn) => `llm-connection-row-${conn.id}`}
+  createTitle={t('settings.adminOperations.llmConnections.addTitle')}
+  editTitle={t('settings.adminOperations.llmConnections.editTitle')}
+  createSubmitId="llm-connection-create-submit"
+  editSubmitId="llm-connection-save-submit"
+  submitDisabled={() => !form.name || !form.provider_type || !form.model}
+  onError={handleError}
+  cellSnippets={{ name: connectionNameCell, model: connectionModelCell, status: connectionStatusCell }}
+  actionsCell={connectionActions}
+  formFields={connectionForm}
+>
+</EntityManagerPage>
 
-  {#if loading}
-    <StateDisplay type="loading" />
-  {:else if connections.length === 0}
-    <div class="flex flex-col items-center py-12 gap-3 rounded-lg border" style="border-color: var(--ds-border); background: var(--ds-surface-raised);">
-      <p class="text-sm" style="color: var(--ds-text-subtle);">{t('settings.adminOperations.llmConnections.empty')}</p>
-      <Button variant="secondary" onclick={openCreate} icon={Plus} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('llmConnections', 'add') }}>
-        {t('settings.adminOperations.llmConnections.addFirst')}
-      </Button>
-    </div>
-  {:else}
-    <DataTable {columns} data={connections} keyField="id" rowAttrs={(conn) => ({ 'data-testid': `llm-connection-row-${conn.id}` })}>
-      {#snippet name(conn)}
-        <div class="flex items-center gap-2">
-          <span class="font-medium" style="color: var(--ds-text);">{conn.name}</span>
-          {#if conn.is_default}
-            <Lozenge appearance="info" size="sm">{t('settings.adminOperations.llmConnections.default')}</Lozenge>
-          {/if}
-          {#if !conn.is_enabled && enabledLLMCapabilitiesForConnection(conn.id).length > 0}
-            <Lozenge appearance="warning" size="sm">{t('settings.adminOperations.llmConnections.referenced')}</Lozenge>
-          {/if}
-        </div>
-      {/snippet}
-      {#snippet model(conn)}
-        <div class="flex items-center gap-2">
-          <span class="font-mono text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-surface-sunken); color: var(--ds-text-subtle);">{conn.model}</span>
-          {#if connVision(conn)}
-            <span data-testid="connection-vision-badge" class="inline-flex items-center gap-1 text-xs" style="color: var(--ds-text-success);" title={t('settings.adminOperations.llmConnections.visionTitle')}>
-              <Eye size={12} /> {t('settings.adminOperations.llmConnections.vision')}
-            </span>
-          {:else}
-            <span data-testid="connection-vision-badge" class="inline-flex items-center gap-1 text-xs" style="color: var(--ds-text-subtle);" title={t('settings.adminOperations.llmConnections.noVisionTitle')}>
-              <EyeOff size={12} /> {t('settings.adminOperations.llmConnections.noVision')}
-            </span>
-          {/if}
-        </div>
-      {/snippet}
-      {#snippet status(conn)}
-        <EnabledStatus enabled={conn.is_enabled} />
-      {/snippet}
-      {#snippet actions(conn)}
-        <EntityRowActions actions={[
-          {
-            id: 'test',
-            icon: TestTube,
-            title: t('settings.adminOperations.llmConnections.testConnection'),
-            testId: 'llm-connection-test',
-            loading: testingConnectionId === conn.id,
-            onclick: () => testConnection(conn.id),
-          },
-          { id: 'edit', icon: Edit, title: t('common.edit'), testId: 'llm-connection-edit', onclick: () => openEdit(conn) },
-          { id: 'delete', icon: Trash2, title: t('common.delete'), testId: 'llm-connection-delete', danger: true, onclick: () => deleteConnection(conn) },
-        ]} />
-      {/snippet}
-    </DataTable>
-  {/if}
-</div>
+{#snippet connectionNameCell(conn)}
+  <div class="flex items-center gap-2">
+    <span class="font-medium" style="color: var(--ds-text);">{conn.name}</span>
+    {#if conn.is_default}
+      <Lozenge appearance="info" size="sm">{t('settings.adminOperations.llmConnections.default')}</Lozenge>
+    {/if}
+    {#if !conn.is_enabled && enabledLLMCapabilitiesForConnection(conn.id).length > 0}
+      <Lozenge appearance="warning" size="sm">{t('settings.adminOperations.llmConnections.referenced')}</Lozenge>
+    {/if}
+  </div>
+{/snippet}
 
-<!-- Create Modal -->
-{#if showCreateModal}
-  <EntityFormModal
-    title={t('settings.adminOperations.llmConnections.addTitle')}
-    onclose={() => showCreateModal = false}
-    onsubmit={handleCreate}
-    disabled={!form.name || !form.provider_type || !form.model}
-    {saving}
-    confirmLabel={t('common.create')}
-    submitId="llm-connection-create-submit"
-  >
-    {#snippet fields()}
-      {@render connectionForm()}
-    {/snippet}
-  </EntityFormModal>
-{/if}
+{#snippet connectionModelCell(conn)}
+  <div class="flex items-center gap-2">
+    <span class="font-mono text-xs px-1.5 py-0.5 rounded" style="background-color: var(--ds-surface-sunken); color: var(--ds-text-subtle);">{conn.model}</span>
+    {#if connVision(conn)}
+      <span data-testid="connection-vision-badge" class="inline-flex items-center gap-1 text-xs" style="color: var(--ds-text-success);" title={t('settings.adminOperations.llmConnections.visionTitle')}>
+        <Eye size={12} /> {t('settings.adminOperations.llmConnections.vision')}
+      </span>
+    {:else}
+      <span data-testid="connection-vision-badge" class="inline-flex items-center gap-1 text-xs" style="color: var(--ds-text-subtle);" title={t('settings.adminOperations.llmConnections.noVisionTitle')}>
+        <EyeOff size={12} /> {t('settings.adminOperations.llmConnections.noVision')}
+      </span>
+    {/if}
+  </div>
+{/snippet}
 
-<!-- Edit Modal -->
-{#if showEditModal}
-  <EntityFormModal
-    title={t('settings.adminOperations.llmConnections.editTitle')}
-    onclose={() => showEditModal = false}
-    onsubmit={handleUpdate}
-    disabled={!form.name || !form.provider_type || !form.model}
-    {saving}
-    submitId="llm-connection-save-submit"
-  >
-    {#snippet fields()}
-      {@render connectionForm()}
+{#snippet connectionStatusCell(conn)}
+  <EnabledStatus enabled={conn.is_enabled} />
+{/snippet}
 
-      {#if editingConnection && !form.is_enabled && enabledLLMCapabilitiesForConnection(editingConnection.id).length > 0}
-        <div class="flex items-start gap-2 rounded-md border p-3 text-sm" style="border-color: var(--ds-border-warning, #f59e0b); background: var(--ds-background-warning-subtle, rgba(245, 158, 11, 0.12)); color: var(--ds-text-warning, #b45309);">
-          <AlertTriangle size={16} class="mt-0.5 flex-shrink-0" />
-          <div>
-            <div class="font-medium">{t('settings.adminOperations.llmConnections.disableWarning')}</div>
-            <div class="mt-1 text-xs">{t('settings.adminOperations.llmConnections.disableWarningHelp', { capabilities: capabilityUsageLabel(enabledLLMCapabilitiesForConnection(editingConnection.id)) })}</div>
-          </div>
-        </div>
-      {/if}
-
-      {#if editingConnection}
-        <div class="flex items-center gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
-          <Button dataTestid="llm-connection-test-modal" variant="secondary" onclick={() => testConnection(editingConnection.id)} loading={testingConnectionId === editingConnection?.id} icon={TestTube}>
-            {t('settings.adminOperations.llmConnections.testConnection')}
-          </Button>
-          {#if testResult}
-            <div class="flex items-center gap-1 text-xs">
-              <CheckCircle size={14} style="color: var(--ds-icon-success);" />
-              <span style="color: var(--ds-text-success);">{testResult.message}</span>
-            </div>
-          {/if}
-        </div>
-      {/if}
-    {/snippet}
-  </EntityFormModal>
-{/if}
-
+{#snippet connectionActions(conn, { edit, remove })}
+  <EntityRowActions actions={[
+    {
+      id: 'test',
+      icon: TestTube,
+      title: t('settings.adminOperations.llmConnections.testConnection'),
+      testId: 'llm-connection-test',
+      loading: testingConnectionId === conn.id,
+      onclick: () => testConnection(conn.id),
+    },
+    { id: 'edit', icon: Edit, title: t('common.edit'), testId: 'llm-connection-edit', onclick: () => edit(conn) },
+    { id: 'delete', icon: Trash2, title: t('common.delete'), testId: 'llm-connection-delete', danger: true, onclick: () => remove(conn) },
+  ]} />
+{/snippet}
 
 {#snippet connectionForm()}
   <!-- Name -->
@@ -672,5 +596,29 @@
     <Checkbox bind:checked={form.is_default} label={t('settings.adminOperations.llmConnections.defaultConnection')} size="small" />
     <Checkbox bind:checked={form.is_enabled} label={t('common.enabled')} size="small" />
   </div>
+
+  {#if editingConnection && !form.is_enabled && enabledLLMCapabilitiesForConnection(editingConnection.id).length > 0}
+    <div class="flex items-start gap-2 rounded-md border p-3 text-sm" style="border-color: var(--ds-border-warning, #f59e0b); background: var(--ds-background-warning-subtle, rgba(245, 158, 11, 0.12)); color: var(--ds-text-warning, #b45309);">
+      <AlertTriangle size={16} class="mt-0.5 flex-shrink-0" />
+      <div>
+        <div class="font-medium">{t('settings.adminOperations.llmConnections.disableWarning')}</div>
+        <div class="mt-1 text-xs">{t('settings.adminOperations.llmConnections.disableWarningHelp', { capabilities: capabilityUsageLabel(enabledLLMCapabilitiesForConnection(editingConnection.id)) })}</div>
+      </div>
+    </div>
+  {/if}
+
+  {#if editingConnection}
+    <div class="flex items-center gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
+      <Button dataTestid="llm-connection-test-modal" variant="secondary" onclick={() => testConnection(editingConnection.id)} loading={testingConnectionId === editingConnection?.id} icon={TestTube}>
+        {t('settings.adminOperations.llmConnections.testConnection')}
+      </Button>
+      {#if testResult}
+        <div class="flex items-center gap-1 text-xs">
+          <CheckCircle size={14} style="color: var(--ds-icon-success);" />
+          <span style="color: var(--ds-text-success);">{testResult.message}</span>
+        </div>
+      {/if}
+    </div>
+  {/if}
 
 {/snippet}

@@ -88,16 +88,16 @@ func registerTestManagementRoutes(builder *routeBuilder, application *services.T
 }
 
 type testExampleResultPatch struct {
-	Status       string `json:"status"`
-	ActualResult string `json:"actual_result"`
-	Notes        string `json:"notes"`
+	Status       Optional[string] `json:"status"`
+	ActualResult Optional[string] `json:"actual_result"`
+	Notes        Optional[string] `json:"notes"`
 }
 
 type testExampleStepResultPatch struct {
-	Status       string `json:"status"`
-	ActualResult string `json:"actual_result"`
-	Notes        string `json:"notes"`
-	ItemID       *int   `json:"item_id"`
+	Status       Optional[string] `json:"status"`
+	ActualResult Optional[string] `json:"actual_result"`
+	Notes        Optional[string] `json:"notes"`
+	ItemID       Optional[*int]   `json:"item_id"`
 }
 
 type testFolderCreate struct {
@@ -460,7 +460,9 @@ func registerBDDRunRoutes(builder *routeBuilder, app *services.TestManagementApp
 				return nil, err
 			}
 			result, err := app.UpdateRunExample(user.ID, workspaceID, runID, caseID, exampleIndex, services.TestExampleResultUpdateRequest{
-				Status: input.Status, ActualResult: input.ActualResult, Notes: input.Notes,
+				Status:       optionalString(input.Status),
+				ActualResult: optionalString(input.ActualResult),
+				Notes:        optionalString(input.Notes),
 			})
 			return result, testManagementError(err)
 		})
@@ -483,7 +485,11 @@ func registerBDDRunRoutes(builder *routeBuilder, app *services.TestManagementApp
 				return updatedResponse{}, err
 			}
 			err = app.UpdateRunExampleStep(user.ID, workspaceID, runID, caseID, exampleIndex, stepNumber, services.TestExampleStepResultUpdateRequest{
-				Status: input.Status, ActualResult: input.ActualResult, Notes: input.Notes, ItemID: input.ItemID,
+				Status:       optionalString(input.Status),
+				ActualResult: optionalString(input.ActualResult),
+				Notes:        optionalString(input.Notes),
+				ItemID:       input.ItemID.Value,
+				ItemIDSet:    input.ItemID.Set,
 			})
 			err = testManagementError(err)
 			return updatedResponse{Updated: err == nil}, err

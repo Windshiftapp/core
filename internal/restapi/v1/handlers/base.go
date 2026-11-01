@@ -13,6 +13,7 @@ import (
 	"windshift/internal/restapi"
 	"windshift/internal/restapi/v1/middleware"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 // BaseHandler provides shared dependencies and utilities for REST API handlers.
@@ -122,10 +123,24 @@ func newJSONDecoder(w http.ResponseWriter, r *http.Request) *json.Decoder {
 	return restapi.NewJSONDecoder(w, r)
 }
 
+// auditDenied records a route-level authorization denial for mutating
+// requests. Reads are skipped so high-volume GET paths do not flood the log.
+func (b *BaseHandler) auditDenied(r *http.Request, requiredPermission string) {
+	if b.Auditor == nil || !utils.IsMutationMethod(r.Method) {
+		return
+	}
+	user := middleware.GetUser(r.Context())
+	if user == nil {
+		return
+	}
+	b.Auditor.LogDenied(r, user, logger.ActionAccessDenied, logger.ResourceRoute, nil, r.URL.Path, requiredPermission, nil)
+}
+
 // RequireGlobalPermission checks global permission or writes 403.
 func (b *BaseHandler) RequireGlobalPermission(w http.ResponseWriter, r *http.Request, userID int, permission, label string) bool {
 	hasPermission, err := b.Perms.HasGlobalPermission(userID, permission)
 	if err != nil || !hasPermission {
+		b.auditDenied(r, permission)
 		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "FORBIDDEN", label+" permission required"))
 		return false
 	}
@@ -147,6 +162,7 @@ func (b *BaseHandler) RequireWorkspaceViewAccess(w http.ResponseWriter, r *http.
 	}
 	canView, _ := b.Perms.CanViewWorkspace(user.ID, wsID)
 	if !canView {
+		b.auditDenied(r, models.PermissionItemView)
 		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 		return 0, false
 	}
@@ -167,6 +183,7 @@ func (b *BaseHandler) RequireWorkspaceEditAccess(w http.ResponseWriter, r *http.
 	}
 	canEdit, _ := b.Perms.CanEditWorkspace(user.ID, wsID)
 	if !canEdit {
+		b.auditDenied(r, models.PermissionItemEdit)
 		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 		return 0, false
 	}
@@ -188,6 +205,7 @@ func (b *BaseHandler) RequireWorkspaceAdminAccess(w http.ResponseWriter, r *http
 	}
 	canAdmin, _ := b.Perms.CanAdminWorkspace(user.ID, wsID)
 	if !canAdmin {
+		b.auditDenied(r, models.PermissionWorkspaceAdmin)
 		restapi.RespondError(w, r, restapi.ErrWorkspaceNotFound)
 		return 0, false
 	}

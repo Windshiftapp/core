@@ -1,5 +1,6 @@
 import { catalogs, customFields, itemTypes, priorities } from '../api/configuration.js';
 import { iterations, milestones } from '../api/milestones.js';
+import { labels as labelsApi } from '../api/misc.js';
 import { BACKGROUND_READ, FOREGROUND_READ } from '../api/readScheduler.js';
 import { getAssignableUsers, getUserDisplayBatch } from '../api/users.js';
 import { statusCategories } from '../api/workflows.js';
@@ -574,7 +575,15 @@ class WorkspaceDataStore {
 
   /** @private */
   async _fetchAll(workspaceId) {
-    const bootstrap = await workspaces.getBootstrap(workspaceId, FOREGROUND_READ);
+    // Labels are not part of the bootstrap aggregate, so fetch the workspace
+    // label directory alongside it instead of serializing a second round trip.
+    const [bootstrap, labels] = await Promise.all([
+      workspaces.getBootstrap(workspaceId, FOREGROUND_READ),
+      labelsApi.getAll(workspaceId).catch((err) => {
+        console.warn('WorkspaceDataStore: failed to load labels', err);
+        return [];
+      }),
+    ]);
 
     // Race condition guard
     if (this.workspaceId !== workspaceId) return;
@@ -590,6 +599,7 @@ class WorkspaceDataStore {
     this.priorities = bootstrap?.priorities ?? [];
     this.projects = bootstrap?.projects ?? [];
     this.customFieldDefinitions = bootstrap?.custom_field_definitions ?? [];
+    this.labels = labels ?? [];
     // Absent metadata means unknown; never treat it as complete.
     this.planningCompleteness = bootstrap?.planning_completeness ?? null;
   }
@@ -651,6 +661,8 @@ class WorkspaceDataStore {
       priorities: () => priorities.getAll(),
       projects: () =>
         workspaces.getProjects ? workspaces.getProjects(workspaceId) : Promise.resolve([]),
+      labels: () =>
+        workspaceId === 'global' ? Promise.resolve([]) : labelsApi.getAll(workspaceId),
       customFieldDefinitions: async () => {
         const res = await customFields.getAll();
         return res || [];

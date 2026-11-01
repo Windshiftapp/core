@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -116,21 +117,123 @@ type AuditEvent struct {
 	Success      bool           // Whether the operation succeeded
 	ErrorMessage string         // Error message if failed
 	Timestamp    time.Time      // When the event occurred (set automatically if zero)
+	// Source overrides the subsystem label used in the structured log. When
+	// empty it is derived from the action type and actor (see auditSource).
+	Source string
 }
 
+// Audit event sources for the structured log's "source" field. They describe
+// which subsystem produced the event, not who the actor was.
 const (
-	auditDetailsRedactedValue = "[REDACTED]"
-	auditDetailsMaxBytes      = 32 * 1024
+	AuditSourceUser   = "USER"   // Authenticated user session or API request
+	AuditSourceSCIM   = "SCIM"   // SCIM provisioning via token auth
+	AuditSourceSystem = "SYSTEM" // Unauthenticated or background actor with no user
 )
+
+const (
+	auditDetailsRedactedValue  = "[REDACTED]"
+	auditDetailsTruncatedValue = "[TRUNCATED]"
+	auditDetailsMaxBytes       = 32 * 1024
+	// Bound individual strings and slices before falling back to a
+	// scalars-only payload, so a single oversized field cannot evict the
+	// small summary fields an operator needs.
+	auditDetailsMaxStringBytes = 512
+	auditDetailsMaxSliceItems  = 100
+	// auditStructuredDetailsMaxBytes bounds the details JSON mirrored to the
+	// live log line so a large payload cannot flood the log stream.
+	auditStructuredDetailsMaxBytes = 8 * 1024
+)
+
+// auditSource resolves the event's source. An explicit Source wins; otherwise
+// a scim.* action type marks SCIM provisioning and a missing user (failed
+// login, rejected SSH key, scheduler work) marks a system actor. A missing
+// user must not be conflated with SCIM.
+func auditSource(event AuditEvent) string {
+	if event.Source != "" {
+		return event.Source
+	}
+	if strings.HasPrefix(event.ActionType, "scim.") {
+		return AuditSourceSCIM
+	}
+	if event.UserID == 0 {
+		return AuditSourceSystem
+	}
+	return AuditSourceUser
+}
+
+const auditInsertQuery = `
+		INSERT INTO audit_logs (
+			timestamp, user_id, username, ip_address, user_agent,
+			action_type, resource_type, resource_id, resource_name,
+			details, success, error_message, source
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+// auditInsert holds the column values for one audit row so LogAudit and
+// LogAuditTx share the same sanitization and marshaling.
+type auditInsert struct {
+	args []any
+}
 
 // LogAudit logs an audit event to the database (immediate write).
 func LogAudit(db database.Database, event AuditEvent) error {
+	insert, source, detailsJSON := prepareAuditEvent(event)
+	emitAuditStructuredLog(event, source, detailsJSON)
+
+	if _, err := db.ExecWrite(auditInsertQuery, insert.args...); err != nil {
+		logAuditFailure(event, source, err)
+		return fmt.Errorf("failed to log audit event: %w", err)
+	}
+
+	slog.Debug("audit event logged successfully",
+		"action_type", event.ActionType,
+		"resource_type", event.ResourceType,
+		"source", source,
+	)
+
+	return nil
+}
+
+// LogAuditTx writes an audit event inside an existing transaction so it
+// commits or rolls back atomically with the mutation it describes. Callers
+// that need that coupling use this instead of LogAudit.
+func LogAuditTx(ctx context.Context, tx database.Tx, event AuditEvent) error {
+	insert, source, detailsJSON := prepareAuditEvent(event)
+	emitAuditStructuredLog(event, source, detailsJSON)
+
+	if _, err := tx.ExecWriteContext(ctx, auditInsertQuery, insert.args...); err != nil {
+		logAuditFailure(event, source, err)
+		return fmt.Errorf("failed to log audit event: %w", err)
+	}
+
+	slog.Debug("audit event logged successfully",
+		"action_type", event.ActionType,
+		"resource_type", event.ResourceType,
+		"source", source,
+	)
+
+	return nil
+}
+
+func logAuditFailure(event AuditEvent, source string, err error) {
+	slog.Error("failed to log audit event",
+		"error", err,
+		"action_type", event.ActionType,
+		"resource_type", event.ResourceType,
+		"source", source,
+		"resource_id", event.ResourceID,
+	)
+}
+
+// prepareAuditEvent sanitizes the details and resolves the insert values. It
+// is shared by LogAudit and LogAuditTx so both paths store identical shapes.
+func prepareAuditEvent(event AuditEvent) (insert auditInsert, source string, detailsJSON *string) {
 	// Convert details map to JSON. On marshal failure we still persist
 	// the audit row, but with a sentinel { "details_marshal_error": ... }
 	// so the trail records *that* an event occurred and that its details
 	// were lost — better than silently storing NULL while callers (~80 of
 	// 81 sites discard LogAudit's error) believe rich details were saved.
-	var detailsJSON *string
+	var detailsJSONOut *string
 	if len(event.Details) > 0 {
 		safeDetails, _ := sanitizeAuditDetails(event.Details).(map[string]any)
 		detailsBytes, err := json.Marshal(safeDetails)
@@ -139,20 +242,17 @@ func LogAudit(db database.Database, event AuditEvent) error {
 			sentinel, mErr := json.Marshal(map[string]string{"details_marshal_error": err.Error()})
 			if mErr == nil {
 				s := string(sentinel)
-				detailsJSON = &s
+				detailsJSONOut = &s
 			} else {
 				s := `{"details_marshal_error":"unknown"}`
-				detailsJSON = &s
+				detailsJSONOut = &s
 			}
 		} else {
 			if len(detailsBytes) > auditDetailsMaxBytes {
-				detailsBytes, _ = json.Marshal(map[string]any{
-					"details_truncated": true,
-					"original_bytes":    len(detailsBytes),
-				})
+				detailsBytes = truncateAuditDetails(safeDetails, len(detailsBytes))
 			}
 			detailsStr := string(detailsBytes)
-			detailsJSON = &detailsStr
+			detailsJSONOut = &detailsStr
 		}
 	}
 
@@ -168,42 +268,8 @@ func LogAudit(db database.Database, event AuditEvent) error {
 		userIDPtr = &event.UserID
 	}
 
-	// Determine if this is a SCIM operation (UserID 0 or action type starts with "scim.")
-	isSCIMOperation := event.UserID == 0 || strings.HasPrefix(event.ActionType, "scim.")
-
-	// Also log to structured logger for real-time monitoring (always immediate)
-	if isSCIMOperation {
-		slog.Info("audit_event",
-			"source", "SCIM",
-			"username", event.Username,
-			"action_type", event.ActionType,
-			"resource_type", event.ResourceType,
-			"resource_id", event.ResourceID,
-			"resource_name", event.ResourceName,
-			"success", event.Success,
-		)
-	} else {
-		slog.Info("audit_event",
-			"user_id", event.UserID,
-			"username", event.Username,
-			"action_type", event.ActionType,
-			"resource_type", event.ResourceType,
-			"resource_id", event.ResourceID,
-			"resource_name", event.ResourceName,
-			"success", event.Success,
-		)
-	}
-
-	query := `
-		INSERT INTO audit_logs (
-			timestamp, user_id, username, ip_address, user_agent,
-			action_type, resource_type, resource_id, resource_name,
-			details, success, error_message
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`
-
-	_, err := db.ExecWrite(
-		query,
+	source = auditSource(event)
+	return auditInsert{args: []any{
 		timestamp,
 		userIDPtr, // nil for SCIM/system operations (becomes SQL NULL)
 		event.Username,
@@ -213,37 +279,54 @@ func LogAudit(db database.Database, event AuditEvent) error {
 		event.ResourceType,
 		event.ResourceID,
 		event.ResourceName,
-		detailsJSON,
+		detailsJSONOut,
 		event.Success,
 		event.ErrorMessage,
-	)
+		source,
+	}}, source, detailsJSONOut
+}
 
-	if err != nil {
-		slog.Error("failed to log audit event",
-			"error", err,
-			"action_type", event.ActionType,
-			"resource_type", event.ResourceType,
-			"is_scim", isSCIMOperation,
-			"resource_id", event.ResourceID,
-		)
-		return fmt.Errorf("failed to log audit event: %w", err)
-	}
-
-	slog.Debug("audit event logged successfully",
+// emitAuditStructuredLog mirrors the event to the structured logger for
+// real-time monitoring (always immediate, independent of the DB write). The
+// details attribute carries the same redacted, size-bounded payload that is
+// persisted, so a failed event is diagnosable from the live log alone.
+func emitAuditStructuredLog(event AuditEvent, source string, detailsJSON *string) {
+	attrs := []any{
+		"source", source,
+		"username", event.Username,
 		"action_type", event.ActionType,
 		"resource_type", event.ResourceType,
-		"is_scim", isSCIMOperation,
-	)
-
-	return nil
+		"resource_id", event.ResourceID,
+		"resource_name", event.ResourceName,
+		"success", event.Success,
+	}
+	if event.UserID != 0 {
+		attrs = append(attrs, "user_id", event.UserID)
+	}
+	if event.ErrorMessage != "" {
+		attrs = append(attrs, "error_message", event.ErrorMessage)
+	}
+	if detailsJSON != nil && *detailsJSON != "" {
+		if len(*detailsJSON) <= auditStructuredDetailsMaxBytes {
+			attrs = append(attrs, "details", *detailsJSON)
+		} else {
+			attrs = append(attrs, "details", auditDetailsTruncatedValue)
+		}
+	}
+	slog.Info("audit_event", attrs...)
 }
 
 func sanitizeAuditDetails(v any) any {
 	switch x := v.(type) {
+	case nil, string, bool,
+		int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64,
+		float32, float64, json.Number:
+		return v
 	case map[string]any:
 		out := make(map[string]any, len(x))
 		for k, val := range x {
-			if isSensitiveAuditKey(k) {
+			if isSensitiveAuditKey(k) && !isBooleanAuditValue(val) {
 				out[k] = auditDetailsRedactedValue
 				continue
 			}
@@ -273,8 +356,115 @@ func sanitizeAuditDetails(v any) any {
 		}
 		return out
 	default:
+		return sanitizeAuditJSONValue(x)
+	}
+}
+
+// sanitizeAuditJSONValue redacts typed containers (structs, typed slices and
+// maps) that the direct type switch cannot traverse. It round-trips through
+// JSON so struct tags and exported-field names drive the redaction keys, then
+// sanitizes the generic result. Without this a value such as
+// `[]models.KnowledgeBasePageSource` would be marshaled unredacted.
+func sanitizeAuditJSONValue(v any) any {
+	raw, err := json.Marshal(v)
+	if err != nil {
 		return v
 	}
+	var decoded any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		return v
+	}
+	return sanitizeAuditDetails(decoded)
+}
+
+// isBooleanAuditValue reports whether a value is a bool. A sensitive-looking
+// boolean flag such as has_secret reveals no secret material, so keeping it
+// preserves useful audit metadata that a substring match on the key would
+// otherwise destroy.
+func isBooleanAuditValue(v any) bool {
+	_, ok := v.(bool)
+	return ok
+}
+
+// truncateAuditDetails shrinks an over-limit details map while preserving
+// scalar summary fields. It first trims long strings and long slices; if the
+// payload is still too large it keeps only scalars and replaces complex
+// values with a marker. Either way the result records that it was truncated
+// and how large the original was.
+func truncateAuditDetails(details map[string]any, originalBytes int) []byte {
+	shrunk, _ := shrinkAuditValue(details, auditDetailsMaxStringBytes, auditDetailsMaxSliceItems).(map[string]any)
+	if b, err := json.Marshal(shrunk); err == nil && len(b) <= auditDetailsMaxBytes {
+		return markAuditDetailsTruncated(shrunk, originalBytes)
+	}
+
+	scalars := make(map[string]any, len(details))
+	for k, v := range details {
+		switch v.(type) {
+		case map[string]any, map[string]string, []any, []map[string]any:
+			scalars[k] = auditDetailsTruncatedValue
+		default:
+			scalars[k] = v
+		}
+	}
+	return markAuditDetailsTruncated(scalars, originalBytes)
+}
+
+// shrinkAuditValue recursively caps string length and slice length.
+func shrinkAuditValue(v any, maxString, maxItems int) any {
+	switch x := v.(type) {
+	case string:
+		if len(x) > maxString {
+			return x[:maxString] + "…" + auditDetailsTruncatedValue
+		}
+		return x
+	case []any:
+		out := make([]any, 0, len(x))
+		for i, item := range x {
+			if i >= maxItems {
+				out = append(out, auditDetailsTruncatedValue)
+				break
+			}
+			out = append(out, shrinkAuditValue(item, maxString, maxItems))
+		}
+		return out
+	case []map[string]any:
+		out := make([]any, 0, len(x))
+		for i, item := range x {
+			if i >= maxItems {
+				out = append(out, auditDetailsTruncatedValue)
+				break
+			}
+			out = append(out, shrinkAuditValue(item, maxString, maxItems))
+		}
+		return out
+	case map[string]any:
+		out := make(map[string]any, len(x))
+		for k, val := range x {
+			out[k] = shrinkAuditValue(val, maxString, maxItems)
+		}
+		return out
+	case map[string]string:
+		out := make(map[string]any, len(x))
+		for k, val := range x {
+			out[k] = shrinkAuditValue(val, maxString, maxItems)
+		}
+		return out
+	default:
+		return v
+	}
+}
+
+func markAuditDetailsTruncated(details map[string]any, originalBytes int) []byte {
+	details["details_truncated"] = true
+	details["original_bytes"] = originalBytes
+	b, err := json.Marshal(details)
+	if err != nil {
+		b, _ = json.Marshal(map[string]any{
+			"details_truncated": true,
+			"original_bytes":    originalBytes,
+		})
+	}
+	return b
 }
 
 func isSensitiveAuditKey(key string) bool {
@@ -318,6 +508,11 @@ const (
 	ActionLogout         = "logout"
 	ActionPasswordChange = "password.change"
 
+	// Authorization
+	// ActionAccessDenied records a rejected authorization attempt for a
+	// mutating request; the required permission and route live in details.
+	ActionAccessDenied = "access.denied"
+
 	// Permission management
 	ActionPermissionGrant  = "permission.grant"
 	ActionPermissionRevoke = "permission.revoke"
@@ -347,6 +542,7 @@ const (
 	// Configuration management
 	ActionConfigSetCreate               = "config_set.create"
 	ActionConfigSetUpdate               = "config_set.update"
+	ActionConfigSetWorkspaceAssign      = "config_set.workspace_assign"
 	ActionConfigSetDelete               = "config_set.delete"
 	ActionConfigSetExport               = "config_set.export"
 	ActionConfigSetImport               = "config_set.import"
@@ -386,6 +582,7 @@ const (
 	ActionItemSplit          = "item.split"
 	ActionItemBulkUpdate     = "item.bulk_update"
 	ActionItemBulkTransition = "item.bulk_transition"
+	ActionItemBulkLabels     = "item.bulk_labels"
 	ActionCommentDelete      = "comment.delete"
 	ActionCommentCreate      = "comment.create"
 	ActionAttachmentDelete   = "attachment.delete"
@@ -421,6 +618,10 @@ const (
 	ActionAPITokenCleanup     = "api_token.cleanup_expired"
 	ActionAPITokenAutoRevoke  = "api_token.auto_revoke" //nolint:gosec // audit action name, not a credential
 
+	// OAuth authorization decisions
+	ActionOAuthApprove = "oauth.approve"
+	ActionOAuthDeny    = "oauth.deny"
+
 	// OAuth client management
 	ActionOAuthClientCreate       = "oauth_client.create"
 	ActionOAuthClientUpdate       = "oauth_client.update"
@@ -432,6 +633,7 @@ const (
 	ActionAgentUpdate     = "agent.update"
 	ActionAgentDelete     = "agent.delete"
 	ActionAgentDeactivate = "agent.deactivate"
+	ActionAgentChatTurn   = "agent.chat.turn"
 
 	// SCIM provisioning
 	ActionSCIMUserCreate        = "scim.user.create"
@@ -450,6 +652,7 @@ const (
 	ActionSCIMUserAgentImpact = "scim.user.agent_impact"
 	ActionSCIMTokenCreate     = "scim.token.create" //nolint:gosec // G101 false positive: audit action constant, not a credential
 	ActionSCIMTokenRevoke     = "scim.token.revoke" //nolint:gosec // G101 false positive: audit action constant, not a credential
+	ActionSCIMDisconnect      = "scim.disconnect"
 
 	// Hierarchy level management
 	ActionHierarchyLevelCreate = "hierarchy_level.create"
@@ -556,6 +759,9 @@ const (
 	ActionLLMConnectionCreate = "llm_connection.create"
 	ActionLLMConnectionUpdate = "llm_connection.update"
 	ActionLLMConnectionDelete = "llm_connection.delete"
+	// ActionLLMConnectionRefreshModels records a provider model-catalog
+	// refresh, which is not a connection edit.
+	ActionLLMConnectionRefreshModels = "llm_connection.refresh_models"
 
 	// Integration Providers
 	ActionIntegrationProviderCreate             = "integration_provider.create"
@@ -568,6 +774,7 @@ const (
 	ActionZammadConnectionDelete                = "zammad_connection.delete"
 	ActionZammadConnectionTest                  = "zammad_connection.test"
 	ActionIntegrationProviderOAuthCredentialSet = "integration_provider.oauth_credential_set" // #nosec G101 -- audit action name, not a credential
+	ActionIntegrationProviderOAuthStart         = "integration_provider.oauth_start"
 	ActionZammadTicketCreate                    = "zammad_ticket.create"
 	ActionZammadTicketLinkExisting              = "zammad_ticket.link_existing"
 	ActionZammadTicketUpdate                    = "zammad_ticket.update"
@@ -653,7 +860,6 @@ const (
 	// Portal customer (contact) management
 	ActionPortalCustomerCreate      = "portal_customer.create"
 	ActionPortalCustomerUpdate      = "portal_customer.update"
-	ActionPortalCustomerDelete      = "portal_customer.delete"
 	ActionPortalCustomerUpdateOrg   = "portal_customer.update_organisation" //nolint:misspell // British spelling
 	ActionPortalCustomerErase       = "portal_customer.erase"
 	ActionPortalCustomerDataExport  = "portal_customer.data_export"
@@ -824,6 +1030,94 @@ const (
 
 	// Public form administration
 	ActionRequestTypeConfigUpdate = "request_type_config.update"
+
+	// Asset report management
+	ActionAssetReportCreate           = "asset_report.create"
+	ActionAssetReportUpdate           = "asset_report.update"
+	ActionAssetReportDelete           = "asset_report.delete"
+	ActionAssetReportVisibilityUpdate = "asset_report.visibility_update"
+	ActionAssetReportFieldsUpdate     = "asset_report.fields_update"
+
+	// Request type management (public intake forms)
+	ActionRequestTypeCreate           = "request_type.create"
+	ActionRequestTypeUpdate           = "request_type.update"
+	ActionRequestTypeDelete           = "request_type.delete"
+	ActionRequestTypeFieldsUpdate     = "request_type.fields_update"
+	ActionRequestTypeVisibilityUpdate = "request_type.visibility_update"
+
+	// Channel intake management
+	ActionChannelIntakeCreate = "channel_intake.create"
+	ActionChannelIntakeUpdate = "channel_intake.update"
+	ActionChannelIntakeDelete = "channel_intake.delete"
+
+	// Workspace agent bindings and runner registration
+	ActionAgentProfileCreate          = "agent_profile.create"
+	ActionAgentProfileUpdate          = "agent_profile.update"
+	ActionAgentProfileMigrateRunner   = "agent_profile.migrate_runner"
+	ActionAgentProfileConnectRunner   = "agent_profile.connect_runner"
+	ActionAgentProfileTest            = "agent_profile.test"
+	ActionAgentProfileReady           = "agent_profile.ready"
+	ActionAgentRunnerSetupTokenMint   = "agent_runner_setup.token_mint"
+	ActionAgentRunnerSetupTokenRevoke = "agent_runner_setup.token_revoke"
+	ActionAgentBindingCreate          = "agent_binding.create"
+	ActionAgentBindingUpdate          = "agent_binding.update"
+	ActionAgentBindingUpdateConfig    = "agent_binding.update_config"
+	ActionAgentBindingArchive         = "agent_binding.archive"
+	ActionAgentBindingRestore         = "agent_binding.restore"
+	ActionAgentBindingTestRun         = "agent_binding.test_run"
+	ActionAgentSkillCreate            = "agent_skill.create"
+	ActionAgentSkillUpdate            = "agent_skill.update"
+	ActionAgentSkillDelete            = "agent_skill.delete"
+
+	// Agent security administration
+	ActionAgentSecurityFlagSet         = "agent_security.flag.set"
+	ActionAgentSecurityAllowlistAdd    = "agent_security.allowlist.add"
+	ActionAgentSecurityAllowlistRemove = "agent_security.allowlist.remove"
+
+	// Agent template catalog administration
+	ActionAgentTemplateCatalogCreate = "agent_template_catalog.create"
+	ActionAgentTemplateCatalogUpdate = "agent_template_catalog.update"
+	ActionAgentTemplateCatalogDelete = "agent_template_catalog.delete"
+
+	// CLI onboarding
+	ActionCLIOnboardingApprove = "cli_onboarding.approve"
+	ActionCLIOnboardingDeny    = "cli_onboarding.deny"
+
+	// LDAP synchronization
+	ActionLDAPSync = "ldap.sync"
+
+	// Catalog priority management
+	ActionPriorityCreate = "priority.create"
+	ActionPriorityUpdate = "priority.update"
+	ActionPriorityDelete = "priority.delete"
+
+	// Bulk import
+	ActionAssetImport  = "asset_import"
+	ActionTicketImport = "ticket_import"
+
+	// SLA configuration management
+	ActionSLACalendarCreate         = "sla_calendar.create"
+	ActionSLACalendarUpdate         = "sla_calendar.update"
+	ActionSLACalendarDelete         = "sla_calendar.delete"
+	ActionSLAWarningThresholdCreate = "sla_warning_threshold.create"
+	ActionSLAWarningThresholdUpdate = "sla_warning_threshold.update"
+	ActionSLAWarningThresholdDelete = "sla_warning_threshold.delete"
+	ActionSLAMetricCreate           = "sla_metric.create"
+	ActionSLAMetricUpdate           = "sla_metric.update"
+	ActionSLAMetricDelete           = "sla_metric.delete"
+	ActionSLATeamBindingCreate      = "sla_team_binding.create"
+	ActionSLATeamBindingDelete      = "sla_team_binding.delete"
+
+	// Object translation administration
+	ActionObjectTranslationUpdate = "object_translation.update"
+	ActionObjectTranslationDelete = "object_translation.delete"
+
+	// User avatar
+	ActionUserAvatarUpdate = "user.avatar_update"
+
+	// Audit log access (reads and SIEM streaming are security-relevant)
+	ActionAuditLogRead   = "audit_log.read"
+	ActionAuditLogStream = "audit_log.stream"
 )
 
 // Resource type constants
@@ -847,6 +1141,8 @@ const (
 	ResourceModule               = "module"
 	ResourceAPIToken             = "api_token"
 	ResourceOAuthClient          = "oauth_client"
+	ResourceAgentSession         = "agent_session"
+	ResourceRoute                = "route"
 	ResourceHierarchyLevel       = "hierarchy_level"
 	ResourceLinkType             = "link_type"
 	ResourcePermissionSet        = "permission_set"
@@ -871,6 +1167,10 @@ const (
 	ResourceDiagnostics          = "diagnostics"
 	ResourceLLMConnection        = "llm_connection"
 	ResourceIntegrationProvider  = "integration_provider"
+	ResourceCustomerOrganisation = "customer_organisation"
+	ResourceAgent                = "agent"
+	ResourceRequestType          = "request_type"
+	ResourceJiraConnection       = "jira_connection"
 	ResourceIntegrationItemLink  = "integration_item_link"
 	ResourceZammadConnection     = "zammad_connection"
 	ResourceZammadTicket         = "zammad_ticket"
@@ -920,4 +1220,32 @@ const (
 	ResourceBoardConfiguration   = "board_configuration"
 	ResourceWebhook              = "webhook"
 	ResourceRequestTypeConfig    = "request_type_config"
+	ResourceAssetReport          = "asset_report"
+	ResourceChannelIntake        = "channel_intake"
+
+	// Workspace agent binding and runner registration resources
+	ResourceWorkspaceAgentBinding   = "workspace_agent_binding"
+	ResourceRunnerRegistrationToken = "runner_registration_token"
+	ResourceAgentSkill              = "workspace_agent_skill"
+	ResourceAgentSecurityFlag       = "agent_security_flag"
+	ResourceAgentSecurityAllowlist  = "agent_security_allowlist"
+	ResourceAgentTemplateCatalog    = "agent_template_catalog"
+
+	// Catalog priority resource
+	ResourcePriority = "priority"
+
+	// Bulk import resources
+	ResourceAssetImport = "asset_import"
+
+	// SLA configuration resources
+	ResourceSLACalendar         = "sla_calendar"
+	ResourceSLAWarningThreshold = "sla_warning_threshold"
+	ResourceSLAMetric           = "sla_metric"
+	ResourceSLATeamBinding      = "sla_team_binding"
+
+	// Object translation administration
+	ResourceObjectTranslation = "object_translation"
+
+	// Audit log read surface
+	ResourceAuditLog = "audit_log"
 )

@@ -634,6 +634,12 @@ export default {
     rangeNone: 'None',
   },
 
+  collectionHierarchy: {
+    selectLevel: 'Select hierarchy level',
+    levelN: 'Level {level}',
+    itemsCount: '{count} items',
+  },
+
   collectionTree: {
     loading: 'Loading...',
     tree: 'Tree',
@@ -698,6 +704,11 @@ export default {
 
     // Filters and query
     filters: 'Filters',
+    sharedFilters: 'Shared',
+    myFilters: 'My filters',
+    saveFilter: 'Save filter',
+    shareFilter: 'Shared with everyone',
+    shareFilterHint: 'Everyone with access to this board can use it',
     savedFilters: 'Saved filters',
     saveCurrentFilter: 'Save current filters',
     filterNamePlaceholder: 'Filter name',
@@ -711,12 +722,17 @@ export default {
     filterSaved: 'Filter saved',
     filterDeleted: 'Filter deleted',
     toggleSelection: 'Toggle selection',
+    selectItems: 'Select items',
     bulkSelected: '{count} selected',
+    bulkSelectHint: 'Select items to apply bulk actions',
     bulkSetStatus: 'Move to',
     bulkSetAssignee: 'Assignee',
     bulkSetPriority: 'Priority',
     bulkLabels: 'Labels',
+    bulkLabelsHint: 'Add or remove labels on {count} selected items',
+    bulkLabelsApply: 'Apply labels',
     bulkClear: 'Clear',
+    bulkDone: 'Done',
     bulkStatusSuccess: 'Moved {count} items',
     bulkStatusPartial: 'Moved {count} items, {failed} failed',
     bulkUpdateSuccess: 'Updated {count} items',

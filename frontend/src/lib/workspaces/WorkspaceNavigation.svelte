@@ -10,7 +10,7 @@
   import ChevronDown from '@tabler/icons-svelte-runes/icons/chevron-down';
   import IconChevronRight from '@tabler/icons-svelte-runes/icons/chevron-right';
   import Palette from '@tabler/icons-svelte-runes/icons/palette';
-  import Sparkles from '@tabler/icons-svelte-runes/icons/sparkles';
+  import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
   import Pencil from '@tabler/icons-svelte-runes/icons/pencil';
   import { workspaceViewItems, workspaceOnlyViews, testNavigationItems, visibleWorkspaceSettingsItems, workspaceSettingsViews, workspaceSettingsRoute, collectionSwitchUrl } from '../navigation/workspaceNavigation.js';
   import { viewSettingsStore } from '../stores/viewSettings.svelte.js';
@@ -45,7 +45,7 @@
     { icon: CheckSquare, labelKey: 'personal.myTasks', route: '/personal', view: 'personal-workspace' },
     { icon: BookOpen, labelKey: 'personal.reviews', route: '/personal/reviews', view: 'workspace-reviews' },
     { icon: Calendar, labelKey: 'personal.weeklyCalendar', route: '/personal/calendar', view: 'workspace-calendar' },
-    { icon: Sparkles, labelKey: 'settings.aiFeatures.features.plan_my_day.name', route: '/personal/plan', view: 'personal-plan' },
+    { icon: IconMessageChatbot, labelKey: 'settings.aiFeatures.features.plan_my_day.name', route: '/personal/plan', view: 'personal-plan' },
   ];
 
   // Full list of workspace admin route views (registry-driven).

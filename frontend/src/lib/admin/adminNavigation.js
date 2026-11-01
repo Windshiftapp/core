@@ -17,6 +17,7 @@ import IconLifebuoy from '@tabler/icons-svelte-runes/icons/lifebuoy';
 import IconLink from '@tabler/icons-svelte-runes/icons/link';
 import IconMail from '@tabler/icons-svelte-runes/icons/mail';
 import IconMessage from '@tabler/icons-svelte-runes/icons/message';
+import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
 import IconPackage from '@tabler/icons-svelte-runes/icons/package';
 import IconPalette from '@tabler/icons-svelte-runes/icons/palette';
 import IconPaperclip from '@tabler/icons-svelte-runes/icons/paperclip';
@@ -28,7 +29,6 @@ import IconSettings from '@tabler/icons-svelte-runes/icons/settings';
 import IconSettings2 from '@tabler/icons-svelte-runes/icons/settings-2';
 import IconShield from '@tabler/icons-svelte-runes/icons/shield';
 import IconShieldLock from '@tabler/icons-svelte-runes/icons/shield-lock';
-import IconSparkles from '@tabler/icons-svelte-runes/icons/sparkles';
 import IconStack2 from '@tabler/icons-svelte-runes/icons/stack-2';
 import IconUserCheck from '@tabler/icons-svelte-runes/icons/user-check';
 import IconUserStar from '@tabler/icons-svelte-runes/icons/user-star';
@@ -136,7 +136,7 @@ export const adminGroups = [
       {
         id: 'llm-connections',
         labelKey: 'settings.adminItems.llmConnections.title',
-        icon: IconSparkles,
+        icon: IconMessageChatbot,
         descriptionKey: 'settings.adminItems.llmConnections.description',
       },
       {

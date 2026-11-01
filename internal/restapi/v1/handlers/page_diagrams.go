@@ -46,7 +46,7 @@ func (h *PageDiagramHandler) List(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	items, err := h.service.List(h.auditActor(r, user), pageID)
+	items, err := h.service.List(r.Context(), h.auditActor(r, user), pageID)
 	if err != nil {
 		h.respondServiceError(w, r, err)
 		return
@@ -77,7 +77,7 @@ func (h *PageDiagramHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	diagram, err := h.service.Get(h.auditActor(r, user), pageID, attachmentID)
+	diagram, err := h.service.Get(r.Context(), h.auditActor(r, user), pageID, attachmentID)
 	if err != nil {
 		h.respondServiceError(w, r, err)
 		return
@@ -112,7 +112,7 @@ func (h *PageDiagramHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	input.PageID = pageID
-	diagram, err := h.service.Create(h.auditActor(r, user), input)
+	diagram, err := h.service.Create(r.Context(), h.auditActor(r, user), input)
 	if err != nil {
 		h.respondServiceError(w, r, err)
 		return
@@ -154,7 +154,7 @@ func (h *PageDiagramHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	input.PageID = pageID
 	input.AttachmentID = attachmentID
-	diagram, err := h.service.Update(h.auditActor(r, user), input)
+	diagram, err := h.service.Update(r.Context(), h.auditActor(r, user), input)
 	if err != nil {
 		h.respondServiceError(w, r, err)
 		return

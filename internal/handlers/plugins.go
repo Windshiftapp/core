@@ -113,6 +113,7 @@ func (h *PluginHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 						"method":      r.Method,
 						"path":        r.Path,
 						"description": r.Description,
+						"auth":        string(r.Auth),
 					})
 				}
 
@@ -396,6 +397,7 @@ func (h *PluginHandler) syncPluginToDatabase() {
 				"method":      r.Method,
 				"path":        r.Path,
 				"description": r.Description,
+				"auth":        string(r.Auth),
 			})
 		}
 		extensionsJSON, _ := json.Marshal(p.Manifest.Extensions)

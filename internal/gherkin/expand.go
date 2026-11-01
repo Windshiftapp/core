@@ -75,19 +75,3 @@ func ExecutionSteps(spec *ScenarioSpec, row map[string]string) []Step {
 	}
 	return steps
 }
-
-// ExampleRowMap converts an Examples row into a column-name keyed map using
-// the block's header.
-func ExampleRowMap(block *ExamplesBlock, rowIndex int) map[string]string {
-	if rowIndex < 0 || rowIndex >= len(block.Rows) {
-		return nil
-	}
-	row := block.Rows[rowIndex]
-	params := make(map[string]string, len(block.Header))
-	for i, column := range block.Header {
-		if i < len(row) {
-			params[column] = row[i]
-		}
-	}
-	return params
-}

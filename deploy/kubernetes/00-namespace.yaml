@@ -1,0 +1,6 @@
+# Optional: the manifests also work in an existing namespace. Remove this file
+# and the `namespace:` fields, or change the name, if you already have one.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: windshift

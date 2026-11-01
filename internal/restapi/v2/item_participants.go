@@ -58,7 +58,7 @@ func addItemParticipant(deps Deps) jsonOperation[itemParticipantRequest, []model
 			return nil, participantMutationError(err)
 		}
 		if created {
-			deps.AdminAuditor.LogWithDetails(r, user, logger.ActionItemParticipantAdd, logger.ResourceItem, &item.ID, item.Title, map[string]any{
+			logger.Record(r, logger.ActionItemParticipantAdd, logger.ResourceItem, &item.ID, item.Title, map[string]any{
 				"email":              input.Email,
 				"portal_customer_id": input.PortalCustomerID,
 			})
@@ -84,7 +84,7 @@ func removeItemParticipant(deps Deps) commandOperation {
 		if _, err := deps.Participants.Remove(r.Context(), user.ID, item.ID, customerID); err != nil {
 			return participantMutationError(err)
 		}
-		deps.AdminAuditor.LogWithDetails(r, user, logger.ActionItemParticipantRemove, logger.ResourceItem, &item.ID, item.Title, map[string]any{
+		logger.Record(r, logger.ActionItemParticipantRemove, logger.ResourceItem, &item.ID, item.Title, map[string]any{
 			"portal_customer_id": customerID,
 		})
 		return nil

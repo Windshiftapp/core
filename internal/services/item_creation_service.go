@@ -100,6 +100,20 @@ func (s *ItemCreationService) SetPermissionService(perm *PermissionService) {
 	s.perm = perm
 }
 
+// resolveCreateItemType picks the item type for a create that omitted one. A
+// child of a parent gets the next hierarchy level down (or the generic
+// sub-task); a root gets the workspace's default type.
+func resolveCreateItemType(db database.Database, workspaceID int, parentID *int) (*int, error) {
+	if parentID != nil && *parentID != 0 {
+		parent, err := repository.NewItemRepository(db).FindByID(*parentID)
+		if err != nil {
+			return nil, err
+		}
+		return resolveChildItemType(db, parent, nil)
+	}
+	return resolveItemTypeForCreation(db, workspaceID, nil)
+}
+
 func (s *ItemCreationService) Create(actorUserID int, actorUsername string, input ItemCreateInput) (*ItemCreateResult, error) {
 	return s.create(actorUserID, actorUsername, input, nil)
 }
@@ -128,6 +142,18 @@ func (s *ItemCreationService) create(
 	}
 	if err := validation.ValidateMarkdownSource("description", input.Description, validation.MarkdownMaxBytes, false); err != nil {
 		return nil, err
+	}
+
+	// Resolve an omitted item type before validation. CreateItem resolves it
+	// later, but the parent-hierarchy check runs here and needs the real type;
+	// without this, an omitted type skipped the adjacent-level rule and the
+	// workspace default top-level type was parented under anything.
+	if input.ItemTypeID == nil {
+		resolved, err := resolveCreateItemType(s.db, input.WorkspaceID, input.ParentID)
+		if err != nil {
+			return nil, err
+		}
+		input.ItemTypeID = resolved
 	}
 
 	validationResult := ValidateItemCreation(s.db, ItemValidationParams{

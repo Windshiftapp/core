@@ -321,7 +321,7 @@ func (h *PortalHandler) AddRequestAttachment(w http.ResponseWriter, r *http.Requ
 	if portalCustomerID != nil {
 		input.UploaderPortalCustomerID = portalCustomerID
 	}
-	response, err := svc.UploadPublicFormAttachment(input)
+	response, err := svc.UploadPublicFormAttachment(r.Context(), input)
 	if err != nil {
 		h.respondPortalUploadError(w, r, err)
 		return
@@ -345,7 +345,7 @@ func (h *PortalHandler) DownloadRequestAttachment(w http.ResponseWriter, r *http
 		return
 	}
 
-	binary, err := h.requestAttachmentService().OpenPortalRequestAttachment(attachmentID, itemID)
+	binary, err := h.requestAttachmentService().OpenPortalRequestAttachment(r.Context(), attachmentID, itemID)
 	if err != nil {
 		if errors.Is(err, services.ErrItemAttachmentDisabled) {
 			respondServiceUnavailable(w, r, "Attachments are not enabled on this server")
@@ -357,7 +357,7 @@ func (h *PortalHandler) DownloadRequestAttachment(w http.ResponseWriter, r *http
 	defer func() { _ = binary.File.Close() }()
 
 	w.Header().Set("Content-Type", binary.MimeType)
-	w.Header().Set("Content-Length", strconv.FormatInt(binary.FileSize, 10))
+	w.Header().Set("Content-Length", strconv.FormatInt(binary.File.Size(), 10))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	if fileserve.IsInlineSafeMimeType(binary.MimeType) {

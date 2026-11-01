@@ -27,7 +27,6 @@
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import Spinner from '../components/Spinner.svelte';
-  import Input from '../components/Input.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import Text from '../components/Text.svelte';
@@ -458,15 +457,18 @@
       <div class="grid grid-cols-2 gap-4">
         <!-- Name -->
         <div>
-          <Label for="name" color="default" required class="mb-1">{t('settings.sso.displayName')}</Label>
-          <Input
-            type="text"
+          <TextField
+            label={t('settings.sso.displayName')}
             id="name"
+            labelColor="default"
+            labelClass="mb-1"
+            required
+            type="text"
+            size="small"
+            inputClass={formErrors.name ? 'border-ds-border-danger' : ''}
+            placeholder={t('settings.sso.displayNamePlaceholder')}
             bind:value={formData.name}
             oninput={handleNameChange}
-            size="small"
-            class={formErrors.name ? 'border-ds-border-danger' : ''}
-            placeholder={t('settings.sso.displayNamePlaceholder')}
           />
           {#if formErrors.name}
             <p class="mt-1 text-sm" style="color: var(--ds-text-danger);">{formErrors.name}</p>
@@ -475,14 +477,17 @@
 
         <!-- Slug -->
         <div>
-          <Label for="slug" color="default" required class="mb-1">{t('settings.sso.slug')}</Label>
-          <Input
-            type="text"
+          <TextField
+            label={t('settings.sso.slug')}
             id="slug"
-            bind:value={formData.slug}
-            class={formErrors.slug ? 'font-mono border-ds-border-danger' : 'font-mono'}
+            labelColor="default"
+            labelClass="mb-1"
+            required
+            type="text"
             size="small"
+            inputClass={formErrors.slug ? 'font-mono border-ds-border-danger' : 'font-mono'}
             placeholder={t('settings.sso.slugPlaceholder')}
+            bind:value={formData.slug}
           />
           {#if formErrors.slug}
             <p class="mt-1 text-sm" style="color: var(--ds-text-danger);">{formErrors.slug}</p>
@@ -508,14 +513,17 @@
 
       <!-- Issuer URL -->
       <div>
-        <Label for="issuer_url" color="default" required class="mb-1">{t('settings.sso.issuerUrl')}</Label>
-        <Input
-          type="url"
+        <TextField
+          label={t('settings.sso.issuerUrl')}
           id="issuer_url"
-          bind:value={formData.issuer_url}
-          class={formErrors.issuer_url ? 'font-mono border-ds-border-danger' : 'font-mono'}
+          labelColor="default"
+          labelClass="mb-1"
+          required
+          type="url"
           size="small"
+          inputClass={formErrors.issuer_url ? 'font-mono border-ds-border-danger' : 'font-mono'}
           placeholder={t('settings.sso.issuerUrlPlaceholder')}
+          bind:value={formData.issuer_url}
         />
         {#if formErrors.issuer_url}
           <p class="mt-1 text-sm" style="color: var(--ds-text-danger);">{formErrors.issuer_url}</p>
@@ -526,14 +534,17 @@
       <div class="grid grid-cols-2 gap-4">
         <!-- Client ID -->
         <div>
-          <Label for="client_id" color="default" required class="mb-1">{t('settings.sso.clientId')}</Label>
-          <Input
-            type="text"
+          <TextField
+            label={t('settings.sso.clientId')}
             id="client_id"
-            bind:value={formData.client_id}
-            class={formErrors.client_id ? 'font-mono border-ds-border-danger' : 'font-mono'}
+            labelColor="default"
+            labelClass="mb-1"
+            required
+            type="text"
             size="small"
+            inputClass={formErrors.client_id ? 'font-mono border-ds-border-danger' : 'font-mono'}
             placeholder={t('settings.sso.clientIdPlaceholder')}
+            bind:value={formData.client_id}
           />
           {#if formErrors.client_id}
             <p class="mt-1 text-sm" style="color: var(--ds-text-danger);">{formErrors.client_id}</p>
@@ -542,14 +553,17 @@
 
         <!-- Client Secret -->
         <div>
-          <Label for="client_secret" color="default" required={showCreateModal} class="mb-1">{t('settings.sso.clientSecret')}</Label>
-          <Input
-            type="password"
+          <TextField
+            label={t('settings.sso.clientSecret')}
             id="client_secret"
-            bind:value={formData.client_secret}
+            labelColor="default"
+            labelClass="mb-1"
+            required={showCreateModal}
+            type="password"
             size="small"
-            class={formErrors.client_secret ? 'border-ds-border-danger' : ''}
+            inputClass={formErrors.client_secret ? 'border-ds-border-danger' : ''}
             placeholder={showEditModal ? t('settings.sso.leaveEmptyToKeepCurrent') : t('settings.sso.enterClientSecret')}
+            bind:value={formData.client_secret}
           />
           {#if formErrors.client_secret}
             <p class="mt-1 text-sm" style="color: var(--ds-text-danger);">{formErrors.client_secret}</p>
@@ -582,30 +596,72 @@
         </h3>
         <DescriptionText class="mb-3">{t('settings.sso.attributeMappingHelp')}</DescriptionText>
         <div class="grid grid-cols-2 gap-4">
-          <div>
-            <Label for="attr_email" color="default" class="mb-1">{t('settings.sso.attributeEmail')}</Label>
-            <Input type="text" id="attr_email" bind:value={attributeMapping.email} class="font-mono" size="small" placeholder="email" />
-          </div>
-          <div>
-            <Label for="attr_email_verified" color="default" class="mb-1">{t('settings.sso.attributeEmailVerified')}</Label>
-            <Input type="text" id="attr_email_verified" bind:value={attributeMapping.email_verified} class="font-mono" size="small" placeholder="email_verified" />
-          </div>
-          <div>
-            <Label for="attr_name" color="default" class="mb-1">{t('settings.sso.attributeName')}</Label>
-            <Input type="text" id="attr_name" bind:value={attributeMapping.name} class="font-mono" size="small" placeholder="name" />
-          </div>
-          <div>
-            <Label for="attr_username" color="default" class="mb-1">{t('settings.sso.attributeUsername')}</Label>
-            <Input type="text" id="attr_username" bind:value={attributeMapping.username} class="font-mono" size="small" placeholder="preferred_username" />
-          </div>
-          <div>
-            <Label for="attr_given_name" color="default" class="mb-1">{t('settings.sso.attributeGivenName')}</Label>
-            <Input type="text" id="attr_given_name" bind:value={attributeMapping.given_name} class="font-mono" size="small" placeholder="given_name" />
-          </div>
-          <div>
-            <Label for="attr_family_name" color="default" class="mb-1">{t('settings.sso.attributeFamilyName')}</Label>
-            <Input type="text" id="attr_family_name" bind:value={attributeMapping.family_name} class="font-mono" size="small" placeholder="family_name" />
-          </div>
+          <TextField
+            label={t('settings.sso.attributeEmail')}
+            id="attr_email"
+            labelColor="default"
+            labelClass="mb-1"
+            type="text"
+            size="small"
+            inputClass="font-mono"
+            placeholder="email"
+            bind:value={attributeMapping.email}
+          />
+          <TextField
+            label={t('settings.sso.attributeEmailVerified')}
+            id="attr_email_verified"
+            labelColor="default"
+            labelClass="mb-1"
+            type="text"
+            size="small"
+            inputClass="font-mono"
+            placeholder="email_verified"
+            bind:value={attributeMapping.email_verified}
+          />
+          <TextField
+            label={t('settings.sso.attributeName')}
+            id="attr_name"
+            labelColor="default"
+            labelClass="mb-1"
+            type="text"
+            size="small"
+            inputClass="font-mono"
+            placeholder="name"
+            bind:value={attributeMapping.name}
+          />
+          <TextField
+            label={t('settings.sso.attributeUsername')}
+            id="attr_username"
+            labelColor="default"
+            labelClass="mb-1"
+            type="text"
+            size="small"
+            inputClass="font-mono"
+            placeholder="preferred_username"
+            bind:value={attributeMapping.username}
+          />
+          <TextField
+            label={t('settings.sso.attributeGivenName')}
+            id="attr_given_name"
+            labelColor="default"
+            labelClass="mb-1"
+            type="text"
+            size="small"
+            inputClass="font-mono"
+            placeholder="given_name"
+            bind:value={attributeMapping.given_name}
+          />
+          <TextField
+            label={t('settings.sso.attributeFamilyName')}
+            id="attr_family_name"
+            labelColor="default"
+            labelClass="mb-1"
+            type="text"
+            size="small"
+            inputClass="font-mono"
+            placeholder="family_name"
+            bind:value={attributeMapping.family_name}
+          />
         </div>
       </div>
 

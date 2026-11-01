@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -72,6 +73,7 @@ func createSLAWarningThreshold(deps Deps) jsonOperation[slaWarningThresholdReque
 		if err != nil {
 			return nil, slaThresholdError(err)
 		}
+		logger.Record(r, logger.ActionSLAWarningThresholdCreate, logger.ResourceSLAWarningThreshold, &threshold.ID, threshold.Label, map[string]any{"workspace_id": workspaceID})
 		return threshold, nil
 	}
 }
@@ -90,6 +92,7 @@ func updateSLAWarningThreshold(deps Deps) jsonOperation[slaWarningThresholdReque
 		if err != nil {
 			return nil, slaThresholdError(err)
 		}
+		logger.Record(r, logger.ActionSLAWarningThresholdUpdate, logger.ResourceSLAWarningThreshold, &threshold.ID, threshold.Label, map[string]any{"workspace_id": workspaceID})
 		return threshold, nil
 	}
 }
@@ -107,6 +110,7 @@ func deleteSLAWarningThreshold(deps Deps) commandOperation {
 		if err := service.DeleteWarningThreshold(r.Context(), workspaceID, thresholdID); err != nil {
 			return slaThresholdError(err)
 		}
+		logger.Record(r, logger.ActionSLAWarningThresholdDelete, logger.ResourceSLAWarningThreshold, &thresholdID, "", map[string]any{"workspace_id": workspaceID})
 		return nil
 	}
 }

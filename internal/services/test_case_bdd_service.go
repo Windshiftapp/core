@@ -38,6 +38,27 @@ func (e *TestBDDValidationError) Error() string {
 	return strings.Join(lines, "\n")
 }
 
+// caseRuleErrors returns the BDD-case document rules beyond parsing: the
+// case must represent exactly one scenario, named so it can serve as the
+// case title.
+func caseRuleErrors(doc *gherkin.Document) []gherkin.ParseError {
+	switch {
+	case doc == nil:
+		return nil
+	case len(doc.Scenarios) != 1:
+		return []gherkin.ParseError{{
+			Line: 1, Column: 1,
+			Message: fmt.Sprintf("a BDD test case must contain exactly one Scenario or Scenario Outline, found %d; use feature-file import for multi-scenario documents", len(doc.Scenarios)),
+		}}
+	case doc.Scenarios[0].Name == "":
+		return []gherkin.ParseError{{
+			Line: doc.Scenarios[0].Line, Column: 1,
+			Message: "the scenario needs a name: Windshift uses it as the test case title",
+		}}
+	}
+	return nil
+}
+
 // BuildScenarioSpec parses authored Gherkin and returns the storable spec
 // for the single scenario a BDD test case represents.
 func BuildScenarioSpec(source string) (*gherkin.ScenarioSpec, *gherkin.ErrorList) {
@@ -45,19 +66,10 @@ func BuildScenarioSpec(source string) (*gherkin.ScenarioSpec, *gherkin.ErrorList
 	if !errs.Empty() {
 		return nil, errs
 	}
-	if len(doc.Scenarios) != 1 {
-		return nil, &gherkin.ErrorList{Errors: []gherkin.ParseError{{
-			Line: 1, Column: 1,
-			Message: fmt.Sprintf("a BDD test case must contain exactly one Scenario or Scenario Outline, found %d; use feature-file import for multi-scenario documents", len(doc.Scenarios)),
-		}}}
+	if ruleErrs := caseRuleErrors(doc); len(ruleErrs) > 0 {
+		return nil, &gherkin.ErrorList{Errors: ruleErrs}
 	}
 	scenario := doc.Scenarios[0]
-	if scenario.Name == "" {
-		return nil, &gherkin.ErrorList{Errors: []gherkin.ParseError{{
-			Line: scenario.Line, Column: 1,
-			Message: "the scenario needs a name: Windshift uses it as the test case title",
-		}}}
-	}
 	spec := doc.ScenarioSpecFrom(&scenario)
 	return &spec, nil
 }
@@ -191,9 +203,11 @@ func (s *TestCaseService) ImportFeatureFile(workspaceID int, folderID *int, sour
 				return nil, err
 			}
 			tc.ID = id
+			// Store the case's own scenario as its authored source. The full
+			// file would fail the single-scenario rule on the next edit.
 			bdd := &models.TestCaseBDD{
 				TestCaseID:      id,
-				Gherkin:         source,
+				Gherkin:         gherkin.RenderSpec(spec),
 				FeatureName:     spec.FeatureName,
 				ScenarioKeyword: keyword,
 				Spec:            encoded,

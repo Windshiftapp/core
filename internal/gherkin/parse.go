@@ -2,6 +2,8 @@ package gherkin
 
 import (
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -310,13 +312,14 @@ func docStringDelimiter(trimmed string) string {
 	}
 }
 
-// unescapeDocString applies the Gherkin doc string escapes: only the
-// delimiter sequence and the backslash itself are escapable; any other
-// backslash stays literal.
+// unescapeDocString applies the Gherkin doc string escapes: the delimiter's
+// first character and the backslash itself are escapable, so \`\`\` and \"\"\"
+// embed a fence and \\\\ embeds a backslash. Any other backslash stays literal.
 func unescapeDocString(content, delimiter string) string {
 	if !strings.Contains(content, "\\") {
 		return content
 	}
+	escapable := delimiter[:1]
 	var out strings.Builder
 	for i := 0; i < len(content); i++ {
 		if content[i] != '\\' {
@@ -328,9 +331,9 @@ func unescapeDocString(content, delimiter string) string {
 		case strings.HasPrefix(rest, "\\"):
 			out.WriteByte('\\')
 			i++
-		case strings.HasPrefix(rest, delimiter):
-			out.WriteString(delimiter)
-			i += len(delimiter)
+		case strings.HasPrefix(rest, escapable):
+			out.WriteString(escapable)
+			i++
 		default:
 			out.WriteByte('\\')
 		}
@@ -342,10 +345,12 @@ func unescapeDocString(content, delimiter string) string {
 // description text.
 func (p *parser) handleKeywordOrText(line, col int, trimmed string) {
 	if strings.HasPrefix(trimmed, "Rule:") {
+		p.takeTags()
 		p.errorAt(line, col, "Rule is not supported: represent the grouping as separate Features instead")
 		return
 	}
 	if strings.HasPrefix(trimmed, "Scenario Template:") {
+		p.takeTags()
 		p.errorAt(line, col, "Scenario Template is not supported: use Scenario Outline")
 		return
 	}
@@ -367,11 +372,11 @@ func (p *parser) handleKeywordOrText(line, col int, trimmed string) {
 }
 
 func (p *parser) startFeature(line, col int, trimmed string) {
+	tags := p.takeTags()
 	if p.featureSet {
 		p.errorAt(line, col, "a document may contain only one Feature; start a new file for the second Feature")
 		return
 	}
-	tags := p.takeTags()
 	title := strings.TrimSpace(strings.TrimPrefix(trimmed, "Feature:"))
 	p.doc = &Document{FeatureName: title, FeatureTags: tagNameList(tags)}
 	p.featureSet = true
@@ -569,7 +574,6 @@ func (p *parser) validateScenario(scenario *Scenario) {
 		p.errorf(scenario.Line, "Scenario Outline %q has no Examples: add an Examples table", scenario.Name)
 		return
 	}
-	headers := map[string]bool{}
 	for i := range scenario.Examples {
 		block := &scenario.Examples[i]
 		if len(block.Header) == 0 {
@@ -589,53 +593,81 @@ func (p *parser) validateScenario(scenario *Scenario) {
 				p.errorf(block.Line, "Examples %q has duplicate column %q", block.Name, column)
 			}
 			seen[column] = true
-			headers[column] = true
 		}
 	}
-	p.validatePlaceholders(scenario, headers)
+	p.validatePlaceholders(scenario)
 }
 
 // validatePlaceholders verifies every <param> used by the outline's steps is
 // provided by the Examples tables.
-func (p *parser) validatePlaceholders(scenario *Scenario, headers map[string]bool) {
-	missing := map[string]bool{}
-	var firstLine int
-	collect := func(text string, line int) {
-		for _, name := range findPlaceholders(text) {
-			if !headers[name] && !missing[name] {
-				missing[name] = true
-				if firstLine == 0 {
-					firstLine = line
-				}
-			}
-		}
-	}
+func (p *parser) validatePlaceholders(scenario *Scenario) {
+	// Every block executes all of the outline's steps, so a placeholder is
+	// only valid when each Examples table provides it; otherwise the rows of
+	// the other blocks would run with the placeholder left unexpanded.
+	used := map[string]bool{}
 	for i := range scenario.Steps {
 		step := &scenario.Steps[i]
-		collect(step.Text, step.Line)
+		collectPlaceholders(step.Text, used)
 		if step.DocString != nil {
-			collect(step.DocString.Content, step.Line)
+			collectPlaceholders(step.DocString.Content, used)
 		}
 		if step.DataTable != nil {
 			for _, row := range step.DataTable.Rows {
 				for _, cell := range row {
-					collect(cell, step.Line)
+					collectPlaceholders(cell, used)
 				}
 			}
 		}
 	}
-	if len(missing) == 0 {
+	if len(used) == 0 {
 		return
 	}
-	names := make([]string, 0, len(missing))
-	for name := range missing {
-		names = append(names, "<"+name+">")
+	for i := range scenario.Examples {
+		block := &scenario.Examples[i]
+		if len(block.Header) == 0 {
+			continue // already reported as a missing table
+		}
+		var missing []string
+		for name := range used {
+			if !blockProvides(block, name) {
+				missing = append(missing, name)
+			}
+		}
+		if len(missing) == 0 {
+			continue
+		}
+		sort.Strings(missing)
+		names := make([]string, len(missing))
+		for j, name := range missing {
+			names[j] = "<" + name + ">"
+		}
+		p.errorf(block.Line, "Examples%s does not provide %s: add the column or remove the placeholder", blockLabel(block.Name), strings.Join(names, ", "))
 	}
-	line := firstLine
-	if line == 0 {
-		line = scenario.Line
+}
+
+// blockProvides reports whether the block's header defines the column.
+func blockProvides(block *ExamplesBlock, name string) bool {
+	for _, column := range block.Header {
+		if column == name {
+			return true
+		}
 	}
-	p.errorf(line, "Examples tables do not provide %s: add the column or remove the placeholder", strings.Join(names, ", "))
+	return false
+}
+
+// blockLabel renders the Examples block's name for diagnostics.
+func blockLabel(name string) string {
+	if name == "" {
+		return ""
+	}
+	return " " + strconv.Quote(name)
+}
+
+// collectPlaceholders adds the <param> names in text to used.
+func collectPlaceholders(text string, used map[string]bool) {
+	for _, name := range findPlaceholders(text) {
+		used[name] = true
+	}
 }
 
 // findPlaceholders returns the <param> names in text, left to right,

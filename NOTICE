@@ -1,0 +1,20 @@
+Third-party notices
+===================
+
+This distribution includes the following third-party software. The notices
+below are reproduced as required by the Apache License, Version 2.0.
+
+--------------------------------------------------------------------------------
+AWS SDK for Go — github.com/aws/aws-sdk-go-v2 and its submodules
+(github.com/aws/aws-sdk-go-v2/config, .../credentials, .../service/s3)
+--------------------------------------------------------------------------------
+
+AWS SDK for Go
+Copyright 2015 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+Copyright 2014-2015 Stripe, Inc.
+
+--------------------------------------------------------------------------------
+AWS Smithy Go — github.com/aws/smithy-go
+--------------------------------------------------------------------------------
+
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.

@@ -396,66 +396,6 @@
     </div>
   </section>
 
-  <!-- PersonalLabelCombobox -->
-  <section class="mb-10">
-    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2" style="color: var(--ds-text);">
-      <Tag size={20} />
-      PersonalLabelCombobox
-    </h2>
-    <p class="mb-4 text-sm" style="color: var(--ds-text-subtle);">
-      Multi-select combobox for personal labels with the ability to create new labels on-the-fly.
-    </p>
-
-    <div
-      class="p-4 rounded-lg mb-4"
-      style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
-    >
-      <h4 class="font-medium mb-2" style="color: var(--ds-text);">Features</h4>
-      <ul class="text-sm space-y-1" style="color: var(--ds-text-subtle);">
-        <li>• Multi-select with chip display</li>
-        <li>• Create new labels by typing and pressing Enter</li>
-        <li>• User-scoped personal labels</li>
-        <li>• Color indicators for labels</li>
-      </ul>
-    </div>
-
-    <div
-      class="p-4 rounded-lg overflow-x-auto"
-      style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
-    >
-      <table class="w-full text-sm">
-        <thead>
-          <tr style="border-bottom: 1px solid var(--ds-border);">
-            <th class="text-left p-2 font-medium" style="color: var(--ds-text);">Prop</th>
-            <th class="text-left p-2 font-medium" style="color: var(--ds-text);">Type</th>
-            <th class="text-left p-2 font-medium" style="color: var(--ds-text);">Default</th>
-          </tr>
-        </thead>
-        <tbody style="color: var(--ds-text-subtle);">
-          <tr style="border-bottom: 1px solid var(--ds-border);">
-            <td class="p-2"><code>value</code></td>
-            <td class="p-2">number[] (bindable)</td>
-            <td class="p-2">[]</td>
-          </tr>
-          <tr style="border-bottom: 1px solid var(--ds-border);">
-            <td class="p-2"><code>userId</code></td>
-            <td class="p-2">number</td>
-            <td class="p-2">-</td>
-          </tr>
-          <tr style="border-bottom: 1px solid var(--ds-border);">
-            <td class="p-2"><code>placeholder</code></td>
-            <td class="p-2">string</td>
-            <td class="p-2">'Select labels...'</td>
-          </tr>
-          <tr>
-            <td class="p-2"><code>disabled</code></td>
-            <td class="p-2">boolean</td>
-            <td class="p-2">false</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
 
   <!-- PriorityPicker -->
   <section class="mb-10">

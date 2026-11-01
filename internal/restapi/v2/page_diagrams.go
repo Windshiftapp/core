@@ -24,7 +24,7 @@ func listPageDiagrams(deps Deps) readOperation[[]services.PageDiagram] {
 		if err != nil {
 			return nil, err
 		}
-		diagrams, err := deps.PageDiagrams.List(auditActor(r, user), pageID)
+		diagrams, err := deps.PageDiagrams.List(r.Context(), auditActor(r, user), pageID)
 		if err != nil {
 			return nil, pageDiagramError(err)
 		}
@@ -42,7 +42,7 @@ func createPageDiagram(deps Deps) jsonOperation[services.CreatePageDiagramInput,
 			return services.PageDiagram{}, err
 		}
 		input.PageID = pageID
-		diagram, err := deps.PageDiagrams.Create(auditActor(r, user), input)
+		diagram, err := deps.PageDiagrams.Create(r.Context(), auditActor(r, user), input)
 		if err != nil {
 			return services.PageDiagram{}, pageDiagramError(err)
 		}
@@ -60,7 +60,7 @@ func getPageDiagram(deps Deps) readOperation[services.PageDiagram] {
 		if err != nil {
 			return services.PageDiagram{}, err
 		}
-		diagram, err := deps.PageDiagrams.Get(auditActor(r, user), pageID, attachmentID)
+		diagram, err := deps.PageDiagrams.Get(r.Context(), auditActor(r, user), pageID, attachmentID)
 		if err != nil {
 			return services.PageDiagram{}, pageDiagramError(err)
 		}
@@ -80,7 +80,7 @@ func updatePageDiagram(deps Deps) jsonOperation[services.UpdatePageDiagramInput,
 		}
 		input.PageID = pageID
 		input.AttachmentID = attachmentID
-		diagram, err := deps.PageDiagrams.Update(auditActor(r, user), input)
+		diagram, err := deps.PageDiagrams.Update(r.Context(), auditActor(r, user), input)
 		if err != nil {
 			return services.PageDiagram{}, pageDiagramError(err)
 		}

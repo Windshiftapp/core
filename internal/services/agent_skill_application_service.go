@@ -7,6 +7,7 @@ import (
 
 	"windshift/internal/agentskills"
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
@@ -132,7 +133,7 @@ func (s *AgentSkillApplicationService) Create(ctx context.Context, actor AuditAc
 	if err := s.populate(ctx, item); err != nil {
 		return nil, err
 	}
-	emitServiceAudit(s.db, actor, "agent_skill.create", "workspace_agent_skill", &id, item.Name, map[string]any{"workspace_id": workspaceID})
+	emitServiceAudit(s.db, actor, logger.ActionAgentSkillCreate, logger.ResourceAgentSkill, &id, item.Name, map[string]any{"workspace_id": workspaceID})
 	return item, nil
 }
 
@@ -187,7 +188,7 @@ func (s *AgentSkillApplicationService) Patch(ctx context.Context, actor AuditAct
 	if err := s.populate(ctx, prepared); err != nil {
 		return nil, err
 	}
-	emitServiceAudit(s.db, actor, "agent_skill.update", "workspace_agent_skill", &skillID, prepared.Name, map[string]any{"workspace_id": workspaceID})
+	emitServiceAudit(s.db, actor, logger.ActionAgentSkillUpdate, logger.ResourceAgentSkill, &skillID, prepared.Name, map[string]any{"workspace_id": workspaceID})
 	return prepared, nil
 }
 
@@ -202,7 +203,7 @@ func (s *AgentSkillApplicationService) Delete(ctx context.Context, actor AuditAc
 	if n == 0 {
 		return repository.ErrNotFound
 	}
-	emitServiceAudit(s.db, actor, "agent_skill.delete", "workspace_agent_skill", &skillID, "", map[string]any{"workspace_id": workspaceID})
+	emitServiceAudit(s.db, actor, logger.ActionAgentSkillDelete, logger.ResourceAgentSkill, &skillID, "", map[string]any{"workspace_id": workspaceID})
 	return nil
 }
 

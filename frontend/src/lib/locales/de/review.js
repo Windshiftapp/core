@@ -49,12 +49,6 @@ export default {
     "itemTypeUpdated": "Vorgangstyp erfolgreich aktualisiert",
     "itemTypeDeleted": "Vorgangstyp erfolgreich gelöscht"
   },
-  "auditLog": {
-    "itemTypeCreated": "Vorgangstyp erstellt",
-    "itemTypeUpdated": "Vorgangstyp aktualisiert",
-    "itemTypeDeleted": "Vorgangstyp gelöscht",
-    "itemType": "Vorgangstyp"
-  },
   "commandPalette": {
     "commands": {
       "collections": {

@@ -888,11 +888,16 @@ type ItemLink struct {
 
 	SourceTitle        string `json:"source_title,omitempty"`
 	SourceWorkspaceKey string `json:"source_workspace_key,omitempty"`
-	SourceStatusName   string `json:"source_status_name,omitempty"`
+	// SourceItemNumber is the workspace-scoped number (the "1927" in
+	// "WI-1927"); SourceID is the global DB id and must not be shown as a key.
+	SourceItemNumber *int   `json:"source_item_number,omitempty"`
+	SourceStatusName string `json:"source_status_name,omitempty"`
 
 	TargetTitle        string `json:"target_title,omitempty"`
 	TargetWorkspaceKey string `json:"target_workspace_key,omitempty"`
-	TargetStatusName   string `json:"target_status_name,omitempty"`
+	// TargetItemNumber: see SourceItemNumber.
+	TargetItemNumber *int   `json:"target_item_number,omitempty"`
+	TargetStatusName string `json:"target_status_name,omitempty"`
 }
 
 // LinkCreateRequest is the body for POST /links.

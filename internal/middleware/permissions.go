@@ -8,20 +8,27 @@ import (
 	"strconv"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/restapi"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 // PermissionMiddleware handles permission checking for protected routes
 type PermissionMiddleware struct {
 	db                database.Database
 	permissionService *services.PermissionService
+	auditor           *logger.Auditor
 }
 
 // NewPermissionMiddleware creates a new permission middleware
 func NewPermissionMiddleware(db database.Database, permissionService *services.PermissionService) *PermissionMiddleware {
-	return &PermissionMiddleware{db: db, permissionService: permissionService}
+	return &PermissionMiddleware{
+		db:                db,
+		permissionService: permissionService,
+		auditor:           logger.NewAuditor(db),
+	}
 }
 
 // permissionCheck is the per-request decision produced by a Require* middleware.
@@ -35,8 +42,9 @@ type permissionCheck struct {
 
 // requireWithCheck builds a middleware that applies the standard auth + system-admin
 // short-circuit scaffold, then delegates the real permission decision to check.
+// requiredPermission is recorded on the audit row when a mutating request is denied.
 func (pm *PermissionMiddleware) requireWithCheck(
-	errLabel string,
+	errLabel, requiredPermission string,
 	check func(user *models.User, r *http.Request) permissionCheck,
 ) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -55,6 +63,9 @@ func (pm *PermissionMiddleware) requireWithCheck(
 
 			result := check(user, r)
 			if result.APIErr != nil {
+				if result.APIErr.StatusCode == http.StatusForbidden {
+					auditDenied(pm.auditor, r, user, requiredPermission)
+				}
 				restapi.RespondError(w, r, result.APIErr)
 				return
 			}
@@ -64,6 +75,7 @@ func (pm *PermissionMiddleware) requireWithCheck(
 				return
 			}
 			if !result.Allowed {
+				auditDenied(pm.auditor, r, user, requiredPermission)
 				restapi.RespondError(w, r, restapi.ErrInsufficientPermission)
 				return
 			}
@@ -73,9 +85,18 @@ func (pm *PermissionMiddleware) requireWithCheck(
 	}
 }
 
+// auditDenied records a route-level authorization denial for mutating requests.
+// Reads are skipped so high-volume GET paths do not flood the audit log.
+func auditDenied(auditor *logger.Auditor, r *http.Request, user *models.User, requiredPermission string) {
+	if auditor == nil || !utils.IsMutationMethod(r.Method) {
+		return
+	}
+	auditor.LogDenied(r, user, logger.ActionAccessDenied, logger.ResourceRoute, nil, r.URL.Path, requiredPermission, nil)
+}
+
 // RequireGlobalPermission creates middleware that requires a specific global permission
 func (pm *PermissionMiddleware) RequireGlobalPermission(permissionKey string) func(http.Handler) http.Handler {
-	return pm.requireWithCheck("error checking global permission",
+	return pm.requireWithCheck("error checking global permission", permissionKey,
 		func(user *models.User, _ *http.Request) permissionCheck {
 			ok, err := pm.hasGlobalPermission(user.ID, permissionKey)
 			return permissionCheck{Allowed: ok, Err: err}
@@ -85,7 +106,7 @@ func (pm *PermissionMiddleware) RequireGlobalPermission(permissionKey string) fu
 // RequireWorkspacePermission creates middleware that requires a specific workspace permission
 // The workspace ID should be in the URL path as {workspaceId}
 func (pm *PermissionMiddleware) RequireWorkspacePermission(permissionKey string) func(http.Handler) http.Handler {
-	return pm.requireWithCheck("error checking workspace permission",
+	return pm.requireWithCheck("error checking workspace permission", permissionKey,
 		func(user *models.User, r *http.Request) permissionCheck {
 			workspaceID, err := extractWorkspaceID(r)
 			if err != nil {

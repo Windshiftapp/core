@@ -1,14 +1,16 @@
 package services
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"windshift/internal/blobstore"
 	"windshift/internal/database"
 	"windshift/internal/models"
 )
@@ -33,8 +35,8 @@ type storedAttachmentFile struct {
 	thumbnailPath string
 }
 
-func validateAttachmentUpload(db database.Database, attachmentPath string, input attachmentFileInput, uploadErrors attachmentValidationErrors) (string, error) {
-	if attachmentPath == "" {
+func validateAttachmentUpload(db database.Database, enabled bool, input attachmentFileInput, uploadErrors attachmentValidationErrors) (string, error) {
+	if !enabled {
 		return "", uploadErrors.disabled
 	}
 	if strings.TrimSpace(input.originalFilename) == "" {
@@ -50,7 +52,7 @@ func validateAttachmentUpload(db database.Database, attachmentPath string, input
 	if err != nil {
 		return "", fmt.Errorf("%w: File content validation failed: %s", uploadErrors.invalid, err.Error())
 	}
-	settings, err := loadAttachmentSettings(db, attachmentPath)
+	settings, err := loadAttachmentSettings(db)
 	if err != nil {
 		return "", fmt.Errorf("get attachment settings: %w", err)
 	}
@@ -66,30 +68,42 @@ func validateAttachmentUpload(db database.Database, attachmentPath string, input
 	return detectedMimeType, nil
 }
 
-func storeAttachmentFile(attachmentPath, collection, entityType string, entityID int, input attachmentFileInput, mimeType string) (storedAttachmentFile, error) {
+func storeAttachmentFile(ctx context.Context, store *blobstore.Store, collection, entityType string, entityID int, input attachmentFileInput, mimeType string) (storedAttachmentFile, error) {
 	filename, err := generateAttachmentFilename(input.originalFilename)
 	if err != nil {
 		return storedAttachmentFile{}, fmt.Errorf("generate filename: %w", err)
 	}
-	dir := filepath.Join(attachmentPath, collection, strconv.Itoa(entityID))
-	if err := os.MkdirAll(dir, 0o750); err != nil { //nolint:gosec // trusted root and collection, numeric id
-		return storedAttachmentFile{}, fmt.Errorf("create attachment directory: %w", err)
-	}
+	entityPart := strconv.Itoa(entityID)
+	storedPath := store.Path(collection, entityPart, filename)
 	stored := storedAttachmentFile{
 		filename: filename,
-		path:     filepath.Join(dir, filename),
+		path:     storedPath,
 		mimeType: mimeType,
 		size:     int64(len(input.data)),
 	}
-	if err := os.WriteFile(stored.path, input.data, 0o600); err != nil { //nolint:gosec // generated filename under trusted directory
+
+	if err := store.Put(ctx, storedPath, bytes.NewReader(input.data), int64(len(input.data)), mimeType); err != nil {
 		return storedAttachmentFile{}, fmt.Errorf("save file: %w", err)
 	}
 	if !strings.HasPrefix(mimeType, "image/") {
 		return stored, nil
 	}
-	thumbnailPath, err := generateAttachmentThumbnail(stored.path, filename)
+
+	thumbnail, err := GenerateAttachmentThumbnailJPEG(input.data)
 	if err != nil {
-		slog.Warn("failed to generate attachment thumbnail", slog.String("component", "attachments"), slog.String("entity_type", entityType), slog.Any("error", err))
+		slog.Warn("failed to generate attachment thumbnail",
+			slog.String("component", "attachments"),
+			slog.String("entity_type", entityType),
+			slog.Any("error", err))
+		return stored, nil
+	}
+	thumbnailName := strings.TrimSuffix(filename, filepath.Ext(filename)) + ".thumb.jpg"
+	thumbnailPath := store.Path(collection, entityPart, thumbnailName)
+	if err := store.Put(ctx, thumbnailPath, bytes.NewReader(thumbnail), int64(len(thumbnail)), "image/jpeg"); err != nil {
+		slog.Warn("failed to store attachment thumbnail",
+			slog.String("component", "attachments"),
+			slog.String("entity_type", entityType),
+			slog.Any("error", err))
 		return stored, nil
 	}
 	stored.hasThumbnail = true
@@ -97,10 +111,10 @@ func storeAttachmentFile(attachmentPath, collection, entityType string, entityID
 	return stored, nil
 }
 
-func removeStoredAttachmentFile(stored storedAttachmentFile) {
-	_ = os.Remove(stored.path) //nolint:gosec // server-managed attachment path
+func removeStoredAttachmentFile(ctx context.Context, store *blobstore.Store, stored storedAttachmentFile) {
+	_ = store.Remove(ctx, stored.path)
 	if stored.thumbnailPath != "" {
-		_ = os.Remove(stored.thumbnailPath) //nolint:gosec // server-managed thumbnail path
+		_ = store.Remove(ctx, stored.thumbnailPath)
 	}
 }
 
@@ -116,6 +130,7 @@ func newAttachmentUploadResponse(attachmentID int64, entityID int, originalFilen
 			MimeType:         stored.mimeType,
 			FileSize:         stored.size,
 			UploadedBy:       uploaderID,
+			HasThumbnail:     stored.hasThumbnail,
 			CreatedAt:        time.Now(),
 		},
 	}

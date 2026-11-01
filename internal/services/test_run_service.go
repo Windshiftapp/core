@@ -42,7 +42,8 @@ func NewTestRunService(db database.Database) *TestRunService {
 // TestRunResultWithCaseTitle is the shared test-result response shape.
 type TestRunResultWithCaseTitle struct {
 	models.TestResult
-	TestCaseTitle string `json:"test_case_title"`
+	TestCaseTitle  string `json:"test_case_title"`
+	TestCaseFormat string `json:"test_case_format"`
 }
 
 // TestRunStepResult is the shared step-result response shape.
@@ -307,6 +308,7 @@ func (s *TestRunService) ListResults(runID, workspaceID int) ([]TestRunResultWit
 	for _, row := range rows {
 		results = append(results, TestRunResultWithCaseTitle{
 			TestResult: row.TestResult, TestCaseTitle: row.TestCaseTitle,
+			TestCaseFormat: row.TestCaseFormat,
 		})
 	}
 	return results, nil
@@ -494,20 +496,25 @@ func isValidTestResultStatus(status string) bool {
 
 // BDD example execution
 
-// TestExampleResultUpdateRequest records a direct result for one Examples row.
+// TestExampleResultUpdateRequest patches fields of one Examples row result.
+// Nil fields keep their current value; the HTTP surface decodes
+// application/merge-patch+json, so a status-only write no longer clears the
+// recorded actual result and notes.
 type TestExampleResultUpdateRequest struct {
-	Status       string
-	ActualResult string
-	Notes        string
+	Status       *string
+	ActualResult *string
+	Notes        *string
 }
 
-// TestExampleStepResultUpdateRequest records one step result within an
-// example execution.
+// TestExampleStepResultUpdateRequest patches fields of one step result within
+// an example execution. ItemIDSet distinguishes an absent item_id from an
+// explicit null, which clears the linked item.
 type TestExampleStepResultUpdateRequest struct {
-	Status       string
-	ActualResult string
-	Notes        string
+	Status       *string
+	ActualResult *string
+	Notes        *string
 	ItemID       *int
+	ItemIDSet    bool
 }
 
 // ListExampleResults returns the per-example execution results of a
@@ -597,23 +604,26 @@ func exampleRowBounds(spec *gherkin.ScenarioSpec) (count int) {
 	return len(spec.Background) + len(spec.Steps)
 }
 
-// UpdateExampleResult records a direct (non-step) result for one Examples
-// row and recomputes the case-level aggregate.
+// UpdateExampleResult merge-patches a direct (non-step) result for one
+// Examples row and recomputes the case-level aggregate.
 func (s *TestRunService) UpdateExampleResult(workspaceID, runID, testCaseID, exampleIndex int, req TestExampleResultUpdateRequest) (*models.TestExampleResult, error) {
 	ctxData, err := s.requireExampleContext(workspaceID, runID, testCaseID, exampleIndex)
 	if err != nil {
 		return nil, err
 	}
-	if !isValidTestResultStatus(req.Status) {
-		return nil, ErrInvalidTestResultStatus
-	}
-	req.ActualResult = sanitize.RichText.Sanitize(req.ActualResult)
-	req.Notes = sanitize.RichText.Sanitize(req.Notes)
-
 	result := ctxData.result
-	result.Status = req.Status
-	result.ActualResult = req.ActualResult
-	result.Notes = req.Notes
+	if req.Status != nil {
+		if !isValidTestResultStatus(*req.Status) {
+			return nil, ErrInvalidTestResultStatus
+		}
+		result.Status = *req.Status
+	}
+	if req.ActualResult != nil {
+		result.ActualResult = sanitize.RichText.Sanitize(*req.ActualResult)
+	}
+	if req.Notes != nil {
+		result.Notes = sanitize.RichText.Sanitize(*req.Notes)
+	}
 
 	err = database.WithTx(s.db, func(tx database.Tx) error {
 		if _, err := s.bddRepo.UpdateExampleResult(tx, result); err != nil {
@@ -627,7 +637,7 @@ func (s *TestRunService) UpdateExampleResult(workspaceID, runID, testCaseID, exa
 	return result, nil
 }
 
-// UpdateExampleStepResult records one step result within an example
+// UpdateExampleStepResult merge-patches one step result within an example
 // execution, derives the example's status from its step results, and
 // recomputes the case-level aggregate.
 func (s *TestRunService) UpdateExampleStepResult(workspaceID, runID, testCaseID, exampleIndex, stepNumber int, req TestExampleStepResultUpdateRequest) error {
@@ -635,26 +645,39 @@ func (s *TestRunService) UpdateExampleStepResult(workspaceID, runID, testCaseID,
 	if err != nil {
 		return err
 	}
-	if !isValidTestResultStatus(req.Status) {
-		return ErrInvalidTestResultStatus
-	}
 	if stepNumber < 1 || stepNumber > exampleRowBounds(ctxData.spec) {
 		return &TestManagementValidationError{Msg: "step number is outside the scenario's steps"}
 	}
-	if req.ItemID != nil {
+	if req.ItemIDSet && req.ItemID != nil {
 		itemWorkspaceID, err := s.itemRepo.GetWorkspaceID(*req.ItemID)
 		if err != nil || itemWorkspaceID != workspaceID {
 			return ErrTestRunItemNotFound
 		}
 	}
 
-	step := &models.TestExampleStepResult{
-		ExampleResultID: ctxData.result.ID,
-		StepNumber:      stepNumber,
-		Status:          req.Status,
-		ActualResult:    sanitize.RichText.Sanitize(req.ActualResult),
-		Notes:           sanitize.RichText.Sanitize(req.Notes),
-		ItemID:          req.ItemID,
+	// Start from the stored step result so absent patch fields keep their
+	// current value; a first write must at least carry a status.
+	step, err := s.bddRepo.FindExampleStepResult(ctxData.result.ID, stepNumber)
+	if err != nil {
+		if !errors.Is(err, repository.ErrNotFound) {
+			return err
+		}
+		step = &models.TestExampleStepResult{ExampleResultID: ctxData.result.ID, StepNumber: stepNumber, Status: "not_run"}
+	}
+	if req.Status != nil {
+		if !isValidTestResultStatus(*req.Status) {
+			return ErrInvalidTestResultStatus
+		}
+		step.Status = *req.Status
+	}
+	if req.ActualResult != nil {
+		step.ActualResult = sanitize.RichText.Sanitize(*req.ActualResult)
+	}
+	if req.Notes != nil {
+		step.Notes = sanitize.RichText.Sanitize(*req.Notes)
+	}
+	if req.ItemIDSet {
+		step.ItemID = req.ItemID
 	}
 	return database.WithTx(s.db, func(tx database.Tx) error {
 		if _, err := s.bddRepo.UpsertExampleStepResult(tx, step); err != nil {

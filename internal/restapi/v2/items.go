@@ -22,6 +22,20 @@ type idBatchRequest struct {
 	IDs []int `json:"ids"`
 }
 
+// itemHierarchyRequest scopes an ancestor read to a level-picked base page.
+// workspace_id/collection_id/sub_ql mirror the list endpoint's scope; the
+// server resolves the QL so the caller cannot widen it.
+type itemHierarchyRequest struct {
+	RootIDs       []int  `json:"root_ids"`
+	WorkspaceID   *int   `json:"workspace_id"`
+	CollectionID  *int   `json:"collection_id"`
+	QL            string `json:"ql"`
+	SubQL         string `json:"sub_ql"`
+	MaxDepth      int    `json:"max_depth"`
+	PerRootLimit  int    `json:"per_root_limit"`
+	PerRootOffset int    `json:"per_root_offset"`
+}
+
 type itemListMeta struct {
 	NextCursor     string   `json:"next_cursor,omitempty"`
 	Watermark      int64    `json:"watermark,omitempty"`
@@ -184,6 +198,48 @@ func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationServ
 			return nil, err
 		}
 		result, err := app.BatchAncestors(r.Context(), user.ID, ids)
+		return result, itemError(err)
+	})
+	builder.JSON(http.MethodPost, collection+"/hierarchy", http.StatusOK, false, AuthAuthenticated, []string{"items:read"}, func(r *http.Request, input itemHierarchyRequest) ([]repository.HierarchyRootGroup, error) {
+		user, err := principal(r)
+		if err != nil {
+			return nil, err
+		}
+		rootIDs, err := normalizeBatchIDs(input.RootIDs)
+		if err != nil {
+			return nil, err
+		}
+		if input.MaxDepth < 0 || input.PerRootLimit < 0 || input.PerRootOffset < 0 {
+			return nil, invalidQuery("max_depth")
+		}
+		request := services.ItemHierarchyRequest{
+			UserID:        user.ID,
+			QL:            input.QL,
+			SubQL:         input.SubQL,
+			RootIDs:       rootIDs,
+			MaxDepth:      input.MaxDepth,
+			PerRootLimit:  input.PerRootLimit,
+			PerRootOffset: input.PerRootOffset,
+		}
+		if input.WorkspaceID != nil {
+			request.WorkspaceID = *input.WorkspaceID
+		}
+		if input.CollectionID != nil {
+			request.CollectionID = *input.CollectionID
+		}
+		result, err := app.Hierarchy(r.Context(), request)
+		return result, itemError(err)
+	})
+	builder.Read(collection+"/level-counts", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]repository.HierarchyLevelCount, error) {
+		user, err := principal(r)
+		if err != nil {
+			return nil, err
+		}
+		_, request, err := parseItemList(r, user.ID)
+		if err != nil {
+			return nil, err
+		}
+		result, err := app.LevelCounts(r.Context(), request)
 		return result, itemError(err)
 	})
 	builder.Read("/workspaces/{workspace_key}/items/{item_number}", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (*models.Item, error) {
@@ -842,10 +898,11 @@ func parseItemListAt(r *http.Request, userID int, now time.Time) (Pagination, se
 	query := r.URL.Query()
 	request := services.ItemListRequest{
 		UserID: userID, QL: query.Get("ql"), SubQL: query.Get("sub_ql"),
-		Pagination:       services.PaginationParams{Limit: page.PageSize, Offset: page.Offset, Cursor: query.Get("cursor"), CursorMode: query.Get("cursor") != ""},
-		OmitDescriptions: query.Get("fields") == "summary",
-		IncludeWatermark: query.Get("include_watermark") == "true",
-		ExcludePersonal:  excludePersonal(r),
+		Pagination:         services.PaginationParams{Limit: page.PageSize, Offset: page.Offset, Cursor: query.Get("cursor"), CursorMode: query.Get("cursor") != ""},
+		OmitDescriptions:   query.Get("fields") == "summary",
+		IncludeWatermark:   query.Get("include_watermark") == "true",
+		IncludeHasChildren: query.Get("include_has_children") == "true",
+		ExcludePersonal:    excludePersonal(r),
 	}
 	for name, target := range map[string]*int{"workspace_id": &request.WorkspaceID, "collection_id": &request.CollectionID} {
 		if query.Get(name) == "" {

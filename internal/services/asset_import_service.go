@@ -197,7 +197,7 @@ func (s *AssetApplicationService) StartImport(userID, setID int, actor AuditActo
 	if !claimed {
 		return s.GetImportJob(userID, setID, jobID)
 	}
-	emitServiceAudit(s.db, actor, "asset_import", "asset_import", nil, jobID, map[string]any{"set_id": setID, "asset_type_id": input.AssetTypeID})
+	emitServiceAudit(s.db, actor, logger.ActionAssetImport, logger.ResourceAssetImport, nil, jobID, map[string]any{"set_id": setID, "asset_type_id": input.AssetTypeID})
 	job, err := s.GetImportJob(userID, setID, jobID)
 	if err != nil {
 		return AssetImportJob{}, err

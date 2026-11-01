@@ -4,7 +4,7 @@
   import GitBranch from '@lucide/svelte/icons/git-branch';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { onClickOutside } from 'runed';
-  import WindshiftAiIcon from '../../components/WindshiftAiIcon.svelte';
+  import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
 
   let {
     item = null,
@@ -38,7 +38,7 @@
     onclick={(e) => { e.stopPropagation(); showMenu = !showMenu; }}
     title="AI Actions"
   >
-    <WindshiftAiIcon class="w-4 h-4 flex-shrink-0" />
+    <IconMessageChatbot class="w-4 h-4 flex-shrink-0" />
     <span class="action-label">AI</span>
     <ChevronDown class="w-3 h-3 ml-0.5" />
   </button>

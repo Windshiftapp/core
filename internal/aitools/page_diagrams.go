@@ -44,12 +44,12 @@ func init() {
 		Risk:        RiskMedium,
 		Description: "Create an editable Mermaid-seeded or Excalidraw diagram and embed it at the explicit start/end of a Page.",
 		Scopes:      []string{auth.ScopePagesWrite},
-		Run: func(_ context.Context, env *Env, args createPageDiagramArgs) (any, error) {
+		Run: func(ctx context.Context, env *Env, args createPageDiagramArgs) (any, error) {
 			service, page, result := authorizedPageDiagramService(env, args.PageID)
 			if result != nil {
 				return result, nil
 			}
-			diagram, err := service.Create(pageAuditActor(env), services.CreatePageDiagramInput{
+			diagram, err := service.Create(ctx, pageAuditActor(env), services.CreatePageDiagramInput{
 				PageID:              page.ID,
 				Name:                args.Name,
 				Mermaid:             args.Mermaid,
@@ -71,12 +71,12 @@ func init() {
 		Risk:        RiskLow,
 		Description: "List editable diagrams embedded in a Page, including their attachment IDs, kinds, payloads, and current Page content hash.",
 		Scopes:      []string{auth.ScopePagesRead},
-		Run: func(_ context.Context, env *Env, args listPageDiagramsArgs) (any, error) {
+		Run: func(ctx context.Context, env *Env, args listPageDiagramsArgs) (any, error) {
 			service, page, result := authorizedPageDiagramService(env, args.PageID)
 			if result != nil {
 				return result, nil
 			}
-			diagrams, err := service.List(pageAuditActor(env), page.ID)
+			diagrams, err := service.List(ctx, pageAuditActor(env), page.ID)
 			if err != nil {
 				return pageDiagramToolError(err), nil
 			}
@@ -91,12 +91,12 @@ func init() {
 		Risk:        RiskLow,
 		Description: "Fetch one editable Page diagram by its Page and attachment IDs, including the Mermaid seed or Excalidraw scene.",
 		Scopes:      []string{auth.ScopePagesRead},
-		Run: func(_ context.Context, env *Env, args getPageDiagramArgs) (any, error) {
+		Run: func(ctx context.Context, env *Env, args getPageDiagramArgs) (any, error) {
 			service, page, result := authorizedPageDiagramService(env, args.PageID)
 			if result != nil {
 				return result, nil
 			}
-			diagram, err := service.Get(pageAuditActor(env), page.ID, args.AttachmentID)
+			diagram, err := service.Get(ctx, pageAuditActor(env), page.ID, args.AttachmentID)
 			if err != nil {
 				return pageDiagramToolError(err), nil
 			}
@@ -111,12 +111,12 @@ func init() {
 		Risk:        RiskMedium,
 		Description: "Replace exactly one embedded Page diagram with a new immutable Mermaid-seeded or Excalidraw attachment.",
 		Scopes:      []string{auth.ScopePagesWrite},
-		Run: func(_ context.Context, env *Env, args updatePageDiagramArgs) (any, error) {
+		Run: func(ctx context.Context, env *Env, args updatePageDiagramArgs) (any, error) {
 			service, page, result := authorizedPageDiagramService(env, args.PageID)
 			if result != nil {
 				return result, nil
 			}
-			diagram, err := service.Update(pageAuditActor(env), services.UpdatePageDiagramInput{
+			diagram, err := service.Update(ctx, pageAuditActor(env), services.UpdatePageDiagramInput{
 				PageID:              page.ID,
 				AttachmentID:        args.AttachmentID,
 				Name:                args.Name,

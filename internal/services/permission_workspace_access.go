@@ -90,7 +90,7 @@ func (ps *PermissionService) accessibleWorkspacePairs(userID int) ([]repository.
 
 	out := make([]repository.IDKey, 0, len(activePairs))
 	for _, pair := range activePairs {
-		if workspacePermissionFromSnapshot(permissions, pair.ID, models.PermissionItemView) {
+		if ps.workspacePermission(permissions, pair.ID, models.PermissionItemView) {
 			out = append(out, pair)
 		}
 	}
@@ -157,15 +157,16 @@ type WorkspaceVisibility interface {
 // snapshotWorkspaceVisibility answers from an already-decoded snapshot;
 // evaluation is fail-closed map lookups and cannot error.
 type snapshotWorkspaceVisibility struct {
+	service     *PermissionService
 	permissions *models.UserPermissionCache
 }
 
 func (v snapshotWorkspaceVisibility) CanView(workspaceID int) (bool, error) {
-	return workspacePermissionFromSnapshot(v.permissions, workspaceID, models.PermissionItemView), nil
+	return v.service.workspacePermission(v.permissions, workspaceID, models.PermissionItemView), nil
 }
 
 func (v snapshotWorkspaceVisibility) CanAdmin(workspaceID int) (bool, error) {
-	return workspacePermissionFromSnapshot(v.permissions, workspaceID, models.PermissionWorkspaceAdmin), nil
+	return v.service.workspacePermission(v.permissions, workspaceID, models.PermissionWorkspaceAdmin), nil
 }
 
 // WorkspaceVisibility acquires the request-scoped evaluator. A snapshot build
@@ -177,13 +178,17 @@ func (ps *PermissionService) WorkspaceVisibility(userID int) (WorkspaceVisibilit
 	if err != nil {
 		return nil, err
 	}
-	return snapshotWorkspaceVisibility{permissions: permissions}, nil
+	return snapshotWorkspaceVisibility{service: ps, permissions: permissions}, nil
 }
 
 // InvalidateActiveWorkspaceCache makes local workspace create/update/delete
 // mutations visible immediately. The TTL bounds changes made by other replicas.
 func (ps *PermissionService) InvalidateActiveWorkspaceCache() {
-	if ps != nil && ps.workspaceAccess != nil {
+	if ps == nil {
+		return
+	}
+	ps.everyoneGeneration.Add(1)
+	if ps.workspaceAccess != nil {
 		ps.workspaceAccess.epoch.Add(1)
 		ps.workspaceAccess.active.Store(nil)
 	}

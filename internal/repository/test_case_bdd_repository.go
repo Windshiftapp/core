@@ -246,27 +246,6 @@ func scanExampleResult(rows exampleResultScanner) (models.TestExampleResult, err
 	return result, nil
 }
 
-// FindExampleResultByID returns one example result, scoped to the run's
-// workspace.
-func (r *TestCaseBDDRepository) FindExampleResultByID(runID, workspaceID, exampleResultID int) (*models.TestExampleResult, error) {
-	row := r.db.QueryRow(`
-		SELECT er.id, er.run_id, er.test_case_id, er.example_index, er.row_values,
-		       er.status, COALESCE(er.actual_result, ''), COALESCE(er.notes, ''),
-		       er.executed_at, er.created_at, er.updated_at
-		FROM test_example_results er
-		JOIN test_runs run ON run.id = er.run_id
-		WHERE er.id = ? AND er.run_id = ? AND run.workspace_id = ?
-	`, exampleResultID, runID, workspaceID)
-	result, err := scanExampleResult(row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &result, nil
-}
-
 // FindStepResultsForExample returns the recorded step results of one example
 // execution ordered by step number.
 func (r *TestCaseBDDRepository) FindStepResultsForExample(exampleResultID int) ([]models.TestExampleStepResult, error) {
@@ -295,6 +274,27 @@ func (r *TestCaseBDDRepository) FindStepResultsForExample(exampleResultID int) (
 		return nil, fmt.Errorf("failed to iterate example step results: %w", err)
 	}
 	return results, nil
+}
+
+// FindExampleStepResult returns one recorded step result of an example
+// execution, or ErrNotFound when the step has no result yet.
+func (r *TestCaseBDDRepository) FindExampleStepResult(exampleResultID, stepNumber int) (*models.TestExampleStepResult, error) {
+	row := r.db.QueryRow(`
+		SELECT id, example_result_id, step_number, status, COALESCE(actual_result, ''),
+		       COALESCE(notes, ''), item_id, executed_at
+		FROM test_example_step_results
+		WHERE example_result_id = ? AND step_number = ?
+	`, exampleResultID, stepNumber)
+	var step models.TestExampleStepResult
+	err := row.Scan(&step.ID, &step.ExampleResultID, &step.StepNumber,
+		&step.Status, &step.ActualResult, &step.Notes, &step.ItemID, &step.ExecutedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to find example step result: %w", err)
+	}
+	return &step, nil
 }
 
 // UpsertExampleStepResult inserts or updates one step result of an example

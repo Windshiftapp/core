@@ -1,6 +1,6 @@
 <script>
   import Square from '@lucide/svelte/icons/square';
-  import CheckSquare from '@lucide/svelte/icons/check-square';
+  import CheckSquare from '@lucide/svelte/icons/square-check';
   import Button from '../components/Button.svelte';
   import DescriptionText from '../components/DescriptionText.svelte';
   import AIModalShell from '../components/AIModalShell.svelte';

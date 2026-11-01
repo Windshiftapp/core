@@ -134,9 +134,9 @@
   });
 
   function handleSelect(user) {
-    // The roster decides whether a display-name mention would be ambiguous, so
-    // the editor inserts a username instead when another user shares the name.
-    onSelect?.({ ...user, mentionText: mentionTextFor(user, users) });
+    // The token embeds the user id, so the mention never depends on the display
+    // name being unique and never exposes a username that may be an email.
+    onSelect?.({ ...user, mentionText: mentionTextFor(user) });
   }
 
   // Keys the picker owns while it is open. While a mention is in progress,

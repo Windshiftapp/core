@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { ai, llmProviders } from '../../api/ai.js';
   import { iterations } from '../../api/milestones.js';
-  import IconSparkles from '@tabler/icons-svelte-runes/icons/sparkles';
+  import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
   import IconRotate from '@tabler/icons-svelte-runes/icons/rotate';
   import IconCircleCheck from '@tabler/icons-svelte-runes/icons/circle-check';
   import IconAlertCircle from '@tabler/icons-svelte-runes/icons/alert-circle';
@@ -163,7 +163,7 @@
 <div class="flex min-h-screen" style="background-color: var(--ds-surface);">
   <div class="flex-1 max-w-5xl mx-auto p-6">
   <PageHeader
-    icon={IconSparkles}
+    icon={IconMessageChatbot}
     title="Dependency Analysis"
     subtitle={iteration ? `Analyze dependencies for ${iteration.name}` : 'AI-powered dependency detection'}
   />
@@ -181,7 +181,7 @@
       <Card variant="raised" padding="default">
         <div class="flex flex-col items-center py-8 gap-4">
           <div class="rounded-full p-4" style="background-color: var(--ds-surface-sunken);">
-            <IconSparkles size={32} style="color: var(--ds-text-subtle);" />
+            <IconMessageChatbot size={32} style="color: var(--ds-text-subtle);" />
           </div>
           <p class="text-sm text-center max-w-md" style="color: var(--ds-text-subtle);">
             Analyze items in this iteration to discover dependency relationships between work items across workspaces.

@@ -13,6 +13,7 @@ import (
 
 	"windshift/internal/logbookauth"
 	"windshift/internal/middleware"
+	"windshift/internal/ratelimit"
 	"windshift/internal/services"
 	"windshift/internal/utils"
 )
@@ -22,7 +23,7 @@ type LogbookProxyConfig struct {
 	Endpoint          string
 	AuthMiddleware    *middleware.AuthMiddleware
 	PermissionService *services.PermissionService
-	UploadLimiter     *middleware.RateLimiter
+	UploadLimiter     *ratelimit.Limiter
 	// SharedSecret is the HMAC key used to sign X-Logbook-* headers so the
 	// sidecar can verify requests originated from this proxy rather than
 	// trusting network reachability. Sourced from SSO_SECRET.

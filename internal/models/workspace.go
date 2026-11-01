@@ -372,15 +372,26 @@ type ViewSettings struct {
 	// override/inherit state.
 	MilestoneSwimlanes *MilestoneSwimlaneConfig `json:"milestone_swimlanes,omitempty"`
 	// CompletedVisibility selects how much completed work a board fetches:
-	// "all", "last_day", "last_week", "current_iteration", or "none". nil
-	// inherits; an explicit empty string keeps the legacy
+	// "all", "last_day", "last_week", "limit", or "none". nil inherits; an
+	// explicit empty string keeps the legacy
 	// show_rightmost_column_last_50 / completed_item_retention_days behavior.
 	CompletedVisibility *string `json:"completed_visibility,omitempty"`
+	// CompletedLimit caps how many completed items a board fetches when
+	// CompletedVisibility is "limit". nil uses DefaultCompletedLimit.
+	CompletedLimit *int `json:"completed_limit,omitempty"`
 }
 
 // CompletedVisibilityValues are the accepted completed-work presets. The empty
 // string is the legacy behavior and is only valid as an explicit reset.
-var CompletedVisibilityValues = []string{"", "all", "last_day", "last_week", "current_iteration", "none"}
+var CompletedVisibilityValues = []string{"", "all", "last_day", "last_week", "limit", "none"}
+
+// Bounds for an explicit completed-item cap. The upper bound matches the API's
+// maximum page size so a "limit" board fetches its completed work in one read.
+const (
+	DefaultCompletedLimit = 100
+	MinCompletedLimit     = 1
+	MaxCompletedLimit     = 1000
+)
 
 // IsCompletedVisibility reports whether value is an accepted preset.
 func IsCompletedVisibility(value string) bool {
@@ -397,7 +408,7 @@ func (v *ViewSettings) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	for key := range fields {
-		if key != "enabled_views" && key != "milestone_swimlanes" && key != "completed_visibility" {
+		if key != "enabled_views" && key != "milestone_swimlanes" && key != "completed_visibility" && key != "completed_limit" {
 			return fmt.Errorf("view_settings: unknown key %q", key)
 		}
 	}
@@ -428,6 +439,14 @@ func (v *ViewSettings) UnmarshalJSON(data []byte) error {
 			}
 		}
 		v.CompletedVisibility = &visibility
+	}
+	v.CompletedLimit = nil
+	if raw, ok := fields["completed_limit"]; ok && string(raw) != "null" {
+		var limit int
+		if err := json.Unmarshal(raw, &limit); err != nil {
+			return err
+		}
+		v.CompletedLimit = &limit
 	}
 	return nil
 }
@@ -461,6 +480,13 @@ func (v ViewSettings) MarshalJSON() ([]byte, error) {
 			return nil, err
 		}
 		fields["completed_visibility"] = encoded
+	}
+	if v.CompletedLimit != nil {
+		encoded, err := json.Marshal(*v.CompletedLimit)
+		if err != nil {
+			return nil, err
+		}
+		fields["completed_limit"] = encoded
 	}
 	return json.Marshal(fields)
 }

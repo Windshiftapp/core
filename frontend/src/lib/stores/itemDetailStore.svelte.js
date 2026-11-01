@@ -315,14 +315,28 @@ class ItemDetailStore {
       effectiveItemId = itemData.id;
       effectiveWorkspaceId = itemData.workspace_id;
       this.itemId = effectiveItemId;
-      // Screen field state must never outlive the item that produced it: clear
-      // it synchronously with the item assignment; #hydrateScreenFields refills
-      // it from the summary or the workspace cache.
-      this.workspaceScreenFields = [];
-      this.workspaceScreenSystemFields = [];
-      this.editableScreenFieldIds = null;
-      this.editableScreenSystemFields = null;
-      this.item = itemData;
+      // A background reconcile of the same item (SSE `changed`) must not tear
+      // down the editing UI: keep the resolved screen fields and merge the
+      // incoming snapshot over the active local edits instead of replacing it.
+      // A different item, workspace, or item type still gets a full reset.
+      const previousItem = this.item;
+      const sameItem =
+        previousItem != null &&
+        String(previousItem.id) === String(itemData.id) &&
+        previousItem.workspace_id === itemData.workspace_id &&
+        previousItem.item_type_id === itemData.item_type_id;
+      if (!sameItem) {
+        // Screen field state must never outlive the item that produced it: clear
+        // it synchronously with the item assignment; #hydrateScreenFields refills
+        // it from the summary or the workspace cache.
+        this.workspaceScreenFields = [];
+        this.workspaceScreenSystemFields = [];
+        this.editableScreenFieldIds = null;
+        this.editableScreenSystemFields = null;
+      }
+      this.item = sameItem
+        ? this.#mergeItemPreservingActiveEdits(previousItem, itemData)
+        : itemData;
       if (this.item.assignee_id === undefined) {
         this.item.assignee_id = null;
       }
@@ -382,11 +396,9 @@ class ItemDetailStore {
       this.availableSubIssueTypes = summary.available_sub_issue_types || [];
       this.manualActions = summary.manual_actions || [];
 
-      const fieldConfigPromise = this.#hydrateScreenFields(
-        summary.screen_context,
-        itemData.item_type_id ?? null,
-        token
-      );
+      const fieldConfigPromise = sameItem
+        ? Promise.resolve()
+        : this.#hydrateScreenFields(summary.screen_context, itemData.item_type_id ?? null, token);
 
       this.storyPointsRollup = summary.story_points_rollup || null;
 
@@ -397,7 +409,11 @@ class ItemDetailStore {
 
       // Heavy optional panels such as diagrams, worklogs, history, SCM detail,
       // and agent logs remain deferred behind their existing loaders.
-      this.#syncEditingFromItem();
+      if (sameItem) {
+        this.#syncInactiveEditingFromItem();
+      } else {
+        this.#syncEditingFromItem();
+      }
       await fieldConfigPromise;
       // Screen-field hydration can outlive this request; a newer load that
       // started meanwhile owns the store now.

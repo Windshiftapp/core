@@ -16,7 +16,7 @@ export default withEnglishAdminOperations({
   workspaceMembers: {
     invalidWorkspace: '工作区无效。', loadFailed: '无法加载工作区成员。', addMemberFailed: '无法添加成员：{error}', addGroupFailed: '无法添加用户组：{error}',
     removeRoleTitle: '从 {name} 移除“{role}”角色？', removeRoleMessage: '这将移除角色分配及其权限。', removeRoleFailed: '无法移除角色：{error}',
-    summaryTitle: '访问摘要', summaryDescription: '显示此工作区中的角色分配。没有分配成员或用户组的角色对所有人开放。权限层级：{viewer} → {editor} → {tester}。',
+    summaryTitle: '访问摘要', summaryDescription: '显示此工作区中的角色分配。没有分配成员或用户组的角色对所有人开放。为任何人分配 {viewer} 角色后，工作区将受限，仅被分配的用户和用户组可以查看。权限层级：{viewer} → {editor} → {tester}。',
     role: '角色', effectiveAccess: '访问权限', assignments: '分配对象', memberOrGroup: '成员或用户组', rolesLabel: '角色', actions: '操作',
     roles: {
       viewer: { name: '查看者', description: '查看工作区内容并参与讨论' },

@@ -687,8 +687,9 @@ func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Re
 			IPAddress:    utils.GetClientIP(r),
 			UserAgent:    r.UserAgent(),
 			ActionType:   logger.ActionLoginFailure,
-			ResourceType: logger.ResourceWebAuthn,
+			ResourceType: logger.ResourceUser,
 			ResourceID:   &user.ID,
+			Details:      map[string]any{"credential_id": credential.ID},
 			Success:      false,
 			ErrorMessage: "authenticator clone warning",
 		})

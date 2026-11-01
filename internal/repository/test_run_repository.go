@@ -313,7 +313,8 @@ func (r *TestRunRepository) CreateResultsFromSet(tx database.Tx, runID, setID in
 // TestResultWithTestCase is a test result paired with the parent test case title.
 type TestResultWithTestCase struct {
 	models.TestResult
-	TestCaseTitle string
+	TestCaseTitle  string
+	TestCaseFormat string
 }
 
 // FindResultsWithTestCase returns test results for a run (scoped to workspace)
@@ -321,7 +322,7 @@ type TestResultWithTestCase struct {
 func (r *TestRunRepository) FindResultsWithTestCase(runID, workspaceID int) ([]TestResultWithTestCase, error) {
 	rows, err := r.db.Query(`
 		SELECT tr.id, tr.run_id, tr.test_case_id, tr.status, tr.actual_result, tr.notes,
-		       tr.executed_at, tr.created_at, tr.updated_at, tc.title
+		       tr.executed_at, tr.created_at, tr.updated_at, tc.title, tc.format
 		FROM test_results tr
 		JOIN test_cases tc ON tr.test_case_id = tc.id
 		JOIN test_runs run ON tr.run_id = run.id
@@ -341,7 +342,7 @@ func (r *TestRunRepository) FindResultsWithTestCase(runID, workspaceID int) ([]T
 
 		if err := rows.Scan(&res.ID, &res.RunID, &res.TestCaseID, &res.Status,
 			&actualResult, &notes, &executedAt,
-			&res.CreatedAt, &res.UpdatedAt, &res.TestCaseTitle); err != nil {
+			&res.CreatedAt, &res.UpdatedAt, &res.TestCaseTitle, &res.TestCaseFormat); err != nil {
 			return nil, fmt.Errorf("failed to scan test result row: %w", err)
 		}
 		if actualResult.Valid {

@@ -14,11 +14,27 @@ type PluginMetadata struct {
 	Extensions   []Extension `json:"extensions,omitempty"`
 }
 
+// RouteAuth is the credential a plugin route requires. It is declared in the
+// manifest (or returned by get_routes/get_metadata) and enforced by the plugin
+// router. The zero value is normalized to RouteAuthSession, so a route is
+// private unless it explicitly opts into being public.
+type RouteAuth string
+
+const (
+	// RouteAuthSession requires an authenticated session and CSRF validation.
+	RouteAuthSession RouteAuth = "session"
+	// RouteAuthAdmin requires an authenticated system administrator.
+	RouteAuthAdmin RouteAuth = "admin"
+	// RouteAuthNone is a public route. It is an explicit opt-in.
+	RouteAuthNone RouteAuth = "none"
+)
+
 // Route describes an HTTP route the plugin handles.
 type Route struct {
-	Method      string `json:"method"`
-	Path        string `json:"path"`
-	Description string `json:"description"`
+	Method      string    `json:"method"`
+	Path        string    `json:"path"`
+	Description string    `json:"description"`
+	Auth        RouteAuth `json:"auth,omitempty"`
 }
 
 // Extension represents a UI extension point provided by a plugin.
@@ -35,14 +51,24 @@ type Extension struct {
 	PluginName  string `json:"pluginName"`       // Name of the plugin this extension belongs to
 }
 
+// Principal is the authoritative caller identity forwarded to a plugin. It is
+// nil on public routes. Raw headers stay for compatibility, but this is the
+// only trusted identity.
+type Principal struct {
+	UserID   int   `json:"user_id"`
+	IsAdmin  bool  `json:"is_admin"`
+	GroupIDs []int `json:"group_ids"`
+}
+
 // HTTPRequest represents an incoming HTTP request forwarded to a plugin.
 type HTTPRequest struct {
-	Method  string            `json:"method"`
-	Path    string            `json:"path"`
-	Headers map[string]string `json:"headers"`
-	Body    string            `json:"body"`
-	Query   map[string]string `json:"query"`
-	Params  map[string]string `json:"params"`
+	Method    string            `json:"method"`
+	Path      string            `json:"path"`
+	Headers   map[string]string `json:"headers"`
+	Body      string            `json:"body"`
+	Query     map[string]string `json:"query"`
+	Params    map[string]string `json:"params"`
+	Principal *Principal        `json:"principal,omitempty"`
 }
 
 // HTTPResponse represents the plugin's HTTP response.

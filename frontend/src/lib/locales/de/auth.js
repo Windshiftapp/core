@@ -109,6 +109,15 @@ export default {
     languageHint: 'Ihre bevorzugte Sprache für die Anwendungsoberfläche',
     saveSettings: 'Einstellungen speichern',
     settingsSaved: 'Einstellungen erfolgreich gespeichert',
+    notificationsTab: 'Benachrichtigungen',
+    dueDateReminders: 'Fälligkeitserinnerungen',
+    dueDateRemindersDesc:
+      'Erhalte eine Benachrichtigung, wenn sich deine offenen Elemente ihrem Fälligkeitsdatum nähern. Das gilt auch für Elemente in deinem persönlichen Arbeitsbereich.',
+    dueDateRemindersEnable: 'Fälligkeitserinnerungen aktivieren',
+    dueDateRemindersEnableHint:
+      'Erinnerungen werden nur gesendet, wenn du sie hier aktivierst; sie sind nie automatisch.',
+    dueDateReminderDays: 'Tage vor dem Fälligkeitsdatum',
+    dueDateReminderDaysHint: 'Wähle zwischen 1 und 30 Tagen.',
     connectedAccounts: 'Verbundene Konten',
     connectedAccountsTab: 'Konten',
     connectedAccountsDesc: 'Verbinden Sie Ihre Quellcodeverwaltungskonten, um Branches und Pull Requests zu erstellen',

@@ -373,7 +373,7 @@ func (h *TimeCustomerHandler) UpdateRequestSharing(w http.ResponseWriter, r *htt
 	}
 
 	if user != nil {
-		h.auditor.Log(r, user, logger.ActionTimeCustomerUpdate, logger.ResourceTimeCustomer, &id, "request-sharing")
+		h.auditor.Log(r, user, logger.ActionTimeCustomerUpdate, logger.ResourceTimeCustomer, &id, c.Name)
 	}
 
 	respondJSONOK(w, map[string]any{

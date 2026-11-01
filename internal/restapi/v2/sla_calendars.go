@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"windshift/internal/businesstime"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -165,6 +166,7 @@ func createSLACalendar(deps Deps) jsonOperation[slaCalendarRequest, *models.Work
 		if err != nil {
 			return nil, slaCalendarError(err)
 		}
+		logger.Record(r, logger.ActionSLACalendarCreate, logger.ResourceSLACalendar, &calendar.ID, calendar.Name, map[string]any{"workspace_id": workspaceID})
 		return calendar, nil
 	}
 }
@@ -191,6 +193,7 @@ func updateSLACalendar(deps Deps) jsonOperation[slaCalendarRequest, *models.Work
 		if err != nil {
 			return nil, slaCalendarError(err)
 		}
+		logger.Record(r, logger.ActionSLACalendarUpdate, logger.ResourceSLACalendar, &calendar.ID, calendar.Name, map[string]any{"workspace_id": workspaceID})
 		return calendar, nil
 	}
 }
@@ -212,6 +215,7 @@ func deleteSLACalendar(deps Deps) commandOperation {
 		if err := service.DeleteWorkspace(r.Context(), workspaceID, calendarID); err != nil {
 			return slaCalendarError(err)
 		}
+		logger.Record(r, logger.ActionSLACalendarDelete, logger.ResourceSLACalendar, &calendarID, "", map[string]any{"workspace_id": workspaceID})
 		return nil
 	}
 }

@@ -318,20 +318,6 @@ func (r *PermissionRepository) ListEffectiveUserGlobalGrants() ([]UserEffectiveG
 	return grants, nil
 }
 
-// GetUserBasic returns the basic user fields needed by the permission
-// summary view.
-func (r *PermissionRepository) GetUserBasic(userID int) (*models.User, error) {
-	var user models.User
-	err := r.db.QueryRow(`
-		SELECT id, email, username, first_name, last_name, is_active
-		FROM users WHERE id = ?
-	`, userID).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName, &user.IsActive)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user info: %w", err)
-	}
-	return &user, nil
-}
-
 // ListUserGlobalGrants returns a user's direct global permission grants
 // with the Permission populated. Rows that fail to scan are skipped.
 func (r *PermissionRepository) ListUserGlobalGrants(userID int) ([]models.UserGlobalPermission, error) {
@@ -486,47 +472,4 @@ func (r *PermissionRepository) ListUserWorkspacePermissionKeys(userID int) (map[
 		result[workspaceID][key] = true
 	}
 	return result, rows.Err()
-}
-
-// PermissionsByKey returns the full permission catalog keyed by
-// permission_key. Rows that fail to scan are skipped and iteration errors
-// are ignored — callers use this as a best-effort lookup table.
-func (r *PermissionRepository) PermissionsByKey() (map[string]*models.Permission, error) {
-	lookup := make(map[string]*models.Permission)
-	rows, err := r.db.Query("SELECT " + permissionColumns + " FROM permissions")
-	if err != nil {
-		return lookup, fmt.Errorf("list permissions by key: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	for rows.Next() {
-		var p models.Permission
-		if scanErr := rows.Scan(&p.ID, &p.PermissionKey, &p.PermissionName, &p.Description, &p.Scope, &p.IsSystem, &p.CreatedAt, &p.UpdatedAt); scanErr == nil {
-			cp := p // copy to avoid pointer reuse
-			lookup[p.PermissionKey] = &cp
-		}
-	}
-	_ = rows.Err()
-	return lookup, nil
-}
-
-// ListWorkspacesBasic returns id/name/description/key for every workspace.
-// Rows that fail to scan are skipped and iteration errors are ignored —
-// callers use this as a best-effort lookup table.
-func (r *PermissionRepository) ListWorkspacesBasic() ([]models.Workspace, error) {
-	rows, err := r.db.Query("SELECT id, name, description, key FROM workspaces")
-	if err != nil {
-		return nil, fmt.Errorf("list workspaces: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	var workspaces []models.Workspace
-	for rows.Next() {
-		var w models.Workspace
-		if scanErr := rows.Scan(&w.ID, &w.Name, &w.Description, &w.Key); scanErr == nil {
-			workspaces = append(workspaces, w)
-		}
-	}
-	_ = rows.Err()
-	return workspaces, nil
 }

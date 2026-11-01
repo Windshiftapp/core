@@ -17,6 +17,7 @@ func registerPageRoutes(builder *routeBuilder, deps Deps) {
 	pages := deps.PageApplication
 	builder.Read("/workspaces/{workspace_id}/pages", AuthAuthenticated, []string{"pages:read"}, listPages(pages))
 	builder.Read("/pages/titles", AuthAuthenticated, []string{"pages:read"}, listPageTitlesAcrossWorkspaces(pages))
+	builder.Read("/pages/summaries", AuthAuthenticated, []string{"pages:read"}, listPageSummariesAcrossWorkspaces(pages))
 	builder.Read("/workspaces/{workspace_id}/pages/effective-levels", AuthAuthenticated, []string{"pages:read"}, listPageEffectiveLevels(pages))
 	builder.Read("/workspaces/{workspace_id}/pages/archived", AuthAuthenticated, []string{"pages:read"}, listArchivedPages(pages))
 	builder.Read("/workspaces/{workspace_id}/pages/search", AuthAuthenticated, []string{"pages:read"}, searchPages(pages))
@@ -108,6 +109,27 @@ func listPageTitlesAcrossWorkspaces(pages pageApplication) readOperation[[]servi
 			return []services.PageTitleRow{}, nil
 		}
 		return pages.ListTitlesAcrossWorkspaces(user.ID, workspaceIDs)
+	}
+}
+
+// listPageSummariesAcrossWorkspaces serves the mobile pages list and search
+// for several workspaces in one request, so the client batches workspace ids
+// instead of fanning out one request per workspace (WI-1918).
+func listPageSummariesAcrossWorkspaces(pages pageApplication) readOperation[[]services.PageSummaryRow] {
+	return func(r *http.Request) ([]services.PageSummaryRow, error) {
+		user, err := principal(r)
+		if err != nil {
+			return nil, err
+		}
+		workspaceIDs := parseWorkspaceIDList(r.URL.Query().Get("workspace_ids"), maxTitleWorkspaces)
+		if len(workspaceIDs) == 0 {
+			return []services.PageSummaryRow{}, nil
+		}
+		limit, err := parsePositiveInt(r, "limit", 12, 100)
+		if err != nil {
+			return nil, err
+		}
+		return pages.ListSummariesAcrossWorkspaces(user.ID, workspaceIDs, r.URL.Query().Get("q"), limit)
 	}
 }
 

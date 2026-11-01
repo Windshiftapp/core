@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/sanitize"
 	"windshift/internal/utils"
@@ -370,7 +371,7 @@ func (s *PlanningApplicationService) ReleaseMilestone(ctx context.Context, userI
 		_ = s.planning.MarkMilestoneReleaseUncertain(ctx, attempt.ID, attempt.LeaseToken, err.Error())
 		return nil, err
 	}
-	emitServiceAudit(s.planning.db, actor, "milestone.release", "milestone", &id, result.Name, nil)
+	emitServiceAudit(s.planning.db, actor, logger.ActionMilestoneRelease, logger.ResourceMilestone, &id, result.Name, nil)
 	return result, nil
 }
 

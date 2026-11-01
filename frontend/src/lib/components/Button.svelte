@@ -8,6 +8,8 @@
     variant = 'default',
     size = 'medium',
     disabled = false,
+    /** Toggle state for toggle buttons; renders aria-pressed when set. */
+    pressed = undefined,
     icon = null,
     iconPosition = 'left',
     /** @type {"button" | "submit" | "reset"} */
@@ -168,7 +170,7 @@
       {@render linkContent()}
     </a>
   {:else}
-    <button bind:this={buttonEl} {id} type={buttonType} disabled={effectiveDisabled} aria-busy={loading} {style} data-testid={dataTestid} data-page-id={dataPageId} class={allClasses} onclick={handleClick}>
+    <button bind:this={buttonEl} {id} type={buttonType} disabled={effectiveDisabled} aria-busy={loading} aria-pressed={pressed} {style} data-testid={dataTestid} data-page-id={dataPageId} class={allClasses} onclick={handleClick}>
       {@render buttonContent()}
     </button>
   {/if}

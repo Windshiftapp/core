@@ -195,6 +195,7 @@ lint:
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not installed; run 'make dev-tools' first"; exit 1; }
 	@scripts/run-golangci-lint.sh run --timeout=5m
 	@node scripts/check-sql-boolean-literals.mjs
+	@node scripts/check-audit-literals.mjs
 	@bash scripts/check-layering.sh
 	@bash scripts/check-handler-db-access.sh
 

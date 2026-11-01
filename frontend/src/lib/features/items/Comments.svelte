@@ -21,6 +21,7 @@
 	import { agentOwnerName, loadAttributedComments } from './activityAttributionData.js';
 	import { isExpectedBackgroundSyncError } from '../../utils/backgroundSync.js';
 	import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
+	import { collectionPreferences } from '../../stores/collectionPreferences.svelte.js';
 	import CannedResponsePicker from '../support/CannedResponsePicker.svelte';
 	import CommentReactions from './CommentReactions.svelte';
 
@@ -63,8 +64,9 @@
 	// Get user's timezone
 	let timezone = $derived(getUserTimezone(authStore.currentUser));
 
-	// Sort state
-	let sortOrder = $state('oldest'); // 'oldest' | 'newest'
+	// Sort state: the preference is persisted in user settings and loaded with
+	// the rest of the shell preferences, so it follows the user across devices.
+	let sortOrder = $derived(collectionPreferences.commentSortOrder);
 
 	// Count of comments that arrived via polling and the user hasn't acknowledged.
 	let newCount = $state(0);
@@ -107,7 +109,7 @@
 	const hiddenCommentCount = $derived(sortedComments.length - visibleComments.length);
 
 	function toggleSortOrder() {
-		sortOrder = sortOrder === 'oldest' ? 'newest' : 'oldest';
+		collectionPreferences.setCommentSortOrder(sortOrder === 'oldest' ? 'newest' : 'oldest');
 		renderedCommentLimit = RENDER_WINDOW_STEP;
 	}
 

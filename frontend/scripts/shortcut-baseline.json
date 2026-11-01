@@ -205,13 +205,6 @@
       "message": "Likely Add/Create/New button is missing a visible keyboard hint and hotkeyConfig."
     },
     {
-      "signature": "src/lib/features/labels/PersonalLabelManager.svelte:add-create-button-without-shortcut:<Button variant=\"primary\" size=\"small\" icon={Plus} onclick={openCreate} > {t('users.labels.new') || 'New label'}",
-      "count": 1,
-      "file": "src/lib/features/labels/PersonalLabelManager.svelte",
-      "rule": "add-create-button-without-shortcut",
-      "message": "Likely Add/Create/New button is missing a visible keyboard hint and hotkeyConfig."
-    },
-    {
       "signature": "src/lib/features/logbook/BucketNavigation.svelte:add-create-button-without-shortcut:<Button variant=\"default\" icon={Plus} onclick={() => showCreateForm = true} class=\"w-full justify-center\" > {t('logbook.createBucket')}",
       "count": 1,
       "file": "src/lib/features/logbook/BucketNavigation.svelte",

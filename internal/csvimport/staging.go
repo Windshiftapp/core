@@ -186,8 +186,3 @@ type StagedUpload struct {
 func UploadPath(storageRoot, uploadID string) string {
 	return filepath.Join(storageRoot, "imports", uploadID, "upload.csv")
 }
-
-// RemoveUpload deletes the staged directory for one upload ID.
-func RemoveUpload(storageRoot, uploadID string) {
-	_ = os.RemoveAll(filepath.Join(storageRoot, "imports", uploadID))
-}

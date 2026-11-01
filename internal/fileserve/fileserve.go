@@ -34,6 +34,23 @@ func OpenUnderRoot(root, storedPath string) (*os.File, error) {
 	return r.Open(rel)
 }
 
+// ResolveUnderRoot resolves a stored path to an absolute location confined to
+// root. It is the write-side counterpart to OpenUnderRoot.
+func ResolveUnderRoot(root, storedPath string) (string, error) {
+	if root == "" {
+		return "", ErrOutsideRoot
+	}
+	rel, err := relWithinRoot(root, storedPath)
+	if err != nil {
+		return "", err
+	}
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(absRoot, rel), nil
+}
+
 // RemoveUnderRoot mirrors OpenUnderRoot confinement and removes only the named file.
 func RemoveUnderRoot(root, storedPath string) error {
 	if root == "" {

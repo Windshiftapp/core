@@ -150,6 +150,7 @@ type PageAttachmentRecord struct {
 	Filename         string
 	OriginalFilename string
 	FilePath         string
+	ThumbnailPath    string
 	MimeType         string
 	FileSize         int64
 	UploadedBy       *int
@@ -271,35 +272,64 @@ func (r *AttachmentRepository) GetItemThumbnailRecord(id int) (*AttachmentThumbn
 	return &rec, nil
 }
 
-// GetPageAttachmentRecord returns attachment metadata only when the row is
-// explicitly page-scoped and owned by the requested Page.
-func (r *AttachmentRepository) GetPageAttachmentRecord(pageID, attachmentID int) (*PageAttachmentRecord, error) {
+// pageAttachmentSelect resolves a page-scoped attachment through its owning
+// page so callers receive the page and workspace ids needed for authorization.
+const pageAttachmentSelect = `
+	SELECT a.id, p.id, p.workspace_id, a.filename, a.original_filename,
+	       a.file_path, COALESCE(a.thumbnail_path, ''), a.mime_type, a.file_size, a.uploaded_by, a.created_at
+	FROM attachments a
+	JOIN pages p ON p.id = a.item_id
+`
+
+func scanPageAttachmentRecord(row interface{ Scan(dest ...any) error }) (*PageAttachmentRecord, error) {
 	var rec PageAttachmentRecord
 	var uploadedBy sql.NullInt64
-	err := r.db.QueryRow(`
-		SELECT a.id, p.id, p.workspace_id, a.filename, a.original_filename,
-		       a.file_path, a.mime_type, a.file_size, a.uploaded_by, a.created_at
-		FROM attachments a
-		JOIN pages p ON p.id = a.item_id
-		WHERE a.id = ?
-		  AND p.id = ?
-		  AND a.entity_type = 'page'
-	`, attachmentID, pageID).Scan(
+	if err := row.Scan(
 		&rec.ID, &rec.PageID, &rec.WorkspaceID, &rec.Filename,
-		&rec.OriginalFilename, &rec.FilePath, &rec.MimeType, &rec.FileSize,
+		&rec.OriginalFilename, &rec.FilePath, &rec.ThumbnailPath, &rec.MimeType, &rec.FileSize,
 		&uploadedBy, &rec.CreatedAt,
-	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, fmt.Errorf("get page attachment %d for page %d: %w", attachmentID, pageID, err)
+	); err != nil {
+		return nil, err
 	}
 	if uploadedBy.Valid {
 		id := int(uploadedBy.Int64)
 		rec.UploadedBy = &id
 	}
 	return &rec, nil
+}
+
+// GetPageAttachmentRecord returns attachment metadata only when the row is
+// explicitly page-scoped and owned by the requested Page.
+func (r *AttachmentRepository) GetPageAttachmentRecord(pageID, attachmentID int) (*PageAttachmentRecord, error) {
+	rec, err := scanPageAttachmentRecord(r.db.QueryRow(pageAttachmentSelect+`
+		WHERE a.id = ?
+		  AND p.id = ?
+		  AND a.entity_type = 'page'
+	`, attachmentID, pageID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get page attachment %d for page %d: %w", attachmentID, pageID, err)
+	}
+	return rec, nil
+}
+
+// GetPageAttachmentRecordByID returns a page-scoped attachment by its own id,
+// resolving the owning page and workspace so the caller can enforce page-view
+// permission before streaming the blob.
+func (r *AttachmentRepository) GetPageAttachmentRecordByID(attachmentID int) (*PageAttachmentRecord, error) {
+	rec, err := scanPageAttachmentRecord(r.db.QueryRow(pageAttachmentSelect+`
+		WHERE a.id = ?
+		  AND a.entity_type = 'page'
+	`, attachmentID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get page attachment %d: %w", attachmentID, err)
+	}
+	return rec, nil
 }
 
 // UpdateCreatedAt preserves the source timestamp for an imported attachment.

@@ -1,6 +1,5 @@
 <script>
   import { onMount } from 'svelte';
-  import { ai } from '../../api/ai.js';
   import { tests } from '../../api/tests/index.js';
   import { milestones as milestonesApi } from '../../api/milestones.js';
   import { writable } from 'svelte/store';
@@ -27,7 +26,7 @@
   import { getStatusLabel, getTestStatusColor } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
-  import { errorToast, successToast } from '../../stores/toasts.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
   import TestManagementHeader from './TestManagementHeader.svelte';
@@ -56,54 +55,6 @@
     description: '',
     milestone_id: null
   });
-
-  let generating = $state(false);
-
-  async function confirmOverwriteIfNeeded(currentDescription) {
-    if (!currentDescription?.trim()) return true;
-    return await confirm({
-      title: t('testing.overwriteDescriptionTitle'),
-      message: t('testing.overwriteDescriptionConfirm'),
-      confirmText: t('testing.overwrite'),
-    });
-  }
-
-  async function generateDescriptionForForm() {
-    if (!editingSet || generating) return;
-    if (!(await confirmOverwriteIfNeeded(formData.description))) return;
-    generating = true;
-    try {
-      const { description } = await ai.summarizeTestPlanDescription(editingSet.id);
-      formData.description = description ?? '';
-    } catch (err) {
-      errorToast(err?.message || t('testing.generateFailed'));
-    } finally {
-      generating = false;
-    }
-  }
-
-  async function generateDescriptionForSelectedSet() {
-    const set = $selectedSet;
-    if (!set || generating) return;
-    if (!(await confirmOverwriteIfNeeded(set.description))) return;
-    generating = true;
-    try {
-      const { description } = await ai.summarizeTestPlanDescription(set.id);
-      const next = description ?? '';
-      await tests.testPlans.update(workspaceId, set.id, {
-        name: set.name,
-        description: next,
-        milestone_id: set.milestone_id,
-      });
-      selectedSet.set({ ...set, description: next });
-      await loadData();
-      successToast(t('testing.generateWithAI'));
-    } catch (err) {
-      errorToast(err?.message || t('testing.generateFailed'));
-    } finally {
-      generating = false;
-    }
-  }
 
   onMount(async () => {
     await loadData();
@@ -334,19 +285,6 @@
         </FormField>
 
         <FormField label={t('common.description')}>
-          <div class="flex justify-end -mt-1 mb-2">
-            {#if editingSet}
-              <Button
-                type="button"
-                size="small"
-                variant="ghost"
-                disabled={generating}
-                onclick={generateDescriptionForForm}
-              >
-                {generating ? t('common.generating') : t('testing.generateWithAI')}
-              </Button>
-            {/if}
-          </div>
           <Textarea bind:value={formData.description} rows={3} data-testid="test-set-description" />
         </FormField>
 
@@ -384,18 +322,6 @@
       onClose={closeTestCaseSelector}
     />
     <div class="p-6 max-h-[65vh] overflow-y-auto">
-      <div class="flex justify-end mb-4">
-          <Button
-            type="button"
-            size="small"
-            variant="ghost"
-            disabled={generating}
-            onclick={generateDescriptionForSelectedSet}
-          >
-            {generating ? t('common.generating') : t('testing.generateWithAI')}
-          </Button>
-      </div>
-
       <!-- Add Test Case Picker -->
       {#if canManageTests}
         <FormField label={t('testing.addTestCase')} class="mb-6">

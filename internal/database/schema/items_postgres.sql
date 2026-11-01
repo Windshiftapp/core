@@ -286,3 +286,56 @@ CREATE TABLE IF NOT EXISTS item_import_rows (
 
 CREATE INDEX IF NOT EXISTS idx_item_import_rows_job_id ON item_import_rows(job_id);
 CREATE INDEX IF NOT EXISTS idx_item_import_rows_item_id ON item_import_rows(item_id);
+
+-- Due-date reminder ledger: see items.sql for the table contract.
+CREATE TABLE IF NOT EXISTS item_due_reminders (
+	id SERIAL PRIMARY KEY,
+	item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	due_date TEXT NOT NULL,
+	sent_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	UNIQUE(item_id, user_id, due_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_item_due_reminders_item ON item_due_reminders(item_id);
+
+-- Token-prefix item search (WI-413). unaccent is applied when the extension is
+-- available; otherwise ws_unaccent degrades to lowercasing so the index and the
+-- query predicate keep the same expression. Punctuation is collapsed to spaces
+-- because the default parser keeps hyphenated numbers and dotted versions as
+-- single tokens. The migration 20261116_item_search_prefix creates the same
+-- objects on existing databases.
+-- migration: 20261116_item_search_prefix
+DO $ws_search$
+DECLARE
+	unaccent_schema text;
+BEGIN
+	BEGIN
+		CREATE EXTENSION IF NOT EXISTS unaccent;
+	EXCEPTION WHEN OTHERS THEN
+		NULL;
+	END;
+	-- The extension can already live in a schema outside search_path, where
+	-- the unqualified name does not resolve, so qualify it with its actual
+	-- schema. The single-argument form avoids also resolving the 'unaccent'
+	-- text-search dictionary through search_path.
+	SELECT n.nspname INTO unaccent_schema
+	FROM pg_extension e
+	JOIN pg_namespace n ON n.oid = e.extnamespace
+	WHERE e.extname = 'unaccent';
+	IF unaccent_schema IS NOT NULL THEN
+		EXECUTE format(
+			'CREATE OR REPLACE FUNCTION ws_unaccent(text) RETURNS text
+				LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $fn$ SELECT lower(%I.unaccent($1)) $fn$',
+			unaccent_schema);
+	ELSE
+		CREATE OR REPLACE FUNCTION ws_unaccent(text) RETURNS text
+			LANGUAGE sql IMMUTABLE PARALLEL SAFE AS
+			$fn$ SELECT lower($1) $fn$;
+	END IF;
+END
+$ws_search$;
+
+CREATE INDEX IF NOT EXISTS idx_items_search ON items USING GIN (
+	to_tsvector('simple', regexp_replace(ws_unaccent(coalesce(title, '') || ' ' || coalesce(description, '')), '[[:space:][:punct:]]+', ' ', 'g'))
+);

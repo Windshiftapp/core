@@ -1,36 +1,23 @@
 <script>
-  import { onMount } from 'svelte';
-  import StateDisplay from '../components/StateDisplay.svelte';
   import { actionCapabilities, llmConnections as llmConnectionsApi } from '../api/ai.js';
   import { workspacesStore } from '../stores/workspaces.svelte.js';
-  import Plus from '@lucide/svelte/icons/plus';
-  import Edit from '@lucide/svelte/icons/edit';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import Button from '../components/Button.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import WorkspaceCheckboxList from '../components/WorkspaceCheckboxList.svelte';
   import Radio from '../components/Radio.svelte';
   import Input from '../components/Input.svelte';
-  import PageHeader from '../layout/PageHeader.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import Select from '../components/Select.svelte';
-  import DataTable from '../components/DataTable.svelte';
   import CredentialPicker from '../components/CredentialPicker.svelte';
   import { successToast, errorToast } from '../stores/toasts.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
-  import { confirm } from '../composables/useConfirm.js';
   import EnabledStatus from './EnabledStatus.svelte';
-  import EntityFormModal from './EntityFormModal.svelte';
-  import EntityRowActions from './EntityRowActions.svelte';
+  import EntityManagerPage from './EntityManagerPage.svelte';
 
-  let capabilities = $state([]);
   let llmConnections = $state([]);
   let workspaces = $state([]);
-  let loading = $state(true);
-  let showCreateModal = $state(false);
-  let showEditModal = $state(false);
   let editingCapability = $state(null);
-  let saving = $state(false);
 
   const CAPABILITY_TYPES = [
     { value: 'docker_environment', label: t('settings.actionCapabilities.typeDocker') },
@@ -230,12 +217,12 @@
   }
 
   async function loadCapabilities() {
-    try {
-      capabilities = await actionCapabilities.getAll();
-    } catch (err) {
-      console.error('Failed to load capabilities:', err);
-      errorToast(t('settings.actionCapabilities.loadFailed'));
-    }
+    const [capabilities] = await Promise.all([
+      actionCapabilities.getAll(),
+      loadLLMConnections(),
+      loadWorkspaces(),
+    ]);
+    return capabilities;
   }
 
   async function loadLLMConnections() {
@@ -254,14 +241,9 @@
     }
   }
 
-  onMount(async () => {
-    await Promise.all([loadCapabilities(), loadLLMConnections(), loadWorkspaces()]);
-    loading = false;
-  });
-
   function openCreate() {
     resetForm();
-    showCreateModal = true;
+    editingCapability = null;
   }
 
   function openEdit(cap) {
@@ -273,66 +255,45 @@
     form.applies_to_all_workspaces = cap.applies_to_all_workspaces ?? true;
     form.workspace_ids = Array.isArray(cap.workspace_ids) ? [...cap.workspace_ids] : [];
     parseConfigToForm(cap.capability_type, cap.config);
-    showEditModal = true;
   }
 
   async function deleteCapability(cap) {
-    const ok = await confirm({
-      title: t('settings.actionCapabilities.deleteCapability'),
-      message: t('settings.actionCapabilities.confirmDelete') + ' ' + cap.name + '?',
-      confirmText: t('common.delete'),
-      variant: 'danger',
-    });
-    if (!ok) return;
-    try {
-      await actionCapabilities.delete(cap.id);
-      successToast(t('settings.actionCapabilities.deleteSuccess'));
-      await loadCapabilities();
-    } catch (err) {
-      errorToast(err.message || t('settings.actionCapabilities.deleteFailed'));
-    }
+    await actionCapabilities.delete(cap.id);
+    successToast(t('settings.actionCapabilities.deleteSuccess'));
   }
 
   async function handleCreate() {
-    saving = true;
-    try {
-      await actionCapabilities.create({
-        name: form.name,
-        capability_type: form.capability_type,
-        config: buildConfigJSON(),
-        is_enabled: form.is_enabled,
-        applies_to_all_workspaces: form.applies_to_all_workspaces,
-        workspace_ids: form.applies_to_all_workspaces ? [] : form.workspace_ids,
-      });
-      successToast(t('settings.actionCapabilities.createSuccess'));
-      showCreateModal = false;
-      await loadCapabilities();
-    } catch (err) {
-      errorToast(err.message || t('settings.actionCapabilities.createFailed'));
-    } finally {
-      saving = false;
-    }
+    await actionCapabilities.create({
+      name: form.name,
+      capability_type: form.capability_type,
+      config: buildConfigJSON(),
+      is_enabled: form.is_enabled,
+      applies_to_all_workspaces: form.applies_to_all_workspaces,
+      workspace_ids: form.applies_to_all_workspaces ? [] : form.workspace_ids,
+    });
+    successToast(t('settings.actionCapabilities.createSuccess'));
   }
 
-  async function handleUpdate() {
-    if (!editingCapability) return;
-    saving = true;
-    try {
-      await actionCapabilities.update(editingCapability.id, {
-        name: form.name,
-        config: buildConfigJSON(),
-        is_enabled: form.is_enabled,
-        applies_to_all_workspaces: form.applies_to_all_workspaces,
-        workspace_ids: form.applies_to_all_workspaces ? [] : form.workspace_ids,
-      });
-      successToast(t('settings.actionCapabilities.updateSuccess'));
-      showEditModal = false;
-      await loadCapabilities();
-    } catch (err) {
-      errorToast(err.message || t('settings.actionCapabilities.updateFailed'));
-    } finally {
-      saving = false;
-    }
+  async function handleUpdate(id) {
+    await actionCapabilities.update(id, {
+      name: form.name,
+      config: buildConfigJSON(),
+      is_enabled: form.is_enabled,
+      applies_to_all_workspaces: form.applies_to_all_workspaces,
+      workspace_ids: form.applies_to_all_workspaces ? [] : form.workspace_ids,
+    });
+    successToast(t('settings.actionCapabilities.updateSuccess'));
+  }
+
+  function handleError(err, phase, item) {
+    const key = {
+      load: 'settings.actionCapabilities.loadFailed',
+      save: item
+        ? 'settings.actionCapabilities.updateFailed'
+        : 'settings.actionCapabilities.createFailed',
+      delete: 'settings.actionCapabilities.deleteFailed',
+    }[phase];
+    errorToast(err.message || t(key));
   }
 
   function toggleWorkspaceScope(workspaceId) {
@@ -395,78 +356,42 @@
   ];
 </script>
 
-<div class="space-y-4">
-  <PageHeader title={t('settings.actionCapabilities.title')} subtitle={t('settings.actionCapabilities.subtitle')}>
-    {#snippet actions()}
-      <Button variant="primary" onclick={openCreate} icon={Plus}>
-        {t('settings.actionCapabilities.addCapability')}
-      </Button>
-    {/snippet}
-  </PageHeader>
+<EntityManagerPage
+  title={t('settings.actionCapabilities.title')}
+  subtitle={t('settings.actionCapabilities.subtitle')}
+  addLabel={t('settings.actionCapabilities.addCapability')}
+  emptyMessage={t('settings.actionCapabilities.noCapabilities')}
+  {columns}
+  load={loadCapabilities}
+  create={handleCreate}
+  update={handleUpdate}
+  remove={deleteCapability}
+  onOpenCreate={openCreate}
+  onOpenEdit={openEdit}
+  confirmDeleteMessage={(cap) =>
+    `${t('settings.actionCapabilities.confirmDelete')} ${cap.name}?`}
+  createTitle={t('settings.actionCapabilities.addCapability')}
+  editTitle={t('settings.actionCapabilities.editCapability')}
+  submitDisabled={() => !canSubmit}
+  onError={handleError}
+  cellSnippets={{ name: capabilityNameCell, type: capabilityTypeCell, status: capabilityStatusCell }}
+  formFields={capabilityForm}
+>
+</EntityManagerPage>
 
-  {#if loading}
-    <StateDisplay type="loading" />
-  {:else if capabilities.length === 0}
-    <div class="flex flex-col items-center py-12 gap-3 rounded-lg border" style="border-color: var(--ds-border); background: var(--ds-surface-raised);">
-      <p class="text-sm" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.noCapabilities')}</p>
-      <Button variant="secondary" onclick={openCreate} icon={Plus}>
-        {t('settings.actionCapabilities.addFirst')}
-      </Button>
-    </div>
-  {:else}
-    <DataTable {columns} data={capabilities} keyField="id">
-      {#snippet name(cap)}
-        <span class="font-medium" style="color: var(--ds-text);">{cap.name}</span>
-      {/snippet}
-      {#snippet type(cap)}
-        <Lozenge appearance={typeAppearance(cap.capability_type)} size="sm">{typeLabel(cap.capability_type)}</Lozenge>
-      {/snippet}
-      {#snippet status(cap)}
-        <EnabledStatus enabled={cap.is_enabled} />
-      {/snippet}
-      {#snippet actions(cap)}
-        <EntityRowActions actions={[
-          { id: 'edit', icon: Edit, title: t('common.edit'), onclick: () => openEdit(cap) },
-          { id: 'delete', icon: Trash2, title: t('common.delete'), danger: true, onclick: () => deleteCapability(cap) },
-        ]} />
-      {/snippet}
-    </DataTable>
-  {/if}
-</div>
+{#snippet capabilityNameCell(cap)}
+  <span class="font-medium" style="color: var(--ds-text);">{cap.name}</span>
+{/snippet}
 
-<!-- Create Modal -->
-{#if showCreateModal}
-  <EntityFormModal
-    title={t('settings.actionCapabilities.addCapability')}
-    onclose={() => showCreateModal = false}
-    onsubmit={handleCreate}
-    disabled={!canSubmit}
-    {saving}
-    confirmLabel={t('common.create')}
-  >
-    {#snippet fields()}
-      {@render capabilityForm(false)}
-    {/snippet}
-  </EntityFormModal>
-{/if}
+{#snippet capabilityTypeCell(cap)}
+  <Lozenge appearance={typeAppearance(cap.capability_type)} size="sm">{typeLabel(cap.capability_type)}</Lozenge>
+{/snippet}
 
-<!-- Edit Modal -->
-{#if showEditModal}
-  <EntityFormModal
-    title={t('settings.actionCapabilities.editCapability')}
-    onclose={() => showEditModal = false}
-    onsubmit={handleUpdate}
-    disabled={!canSubmit}
-    {saving}
-  >
-    {#snippet fields()}
-      {@render capabilityForm(true)}
-    {/snippet}
-  </EntityFormModal>
-{/if}
+{#snippet capabilityStatusCell(cap)}
+  <EnabledStatus enabled={cap.is_enabled} />
+{/snippet}
 
-
-{#snippet capabilityForm(isEdit)}
+{#snippet capabilityForm()}
   <!-- Name -->
   <div>
     <label for="cap-name" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.name')}</label>
@@ -481,7 +406,7 @@
   <!-- Capability Type -->
   <div>
     <label for="cap-type" class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('settings.actionCapabilities.capabilityType')}</label>
-    {#if isEdit}
+    {#if editingCapability}
       <div class="px-3 py-2 text-sm rounded-md border" style="border-color: var(--ds-border); background: var(--ds-surface-sunken); color: var(--ds-text-subtle);">
         {typeLabel(form.capability_type)}
       </div>

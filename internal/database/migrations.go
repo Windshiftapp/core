@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+
+	"github.com/lib/pq"
 )
 
 // pgJSONBColumnsCheck reports whether every named column already has the
@@ -1391,27 +1393,6 @@ var Catalog = []Migration{
 			);
 			CREATE UNIQUE INDEX IF NOT EXISTS uq_workspaces_personal_owner ON workspaces(owner_id) WHERE is_personal = true;
 		`,
-	},
-	{
-		Version:       "20260918_personal_labels_unique_per_user",
-		Name:          "Scope personal label name uniqueness to the owning user",
-		CheckSQLite:   sqliteIndexCheck("uq_personal_labels_user_name"),
-		CheckPostgres: pgIndexCheck("uq_personal_labels_user_name"),
-		Postgres: `
-			ALTER TABLE personal_labels DROP CONSTRAINT IF EXISTS personal_labels_name_key;
-			CREATE UNIQUE INDEX IF NOT EXISTS uq_personal_labels_user_name
-				ON personal_labels(COALESCE(user_id, 0), name);
-		`,
-		// SQLite cannot drop the inline UNIQUE(name) without a table rebuild.
-		// The SQL field must stay non-empty: an empty body makes the runner
-		// stamp the row without reaching Check or ApplySQLite.
-		SQLite:      "applySQLitePersonalLabelsPerUserUnique:v1",
-		ApplySQLite: applySQLitePersonalLabelsPerUserUnique,
-		// Databases stamped while the SQLite field was empty carry the
-		// empty-body checksum (sha256 of ""); advance them to the marker
-		// checksum. Their rebuild still requires re-running the migration,
-		// which the runner does not do for stamped rows.
-		Superseded: []string{"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
 	},
 	{
 		Version:       "20260918_kb_events",
@@ -3080,6 +3061,314 @@ var Catalog = []Migration{
 		`,
 		ApplySQLite: applySQLiteQueuesCollectionScope,
 	},
+	{
+		Version:       "20261112_audit_logs_source",
+		Name:          "Add audit_logs.source for system/SCIM/user attribution",
+		CheckSQLite:   sqliteColumnCheck("audit_logs", "source"),
+		CheckPostgres: pgColumnCheck("audit_logs", "source"),
+		SQLite:        "ALTER TABLE audit_logs ADD COLUMN source TEXT NOT NULL DEFAULT ''",
+		Postgres:      "ALTER TABLE audit_logs ADD COLUMN source TEXT NOT NULL DEFAULT ''",
+	},
+	{
+		Version:       "20261113_item_due_reminders",
+		Name:          "Record sent due-date reminders so dismissed reminders are not re-created",
+		CheckSQLite:   sqliteTableCheck("item_due_reminders"),
+		CheckPostgres: pgTableCheck("item_due_reminders"),
+		SQLite: `
+			CREATE TABLE IF NOT EXISTS item_due_reminders (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				item_id INTEGER NOT NULL,
+				user_id INTEGER NOT NULL,
+				due_date TEXT NOT NULL,
+				sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(item_id, user_id, due_date),
+				FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+			);
+			CREATE INDEX IF NOT EXISTS idx_item_due_reminders_item ON item_due_reminders(item_id);
+		`,
+		Postgres: `
+			CREATE TABLE IF NOT EXISTS item_due_reminders (
+				id SERIAL PRIMARY KEY,
+				item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+				user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+				due_date TEXT NOT NULL,
+				sent_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(item_id, user_id, due_date)
+			);
+			CREATE INDEX IF NOT EXISTS idx_item_due_reminders_item ON item_due_reminders(item_id);
+		`,
+	},
+	{
+		Version:       "20261114_user_due_date_reminder_prefs",
+		Name:          "Add per-user due-date reminder preferences",
+		CheckSQLite:   "SELECT CASE WHEN (SELECT COUNT(*) FROM pragma_table_info('user_preferences') WHERE name IN ('due_date_reminders_enabled','due_date_reminder_days')) = 2 THEN 1 ELSE 0 END",
+		CheckPostgres: "SELECT CASE WHEN (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='user_preferences' AND column_name IN ('due_date_reminders_enabled','due_date_reminder_days')) = 2 THEN 1 ELSE 0 END",
+		SQLite: `
+			ALTER TABLE user_preferences ADD COLUMN due_date_reminders_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+			ALTER TABLE user_preferences ADD COLUMN due_date_reminder_days INTEGER NOT NULL DEFAULT 3;
+		`,
+		Postgres: `
+			ALTER TABLE user_preferences ADD COLUMN due_date_reminders_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+			ALTER TABLE user_preferences ADD COLUMN due_date_reminder_days INTEGER NOT NULL DEFAULT 3;
+		`,
+	},
+	{
+		Version: "20261115_remove_personal_labels",
+		Name:    "Remove the unused personal labels feature",
+		// Effect present when neither table exists, which is also true on fresh
+		// installs (the tables are gone from the schema).
+		CheckSQLite:   "SELECT CASE WHEN (SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('personal_labels','personal_item_labels')) = 0 THEN 1 ELSE 0 END",
+		CheckPostgres: "SELECT CASE WHEN (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_name IN ('personal_labels','personal_item_labels')) = 0 THEN 1 ELSE 0 END",
+		SQLite: `
+			DROP TABLE IF EXISTS personal_item_labels;
+			DROP TABLE IF EXISTS personal_labels;
+		`,
+		Postgres: `
+			DROP TABLE IF EXISTS personal_item_labels;
+			DROP TABLE IF EXISTS personal_labels;
+		`,
+	},
+	{
+		Version: "20261116_item_search_prefix",
+		Name:    "Index item title/description search with token-prefix FTS (WI-413)",
+		// Ready only when the FTS table and all three sync triggers exist, so a
+		// partially applied migration is retried rather than stamped.
+		CheckSQLite: "SELECT CASE WHEN (SELECT COUNT(*) FROM sqlite_master WHERE name IN ('items_fts', 'items_fts_ai', 'items_fts_ad', 'items_fts_au')) = 4 THEN 1 ELSE 0 END",
+		// Ready only for a valid index; an invalid one is a failed
+		// CREATE INDEX CONCURRENTLY leftover and must be rebuilt.
+		CheckPostgres: "SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = 'idx_items_search' AND n.nspname = current_schema() AND i.indisvalid) THEN 1 ELSE 0 END",
+		SQLite:        "applyItemSearchFTS:v1",
+		Postgres:      "applyItemSearchIndexPostgres:v1",
+		ApplySQLite:   applyItemSearchFTS,
+		ApplyPostgres: applyItemSearchIndexPostgres,
+	},
+	{
+		Version: "20261117_time_project_customer_backfill",
+		Name:    "Backfill NULL time-project customers to the no-customer placeholder",
+		// Effect present when no project lacks a customer. Projects written before
+		// the no-customer placeholder existed can still carry NULL; the worklog
+		// customer is now derived from the project, so the invariant must hold.
+		CheckSQLite:   "SELECT CASE WHEN (SELECT COUNT(*) FROM time_projects WHERE customer_id IS NULL) = 0 THEN 1 ELSE 0 END",
+		CheckPostgres: "SELECT CASE WHEN (SELECT COUNT(*) FROM time_projects WHERE customer_id IS NULL) = 0 THEN 1 ELSE 0 END",
+		SQLite: `
+			UPDATE time_projects
+			SET customer_id = (SELECT id FROM customer_organisations WHERE builtin_key = 'no_customer')
+			WHERE customer_id IS NULL;
+		`,
+		Postgres: `
+			UPDATE time_projects
+			SET customer_id = (SELECT id FROM customer_organisations WHERE builtin_key = 'no_customer')
+			WHERE customer_id IS NULL;
+		`,
+	},
+	{
+		Version: "20261118_drop_time_worklog_customer",
+		Name:    "Drop the denormalised customer reference from time worklogs",
+		// Effect present when the column is gone. Worklogs derive their customer
+		// from the project (customer -> project -> worklog), so deleting an
+		// organisation can no longer cascade into worklog data.
+		CheckSQLite:   "SELECT CASE WHEN (SELECT COUNT(*) FROM pragma_table_info('time_worklogs') WHERE name='customer_id') = 0 THEN 1 ELSE 0 END",
+		CheckPostgres: "SELECT CASE WHEN (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='time_worklogs' AND column_name='customer_id') = 0 THEN 1 ELSE 0 END",
+		// SQLite cannot drop a column used in a foreign key in place; the
+		// ApplySQLite rebuild handles it. The SQL field is the checksum marker.
+		SQLite:      "drop-time-worklog-customer:v1",
+		ApplySQLite: dropTimeWorklogCustomerSQLite,
+		Postgres: `
+			ALTER TABLE time_worklogs DROP COLUMN IF EXISTS customer_id;
+			DROP INDEX IF EXISTS idx_time_worklogs_customer_id;
+		`,
+	},
+}
+
+// dropTimeWorklogCustomerSQLite rebuilds time_worklogs without the customer_id
+// column and its foreign key for SQLite, which cannot drop a column referenced
+// by a foreign key in place.
+func dropTimeWorklogCustomerSQLite(db Database) (retErr error) {
+	sqliteDB, ok := db.(*SQLiteDB)
+	if !ok {
+		return fmt.Errorf("expected SQLite database, got %T", db)
+	}
+
+	ctx := context.Background()
+	conn, err := sqliteDB.writeConn.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire SQLite write connection: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	var foreignKeysEnabled bool
+	if err := conn.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&foreignKeysEnabled); err != nil {
+		return fmt.Errorf("read foreign_keys pragma: %w", err)
+	}
+	if foreignKeysEnabled {
+		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=OFF"); err != nil {
+			return fmt.Errorf("disable foreign keys: %w", err)
+		}
+		defer func() {
+			if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=ON"); retErr == nil && err != nil {
+				retErr = fmt.Errorf("restore foreign keys: %w", err)
+			}
+		}()
+	}
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin time_worklogs rebuild: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	statements := []string{
+		`CREATE TABLE time_worklogs_migration (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			project_id INTEGER NOT NULL,
+			user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+			item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
+			description TEXT NOT NULL,
+			date INTEGER NOT NULL,
+			start_time INTEGER NOT NULL,
+			end_time INTEGER NOT NULL,
+			duration_minutes INTEGER NOT NULL,
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL,
+			FOREIGN KEY (project_id) REFERENCES time_projects(id) ON DELETE CASCADE
+		)`,
+		`INSERT INTO time_worklogs_migration (id, project_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at)
+			SELECT id, project_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at FROM time_worklogs`,
+		`DROP TABLE time_worklogs`,
+		`ALTER TABLE time_worklogs_migration RENAME TO time_worklogs`,
+		`CREATE INDEX IF NOT EXISTS idx_time_worklogs_project_id ON time_worklogs(project_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_time_worklogs_date ON time_worklogs(date)`,
+		`CREATE INDEX IF NOT EXISTS idx_time_worklogs_item_id ON time_worklogs(item_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_time_worklogs_user_id ON time_worklogs(user_id)`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("rebuild time_worklogs: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit time_worklogs rebuild: %w", err)
+	}
+	return nil
+}
+
+// itemSearchIndexName is the PostgreSQL GIN index backing token-prefix item
+// search. The index and the query must use the identical expression.
+const itemSearchIndexName = "idx_items_search"
+
+// itemSearchExpression is the exact text expression the PostgreSQL GIN index
+// indexes. itemTextSearchPredicate in the repository reproduces it verbatim so
+// the planner can use the index. Punctuation is collapsed to spaces because the
+// default parser keeps hyphenated numbers ("2026-09-18") and dotted versions
+// ("v1.2.3") as single tokens, which would not match the per-word terms the
+// query builder emits.
+const itemSearchExpression = `regexp_replace(ws_unaccent(coalesce(title,'') || ' ' || coalesce(description,'')), '[[:space:][:punct:]]+', ' ', 'g')`
+
+// applyItemSearchFTS creates the SQLite FTS5 index over item title and
+// description and rebuilds it from existing rows. External-content FTS keeps
+// only the inverted index; the triggers keep it in sync with items.
+func applyItemSearchFTS(db Database) error {
+	statements := []string{
+		`CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
+			title, description,
+			content='items', content_rowid='id',
+			tokenize='unicode61'
+		)`,
+		`CREATE TRIGGER IF NOT EXISTS items_fts_ai AFTER INSERT ON items BEGIN
+			INSERT INTO items_fts(rowid, title, description)
+			VALUES (new.id, new.title, new.description);
+		END`,
+		`CREATE TRIGGER IF NOT EXISTS items_fts_ad AFTER DELETE ON items BEGIN
+			INSERT INTO items_fts(items_fts, rowid, title, description)
+			VALUES ('delete', old.id, old.title, old.description);
+		END`,
+		// Only reindex when the indexed columns change; item updates touch
+		// last_active_at and other columns far more often than the text.
+		`CREATE TRIGGER IF NOT EXISTS items_fts_au AFTER UPDATE OF title, description ON items BEGIN
+			INSERT INTO items_fts(items_fts, rowid, title, description)
+			VALUES ('delete', old.id, old.title, old.description);
+			INSERT INTO items_fts(rowid, title, description)
+			VALUES (new.id, new.title, new.description);
+		END`,
+	}
+	for _, statement := range statements {
+		if _, err := db.Exec(statement); err != nil {
+			return fmt.Errorf("item search FTS ddl: %w", err)
+		}
+	}
+	// Idempotent: rebuilds the whole index from the content table, so a retry
+	// after a partial failure (or a large upgrade) converges on the same state.
+	if _, err := db.Exec(`INSERT INTO items_fts(items_fts) VALUES ('rebuild')`); err != nil {
+		return fmt.Errorf("rebuild item search FTS index: %w", err)
+	}
+	return nil
+}
+
+// itemSearchUnaccentBody returns the SQL body of the immutable ws_unaccent
+// wrapper: a schema-qualified unaccent call when the extension is available,
+// otherwise a bare lower(). The extension can already be installed in a schema
+// outside search_path (managed Postgres often keeps extensions in a dedicated
+// schema), where CREATE EXTENSION IF NOT EXISTS is a no-op and the unqualified
+// name does not resolve, so the call is qualified with the extension's actual
+// schema. The single-argument form is used because the two-argument form would
+// additionally need the 'unaccent' text-search dictionary on search_path.
+func itemSearchUnaccentBody(db Database) string {
+	if _, err := db.Exec(`CREATE EXTENSION IF NOT EXISTS unaccent`); err != nil {
+		slog.Warn("unaccent extension unavailable; item search will not fold accents",
+			slog.String("component", "database"), slog.Any("error", err))
+		return "lower($1)"
+	}
+	var schema string
+	if err := db.QueryRow(`
+		SELECT n.nspname FROM pg_extension e
+		JOIN pg_namespace n ON n.oid = e.extnamespace
+		WHERE e.extname = 'unaccent'
+	`).Scan(&schema); err != nil {
+		slog.Warn("unaccent extension schema unresolved; item search will not fold accents",
+			slog.String("component", "database"), slog.Any("error", err))
+		return "lower($1)"
+	}
+	return fmt.Sprintf("lower(%s.unaccent($1))", pq.QuoteIdentifier(schema))
+}
+
+// applyItemSearchIndexPostgres builds the GIN index over item title and
+// description. It is created concurrently so a large items table is not locked
+// for the duration of the build. Accent folding is enabled when the unaccent
+// extension is installable; otherwise the same immutable wrapper degrades to
+// lowercasing only, keeping the index and query expressions identical.
+func applyItemSearchIndexPostgres(db Database) error {
+	body := itemSearchUnaccentBody(db)
+	if _, err := db.Exec(`CREATE OR REPLACE FUNCTION ws_unaccent(text) RETURNS text
+		LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$ SELECT ` + body + ` $$`); err != nil {
+		return fmt.Errorf("create ws_unaccent: %w", err)
+	}
+
+	// Drop an invalid leftover from a previously failed concurrent build;
+	// CREATE INDEX CONCURRENTLY IF NOT EXISTS would otherwise keep it.
+	var invalid int
+	if err := db.QueryRow(`
+		SELECT COUNT(*) FROM pg_index i
+		JOIN pg_class c ON c.oid = i.indexrelid
+		JOIN pg_namespace n ON n.oid = c.relnamespace
+		WHERE c.relname = ? AND n.nspname = current_schema() AND NOT i.indisvalid
+	`, itemSearchIndexName).Scan(&invalid); err != nil {
+		return fmt.Errorf("check item search index: %w", err)
+	}
+	if invalid > 0 {
+		if _, err := db.Exec(`DROP INDEX IF EXISTS ` + itemSearchIndexName); err != nil {
+			return fmt.Errorf("drop invalid item search index: %w", err)
+		}
+	}
+
+	indexSQL := fmt.Sprintf(
+		`CREATE INDEX CONCURRENTLY IF NOT EXISTS %s ON items USING gin (to_tsvector('simple', %s))`,
+		itemSearchIndexName, itemSearchExpression,
+	)
+	if _, err := db.Exec(indexSQL); err != nil {
+		return fmt.Errorf("create item search index: %w", err)
+	}
+	return nil
 }
 
 // applyAssetReportsWorkspacePinned backfills form-mode asset reports that have
@@ -3661,73 +3950,6 @@ func applyViewSettingsToolsBackfill(db Database) error {
 	return nil
 }
 
-func applySQLitePersonalLabelsPerUserUnique(db Database) (retErr error) {
-	sqliteDB, ok := db.(*SQLiteDB)
-	if !ok {
-		return fmt.Errorf("expected SQLite database, got %T", db)
-	}
-
-	ctx := context.Background()
-	conn, err := sqliteDB.writeConn.Conn(ctx)
-	if err != nil {
-		return fmt.Errorf("acquire SQLite write connection: %w", err)
-	}
-	defer func() { _ = conn.Close() }()
-
-	var foreignKeysEnabled bool
-	if err := conn.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&foreignKeysEnabled); err != nil {
-		return fmt.Errorf("read foreign_keys pragma: %w", err)
-	}
-	if foreignKeysEnabled {
-		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=OFF"); err != nil {
-			return fmt.Errorf("disable foreign keys: %w", err)
-		}
-		defer func() {
-			if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=ON"); retErr == nil && err != nil {
-				retErr = fmt.Errorf("restore foreign keys: %w", err)
-			}
-		}()
-	}
-
-	tx, err := conn.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin personal_labels rebuild: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	statements := []string{
-		`CREATE TABLE personal_labels_migration (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT NOT NULL,
-			color TEXT DEFAULT '#3B82F6',
-			user_id INTEGER,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-		)`,
-		`INSERT INTO personal_labels_migration (id, name, color, user_id, created_at, updated_at)
-			SELECT id, name, color, user_id, created_at, updated_at FROM personal_labels`,
-		`DROP TABLE personal_labels`,
-		`ALTER TABLE personal_labels_migration RENAME TO personal_labels`,
-		`CREATE INDEX idx_personal_labels_user_id ON personal_labels(user_id)`,
-		`CREATE UNIQUE INDEX uq_personal_labels_user_name ON personal_labels(COALESCE(user_id, 0), name)`,
-	}
-	for _, statement := range statements {
-		if _, err := tx.ExecContext(ctx, statement); err != nil {
-			return fmt.Errorf("rebuild personal_labels: %w", err)
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit personal_labels rebuild: %w", err)
-	}
-
-	return nil
-}
-
-// applySQLiteEmailReplyOutboxPerRecipient rebuilds email_reply_outbox without
-// the inline UNIQUE(comment_id) constraint and adds the per-recipient unique
-// index (WI-1136). SQLite cannot drop the constraint in place.
 func applySQLiteEmailReplyOutboxPerRecipient(db Database) (retErr error) {
 	sqliteDB, ok := db.(*SQLiteDB)
 	if !ok {

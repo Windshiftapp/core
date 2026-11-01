@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -52,6 +53,7 @@ func createSLATeamBinding(deps Deps) jsonOperation[slaTeamBindingRequest, *model
 		if err != nil {
 			return nil, slaTeamBindingError(err)
 		}
+		logger.Record(r, logger.ActionSLATeamBindingCreate, logger.ResourceSLATeamBinding, &binding.ID, "", map[string]any{"workspace_id": workspaceID, "team_id": request.TeamID})
 		return binding, nil
 	}
 }
@@ -73,6 +75,7 @@ func deleteSLATeamBinding(deps Deps) commandOperation {
 		if err := service.DeleteForWorkspace(r.Context(), user.ID, workspaceID, bindingID); err != nil {
 			return slaTeamBindingError(err)
 		}
+		logger.Record(r, logger.ActionSLATeamBindingDelete, logger.ResourceSLATeamBinding, &bindingID, "", map[string]any{"workspace_id": workspaceID})
 		return nil
 	}
 }

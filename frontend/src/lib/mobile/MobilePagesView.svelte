@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import CommandIcon from '@lucide/svelte/icons/command';
   import House from '@lucide/svelte/icons/house';
@@ -21,6 +21,7 @@
   let errored = $state(false);
   let filter = $state('');
   let loadSeq = 0;
+  let loadController = null;
 
   const trimmedFilter = $derived(filter.trim().toLowerCase());
 
@@ -41,30 +42,43 @@
 
   async function load() {
     const seq = ++loadSeq;
+    // Supersede any in-flight load so a stale response cannot overwrite the
+    // current one and its queued requests are cancelled.
+    loadController?.abort();
+    const ac = new AbortController();
+    loadController = ac;
     loading = true;
     errored = false;
     try {
-      // MobileShell loads the workspace list eagerly; the personal workspace
-      // is on-demand and pages live there too.
+      // MobileShell loads the workspace list eagerly, but this view mounts
+      // first; wait for it so the first request covers every workspace. The
+      // personal workspace is on-demand and pages live there too.
+      await workspacesStore.load();
       if (!$workspacesStore.personalWorkspace) await workspacesStore.loadPersonalWorkspace?.();
       const workspaces = [
         ...($workspacesStore.personalWorkspace ? [$workspacesStore.personalWorkspace] : []),
         ...$workspacesStore.regularWorkspaces,
       ];
-      const loaded = await fetchWorkspacePageSections(workspaces);
+      const loaded = await fetchWorkspacePageSections(workspaces, { signal: ac.signal });
       if (seq !== loadSeq) return;
       // fetchWorkspacePageSections swallows per-workspace failures (permission
       // or deletion); only a hard throw above surfaces the error state.
       sections = loaded;
     } catch (err) {
-      console.error('Failed to load pages:', err);
-      if (seq === loadSeq) errored = true;
+      if (seq === loadSeq && !ac.signal.aborted) {
+        console.error('Failed to load pages:', err);
+        errored = true;
+      }
     } finally {
-      if (seq === loadSeq) loading = false;
+      if (seq === loadSeq) {
+        loading = false;
+        loadController = null;
+      }
     }
   }
 
   onMount(load);
+  onDestroy(() => loadController?.abort());
 </script>
 
 <MobileHeader title={t('pages.treeHeading')}>
@@ -113,7 +127,7 @@
             class="row"
             style:padding-left={`calc(0.875rem + ${Math.min(page.depth ?? 0, 6) * 0.75}rem)`}
             onclick={() => openPage(section.workspace.id, page.id)}
-            data-testid="mobile-page-row"
+            data-testid={`mobile-page-row-${page.id}`}
             data-page-id={page.id}
             type="button"
           >

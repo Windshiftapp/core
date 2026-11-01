@@ -2,7 +2,7 @@
   import Link2 from '@lucide/svelte/icons/link-2';
   import Plus from '@lucide/svelte/icons/plus';
   import Paperclip from '@lucide/svelte/icons/paperclip';
-  import PenTool from '@lucide/svelte/icons/pen-tool';
+  import IconGraph from '@tabler/icons-svelte-runes/icons/graph';
   import Zap from '@lucide/svelte/icons/zap';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { tick } from 'svelte';
@@ -294,7 +294,7 @@
           onclick={handleNewDiagram}
           title={t('items.newDiagram')}
         >
-          <PenTool class="w-4 h-4 flex-shrink-0" />
+          <IconGraph class="w-4 h-4 flex-shrink-0" />
           <span class="action-label">{t('items.diagram')}</span>
         </button>
       {/if}

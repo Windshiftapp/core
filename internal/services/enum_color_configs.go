@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 )
 
@@ -67,6 +68,10 @@ func newColoredEnumConfig[T EnumEntity](spec coloredEnumSpec[T]) EnumConfig {
 			return "name = ?, color = ?, description = ?, updated_at = ?",
 				[]any{*fields.name, *fields.color, *fields.description, now}
 		},
+		// Dynamic enum taxonomy: the resource name is a logger constant on the
+		// spec, and the create/update/delete verbs are generated here instead
+		// of repeating three action constants per colored enum. This is the one
+		// documented exception to the raw-literal guard.
 		AuditActionCreate: spec.auditResourceType + ".create",
 		AuditActionUpdate: spec.auditResourceType + ".update",
 		AuditActionDelete: spec.auditResourceType + ".delete",
@@ -148,7 +153,7 @@ func milestoneCategorySpec() coloredEnumSpec[*models.MilestoneCategory] {
 		dependencyTable:       "milestones",
 		dependencyColumn:      "category_id",
 		dependencyMessage:     "Cannot delete milestone category that is in use by milestones",
-		auditResourceType:     "milestone_category",
+		auditResourceType:     logger.ResourceMilestoneCategory,
 		defaultColor:          defaultEnumColor,
 		caseInsensitiveUnique: true,
 		newEntity:             func() *models.MilestoneCategory { return &models.MilestoneCategory{} },
@@ -165,7 +170,7 @@ func collectionCategorySpec() coloredEnumSpec[*models.CollectionCategory] {
 		dependencyTable:       "collections",
 		dependencyColumn:      "category_id",
 		dependencyMessage:     "Cannot delete collection category that is in use by collections",
-		auditResourceType:     "collection_category",
+		auditResourceType:     logger.ResourceCollectionCategory,
 		defaultColor:          defaultEnumColor,
 		caseInsensitiveUnique: true,
 		newEntity:             func() *models.CollectionCategory { return &models.CollectionCategory{} },
@@ -182,7 +187,7 @@ func channelCategorySpec() coloredEnumSpec[*models.ChannelCategory] {
 		dependencyTable:       "channels",
 		dependencyColumn:      "category_id",
 		dependencyMessage:     "Cannot delete channel category that is in use by channels",
-		auditResourceType:     "channel_category",
+		auditResourceType:     logger.ResourceChannelCategory,
 		defaultColor:          defaultEnumColor,
 		caseInsensitiveUnique: true,
 		newEntity:             func() *models.ChannelCategory { return &models.ChannelCategory{} },
@@ -199,7 +204,7 @@ func iterationTypeSpec() coloredEnumSpec[*models.IterationType] {
 		dependencyTable:   "iterations",
 		dependencyColumn:  "type_id",
 		dependencyMessage: "Cannot delete iteration type that is in use by iterations",
-		auditResourceType: "iteration_type",
+		auditResourceType: logger.ResourceIterationType,
 		requireColor:      true,
 		newEntity:         func() *models.IterationType { return &models.IterationType{} },
 		fields: func(entity *models.IterationType) coloredEnumFields {

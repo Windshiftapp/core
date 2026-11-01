@@ -82,25 +82,6 @@ export default {
       "missingHistory": "{count} Derzeit abgeschlossene Vorgänge wurden ausgeschlossen, da ihr Abschlussverlauf fehlt."
     }
   },
-  "users": {
-    "labels": {
-      "tabLabel": "Labels",
-      "tabDescription": "Verwalten Sie Ihre persönlichen Labels.",
-      "searchPlaceholder": "Labels suchen",
-      "new": "Neues Label",
-      "createTitle": "Label erstellen",
-      "editTitle": "Label bearbeiten",
-      "namePlaceholder": "z.B. dringend",
-      "mine": "Meine Labels",
-      "empty": "Noch keine Labels",
-      "emptyHint": "Erstellen Sie Ihr erstes Label, um Artikel zu organisieren.",
-      "created": "Label erstellt",
-      "updated": "Label aktualisiert",
-      "deleted": "Label gelöscht",
-      "deleteTitle": "Label löschen?",
-      "deleteMessage": "„{name}“ löschen? Dadurch wird es von allen Gegenständen entfernt, an die es angeschlossen ist."
-    }
-  },
   "channel": {
     "channelConfigCorrupted": "Die Kanalkonfiguration ist beschädigt und kann nicht sicher bearbeitet werden. Bitte wenden Sie sich an einen Administrator.",
     "portalSlugInvalid": "Slug muss aus 1–40 Kleinbuchstaben, Zahlen oder Bindestrichen bestehen und darf nicht mit einem Bindestrich beginnen oder enden oder aufeinanderfolgende Bindestriche enthalten.",
@@ -334,11 +315,6 @@ export default {
     "libCharmbracelet": "TUI- und SSH-Zugriff (Bubble Tea, Wish)"
   },
   "testing": {
-    "generateWithAI": "Mit KI generieren",
-    "overwriteDescriptionTitle": "Beschreibung überschreiben?",
-    "overwriteDescriptionConfirm": "Die vorhandene Beschreibung durch eine KI-generierte Zusammenfassung ersetzen?",
-    "overwrite": "Überschreiben",
-    "generateFailed": "Fehler beim Generieren der Beschreibung.",
     "actualResult": "Tatsächliches Ergebnis",
     "editTestPlan": "Testplan bearbeiten",
     "execute": "Ausführen",

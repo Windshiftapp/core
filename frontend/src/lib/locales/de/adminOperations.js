@@ -137,7 +137,7 @@ export default withEnglishAdminOperations({
   workspaceMembers: {
     invalidWorkspace: 'Ungültiger Arbeitsbereich.', loadFailed: 'Mitglieder des Arbeitsbereichs konnten nicht geladen werden.', addMemberFailed: 'Mitglied konnte nicht hinzugefügt werden: {error}', addGroupFailed: 'Gruppe konnte nicht hinzugefügt werden: {error}',
     removeRoleTitle: 'Die Rolle {role} von {name} entfernen?', removeRoleMessage: 'Dadurch werden die Rollenzuweisung und die zugehörigen Berechtigungen entfernt.', removeRoleFailed: 'Rolle konnte nicht entfernt werden: {error}',
-    summaryTitle: 'Zugriffsübersicht', summaryDescription: 'Zeigt die Rollenverteilung in diesem Arbeitsbereich. Eine Rolle ohne zugewiesene Mitglieder oder Gruppen steht allen zur Verfügung. Berechtigungshierarchie: {viewer} → {editor} → {tester}.',
+    summaryTitle: 'Zugriffsübersicht', summaryDescription: 'Zeigt die Rollenverteilung in diesem Arbeitsbereich. Eine Rolle ohne zugewiesene Mitglieder oder Gruppen steht allen zur Verfügung. Sobald jemand die Rolle {viewer} erhält, wird der Arbeitsbereich eingeschränkt und ist nur für zugewiesene Benutzer und Gruppen sichtbar. Berechtigungshierarchie: {viewer} → {editor} → {tester}.',
     role: 'Rolle', effectiveAccess: 'Zugriff', assignments: 'Zuweisungen', memberOrGroup: 'Mitglied oder Gruppe', rolesLabel: 'Rollen', actions: 'Aktionen',
     roles: {
       viewer: { name: 'Betrachter', description: 'Inhalte des Arbeitsbereichs ansehen und an Diskussionen teilnehmen' },

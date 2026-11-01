@@ -22,6 +22,9 @@ type Channel struct {
 	CategoryName  string           `json:"category_name,omitempty"`  // Category name (from JOIN)
 	CategoryColor string           `json:"category_color,omitempty"` // Category color (from JOIN)
 	Managers      []ChannelManager `json:"managers,omitempty"`       // Channel managers for detailed views
+	// Intakes is populated on demand by GET /channels?include_intakes=true so
+	// callers can resolve portal linkage without one request per channel.
+	Intakes []Intake `json:"intakes,omitempty"`
 }
 
 // ChannelCategory represents a grouping for channels
@@ -287,7 +290,8 @@ type CustomerOrganisation struct {
 }
 
 // CustomerOrganisationBuiltinNoCustomer is the builtin_key of the placeholder
-// organisation that owns projects and worklogs created without a real customer.
+// organisation that owns time projects created without a real customer. Worklogs
+// derive their customer from the project.
 const CustomerOrganisationBuiltinNoCustomer = "no_customer"
 
 // Portal organisation request-sharing modes stored in

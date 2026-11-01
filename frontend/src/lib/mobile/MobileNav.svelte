@@ -1,6 +1,6 @@
 <script>
   import ListChecks from '@lucide/svelte/icons/list-checks';
-  import SquareCheckBig from '@lucide/svelte/icons/square-check-big';
+  import SquareCheck from '@lucide/svelte/icons/square-check';
   import BookOpen from '@lucide/svelte/icons/book-open';
   import Timer from '@lucide/svelte/icons/timer';
   import Bell from '@lucide/svelte/icons/bell';
@@ -11,7 +11,7 @@
 
   const tabs = [
     { view: 'mobile-my-work', href: '/m', labelKey: 'mobile.myWork.title', icon: ListChecks, testid: 'mobile-nav-my-work' },
-    { view: 'mobile-personal', href: '/m/personal', labelKey: 'workspaces.personal', icon: SquareCheckBig, testid: 'mobile-nav-personal' },
+    { view: 'mobile-personal', href: '/m/personal', labelKey: 'workspaces.personal', icon: SquareCheck, testid: 'mobile-nav-personal' },
     { view: 'mobile-pages', href: '/m/pages', labelKey: 'pages.treeHeading', icon: BookOpen, testid: 'mobile-nav-pages' },
     { view: 'mobile-timer', href: '/m/timer', labelKey: 'time.pomodoro.timer', icon: Timer, testid: 'mobile-nav-timer' },
     { view: 'mobile-notifications', href: '/m/notifications', labelKey: 'mobile.nav.alerts', icon: Bell, testid: 'mobile-nav-notifications' },

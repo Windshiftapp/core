@@ -12,10 +12,6 @@ export default {
     "configureFilter": "配置筛选器以查看工作项"
   },
   "users": {
-    "labels": {
-      "emptyHint": "创建您的第一个标签来组织工作项。",
-      "deleteMessage": "删除“{name}”？这会将其从所附加的任何工作项中删除。"
-    }
   },
   "items": {
     "agentLogEmpty": "尚未为此工作项运行代理",

@@ -99,7 +99,7 @@ func (h *ConfigurationSetHandler) AssignWorkspaceConfigurationSet(w http.Respons
 			Username:     currentUser.Username,
 			IPAddress:    utils.GetClientIP(r),
 			UserAgent:    r.UserAgent(),
-			ActionType:   logger.ActionConfigSetUpdate,
+			ActionType:   logger.ActionConfigSetWorkspaceAssign,
 			ResourceType: logger.ResourceConfigurationSet,
 			ResourceID:   resourceID,
 			ResourceName: resourceName,

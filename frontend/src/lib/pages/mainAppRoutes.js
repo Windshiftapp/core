@@ -489,7 +489,9 @@ export const MAIN_APP_TEST_VIEWS = new Set([
 
 // Views whose content grows with the document and should end with the app
 // footer. Viewport-filling surfaces (boards, canvases, editors, Svelte Flow
-// designers, internally-scrolled lists) are intentionally absent.
+// designers, and two-panel pages that fill the viewport and scroll one of their
+// own panes) are intentionally absent: the footer wrapper is not viewport tall,
+// so an `h-full` pane inside it collapses to its content height.
 export const MAIN_APP_FOOTER_VIEWS = new Set([
   'homepage',
   'workspaces',
@@ -505,10 +507,8 @@ export const MAIN_APP_FOOTER_VIEWS = new Set([
   'approvals-inbox',
   'search',
   'about',
-  'api-docs',
   'licenses',
   '404',
-  'organizations',
   'workspace-detail',
   'workspace-overview',
   'personal-workspace',
@@ -518,8 +518,6 @@ export const MAIN_APP_FOOTER_VIEWS = new Set([
   'workspace-nav-config',
   'collection-nav-config',
   'asset-settings',
-  'configuration-set-detail',
-  'logbook',
   'logbook-document',
 ]);
 

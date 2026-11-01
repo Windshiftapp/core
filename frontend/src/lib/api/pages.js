@@ -14,6 +14,21 @@ export const pages = {
   getTitles: (workspaceIds) =>
     fetchV2Data(`/pages/titles${buildQueryString({ workspace_ids: workspaceIds.join(',') })}`),
 
+  /**
+   * Cross-workspace page summaries (id/title/depth/flags) for the mobile
+   * list and search. Pass a query to search titles and bodies; omit it to
+   * list every visible page. At most 50 workspace ids per request — callers
+   * batch larger workspace sets.
+   *
+   * @param {number[]} workspaceIds
+   * @param {{q?: string, limit?: number, signal?: AbortSignal, readPolicy?: {priority: string}}} [options]
+   */
+  getSummaries: (workspaceIds, { q = '', limit, ...requestOptions } = {}) =>
+    fetchV2Data(
+      `/pages/summaries${buildQueryString({ workspace_ids: workspaceIds.join(','), q, limit })}`,
+      requestOptions
+    ),
+
   /** Caller's effective page permission level per visible page, keyed by page ID. */
   getEffectiveLevels: (workspaceId) =>
     fetchV2Data(`/workspaces/${workspaceId}/pages/effective-levels`),

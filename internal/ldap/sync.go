@@ -141,24 +141,25 @@ func (s *SyncService) SyncUsers(ctx context.Context, config *models.LDAPConfig) 
 	// Update sync status
 	s.updateSyncStatus(syncStatusID, "completed", nil, result)
 
-	// Audit log
-	go func() {
-		_ = logger.LogAudit(s.db, logger.AuditEvent{
-			Username:     "LDAP:sync",
-			ActionType:   "ldap.sync",
-			ResourceType: "ldap_config",
-			ResourceName: config.Name,
-			Details: map[string]any{
-				"config_id":   config.ID,
-				"synced":      result.UsersSynced,
-				"created":     result.UsersCreated,
-				"updated":     result.UsersUpdated,
-				"deactivated": result.UsersDeactivated,
-				"errors":      len(result.Errors),
-			},
-			Success: len(result.Errors) == 0,
-		})
-	}()
+	// Audit log. Written synchronously: the previous fire-and-forget
+	// goroutine dropped events on shutdown or DB errors and gave no ordering
+	// guarantee.
+	_ = logger.LogAudit(s.db, logger.AuditEvent{
+		Username:     "system:ldap",
+		Source:       logger.AuditSourceSystem,
+		ActionType:   logger.ActionLDAPSync,
+		ResourceType: logger.ResourceLDAPConfig,
+		ResourceName: config.Name,
+		Details: map[string]any{
+			"config_id":   config.ID,
+			"synced":      result.UsersSynced,
+			"created":     result.UsersCreated,
+			"updated":     result.UsersUpdated,
+			"deactivated": result.UsersDeactivated,
+			"errors":      len(result.Errors),
+		},
+		Success: len(result.Errors) == 0,
+	})
 
 	slog.Info("LDAP sync completed",
 		"config", config.Name,

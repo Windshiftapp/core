@@ -31,6 +31,13 @@
       !routeState.error &&
       !$uiStore.reviewFullscreen
   );
+  // Footer routes need a flex column so `mt-auto` can pin the footer on short
+  // pages. Put that column inside the scroll container rather than on it: a
+  // fixed-height flex container shrinks tall content, whose overflow then
+  // paints over the footer.
+  const footerLayout = $derived(
+    isMainAppFooterView(view) && !$uiStore.reviewFullscreen
+  );
   const routeProps = $derived.by(() =>
     getMainAppRouteProps(view, route, {
       currentUser: authStore.currentUser,
@@ -112,38 +119,62 @@
   </div>
 {:else if routeEntry.config}
   {#if wrapper === 'surface-full'}
-    <div
-      class="h-full min-h-0 overflow-y-auto"
-      class:flex={showFooter}
-      class:flex-col={showFooter}
-      style="background-color: var(--ds-surface);"
-    >
-      {@render lazyLoadedComponent(view, routeProps)}
-      {@render routeFooter()}
+    <div class="h-full min-h-0 overflow-y-auto" style="background-color: var(--ds-surface);">
+      {#if footerLayout}
+        <div class="flex min-h-full flex-col">
+          {@render lazyLoadedComponent(view, routeProps)}
+          {@render routeFooter()}
+        </div>
+      {:else}
+        {@render lazyLoadedComponent(view, routeProps)}
+      {/if}
     </div>
   {:else if wrapper === 'surface-padded'}
-    <div class="p-6" style="background-color: var(--ds-surface);">
-      {@render lazyLoadedComponent(view, routeProps)}
-    </div>
-    {@render routeFooter()}
+    {#if footerLayout}
+      <div class="flex min-h-full flex-col">
+        <div class="p-6" style="background-color: var(--ds-surface);">
+          {@render lazyLoadedComponent(view, routeProps)}
+        </div>
+        {@render routeFooter()}
+      </div>
+    {:else}
+      <div class="p-6" style="background-color: var(--ds-surface);">
+        {@render lazyLoadedComponent(view, routeProps)}
+      </div>
+    {/if}
   {:else if wrapper === 'surface-admin'}
-    <div
-      class="flex-1 overflow-y-auto px-16 py-12"
-      class:flex={showFooter}
-      class:flex-col={showFooter}
-      style="background-color: var(--ds-surface);"
-    >
-      {@render lazyLoadedComponent(view, routeProps)}
-      {@render routeFooter()}
+    <div class="h-full min-h-0 overflow-y-auto px-16 py-12" style="background-color: var(--ds-surface);">
+      {#if footerLayout}
+        <div class="flex min-h-full flex-col">
+          {@render lazyLoadedComponent(view, routeProps)}
+          {@render routeFooter()}
+        </div>
+      {:else}
+        {@render lazyLoadedComponent(view, routeProps)}
+      {/if}
     </div>
   {:else if wrapper === 'surface'}
-    <div style="background-color: var(--ds-surface);">
-      {@render lazyLoadedComponent(view, routeProps)}
-    </div>
-    {@render routeFooter()}
+    {#if footerLayout}
+      <div class="flex min-h-full flex-col">
+        <div style="background-color: var(--ds-surface);">
+          {@render lazyLoadedComponent(view, routeProps)}
+        </div>
+        {@render routeFooter()}
+      </div>
+    {:else}
+      <div style="background-color: var(--ds-surface);">
+        {@render lazyLoadedComponent(view, routeProps)}
+      </div>
+    {/if}
   {:else}
-    {@render lazyLoadedComponent(view, routeProps)}
-    {@render routeFooter()}
+    {#if footerLayout}
+      <div class="flex min-h-full flex-col">
+        {@render lazyLoadedComponent(view, routeProps)}
+        {@render routeFooter()}
+      </div>
+    {:else}
+      {@render lazyLoadedComponent(view, routeProps)}
+    {/if}
   {/if}
 {:else}
   {@render lazyLoadedComponent('workspaces', { showAdminHeader: false })}

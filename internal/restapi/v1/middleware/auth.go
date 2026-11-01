@@ -7,8 +7,10 @@ import (
 	"strings"
 
 	"windshift/internal/auth"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/restapi"
+	"windshift/internal/utils"
 )
 
 // BearerAuth middleware requires bearer token authentication for the public API
@@ -16,6 +18,7 @@ import (
 type BearerAuth struct {
 	tokenManager      *auth.TokenManager
 	permissionService PermissionChecker
+	auditor           *logger.Auditor
 }
 
 // PermissionChecker abstracts the permission check needed by the middleware.
@@ -24,10 +27,11 @@ type PermissionChecker interface {
 }
 
 // NewBearerAuthWithPermissions creates a BearerAuth with permission checking support.
-func NewBearerAuthWithPermissions(tokenManager *auth.TokenManager, permSvc PermissionChecker) *BearerAuth {
+func NewBearerAuthWithPermissions(tokenManager *auth.TokenManager, permSvc PermissionChecker, auditor *logger.Auditor) *BearerAuth {
 	return &BearerAuth{
 		tokenManager:      tokenManager,
 		permissionService: permSvc,
+		auditor:           auditor,
 	}
 }
 
@@ -100,6 +104,13 @@ func (ba *BearerAuth) RequirePermission(permissions ...string) func(http.Handler
 			}
 
 			if !ba.tokenManager.CheckTokenPermissions(apiToken, permissions) {
+				if ba.auditor != nil && utils.IsMutationMethod(r.Method) {
+					if user := GetUser(r.Context()); user != nil {
+						ba.auditor.LogDenied(r, user, logger.ActionAccessDenied, logger.ResourceRoute, nil, r.URL.Path, strings.Join(permissions, ","), map[string]any{
+							"auth_method": "bearer",
+						})
+					}
+				}
 				restapi.RespondError(w, r, restapi.NewAPIError(
 					http.StatusForbidden,
 					restapi.ErrCodeInsufficientPermission,
@@ -131,6 +142,11 @@ func (ba *BearerAuth) RequireSystemAdmin(next http.Handler) http.Handler {
 
 		isAdmin, err := ba.permissionService.IsSystemAdmin(user.ID)
 		if err != nil || !isAdmin {
+			if err == nil && ba.auditor != nil && utils.IsMutationMethod(r.Method) {
+				ba.auditor.LogDenied(r, user, logger.ActionAccessDenied, logger.ResourceRoute, nil, r.URL.Path, models.PermissionSystemAdmin, map[string]any{
+					"auth_method": "bearer",
+				})
+			}
 			restapi.RespondError(w, r, restapi.ErrAdminRequired)
 			return
 		}

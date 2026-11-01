@@ -81,7 +81,7 @@ func (h *ItemAttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response, err := h.uploads.UploadItemAttachment(services.ItemAttachmentUploadInput{
+	response, err := h.uploads.UploadItemAttachment(r.Context(), services.ItemAttachmentUploadInput{
 		ItemID:           itemID,
 		UploaderID:       user.ID,
 		OriginalFilename: fileHeader.Filename,
@@ -119,7 +119,7 @@ func (h *ItemAttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.uploads.DeleteItemAttachment(attachmentID, user.ID); err != nil {
+	if err := h.uploads.DeleteItemAttachment(r.Context(), attachmentID, user.ID); err != nil {
 		h.respondDeleteError(w, r, err)
 		return
 	}

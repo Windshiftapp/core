@@ -939,6 +939,9 @@ export default {
       changeManifest: 'Заменить manifest.json',
       manifestSelected: 'Выбран манифест: {name}',
       registeredRoutes: 'Зарегистрированные маршруты',
+      routeAuth_session: 'Сессия',
+      routeAuth_admin: 'Администратор',
+      routeAuth_none: 'Публичный',
       moduleSettingsNote:
         'Изменения настроек модулей применяются сразу. Отключённый модуль будет скрыт из навигации.',
       failedToUpload: 'Не удалось загрузить: {error}',
@@ -1179,6 +1182,8 @@ export default {
       completedVisibility: 'Завершённая работа',
       completedVisibilityCustom: 'Настраиваемый (используйте параметры ниже)',
       completedVisibilityHint: 'Определяет, сколько завершённой работы загружает эта доска. Действует для всех зрителей.',
+      completedLimit: 'Количество завершённых элементов',
+      completedLimitHint: 'Показывать на доске не более этого числа завершённых элементов (1–{max}).',
       backlogSelected: 'Для бэклога выбрано статусов: {count}',
       backlogSelected_one: 'Для бэклога выбран {count} статус',
       backlogSelected_few: 'Для бэклога выбрано {count} статуса',

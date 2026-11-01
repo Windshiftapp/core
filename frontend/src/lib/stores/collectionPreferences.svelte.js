@@ -1,8 +1,10 @@
 import { userPreferences } from '../api/users.js';
 
-// Per-user collection view configuration, stored in user_preferences so it
-// follows the user across devices. Existing localStorage values stay readable
-// as a fallback; writes always go to the server.
+// Per-user collection view configuration and other top-level user
+// preferences, stored in user_preferences so they follow the user across
+// devices. Existing localStorage values stay readable as a fallback; writes
+// always go to the server. All fields share one GET/PATCH pair so the shell
+// loads the whole preferences document exactly once.
 
 const SAVE_DEBOUNCE_MS = 400;
 
@@ -16,6 +18,8 @@ class CollectionPreferencesStore {
   viewState = $state({});
   /** @type {Record<string, unknown[]>} scope -> personal saved filters */
   savedFilters = $state({});
+  /** @type {'oldest' | 'newest'} preferred comment thread order */
+  commentSortOrder = $state('oldest');
   loaded = $state(false);
 
   #userId = null;
@@ -23,6 +27,7 @@ class CollectionPreferencesStore {
   #generation = 0;
   #dirtyViewScopes = new Set();
   #dirtyFilterScopes = new Set();
+  #dirtyCommentSort = false;
   #saveTimer = null;
   #saving = null;
 
@@ -30,7 +35,7 @@ class CollectionPreferencesStore {
    * Load the user's preferences once. Safe to call repeatedly; a call for a
    * different user resets the cache first.
    */
-  ensureLoaded(userId = null) {
+  ensureLoaded(userId = null, { timeout = 0 } = {}) {
     if (userId != null && this.#userId != null && this.#userId !== userId) {
       this.reset();
     }
@@ -40,11 +45,12 @@ class CollectionPreferencesStore {
 
     const generation = this.#generation;
     const promise = userPreferences
-      .get()
+      .get({ timeout })
       .then((prefs) => {
         if (generation !== this.#generation) return;
         this.viewState = prefs?.view_state ?? {};
         this.savedFilters = prefs?.saved_filters ?? {};
+        this.commentSortOrder = prefs?.comment_sort_order === 'newest' ? 'newest' : 'oldest';
         this.loaded = true;
       })
       .catch((error) => {
@@ -62,11 +68,13 @@ class CollectionPreferencesStore {
     this.#generation += 1;
     this.viewState = {};
     this.savedFilters = {};
+    this.commentSortOrder = 'oldest';
     this.loaded = false;
     this.#userId = null;
     this.#loadPromise = null;
     this.#dirtyViewScopes.clear();
     this.#dirtyFilterScopes.clear();
+    this.#dirtyCommentSort = false;
     if (this.#saveTimer) {
       clearTimeout(this.#saveTimer);
       this.#saveTimer = null;
@@ -114,6 +122,15 @@ class CollectionPreferencesStore {
     this.#scheduleSave();
   }
 
+  /** Set the preferred comment thread order and persist it. */
+  setCommentSortOrder(order) {
+    const next = order === 'newest' ? 'newest' : 'oldest';
+    if (this.commentSortOrder === next) return;
+    this.commentSortOrder = next;
+    this.#dirtyCommentSort = true;
+    this.#scheduleSave();
+  }
+
   #scheduleSave() {
     if (this.#saveTimer) clearTimeout(this.#saveTimer);
     this.#saveTimer = setTimeout(() => {
@@ -123,7 +140,7 @@ class CollectionPreferencesStore {
   }
 
   /** Flush pending writes immediately (also used by tests). */
-  async flush() {
+  async flush({ keepalive = false } = {}) {
     if (this.#saveTimer) {
       clearTimeout(this.#saveTimer);
       this.#saveTimer = null;
@@ -134,10 +151,12 @@ class CollectionPreferencesStore {
     }
     const viewScopes = [...this.#dirtyViewScopes];
     const filterScopes = [...this.#dirtyFilterScopes];
-    if (viewScopes.length === 0 && filterScopes.length === 0) return;
+    const commentSortDirty = this.#dirtyCommentSort;
+    if (viewScopes.length === 0 && filterScopes.length === 0 && !commentSortDirty) return;
 
     this.#dirtyViewScopes.clear();
     this.#dirtyFilterScopes.clear();
+    this.#dirtyCommentSort = false;
 
     const body = {};
     if (viewScopes.length > 0) {
@@ -150,13 +169,19 @@ class CollectionPreferencesStore {
         filterScopes.map((scope) => [scope, this.savedFilters[scope] ?? null])
       );
     }
+    if (commentSortDirty) {
+      body.comment_sort_order = this.commentSortOrder;
+    }
 
-    this.#saving = userPreferences
-      .update(body)
+    const save = keepalive
+      ? userPreferences.update(body, { keepalive: true })
+      : userPreferences.update(body);
+    this.#saving = save
       .catch((error) => {
         // Re-mark for retry; the local state stays authoritative.
         for (const scope of viewScopes) this.#dirtyViewScopes.add(scope);
         for (const scope of filterScopes) this.#dirtyFilterScopes.add(scope);
+        if (commentSortDirty) this.#dirtyCommentSort = true;
         console.warn('[collectionPreferences] failed to save preferences', error);
       })
       .finally(() => {
@@ -167,3 +192,11 @@ class CollectionPreferencesStore {
 }
 
 export const collectionPreferences = new CollectionPreferencesStore();
+
+// Debounced writes must not be lost when the user reloads or closes the tab
+// before the timer fires. A keepalive PATCH survives the unload.
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => {
+    void collectionPreferences.flush({ keepalive: true });
+  });
+}

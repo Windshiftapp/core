@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import { currentRoute, isWorkspaceRoute } from '../router.js';
   import { permissionStore } from '../stores/permissions.svelte.js';
   import { uiStore } from '../stores/ui.svelte.js';
@@ -23,7 +24,7 @@
   import IconFolders from '@tabler/icons-svelte-runes/icons/folders';
   import IconLayoutSidebarLeftExpand from '@tabler/icons-svelte-runes/icons/layout-sidebar-left-expand';
   import IconLayoutSidebarLeftCollapse from '@tabler/icons-svelte-runes/icons/layout-sidebar-left-collapse';
-  import IconMessage from '@tabler/icons-svelte-runes/icons/message';
+  import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
   import IconTerminal2 from '@tabler/icons-svelte-runes/icons/terminal-2';
   import { mainNavItems, bottomNavItems } from '../navigation/mainNavigation.js';
 
@@ -78,6 +79,13 @@
     const timestamp = Date.parse(visit?.last_visited ?? '');
     return Number.isNaN(timestamp) ? 0 : timestamp;
   }
+
+  // Resolve the visit order before the menu is first opened. Loading it in
+  // onOpen sorted an already-visible list and flashed from directory order to
+  // recency order. onOpen still refreshes it so recent navigation is reflected.
+  onMount(() => {
+    void loadRecentWorkspaceOrder();
+  });
 
   function onWorkspaceSearchInput(value) {
     workspaceSearchQuery = value;
@@ -233,7 +241,7 @@
       {#if aiStore.chatAvailable}
         <NavLink
           id="chat-toggle-button"
-          icon={IconMessage}
+          icon={IconMessageChatbot}
           label={t('nav.aiChat')}
           onclick={onShowChatPanel}
           expanded={$uiStore.navExpanded}

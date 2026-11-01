@@ -1,11 +1,8 @@
 <script>
   import { collectionStore } from '../../stores/collectionContext.svelte.js';
   import { QLBuilder } from '../../utils/ql.js';
-  import DynamicFieldFilter from '../items/DynamicFieldFilter.svelte';
-  import DynamicFilterPopover from '../shared/DynamicFilterPopover.svelte';
   import Toggle from '../../components/Toggle.svelte';
-  import SavedFilterMenu from './SavedFilterMenu.svelte';
-  import CollectionViewsMenu from './CollectionViewsMenu.svelte';
+  import FilterMenu from './FilterMenu.svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
   let {
@@ -15,21 +12,20 @@
   } = $props();
 
   let filters = $state(JSON.parse(JSON.stringify(collectionStore.subFilterRows ?? [])));
-  let activeQl = $derived(QLBuilder.buildQuery({ dynamicFields: filters }) || '');
 
-  function applyFilters(rows) {
-    const ql = QLBuilder.buildQuery({ dynamicFields: rows });
-    if (ql) collectionStore.setSubFilter(ql, JSON.parse(JSON.stringify(rows)));
+  // A saved or shared filter replaces the whole stack, so rehydrate the local
+  // rows from the stored set before applying its query.
+  function applyFilters(rows, ql) {
+    const nextRows = JSON.parse(JSON.stringify(rows ?? []));
+    filters = nextRows;
+    const query = ql ?? QLBuilder.buildQuery({ dynamicFields: nextRows }) ?? '';
+    if (query) collectionStore.setSubFilter(query, nextRows);
     else collectionStore.clearSubFilter();
   }
 
-  // A saved filter replaces the whole stack, so rehydrate the builder rows
-  // from the stored set before applying its query.
-  function applySavedFilter(rows, ql) {
-    const nextRows = JSON.parse(JSON.stringify(rows ?? []));
-    filters = nextRows;
-    if (ql) collectionStore.setSubFilter(ql, nextRows);
-    else collectionStore.clearSubFilter();
+  function clearFilters() {
+    filters = [];
+    collectionStore.clearSubFilter();
   }
 </script>
 
@@ -45,37 +41,12 @@
     />
   {/if}
 
-  <DynamicFilterPopover
-    bind:filters
+  <FilterMenu
+    {workspaceId}
+    {collectionId}
+    activeRows={filters}
     applied={Boolean(collectionStore.subFilterQL)}
     onapply={applyFilters}
-    onclear={() => collectionStore.clearSubFilter()}
-  >
-    {#snippet filterRow({ filter, index, onchange, onremove, onexecute })}
-      <DynamicFieldFilter
-        {filter}
-        compact
-        testIdPrefix={`collection-dynamic-filter-${index}`}
-        {onchange}
-        {onremove}
-        {onexecute}
-      />
-    {/snippet}
-  </DynamicFilterPopover>
-
-  <SavedFilterMenu
-    {workspaceId}
-    {collectionId}
-    {activeQl}
-    activeRows={filters}
-    onapply={applySavedFilter}
-  />
-
-  <CollectionViewsMenu
-    {workspaceId}
-    {collectionId}
-    {activeQl}
-    activeRows={filters}
-    onapply={applySavedFilter}
+    onclear={clearFilters}
   />
 </div>

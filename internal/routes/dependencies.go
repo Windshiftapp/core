@@ -40,7 +40,8 @@ type Deps struct {
 	OAuthTokenLimiter     RateLimiter // IP-keyed limiter for the unauthenticated OAuth /token endpoint (never honors DisableIPRateLimit)
 	EmailVerifyLimiter    RateLimiter
 	SetupLimiter          RateLimiter
-	AIRateLimiter         RateLimiter // Rate limiter for AI/LLM endpoints (5 req/min per IP)
+	AIRateLimiter         RateLimiter // Rate limiter for AI/LLM endpoints (20 req/min per user)
+	WidgetGenerateLimiter RateLimiter // Per-user limiter for custom widget generation (20/hour)
 	UploadLimiter         RateLimiter // Rate limiter for file uploads (10 req/min per IP)
 	WebhookLimiter        RateLimiter // Rate limiter for webhook triggers (10 req/min per IP)
 	CalendarFeedLimiter   RateLimiter // Rate limiter for public calendar feeds (10 req/min per IP)
@@ -162,7 +163,6 @@ type AdminHandlers struct {
 type PlanningHandlers struct {
 	MilestoneCategory *handlers.EnumHandler
 	IterationType     *handlers.EnumHandler
-	PersonalLabel     *handlers.PersonalLabelHandler
 }
 
 // TimeTrackingHandlers groups time tracking handlers.

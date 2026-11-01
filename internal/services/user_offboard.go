@@ -380,7 +380,6 @@ func OffboardUser(db database.Database, userID int, notificationDeleter UserNoti
 		desc  string
 	}{
 		{`DELETE FROM user_preferences WHERE user_id = ?`, "preferences"},
-		{`DELETE FROM personal_labels WHERE user_id = ?`, "personal labels"},
 		{`DELETE FROM reviews WHERE user_id = ?`, "reviews"},
 		{`DELETE FROM active_timers WHERE user_id = ?`, "active timers"},
 		{`DELETE FROM item_watches WHERE user_id = ?`, "item watches"},

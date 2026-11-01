@@ -2,7 +2,7 @@
   import { onMount, tick } from 'svelte';
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import Send from '@lucide/svelte/icons/send';
-  import Sparkles from '@lucide/svelte/icons/sparkles';
+  import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
   import Loader from '@lucide/svelte/icons/loader';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import { chatStore, preprocessItemKeys } from '../stores/chatStore.svelte.js';
@@ -59,7 +59,7 @@
 <div class="chat">
 <header class="chat-header" data-testid="mobile-chat-header">
   <button class="back" onclick={back} aria-label={t('common.back')} type="button"><ChevronLeft size={24} /></button>
-  <span class="title"><Sparkles size={17} /> {t('mobile.chat.title')}</span>
+  <span class="title"><IconMessageChatbot size={17} /> {t('mobile.chat.title')}</span>
   {#if messages.length > 0}
     <button class="clear" onclick={() => chatStore.clearHistory()} aria-label={t('mobile.chat.clear')} type="button"><Trash2 size={18} /></button>
   {:else}
@@ -70,7 +70,7 @@
 <div class="messages" bind:this={scrollEl} data-testid="mobile-chat-messages">
   {#if messages.length === 0}
     <div class="empty" data-testid="chat-empty">
-      <Sparkles size={28} />
+      <IconMessageChatbot size={28} />
       <p>{t('mobile.chat.intro')}</p>
       <span>{t('mobile.chat.help')}</span>
     </div>

@@ -3,6 +3,8 @@ package services
 import (
 	"encoding/json"
 	"errors"
+	"strings"
+	"time"
 
 	"windshift/internal/logger"
 	"windshift/internal/models"
@@ -55,6 +57,77 @@ type PageTitleRow struct {
 	WorkspaceID int    `json:"workspace_id"`
 	PageID      int    `json:"page_id"`
 	Title       string `json:"title"`
+}
+
+// PageSummaryRow is a lightweight cross-workspace page reference for the
+// mobile list and search surfaces: enough to render a row without the body.
+type PageSummaryRow struct {
+	WorkspaceID int       `json:"workspace_id"`
+	PageID      int       `json:"page_id"`
+	ParentID    *int      `json:"parent_id"`
+	Title       string    `json:"title"`
+	Depth       int       `json:"depth"`
+	IsHome      bool      `json:"is_home"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// ListSummariesAcrossWorkspaces returns visible page summaries for the
+// requested workspaces. An empty query lists every visible page; a non-empty
+// query runs the same title+body substring search as Search and stops once
+// limit rows are collected. Workspaces the user cannot access contribute no
+// rows, so the mobile surfaces fan out per workspace only on the server.
+func (s *PageApplicationService) ListSummariesAcrossWorkspaces(userID int, workspaceIDs []int, query string, limit int) ([]PageSummaryRow, error) {
+	if limit <= 0 {
+		limit = 12
+	}
+	q := strings.TrimSpace(query)
+	rows := make([]PageSummaryRow, 0)
+	seen := make(map[int]bool, len(workspaceIDs))
+	for _, workspaceID := range workspaceIDs {
+		if seen[workspaceID] {
+			continue
+		}
+		seen[workspaceID] = true
+		var pages []models.Page
+		var err error
+		if q == "" {
+			pages, err = s.pages.ListTreeMeta(workspaceID, false)
+		} else {
+			pages, err = s.pages.SearchByKeyword(workspaceID, q, limit)
+		}
+		if err != nil {
+			return nil, err
+		}
+		ids := make([]int, len(pages))
+		for i := range pages {
+			ids[i] = pages[i].ID
+		}
+		visible, err := s.pageAuth.ListVisiblePageIDs(userID, workspaceID, ids)
+		if err != nil {
+			return nil, err
+		}
+		for i := range pages {
+			if !visible[pages[i].ID] {
+				continue
+			}
+			rows = append(rows, PageSummaryRow{
+				WorkspaceID: workspaceID,
+				PageID:      pages[i].ID,
+				ParentID:    pages[i].ParentID,
+				Title:       pages[i].Title,
+				Depth:       pages[i].Depth,
+				IsHome:      pages[i].IsHome,
+				UpdatedAt:   pages[i].UpdatedAt,
+			})
+		}
+		if q != "" && len(rows) >= limit {
+			break
+		}
+	}
+	if q != "" && len(rows) > limit {
+		rows = rows[:limit]
+	}
+	return rows, nil
 }
 
 // ListTitlesAcrossWorkspaces returns id+title pairs for the pages the user

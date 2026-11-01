@@ -409,13 +409,6 @@ func (s *TestManagementApplicationService) ListCases(userID int, params TestCase
 	return items, total, err
 }
 
-func (s *TestManagementApplicationService) GetCase(userID, workspaceID, id int) (*models.TestCase, error) {
-	if err := s.require(userID, workspaceID, models.PermissionTestView); err != nil {
-		return nil, err
-	}
-	return s.cases.GetByID(id, workspaceID)
-}
-
 func (s *TestManagementApplicationService) CreateCase(userID, workspaceID int, actor AuditActor, input TestCaseCreateRequest) (*models.TestCase, error) {
 	if err := s.require(userID, workspaceID, models.PermissionTestManage); err != nil {
 		return nil, err
@@ -824,13 +817,6 @@ func (s *TestManagementApplicationService) ExecuteTemplate(userID, workspaceID, 
 		return nil, err
 	}
 	return s.templates.Execute(id, workspaceID)
-}
-
-func (s *TestManagementApplicationService) ListRuns(userID, workspaceID int, filters TestRunListFilters) ([]models.TestRun, error) {
-	if err := s.require(userID, workspaceID, models.PermissionTestView); err != nil {
-		return nil, err
-	}
-	return s.runs.List(workspaceID, filters)
 }
 
 func (s *TestManagementApplicationService) ListRunsPage(userID, workspaceID int, filters TestRunListFilters, limit, offset int) ([]models.TestRun, int, error) {

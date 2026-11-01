@@ -171,8 +171,8 @@ func (h *DiagnosticsHandler) GetEmailIntakeDiagnostics(w http.ResponseWriter, r 
 	})
 }
 
-// GetCacheMemory returns the configured process budget and live BigCache
-// allocation/traffic counters for this replica.
+// GetCacheMemory returns the configured process budget and live process-local
+// cache allocation/traffic counters for this replica.
 //
 // GET /api/admin/diagnostics/cache-memory
 func (h *DiagnosticsHandler) GetCacheMemory(w http.ResponseWriter, _ *http.Request) {

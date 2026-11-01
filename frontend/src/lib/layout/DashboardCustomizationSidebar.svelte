@@ -1,6 +1,6 @@
 <script>
-  import Sparkles from '@lucide/svelte/icons/sparkles';
-  import CheckSquare from '@lucide/svelte/icons/check-square';
+  import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
+  import CheckSquare from '@lucide/svelte/icons/square-check';
   import Compass from '@lucide/svelte/icons/compass';
   import LifeBuoy from '@lucide/svelte/icons/life-buoy';
   import Bell from '@lucide/svelte/icons/bell';
@@ -25,7 +25,7 @@
   let { isOpen = $bindable(false), activeCategory = $bindable('activity') } = $props();
 
   const iconMap = {
-    Sparkles,
+    MessageChatbot: IconMessageChatbot,
     CheckSquare,
     Compass,
     LifeBuoy,
@@ -69,7 +69,7 @@
       id: dashboardWidgetCategories.CUSTOM,
       name: t('dashboard.customization.custom.name'),
       description: t('dashboard.customization.custom.description'),
-      icon: Sparkles,
+      icon: IconMessageChatbot,
     },
     {
       id: 'background',
@@ -108,7 +108,7 @@
   categories={availableCategories}
   {widgets}
   {iconMap}
-  fallbackIcon={Sparkles}
+  fallbackIcon={IconMessageChatbot}
   cardAttributes={{ 'data-dashboard-widget-card': '' }}
   fallbackTitle={t('dashboard.customization.widgets')}
   tipLabel={t('dashboard.customization.tipLabel')}

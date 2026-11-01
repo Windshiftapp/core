@@ -10,7 +10,7 @@
   import PlusSquare from '@lucide/svelte/icons/plus-square';
   import Box from '@lucide/svelte/icons/box';
   import Globe from '@lucide/svelte/icons/globe';
-  import Sparkles from '@lucide/svelte/icons/sparkles';
+  import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
   import Bot from '@lucide/svelte/icons/bot';
   import Milestone from '@lucide/svelte/icons/milestone';
   import UsersRound from '@lucide/svelte/icons/users-round';
@@ -183,7 +183,7 @@
     create_asset: PlusSquare,
     http_request: Globe,
     container_run: Box,
-    ai_extract: Sparkles,
+    ai_extract: IconMessageChatbot,
     ai_agent: Bot,
     transition_item: RefreshCw,
     related_items: RefreshCw,

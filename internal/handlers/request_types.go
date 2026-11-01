@@ -349,7 +349,7 @@ func (h *RequestTypeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		h.auditor.LogWithDetails(r, currentUser,
-			"request_type_create", "request_type",
+			logger.ActionRequestTypeCreate, logger.ResourceRequestType,
 			&rt.ID, rt.Name,
 			map[string]any{
 				"channel_id":     rt.ChannelID,
@@ -516,7 +516,7 @@ func (h *RequestTypeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 
 		h.auditor.LogWithDetails(r, currentUser,
-			"request_type_update", "request_type",
+			logger.ActionRequestTypeUpdate, logger.ResourceRequestType,
 			&rt.ID, rt.Name, details,
 		)
 	}
@@ -560,7 +560,7 @@ func (h *RequestTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		h.auditor.LogWithDetails(r, currentUser,
-			"request_type_delete", "request_type",
+			logger.ActionRequestTypeDelete, logger.ResourceRequestType,
 			&id, requestTypeName,
 			map[string]any{
 				"channel_id": channelID,
@@ -656,7 +656,7 @@ func (h *RequestTypeHandler) UpdateFields(w http.ResponseWriter, r *http.Request
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		h.auditor.LogWithDetails(r, currentUser,
-			"request_type_fields_update", "request_type",
+			logger.ActionRequestTypeFieldsUpdate, logger.ResourceRequestType,
 			&requestTypeID, "",
 			map[string]any{
 				"field_count": len(fields),
@@ -740,7 +740,7 @@ func (h *RequestTypeHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		h.auditor.LogWithDetails(r, currentUser,
-			"request_type_visibility_update", "request_type",
+			logger.ActionRequestTypeVisibilityUpdate, logger.ResourceRequestType,
 			&rt.ID, rt.Name,
 			map[string]any{
 				"visibility_group_ids": rt.VisibilityGroupIDs,

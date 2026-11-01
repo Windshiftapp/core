@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"windshift/internal/email"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 )
@@ -242,7 +243,7 @@ func (h *ChannelHandler) CreateChannelIntake(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	intake.ID = id
-	h.auditor.LogWithDetails(r, user, "channel_intake_create", "channel_intake", &id, channel.Name, map[string]any{
+	h.auditor.LogWithDetails(r, user, logger.ActionChannelIntakeCreate, logger.ResourceChannelIntake, &id, channel.Name, map[string]any{
 		"mailbox_id":        channelID,
 		"folder":            intake.Folder,
 		"workspace_id":      intake.WorkspaceID,
@@ -308,7 +309,7 @@ func (h *ChannelHandler) UpdateChannelIntake(w http.ResponseWriter, r *http.Requ
 		h.respondIntakeError(w, r, err)
 		return
 	}
-	h.auditor.LogWithDetails(r, user, "channel_intake_update", "channel_intake", &intakeID, channel.Name, map[string]any{
+	h.auditor.LogWithDetails(r, user, logger.ActionChannelIntakeUpdate, logger.ResourceChannelIntake, &intakeID, channel.Name, map[string]any{
 		"mailbox_id":        channelID,
 		"folder":            intake.Folder,
 		"workspace_id":      intake.WorkspaceID,
@@ -366,7 +367,7 @@ func (h *ChannelHandler) DeleteChannelIntake(w http.ResponseWriter, r *http.Requ
 		respondInternalError(w, r, err)
 		return
 	}
-	h.auditor.Log(r, user, "channel_intake_delete", "channel_intake", &intakeID, channel.Name)
+	h.auditor.Log(r, user, logger.ActionChannelIntakeDelete, logger.ResourceChannelIntake, &intakeID, channel.Name)
 	w.WriteHeader(http.StatusNoContent)
 }
 

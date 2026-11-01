@@ -119,25 +119,6 @@ export default {
       "missingHistory": "{count} os itens atualmente concluídos foram excluídos porque seu histórico de conclusão está faltando."
     }
   },
-  "users": {
-    "labels": {
-      "tabLabel": "Etiquetas",
-      "tabDescription": "Gerencie suas etiquetas pessoais.",
-      "searchPlaceholder": "Pesquisar rótulos",
-      "new": "Novo rótulo",
-      "createTitle": "Criar rótulo",
-      "editTitle": "Editar rótulo",
-      "namePlaceholder": "por exemplo. urgente",
-      "mine": "Minhas etiquetas",
-      "empty": "Ainda não há etiquetas",
-      "emptyHint": "Crie sua primeira etiqueta para organizar itens.",
-      "created": "Rótulo criado",
-      "updated": "Rótulo atualizado",
-      "deleted": "Rótulo excluído",
-      "deleteTitle": "Excluir rótulo?",
-      "deleteMessage": "Excluir \"{name}\"? Isso o removerá de todos os itens aos quais estiver anexado."
-    }
-  },
   "channel": {
     "channelConfigCorrupted": "A configuração do canal está corrompida e não pode ser editada com segurança. Entre em contato com um administrador.",
     "portalSlugInvalid": "O slug deve ter de 1 a 40 letras minúsculas, números ou hifens e não pode começar ou terminar com um hífen ou conter hifens consecutivos.",
@@ -369,11 +350,6 @@ export default {
     "libCharmbracelet": "Acesso TUI e SSH (Bubble Tea, Wish)"
   },
   "testing": {
-    "generateWithAI": "Gerar com AI",
-    "overwriteDescriptionTitle": "Substituir descrição?",
-    "overwriteDescriptionConfirm": "Substituir a descrição existente por um resumo gerado por IA?",
-    "overwrite": "Substituir",
-    "generateFailed": "Falha ao gerar descrição.",
     "actualResult": "Resultado real",
     "editTestPlan": "Editar plano de teste",
     "execute": "Executar",

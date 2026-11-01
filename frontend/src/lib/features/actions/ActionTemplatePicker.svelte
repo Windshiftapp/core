@@ -1,7 +1,7 @@
 <script>
   import Modal from '../../dialogs/Modal.svelte';
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
-  import Sparkles from '@lucide/svelte/icons/sparkles';
+  import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
   import { actionTemplates } from '../../api/actions.js';
   import { t } from '../../stores/i18n.svelte.js';
   import Button from '../../components/Button.svelte';
@@ -48,7 +48,7 @@
 <Modal isOpen={true} onclose={onclose} maxWidth="max-w-2xl">
   <ModalHeader
     title={t('actions.templates.pickTitle', 'Choose an action template')}
-    icon={Sparkles}
+    icon={IconMessageChatbot}
     onClose={onclose}
   />
   <div class="p-6">

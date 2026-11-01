@@ -122,6 +122,15 @@ export default {
     languageHint: 'Su idioma preferido para la interfaz de la aplicación',
     saveSettings: 'Guardar configuración',
     settingsSaved: 'Configuración guardada correctamente',
+    notificationsTab: 'Notificaciones',
+    dueDateReminders: 'Recordatorios de vencimiento',
+    dueDateRemindersDesc:
+      'Recibe una notificación cuando tus elementos abiertos se acerquen a su fecha de vencimiento. También cubre los elementos de tu espacio de trabajo personal.',
+    dueDateRemindersEnable: 'Activar recordatorios de vencimiento',
+    dueDateRemindersEnableHint:
+      'Los recordatorios solo se envían si los activas aquí; nunca son automáticos.',
+    dueDateReminderDays: 'Días antes del vencimiento',
+    dueDateReminderDaysHint: 'Elige entre 1 y 30 días.',
     connectedAccounts: 'Cuentas conectadas',
     connectedAccountsTab: 'Cuentas',
     connectedAccountsDesc: 'Conecte sus cuentas de control de código fuente para crear ramas y solicitudes de incorporación',

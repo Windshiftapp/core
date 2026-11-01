@@ -20,7 +20,9 @@
   import { customerOrganisationName, realCustomers } from '../../utils/customerLabel.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
-  import { formatDateSimple } from '../../utils/dateFormatter.js';
+  import { formatDateOnly, getUserTimezone } from '../../utils/dateFormatter.js';
+  import { dateKeyInZone } from '../../utils/worklogTimezone.js';
+  import { authStore } from '../../stores/auth.svelte.js';
   import PageHeader from '../../layout/PageHeader.svelte';
 
   // Bind to store values
@@ -38,7 +40,7 @@
   const canManageProjects = $derived($permissionStore.userPermissionKeys?.has('project.manage') || $isSystemAdmin);
 
   const worklogColumns = $derived([
-    { key: 'created_at', label: t('time.entry.submitted'), render: (w) => formatDateSimple(new Date(w.created_at * 1000)) },
+    { key: 'date', label: t('common.date'), render: (w) => formatDateOnly(dateKeyInZone(w.start_time, getUserTimezone(authStore?.currentUser))) },
     { key: 'project_name', label: t('time.reports.project'), slot: 'project' },
     { key: 'item_title', label: t('items.workItem'), slot: 'item' },
     { key: 'description', label: t('common.description') },
@@ -58,6 +60,7 @@
         type: 'regular',
         icon: Edit,
         title: t('common.edit'),
+        testid: 'worklog-edit',
         hoverClass: 'hover-bg',
         onClick: () => timeEntryStore.editWorklog(worklog)
       },
@@ -66,6 +69,7 @@
         type: 'danger',
         icon: Trash2,
         title: t('common.delete'),
+        testid: 'worklog-delete',
         hoverClass: 'hover-danger',
         onClick: () => deleteWorklog(worklog)
       }
@@ -249,6 +253,8 @@
     keyField="id"
     emptyMessage={t('time.entry.noEntries')}
     actionItems={buildWorklogDropdownItems}
+    actionTriggerTestid={(worklog) => `worklog-actions-${worklog.id}`}
+    rowAttrs={(worklog) => ({ 'data-testid': `worklog-row-${worklog.id}` })}
     class="rounded-none border-0 shadow-none overflow-hidden"
   >
     <!-- Project: name + customer -->

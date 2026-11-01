@@ -151,13 +151,15 @@ export const cliAuth = {
 // User Preferences API
 export const userPreferences = {
   // Get current user's preferences
-  get: () => fetchV2Data('/users/me/preferences'),
+  get: (options = {}) => fetchV2Data('/users/me/preferences', options),
 
-  // Update current user's preferences
-  update: (data) =>
+  // Update current user's preferences. `keepalive` lets a pending write
+  // survive a page unload (used to flush debounced view-state saves).
+  update: (data, options = {}) =>
     fetchV2Data('/users/me/preferences', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/merge-patch+json' },
       body: JSON.stringify(data),
+      ...options,
     }),
 };

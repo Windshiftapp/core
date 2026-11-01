@@ -27,6 +27,7 @@
   import { errorToast } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { createDashboardWidgetDrag } from '../composables/dashboardWidgetDrag.js';
+  import { useDashboardCustomization } from '../composables/useDashboardCustomization.svelte.js';
   import {
     WORKSPACE_WIDGET_GRID_COLUMNS,
     clampWidgetWidth,
@@ -99,11 +100,6 @@
   // Initialize gradient styles from global stores
   const gradientStyles = useGradientStyles();
 
-  // Section editing
-  let editingSectionId = $state(null);
-  let editingSectionTitle = $state('');
-  let editingSectionSubtitle = $state('');
-  let isNewSection = $state(false); // Track if we're creating a new section
   let pendingSaveQueued = false;
 
   // Default section layout
@@ -431,21 +427,28 @@
 
   const debouncedSave = useDebounce(() => saveHomepageLayout(), 1000);
 
+  // Section editing. The workspace dashboard keeps its own local state and
+  // debounced save, so persistence is injected.
+  const customization = useDashboardCustomization({
+    updateSection: (sectionId, values) => {
+      sections = sections.map(s => (s.id === sectionId ? { ...s, ...values } : s));
+      debouncedSave();
+    },
+    removeSection: (sectionId) => {
+      sections = sections.filter(s => s.id !== sectionId);
+    },
+    findSection: (sectionId) => sections.find(s => s.id === sectionId),
+    getSectionDisplay: (section) => ({ title: section.title, subtitle: section.subtitle }),
+    getSectionSaveValues: (_section, draft) => draft,
+  });
+
   // Mode toggles
   function toggleEditMode() {
     isEditMode = !isEditMode;
     if (!isEditMode) {
-      // If exiting edit mode while creating a new section, either keep it
-      // (if the user typed a title) or discard it.
-      if (isNewSection && editingSectionId) {
-        if (editingSectionTitle.trim()) {
-          saveSection();
-        } else {
-          sections = sections.filter(s => s.id !== editingSectionId);
-        }
-      }
-      editingSectionId = null;
-      isNewSection = false;
+      // If exiting edit mode while creating a new section, keep it when the
+      // user typed a title and discard it otherwise.
+      customization.commitOrDiscardDraft();
       debouncedSave();
     }
     if (isEditMode && isCustomizeMode) {
@@ -470,50 +473,7 @@
       widget_ids: []
     };
     sections = [...sections, newSection];
-    editingSectionId = newSection.id;
-    editingSectionTitle = newSection.title;
-    editingSectionSubtitle = newSection.subtitle;
-    isNewSection = true; // Mark as new section
-  }
-
-  function startEditingSection(section) {
-    editingSectionId = section.id;
-    editingSectionTitle = section.title;
-    editingSectionSubtitle = section.subtitle || '';
-    isNewSection = false; // Editing existing section
-  }
-
-  function saveSection() {
-    if (!editingSectionId) return;
-
-    sections = sections.map(s =>
-      s.id === editingSectionId
-        ? { ...s, title: editingSectionTitle, subtitle: editingSectionSubtitle }
-        : s
-    );
-    editingSectionId = null;
-    isNewSection = false; // Reset after save
-    debouncedSave();
-  }
-
-  function cancelEditingSection() {
-    // If canceling a new section, remove it from the list
-    if (isNewSection && editingSectionId) {
-      sections = sections.filter(s => s.id !== editingSectionId);
-    }
-
-    editingSectionId = null;
-    isNewSection = false;
-  }
-
-  function handleSectionEditKeydown(event) {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      saveSection();
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      cancelEditingSection();
-    }
+    customization.beginNewSection(newSection);
   }
 
   async function deleteSection(sectionId) {
@@ -640,6 +600,7 @@
   contextVars={gradientStyles.contextVars}
   class="workspace-welcome-wrapper"
   contentClass="workspace-welcome p-6"
+  testid="workspace-welcome"
 >
     {#if loading}
       <div class="flex items-center justify-center h-64">
@@ -662,6 +623,7 @@
             variant={isEditMode ? 'primary' : 'default'}
             icon={isEditMode ? X : Edit3}
             onclick={toggleEditMode}
+            dataTestid="workspace-dashboard-edit-toggle"
           >
             {isEditMode ? t('workspaceDashboard.doneEditing') : t('common.edit')}
           </Button>
@@ -671,6 +633,7 @@
             variant={isCustomizeMode ? 'primary' : 'default'}
             icon={isCustomizeMode ? X : LayoutGrid}
             onclick={toggleCustomizeMode}
+            dataTestid="workspace-dashboard-customize"
           >
             {isCustomizeMode ? t('common.done') : t('workspaceDashboard.customize')}
           </Button>
@@ -691,6 +654,7 @@
           size="small"
           icon={Plus}
           onclick={addSection}
+          dataTestid="workspace-add-section"
         >
           {t('layout.addSection')}
         </Button>
@@ -701,37 +665,38 @@
     <div class="space-y-6">
       {#each sections as section (section.id)}
         {@const sectionWidgets = getWidgetsForSection(section.id)}
-        <Card glass padding="spacious">
+        <Card glass padding="spacious" dataTestid="workspace-section">
           <!-- Section header -->
           <div class="flex items-center justify-between mb-4">
-            {#if editingSectionId === section.id}
+            {#if customization.editingSectionId === section.id}
               <!-- Editing mode -->
               <div class="flex-1 flex items-center gap-2">
                 <Input
                   type="text"
-                  bind:value={editingSectionTitle}
+                  bind:value={customization.editingSectionTitle}
                   class="text-lg font-semibold"
                   placeholder={t('dashboard.sections.titlePlaceholder')}
-                  onkeydown={handleSectionEditKeydown}
+                  onkeydown={customization.handleSectionEditKeydown}
+                  dataTestid="workspace-section-title-input"
                 />
                 <Input
                   type="text"
-                  bind:value={editingSectionSubtitle}
+                  bind:value={customization.editingSectionSubtitle}
                   placeholder={t('dashboard.sections.subtitlePlaceholder')}
-                  onkeydown={handleSectionEditKeydown}
+                  onkeydown={customization.handleSectionEditKeydown}
                   size="small"
                 />
                 <Button
                   variant="primary"
                   size="small"
-                  onclick={saveSection}
+                  onclick={customization.save}
                 >
                   {t('common.save')} <span class="ml-1 opacity-60">⏎</span>
                 </Button>
                 <Button
                   variant="default"
                   size="small"
-                  onclick={cancelEditingSection}
+                  onclick={customization.cancel}
                 >
                   {t('common.cancel')} <span class="ml-1 opacity-60">Esc</span>
                 </Button>
@@ -749,8 +714,9 @@
                 <div class="flex items-center gap-2">
                   <button
                     class="section-edit p-2 rounded"
-                    onclick={() => startEditingSection(section)}
+                    onclick={() => customization.startEditing(section)}
                     title={t('dashboard.sections.rename')}
+                    data-testid="workspace-section-edit"
                   >
                     <Pencil class="h-4 w-4" />
                   </button>

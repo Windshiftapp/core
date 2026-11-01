@@ -16,7 +16,7 @@ export default withEnglishAdminOperations({
   workspaceMembers: {
     invalidWorkspace: 'مساحة العمل غير صالحة.', loadFailed: 'تعذر تحميل أعضاء مساحة العمل.', addMemberFailed: 'تعذرت إضافة العضو: {error}', addGroupFailed: 'تعذرت إضافة المجموعة: {error}',
     removeRoleTitle: 'إزالة دور {role} من {name}؟', removeRoleMessage: 'سيؤدي ذلك إلى إزالة تعيين الدور وصلاحياته.', removeRoleFailed: 'تعذرت إزالة الدور: {error}',
-    summaryTitle: 'ملخص الوصول', summaryDescription: 'يعرض كيفية تعيين الأدوار في مساحة العمل. يكون الدور بلا أعضاء أو مجموعات معينة متاحاً للجميع. تسلسل الصلاحيات: {viewer} ← {editor} ← {tester}.',
+    summaryTitle: 'ملخص الوصول', summaryDescription: 'يعرض كيفية تعيين الأدوار في مساحة العمل. يكون الدور بلا أعضاء أو مجموعات معينة متاحاً للجميع. يؤدي تعيين دور {viewer} لأي شخص إلى تقييد مساحة العمل بحيث لا يراها سوى المستخدمين والمجموعات المعيّنين. تسلسل الصلاحيات: {viewer} ← {editor} ← {tester}.',
     role: 'الدور', effectiveAccess: 'الوصول', assignments: 'التعيينات', memberOrGroup: 'عضو أو مجموعة', rolesLabel: 'الأدوار', actions: 'الإجراءات',
     roles: {
       viewer: { name: 'مشاهد', description: 'عرض محتوى مساحة العمل والمشاركة في المناقشات' },

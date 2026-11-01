@@ -17,6 +17,7 @@ import (
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 // sanitizeSCIMUser scrubs the IdP-supplied fields on a SCIM user payload.
@@ -112,8 +113,9 @@ func (h *SCIMHandler) logSCIMAuditEvent(r *http.Request, actionType, resourceTyp
 
 	event := logger.AuditEvent{
 		UserID:       0, // SCIM uses token auth, not user auth
+		Source:       logger.AuditSourceSCIM,
 		Username:     "SCIM:" + tokenPrefix,
-		IPAddress:    r.RemoteAddr,
+		IPAddress:    utils.GetClientIP(r),
 		UserAgent:    r.UserAgent(),
 		ActionType:   actionType,
 		ResourceType: resourceType,
@@ -124,8 +126,10 @@ func (h *SCIMHandler) logSCIMAuditEvent(r *http.Request, actionType, resourceTyp
 		ErrorMessage: errorMsg,
 	}
 
-	// Audit logging is asynchronous so provisioning is not delayed.
-	go h.auditor.LogEvent(event)
+	// Written synchronously so the row exists before the request completes;
+	// the previous fire-and-forget goroutine dropped events on shutdown or DB
+	// errors and gave no ordering guarantee.
+	h.auditor.LogEvent(event)
 }
 
 // attrChange records one PATCH mutation for the audit log.
@@ -1976,7 +1980,7 @@ func (h *SCIMHandler) finalizeUserDeprovisioning(r *http.Request, userID int, us
 	// Per-resource audit rows preserve the offboarding trail.
 	for _, aid := range result.AgentIDs {
 		agentID := aid
-		h.logSCIMAuditEvent(r, logger.ActionAgentDeactivate, logger.ResourceUser, &agentID, "",
+		h.logSCIMAuditEvent(r, logger.ActionAgentDeactivate, logger.ResourceAgent, &agentID, "",
 			map[string]any{
 				"reason":   "scim_owner_deactivated",
 				"owner_id": userID,

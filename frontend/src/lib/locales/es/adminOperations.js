@@ -31,7 +31,7 @@ export default withEnglishAdminOperations({
   workspaceMembers: {
     invalidWorkspace: 'Espacio de trabajo no válido.', loadFailed: 'No se pudieron cargar los miembros del espacio de trabajo.', addMemberFailed: 'No se pudo añadir el miembro: {error}', addGroupFailed: 'No se pudo añadir el grupo: {error}',
     removeRoleTitle: '¿Quitar el rol {role} a {name}?', removeRoleMessage: 'Se eliminarán la asignación del rol y sus permisos.', removeRoleFailed: 'No se pudo quitar el rol: {error}',
-    summaryTitle: 'Resumen de acceso', summaryDescription: 'Muestra cómo se asignan los roles en este espacio. Un rol sin miembros ni grupos asignados está disponible para todos. Jerarquía de permisos: {viewer} → {editor} → {tester}.',
+    summaryTitle: 'Resumen de acceso', summaryDescription: 'Muestra cómo se asignan los roles en este espacio. Un rol sin miembros ni grupos asignados está disponible para todos. Asignar el rol {viewer} a alguien restringe el espacio para que solo los usuarios y grupos asignados puedan verlo. Jerarquía de permisos: {viewer} → {editor} → {tester}.',
     role: 'Rol', effectiveAccess: 'Acceso', assignments: 'Asignaciones', memberOrGroup: 'Miembro o grupo', rolesLabel: 'Roles', actions: 'Acciones',
     roles: {
       viewer: { name: 'Lector', description: 'Ver el contenido del espacio y participar en conversaciones' },

@@ -119,6 +119,10 @@
   {/snippet}
 
   {#snippet noResultsSnippet({ searchQuery })}
-    <LabelCreateRow {searchQuery} oncreate={handleCreate} />
+    <LabelCreateRow
+      {searchQuery}
+      oncreate={handleCreate}
+      testid={testidPrefix ? `${testidPrefix}-create` : 'label-picker-create'}
+    />
   {/snippet}
 </BasePicker>

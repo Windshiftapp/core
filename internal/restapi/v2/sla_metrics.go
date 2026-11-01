@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -85,6 +86,7 @@ func createSLAMetric(deps Deps) jsonOperation[slaMetricRequest, *models.SLAMetri
 		if err != nil {
 			return nil, slaMetricError(err)
 		}
+		logger.Record(r, logger.ActionSLAMetricCreate, logger.ResourceSLAMetric, &metric.ID, metric.Name, map[string]any{"workspace_id": workspaceID})
 		return metric, nil
 	}
 }
@@ -103,6 +105,7 @@ func updateSLAMetric(deps Deps) jsonOperation[slaMetricRequest, *models.SLAMetri
 		if err != nil {
 			return nil, slaMetricError(err)
 		}
+		logger.Record(r, logger.ActionSLAMetricUpdate, logger.ResourceSLAMetric, &metric.ID, metric.Name, map[string]any{"workspace_id": workspaceID})
 		return metric, nil
 	}
 }
@@ -120,6 +123,7 @@ func deleteSLAMetric(deps Deps) commandOperation {
 		if err := service.Delete(r.Context(), workspaceID, metricID); err != nil {
 			return slaMetricError(err)
 		}
+		logger.Record(r, logger.ActionSLAMetricDelete, logger.ResourceSLAMetric, &metricID, "", map[string]any{"workspace_id": workspaceID})
 		return nil
 	}
 }

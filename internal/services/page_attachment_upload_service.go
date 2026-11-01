@@ -2,28 +2,21 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"image"
-	_ "image/gif" // Register GIF decoder for thumbnails.
-	"image/jpeg"
-	_ "image/png" // Register PNG decoder for thumbnails.
 	"mime"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 
+	"windshift/internal/blobstore"
 	"windshift/internal/database"
-	"windshift/internal/fileserve"
 	"windshift/internal/models"
 	"windshift/internal/repository"
-	"windshift/internal/utils"
-
-	"golang.org/x/image/draw"
 )
 
 // maxAttachmentThumbnailSourcePixels bounds the declared dimensions an
@@ -34,6 +27,9 @@ var (
 	ErrPageAttachmentUploadDisabled = errors.New("page attachment upload disabled")
 	ErrPageAttachmentUploadInvalid  = errors.New("page attachment upload invalid")
 	ErrPageAttachmentUploadNotFound = errors.New("page attachment upload target not found")
+	// ErrPageAttachmentNotFound collapses a missing, non-page, or
+	// unauthorized page attachment so existence is never leaked.
+	ErrPageAttachmentNotFound = errors.New("page attachment not found")
 )
 
 // PageAttachmentUploadService owns page-attachment upload validation, storage,
@@ -41,17 +37,17 @@ var (
 // bearer HTTP adapters can call this use case without sharing handler code.
 type PageAttachmentUploadService struct {
 	db                    database.Database
-	attachmentPath        string
+	storage               *blobstore.Store
 	permissionService     *PermissionService
 	pagePermissionService *PagePermissionService
 	attachmentService     *AttachmentService
 }
 
 // NewPageAttachmentUploadService creates a page attachment upload service.
-func NewPageAttachmentUploadService(db database.Database, attachmentPath string, permissionService *PermissionService, pagePermissionService *PagePermissionService) *PageAttachmentUploadService {
+func NewPageAttachmentUploadService(db database.Database, storage *blobstore.Store, permissionService *PermissionService, pagePermissionService *PagePermissionService) *PageAttachmentUploadService {
 	return &PageAttachmentUploadService{
 		db:                    db,
-		attachmentPath:        attachmentPath,
+		storage:               storage,
 		permissionService:     permissionService,
 		pagePermissionService: pagePermissionService,
 		attachmentService:     NewAttachmentService(db),
@@ -69,8 +65,8 @@ type PageAttachmentUploadInput struct {
 
 // UploadPageAttachment stores a new attachment for a page and returns the same
 // response model used by the legacy upload endpoint for regular attachments.
-func (s *PageAttachmentUploadService) UploadPageAttachment(in PageAttachmentUploadInput) (models.AttachmentUploadResponse, error) {
-	if s.attachmentPath == "" {
+func (s *PageAttachmentUploadService) UploadPageAttachment(ctx context.Context, in PageAttachmentUploadInput) (models.AttachmentUploadResponse, error) {
+	if !s.storage.Enabled() {
 		return models.AttachmentUploadResponse{}, ErrPageAttachmentUploadDisabled
 	}
 	if in.PageID <= 0 {
@@ -92,14 +88,14 @@ func (s *PageAttachmentUploadService) UploadPageAttachment(in PageAttachmentUplo
 		data:             in.FileData,
 		validationSize:   in.FileSize,
 	}
-	detectedMimeType, err := validateAttachmentUpload(s.db, s.attachmentPath, fileInput, attachmentValidationErrors{
+	detectedMimeType, err := validateAttachmentUpload(s.db, s.storage.Enabled(), fileInput, attachmentValidationErrors{
 		disabled: ErrPageAttachmentUploadDisabled,
 		invalid:  ErrPageAttachmentUploadInvalid,
 	})
 	if err != nil {
 		return models.AttachmentUploadResponse{}, err
 	}
-	stored, err := storeAttachmentFile(s.attachmentPath, "pages", "page", in.PageID, fileInput, detectedMimeType)
+	stored, err := storeAttachmentFile(ctx, s.storage, "pages", "page", in.PageID, fileInput, detectedMimeType)
 	if err != nil {
 		return models.AttachmentUploadResponse{}, err
 	}
@@ -119,7 +115,7 @@ func (s *PageAttachmentUploadService) UploadPageAttachment(in PageAttachmentUplo
 		Category:         "",
 	})
 	if err != nil {
-		removeStoredAttachmentFile(stored)
+		removeStoredAttachmentFile(ctx, s.storage, stored)
 		return models.AttachmentUploadResponse{}, fmt.Errorf("save attachment record: %w", err)
 	}
 	return newAttachmentUploadResponse(attachmentID, in.PageID, in.OriginalFilename, &uploaderID, stored), nil
@@ -128,13 +124,24 @@ func (s *PageAttachmentUploadService) UploadPageAttachment(in PageAttachmentUplo
 // DeleteUploadedPageAttachment compensates a failed higher-level mutation.
 // It is intentionally not exposed as a user-facing delete operation: live and
 // historical Page revisions may still reference successful diagram uploads.
-func (s *PageAttachmentUploadService) DeleteUploadedPageAttachment(pageID, attachmentID int) error {
+func (s *PageAttachmentUploadService) DeleteUploadedPageAttachment(ctx context.Context, pageID, attachmentID int) error {
 	rec, err := repository.NewAttachmentRepository(s.db).GetPageAttachmentRecord(pageID, attachmentID)
 	if err != nil {
 		return err
 	}
-	if err := fileserve.RemoveUnderRoot(s.attachmentPath, rec.FilePath); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("remove page attachment file: %w", err)
+	// Blob-first: remove the file and thumbnail before the row. A removal
+	// failure keeps the row so the delete can be retried; a missing object is
+	// already success.
+	for _, path := range []string{rec.FilePath, rec.ThumbnailPath} {
+		if path == "" {
+			continue
+		}
+		if err := s.storage.Remove(ctx, path); err != nil {
+			if errors.Is(err, blobstore.ErrOutsideRoot) {
+				continue
+			}
+			return fmt.Errorf("remove page attachment file: %w", err)
+		}
 	}
 	rows, err := s.attachmentService.DeleteRecord(attachmentID)
 	if err != nil {
@@ -155,8 +162,49 @@ func (s *PageAttachmentUploadService) authorizePageEdit(userID, pageID int) erro
 	if err != nil {
 		return fmt.Errorf("resolve page workspace: %w", err)
 	}
+	return s.checkPageAccess(userID, wsID, pageID, PageOpEdit)
+}
+
+// OpenPageAttachment opens a page-scoped attachment for an authorized viewer.
+// View access follows the owning page's effective ACL, matching the cookie-auth
+// attachment handler. Missing rows, non-page rows, and denied callers all
+// collapse to ErrPageAttachmentNotFound.
+func (s *PageAttachmentUploadService) OpenPageAttachment(ctx context.Context, userID, attachmentID int, thumbnail bool) (*ItemAttachmentBinary, error) {
+	if !s.storage.Enabled() {
+		return nil, ErrPageAttachmentUploadDisabled
+	}
+	rec, err := repository.NewAttachmentRepository(s.db).GetPageAttachmentRecordByID(attachmentID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrPageAttachmentNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("load page attachment %d: %w", attachmentID, err)
+	}
+	if err := s.checkPageAccess(userID, rec.WorkspaceID, rec.PageID, PageOpView); err != nil {
+		return nil, ErrPageAttachmentNotFound
+	}
+	if thumbnail {
+		if rec.ThumbnailPath == "" {
+			return nil, ErrPageAttachmentNotFound
+		}
+		file, err := s.storage.Open(ctx, rec.ThumbnailPath)
+		if err != nil {
+			return nil, ErrPageAttachmentNotFound
+		}
+		return &ItemAttachmentBinary{File: file, OriginalFilename: "thumbnail.jpg", MimeType: "image/jpeg", FileSize: file.Size()}, nil
+	}
+	file, err := s.storage.Open(ctx, rec.FilePath)
+	if err != nil {
+		return nil, ErrPageAttachmentNotFound
+	}
+	return &ItemAttachmentBinary{File: file, OriginalFilename: rec.OriginalFilename, MimeType: rec.MimeType, FileSize: rec.FileSize}, nil
+}
+
+// checkPageAccess evaluates a page operation with the page ACL service when
+// wired, falling back to the workspace page permission in degraded mode.
+func (s *PageAttachmentUploadService) checkPageAccess(userID, wsID, pageID int, op string) error {
 	if s.pagePermissionService != nil {
-		can, err := s.pagePermissionService.Can(userID, wsID, pageID, PageOpEdit)
+		can, err := s.pagePermissionService.Can(userID, wsID, pageID, op)
 		if err != nil {
 			return fmt.Errorf("check page permission: %w", err)
 		}
@@ -168,7 +216,11 @@ func (s *PageAttachmentUploadService) authorizePageEdit(userID, pageID int) erro
 	if s.permissionService == nil {
 		return ErrPageAttachmentUploadNotFound
 	}
-	allowed, err := s.permissionService.HasWorkspacePermission(userID, wsID, models.PermissionPageEdit)
+	key := models.PermissionPageEdit
+	if op == PageOpView {
+		key = models.PermissionPageView
+	}
+	allowed, err := s.permissionService.HasWorkspacePermission(userID, wsID, key)
 	if err != nil {
 		return fmt.Errorf("check workspace permission: %w", err)
 	}
@@ -181,11 +233,10 @@ func (s *PageAttachmentUploadService) authorizePageEdit(userID, pageID int) erro
 // loadAttachmentSettings loads the system-wide attachment settings, falling
 // back to permissive defaults when no row exists. Shared by the page and item
 // attachment upload services so both surfaces read storage limits identically.
-func loadAttachmentSettings(db database.Database, attachmentPath string) (*models.AttachmentSettings, error) {
+func loadAttachmentSettings(db database.Database) (*models.AttachmentSettings, error) {
 	settings := &models.AttachmentSettings{
 		MaxFileSize:      52428800, // 50MB default
 		AllowedMimeTypes: "",
-		AttachmentPath:   attachmentPath,
 		Enabled:          true,
 	}
 	err := db.QueryRow(`
@@ -297,47 +348,4 @@ func generateAttachmentFilename(originalFilename string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%x%s", randomBytes, ext), nil
-}
-
-func generateAttachmentThumbnail(originalPath, filename string) (string, error) {
-	file, err := os.Open(originalPath) //nolint:gosec // path from server-managed attachment storage
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = file.Close() }()
-
-	// Reject pixel bombs before the full decode allocates.
-	if err := utils.EnsureImageDimensionsBounded(file, maxAttachmentThumbnailSourcePixels); err != nil {
-		return "", err
-	}
-	img, _, err := image.Decode(file)
-	if err != nil {
-		return "", err
-	}
-	bounds := img.Bounds()
-	origWidth := bounds.Dx()
-	origHeight := bounds.Dy()
-	maxSize := 200
-	var newWidth, newHeight int
-	if origWidth > origHeight {
-		newWidth = maxSize
-		newHeight = (origHeight * maxSize) / origWidth
-	} else {
-		newHeight = maxSize
-		newWidth = (origWidth * maxSize) / origHeight
-	}
-	thumbnail := image.NewRGBA(image.Rect(0, 0, newWidth, newHeight))
-	draw.CatmullRom.Scale(thumbnail, thumbnail.Bounds(), img, bounds, draw.Over, nil)
-
-	base := strings.TrimSuffix(filename, filepath.Ext(filename))
-	thumbnailPath := filepath.Join(filepath.Dir(originalPath), base+".thumb.jpg")
-	thumbnailFile, err := os.Create(thumbnailPath) //nolint:gosec // path derived from server-managed attachment storage
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = thumbnailFile.Close() }()
-	if err := jpeg.Encode(thumbnailFile, thumbnail, &jpeg.Options{Quality: 85}); err != nil {
-		return "", err
-	}
-	return thumbnailPath, nil
 }

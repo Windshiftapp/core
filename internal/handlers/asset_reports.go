@@ -394,7 +394,7 @@ func (h *AssetReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		h.auditor.LogWithDetails(r, currentUser,
-			"asset_report_create", "asset_report",
+			logger.ActionAssetReportCreate, logger.ResourceAssetReport,
 			&ar.ID, ar.Name,
 			map[string]any{
 				"channel_id":   ar.ChannelID,
@@ -550,7 +550,7 @@ func (h *AssetReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 
 		h.auditor.LogWithDetails(r, currentUser,
-			"asset_report_update", "asset_report",
+			logger.ActionAssetReportUpdate, logger.ResourceAssetReport,
 			&ar.ID, ar.Name, details,
 		)
 	}
@@ -593,7 +593,7 @@ func (h *AssetReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		h.auditor.LogWithDetails(r, currentUser,
-			"asset_report_delete", "asset_report",
+			logger.ActionAssetReportDelete, logger.ResourceAssetReport,
 			&id, assetReportName,
 			map[string]any{
 				"channel_id": channelID,
@@ -640,7 +640,7 @@ func (h *AssetReportHandler) UpdateVisibility(w http.ResponseWriter, r *http.Req
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		h.auditor.LogWithDetails(r, currentUser,
-			"asset_report_visibility_update", "asset_report",
+			logger.ActionAssetReportVisibilityUpdate, logger.ResourceAssetReport,
 			&ar.ID, ar.Name,
 			map[string]any{
 				"visibility_group_ids": ar.VisibilityGroupIDs,
@@ -774,7 +774,7 @@ func (h *AssetReportHandler) UpdateFields(w http.ResponseWriter, r *http.Request
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
 		h.auditor.LogWithDetails(r, currentUser,
-			"asset_report_fields_update", "asset_report",
+			logger.ActionAssetReportFieldsUpdate, logger.ResourceAssetReport,
 			&assetReportID, "",
 			map[string]any{"field_count": len(fields)},
 		)

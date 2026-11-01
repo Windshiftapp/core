@@ -9,6 +9,7 @@ import (
 
 	"windshift/internal/constants"
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 )
@@ -88,10 +89,10 @@ func NewStatusCategoryConfig() EnumConfig {
 				[]any{c.Name, c.Color, c.Description, c.IsDefault, c.IsCompleted, now}
 		},
 
-		AuditActionCreate: "status_category.create",
-		AuditActionUpdate: "status_category.update",
-		AuditActionDelete: "status_category.delete",
-		AuditResourceType: "status_category",
+		AuditActionCreate: logger.ActionStatusCategoryCreate,
+		AuditActionUpdate: logger.ActionStatusCategoryUpdate,
+		AuditActionDelete: logger.ActionStatusCategoryDelete,
+		AuditResourceType: logger.ResourceStatusCategory,
 	}
 }
 
@@ -174,10 +175,10 @@ func NewHierarchyLevelConfig() EnumConfig {
 				[]any{h.Level, h.Name, h.Description, now}
 		},
 
-		AuditActionCreate: "hierarchy_level.create",
-		AuditActionUpdate: "hierarchy_level.update",
-		AuditActionDelete: "hierarchy_level.delete",
-		AuditResourceType: "hierarchy_level",
+		AuditActionCreate: logger.ActionHierarchyLevelCreate,
+		AuditActionUpdate: logger.ActionHierarchyLevelUpdate,
+		AuditActionDelete: logger.ActionHierarchyLevelDelete,
+		AuditResourceType: logger.ResourceHierarchyLevel,
 	}
 }
 
@@ -246,10 +247,10 @@ func NewContactRoleConfig() EnumConfig {
 				[]any{c.Name, c.Description, c.SortOrder}
 		},
 
-		AuditActionCreate: "contact_role.create",
-		AuditActionUpdate: "contact_role.update",
-		AuditActionDelete: "contact_role.delete",
-		AuditResourceType: "contact_role",
+		AuditActionCreate: logger.ActionContactRoleCreate,
+		AuditActionUpdate: logger.ActionContactRoleUpdate,
+		AuditActionDelete: logger.ActionContactRoleDelete,
+		AuditResourceType: logger.ResourceContactRole,
 	}
 }
 

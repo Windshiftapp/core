@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"windshift/internal/auth"
+	"windshift/internal/logger"
 	coremiddleware "windshift/internal/middleware"
 	"windshift/internal/objecttranslation"
 	"windshift/internal/repository"
@@ -39,7 +40,7 @@ func RegisterRoutes(deps restapi.Deps) {
 		objectTranslationService = objecttranslation.NewService(db)
 	}
 
-	bearerAuth := v1middleware.NewBearerAuthWithPermissions(tokenManager, permissionService)
+	bearerAuth := v1middleware.NewBearerAuthWithPermissions(tokenManager, permissionService, logger.NewAuditor(db))
 
 	rateLimiter := v1middleware.NewRateLimiter(1000, deps.IPExtractor)
 
@@ -64,7 +65,7 @@ func RegisterRoutes(deps restapi.Deps) {
 	collectionHandler := handlers.NewCollectionHandler(db, permissionService)
 	actionHandler := handlers.NewActionHandler(db, permissionService, deps.ActionService)
 	actionHandler.SetAssetService(deps.AssetService)
-	attachmentHandler := handlers.NewAttachmentHandler(db, permissionService, deps.AttachmentPath)
+	attachmentHandler := handlers.NewAttachmentHandler(db, permissionService, deps.Storage)
 	pagePermissionService := services.NewPagePermissionService(db, permissionService)
 	pageApplicationService := deps.PageApplicationService
 	if pageApplicationService == nil {
@@ -79,7 +80,7 @@ func RegisterRoutes(deps restapi.Deps) {
 	if pageDiagramService == nil {
 		pageDiagramService = services.NewPageDiagramService(
 			db,
-			deps.AttachmentPath,
+			deps.Storage,
 			pageApplicationService,
 			pagePermissionService,
 			permissionService,
@@ -100,11 +101,11 @@ func RegisterRoutes(deps restapi.Deps) {
 
 	pageAttachmentUploadHandler := handlers.NewPageAttachmentUploadHandler(
 		handlers.NewBaseHandler(db, permissionService),
-		services.NewPageAttachmentUploadService(db, deps.AttachmentPath, permissionService, pagePermissionService),
+		services.NewPageAttachmentUploadService(db, deps.Storage, permissionService, pagePermissionService),
 	)
 	itemAttachmentHandler := handlers.NewItemAttachmentHandler(
 		handlers.NewBaseHandler(db, permissionService),
-		services.NewItemAttachmentService(db, deps.AttachmentPath, permissionService),
+		services.NewItemAttachmentService(db, deps.Storage, permissionService),
 	)
 
 	timePermService := services.NewTimePermissionService(db, permissionService)
@@ -123,7 +124,7 @@ func RegisterRoutes(deps restapi.Deps) {
 		deprecationHeaders,
 		v1middleware.RequestID,
 		coremiddleware.LimitJSONRequestBody(restapi.DefaultJSONRequestBodyLimit),
-		rateLimiter.Middleware,
+		rateLimiter.Limit,
 	)
 	publicV1.Handle("GET /openapi.json", handlers.OpenAPISpecJSON)
 
@@ -134,7 +135,7 @@ func RegisterRoutes(deps restapi.Deps) {
 		v1middleware.RequestID,
 		coremiddleware.LimitJSONRequestBody(restapi.DefaultJSONRequestBodyLimit),
 		bearerAuth.RequireAuth,
-		rateLimiter.Middleware,
+		rateLimiter.Limit,
 	)
 
 	v1.HandleWithMiddleware("GET /items", itemHandler.List, bearerAuth.RequirePermission("items:read"))

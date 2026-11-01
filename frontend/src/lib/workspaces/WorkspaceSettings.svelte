@@ -11,6 +11,7 @@
   import Shield from '@lucide/svelte/icons/shield';
   import { moduleSettings } from '../stores/moduleSettings.js';
   import { viewSettingsStore } from '../stores/viewSettings.svelte.js';
+  import { buildDefaultViewOptions } from './defaultViewOptions.js';
   import WorkspaceConfigurationAssigner from './WorkspaceConfigurationAssigner.svelte';
   import WorkspaceConfigurationPreview from './WorkspaceConfigurationPreview.svelte';
   import WorkspaceSCMSettings from './WorkspaceSCMSettings.svelte';
@@ -91,18 +92,7 @@ import WorkspaceCannedResponses from './WorkspaceCannedResponses.svelte';
   });
   const defaultViewOptions = $derived.by(() => {
     const enabled = viewSettingsStore.enabledViewIds(workspaceId, null);
-    const optionViews = new Set([...enabled, formData.default_view].filter(Boolean));
-    const labels = {
-      board: t('workspaceSettings.views.board'),
-      backlog: t('workspaceSettings.views.backlog'),
-      list: t('workspaceSettings.views.list'),
-      tree: t('workspaceSettings.views.tree'),
-      map: t('workspaceSettings.views.map'),
-      overview: t('workspaceSettings.views.overview'),
-    };
-    return [...optionViews]
-      .filter((value) => labels[value])
-      .map((value) => ({ value, label: labels[value] }));
+    return buildDefaultViewOptions(enabled, formData.default_view, t);
   });
 
   // MainApp renders one WorkspaceSettings instance for every

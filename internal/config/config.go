@@ -52,11 +52,13 @@ type Config struct {
 	CodingAgent  CodingAgentConfig
 	Logbook      LogbookConfig
 	Notification NotificationConfig
+	Reminders    ReminderConfig
 	Email        EmailConfig
 	OutboundTLS  OutboundTLSConfig
 	Push         PushConfig
 	Jira         JiraConfig
 	Memory       MemoryConfig
+	Storage      StorageConfig
 
 	// Flat fields (no logical grouping)
 	AttachmentPath              string
@@ -84,6 +86,31 @@ type Config struct {
 // process. The runtime heap target and cache allocations are derived from it.
 type MemoryConfig struct {
 	LimitMB int
+}
+
+// Storage backend names accepted by STORAGE_BACKEND.
+const (
+	StorageBackendLocal = "local"
+	StorageBackendS3    = "s3"
+)
+
+// StorageConfig selects where attachment blobs live. Local disk stays the
+// zero-config default; S3 is opt-in.
+type StorageConfig struct {
+	Backend   string
+	LocalPath string
+	S3        S3StorageConfig
+}
+
+// S3StorageConfig holds the S3-compatible bucket settings.
+type S3StorageConfig struct {
+	Endpoint        string
+	Bucket          string
+	Region          string
+	AccessKeyID     string
+	SecretAccessKey string
+	Prefix          string
+	ForcePathStyle  bool
 }
 
 // DBConfig holds database connection + pool configuration.
@@ -173,6 +200,9 @@ type PluginsConfig struct {
 	// LicensePubKey is the base64 Ed25519 public key that plugin license
 	// tokens must verify against. Empty disables license enforcement.
 	LicensePubKey string
+	// AllowPublicRoutes permits plugin routes that declare auth "none". Off by
+	// default: a public route is a deliberate operator opt-in.
+	AllowPublicRoutes bool
 }
 
 // LLMConfig holds LLM-related configuration.
@@ -202,6 +232,16 @@ type CodingAgentConfig struct {
 // LogbookConfig holds the URL of the logbook sidecar (if any).
 type LogbookConfig struct {
 	Endpoint string
+}
+
+// ReminderConfig holds the due-date reminder scheduler knobs.
+type ReminderConfig struct {
+	// Interval is how often the scheduler scans for due-soon items
+	// (WINDSHIFT_REMINDER_INTERVAL). Zero means the built-in default (1 hour).
+	Interval time.Duration
+	// BatchSize caps how many due items one scan handles
+	// (WINDSHIFT_REMINDER_BATCH_SIZE). Zero means the built-in default (500).
+	BatchSize int
 }
 
 // NotificationConfig holds the notification WriteBatcher tuning knobs.

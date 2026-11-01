@@ -7,20 +7,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"image"
-	_ "image/gif" // Register GIF decoder
-	"image/jpeg"
-	_ "image/png" // Register PNG decoder
 	"io"
 	"log/slog"
 	"mime"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"windshift/internal/blobstore"
 	"windshift/internal/database"
 	"windshift/internal/fileserve"
 	"windshift/internal/logger"
@@ -28,13 +24,11 @@ import (
 	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
-
-	"golang.org/x/image/draw"
 )
 
 type AttachmentHandler struct {
 	db                    database.Database
-	attachmentPath        string
+	storage               *blobstore.Store
 	permissionService     *services.PermissionService
 	channelService        *services.ChannelService
 	attachmentService     *services.AttachmentService
@@ -42,14 +36,10 @@ type AttachmentHandler struct {
 	pagePermissionService *services.PagePermissionService // for entity_type='page' uploads (optional)
 }
 
-const maxThumbnailSourcePixels = 25_000_000
-
-var errThumbnailSourceTooLarge = errors.New("thumbnail source dimensions exceed the pixel limit")
-
-func NewAttachmentHandler(db database.Database, attachmentPath string, permissionService *services.PermissionService) *AttachmentHandler {
+func NewAttachmentHandler(db database.Database, storage *blobstore.Store, permissionService *services.PermissionService) *AttachmentHandler {
 	return &AttachmentHandler{
 		db:                db,
-		attachmentPath:    attachmentPath,
+		storage:           storage,
 		permissionService: permissionService,
 		attachmentService: services.NewAttachmentServiceWithPermissions(db, permissionService),
 	}
@@ -151,7 +141,7 @@ func (h *AttachmentHandler) authorizeTestResultAttachmentAccess(w http.ResponseW
 
 // IsEnabled checks if attachments are enabled (attachment path is set)
 func (h *AttachmentHandler) IsEnabled() bool {
-	return h.attachmentPath != ""
+	return h.storage.Enabled()
 }
 
 // authorizeUploadEntity verifies the upload target exists and the caller
@@ -354,6 +344,77 @@ func (h *AttachmentHandler) authorizeUploadEntity(w http.ResponseWriter, r *http
 	}
 }
 
+// attachmentKind is the single classification of an upload target. It replaces
+// the string comparisons and per-type switches that used to be spread across
+// Upload: collection path, entity-id requirement, image-only policy, public
+// asset URL, and response shape.
+type attachmentKind struct {
+	entityType       string
+	collection       string
+	scopedByEntity   bool
+	domain           bool
+	imageOnly        bool
+	requiresEntityID bool
+	publicAsset      bool
+	urlKey           string
+	message          string
+}
+
+var errUnknownAttachmentType = errors.New("unknown attachment entity type")
+
+func classifyAttachment(entityType, category string) (attachmentKind, error) {
+	if entityType == "" {
+		switch category {
+		case "avatar", "workspace_avatar", "team_avatar", "customer_avatar",
+			"workspace_background", "portal_background", "portal_logo",
+			"hub_logo", "theme_logo":
+			entityType = category
+		default:
+			entityType = "item" // legacy default
+		}
+	}
+
+	switch entityType {
+	case "item":
+		return attachmentKind{entityType: "item", collection: "items", scopedByEntity: true, domain: true, requiresEntityID: true}, nil
+	case "page":
+		return attachmentKind{entityType: "page", collection: "pages", scopedByEntity: true, domain: true, requiresEntityID: true}, nil
+	case "test_case":
+		return attachmentKind{entityType: "test_case", collection: "test_cases", scopedByEntity: true, requiresEntityID: true}, nil
+	case "test_result":
+		return attachmentKind{entityType: "test_result", collection: "test_results", scopedByEntity: true, requiresEntityID: true}, nil
+	case "avatar":
+		return attachmentKind{entityType: "avatar", collection: "avatars", imageOnly: true, urlKey: "avatar_url", message: "Avatar uploaded successfully"}, nil
+	case "workspace_avatar":
+		return attachmentKind{entityType: "workspace_avatar", collection: "workspace_avatars", imageOnly: true, requiresEntityID: true, urlKey: "avatar_url", message: "Workspace avatar uploaded successfully"}, nil
+	case "team_avatar":
+		return attachmentKind{entityType: "team_avatar", collection: "team_avatars", imageOnly: true, requiresEntityID: true, urlKey: "avatar_url", message: "Team avatar uploaded successfully"}, nil
+	case "customer_avatar":
+		return attachmentKind{entityType: "customer_avatar", collection: "customer_avatars", imageOnly: true, requiresEntityID: true, urlKey: "avatar_url", message: "Customer avatar uploaded successfully"}, nil
+	case "workspace_background":
+		return attachmentKind{entityType: "workspace_background", collection: "workspace_backgrounds", imageOnly: true, requiresEntityID: true, urlKey: "background_url", message: "Workspace background uploaded successfully"}, nil
+	case "portal_background":
+		return attachmentKind{entityType: "portal_background", collection: "portal_backgrounds", imageOnly: true, requiresEntityID: true, publicAsset: true, urlKey: "background_url", message: "Portal background uploaded successfully"}, nil
+	case "portal_logo":
+		return attachmentKind{entityType: "portal_logo", collection: "portal_logos", imageOnly: true, requiresEntityID: true, publicAsset: true, urlKey: "logo_url", message: "Portal logo uploaded successfully"}, nil
+	case "hub_logo":
+		return attachmentKind{entityType: "hub_logo", collection: "hub_logos", imageOnly: true, publicAsset: true, urlKey: "logo_url", message: "Hub logo uploaded successfully"}, nil
+	case "theme_logo":
+		return attachmentKind{entityType: "theme_logo", collection: "theme_logos", imageOnly: true, publicAsset: true, urlKey: "logo_url", message: "Theme logo uploaded successfully"}, nil
+	default:
+		return attachmentKind{}, fmt.Errorf("%w: %q", errUnknownAttachmentType, entityType)
+	}
+}
+
+// kindPath resolves the blob path for a classified upload. Store.Path is
+// variadic, so each shape passes only the segments it needs.
+func (h *AttachmentHandler) kindPath(kind attachmentKind, entityID int, name string) string {
+	if kind.scopedByEntity {
+		return h.storage.Path(kind.collection, strconv.Itoa(entityID), name)
+	}
+	return h.storage.Path(kind.collection, name)
+}
+
 // Upload handles file upload to an item
 func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	// FIXME: split authorization from storage concerns.
@@ -385,45 +446,13 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	entityType := r.FormValue("entity_type")
 	category := r.FormValue("category")
 
-	// Derive a missing entity type for legacy clients.
-	if entityType == "" {
-		switch category {
-		case "avatar":
-			entityType = "avatar"
-		case "workspace_avatar":
-			entityType = "workspace_avatar"
-		case "team_avatar":
-			entityType = "team_avatar"
-		case "customer_avatar":
-			entityType = "customer_avatar"
-		case "workspace_background":
-			entityType = "workspace_background"
-		case "portal_background":
-			entityType = "portal_background"
-		case "portal_logo":
-			entityType = "portal_logo"
-		case "hub_logo":
-			entityType = "hub_logo"
-		case "theme_logo":
-			entityType = "theme_logo"
-		default:
-			entityType = "item" // Default to item for backwards compatibility
-		}
+	kind, err := classifyAttachment(entityType, category)
+	if err != nil {
+		slog.Warn("unknown attachment entity type", slog.String("component", "attachments"), slog.String("entity_type", entityType))
+		respondValidationError(w, r, "Unknown entity type")
+		return
 	}
-
-	slog.Debug("entity info received", slog.String("component", "attachments"), slog.String("entity_id", entityIDStr), slog.String("entity_type", entityType), slog.String("category", category))
-
-	// Handle avatar uploads differently (they don't need a real entity)
-	isAvatar := entityType == "avatar"
-	isWorkspaceAvatar := entityType == "workspace_avatar"
-	isTeamAvatar := entityType == "team_avatar"
-	isCustomerAvatar := entityType == "customer_avatar"
-	isWorkspaceBackground := entityType == "workspace_background"
-	isPortalBackground := entityType == "portal_background"
-	isPortalLogo := entityType == "portal_logo"
-	isHubLogo := entityType == "hub_logo"
-	isThemeLogo := entityType == "theme_logo"
-	isImageEntityType := isAvatar || isWorkspaceAvatar || isTeamAvatar || isCustomerAvatar || isWorkspaceBackground || isPortalBackground || isPortalLogo || isHubLogo || isThemeLogo
+	entityType = kind.entityType
 
 	// category is an older image-asset discriminator used by /api/portal-assets.
 	// Keep it in lockstep with entity_type so callers cannot make an item/test
@@ -432,20 +461,15 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		respondValidationError(w, r, "category must match entity_type")
 		return
 	}
-	if category == "" && isImageEntityType {
+	if category == "" && kind.imageOnly {
 		category = entityType
 	}
 
-	// entity_id is required for every entity type that has an owner row
-	// (item, test_case, test_result, workspace/team/customer scoped image
-	// assets). Portal logo/background uploads use entity_id as the owning
-	// channel id so public URLs cannot be minted by arbitrary users. The truly
-	// global uploads — user avatar, hub logo, and theme logo — need no owner
-	// id here.
-	entityIDRequired := entityType != "avatar" &&
-		entityType != "hub_logo" &&
-		entityType != "theme_logo"
-	if entityIDStr == "" && entityIDRequired {
+	slog.Debug("entity info received", slog.String("component", "attachments"), slog.String("entity_id", entityIDStr), slog.String("entity_type", entityType), slog.String("category", category))
+
+	// entity_id is required for every entity type that has an owner row. The
+	// global uploads (user avatar, hub logo, theme logo) have no owner id.
+	if entityIDStr == "" && kind.requiresEntityID {
 		slog.Debug("missing entity_id in form", slog.String("component", "attachments"))
 		respondValidationError(w, r, "entity_id is required")
 		return
@@ -462,7 +486,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Debug("uploading to entity", slog.String("component", "attachments"), slog.String("entity_type", entityType), slog.Int("entity_id", entityID))
 
-	if entityType == "item" || entityType == "page" {
+	if kind.domain {
 		h.uploadDomainAttachment(w, r, entityType, entityID)
 		return
 	}
@@ -507,13 +531,11 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Debug("content verified", slog.String("component", "attachments"), slog.String("mime_type", detectedMimeType))
 
-	if isImageEntityType {
-		if !isAllowedImageExtension(fileHeader.Filename) {
-			respondValidationError(w, r, fmt.Sprintf(
-				"File extension %s is not allowed for %s uploads. Only image files are accepted",
-				strings.ToLower(filepath.Ext(fileHeader.Filename)), entityType))
-			return
-		}
+	if kind.imageOnly && !isAllowedImageExtension(fileHeader.Filename) {
+		respondValidationError(w, r, fmt.Sprintf(
+			"File extension %s is not allowed for %s uploads. Only image files are accepted",
+			strings.ToLower(filepath.Ext(fileHeader.Filename)), entityType))
+		return
 	}
 
 	slog.Debug("getting attachment settings", slog.String("component", "attachments"))
@@ -567,51 +589,13 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Debug("generated filename", slog.String("component", "attachments"), slog.String("unique_filename", uniqueFilename))
 
-	var itemDir string
-	switch entityType {
-	case "avatar":
-		itemDir = filepath.Join(h.attachmentPath, "avatars")
-	case "workspace_avatar":
-		itemDir = filepath.Join(h.attachmentPath, "workspace_avatars")
-	case "team_avatar":
-		itemDir = filepath.Join(h.attachmentPath, "team_avatars")
-	case "customer_avatar":
-		itemDir = filepath.Join(h.attachmentPath, "customer_avatars")
-	case "workspace_background":
-		itemDir = filepath.Join(h.attachmentPath, "workspace_backgrounds")
-	case "portal_background":
-		itemDir = filepath.Join(h.attachmentPath, "portal_backgrounds")
-	case "portal_logo":
-		itemDir = filepath.Join(h.attachmentPath, "portal_logos")
-	case "hub_logo":
-		itemDir = filepath.Join(h.attachmentPath, "hub_logos")
-	case "theme_logo":
-		itemDir = filepath.Join(h.attachmentPath, "theme_logos")
-	case "test_case":
-		itemDir = filepath.Join(h.attachmentPath, "test_cases", strconv.Itoa(entityID))
-	case "test_result":
-		itemDir = filepath.Join(h.attachmentPath, "test_results", strconv.Itoa(entityID))
-	default: // "item"
-		itemDir = filepath.Join(h.attachmentPath, "items", strconv.Itoa(entityID))
-	}
-	slog.Debug("creating directory", slog.String("component", "attachments"), slog.String("path", itemDir))
-	if err = os.MkdirAll(itemDir, 0o750); err != nil { //nolint:gosec // G703: path built from hardcoded strings + strconv.Itoa(entityID)
-		slog.Error("failed to create directory", slog.String("component", "attachments"), slog.String("path", itemDir), slog.Any("error", err))
-		respondInternalError(w, r, fmt.Errorf("failed to create attachment directory: %w", err))
-		return
-	}
-
-	filePath := filepath.Join(itemDir, uniqueFilename)
-	slog.Debug("creating file", slog.String("component", "attachments"), slog.String("path", filePath))
-
-	slog.Debug("writing file data", slog.String("component", "attachments"))
-	err = os.WriteFile(filePath, fileData, 0o600) //nolint:gosec // G703: path from hardcoded base + strconv.Itoa
-	if err != nil {
+	filePath := h.kindPath(kind, entityID, uniqueFilename)
+	fileSize := int64(len(fileData))
+	if err = h.storage.Put(r.Context(), filePath, bytes.NewReader(fileData), fileSize, detectedMimeType); err != nil {
 		slog.Error("failed to write file", slog.String("component", "attachments"), slog.String("path", filePath), slog.Any("error", err))
 		respondInternalError(w, r, fmt.Errorf("failed to save file: %w", err))
 		return
 	}
-	fileSize := int64(len(fileData))
 	slog.Debug("file saved", slog.String("component", "attachments"), slog.Int64("bytes", fileSize))
 
 	var uploaderID *int
@@ -625,13 +609,20 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	hasThumbnail := false
 	var thumbnailPath string
 	if strings.HasPrefix(mimeType, "image/") {
-		slog.Debug("generating thumbnail for image", slog.String("component", "attachments"), slog.String("filename", uniqueFilename))
-		thumbnailPath, err = h.generateThumbnail(filePath, uniqueFilename)
-		if err == nil {
-			hasThumbnail = true
-			slog.Debug("thumbnail generated", slog.String("component", "attachments"), slog.String("thumbnail_path", thumbnailPath))
+		// Shared with the item/page upload services so local and S3 share one
+		// implementation; the uploaded bytes are already in memory.
+		thumbnail, thumbErr := services.GenerateAttachmentThumbnailJPEG(fileData)
+		if thumbErr != nil {
+			slog.Warn("failed to generate thumbnail", slog.String("component", "attachments"), slog.String("filename", uniqueFilename), slog.Any("error", thumbErr))
 		} else {
-			slog.Warn("failed to generate thumbnail", slog.String("component", "attachments"), slog.String("filename", uniqueFilename), slog.Any("error", err))
+			thumbnailName := strings.TrimSuffix(uniqueFilename, filepath.Ext(uniqueFilename)) + ".thumb.jpg"
+			thumbnailPath = h.kindPath(kind, entityID, thumbnailName)
+			if putErr := h.storage.Put(r.Context(), thumbnailPath, bytes.NewReader(thumbnail), int64(len(thumbnail)), "image/jpeg"); putErr != nil {
+				slog.Warn("failed to store thumbnail", slog.String("component", "attachments"), slog.String("filename", uniqueFilename), slog.Any("error", putErr))
+				thumbnailPath = ""
+			} else {
+				hasThumbnail = true
+			}
 		}
 	} else {
 		slog.Debug("skipping thumbnail generation for non-image", slog.String("component", "attachments"), slog.String("mime_type", mimeType))
@@ -655,29 +646,24 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		slog.Error("failed to save attachment record", slog.String("component", "attachments"), slog.Any("error", err))
-		_ = os.Remove(filePath) //nolint:gosec // G703: cleanup of path already validated
+		_ = h.storage.Remove(r.Context(), filePath)
+		if thumbnailPath != "" {
+			_ = h.storage.Remove(r.Context(), thumbnailPath)
+		}
 		respondInternalError(w, r, fmt.Errorf("failed to save attachment record: %w", err))
 		return
 	}
 
-	var attachmentEntityID any
-	if isImageEntityType {
-		attachmentEntityID = nil
-	} else {
-		attachmentEntityID = entityID
-	}
 	slog.Debug("attachment saved", slog.String("component", "attachments"), slog.Int64("attachment_id", attachmentID))
 
-	if entityType == "item" && attachmentEntityID != nil {
-		if entityIDInt, ok := attachmentEntityID.(int); ok {
-			if err = h.attachmentService.RecordItemHistory(entityIDInt, services.AttachmentHistoryActor{UserID: uploaderID}, "attachment_uploaded", nil, attachmentID, fileHeader.Filename); err != nil {
-				slog.Warn("failed to record attachment history", slog.String("component", "attachments"), slog.Any("error", err))
-				// Don't fail the whole operation if history recording fails
-			}
+	if kind.entityType == "item" {
+		if err = h.attachmentService.RecordItemHistory(entityID, services.AttachmentHistoryActor{UserID: uploaderID}, "attachment_uploaded", nil, attachmentID, fileHeader.Filename); err != nil {
+			slog.Warn("failed to record attachment history", slog.String("component", "attachments"), slog.Any("error", err))
+			// Don't fail the whole operation if history recording fails
 		}
 	}
 
-	if isAvatar && uploaderID != nil {
+	if kind.entityType == "avatar" && uploaderID != nil {
 		avatarURL := fmt.Sprintf("/api/attachments/%d/download", attachmentID)
 		slog.Debug("updating user avatar_url", slog.String("component", "attachments"), slog.Int("user_id", *uploaderID), slog.String("avatar_url", avatarURL))
 
@@ -690,72 +676,39 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if isImageEntityType {
-		// Image uploads use public or authenticated download URLs by entity type.
-		var downloadURL string
-		if isPortalBackground || isPortalLogo || isHubLogo || isThemeLogo {
-			// Public endpoint for portal branding (no auth required)
+	if kind.imageOnly {
+		downloadURL := fmt.Sprintf("/api/attachments/%d/download", attachmentID)
+		if kind.publicAsset {
 			downloadURL = fmt.Sprintf("/api/portal-assets/%d", attachmentID)
-		} else {
-			// Authenticated endpoint for user avatars
-			downloadURL = fmt.Sprintf("/api/attachments/%d/download", attachmentID)
 		}
-		message := "Avatar uploaded successfully"
-		urlKey := "avatar_url"
-		switch {
-		case isWorkspaceAvatar:
-			message = "Workspace avatar uploaded successfully"
-		case isTeamAvatar:
-			message = "Team avatar uploaded successfully"
-		case isCustomerAvatar:
-			message = "Customer avatar uploaded successfully"
-		case isWorkspaceBackground:
-			message = "Workspace background uploaded successfully"
-			urlKey = "background_url"
-		case isPortalBackground:
-			message = "Portal background uploaded successfully"
-			urlKey = "background_url"
-		case isPortalLogo:
-			message = "Portal logo uploaded successfully"
-			urlKey = "logo_url"
-		case isHubLogo:
-			message = "Hub logo uploaded successfully"
-			urlKey = "logo_url"
-		case isThemeLogo:
-			message = "Theme logo uploaded successfully"
-			urlKey = "logo_url"
-		}
-		response := map[string]any{
+		respondJSONOK(w, map[string]any{
 			"success":       true,
-			"message":       message,
-			urlKey:          downloadURL,
+			"message":       kind.message,
+			kind.urlKey:     downloadURL,
 			"attachment_id": attachmentID,
 			"filename":      uniqueFilename,
-		}
-		respondJSONOK(w, response)
+		})
 		return
-	} else {
-		// For regular attachments, return attachment structure
-		attachment := models.Attachment{
-			ID:               int(attachmentID),
-			ItemID:           &entityID,
-			Filename:         uniqueFilename,
-			OriginalFilename: fileHeader.Filename,
-			MimeType:         mimeType,
-			FileSize:         fileSize,
-			UploadedBy:       uploaderID,
-			CreatedAt:        time.Now(),
-		}
-
-		response := models.AttachmentUploadResponse{
-			Success:    true,
-			Message:    "File uploaded successfully",
-			Attachment: attachment,
-		}
-
-		slog.Debug("upload completed successfully", slog.String("component", "attachments"))
-		respondJSONOK(w, response)
 	}
+
+	// For regular attachments, return the attachment structure.
+	attachment := models.Attachment{
+		ID:               int(attachmentID),
+		ItemID:           &entityID,
+		Filename:         uniqueFilename,
+		OriginalFilename: fileHeader.Filename,
+		MimeType:         mimeType,
+		FileSize:         fileSize,
+		UploadedBy:       uploaderID,
+		CreatedAt:        time.Now(),
+	}
+	response := models.AttachmentUploadResponse{
+		Success:    true,
+		Message:    "File uploaded successfully",
+		Attachment: attachment,
+	}
+	slog.Debug("upload completed successfully", slog.String("component", "attachments"))
+	respondJSONOK(w, response)
 }
 
 func (h *AttachmentHandler) uploadDomainAttachment(w http.ResponseWriter, r *http.Request, entityType string, entityID int) {
@@ -778,12 +731,12 @@ func (h *AttachmentHandler) uploadDomainAttachment(w http.ResponseWriter, r *htt
 	var response models.AttachmentUploadResponse
 	switch entityType {
 	case "item":
-		response, err = services.NewItemAttachmentService(h.db, h.attachmentPath, h.permissionService).UploadItemAttachment(services.ItemAttachmentUploadInput{
+		response, err = services.NewItemAttachmentService(h.db, h.storage, h.permissionService).UploadItemAttachment(r.Context(), services.ItemAttachmentUploadInput{
 			ItemID: entityID, UploaderID: user.ID, OriginalFilename: header.Filename,
 			FileData: data, FileSize: int64(len(data)),
 		})
 	case "page":
-		response, err = services.NewPageAttachmentUploadService(h.db, h.attachmentPath, h.permissionService, h.pagePermissionService).UploadPageAttachment(services.PageAttachmentUploadInput{
+		response, err = services.NewPageAttachmentUploadService(h.db, h.storage, h.permissionService, h.pagePermissionService).UploadPageAttachment(r.Context(), services.PageAttachmentUploadInput{
 			PageID: entityID, UploaderID: user.ID, OriginalFilename: header.Filename,
 			FileData: data, FileSize: int64(len(data)),
 		})
@@ -936,22 +889,20 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Open the file confined to the attachment storage root. os.OpenRoot (used
-	// by fileserve.OpenUnderRoot) rejects ".." traversal and symlink escapes,
-	// so a malicious stored path or a planted symlink cannot read outside the
-	// root. Email ingestion stores relative paths; those resolve against the
-	// same root. Escapes and missing files both return 404 to avoid disclosing
-	// filesystem details.
-	slog.Debug("opening file under attachment root", slog.String("component", "attachments"), slog.String("file_path", attachment.FilePath))
-	file, err := fileserve.OpenUnderRoot(h.attachmentPath, attachment.FilePath)
+	// Open the blob through the configured backend. The local backend keeps the
+	// historical os.Root confinement; S3 maps the stored path to an object key.
+	// Escapes and missing objects both return 404 to avoid disclosing storage
+	// details.
+	slog.Debug("opening attachment blob", slog.String("component", "attachments"), slog.String("file_path", attachment.FilePath))
+	file, err := h.storage.Open(r.Context(), attachment.FilePath)
 	if err != nil {
-		if errors.Is(err, fileserve.ErrOutsideRoot) {
+		if errors.Is(err, blobstore.ErrOutsideRoot) {
 			slog.Warn("path traversal attempt blocked", slog.String("component", "attachments"), slog.String("file_path", attachment.FilePath))
 			respondNotFound(w, r, "file")
 			return
 		}
-		if errors.Is(err, os.ErrNotExist) {
-			slog.Debug("file not found on disk", slog.String("component", "attachments"), slog.String("file_path", attachment.FilePath))
+		if errors.Is(err, blobstore.ErrNotFound) {
+			slog.Debug("file not found in storage", slog.String("component", "attachments"), slog.String("file_path", attachment.FilePath))
 			respondNotFound(w, r, "file")
 			return
 		}
@@ -964,7 +915,7 @@ func (h *AttachmentHandler) Download(w http.ResponseWriter, r *http.Request) {
 	// Set headers
 	slog.Debug("setting headers and serving file", slog.String("component", "attachments"), slog.String("original_filename", attachment.OriginalFilename))
 	w.Header().Set("Content-Type", attachment.MimeType)
-	w.Header().Set("Content-Length", strconv.FormatInt(attachment.FileSize, 10))
+	w.Header().Set("Content-Length", strconv.FormatInt(file.Size(), 10))
 
 	// Prevent MIME sniffing and embedding.
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -1012,8 +963,8 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 			respondNotFound(w, r, "attachment")
 			return
 		}
-		itemAttachments := services.NewItemAttachmentService(h.db, h.attachmentPath, h.permissionService)
-		if err := itemAttachments.DeleteItemAttachment(attachmentID, currentUser.ID); err != nil {
+		itemAttachments := services.NewItemAttachmentService(h.db, h.storage, h.permissionService)
+		if err := itemAttachments.DeleteItemAttachment(r.Context(), attachmentID, currentUser.ID); err != nil {
 			if errors.Is(err, services.ErrItemAttachmentNotFound) {
 				respondNotFound(w, r, "attachment")
 				return
@@ -1096,6 +1047,25 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Blob-first: remove the file and thumbnail before the row. A removal
+	// failure keeps the row so the caller can retry; Store.Remove treats a
+	// missing object as success. A path outside the storage root is refused
+	// (never touched) but does not block removing the corrupt row.
+	for _, path := range []string{details.FilePath, details.ThumbnailPath} {
+		if path == "" {
+			continue
+		}
+		if err := h.storage.Remove(r.Context(), path); err != nil {
+			if errors.Is(err, blobstore.ErrOutsideRoot) {
+				slog.Warn("refusing to delete attachment outside storage root", slog.String("component", "attachments"), slog.String("file_path", path))
+				continue
+			}
+			slog.Error("failed to delete attachment blob", slog.String("component", "attachments"), slog.String("file_path", path), slog.Any("error", err))
+			respondInternalError(w, r, fmt.Errorf("failed to delete attachment file: %w", err))
+			return
+		}
+	}
+
 	// Delete from database
 	rowsAffected, err := h.attachmentService.DeleteRecord(attachmentID)
 	if err != nil {
@@ -1114,17 +1084,6 @@ func (h *AttachmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 			"item_id":           details.ItemID,
 			"original_filename": details.OriginalFilename,
 		})
-	}
-
-	// Delete physical file using the same root-confined resolver as downloads.
-	// Missing files are tolerated so stale DB rows can still be cleaned up.
-	if err := fileserve.RemoveUnderRoot(h.attachmentPath, details.FilePath); err != nil && !os.IsNotExist(err) {
-		if errors.Is(err, fileserve.ErrOutsideRoot) {
-			slog.Warn("refusing to delete attachment file outside storage root", slog.String("component", "attachments"), slog.String("file_path", details.FilePath), slog.Any("error", err))
-		} else {
-			// Log warning but don't fail the request if file removal fails.
-			slog.Warn("failed to delete attachment file", slog.String("component", "attachments"), slog.String("file_path", details.FilePath), slog.Any("error", err))
-		}
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -1173,16 +1132,16 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Open the thumbnail confined to the attachment storage root (see Download
-	// for the rationale). Escapes and missing files both surface as 404.
-	file, err := fileserve.OpenUnderRoot(h.attachmentPath, thumbnailPath)
+	// Open the thumbnail through the configured backend (see Download for the
+	// rationale). Escapes and missing objects both surface as 404.
+	file, err := h.storage.Open(r.Context(), thumbnailPath)
 	if err != nil {
-		if errors.Is(err, fileserve.ErrOutsideRoot) {
+		if errors.Is(err, blobstore.ErrOutsideRoot) {
 			slog.Warn("thumbnail path traversal attempt blocked", slog.String("component", "attachments"), slog.String("thumbnail_path", thumbnailPath))
 			respondNotFound(w, r, "thumbnail")
 			return
 		}
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, blobstore.ErrNotFound) {
 			respondNotFound(w, r, "thumbnail")
 			return
 		}
@@ -1191,14 +1150,8 @@ func (h *AttachmentHandler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = file.Close() }()
 
-	fileInfo, err := file.Stat()
-	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to get file info: %w", err))
-		return
-	}
-
 	w.Header().Set("Content-Type", "image/jpeg")
-	w.Header().Set("Content-Length", strconv.FormatInt(fileInfo.Size(), 10))
+	w.Header().Set("Content-Length", strconv.FormatInt(file.Size(), 10))
 	w.Header().Set("Cache-Control", "public, max-age=31536000") // Cache for 1 year
 
 	_, _ = io.Copy(w, file)
@@ -1329,7 +1282,7 @@ func (h *AttachmentHandler) getAttachmentSettings() (*models.AttachmentSettings,
 	settings := &models.AttachmentSettings{
 		MaxFileSize:      52428800, // 50MB default
 		AllowedMimeTypes: "",
-		AttachmentPath:   h.attachmentPath,
+		AttachmentPath:   h.storage.Describe(),
 		Enabled:          true,
 	}
 
@@ -1348,91 +1301,4 @@ func (h *AttachmentHandler) getAttachmentSettings() (*models.AttachmentSettings,
 	}
 
 	return settings, nil
-}
-
-// generateThumbnail creates a thumbnail for an image file
-func (h *AttachmentHandler) generateThumbnail(originalPath, filename string) (string, error) {
-	slog.Debug("starting thumbnail generation", slog.String("component", "attachments"), slog.String("original_path", originalPath))
-
-	// Open original image
-	file, err := os.Open(originalPath) //nolint:gosec // path from server-managed attachment storage
-	if err != nil {
-		slog.Error("failed to open image file", slog.String("component", "attachments"), slog.Any("error", err))
-		return "", err
-	}
-	defer func() { _ = file.Close() }()
-
-	config, _, err := image.DecodeConfig(file)
-	if err != nil {
-		slog.Error("failed to read image dimensions", slog.String("component", "attachments"), slog.Any("error", err))
-		return "", err
-	}
-	if config.Width <= 0 || config.Height <= 0 || config.Width > maxThumbnailSourcePixels/config.Height {
-		return "", fmt.Errorf("%w: %dx%d exceeds %d pixels", errThumbnailSourceTooLarge, config.Width, config.Height, maxThumbnailSourcePixels)
-	}
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return "", fmt.Errorf("rewind image after dimension check: %w", err)
-	}
-
-	// Decode image after its declared dimensions pass the allocation bound.
-	slog.Debug("decoding image", slog.String("component", "attachments"))
-	img, format, err := image.Decode(file)
-	if err != nil {
-		slog.Error("failed to decode image", slog.String("component", "attachments"), slog.Any("error", err))
-		return "", err
-	}
-	slog.Debug("image decoded successfully", slog.String("component", "attachments"), slog.String("format", format))
-
-	// Calculate thumbnail dimensions (max 200x200, maintaining aspect ratio)
-	bounds := img.Bounds()
-	origWidth := bounds.Dx()
-	origHeight := bounds.Dy()
-	slog.Debug("original dimensions", slog.String("component", "attachments"), slog.Int("width", origWidth), slog.Int("height", origHeight))
-
-	maxSize := 200
-	var newWidth, newHeight int
-
-	if origWidth > origHeight {
-		newWidth = maxSize
-		newHeight = (origHeight * maxSize) / origWidth
-	} else {
-		newHeight = maxSize
-		newWidth = (origWidth * maxSize) / origHeight
-	}
-	slog.Debug("thumbnail dimensions", slog.String("component", "attachments"), slog.Int("width", newWidth), slog.Int("height", newHeight))
-
-	// Create thumbnail image
-	slog.Debug("creating thumbnail image", slog.String("component", "attachments"))
-	thumbnail := image.NewRGBA(image.Rect(0, 0, newWidth, newHeight))
-	slog.Debug("scaling image", slog.String("component", "attachments"))
-	draw.CatmullRom.Scale(thumbnail, thumbnail.Bounds(), img, bounds, draw.Over, nil)
-
-	// Generate thumbnail filename (remove original extension, add .thumb.jpg)
-	base := strings.TrimSuffix(filename, filepath.Ext(filename))
-	thumbnailFilename := base + ".thumb.jpg"
-	slog.Debug("thumbnail filename generated", slog.String("component", "attachments"), slog.String("thumbnail_filename", thumbnailFilename))
-
-	// Create thumbnail path (same directory as original)
-	thumbnailPath := filepath.Join(filepath.Dir(originalPath), thumbnailFilename)
-	slog.Debug("thumbnail path", slog.String("component", "attachments"), slog.String("thumbnail_path", thumbnailPath))
-
-	// Create thumbnail file
-	slog.Debug("creating thumbnail file", slog.String("component", "attachments"))
-	thumbnailFile, err := os.Create(thumbnailPath) //nolint:gosec // path derived from server-managed attachment storage
-	if err != nil {
-		slog.Error("failed to create thumbnail file", slog.String("component", "attachments"), slog.Any("error", err))
-		return "", err
-	}
-	defer func() { _ = thumbnailFile.Close() }()
-
-	// Encode as JPEG with good quality
-	slog.Debug("encoding thumbnail as JPEG", slog.String("component", "attachments"))
-	err = jpeg.Encode(thumbnailFile, thumbnail, &jpeg.Options{Quality: 85})
-	if err != nil {
-		slog.Error("failed to encode thumbnail", slog.String("component", "attachments"), slog.Any("error", err))
-		return "", err
-	}
-
-	slog.Debug("thumbnail generation completed successfully", slog.String("component", "attachments"))
-	return thumbnailPath, nil
 }

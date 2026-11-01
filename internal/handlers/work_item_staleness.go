@@ -42,6 +42,12 @@ func (h *WorkItemStalenessHandler) Update(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	before, err := h.Settings()
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
 	settings, err := h.service.Update(request.StaleAfterDays)
 	if errors.Is(err, services.ErrInvalidWorkItemStalenessThreshold) {
 		respondValidationError(w, r, err.Error())
@@ -53,13 +59,16 @@ func (h *WorkItemStalenessHandler) Update(w http.ResponseWriter, r *http.Request
 	}
 
 	if currentUser := utils.GetCurrentUser(r); currentUser != nil {
-		h.auditor.Log(
+		h.auditor.LogWithDetails(
 			r,
 			currentUser,
 			logger.ActionWorkItemStalenessUpdate,
 			logger.ResourceWorkItemStaleness,
 			nil,
 			"work_item_staleness",
+			map[string]any{
+				"stale_after_days": map[string]any{"old": before.StaleAfterDays, "new": settings.StaleAfterDays},
+			},
 		)
 	}
 	respondJSONOK(w, settings)

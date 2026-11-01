@@ -32,7 +32,7 @@ func newGherkinDocumentResponse(doc *gherkin.Document, errs *gherkin.ErrorList) 
 // consumption, tests:write for authoring and execution.
 
 // GetCaseDetail returns a case with its BDD content attached when the case
-// is BDD-format. The plain GetCase stays unchanged for step-based cases.
+// is BDD-format.
 func (s *TestManagementApplicationService) GetCaseDetail(userID, workspaceID, id int) (*models.TestCase, error) {
 	if err := s.require(userID, workspaceID, models.PermissionTestView); err != nil {
 		return nil, err
@@ -49,19 +49,6 @@ func (s *TestManagementApplicationService) GetCaseDetail(userID, workspaceID, id
 		testCase.BDD = bdd
 	}
 	return testCase, nil
-}
-
-// UpdateCaseGherkin validates and stores new Gherkin for a BDD case.
-func (s *TestManagementApplicationService) UpdateCaseGherkin(userID, workspaceID, id int, actor AuditActor, source string) (*models.TestCase, error) {
-	if err := s.require(userID, workspaceID, models.PermissionTestManage); err != nil {
-		return nil, err
-	}
-	updated, err := s.cases.UpdateBDDContent(id, workspaceID, source)
-	if err != nil {
-		return nil, err
-	}
-	emitServiceAudit(s.db, actor, logger.ActionTestCaseUpdate, logger.ResourceTestCase, &updated.ID, updated.Title, nil)
-	return updated, nil
 }
 
 // ImportFeatureResult reports the outcome of a feature-file import.
@@ -121,13 +108,22 @@ func featureFilename(title string, id int) string {
 }
 
 // ValidateFeature parses authored Gherkin and returns structured errors plus
-// the parsed document for preview purposes. It persists nothing.
+// the parsed document for preview purposes. It applies the same case rules as
+// saving a BDD test case (exactly one named scenario) so a green validation
+// cannot still fail on save. It persists nothing.
 func (s *TestManagementApplicationService) ValidateFeature(userID, workspaceID int, content string) (*GherkinDocumentResponse, error) {
 	if err := s.require(userID, workspaceID, models.PermissionTestManage); err != nil {
 		return nil, err
 	}
 	doc, errs := gherkin.Parse(content)
-	return newGherkinDocumentResponse(doc, errs), nil
+	response := newGherkinDocumentResponse(doc, errs)
+	if errs.Empty() {
+		for _, ruleErr := range caseRuleErrors(doc) {
+			response.Valid = false
+			response.Errors = append(response.Errors, ruleErr)
+		}
+	}
+	return response, nil
 }
 
 // ListRunExamples returns the per-example execution results of a run.

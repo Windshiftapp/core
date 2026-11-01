@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import Sparkles from '@lucide/svelte/icons/sparkles';
+  import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import { ai } from '../../api/ai.js';
   import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
@@ -64,7 +64,7 @@
   </div>
 {:else if unavailable || !briefing}
   <div class="flex items-start gap-3 py-2">
-    <Sparkles class="w-4 h-4 mt-0.5" style="color: var(--ds-icon-accent);" />
+    <IconMessageChatbot class="w-4 h-4 mt-0.5" style="color: var(--ds-icon-accent);" />
     <p class="text-sm" style="color: var(--ds-text-subtle);">
       {t('dashboard.states.dailyBriefingUnavailable')}
     </p>

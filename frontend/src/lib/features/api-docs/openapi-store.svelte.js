@@ -1,7 +1,7 @@
 /** Pure reusable data helpers for the /api-docs renderer. */
 
 /** @typedef {{ $ref?: string, name?: string, in?: string }} OpenAPIParameter */
-/** @typedef {{ summary?: string, tags?: string[], parameters?: OpenAPIParameter[], security?: Record<string, string[]>[], 'x-required-scopes'?: string[] }} OpenAPIOperation */
+/** @typedef {{ summary?: string, tags?: string[], parameters?: OpenAPIParameter[], security?: Record<string, string[]>[], 'x-required-scopes'?: string[], 'x-required-any-scopes'?: string[] }} OpenAPIOperation */
 /** @typedef {{ parameters?: OpenAPIParameter[], get?: OpenAPIOperation, post?: OpenAPIOperation, put?: OpenAPIOperation, patch?: OpenAPIOperation, delete?: OpenAPIOperation, head?: OpenAPIOperation, options?: OpenAPIOperation }} OpenAPIPathItem */
 /** @typedef {{ paths?: Record<string, OpenAPIPathItem> }} OpenAPISpec */
 /** @typedef {{ tag: string, path: string, method: string, operation: OpenAPIOperation, pathParameters: OpenAPIParameter[], id: string }} OperationEntry */
@@ -111,19 +111,25 @@ export function resolveOperationParameters(spec, entry) {
 /**
  * Return the scopes a browser should show for an operation. V2 uses the
  * standards-safe extension; v1 keeps its historical security-array encoding.
+ * A route may also accept one of several alternative scopes (for example an
+ * attachment binary that belongs to either an item or a page); those are shown
+ * alongside the required scopes so the documentation does not hide them.
  * @param {OpenAPIOperation} operation
  */
 export function operationRequiredScopes(operation) {
-  if (Array.isArray(operation['x-required-scopes'])) {
-    return operation['x-required-scopes'];
-  }
-  return [
-    ...new Set(
-      (operation.security || []).flatMap((requirement) =>
-        Object.values(requirement).flatMap((scopes) => (Array.isArray(scopes) ? scopes : []))
-      )
-    ),
-  ];
+  const required = Array.isArray(operation['x-required-scopes'])
+    ? operation['x-required-scopes']
+    : [
+        ...new Set(
+          (operation.security || []).flatMap((requirement) =>
+            Object.values(requirement).flatMap((scopes) => (Array.isArray(scopes) ? scopes : []))
+          )
+        ),
+      ];
+  const anyScopes = Array.isArray(operation['x-required-any-scopes'])
+    ? operation['x-required-any-scopes']
+    : [];
+  return [...new Set([...required, ...anyScopes])];
 }
 
 /**

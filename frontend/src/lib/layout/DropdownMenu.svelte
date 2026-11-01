@@ -32,6 +32,8 @@
     onOpen = null,
     triggerAlignment = 'center',
     disabled = false,
+    /** Marks the trigger as the active segment of a ButtonGroup. */
+    triggerActive = false,
     triggerTestid = '',
     triggerLabel = '',
     isOpen = $bindable(false),
@@ -186,6 +188,7 @@
     use:melt={$trigger}
     disabled={isDisabled}
     data-testid={triggerTestid || undefined}
+    data-active={triggerActive ? 'true' : undefined}
     aria-label={triggerLabel || triggerText || undefined}
     title={triggerText || undefined}
     onclick={(e) => e.stopPropagation()}

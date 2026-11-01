@@ -130,6 +130,33 @@
             }
           },
           {
+            "Name": "source",
+            "In": "query",
+            "Description": "Exact match on the event source (USER, SCIM, SYSTEM).",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "success",
+            "In": "query",
+            "Description": "Filter by the success flag.",
+            "Required": false,
+            "Schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "Name": "search",
+            "In": "query",
+            "Description": "Case-insensitive substring match on username, resource name, or action type.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
             "Name": "from",
             "In": "query",
             "Description": "Inclusive RFC3339 timestamp bound.",
@@ -5054,6 +5081,16 @@
               "default": false,
               "type": "boolean"
             }
+          },
+          {
+            "Name": "include_has_children",
+            "In": "query",
+            "Description": "Attach has_children to each row, true when the caller can view at least one child. Values true and 1 enable; omitted or other values leave the payload unchanged.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -5256,6 +5293,25 @@
         ]
       }
     },
+    "/items/bulk-labels": {
+      "post": {
+        "description": "Bulk update item labels. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Bulk update item labels",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
     "/items/bulk-patch": {
       "post": {
         "description": "Bulk patch items. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
@@ -5400,6 +5456,41 @@
           "500": {}
         },
         "summary": "Get item changes",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
+    "/items/hierarchy": {
+      "post": {
+        "description": "Returns the matching descendants of up to 500 root items, grouped by root and capped per root. The collection and sub-filter apply to the descendants; the recursive walk is not pruned by the filter, so a matching descendant under a filtered-out intermediate is still returned. Rows are ordered breadth-first so a truncated root keeps complete shallow levels. Inaccessible items and cross-workspace descendants the caller cannot view are omitted.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Read the hierarchy below a set of roots",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
+    "/items/level-counts": {
+      "get": {
+        "description": "Returns the filtered item count for each item-type hierarchy level, applying the same collection, sub-filter, and workspace scope as the item list. Sub-task (-1) is reported but is not a valid level-picker root.",
+        "parameters": [],
+        "responses": {
+          "401": {},
+          "403": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Count visible items per hierarchy level",
         "tags": [
           "Work items"
         ]
@@ -8922,6 +9013,54 @@
         "summary": "Verify a built-in framework pack",
         "tags": [
           "Workspace configuration"
+        ]
+      }
+    },
+    "/pages/summaries": {
+      "get": {
+        "description": "List page summaries across workspaces. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "workspace_ids",
+            "In": "query",
+            "Description": "Comma-separated workspace IDs to include. At most 50 IDs are accepted.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "q",
+            "In": "query",
+            "Description": "Page title and content search text; omit to list every visible page.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "limit",
+            "In": "query",
+            "Description": "Maximum number of search matches.",
+            "Required": false,
+            "Schema": {
+              "default": 12,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List page summaries across workspaces",
+        "tags": [
+          "Knowledge"
         ]
       }
     },

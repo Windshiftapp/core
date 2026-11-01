@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 )
 
@@ -432,31 +433,34 @@ func (r *AgentConversationRepository) BeginTurn(ctx context.Context, in BeginAge
 		`, out.RunID, out.MessageID); err != nil {
 			return err
 		}
-		details, err := json.Marshal(map[string]any{
-			"source":                    "agent_chat",
-			"agent_session_id":          in.SessionID,
-			"agent_message_id":          out.MessageID,
-			"agent_run_id":              out.RunID,
-			"root_initiator_user_id":    in.SenderUserID,
-			"immediate_trigger_user_id": in.SenderUserID,
-			"acting_user_id":            in.ActingUserID,
-			"workspace_id":              in.WorkspaceID,
-		})
-		if err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO audit_logs(
-				timestamp, user_id, username, action_type, resource_type,
-				resource_id, resource_name, details, success
-			) VALUES (?, ?, ?, 'agent.chat.turn', 'agent_session', ?, 'Agent chat turn', ?, true)
-		`, time.Now().UTC(), in.SenderUserID, in.SenderUsername, in.SessionID, string(details)); err != nil {
+		sessionID := in.SessionID
+		if err := logger.LogAuditTx(ctx, tx, logger.AuditEvent{
+			UserID:       in.SenderUserID,
+			Username:     in.SenderUsername,
+			ActionType:   logger.ActionAgentChatTurn,
+			ResourceType: logger.ResourceAgentSession,
+			ResourceID:   &sessionID,
+			ResourceName: "Agent chat turn",
+			Details: map[string]any{
+				"source":                    "agent_chat",
+				"agent_session_id":          in.SessionID,
+				"agent_message_id":          out.MessageID,
+				"agent_run_id":              out.RunID,
+				"root_initiator_user_id":    in.SenderUserID,
+				"immediate_trigger_user_id": in.SenderUserID,
+				"acting_user_id":            in.ActingUserID,
+				"workspace_id":              in.WorkspaceID,
+			},
+			Success: true,
+		}); err != nil {
 			return fmt.Errorf("persist agent turn audit: %w", err)
 		}
-		_, err = tx.ExecContext(ctx, `
+		if _, err := tx.ExecContext(ctx, `
 			UPDATE agent_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?
-		`, in.SessionID)
-		return err
+		`, in.SessionID); err != nil {
+			return err
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err

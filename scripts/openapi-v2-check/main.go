@@ -33,15 +33,16 @@ type tag struct {
 }
 
 type operation struct {
-	OperationID    string                `json:"operationId"`
-	Tags           []string              `json:"tags"`
-	Summary        string                `json:"summary"`
-	Description    string                `json:"description"`
-	Security       []map[string][]string `json:"security"`
-	RequiredScopes []string              `json:"x-required-scopes"`
-	Parameters     []parameter           `json:"parameters"`
-	RequestBody    *requestBody          `json:"requestBody"`
-	Responses      map[string]response   `json:"responses"`
+	OperationID       string                `json:"operationId"`
+	Tags              []string              `json:"tags"`
+	Summary           string                `json:"summary"`
+	Description       string                `json:"description"`
+	Security          []map[string][]string `json:"security"`
+	RequiredScopes    []string              `json:"x-required-scopes"`
+	RequiredAnyScopes []string              `json:"x-required-any-scopes"`
+	Parameters        []parameter           `json:"parameters"`
+	RequestBody       *requestBody          `json:"requestBody"`
+	Responses         map[string]response   `json:"responses"`
 }
 
 type requestBody struct {
@@ -324,6 +325,9 @@ func validateSecurity(route v2.Route, operation operation) {
 	}
 	if strings.Join(operation.RequiredScopes, "\x00") != strings.Join(route.Scopes, "\x00") {
 		fail("route %s %s x-required-scopes do not match its inventory", route.Method, route.Path)
+	}
+	if strings.Join(operation.RequiredAnyScopes, "\x00") != strings.Join(route.ScopesAny, "\x00") {
+		fail("route %s %s x-required-any-scopes do not match its inventory", route.Method, route.Path)
 	}
 }
 

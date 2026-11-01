@@ -1,6 +1,6 @@
 <script>
   import Search from '@lucide/svelte/icons/search';
-  import Sparkles from '@lucide/svelte/icons/sparkles';
+  import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
   import CommandIcon from '@lucide/svelte/icons/command';
   import { authStore } from '../stores/auth.svelte.js';
   import { aiStore } from '../stores/aiStore.svelte.js';
@@ -139,7 +139,7 @@
     </button>
     {#if aiStore.chatAvailable}
       <button class="hdr-search" onclick={() => navigate('/m/chat')} data-testid="mobile-chat-open" aria-label={t('mobile.chat.title')} type="button">
-        <Sparkles size={20} />
+        <IconMessageChatbot size={20} />
       </button>
     {/if}
     <button class="hdr-search" onclick={() => navigate('/m/search')} data-testid="mobile-search-open" aria-label={t('common.search')} type="button">

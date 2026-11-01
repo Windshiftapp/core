@@ -3,6 +3,7 @@ package middleware
 import (
 	"fmt"
 	"log/slog"
+	"net"
 	"strings"
 
 	"windshift/internal/database"
@@ -44,7 +45,7 @@ func (m *SSHAuthMiddleware) PublicKeyHandler() ssh.PublicKeyHandler {
 			return false
 		}
 
-		remoteAddr := ctx.RemoteAddr().String()
+		remoteAddr := hostOnly(ctx.RemoteAddr().String())
 
 		if userCredential == nil {
 			// Log the failed attempt with key fingerprint for security monitoring
@@ -148,4 +149,13 @@ func IsAuthenticated(ctx ssh.Context) bool {
 		return authenticated
 	}
 	return false
+}
+
+// hostOnly strips the ephemeral port from a remote address so SSH audit rows
+// store the same bare-IP shape as HTTP audit rows.
+func hostOnly(addr string) string {
+	if host, _, err := net.SplitHostPort(addr); err == nil {
+		return host
+	}
+	return addr
 }

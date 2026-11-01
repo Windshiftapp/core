@@ -18,7 +18,6 @@ import Building from '@lucide/svelte/icons/building';
 import Calendar from '@lucide/svelte/icons/calendar';
 import Camera from '@lucide/svelte/icons/camera';
 import CheckCircle from '@lucide/svelte/icons/check-circle';
-import CheckSquare from '@lucide/svelte/icons/check-square';
 import Circle from '@lucide/svelte/icons/circle';
 import Clock from '@lucide/svelte/icons/clock';
 import Cloud from '@lucide/svelte/icons/cloud';
@@ -88,6 +87,7 @@ import Settings from '@lucide/svelte/icons/settings';
 import Shield from '@lucide/svelte/icons/shield';
 import ShoppingCart from '@lucide/svelte/icons/shopping-cart';
 import Smile from '@lucide/svelte/icons/smile';
+import CheckSquare from '@lucide/svelte/icons/square-check';
 import Star from '@lucide/svelte/icons/star';
 // Misc icons
 import Tag from '@lucide/svelte/icons/tag';

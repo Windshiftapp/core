@@ -23,7 +23,7 @@
   import Globe from '@lucide/svelte/icons/globe';
   import Building2 from '@lucide/svelte/icons/building-2';
   import Link2 from '@lucide/svelte/icons/link-2';
-  import CheckSquare from '@lucide/svelte/icons/check-square';
+  import CheckSquare from '@lucide/svelte/icons/square-check';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import DataTable from '../components/DataTable.svelte';

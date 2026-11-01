@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sync"
 	"time"
 
 	"github.com/grafana/sobek"
@@ -16,35 +15,19 @@ const (
 	maxScriptLength        = 10240 // 10KB
 )
 
-// pooledVM wraps a sobek.Runtime with a snapshot of its baseline global
-// property names. Cleanup deletes any globals not in the baseline so scripts
-// cannot leak state to the next caller that borrows the same VM.
-type pooledVM struct {
-	vm          *sobek.Runtime
-	baseGlobals map[string]struct{}
-}
-
 // ScriptEngine provides sandboxed JavaScript execution via Sobek (Grafana's goja fork).
 // It is general-purpose and can be reused for computed fields, validation rules, automations, etc.
-type ScriptEngine struct {
-	pool sync.Pool
-}
+//
+// Every execution runs in a fresh sobek runtime. Scripts can mutate built-ins
+// and their prototypes, and sobek cannot restore a mutated realm, so reusing a
+// runtime would let one script change what later executions observe. Creating a
+// runtime costs a couple of microseconds, which is cheap enough that pooling is
+// not worth the cross-execution isolation risk.
+type ScriptEngine struct{}
 
-// NewScriptEngine creates a new script engine with a VM pool.
+// NewScriptEngine creates a new script engine.
 func NewScriptEngine() *ScriptEngine {
-	return &ScriptEngine{
-		pool: sync.Pool{
-			New: func() any {
-				vm := sobek.New()
-				keys := vm.GlobalObject().Keys()
-				base := make(map[string]struct{}, len(keys))
-				for _, k := range keys {
-					base[k] = struct{}{}
-				}
-				return &pooledVM{vm: vm, baseGlobals: base}
-			},
-		},
-	}
+	return &ScriptEngine{}
 }
 
 // Execute runs a JavaScript script with the given variables and returns the result
@@ -53,7 +36,7 @@ func NewScriptEngine() *ScriptEngine {
 // timeoutMs controls execution timeout (0 = default 1s).
 //
 // The exported Go value is safe to use after this function returns; no sobek.Value
-// escapes the pool-managed runtime (which is NOT goroutine-safe).
+// escapes the runtime (which is NOT goroutine-safe).
 func (e *ScriptEngine) Execute(ctx context.Context, script string, vars map[string]any, timeoutMs int) (any, error) {
 	if len(script) > maxScriptLength {
 		return nil, fmt.Errorf("script exceeds maximum length of %d bytes", maxScriptLength)
@@ -63,22 +46,9 @@ func (e *ScriptEngine) Execute(ctx context.Context, script string, vars map[stri
 		timeoutMs = defaultScriptTimeoutMs
 	}
 
-	poolObj := e.pool.Get()
-	pv, ok := poolObj.(*pooledVM)
-	if !ok {
-		return nil, fmt.Errorf("unexpected VM type from pool")
-	}
-	vm := pv.vm
-	defer func() {
-		// Delete any global not in the baseline snapshot — this removes both
-		// vars set below and anything the script may have written to globalThis.
-		for _, k := range vm.GlobalObject().Keys() {
-			if _, base := pv.baseGlobals[k]; !base {
-				_ = vm.GlobalObject().Delete(k)
-			}
-		}
-		e.pool.Put(pv)
-	}()
+	// A fresh runtime per call is the only way to guarantee that built-ins and
+	// their prototypes are pristine; there is no realm reset in sobek.
+	vm := sobek.New()
 
 	// Set variables as globals
 	for key, value := range vars {
@@ -92,9 +62,8 @@ func (e *ScriptEngine) Execute(ctx context.Context, script string, vars map[stri
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	// Interrupt goroutine: must be joined before we touch the VM again, otherwise
-	// a delayed Interrupt could fire on a VM already returned to the pool and
-	// reused by another goroutine.
+	// Interrupt goroutine: join it before returning so no goroutine outlives the
+	// call, even though the discarded runtime cannot be reused.
 	done := make(chan struct{})
 	exited := make(chan struct{})
 	go func() {
@@ -121,7 +90,6 @@ func (e *ScriptEngine) Execute(ctx context.Context, script string, vars map[stri
 	}
 	close(done)
 	<-exited
-	vm.ClearInterrupt()
 
 	if err != nil {
 		// Check if it was a timeout

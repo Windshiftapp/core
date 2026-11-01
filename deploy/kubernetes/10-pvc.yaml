@@ -1,0 +1,17 @@
+# /data holds attachments, plugins, prompts, and (with the default SQLite
+# backend) the database itself. Use a storage class that supports
+# ReadWriteOnce; this example does not set storageClassName so the cluster
+# default is used.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: windshift-data
+  namespace: windshift
+  labels:
+    app.kubernetes.io/name: windshift
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

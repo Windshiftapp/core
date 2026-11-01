@@ -64,7 +64,7 @@ func (h *AssetHandler) SetEveryoneRole(w http.ResponseWriter, r *http.Request) {
 	if req.RoleID != nil {
 		actionType = logger.ActionAssetSetRoleAssign
 	}
-	logAudit(h.db, r, currentUser, actionType, logger.ResourceAssetSetRole, &setID, "")
+	logAudit(h.db, r, currentUser, actionType, logger.ResourceAssetSet, &setID, "")
 
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})

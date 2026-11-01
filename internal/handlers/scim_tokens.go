@@ -193,7 +193,7 @@ func (h *SCIMTokenHandler) DisconnectSCIM(w http.ResponseWriter, r *http.Request
 
 	if currentUser != nil {
 		h.auditor.LogWithDetails(r, currentUser,
-			logger.ActionSCIMTokenRevoke, logger.ResourceSCIMToken,
+			logger.ActionSCIMDisconnect, logger.ResourceSCIMToken,
 			nil, "scim-disconnect",
 			map[string]any{
 				"revoked_tokens":       summary.ActiveTokens,

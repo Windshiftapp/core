@@ -14,6 +14,7 @@ import (
 	"windshift/internal/csvimport"
 	"windshift/internal/database"
 	"windshift/internal/itemevents"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
@@ -116,7 +117,7 @@ func (s *TicketImportService) Start(ctx context.Context, actor AuditActor, works
 		return nil, err
 	}
 	if claimed {
-		emitServiceAudit(s.db, actor, "ticket_import", "workspace", &workspaceID, "", map[string]any{"upload_id": input.UploadID})
+		emitServiceAudit(s.db, actor, logger.ActionTicketImport, logger.ResourceWorkspace, &workspaceID, "", map[string]any{"upload_id": input.UploadID})
 		go s.run(workspaceID, input.UploadID, path, hasHeader, csvimport.ParseDelimiter(input.Delimiter), actor.UserID)
 	}
 	return s.getJob(workspaceID, input.UploadID)

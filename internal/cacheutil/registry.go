@@ -15,6 +15,19 @@ type cacheRegistration struct {
 	evictions atomic.Uint64
 }
 
+func (r *cacheRegistration) cacheSnapshot(name string) Snapshot {
+	stats := r.cache.Stats()
+	return Snapshot{
+		Name:                   name,
+		Entries:                r.cache.Len(),
+		AllocatedCapacityBytes: int64(r.cache.Capacity()),
+		MaximumCapacityBytes:   r.maxBytes,
+		Hits:                   stats.Hits,
+		Misses:                 stats.Misses,
+		NoSpaceEvictions:       r.evictions.Load(),
+	}
+}
+
 // Snapshot describes one live process-local cache.
 type Snapshot struct {
 	Name                   string `json:"name"`
@@ -26,38 +39,35 @@ type Snapshot struct {
 	NoSpaceEvictions       uint64 `json:"no_space_evictions"`
 }
 
+// snapshotSource is implemented by every registered cache. Unexported so only
+// cacheutil types can register.
+type snapshotSource interface {
+	cacheSnapshot(name string) Snapshot
+}
+
 var cacheRegistry = struct {
 	sync.RWMutex
-	entries map[string]*cacheRegistration
-}{entries: make(map[string]*cacheRegistration)}
+	entries map[string]snapshotSource
+}{entries: make(map[string]snapshotSource)}
 
-func registerCache(registration *cacheRegistration) {
+func registerCache(name string, source snapshotSource) {
 	cacheRegistry.Lock()
-	cacheRegistry.entries[registration.name] = registration
+	cacheRegistry.entries[name] = source
 	cacheRegistry.Unlock()
 }
 
 // Snapshots returns stable, name-sorted diagnostics for registered caches.
 func Snapshots() []Snapshot {
 	cacheRegistry.RLock()
-	registrations := make([]*cacheRegistration, 0, len(cacheRegistry.entries))
-	for _, registration := range cacheRegistry.entries {
-		registrations = append(registrations, registration)
+	sources := make(map[string]snapshotSource, len(cacheRegistry.entries))
+	for name, source := range cacheRegistry.entries {
+		sources[name] = source
 	}
 	cacheRegistry.RUnlock()
 
-	snapshots := make([]Snapshot, 0, len(registrations))
-	for _, registration := range registrations {
-		stats := registration.cache.Stats()
-		snapshots = append(snapshots, Snapshot{
-			Name:                   registration.name,
-			Entries:                registration.cache.Len(),
-			AllocatedCapacityBytes: int64(registration.cache.Capacity()),
-			MaximumCapacityBytes:   registration.maxBytes,
-			Hits:                   stats.Hits,
-			Misses:                 stats.Misses,
-			NoSpaceEvictions:       registration.evictions.Load(),
-		})
+	snapshots := make([]Snapshot, 0, len(sources))
+	for name, source := range sources {
+		snapshots = append(snapshots, source.cacheSnapshot(name))
 	}
 	sort.Slice(snapshots, func(i, j int) bool { return snapshots[i].Name < snapshots[j].Name })
 	return snapshots

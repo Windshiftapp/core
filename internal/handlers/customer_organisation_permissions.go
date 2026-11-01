@@ -109,7 +109,7 @@ func (h *CustomerOrganisationPermissionHandler) AddMember(w http.ResponseWriter,
 		return
 	}
 
-	h.auditor.LogWithDetails(r, user, logger.ActionCustomerOrgAddMember, logger.ResourceTimeCustomer, &orgID, "", map[string]any{"member_id": req.MemberID})
+	h.auditor.LogWithDetails(r, user, logger.ActionCustomerOrgAddMember, logger.ResourceCustomerOrganisation, &orgID, "", map[string]any{"member_id": req.MemberID})
 	respondJSONCreated(w, member)
 }
 
@@ -147,7 +147,7 @@ func (h *CustomerOrganisationPermissionHandler) RemoveMember(w http.ResponseWrit
 		return
 	}
 
-	h.auditor.LogWithDetails(r, user, logger.ActionCustomerOrgRemoveMember, logger.ResourceTimeCustomer, &orgID, "", map[string]any{"member_id": memberID})
+	h.auditor.LogWithDetails(r, user, logger.ActionCustomerOrgRemoveMember, logger.ResourceCustomerOrganisation, &orgID, "", map[string]any{"member_id": memberID})
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -214,7 +214,7 @@ func (h *CustomerOrganisationPermissionHandler) AddManager(w http.ResponseWriter
 		return
 	}
 
-	h.auditor.LogWithDetails(r, user, logger.ActionCustomerOrgAddManager, logger.ResourceTimeCustomer, &orgID, "", map[string]any{"manager_id": req.ManagerID})
+	h.auditor.LogWithDetails(r, user, logger.ActionCustomerOrgAddManager, logger.ResourceCustomerOrganisation, &orgID, "", map[string]any{"manager_id": req.ManagerID})
 	respondJSONCreated(w, manager)
 }
 
@@ -268,6 +268,6 @@ func (h *CustomerOrganisationPermissionHandler) RemoveManager(w http.ResponseWri
 		return
 	}
 
-	h.auditor.LogWithDetails(r, user, logger.ActionCustomerOrgRemoveManager, logger.ResourceTimeCustomer, &orgID, "", map[string]any{"manager_id": managerID})
+	h.auditor.LogWithDetails(r, user, logger.ActionCustomerOrgRemoveManager, logger.ResourceCustomerOrganisation, &orgID, "", map[string]any{"manager_id": managerID})
 	w.WriteHeader(http.StatusNoContent)
 }

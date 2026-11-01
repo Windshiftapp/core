@@ -4,8 +4,10 @@ import (
 	"errors"
 	"net/http"
 
+	"windshift/internal/logger"
 	"windshift/internal/objecttranslation"
 	"windshift/internal/restapi"
+	"windshift/internal/restapi/v1/middleware"
 )
 
 // ObjectTranslationHandler exposes instance translation administration to API tokens.
@@ -108,6 +110,14 @@ func (h *ObjectTranslationHandler) Upsert(w http.ResponseWriter, r *http.Request
 		h.respondTranslationError(w, r, err)
 		return
 	}
+	if user := middleware.GetUser(r.Context()); user != nil {
+		h.Auditor.LogWithDetails(r, user, logger.ActionObjectTranslationUpdate, logger.ResourceObjectTranslation, &objectID, r.PathValue("objectType"), map[string]any{
+			"object_type": r.PathValue("objectType"),
+			"field":       r.PathValue("field"),
+			"locale":      r.PathValue("locale"),
+			"value":       request.Value,
+		})
+	}
 	h.RespondOK(w, translation)
 }
 
@@ -138,6 +148,13 @@ func (h *ObjectTranslationHandler) Delete(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		h.respondTranslationError(w, r, err)
 		return
+	}
+	if user := middleware.GetUser(r.Context()); user != nil {
+		h.Auditor.LogWithDetails(r, user, logger.ActionObjectTranslationDelete, logger.ResourceObjectTranslation, &objectID, r.PathValue("objectType"), map[string]any{
+			"object_type": r.PathValue("objectType"),
+			"field":       r.PathValue("field"),
+			"locale":      r.PathValue("locale"),
+		})
 	}
 	h.RespondNoContent(w)
 }

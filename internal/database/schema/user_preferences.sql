@@ -3,6 +3,10 @@ CREATE TABLE IF NOT EXISTS user_preferences (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	user_id INTEGER NOT NULL UNIQUE,
 	preferences TEXT NOT NULL DEFAULT '{}',
+	-- Per-user due-date reminder opt-in. Queryable columns (not JSON) so the
+	-- reminder sweep can filter opted-in recipients in one query.
+	due_date_reminders_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+	due_date_reminder_days INTEGER NOT NULL DEFAULT 3,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

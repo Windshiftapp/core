@@ -1,4 +1,5 @@
-import { channelIntakes, channels as channelsApi } from '../../api/channels.js';
+import { channels as channelsApi } from '../../api/channels.js';
+import { BACKGROUND_READ } from '../../api/readScheduler.js';
 
 export function parseChannelConfig(config) {
   if (config == null) return {};
@@ -22,28 +23,25 @@ export function parseChannelConfig(config) {
 
 /**
  * Email channels whose tickets surface in a portal. An intake linked to the
- * portal (portal_channel_id) is the only link since WI-1644.
+ * portal (portal_channel_id) is the only link since WI-1644. The channel list
+ * carries its intakes, so this resolves every mailbox in one background read
+ * instead of one intake request per channel; a failed load rejects rather
+ * than masquerading as "no connected mailboxes".
  */
 export async function loadPortalConnectedMailboxes(portalId) {
-  const emailChannels = await channelsApi.getAll({
-    type: 'email',
-    direction: 'inbound',
-    include_disabled: true,
-  });
+  const emailChannels = await channelsApi.getAll(
+    {
+      type: 'email',
+      direction: 'inbound',
+      include_disabled: true,
+      include_intakes: true,
+    },
+    BACKGROUND_READ
+  );
   const channels = Array.isArray(emailChannels) ? emailChannels : [];
-  const linked = [];
-  for (const channel of channels) {
-    let intakes = [];
-    try {
-      intakes = (await channelIntakes.list(channel.id)) ?? [];
-    } catch {
-      intakes = [];
-    }
-    if (intakes.some((intake) => intake.portal_channel_id === portalId)) {
-      linked.push(channel);
-    }
-  }
-  return linked;
+  return channels.filter((channel) =>
+    (channel.intakes ?? []).some((intake) => intake.portal_channel_id === portalId)
+  );
 }
 
 export function channelBasicFormData(channel) {

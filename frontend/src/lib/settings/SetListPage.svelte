@@ -164,7 +164,7 @@
   <div class="space-y-3" data-testid={config.listTestid}>
     {#each filtered as item (item.id)}
       <Panel padding="spacious" hoverable>
-        <div class="flex items-center justify-between" data-testid={`${config.rowTestidPrefix}-${item.id}`}>
+        <div class="flex items-center justify-between" data-testid={`${config.rowTestidPrefix}-row-${item.id}`}>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-3 mb-2">
               <h3 class="text-lg font-medium" style="color: var(--ds-text);">{item.name}</h3>

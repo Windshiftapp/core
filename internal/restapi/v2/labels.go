@@ -9,6 +9,7 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
+	"windshift/internal/validation"
 )
 
 func registerLabelRoutes(builder *routeBuilder, deps Deps) {
@@ -19,6 +20,7 @@ func registerLabelRoutes(builder *routeBuilder, deps Deps) {
 	builder.JSON(http.MethodPut, "/items/{item_id}/labels", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, setItemLabels(deps))
 	builder.JSON(http.MethodPost, "/items/{item_id}/labels", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, addItemLabel(deps))
 	builder.Command(http.MethodDelete, "/items/{item_id}/labels/{label_id}", AuthAuthenticated, []string{"items:write"}, removeItemLabel(deps))
+	builder.JSON(http.MethodPost, "/items/bulk-labels", http.StatusOK, false, AuthAuthenticated, []string{"items:write"}, bulkItemLabels(deps))
 }
 
 type labelCreateRequest struct {
@@ -37,6 +39,13 @@ type labelIDsRequest struct {
 
 type labelIDRequest struct {
 	LabelID int `json:"label_id"`
+}
+
+type itemBulkLabelsRequest struct {
+	ItemIDs []int  `json:"item_ids"`
+	Add     []int  `json:"add,omitempty"`
+	Remove  []int  `json:"remove,omitempty"`
+	Set     *[]int `json:"set"`
 }
 
 func createLabel(deps Deps) jsonOperation[labelCreateRequest, labelDTO] {
@@ -159,6 +168,49 @@ func removeItemLabel(deps Deps) commandOperation {
 		}
 		return nil
 	}
+}
+
+// bulkItemLabels applies add/remove/set to up to 500 items in one request so
+// the board does not fan out one PUT per selected item. Items that cannot be
+// updated are returned in Failures while the rest commit.
+func bulkItemLabels(deps Deps) jsonOperation[itemBulkLabelsRequest, services.BulkLabelResult] {
+	return func(r *http.Request, input itemBulkLabelsRequest) (services.BulkLabelResult, error) {
+		user, err := principal(r)
+		if err != nil {
+			return services.BulkLabelResult{}, err
+		}
+		result, err := deps.Labels.BulkApply(auditActorFromRequest(r), services.BulkLabelOperation{
+			ItemIDs: input.ItemIDs, Add: input.Add, Remove: input.Remove, Set: input.Set,
+		}, func(workspaceID int) (bool, error) {
+			return deps.Access.CanEditWorkspace(user.ID, workspaceID)
+		})
+		if err != nil {
+			return services.BulkLabelResult{}, bulkLabelError(err)
+		}
+		return result, nil
+	}
+}
+
+func bulkLabelError(err error) error {
+	if err == nil {
+		return nil
+	}
+	switch {
+	case errors.Is(err, repository.ErrNotFound), errors.Is(err, sql.ErrNoRows):
+		return newError(http.StatusNotFound, "not_found", "Label was not found")
+	case errors.Is(err, services.ErrLabelNameRequired), errors.Is(err, services.ErrLabelIDRequired):
+		return newError(http.StatusBadRequest, "invalid_request", err.Error())
+	}
+	var validationError *validation.ValidationError
+	if errors.As(err, &validationError) {
+		apiErr := newError(http.StatusBadRequest, "validation_failed", err.Error())
+		apiErr.Details = map[string]string{"field": validationError.Field}
+		return apiErr
+	}
+	if errors.Is(err, services.ErrBulkItemLimit) {
+		return newError(http.StatusBadRequest, "validation_failed", err.Error())
+	}
+	return internalError(err)
 }
 
 func requireItem(r *http.Request, deps Deps, allowed func(int, int) (bool, error)) (*models.Item, error) {

@@ -141,6 +141,36 @@ func (r *IntakeRepository) ListEnabledForMailbox(ctx context.Context, mailboxID 
 	return scanIntakes(rows)
 }
 
+// ListByMailboxes returns every intake reading from the given mailboxes in
+// one query, grouped by mailbox id. Mailboxes without intakes are absent from
+// the map. Used to attach intake linkage to a channel listing without one
+// request per channel.
+func (r *IntakeRepository) ListByMailboxes(ctx context.Context, mailboxIDs []int) (map[int][]models.Intake, error) {
+	out := make(map[int][]models.Intake)
+	placeholders, args := inPlaceholders(mailboxIDs)
+	if placeholders == "" {
+		return out, nil
+	}
+	rows, err := r.db.QueryContext(ctx, `SELECT`+intakeSelectColumns+intakeFromJoins+`
+		WHERE i.mailbox_id IN (`+placeholders+`)
+		ORDER BY i.mailbox_id, i.folder, i.id`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list intakes for mailboxes: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		in, scanErr := scanIntake(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scan intake: %w", scanErr)
+		}
+		out[in.MailboxID] = append(out[in.MailboxID], in)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate intakes: %w", err)
+	}
+	return out, nil
+}
+
 // ListByPortal returns the intakes that expose requests to a portal.
 func (r *IntakeRepository) ListByPortal(ctx context.Context, portalChannelID int) ([]models.Intake, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT`+intakeSelectColumns+intakeFromJoins+`
@@ -148,18 +178,6 @@ func (r *IntakeRepository) ListByPortal(ctx context.Context, portalChannelID int
 		ORDER BY i.folder, i.id`, portalChannelID)
 	if err != nil {
 		return nil, fmt.Errorf("list intakes for portal %d: %w", portalChannelID, err)
-	}
-	defer func() { _ = rows.Close() }()
-	return scanIntakes(rows)
-}
-
-// ListByWorkspace returns the intakes routing into a workspace.
-func (r *IntakeRepository) ListByWorkspace(ctx context.Context, workspaceID int) ([]models.Intake, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT`+intakeSelectColumns+intakeFromJoins+`
-		WHERE i.workspace_id = ?
-		ORDER BY i.folder, i.id`, workspaceID)
-	if err != nil {
-		return nil, fmt.Errorf("list intakes for workspace %d: %w", workspaceID, err)
 	}
 	defer func() { _ = rows.Close() }()
 	return scanIntakes(rows)
@@ -293,16 +311,6 @@ func (r *IntakeRepository) DeleteByWorkspaceTx(tx database.Tx, workspaceID int) 
 		`DELETE FROM intakes WHERE workspace_id = ?`, workspaceID,
 	); err != nil {
 		return fmt.Errorf("delete intakes for workspace %d: %w", workspaceID, err)
-	}
-	return nil
-}
-
-// DeleteByPortalTx removes every intake exposing requests to a deleted portal.
-func (r *IntakeRepository) DeleteByPortalTx(tx database.Tx, portalChannelID int) error {
-	if _, err := tx.Exec(
-		`DELETE FROM intakes WHERE portal_channel_id = ?`, portalChannelID,
-	); err != nil {
-		return fmt.Errorf("delete intakes for portal %d: %w", portalChannelID, err)
 	}
 	return nil
 }

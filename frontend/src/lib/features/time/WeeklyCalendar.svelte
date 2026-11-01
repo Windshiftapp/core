@@ -4,7 +4,7 @@
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Calendar from '@lucide/svelte/icons/calendar';
-  import CheckSquare from '@lucide/svelte/icons/check-square';
+  import CheckSquare from '@lucide/svelte/icons/square-check';
   import X from '@lucide/svelte/icons/x';
   import Download from '@lucide/svelte/icons/download';
   import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';

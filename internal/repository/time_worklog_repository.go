@@ -99,15 +99,15 @@ func NewTimeWorklogRepository(db database.Database) *TimeWorklogRepository {
 	return &TimeWorklogRepository{db: db}
 }
 
-const worklogDetailSelect = `SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
+const worklogDetailSelect = `SELECT w.id, w.project_id, c.id, w.item_id, w.description, w.date, w.start_time,
        w.end_time, w.duration_minutes, w.created_at, w.updated_at,
        c.name, COALESCE(c.builtin_key, ''), p.name, i.title, ws.id, ws.key, i.workspace_item_number,
        p.settings,
        (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = w.project_id),
        w.user_id, COALESCE(u.first_name || ' ' || u.last_name, '')
 FROM time_worklogs w
-JOIN customer_organisations c ON w.customer_id = c.id
 JOIN time_projects p ON w.project_id = p.id
+JOIN customer_organisations c ON p.customer_id = c.id
 LEFT JOIN items i ON w.item_id = i.id
 LEFT JOIN workspaces ws ON i.workspace_id = ws.id
 LEFT JOIN users u ON w.user_id = u.id`
@@ -204,10 +204,10 @@ func (r *TimeWorklogRepository) StreamAggregateInputs(ctx context.Context, filte
 	where, args := worklogDetailWhere(filter)
 	query := `SELECT w.start_time, w.end_time, w.duration_minutes,
 	       w.user_id, COALESCE(u.first_name || ' ' || u.last_name, ''),
-	       w.project_id, p.name, w.customer_id, c.name, COALESCE(c.builtin_key, '')
+	       w.project_id, p.name, c.id, c.name, COALESCE(c.builtin_key, '')
 	FROM time_worklogs w
-	JOIN customer_organisations c ON w.customer_id = c.id
 	JOIN time_projects p ON w.project_id = p.id
+	JOIN customer_organisations c ON p.customer_id = c.id
 	LEFT JOIN users u ON w.user_id = u.id
 	` + where + "\n ORDER BY w.start_time ASC, w.id ASC"
 
@@ -274,7 +274,7 @@ func (r *TimeWorklogRepository) ListDetailsPage(filter WorklogDetailFilter) ([]m
 	}
 	where, args := worklogDetailWhere(filter)
 	var total int
-	if err := r.db.QueryRow("SELECT COUNT(*) FROM time_worklogs w "+where, args...).Scan(&total); err != nil {
+	if err := r.db.QueryRow("SELECT COUNT(*) FROM time_worklogs w JOIN time_projects p ON w.project_id = p.id "+where, args...).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("count worklog details: %w", err)
 	}
 	items, err := r.ListDetails(filter)
@@ -305,7 +305,7 @@ func worklogDetailWhere(filter WorklogDetailFilter) (query string, args []any) {
 		query += " AND w.project_id IN (" + strings.Join(placeholders, ",") + ")"
 	}
 	if filter.CustomerID != nil {
-		query += " AND w.customer_id = ?"
+		query += " AND p.customer_id = ?"
 		args = append(args, *filter.CustomerID)
 	}
 	if filter.ProjectID != nil {
@@ -343,7 +343,6 @@ func (r *TimeWorklogRepository) GetDetail(worklogID int) (*models.Worklog, error
 // start/end times are unix seconds, matching the table's storage format.
 type NewWorklog struct {
 	ProjectID       int
-	CustomerID      int64
 	UserID          int
 	ItemID          *int // nil when the worklog isn't linked to a work item
 	Description     string
@@ -356,7 +355,6 @@ type NewWorklog struct {
 // ImportedWorklog preserves source timestamps and permits an unresolved user.
 type ImportedWorklog struct {
 	ProjectID       int
-	CustomerID      int64
 	UserID          *int
 	ItemID          int
 	Description     string
@@ -373,10 +371,10 @@ func (r *TimeWorklogRepository) CreateImported(in ImportedWorklog) (int64, error
 	var id int64
 	err := r.db.QueryRow(`
 		INSERT INTO time_worklogs
-			(project_id, customer_id, user_id, item_id, description, date,
+			(project_id, user_id, item_id, description, date,
 			 start_time, end_time, duration_minutes, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-	`, in.ProjectID, in.CustomerID, in.UserID, in.ItemID, in.Description,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+	`, in.ProjectID, in.UserID, in.ItemID, in.Description,
 		in.DateUnix, in.StartTimeUnix, in.EndTimeUnix, in.DurationMinutes,
 		in.CreatedAtUnix, in.UpdatedAtUnix).Scan(&id)
 	if err != nil {
@@ -389,7 +387,6 @@ func (r *TimeWorklogRepository) CreateImported(in ImportedWorklog) (int64, error
 type UpdateWorklog struct {
 	ID              int
 	ProjectID       int
-	CustomerID      int
 	ItemID          *int
 	Description     string
 	DateUnix        int64
@@ -402,10 +399,10 @@ type UpdateWorklog struct {
 func (r *TimeWorklogRepository) Update(in UpdateWorklog) error {
 	_, err := r.db.ExecWrite(`
 		UPDATE time_worklogs
-		SET project_id = ?, customer_id = ?, item_id = ?, description = ?, date = ?,
+		SET project_id = ?, item_id = ?, description = ?, date = ?,
 		    start_time = ?, end_time = ?, duration_minutes = ?, updated_at = ?
 		WHERE id = ?
-	`, in.ProjectID, in.CustomerID, in.ItemID, in.Description, in.DateUnix,
+	`, in.ProjectID, in.ItemID, in.Description, in.DateUnix,
 		in.StartTimeUnix, in.EndTimeUnix, in.DurationMinutes, time.Now().Unix(), in.ID)
 	if err != nil {
 		return fmt.Errorf("update worklog: %w", err)
@@ -419,9 +416,9 @@ func (r *TimeWorklogRepository) Create(in NewWorklog) (int64, error) {
 	now := time.Now().Unix()
 	var id int64
 	err := r.db.QueryRow(`
-		INSERT INTO time_worklogs (project_id, customer_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-		in.ProjectID, in.CustomerID, in.UserID, in.ItemID, in.Description,
+		INSERT INTO time_worklogs (project_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+		in.ProjectID, in.UserID, in.ItemID, in.Description,
 		in.DateUnix, in.StartTimeUnix, in.EndTimeUnix, in.DurationMinutes, now, now,
 	).Scan(&id)
 	if err != nil {
@@ -447,14 +444,14 @@ type WorklogListFilter struct {
 // project budget figures) populated. The second return value is the total
 // match count before pagination.
 func (r *TimeWorklogRepository) ListForUser(f WorklogListFilter) ([]models.Worklog, int, error) {
-	query := `SELECT w.id, w.project_id, w.customer_id, w.item_id, w.description, w.date, w.start_time,
+	query := `SELECT w.id, w.project_id, c.id, w.item_id, w.description, w.date, w.start_time,
 	       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
 	       c.name, COALESCE(c.builtin_key, ''), p.name, i.title, ws.id, ws.key, i.workspace_item_number,
 	       p.settings as project_settings,
 	       (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = w.project_id) as project_total_hours
 	FROM time_worklogs w
-	JOIN customer_organisations c ON w.customer_id = c.id
 	JOIN time_projects p ON w.project_id = p.id
+	JOIN customer_organisations c ON p.customer_id = c.id
 	LEFT JOIN items i ON w.item_id = i.id
 	LEFT JOIN workspaces ws ON i.workspace_id = ws.id
 	WHERE w.user_id = ?`

@@ -3,7 +3,7 @@
   import ColorDot from '../../components/ColorDot.svelte';
   import { ai, llmProviders } from '../../api/ai.js';
   import { fetchAPI } from '../../api/core.js';
-  import Sparkles from '@lucide/svelte/icons/sparkles';
+  import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
   import CalendarPlus from '@lucide/svelte/icons/calendar-plus';
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import CheckCircle from '@lucide/svelte/icons/check-circle';
@@ -116,7 +116,7 @@
   data-testid="plan-my-day-view"
 >
   <PageHeader
-    icon={Sparkles}
+    icon={IconMessageChatbot}
     title="Plan My Day"
     subtitle="AI-powered daily planning based on your assigned items"
   />
@@ -127,7 +127,7 @@
       <Card variant="raised" padding="default">
         <div class="flex flex-col items-center py-8 gap-4">
           <div class="rounded-full p-4" style="background-color: var(--ds-surface-sunken);">
-            <Sparkles size={32} style="color: var(--ds-text-subtle);" />
+            <IconMessageChatbot size={32} style="color: var(--ds-text-subtle);" />
           </div>
           <p class="text-sm" style="color: var(--ds-text-subtle);">
             Generate a prioritized daily schedule from your open work items.

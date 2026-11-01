@@ -125,9 +125,7 @@ func RunRows(store progressSink, jobID, path string, delimiter rune, hasHeader b
 	}
 }
 
-// MarshalProgress encodes progress for the job row's progress_json column.
-func MarshalProgress(progress *Progress) string { return marshalProgress(progress) }
-
+// marshalProgress encodes progress for the job row's progress_json column.
 func marshalProgress(progress *Progress) string {
 	data, err := json.Marshal(progress)
 	if err != nil {

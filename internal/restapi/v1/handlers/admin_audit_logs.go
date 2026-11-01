@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/repository"
 	"windshift/internal/restapi"
+	"windshift/internal/restapi/v1/middleware"
 	"windshift/internal/services"
 )
 
@@ -42,6 +44,7 @@ type AuditLogEntryResponse struct {
 	Details      map[string]any `json:"details,omitempty"`
 	Success      bool           `json:"success"`
 	ErrorMessage string         `json:"error_message,omitempty"`
+	Source       string         `json:"source,omitempty"`
 }
 
 // List handles GET /rest/api/v1/admin/audit-logs
@@ -73,33 +76,10 @@ func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 	pagination := h.ParsePagination(r)
 	q := r.URL.Query()
 
-	filters := repository.AuditLogFilters{
-		ActionType:   q.Get("action_type"),
-		ResourceType: q.Get("resource_type"),
-	}
-	if v := q.Get("user_id"); v != "" {
-		uid, err := strconv.Atoi(v)
-		if err != nil {
-			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid user_id"))
-			return
-		}
-		filters.UserID = &uid
-	}
-	if v := q.Get("from"); v != "" {
-		t, err := time.Parse(time.RFC3339, v)
-		if err != nil {
-			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid from (expected RFC3339)"))
-			return
-		}
-		filters.From = &t
-	}
-	if v := q.Get("to"); v != "" {
-		t, err := time.Parse(time.RFC3339, v)
-		if err != nil {
-			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid to (expected RFC3339)"))
-			return
-		}
-		filters.To = &t
+	filters, err := repository.ParseAuditLogFilters(q)
+	if err != nil {
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, err.Error()))
+		return
 	}
 
 	repo := repository.NewAuditLogRepository(h.DB)
@@ -110,6 +90,14 @@ func (h *AdminAuditLogHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	entries := mapAuditLogRowsToResponses(rows)
+
+	if user := middleware.GetUser(r.Context()); user != nil {
+		details := filters.Details()
+		details["count"] = len(entries)
+		details["total"] = total
+		details["page"] = pagination.Page
+		h.Auditor.LogWithDetails(r, user, logger.ActionAuditLogRead, logger.ResourceAuditLog, nil, "audit_log", details)
+	}
 
 	h.RespondPaginated(w, entries, pagination, total)
 }
@@ -183,6 +171,14 @@ func (h *AdminAuditLogHandler) ListSince(w http.ResponseWriter, r *http.Request)
 		nextAfterID = entries[len(entries)-1].ID
 	}
 
+	if user := middleware.GetUser(r.Context()); user != nil {
+		h.Auditor.LogWithDetails(r, user, logger.ActionAuditLogStream, logger.ResourceAuditLog, nil, "audit_log", map[string]any{
+			"after_id": afterID,
+			"limit":    limit,
+			"count":    len(entries),
+		})
+	}
+
 	h.RespondOK(w, AuditLogStreamResponse{
 		Entries:     entries,
 		NextAfterID: nextAfterID,
@@ -207,6 +203,7 @@ func mapAuditLogRowsToResponses(rows []repository.AuditLogRow) []AuditLogEntryRe
 			Details:      e.Details,
 			Success:      e.Success,
 			ErrorMessage: e.ErrorMessage,
+			Source:       e.Source,
 		})
 	}
 	return entries

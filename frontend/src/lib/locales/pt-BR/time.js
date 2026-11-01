@@ -182,6 +182,7 @@ export default {
       emailOptional: 'E-mail (Opcional)',
       contactPersonOptional: 'Pessoa de Contato (Opcional)',
       failedToSave: 'Falha ao salvar organizacao',
+      failedToDelete: 'Falha ao excluir organizacao',
       deleteOrganization: 'Excluir Organizacao',
       confirmDelete: 'Tem certeza de que deseja excluir "{name}"?',
     },

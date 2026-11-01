@@ -82,9 +82,12 @@ type Item struct {
 	PriorityColor             string `json:"priority_color,omitempty"`
 	ParentTitle               string `json:"parent_title,omitempty"`
 	ParentWorkspaceItemNumber *int   `json:"parent_workspace_item_number,omitempty"` // Parent's workspace-scoped number, for rendering the parent key
-	StatusName                string `json:"status_name,omitempty"`                  // Name from statuses table (joined field)
-	StatusBuiltinKey          string `json:"status_builtin_key,omitempty"`           // Stable key for translating built-in statuses
-	StatusColor               string `json:"status_color,omitempty"`                 // Color from the status category (joined field)
+	// HasChildren is set only by list reads that opt into hierarchy support. It
+	// is true when at least one child exists in a workspace the caller can view.
+	HasChildren      bool   `json:"has_children,omitempty"`
+	StatusName       string `json:"status_name,omitempty"`        // Name from statuses table (joined field)
+	StatusBuiltinKey string `json:"status_builtin_key,omitempty"` // Stable key for translating built-in statuses
+	StatusColor      string `json:"status_color,omitempty"`       // Color from the status category (joined field)
 	// StatusSince is when the item last entered its current status, derived from
 	// item_history (falls back to created_at when there is no recorded change).
 	StatusSince      *time.Time `json:"status_since,omitempty"`
@@ -121,14 +124,13 @@ type Item struct {
 	ChannelName     string `json:"channel_name,omitempty"`      // Name of the portal/channel
 	RequestTypeName string `json:"request_type_name,omitempty"` // Name of the request type
 	// Related work item joined fields (for personal tasks)
-	RelatedWorkItemTitle        string          `json:"related_work_item_title,omitempty"`
-	RelatedWorkItemWorkspaceKey string          `json:"related_work_item_workspace_key,omitempty"`
-	RelatedWorkItemWorkspaceID  int             `json:"related_work_item_workspace_id,omitempty"`
-	RelatedWorkItemNumber       int             `json:"related_work_item_number,omitempty"`
-	Children                    []Item          `json:"children,omitempty"` // For tree representations
-	Labels                      []Label         `json:"labels,omitempty"`   // Global item labels
-	PersonalLabels              []PersonalLabel `json:"personal_labels,omitempty"`
-	Milestones                  []Milestone     `json:"milestones,omitempty"`
+	RelatedWorkItemTitle        string      `json:"related_work_item_title,omitempty"`
+	RelatedWorkItemWorkspaceKey string      `json:"related_work_item_workspace_key,omitempty"`
+	RelatedWorkItemWorkspaceID  int         `json:"related_work_item_workspace_id,omitempty"`
+	RelatedWorkItemNumber       int         `json:"related_work_item_number,omitempty"`
+	Children                    []Item      `json:"children,omitempty"` // For tree representations
+	Labels                      []Label     `json:"labels,omitempty"`   // Global item labels
+	Milestones                  []Milestone `json:"milestones,omitempty"`
 }
 
 // TimeRollup is the rolled-up estimate/logged total for an item plus its
@@ -483,16 +485,6 @@ type CollectionCategory struct {
 	Description string    `json:"description"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
-}
-
-// PersonalLabel represents a label for organizing personal tasks
-type PersonalLabel struct {
-	ID        int       `json:"id"`
-	Name      string    `json:"name"`
-	Color     string    `json:"color"`
-	UserID    *int      `json:"user_id,omitempty"` // NULL for global labels, user_id for user-specific labels
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // RelationshipGraphNode represents a node in the asset relationship graph
