@@ -58,6 +58,7 @@
    *   onAfterSave?: () => void,
    *   onAfterDelete?: () => void,
    *   onError?: (err: any, phase: 'load' | 'save' | 'delete', item: any) => boolean | void,
+   *   onReady?: (helpers: { reload: () => void }) => void,
    *   errorLabels?: { load?: string, save?: string, delete?: string },
    *   formFields?: import('svelte').Snippet | null,
    *   formModal?: import('svelte').Snippet<[{ item: any, save: () => void, close: () => void, saving: boolean }]> | null,
@@ -103,6 +104,7 @@
     onAfterSave = undefined,
     onAfterDelete = undefined,
     onError = undefined,
+    onReady = undefined,
     errorLabels = {},
     formFields = null,
     formModal = null,
@@ -143,7 +145,10 @@
     }
   }
 
-  onMount(reload);
+  onMount(() => {
+    void reload();
+    onReady?.({ reload });
+  });
 
   function startCreate() {
     editingItem = null;
