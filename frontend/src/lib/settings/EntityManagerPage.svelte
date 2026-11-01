@@ -59,7 +59,8 @@
    *   onAfterDelete?: () => void,
    *   onError?: (err: any, phase: 'load' | 'save' | 'delete', item: any) => boolean | void,
    *   errorLabels?: { load?: string, save?: string, delete?: string },
-   *   formFields: import('svelte').Snippet,
+   *   formFields?: import('svelte').Snippet | null,
+   *   formModal?: import('svelte').Snippet<[{ item: any, save: () => void, close: () => void, saving: boolean }]> | null,
    *   actionsCell?: import('svelte').Snippet<[any, any]> | null,
    *   cellSnippets?: Record<string, import('svelte').Snippet<[any]>>,
    *   extraData?: any,
@@ -103,7 +104,8 @@
     onAfterDelete = undefined,
     onError = undefined,
     errorLabels = {},
-    formFields,
+    formFields = null,
+    formModal = null,
     actionsCell = null,
     cellSnippets = {},
     extraData = undefined,
@@ -116,9 +118,9 @@
   let showForm = $state(false);
   let editingItem = $state(null);
 
-  function reportError(err, phase) {
+  function reportError(err, phase, item = editingItem) {
     // Returning false lets the scaffold fall back to its own error banner.
-    if (onError && onError(err, phase, editingItem) !== false) {
+    if (onError && onError(err, phase, item) !== false) {
       return;
     }
     const fallback = {
@@ -198,7 +200,7 @@
       await reload();
       onAfterDelete?.();
     } catch (err) {
-      reportError(err, 'delete');
+      reportError(err, 'delete', item);
     }
   }
 
@@ -288,18 +290,22 @@
 </DataTable>
 
 {#if showForm}
-  <EntityFormModal
-    title={editingItem ? editTitle : createTitle}
-    onclose={closeForm}
-    onsubmit={save}
-    disabled={submitDisabled()}
-    {saving}
-    confirmLabel={editingItem ? t('common.update') : t('common.create')}
-    submitId={editingItem ? editSubmitId : createSubmitId}
-    {confirmTestid}
-  >
-    {#snippet fields()}
-      {@render formFields()}
-    {/snippet}
-  </EntityFormModal>
+  {#if formModal}
+    {@render formModal({ item: editingItem, save, close: closeForm, saving })}
+  {:else}
+    <EntityFormModal
+      title={editingItem ? editTitle : createTitle}
+      onclose={closeForm}
+      onsubmit={save}
+      disabled={submitDisabled()}
+      {saving}
+      confirmLabel={editingItem ? t('common.update') : t('common.create')}
+      submitId={editingItem ? editSubmitId : createSubmitId}
+      {confirmTestid}
+    >
+      {#snippet fields()}
+        {#if formFields}{@render formFields()}{/if}
+      {/snippet}
+    </EntityFormModal>
+  {/if}
 {/if}
