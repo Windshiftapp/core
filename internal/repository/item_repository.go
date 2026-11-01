@@ -958,6 +958,68 @@ func (r *ItemRepository) GetNextWorkspaceItemNumber(tx database.Tx, workspaceID 
 	return int(maxNumber + 1), nil
 }
 
+// IsWorkspaceItemNumberTaken reports whether a workspace item number is already
+// in use by an item or retired in item_key_reservations. Import paths use it to
+// honor a source key's number when it is free and fall back when it is not.
+func (r *ItemRepository) IsWorkspaceItemNumberTaken(tx database.Tx, workspaceID, number int) (bool, error) {
+	var conflicts int
+	if err := tx.QueryRow(`
+		SELECT COUNT(*) FROM (
+			SELECT 1 FROM items WHERE workspace_id = ? AND workspace_item_number = ?
+			UNION ALL
+			SELECT 1 FROM item_key_reservations WHERE workspace_id = ? AND workspace_item_number = ?
+		) AS conflicts
+	`, workspaceID, number, workspaceID, number).Scan(&conflicts); err != nil {
+		return false, fmt.Errorf("check workspace item number %d: %w", number, err)
+	}
+	return conflicts > 0, nil
+}
+
+// ReserveDeletedItemNumbers retires, per workspace, the highest item number
+// among the rows being removed. Deletion is a hard DELETE, so without a
+// reservation the MAX+1 allocator would reissue the workspace's top key after
+// its item is gone. Retiring a number below the workspace max is harmless, so
+// this needs no "was it the max?" read. movedBy and moved_item_id are
+// provenance only; the allocator never reads them.
+func (r *ItemRepository) ReserveDeletedItemNumbers(tx database.Tx, items []*models.Item, movedBy int) error {
+	type topNumber struct {
+		itemID int
+		number int
+	}
+	highest := make(map[int]topNumber)
+	for _, item := range items {
+		if item == nil || item.WorkspaceID == 0 || item.WorkspaceItemNumber <= 0 {
+			continue
+		}
+		current, ok := highest[item.WorkspaceID]
+		if !ok || item.WorkspaceItemNumber > current.number {
+			highest[item.WorkspaceID] = topNumber{itemID: item.ID, number: item.WorkspaceItemNumber}
+		}
+	}
+	if len(highest) == 0 {
+		return nil
+	}
+	now := time.Now()
+	for workspaceID, top := range highest {
+		var movedByArg, movedItemArg any
+		if movedBy > 0 {
+			movedByArg = movedBy
+		}
+		if top.itemID > 0 {
+			movedItemArg = top.itemID
+		}
+		if _, err := tx.Exec(`
+			INSERT INTO item_key_reservations (
+				workspace_id, workspace_item_number, moved_item_id, moved_by, created_at
+			) VALUES (?, ?, ?, ?, ?)
+			ON CONFLICT (workspace_id, workspace_item_number) DO NOTHING
+		`, workspaceID, top.number, movedItemArg, movedByArg, now); err != nil {
+			return fmt.Errorf("reserve deleted item key %d-%d: %w", workspaceID, top.number, err)
+		}
+	}
+	return nil
+}
+
 // Create inserts an item in a caller-owned transaction. It is the single
 // items-row insert: every creation path (services.CreateItem, workspace clone,
 // and the CreateWithRetry wrapper) goes through it, so all callers write the

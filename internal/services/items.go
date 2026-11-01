@@ -151,9 +151,25 @@ type ItemCreationParams struct {
 	// ws CLI) echo the enforced structure even when they supplied their own
 	// description. TemplateID == 0 after the call means the type enforces none.
 	MandatoryTemplateOut *MandatoryTemplateInfo
+	// PinnedItemNumber requests a specific workspace item number instead of the
+	// MAX+1 allocator. The Jira importer uses it to preserve the numeric suffix of
+	// a source key so commit/PR mentions keep resolving. A number already in use
+	// or retired falls back to the next free number rather than failing.
+	PinnedItemNumber *int
+	// PinnedItemNumberResult, when non-nil alongside PinnedItemNumber, receives
+	// the requested and assigned numbers so the caller can report a fallback.
+	PinnedItemNumberResult *PinnedItemNumberOutcome
 	// EventMetadata overrides inferred actor/source provenance for the canonical
 	// item.created fact. Empty fields receive safe defaults.
 	EventMetadata itemevents.Metadata
+}
+
+// PinnedItemNumberOutcome reports how a requested item number resolved so an
+// importer can record that a source key was not preserved verbatim.
+type PinnedItemNumberOutcome struct {
+	Requested int
+	Assigned  int
+	FellBack  bool
 }
 
 // ItemCreateTransactionHook extends the item creation transaction.

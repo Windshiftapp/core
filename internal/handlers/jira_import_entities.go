@@ -1398,12 +1398,60 @@ func (h *JiraImportHandler) upsertJiraIssueItem(im *jiraImportContext, issue *ji
 	if previousItemMapping != nil {
 		itemID, err = h.updateImportedJiraItem(previousItemMapping.WindshiftID, itemParams)
 	} else {
+		// Preserve the Jira key's numeric suffix so commit and PR mentions keep
+		// resolving. A number already used or retired in the target workspace
+		// falls back to the next free number, reported as a fidelity finding.
+		var pinned services.PinnedItemNumberOutcome
+		if number, ok := jiraIssueNumber(issue.Key); ok {
+			itemParams.PinnedItemNumber = &number
+			itemParams.PinnedItemNumberResult = &pinned
+		}
 		itemID, err = services.CreateItem(h.db, itemParams)
+		if err == nil && itemParams.PinnedItemNumber != nil && pinned.FellBack {
+			h.recordJiraIssueNumberFallback(im, issue, pinned)
+		}
 	}
 	if err != nil {
 		return 0, nil, false, fmt.Errorf("failed to create or update item: %w", err)
 	}
 	return itemID, previousItemMapping, forked, nil
+}
+
+// jiraIssueNumber parses the numeric suffix of a Jira issue key
+// (`EXPL-30` -> 30). Keys are PROJECT-N, so split on the last hyphen.
+func jiraIssueNumber(key string) (int, bool) {
+	separator := strings.LastIndex(key, "-")
+	if separator < 0 || separator == len(key)-1 {
+		return 0, false
+	}
+	number, err := strconv.Atoi(key[separator+1:])
+	if err != nil || number <= 0 {
+		return 0, false
+	}
+	return number, true
+}
+
+// recordJiraIssueNumberFallback reports that a Jira key could not be pinned in
+// the target workspace, so the imported item carries a different number and
+// source-key mentions no longer resolve to it.
+func (h *JiraImportHandler) recordJiraIssueNumberFallback(im *jiraImportContext, issue *jira.JiraIssue, outcome services.PinnedItemNumberOutcome) {
+	meta := map[string]any{
+		"code":             "jira_issue_number_taken",
+		"severity":         "warning",
+		"disposition":      "renumbered",
+		"source_count":     1,
+		"resolved_count":   0,
+		"requested_number": outcome.Requested,
+		"assigned_number":  outcome.Assigned,
+		"jira_issue_key":   issue.Key,
+	}
+	summary := fmt.Sprintf("Jira key %s could not keep its number in the target workspace", issue.Key)
+	if err := h.recordMapping(im.jobID, "fidelity_finding", "item-number:"+issue.Key, summary, outcome.Assigned, meta); err != nil {
+		slog.Warn("Failed to record Jira issue-number fallback finding",
+			slog.String("component", "jira"),
+			slog.String("issue", issue.Key),
+			slog.Any("error", err))
+	}
 }
 
 func (h *JiraImportHandler) recordJiraIssueMapping(im *jiraImportContext, issue *jira.JiraIssue, refs *jiraIssueReferences, previous *previousJiraImportMapping, itemID int64) error {
