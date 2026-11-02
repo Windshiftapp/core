@@ -62,6 +62,9 @@ type CatalogPageParams struct {
 	Sort   string
 	Desc   bool
 	Search string
+	// IDs, when set, restricts the page to exactly these resources. Callers
+	// use it to resolve a known id set in one read instead of one read per id.
+	IDs []int
 }
 
 func (s *CatalogReadService) ListWorkspaces(userID int, page CatalogPageParams) ([]models.Workspace, int, error) {
@@ -87,6 +90,14 @@ func (s *CatalogReadService) ListWorkspaces(userID int, page CatalogPageParams) 
 			visibleIDs = append(visibleIDs, candidate.ID)
 		}
 	}
+	if len(page.IDs) > 0 {
+		// The caller named the exact set, so return all of it in one page:
+		// ids outside the visible set are dropped and never leak existence.
+		visibleIDs = intersectIDs(visibleIDs, page.IDs)
+		page.Search = ""
+		page.Limit = len(visibleIDs)
+		page.Offset = 0
+	}
 	workspaces, total, err := s.workspaceRepo.FindByIDsPage(repository.WorkspaceIDPageParams{
 		IDs:    visibleIDs,
 		Search: page.Search,
@@ -106,6 +117,22 @@ func (s *CatalogReadService) ListWorkspaces(userID int, page CatalogPageParams) 
 		workspaces[i].IsRestricted = restricted[workspaces[i].ID]
 	}
 	return workspaces, total, nil
+}
+
+// intersectIDs returns the available ids that appear in requested, in the
+// available order. Requested ids absent from available are omitted.
+func intersectIDs(available, requested []int) []int {
+	wanted := make(map[int]struct{}, len(requested))
+	for _, id := range requested {
+		wanted[id] = struct{}{}
+	}
+	result := make([]int, 0, len(requested))
+	for _, id := range available {
+		if _, ok := wanted[id]; ok {
+			result = append(result, id)
+		}
+	}
+	return result
 }
 
 func (s *CatalogReadService) ListWorkspaceTemplates(ctx context.Context, userID int) ([]models.WorkspaceTemplateSummary, error) {
