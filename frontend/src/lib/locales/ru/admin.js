@@ -942,6 +942,10 @@ export default {
       routeAuth_session: 'Сессия',
       routeAuth_admin: 'Администратор',
       routeAuth_none: 'Публичный',
+      hostFunctionPermissions: 'Разрешения хост-функций',
+      permissionGranted: 'Предоставлено',
+      permissionDenied: 'Отклонено',
+      permissionsDeniedNote: 'Некоторые объявленные разрешения не действуют.',
       moduleSettingsNote:
         'Изменения настроек модулей применяются сразу. Отключённый модуль будет скрыт из навигации.',
       failedToUpload: 'Не удалось загрузить: {error}',

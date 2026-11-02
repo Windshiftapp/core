@@ -903,6 +903,10 @@ export default {
       routeAuth_session: 'Session',
       routeAuth_admin: 'Admin',
       routeAuth_none: 'Public',
+      hostFunctionPermissions: 'Host Function Permissions',
+      permissionGranted: 'Granted',
+      permissionDenied: 'Denied',
+      permissionsDeniedNote: 'Some declared permissions are not in effect.',
       moduleSettingsNote:
         'Changes to module settings take effect immediately. Disabling a module will hide it from the navigation.',
       failedToUpload: 'Upload failed: {error}',

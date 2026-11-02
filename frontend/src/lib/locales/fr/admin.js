@@ -845,6 +845,10 @@ export default {
       routeAuth_session: 'Session',
       routeAuth_admin: 'Administrateur',
       routeAuth_none: 'Public',
+      hostFunctionPermissions: 'Permissions des fonctions hôtes',
+      permissionGranted: 'Accordée',
+      permissionDenied: 'Refusée',
+      permissionsDeniedNote: 'Certaines permissions déclarées ne sont pas effectives.',
       moduleSettingsNote:
         'Les modifications des paramètres de module prennent effet immédiatement. Désactiver un module le masquera de la navigation.',
       failedToUpload: 'Échec du téléversement : {error}',

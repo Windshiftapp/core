@@ -29,6 +29,14 @@ const (
 
 // cliExecHostFunction executes a CLI command and returns the result.
 func (m *Manager) cliExecHostFunction(ctx context.Context, plugin *extism.CurrentPlugin, stack []uint64) {
+	if !m.requirePermission(ctx, PermissionProcessExec) {
+		m.writeHostResponse(plugin, stack, CLIExecResponse{
+			Status: "error",
+			Error:  permissionDeniedMessage(PermissionProcessExec),
+		})
+		return
+	}
+
 	enabled, err := m.cliExecEnabled()
 	if err != nil {
 		m.logger.Error("cli_exec: failed to read security setting", "error", err)

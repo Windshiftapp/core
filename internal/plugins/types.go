@@ -119,16 +119,20 @@ type HTTPFetchResponse struct {
 
 // PluginManifest represents the manifest.json file authored by plugin developers.
 type PluginManifest struct {
-	Name         string           `json:"name"`
-	Version      string           `json:"version"`
-	Description  string           `json:"description"`
-	Author       string           `json:"author"`
-	EntryPoint   string           `json:"entryPoint"`
-	Capabilities []string         `json:"capabilities,omitempty"`
-	Extensions   []Extension      `json:"extensions,omitempty"` // UI extensions provided by this plugin
-	Routes       []Route          `json:"routes,omitempty"`     // Inline route metadata
-	Webhooks     []PluginWebhook  `json:"webhooks,omitempty"`   // Webhooks the plugin wants to receive
-	Schedules    []PluginSchedule `json:"schedules,omitempty"`  // Periodic invocations
+	Name         string   `json:"name"`
+	Version      string   `json:"version"`
+	Description  string   `json:"description"`
+	Author       string   `json:"author"`
+	EntryPoint   string   `json:"entryPoint"`
+	Capabilities []string `json:"capabilities,omitempty"`
+	// Permissions declares the host functions the plugin may call. It is a
+	// closed catalog (see capabilities.go); an unknown name fails the load.
+	// Empty means none: only the always-available log host function is granted.
+	Permissions []string         `json:"permissions,omitempty"`
+	Extensions  []Extension      `json:"extensions,omitempty"` // UI extensions provided by this plugin
+	Routes      []Route          `json:"routes,omitempty"`     // Inline route metadata
+	Webhooks    []PluginWebhook  `json:"webhooks,omitempty"`   // Webhooks the plugin wants to receive
+	Schedules   []PluginSchedule `json:"schedules,omitempty"`  // Periodic invocations
 }
 
 // PluginWebhook represents a webhook registration from a plugin.

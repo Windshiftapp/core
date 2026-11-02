@@ -40,9 +40,15 @@ type LoadedPlugin struct {
 	Path       string
 	Enabled    bool
 	// Licensed reports whether the plugin's license verified. It only gates
-	// capabilities when a LicenseVerifier is configured.
+	// capabilities and host-function permissions when a LicenseVerifier is
+	// configured.
 	Licensed bool
-	compiled *extism.CompiledPlugin
+	// Permissions is the effective host-function permission set after manifest
+	// validation and license gating. Only these permissions can reach host
+	// functions; an empty set leaves only log available. Manifest.Permissions
+	// holds what the plugin requested.
+	Permissions []string
+	compiled    *extism.CompiledPlugin
 }
 
 // Manager handles plugin loading and lifecycle.
@@ -86,6 +92,37 @@ func pluginNameFromContext(ctx context.Context) string {
 	return name
 }
 
+// pluginPermissionsKey is the unexported context key under which the executing
+// plugin's effective host-function permissions are carried to host functions.
+type pluginPermissionsKey struct{}
+
+// withPluginPermissions returns a copy of ctx carrying the plugin's effective
+// host-function permissions so host functions can enforce them per-invocation.
+func withPluginPermissions(ctx context.Context, permissions []string) context.Context {
+	return context.WithValue(ctx, pluginPermissionsKey{}, permissions)
+}
+
+// pluginPermissionsFromContext returns the effective permissions stored in ctx,
+// or nil when absent. Absent means deny, not allow.
+func pluginPermissionsFromContext(ctx context.Context) []string {
+	permissions, _ := ctx.Value(pluginPermissionsKey{}).([]string)
+	return permissions
+}
+
+// requirePermission reports whether the plugin executing in ctx declared the
+// permission. It logs every denial; callers return their own typed error
+// response. A missing plugin context denies, so metadata population and any
+// future direct invocation cannot reach a gated host function.
+func (m *Manager) requirePermission(ctx context.Context, permission string) bool {
+	for _, granted := range pluginPermissionsFromContext(ctx) {
+		if granted == permission {
+			return true
+		}
+	}
+	m.logger.Warn("plugin host function denied", "plugin", pluginNameFromContext(ctx), "permission", permission)
+	return false
+}
+
 // NewManager creates a new plugin manager configured for Extism-backed plugins.
 func NewManager(pluginDir string, opts ...Option) *Manager {
 	options := ManagerOptions{
@@ -127,6 +164,9 @@ func NewManager(pluginDir string, opts ...Option) *Manager {
 		db:                options.Database,
 	}
 	m.hostFuncs = m.buildHostFunctions()
+	if err := validateHostFunctionCatalog(m.hostFuncs); err != nil {
+		m.logger.Error("plugin host function catalog is invalid", "error", err)
+	}
 	return m
 }
 
@@ -209,6 +249,14 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 		return fmt.Errorf("invalid plugin schedules: %w", err)
 	}
 
+	// Permissions are validated before compilation so an unknown name fails the
+	// load with the offending value instead of leaving a host function denied.
+	normalizedPermissions, err := normalizePermissions(manifest.Permissions)
+	if err != nil {
+		return fmt.Errorf("invalid plugin permissions: %w", err)
+	}
+	manifest.Permissions = normalizedPermissions
+
 	wasmPath := filepath.Join(pluginPath, manifest.EntryPoint)
 	if _, err = os.Stat(wasmPath); err != nil {
 		return fmt.Errorf("failed to read WASM file: %w", err)
@@ -222,6 +270,14 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 		return fmt.Errorf("failed to compile plugin: %w", err)
 	}
 
+	licensed := m.verifyStoredLicense(pluginPath, manifest.Name)
+	// Capability AND license: an unlicensed plugin gets no host-function
+	// permissions even when its manifest declares them.
+	var effectivePermissions []string
+	if licensed {
+		effectivePermissions = manifest.Permissions
+	}
+
 	plugin := &LoadedPlugin{
 		Manifest: manifest,
 		Metadata: PluginMetadata{
@@ -230,11 +286,12 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 			Description: manifest.Description,
 			Author:      manifest.Author,
 		},
-		Routes:   manifest.Routes,
-		Path:     pluginPath,
-		Enabled:  true,
-		Licensed: m.verifyStoredLicense(pluginPath, manifest.Name),
-		compiled: compiled,
+		Routes:      manifest.Routes,
+		Path:        pluginPath,
+		Enabled:     true,
+		Licensed:    licensed,
+		Permissions: effectivePermissions,
+		compiled:    compiled,
 	}
 
 	if err := m.populateMetadata(ctx, plugin); err != nil {
@@ -255,6 +312,16 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 		if route.Auth == RouteAuthNone {
 			m.logger.Warn("plugin route is public", "plugin", manifest.Name, "method", route.Method, "path", route.Path)
 		}
+	}
+
+	// Loud load-time notice of the compatibility break: a plugin that predates
+	// host-function permissions still relies on functions it never declared, and
+	// those calls are now denied.
+	if denied := deniedHostFunctions(plugin.Permissions); len(denied) > 0 {
+		m.logger.Warn("plugin host functions are denied because their permission is not granted",
+			"plugin", manifest.Name,
+			"declared_permissions", manifest.Permissions,
+			"denied_host_functions", denied)
 	}
 
 	m.mu.Lock()
@@ -442,6 +509,7 @@ func (m *Manager) invokeEnabledPlugin(
 	ctx, cancel := context.WithTimeout(context.Background(), m.pluginTimeout)
 	defer cancel()
 	ctx = withPluginName(ctx, pluginName)
+	ctx = withPluginPermissions(ctx, p.Permissions)
 
 	instance, err := p.compiled.Instance(ctx, extism.PluginInstanceConfig{})
 	if err != nil {
@@ -723,11 +791,11 @@ func (m *Manager) verifyStoredLicense(pluginPath, pluginName string) bool {
 	}
 	licenseBytes, err := os.ReadFile(filepath.Join(pluginPath, licenseTokenFileName)) //nolint:gosec // G304 — pluginPath from securejoin, fixed name
 	if err != nil || len(licenseBytes) == 0 {
-		m.logger.Warn("plugin has no license; capabilities are disabled for it", "name", pluginName)
+		m.logger.Warn("plugin has no license; capabilities and host-function permissions are disabled for it", "name", pluginName)
 		return false
 	}
 	if err := m.licenseVerifier(pluginName, licenseBytes); err != nil {
-		m.logger.Warn("plugin license verification failed; capabilities are disabled for it", "name", pluginName, "error", err)
+		m.logger.Warn("plugin license verification failed; capabilities and host-function permissions are disabled for it", "name", pluginName, "error", err)
 		return false
 	}
 	return true

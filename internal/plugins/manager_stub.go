@@ -27,6 +27,9 @@ type LoadedPlugin struct {
 	// loads plugins, so it stays false; it exists so callers that read
 	// LoadedPlugin compile in both build variants.
 	Licensed bool
+	// Permissions mirrors the plugins-build field. The stub never loads
+	// plugins, so it stays empty.
+	Permissions []string
 }
 
 // Manager handles plugin loading and lifecycle.
