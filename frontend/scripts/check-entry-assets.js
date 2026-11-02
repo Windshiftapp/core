@@ -10,6 +10,8 @@ const defaultIndexPath = path.resolve(scriptDir, '../dist/index.html');
 
 const forbiddenEntryAssets = [
   { name: 'Excalidraw', pattern: /(?:excalidraw|mermaid-to-excalidraw)/i },
+  { name: 'Mermaid', pattern: /(?:^|[/_.-])mermaid(?:[/_.-]|$)/i },
+  { name: 'Cytoscape', pattern: /(?:^|[/_.-])cytoscape(?:[/_.-]|$)/i },
   { name: 'React', pattern: /(?:^|[/_.-])react(?:-dom)?(?:[/_.-]|$)/i },
   { name: 'SvelteFlow', pattern: /(?:svelteflow|xyflow)/i },
   { name: 'D3', pattern: /(?:^|[/_.-])d3(?:[/_.-]|$)/i },
