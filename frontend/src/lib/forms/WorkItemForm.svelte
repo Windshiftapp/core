@@ -326,7 +326,7 @@
     {/if}
 
     <!-- Assignee Chip -->
-    {#if store.isFieldConfigured('assignee') && !store.isFieldRequired('assignee')}
+    {#if store.isFieldConfigured('assignee') && !store.isFieldRequired('assignee') && store.selectedWorkspace}
       <UserPicker
         bind:value={store.formData.assignee_id}
         showUnassigned={true}
@@ -338,6 +338,7 @@
           <div
             role="button"
             tabindex="0"
+            data-testid="create-assignee-chip"
             class="chip inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm transition-colors"
             style="color: {store.formData.assignee_id ? 'var(--ds-text)' : 'var(--ds-text-subtle)'};"
           >
@@ -631,6 +632,7 @@
             milestones={store.milestones}
             iterations={store.iterations}
             isDarkMode={false}
+            workspaceId={store.formData.workspace_id}
           />
         </div>
       {/each}
@@ -716,11 +718,17 @@
             <Label color="default">
               {t('createModal.assignee')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
             </Label>
-            <UserPicker
-              bind:value={store.formData.assignee_id}
-              placeholder={t('createModal.unassigned')}
-              workspaceId={store.formData.workspace_id}
-            />
+            {#if store.selectedWorkspace}
+              <UserPicker
+                bind:value={store.formData.assignee_id}
+                placeholder={t('createModal.unassigned')}
+                workspaceId={store.formData.workspace_id}
+              />
+            {:else}
+              <div class="px-3 py-2 text-sm rounded border" style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text-subtle);">
+                {t('createModal.selectWorkspaceFirst')}
+              </div>
+            {/if}
           </div>
         {:else if field.field_identifier === 'team'}
           <div class="space-y-1">
@@ -820,6 +828,7 @@
             milestones={store.milestones}
             iterations={store.iterations}
             isDarkMode={false}
+            workspaceId={store.formData.workspace_id}
           />
         </div>
       {/each}

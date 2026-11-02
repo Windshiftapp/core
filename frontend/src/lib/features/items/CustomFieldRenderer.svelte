@@ -54,6 +54,9 @@
     onFieldLinksChanged = null,
     optionData = {}, optionLoading = {}, onRequestOptions = null, loadAssetOptions = null,
     displayAlignment = 'start', truncateDisplay = false, displayTestId = undefined,
+    // Workspace scope for the user/multi-user pickers. When set, the pickers
+    // load the workspace-scoped roster instead of the global directory.
+    workspaceId = null,
     // Row mode: the caller passes the field label and the component renders the
     // label/value row used by the item detail sidebar, swapping it for a
     // full-width editor. rowTestIdPrefix builds the row's stable test ids:
@@ -70,6 +73,15 @@
 
   const users = $derived(providedUsers ?? referenceDisplayCache.users);
   const usersLoading = $derived(providedUsers === null && referenceDisplayCache.usersLoading);
+
+  // User and multi-user custom fields are free pickers. When the caller knows
+  // the workspace, prefer the workspace-scoped roster (assignable-users) over
+  // the global directory, which non-admins cannot read (GH #420). A caller
+  // that supplies its own options keeps ownership of loading them.
+  const userPickerWorkspaceId = $derived(workspaceId ?? null);
+  const userPickerUsers = $derived(
+    providedUsers ?? (userPickerWorkspaceId ? null : users.length ? users : null)
+  );
   const displayHydration = new AbortController();
   onDestroy(() => displayHydration.abort());
 
@@ -721,7 +733,8 @@
         {showSelectedInTrigger}
         class="w-full"
         {disabled}
-        users={providedUsers === null ? (users.length ? users : null) : providedUsers}
+        workspaceId={userPickerWorkspaceId}
+        users={userPickerUsers}
         loading={optionLoading.users ?? false}
         autoOpen={pickerAutoOpen}
         {resolveMissingLabel}
@@ -753,7 +766,8 @@
           showSelectedInTrigger={false}
           class="w-full"
           {disabled}
-          users={providedUsers === null ? (users.length ? users : null) : providedUsers}
+          workspaceId={userPickerWorkspaceId}
+          users={userPickerUsers}
           loading={optionLoading.users ?? false}
           autoOpen={pickerAutoOpen}
           onOpen={() => onRequestOptions?.('users')}
