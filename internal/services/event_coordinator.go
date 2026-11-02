@@ -281,8 +281,12 @@ func (ec *EventCoordinator) EmitStatusChanged(item *models.Item, oldStatusID, ne
 
 	// Emit action event for automation
 	if ec.actionService != nil {
+		eventType := models.ActionTriggerStatusTransition
+		if oldStatusID != nil && newStatusID != nil && *oldStatusID == *newStatusID {
+			eventType = models.ActionTriggerStatusLoop
+		}
 		ec.actionService.EmitActionEvent(&models.ActionEvent{
-			EventType:   models.ActionTriggerStatusTransition,
+			EventType:   eventType,
 			WorkspaceID: item.WorkspaceID,
 			ItemID:      item.ID,
 			ActorUserID: actorUserID,
@@ -290,11 +294,12 @@ func (ec *EventCoordinator) EmitStatusChanged(item *models.Item, oldStatusID, ne
 				"status_id": oldStatusID,
 			},
 			NewValues: map[string]any{
-				"status_id":   newStatusID,
-				"title":       item.Title,
-				"assignee_id": item.AssigneeID,
-				"team_id":     item.TeamID,
-				"creator_id":  item.CreatorID,
+				"status_id":    newStatusID,
+				"item_type_id": item.ItemTypeID,
+				"title":        item.Title,
+				"assignee_id":  item.AssigneeID,
+				"team_id":      item.TeamID,
+				"creator_id":   item.CreatorID,
 			},
 		})
 	}

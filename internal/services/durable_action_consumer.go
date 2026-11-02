@@ -139,7 +139,7 @@ type actionCutoverQuery interface {
 func ConfigureDurableActionConsumers(ctx context.Context, store *events.Store, cutover *ActionCutover) error {
 	return actionevents.ConfigureCutoverConsumers(ctx, store, cutover, events.Consumer{
 		Key: DurableItemActionConsumerKey, HandlerVersion: 1,
-		EventTypes: []string{itemevents.Created, itemevents.Updated, itemevents.StatusChanged, itemevents.Linked},
+		EventTypes: []string{itemevents.Created, itemevents.Updated, itemevents.StatusChanged, itemevents.StatusLooped, itemevents.Linked},
 	},
 		events.Consumer{Key: DurableCompatibilityActionConsumerKey, HandlerVersion: 1, Active: true, StartEventID: 1, EventTypes: []string{DurableActionCompatibilityEvent}},
 		events.Consumer{Key: DurableSCMActionConsumerKey, HandlerVersion: 1, Active: true, StartEventID: 1, EventTypes: []string{DurableSCMObservationEvent}},
@@ -287,6 +287,19 @@ func actionEventFromDomainEvent(event events.Event) (*models.ActionEvent, string
 		actionEvent.NewValues = itemSnapshotValues(payload.Item)
 		actionEvent.NewValues["status_id"] = nullableInt(payload.NewStatusID)
 		applyAutomation(actionEvent, payload.Automation)
+	case itemevents.StatusLooped:
+		var payload itemevents.StatusChangedV1
+		if err := json.Unmarshal(event.Payload, &payload); err != nil {
+			return nil, "", fmt.Errorf("decode item.status_looped: %w", err)
+		}
+		actionEvent.EventType = models.ActionTriggerStatusLoop
+		actionEvent.WorkspaceID = payload.Item.WorkspaceID
+		actionEvent.ItemID = payload.Item.ID
+		actionEvent.ItemTypeID = payload.Item.ItemTypeID
+		actionEvent.OldValues = map[string]any{"status_id": nullableInt(payload.OldStatusID)}
+		actionEvent.NewValues = itemSnapshotValues(payload.Item)
+		actionEvent.NewValues["status_id"] = nullableInt(payload.NewStatusID)
+		applyAutomation(actionEvent, payload.Automation)
 	case itemevents.Linked:
 		var payload itemevents.LinkChangedV1
 		if err := json.Unmarshal(event.Payload, &payload); err != nil {
@@ -359,7 +372,7 @@ func eventActorUserID(event events.Event) int {
 func isItemActionTrigger(trigger models.ActionTriggerType) bool {
 	switch trigger {
 	case models.ActionTriggerItemCreated, models.ActionTriggerItemUpdated,
-		models.ActionTriggerStatusTransition, models.ActionTriggerItemLinked:
+		models.ActionTriggerStatusTransition, models.ActionTriggerStatusLoop, models.ActionTriggerItemLinked:
 		return true
 	default:
 		return false

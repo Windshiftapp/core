@@ -30,6 +30,7 @@ export default {
     // Trigger types
     trigger: {
       statusTransition: 'Changement de statut',
+      statusLoop: 'Boucle de statut',
       itemCreated: 'Élément créé',
       itemUpdated: 'Élément mis à jour',
       itemLinked: 'Élément lié',
@@ -111,6 +112,7 @@ export default {
       triggerType: 'Type de déclencheur',
       fromStatus: 'Depuis le statut',
       toStatus: 'Vers le statut',
+      loopStatus: 'Statut bouclé',
       anyStatus: 'N’importe quel statut',
       triggerField: 'Champ modifié',
       anyField: 'N’importe quel champ (toutes les modifications)',

@@ -786,6 +786,12 @@ const (
 	ActionTriggerItemLinked       ActionTriggerType = "item_linked"
 	ActionTriggerManual           ActionTriggerType = "manual"
 
+	// ActionTriggerStatusLoop fires when an item's status is set to the status it
+	// already has and the item's workflow declares a self-transition for that
+	// status (from_status_id == to_status_id). ToStatusID optionally filters the
+	// looped status; ItemTypeID optionally filters the item type.
+	ActionTriggerStatusLoop ActionTriggerType = "status_loop"
+
 	// SLA-driven triggers emitted in the breach/warning transaction. They are
 	// configuration consumers, not fields on imported SLA goals.
 	ActionTriggerSLABreached ActionTriggerType = "sla_breached"

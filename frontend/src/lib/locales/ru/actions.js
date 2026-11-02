@@ -30,6 +30,7 @@ export default {
 
     trigger: {
       statusTransition: 'Изменение статуса',
+      statusLoop: 'Цикл статуса',
       itemCreated: 'Элемент создан',
       itemUpdated: 'Элемент обновлён',
       itemLinked: 'Элемент связан',
@@ -116,6 +117,7 @@ export default {
       triggerType: 'Тип триггера',
       fromStatus: 'Из статуса',
       toStatus: 'В статус',
+      loopStatus: 'Зацикленный статус',
       anyStatus: 'Любой статус',
       triggerField: 'Изменённое поле',
       anyField: 'Любое поле (все изменения)',

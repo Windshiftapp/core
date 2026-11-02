@@ -23,6 +23,7 @@ export default {
     },
     trigger: {
       statusTransition: '状态转换',
+      statusLoop: '状态循环',
       itemCreated: '事项已创建',
       itemUpdated: '事项已更新',
       itemLinked: '事项已关联',
@@ -79,6 +80,7 @@ export default {
       triggerType: '触发器类型',
       fromStatus: '从状态',
       toStatus: '到状态',
+      loopStatus: '循环状态',
       anyStatus: '任何状态',
       recipientType: '接收者',
       notifyMessage: '消息',

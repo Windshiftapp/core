@@ -241,6 +241,7 @@
   function triggerI18nKey(triggerType) {
     switch (triggerType) {
       case 'status_transition': return 'actions.trigger.statusTransition';
+      case 'status_loop': return 'actions.trigger.statusLoop';
       case 'item_created': return 'actions.trigger.itemCreated';
       case 'item_updated': return 'actions.trigger.itemUpdated';
       case 'item_linked': return 'actions.trigger.itemLinked';
@@ -779,6 +780,28 @@
           label="Any completed status"
           hint="Fire when moving into any status in a completed category"
           dataTestid="trigger-completed-toggle"
+          size="small"
+        />
+      </div>
+    {/if}
+    {#if (selectedNode.data?.triggerType || action?.trigger_type) === 'status_loop'}
+      <div>
+        <label for="config-loop-status" class="block text-xs font-medium mb-1">{t('actions.config.loopStatus')}</label>
+        <Select
+          id="config-loop-status"
+          options={[{ value: '', label: t('actions.config.anyStatus') }, ...statuses.map(s => ({ value: s.id, label: s.name }))]}
+          value={selectedNode.data?.config?.to_status_id || ''}
+          onchange={(v) => store.updateNodeConfig(selectedNode.id, { to_status_id: v ? parseInt(v) : null })}
+          size="small"
+        />
+      </div>
+      <div>
+        <label for="config-loop-item-type" class="block text-xs font-medium mb-1">Item type</label>
+        <Select
+          id="config-loop-item-type"
+          options={[{ value: '', label: 'Any item type' }, ...itemTypes.map(it => ({ value: it.id, label: it.name }))]}
+          value={selectedNode.data?.config?.item_type_id || ''}
+          onchange={(v) => store.updateNodeConfig(selectedNode.id, { item_type_id: v ? parseInt(v) : null })}
           size="small"
         />
       </div>

@@ -1133,7 +1133,7 @@ func (s *ItemApplicationService) transitionItem(ctx context.Context, actor Audit
 	if err != nil {
 		return nil, err
 	}
-	if !result.NoOp && s.events != nil {
+	if (!result.NoOp || result.Loop) && s.events != nil {
 		s.events.EmitStatusChanged(result.Item, result.OldStatusID, result.NewStatusID, actor.UserID, actor.Username)
 	}
 	s.syncStatus(ctx, result.Item.ID, result.NewStatusID, result.NoOp)
