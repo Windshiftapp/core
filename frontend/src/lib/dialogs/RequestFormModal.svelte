@@ -24,6 +24,7 @@
     initializeFormValues,
     validateFormStep,
   } from '../features/forms/formModel.js';
+  import { runWithConcurrency } from '../utils/concurrency.js';
 
   let {
     isOpen = $bindable(false),
@@ -348,16 +349,12 @@
       // fail the submission — the customer can retry from the timeline.
       if (stagedFiles.length > 0) {
         uploadingFiles = true;
-        const failures = [];
-        for (const file of stagedFiles) {
-          try {
-            await portal.addRequestAttachment(portalSlug, result.item_id, file);
-          } catch (err) {
-            console.error('Failed to upload attachment after submit:', err);
-            failures.push(file.name);
-          }
-        }
-        uploadFailures = failures;
+        const results = await runWithConcurrency(stagedFiles, (file) =>
+          portal.addRequestAttachment(portalSlug, result.item_id, file)
+        );
+        uploadFailures = results
+          .filter((entry) => !entry.ok)
+          .map((entry) => entry.item?.name ?? '');
         uploadingFiles = false;
       }
 

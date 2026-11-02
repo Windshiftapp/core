@@ -20,6 +20,8 @@
   import ItemDetailBreadcrumbs from '../items/ItemDetailBreadcrumbs.svelte';
   import { useItemEventStream } from '../../composables/useItemEventStream.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { errorToast } from '../../stores/toasts.svelte.js';
+  import { runWithConcurrency } from '../../utils/concurrency.js';
 
   let {
     itemId,
@@ -261,12 +263,14 @@
 
   async function handleAttachmentUploadFiles(data) {
     const { files } = data;
-    for (const file of files) {
-      try {
-        await attachmentsApi.uploadToItem(item.id, file);
-      } catch (err) {
-        console.error('Failed to upload:', err);
-      }
+    const results = await runWithConcurrency(files, (file) =>
+      attachmentsApi.uploadToItem(item.id, file)
+    );
+    const failed = results.filter((result) => !result.ok);
+    if (failed.length > 0) {
+      console.error('Failed to upload:', failed[0].error);
+      const names = failed.map((result) => result.item?.name).filter(Boolean).join(', ');
+      errorToast(t('dialogs.alerts.failedToUpload', { error: names || t('errors.UNKNOWN') }));
     }
     await loadAttachments();
   }

@@ -27,6 +27,7 @@
   import { getShortcut, matchesShortcut, getDisplayString } from '../utils/keyboardShortcuts.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { showCreatedItemToast } from '../utils/createdItemToast.js';
+  import { runWithConcurrency } from '../utils/concurrency.js';
 
   // Import form components
   import WorkItemForm from '../forms/WorkItemForm.svelte';
@@ -247,21 +248,28 @@
   }
 
   async function uploadPendingDescriptionImages(itemId, description) {
-    if (workItemFormStore.pendingDescriptionImages.length === 0) {
+    const pending = workItemFormStore.pendingDescriptionImages;
+    if (pending.length === 0) {
       return description;
     }
 
     let updatedDescription = description || '';
-    for (const image of workItemFormStore.pendingDescriptionImages) {
-      if (!updatedDescription.includes(image.url)) continue;
-
+    const toUpload = pending.filter((image) => updatedDescription.includes(image.url));
+    const results = await runWithConcurrency(toUpload, async (image) => {
       const attachment = await attachments.uploadToItem(itemId, image.file);
       const attachmentId = attachment?.id;
       if (!attachmentId) {
         throw new Error('Image upload failed');
       }
+      return { image, attachment };
+    });
 
-      const downloadUrl = attachments.getContentUrl(attachmentId);
+    for (const result of results) {
+      if (!result.ok) throw result.error;
+      const value = result.value;
+      if (!value) throw new Error('Image upload failed');
+      const { image, attachment } = value;
+      const downloadUrl = attachments.getContentUrl(attachment.id);
       updatedDescription = updatedDescription.split(image.url).join(downloadUrl);
     }
 
