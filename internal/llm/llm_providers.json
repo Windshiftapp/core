@@ -24,8 +24,7 @@
       "models": [
         {"id": "claude-fable-5", "name": "Claude Fable 5", "max_tokens": 128000, "context_window": 1000000, "supports_vision": true, "pricing": {"prompt": 0.00001, "completion": 0.00005, "cache_read": 0.000001, "cache_write": 0.0000125}},
         {"id": "claude-opus-5", "name": "Claude Opus 5", "max_tokens": 128000, "context_window": 1000000, "supports_vision": true, "pricing": {"prompt": 0.000005, "completion": 0.000025, "cache_read": 0.0000005, "cache_write": 0.00000625}},
-        {"id": "claude-sonnet-5", "name": "Claude Sonnet 5", "max_tokens": 128000, "context_window": 1000000, "supports_vision": true, "pricing": {"prompt": 0.000002, "completion": 0.00001, "cache_read": 0.0000002, "cache_write": 0.0000025}},
-        {"id": "claude-haiku-4-5-20251001", "name": "Claude Haiku 4.5", "max_tokens": 64000, "context_window": 200000, "supports_vision": true, "pricing": {"prompt": 0.000001, "completion": 0.000005, "cache_read": 0.0000001, "cache_write": 0.00000125}}
+        {"id": "claude-sonnet-5", "name": "Claude Sonnet 5", "max_tokens": 128000, "context_window": 1000000, "supports_vision": true, "pricing": {"prompt": 0.000002, "completion": 0.00001, "cache_read": 0.0000002, "cache_write": 0.0000025}}
       ]
     },
     {
@@ -82,8 +81,8 @@
       "models_auth_scheme": "bearer",
       "models_response_format": "openai",
       "models": [
-        {"id": "anthropic/claude-sonnet-4", "name": "Claude Sonnet 4", "max_tokens": 64000, "context_window": 1000000, "supports_vision": true},
-        {"id": "anthropic/claude-opus-4", "name": "Claude Opus 4", "max_tokens": 32000, "context_window": 200000, "supports_vision": true},
+        {"id": "anthropic/claude-sonnet-5", "name": "Claude Sonnet 5", "max_tokens": 128000, "context_window": 1000000, "supports_vision": true},
+        {"id": "anthropic/claude-opus-5", "name": "Claude Opus 5", "max_tokens": 128000, "context_window": 1000000, "supports_vision": true},
         {"id": "openai/gpt-4o", "name": "GPT-4o", "max_tokens": 16384, "context_window": 128000, "supports_vision": true},
         {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini", "max_tokens": 16384, "context_window": 128000, "supports_vision": true},
         {"id": "google/gemini-2.5-pro", "name": "Gemini 2.5 Pro", "max_tokens": 65536, "context_window": 1048576, "supports_vision": true},
