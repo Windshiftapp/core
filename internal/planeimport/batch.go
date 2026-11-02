@@ -203,6 +203,21 @@ func (l *Loader) labelNamesFor(planeIDs []string) []string {
 	return out
 }
 
+// countNewIssueLabels mirrors attachIssueLabels for a row that does not exist
+// yet: a fresh insert owns no label links, so every resolvable label is one the
+// write pass would add. Unknown ids are reported exactly as the write pass
+// reports them.
+func (l *Loader) countNewIssueLabels(planeIDs []string, itemID int) {
+	for _, planeID := range planeIDs {
+		if _, ok := l.labelByPlane[planeID]; !ok {
+			l.report.Collisions = append(l.report.Collisions,
+				fmt.Sprintf("item %d references source label %s the contract never carried", itemID, planeID))
+			continue
+		}
+		l.report.LabelLinksAdded++
+	}
+}
+
 // issueDescription converts one issue body, falling back to Plane's HTML
 // render when the TipTap document is absent or unparseable. The fallback
 // count lands in the report — an honest importer says which bodies it could
@@ -320,10 +335,7 @@ func (l *Loader) dryRunBatch(batch []*Issue, commentsByIssue map[string][]*Comme
 		// An author Resolve() could not map is already named in the report;
 		// the creator column stays NULL rather than getting an invented user.
 		l.report.IssuesImported++
-		if n := i.SequenceID; n > l.report.MaxNumber {
-			l.report.MaxNumber = n
-		}
-		_ = l.attachIssueLabels(i.LabelIDs, i.SequenceID, l.db, nil)
+		l.countNewIssueLabels(i.LabelIDs, i.SequenceID)
 		for _, c := range commentsByIssue[i.ID] {
 			if c.DeletedAt != nil {
 				continue
@@ -425,9 +437,6 @@ func (l *Loader) runBatch(
 		takenNumbers[i.SequenceID] = i.ID
 		numberToPlaneID[i.SequenceID] = i.ID
 		l.report.IssuesImported++
-		if i.SequenceID > l.report.MaxNumber {
-			l.report.MaxNumber = i.SequenceID
-		}
 
 		metadata := itemevents.Import("plane")
 		metadata.OccurredAt = i.CreatedAt // the created fact carries the source chronology

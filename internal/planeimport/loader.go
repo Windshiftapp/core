@@ -371,11 +371,11 @@ func (l *Loader) IssueCount() int { return len(l.issues) }
 func (l *Loader) CommentCount() int { return len(l.comments) }
 
 // Run executes the import. Issues load in ascending sequence order inside
-// per-batch transactions: numbering is allocated by the repository's MAX+1
-// path (dense and gap-correct because the source order is ascending), each
-// row's creator and timestamps come from the contract, parent links attach in
-// the same pass because every parent has a lower sequence id, and created
-// facts are batch-recorded with the source chronology as their occurred_at.
+// per-batch transactions: each row's number is the source sequence_id (gaps
+// stay gaps), its creator and timestamps come from the contract, parent links
+// attach in the same pass because most parents have a lower sequence id (a
+// second pass catches the measured exceptions), and created facts are
+// batch-recorded with the source chronology as their occurred_at.
 func (l *Loader) Run(ctx context.Context) (*Report, error) {
 	if l.meta == nil {
 		return nil, fmt.Errorf("LoadContract must run before Run")
@@ -399,6 +399,27 @@ func (l *Loader) Run(ctx context.Context) (*Report, error) {
 	commentsByIssue := map[string][]*Comment{}
 	for _, c := range l.comments {
 		commentsByIssue[c.IssueID] = append(commentsByIssue[c.IssueID], c)
+	}
+
+	// MaxNumber and the preserved gap list describe the source's number range,
+	// not this run's writes: on a rerun every issue is already mapped, so the
+	// range has to come from the contract rather than from what was inserted.
+	// Soft-deleted and draft issues still hold their source number, so they are
+	// gaps in the range even though no row is written for them. Comments whose
+	// issue never becomes an item are counted here, once.
+	importable := map[string]bool{}
+	for _, i := range l.issues {
+		if i.SequenceID > l.report.MaxNumber {
+			l.report.MaxNumber = i.SequenceID
+		}
+		if i.DeletedAt == nil && !i.IsDraft {
+			importable[i.ID] = true
+		}
+	}
+	for _, c := range l.comments {
+		if !importable[c.IssueID] {
+			l.report.CommentsSkipped++
+		}
 	}
 
 	for start := 0; start < len(l.issues); start += l.opts.BatchSize {

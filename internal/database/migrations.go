@@ -3184,7 +3184,7 @@ var Catalog = []Migration{
 		Version:       "20261119_plane_import_mappings",
 		Name:          "External-id map for the Plane importer (idempotent re-runs, provenance)",
 		CheckSQLite:   `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='plane_import_mappings'`,
-		CheckPostgres: `SELECT COUNT(*) FROM information_schema.tables WHERE table_name='plane_import_mappings'`,
+		CheckPostgres: `SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='plane_import_mappings'`,
 		SQLite: `
 CREATE TABLE IF NOT EXISTS plane_import_mappings (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -89,8 +89,6 @@ type Issue struct {
 	UpdatedByID     string     `json:"updated_by_id"`
 }
 
-// Comment is one Plane issue comment in contract shape. DeltaJSON is the
-// TipTap document the comment stores; DeltaHTML is the fallback render.
 // Comment is one Plane comment in contract shape. CommentJSON is the editor
 // document the comment stores (issue_comments.comment_json); CommentHTML is
 // Plane's render (comment_html); Text is the stripped plain text

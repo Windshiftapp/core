@@ -2,7 +2,6 @@ package planeimport
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -274,8 +273,6 @@ func applyMarks(text string, marks []tiptapMark) string {
 }
 
 func renderTable(n tiptapNode) (string, bool) {
-	rowsAttr := attrInt(n.Attrs, "columnWidths", 0)
-	_ = rowsAttr
 	var rows [][]string
 	headerRow := -1
 	for ri, row := range n.Content {
@@ -468,5 +465,3 @@ func normalizeMarkdownBlankLines(s string) string {
 func ConvertDescriptionFromHTML(html string) string {
 	return strings.TrimSpace(html)
 }
-
-var _ = fmt.Sprintf // keep fmt for future errors without churn
