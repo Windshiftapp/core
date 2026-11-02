@@ -30,6 +30,7 @@ export default {
     // Trigger types
     trigger: {
       statusTransition: 'Status Transition',
+      statusLoop: 'Status Loop',
       itemCreated: 'Item Created',
       itemUpdated: 'Item Updated',
       itemLinked: 'Item Linked',
@@ -120,6 +121,7 @@ export default {
       triggerType: 'Trigger Type',
       fromStatus: 'From Status',
       toStatus: 'To Status',
+      loopStatus: 'Looped Status',
       anyStatus: 'Any Status',
       triggerField: 'Changed Field',
       anyField: 'Any field (all changes)',

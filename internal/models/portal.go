@@ -290,7 +290,8 @@ type CustomerOrganisation struct {
 }
 
 // CustomerOrganisationBuiltinNoCustomer is the builtin_key of the placeholder
-// organisation that owns projects and worklogs created without a real customer.
+// organisation that owns time projects created without a real customer. Worklogs
+// derive their customer from the project.
 const CustomerOrganisationBuiltinNoCustomer = "no_customer"
 
 // Portal organisation request-sharing modes stored in

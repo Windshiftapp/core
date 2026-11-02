@@ -5,10 +5,12 @@
   /**
    * @type {{
    *   label?: string,
+   *   labelSnippet?: import('svelte').Snippet | null,
    *   value?: any,
    *   type?: string,
    *   placeholder?: string,
    *   required?: boolean,
+   *   requiredMark?: boolean,
    *   disabled?: boolean,
    *   autofocus?: boolean,
    *   id?: string,
@@ -40,10 +42,15 @@
    */
   let {
     label = '',
+    // Renders rich label content (icons, helper spans) in place of `label`.
+    labelSnippet = null,
     value = $bindable(''),
     type = 'text',
     placeholder = '',
     required = false,
+    // Shows the required asterisk without setting the input's `required`
+    // attribute, for fields the form validates itself.
+    requiredMark = false,
     disabled = false,
     autofocus = false,
     id = undefined,
@@ -75,8 +82,12 @@
 </script>
 
 <div class={className}>
-  {#if label}
-    <Label for={id} {required} color={labelColor} size={labelSize} class={labelClass}>{label}</Label>
+  {#if labelSnippet}
+    <Label for={id} required={required || requiredMark} color={labelColor} size={labelSize} class={labelClass}>
+      {@render labelSnippet()}
+    </Label>
+  {:else if label}
+    <Label for={id} required={required || requiredMark} color={labelColor} size={labelSize} class={labelClass}>{label}</Label>
   {/if}
   <Input
     {type}

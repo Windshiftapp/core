@@ -1567,7 +1567,6 @@ type jiraImportWorkflowGroup struct {
 	authoritative       bool
 	rulesComplete       bool
 	guardedTransitions  int
-	unsupportedLoops    int
 	unsupportedActions  int
 	unsupportedTriggers int
 }
@@ -1710,12 +1709,11 @@ func (h *JiraImportHandler) ensureWorkflowsAndConfigSet(
 			Edges: serviceEdges, ItemTypeIDs: group.itemTypeIDs,
 			Metadata: map[string]any{
 				"fidelity": fidelity, "transition_count": len(edges),
-				"transition_rules_complete":         group.rulesComplete,
-				"guarded_transition_count":          group.guardedTransitions,
-				"unsupported_loop_transition_count": group.unsupportedLoops,
-				"review_locked_transition_count":    countReviewLockedJiraEdges(edges),
-				"unsupported_transition_actions":    group.unsupportedActions,
-				"unsupported_transition_triggers":   group.unsupportedTriggers,
+				"transition_rules_complete":       group.rulesComplete,
+				"guarded_transition_count":        group.guardedTransitions,
+				"review_locked_transition_count":  countReviewLockedJiraEdges(edges),
+				"unsupported_transition_actions":  group.unsupportedActions,
+				"unsupported_transition_triggers": group.unsupportedTriggers,
 			},
 		})
 	}
@@ -1851,10 +1849,8 @@ func authoritativeJiraWorkflowEdges(
 	addEdge := func(fromStatusID *int, toStatusID int, reviewLocked bool) {
 		key := "initial:" + strconv.Itoa(toStatusID)
 		if fromStatusID != nil {
-			if *fromStatusID == toStatusID {
-				group.unsupportedLoops++
-				return
-			}
+			// A same-status (loop) transition is valid in Windshift, so import it
+			// like any other edge instead of dropping it.
 			key = strconv.Itoa(*fromStatusID) + ":" + strconv.Itoa(toStatusID)
 		}
 		edge := edgesByKey[key]

@@ -380,13 +380,12 @@
             </FormField>
 
             <!-- Configure button -->
-            <div class="flex flex-col gap-1">
-              <span class="text-xs font-medium invisible">{t('common.action')}</span>
-              <Button variant="default" onclick={handleOpenCoverageConfig}>
+            <FormField label={t('common.action')} labelHidden>
+              <Button variant="default" onclick={handleOpenCoverageConfig} dataTestid="coverage-configure">
                 <IconSettings class="w-4 h-4" />
                 {t('common.configure')}
               </Button>
-            </div>
+            </FormField>
           </div>
         {/snippet}
       </PageHeader>

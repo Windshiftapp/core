@@ -215,9 +215,9 @@ var scopeCatalog = []ScopeInfo{
 	{Scope: ScopeLinksRead, Resource: "links", ResourceLabel: "Links", Action: "read", Label: "Discover links", Description: "Read link types and search resources that can be linked.", AgentDefault: true},
 	{Scope: ScopeLinksWrite, Resource: "links", ResourceLabel: "Links", Action: "write", Label: "Manage links", Description: "Create and remove links between accessible resources.", AgentDefault: true},
 
-	{Scope: ScopeMilestonesRead, Resource: "milestones", ResourceLabel: "Milestones", Action: "read", Label: "Read milestones", Description: "Read milestones and their progress.", AgentDefault: true},
-	{Scope: ScopeMilestonesWrite, Resource: "milestones", ResourceLabel: "Milestones", Action: "write", Label: "Manage milestones", Description: "Create and update milestones."},
-	{Scope: ScopeMilestonesDelete, Resource: "milestones", ResourceLabel: "Milestones", Action: "delete", Label: "Delete milestones", Description: "Delete milestones. Destructive — opt in deliberately."},
+	{Scope: ScopeMilestonesRead, Resource: "milestones", ResourceLabel: "Milestones", Action: "read", Label: "Read milestones", Description: "Read milestones, their progress, and comments.", AgentDefault: true},
+	{Scope: ScopeMilestonesWrite, Resource: "milestones", ResourceLabel: "Milestones", Action: "write", Label: "Manage milestones", Description: "Create and update milestones and their comments."},
+	{Scope: ScopeMilestonesDelete, Resource: "milestones", ResourceLabel: "Milestones", Action: "delete", Label: "Delete milestones", Description: "Delete milestones and milestone comments. Destructive — opt in deliberately."},
 
 	{Scope: ScopeIterationsRead, Resource: "iterations", ResourceLabel: "Iterations", Action: "read", Label: "Read iterations", Description: "Read iterations and their contents.", AgentDefault: true},
 	{Scope: ScopeIterationsWrite, Resource: "iterations", ResourceLabel: "Iterations", Action: "write", Label: "Manage iterations", Description: "Create and update iterations."},

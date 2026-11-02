@@ -7,6 +7,7 @@
 
   const triggerLabels = {
     'status_transition': t('actions.trigger.statusTransition'),
+    'status_loop': t('actions.trigger.statusLoop'),
     'item_created': t('actions.trigger.itemCreated'),
     'item_updated': t('actions.trigger.itemUpdated'),
     'item_linked': t('actions.trigger.itemLinked'),
@@ -44,6 +45,12 @@
     // Handle item_updated with field_name
     if (triggerType === 'item_updated' && config?.field_name) {
       return `${t('actions.config.triggerField')}: ${getFieldLabel(config.field_name)}`;
+    }
+
+    // Handle status_loop with a looped status
+    if (triggerType === 'status_loop' && config?.to_status_id) {
+      const status = nodeData.statuses?.find(s => s.id === config.to_status_id);
+      return `${t('actions.config.loopStatus')}: ${status?.name || config.to_status_id}`;
     }
 
     // Handle status_transition with from/to status

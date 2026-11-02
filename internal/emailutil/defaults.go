@@ -237,7 +237,7 @@ const mentionText = `Hi {{.RecipientName}},
 {{.ActorName}} mentioned you in {{.SourceLabel}} on {{.ItemKey}} · {{.ItemTitle}}
 
 ─────────────────────────────
-{{.Content}}
+{{plainMentions .Content}}
 ─────────────────────────────
 {{if .ActionURL}}
 View in Windshift: {{.ActionURL}}
@@ -257,7 +257,7 @@ const portalReplyHTML = emailShellOpen + `<p style="margin:0 0 16px;font-size:14
 const portalReplyText = `{{.AuthorName}} replied on {{.ItemKey}} · {{.ItemTitle}}
 
 ─────────────────────────────
-{{.Content}}
+{{plainMentions .Content}}
 ─────────────────────────────
 {{if .PortalURL}}
 View this request in your portal: {{.PortalURL}}

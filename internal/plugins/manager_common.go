@@ -39,6 +39,9 @@ type ManagerOptions struct {
 	// contributes capabilities when its stored license verifies. Nil keeps the
 	// legacy behavior where every loaded plugin's capabilities count.
 	LicenseVerifier LicenseVerifier
+	// AllowPublicRoutes permits plugin routes that declare auth "none". Off by
+	// default so a public route requires a deliberate operator opt-in.
+	AllowPublicRoutes bool
 }
 
 // LicenseVerifier validates a plugin's license token. It returns nil when the
@@ -77,5 +80,12 @@ func WithAdditionalPluginDirs(dirs ...string) Option {
 func WithLicenseVerifier(verifier LicenseVerifier) Option {
 	return func(o *ManagerOptions) {
 		o.LicenseVerifier = verifier
+	}
+}
+
+// WithAllowPublicRoutes permits plugin routes that declare auth "none".
+func WithAllowPublicRoutes(allow bool) Option {
+	return func(o *ManagerOptions) {
+		o.AllowPublicRoutes = allow
 	}
 }

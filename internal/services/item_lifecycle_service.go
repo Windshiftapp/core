@@ -452,14 +452,14 @@ type ItemSplitResult struct {
 	MovedAttachments int          `json:"moved_attachments"`
 }
 
-// resolveSplitChildType picks the item type for a split child. An explicit
+// resolveChildItemType picks the item type for a child of source. An explicit
 // request is honored only when it is a legal child of the source type — the
 // next hierarchy level down or the generic sub-task sentinel. When the caller
 // omits a type, the first next-level type in catalog order is used, falling
 // back to the generic sub-task. Copying the source type is deliberately not a
 // fallback: a regular type may not parent its own level, so an Initiative's
 // subticket is an Epic, never another Initiative.
-func resolveSplitChildType(db database.Database, source *models.Item, requested *int) (*int, error) {
+func resolveChildItemType(db database.Database, source *models.Item, requested *int) (*int, error) {
 	if source.ItemTypeID == nil {
 		return nil, &validation.ValidationError{Field: "item_type_id", Message: "Source item has no item type"}
 	}
@@ -549,7 +549,7 @@ func (s *ItemLifecycleService) Split(ctx context.Context, input ItemSplitInput) 
 	if len(input.CommentIDs) == 0 && len(input.AttachmentIDs) == 0 {
 		return nil, &validation.ValidationError{Field: "comment_ids", Message: "Select at least one comment or attachment to split out"}
 	}
-	childTypeID, err := resolveSplitChildType(s.db, source, input.ItemTypeID)
+	childTypeID, err := resolveChildItemType(s.db, source, input.ItemTypeID)
 	if err != nil {
 		return nil, err
 	}

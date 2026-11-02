@@ -533,6 +533,35 @@ func (r *ItemRepository) GetWorkspaceIDCtx(ctx context.Context, itemID int) (int
 	return workspaceID, nil
 }
 
+// GetWorkspaceIDs resolves the owning workspace of many items in one query.
+// Items that do not exist are absent from the returned map, so callers can
+// treat a missing entry as "not found".
+func (r *ItemRepository) GetWorkspaceIDs(itemIDs []int) (map[int]int, error) {
+	resolved := make(map[int]int, len(itemIDs))
+	if len(itemIDs) == 0 {
+		return resolved, nil
+	}
+
+	clause, args := inPlaceholders(itemIDs)
+	rows, err := r.db.Query("SELECT id, workspace_id FROM items WHERE id IN ("+clause+")", args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query item workspace ids: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var itemID, workspaceID int
+		if err := rows.Scan(&itemID, &workspaceID); err != nil {
+			return nil, fmt.Errorf("failed to scan item workspace id: %w", err)
+		}
+		resolved[itemID] = workspaceID
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate item workspace ids: %w", err)
+	}
+	return resolved, nil
+}
+
 // ChildItemSummary is the projection used by item briefings. It carries
 // descriptions but not attachments, so a parent briefing can include children
 // without pulling in attachment data.
@@ -958,6 +987,68 @@ func (r *ItemRepository) GetNextWorkspaceItemNumber(tx database.Tx, workspaceID 
 	return int(maxNumber + 1), nil
 }
 
+// IsWorkspaceItemNumberTaken reports whether a workspace item number is already
+// in use by an item or retired in item_key_reservations. Import paths use it to
+// honor a source key's number when it is free and fall back when it is not.
+func (r *ItemRepository) IsWorkspaceItemNumberTaken(tx database.Tx, workspaceID, number int) (bool, error) {
+	var conflicts int
+	if err := tx.QueryRow(`
+		SELECT COUNT(*) FROM (
+			SELECT 1 FROM items WHERE workspace_id = ? AND workspace_item_number = ?
+			UNION ALL
+			SELECT 1 FROM item_key_reservations WHERE workspace_id = ? AND workspace_item_number = ?
+		) AS conflicts
+	`, workspaceID, number, workspaceID, number).Scan(&conflicts); err != nil {
+		return false, fmt.Errorf("check workspace item number %d: %w", number, err)
+	}
+	return conflicts > 0, nil
+}
+
+// ReserveDeletedItemNumbers retires, per workspace, the highest item number
+// among the rows being removed. Deletion is a hard DELETE, so without a
+// reservation the MAX+1 allocator would reissue the workspace's top key after
+// its item is gone. Retiring a number below the workspace max is harmless, so
+// this needs no "was it the max?" read. movedBy and moved_item_id are
+// provenance only; the allocator never reads them.
+func (r *ItemRepository) ReserveDeletedItemNumbers(tx database.Tx, items []*models.Item, movedBy int) error {
+	type topNumber struct {
+		itemID int
+		number int
+	}
+	highest := make(map[int]topNumber)
+	for _, item := range items {
+		if item == nil || item.WorkspaceID == 0 || item.WorkspaceItemNumber <= 0 {
+			continue
+		}
+		current, ok := highest[item.WorkspaceID]
+		if !ok || item.WorkspaceItemNumber > current.number {
+			highest[item.WorkspaceID] = topNumber{itemID: item.ID, number: item.WorkspaceItemNumber}
+		}
+	}
+	if len(highest) == 0 {
+		return nil
+	}
+	now := time.Now()
+	for workspaceID, top := range highest {
+		var movedByArg, movedItemArg any
+		if movedBy > 0 {
+			movedByArg = movedBy
+		}
+		if top.itemID > 0 {
+			movedItemArg = top.itemID
+		}
+		if _, err := tx.Exec(`
+			INSERT INTO item_key_reservations (
+				workspace_id, workspace_item_number, moved_item_id, moved_by, created_at
+			) VALUES (?, ?, ?, ?, ?)
+			ON CONFLICT (workspace_id, workspace_item_number) DO NOTHING
+		`, workspaceID, top.number, movedItemArg, movedByArg, now); err != nil {
+			return fmt.Errorf("reserve deleted item key %d-%d: %w", workspaceID, top.number, err)
+		}
+	}
+	return nil
+}
+
 // Create inserts an item in a caller-owned transaction. It is the single
 // items-row insert: every creation path (services.CreateItem, workspace clone,
 // and the CreateWithRetry wrapper) goes through it, so all callers write the
@@ -1272,26 +1363,6 @@ func (r *ItemRepository) GetParentID(itemID int) (*int, error) {
 	return nullIntPtr(parentID), nil
 }
 
-// GetParentIDAndHierarchyLevel returns the stored parent and hierarchy level.
-func (r *ItemRepository) GetParentIDAndHierarchyLevel(itemID int) (parentID, hierarchyLevel *int, err error) {
-	var parent, level sql.NullInt64
-	err = r.db.QueryRow(`
-		SELECT i.parent_id, it.hierarchy_level
-		FROM items i
-		LEFT JOIN item_types it ON i.item_type_id = it.id
-		WHERE i.id = ?
-	`, itemID).Scan(&parent, &level)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, nil, fmt.Errorf("get parent and hierarchy level: %w", err)
-	}
-	assignNullableInt(&parentID, parent)
-	assignNullableInt(&hierarchyLevel, level)
-	return parentID, hierarchyLevel, nil
-}
-
 // GetParentIDTx locks and reads the parent inside the supplied transaction.
 func (r *ItemRepository) GetParentIDTx(tx database.Tx, itemID int) (*int, error) {
 	query := `SELECT parent_id FROM items WHERE id = ?`
@@ -1363,6 +1434,44 @@ func (r *ItemRepository) CountByField(column string, value any) (int, error) {
 		return 0, fmt.Errorf("failed to count items by %s: %w", column, err)
 	}
 	return count, nil
+}
+
+// CountByFieldIn counts items grouped by an allowlisted column across many
+// values in one query. Values with no matching items are absent from the
+// returned map.
+func (r *ItemRepository) CountByFieldIn(column string, values []int) (map[int]int, error) {
+	if !itemCountableColumns[column] {
+		return nil, fmt.Errorf("CountByFieldIn: column %q is not in the allow-list", column)
+	}
+	counts := make(map[int]int, len(values))
+	if len(values) == 0 {
+		return counts, nil
+	}
+
+	clause, args := inPlaceholders(values)
+	// The column name is validated against a fixed allow-list above, so the
+	// fmt.Sprintf here cannot splice attacker-controlled input.
+	query := fmt.Sprintf(
+		"SELECT %s, COUNT(*) FROM items WHERE %s IN (%s) GROUP BY %s",
+		column, column, clause, column,
+	)
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count items by %s: %w", column, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var value, count int
+		if err := rows.Scan(&value, &count); err != nil {
+			return nil, fmt.Errorf("failed to scan item count by %s: %w", column, err)
+		}
+		counts[value] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate item counts by %s: %w", column, err)
+	}
+	return counts, nil
 }
 
 // FindIDByKeyAndNumber resolves a case-insensitive KEY-NUMBER reference.

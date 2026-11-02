@@ -33,25 +33,6 @@ func (r *ActiveTimerRepository) GetProjectStatus(projectID int) (string, error) 
 	return status, err
 }
 
-// GetProjectCustomerID returns the optional customer_id linked to a time
-// project. A nil ID is distinct from a missing project and lets TimerService
-// reject new timers while safely recovering legacy running timers.
-func (r *ActiveTimerRepository) GetProjectCustomerID(projectID int) (*int, error) {
-	var customerID sql.NullInt64
-	err := r.db.QueryRow("SELECT customer_id FROM time_projects WHERE id = ?", projectID).Scan(&customerID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	if !customerID.Valid {
-		return nil, nil
-	}
-	id := int(customerID.Int64)
-	return &id, nil
-}
-
 // GetUserTimezone returns the user's configured timezone. Empty values keep
 // the application's UTC default.
 func (r *ActiveTimerRepository) GetUserTimezone(userID int) (string, error) {
@@ -123,7 +104,7 @@ func (r *ActiveTimerRepository) DeleteTimer(id int) error {
 func (r *ActiveTimerRepository) FinalizeTimer(timerID int, in CreateWorklogInput) error {
 	return database.WithTx(r.db, func(tx database.Tx) error {
 		if _, err := tx.ExecWrite(createWorklogQuery,
-			in.ProjectID, in.CustomerID, in.UserID, in.ItemID, in.Description,
+			in.ProjectID, in.UserID, in.ItemID, in.Description,
 			in.DateUnix, in.StartTimeUnix, in.EndTimeUnix,
 			in.DurationMinutes, in.NowUnix, in.NowUnix,
 		); err != nil {
@@ -223,7 +204,6 @@ func scanJoinedActiveTimer(row *sql.Row) (*models.ActiveTimer, error) {
 // when a timer stops.
 type CreateWorklogInput struct {
 	ProjectID       int
-	CustomerID      int
 	UserID          int
 	ItemID          *int
 	Description     string
@@ -235,15 +215,15 @@ type CreateWorklogInput struct {
 }
 
 const createWorklogQuery = `
-		INSERT INTO time_worklogs (project_id, customer_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO time_worklogs (project_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 // CreateWorklog inserts a standalone worklog row. Timer stops use
 // FinalizeTimer so worklog creation and timer deletion remain atomic.
 func (r *ActiveTimerRepository) CreateWorklog(in CreateWorklogInput) error {
 	_, err := r.db.ExecWrite(createWorklogQuery,
-		in.ProjectID, in.CustomerID, in.UserID, in.ItemID, in.Description,
+		in.ProjectID, in.UserID, in.ItemID, in.Description,
 		in.DateUnix, in.StartTimeUnix, in.EndTimeUnix,
 		in.DurationMinutes, in.NowUnix, in.NowUnix)
 	return err

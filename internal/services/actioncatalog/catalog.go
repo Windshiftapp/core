@@ -106,6 +106,13 @@ func Build() (*Catalog, error) {
 		return nil, err
 	}
 	if err := registerTrigger[models.ActionTriggerConfig](c, triggerSpec{
+		Type:        models.ActionTriggerStatusLoop,
+		Label:       "Status loop",
+		Description: "Fires when an item is set to the status it already has and its workflow declares a self-transition for that status. to_status_id optionally filters the looped status; item_type_id optionally filters the item type.",
+	}); err != nil {
+		return nil, err
+	}
+	if err := registerTrigger[models.ActionTriggerConfig](c, triggerSpec{
 		Type:        models.ActionTriggerItemCreated,
 		Label:       "Item created",
 		Description: "Fires when a new work item is created. Optional item_type_id filter narrows the match to one type.",
@@ -500,6 +507,7 @@ var AllActionNodeTypes = []models.ActionNodeType{
 // AllActionTriggerTypes is the trigger counterpart of AllActionNodeTypes.
 var AllActionTriggerTypes = []models.ActionTriggerType{
 	models.ActionTriggerStatusTransition,
+	models.ActionTriggerStatusLoop,
 	models.ActionTriggerItemCreated,
 	models.ActionTriggerItemUpdated,
 	models.ActionTriggerItemLinked,

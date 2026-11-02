@@ -292,6 +292,7 @@ export default {
     clickToAddDescription: 'انقر لإضافة وصف',
     noDescriptionProvided: 'لا يوجد وصف - انقر لإضافة واحد',
     addLink: 'إضافة رابط',
+    addPage: 'إضافة صفحة',
     createChild: 'إنشاء فرع',
     child: 'فرع',
     attachFile: 'إرفاق ملف',

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -161,6 +162,9 @@ func (s *ItemCRUDService) deleteSingleWithAuthorization(itemID int, metadata ite
 		if err := s.deleteItemRelationsTx(tx, itemID); err != nil {
 			return err
 		}
+		if err := s.repo.ReserveDeletedItemNumbers(tx, []*models.Item{root}, deleteActorUserID(metadata)); err != nil {
+			return err
+		}
 		return s.repo.Delete(tx, itemID)
 	})
 	if err != nil {
@@ -248,6 +252,11 @@ func (s *ItemCRUDService) deleteWithAuthorization(itemID int, metadata itemevent
 				return err
 			}
 		}
+		// Retire the highest removed number across the whole subtree so the
+		// allocator cannot reissue a key the delete just freed.
+		if err := s.repo.ReserveDeletedItemNumbers(tx, items, deleteActorUserID(metadata)); err != nil {
+			return err
+		}
 		// Remove children first so the foreign key cannot bypass their cleanup.
 		for i := len(items) - 1; i >= 0; i-- {
 			id := items[i].ID
@@ -299,6 +308,19 @@ func (s *ItemCRUDService) stampEmailTrackingCompletedTx(tx database.Tx, itemIDs 
 		return fmt.Errorf("stamp email tracking completed for deleted items: %w", err)
 	}
 	return nil
+}
+
+// deleteActorUserID extracts the deleting user for key-reservation provenance.
+// System, integration, and agent actors have no user row, so they leave NULL.
+func deleteActorUserID(metadata itemevents.Metadata) int {
+	if metadata.ActorKind != "user" {
+		return 0
+	}
+	id, err := strconv.Atoi(metadata.ActorRef)
+	if err != nil || id <= 0 {
+		return 0
+	}
+	return id
 }
 
 func (s *ItemCRUDService) deleteItemRelationsTx(tx database.Tx, itemID int) error {
@@ -749,6 +771,74 @@ func (s *ItemCRUDService) ListDistinctWorkspaceIDsWithQLContext(
 			QLQuery: qlSQL,
 			QLArgs:  qlArgs,
 		},
+	})
+}
+
+// HierarchyListParams contains parameters for an ancestor-scoped hierarchy read.
+type HierarchyListParams struct {
+	WorkspaceID      int
+	CollectionID     int
+	QLQuery          string
+	SubQLQuery       string
+	WorkspaceIDs     []int
+	UserID           int
+	RootIDs          []int
+	MaxDepth         int
+	PerRootLimit     int
+	PerRootOffset    int
+	OmitDescriptions bool
+}
+
+// HierarchyDescendantsContext resolves the collection/QL once and returns the
+// matching descendants of each root, grouped and capped per root.
+func (s *ItemCRUDService) HierarchyDescendantsContext(ctx context.Context, params HierarchyListParams) ([]repository.HierarchyRootGroup, error) {
+	if len(params.WorkspaceIDs) == 0 || len(params.RootIDs) == 0 {
+		return []repository.HierarchyRootGroup{}, nil
+	}
+	resolvedQL, err := s.resolveItemListQLContext(ctx, params.QLQuery, params.CollectionID, params.SubQLQuery, params.UserID)
+	if err != nil {
+		return nil, err
+	}
+	filters := ItemFilters{}
+	if resolvedQL.sql != "" {
+		filters.QLQuery = resolvedQL.sql
+		filters.QLArgs = resolvedQL.args
+	}
+	if !resolvedQL.collectionResolved && params.WorkspaceID > 0 {
+		filters.WorkspaceID = &params.WorkspaceID
+	}
+	return s.repo.HierarchyDescendantsContext(ctx, repository.HierarchyReadParams{
+		RootIDs:          params.RootIDs,
+		WorkspaceIDs:     params.WorkspaceIDs,
+		Filters:          filters,
+		MaxDepth:         params.MaxDepth,
+		PerRootLimit:     params.PerRootLimit,
+		PerRootOffset:    params.PerRootOffset,
+		OmitDescriptions: params.OmitDescriptions,
+	})
+}
+
+// LevelCountsContext resolves the collection/QL once and returns the filtered
+// item count per item-type hierarchy level.
+func (s *ItemCRUDService) LevelCountsContext(ctx context.Context, params ListWithQLParams) ([]repository.HierarchyLevelCount, error) {
+	if len(params.WorkspaceIDs) == 0 {
+		return []repository.HierarchyLevelCount{}, nil
+	}
+	resolvedQL, err := s.resolveItemListQLContext(ctx, params.QLQuery, params.CollectionID, params.SubQLQuery, params.UserID)
+	if err != nil {
+		return nil, err
+	}
+	filters := params.Filters
+	if resolvedQL.sql != "" {
+		filters.QLQuery = resolvedQL.sql
+		filters.QLArgs = resolvedQL.args
+	}
+	if !resolvedQL.collectionResolved && params.WorkspaceID > 0 {
+		filters.WorkspaceID = &params.WorkspaceID
+	}
+	return s.repo.CountByHierarchyLevelContext(ctx, ItemListParams{
+		WorkspaceIDs: params.WorkspaceIDs,
+		Filters:      filters,
 	})
 }
 

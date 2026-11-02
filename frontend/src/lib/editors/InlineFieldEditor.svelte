@@ -10,6 +10,7 @@
   let {
     item, field, fieldType = 'text', options = [], placeholder = '',
     required = false, disabled = false, className = '',
+    maxLines = null,
     enableSingleClick = false, enableDoubleClick = false,
     onitemUpdated = null, onupdateError = null, onclick: onclickProp = null
   } = $props();
@@ -125,6 +126,7 @@
     {required}
     {disabled}
     {className}
+    {maxLines}
     {enableSingleClick}
     {enableDoubleClick}
     onsave={handleSave}

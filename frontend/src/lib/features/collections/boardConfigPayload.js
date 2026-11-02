@@ -6,6 +6,19 @@
 // view_settings, which the backend merges with the stored value, so
 // enabled_views is left untouched.
 
+/** Bounds for the "limit" completed-visibility preset. The upper bound
+ * matches the API's maximum page size, so one read returns the whole cap. */
+export const DEFAULT_COMPLETED_LIMIT = 100;
+export const MIN_COMPLETED_LIMIT = 1;
+export const MAX_COMPLETED_LIMIT = 1000;
+
+/** Coerces a stored completed-item cap into the accepted range. */
+export function normalizeCompletedLimit(value) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return DEFAULT_COMPLETED_LIMIT;
+  return Math.min(MAX_COMPLETED_LIMIT, Math.max(MIN_COMPLETED_LIMIT, parsed));
+}
+
 /** Legacy fields that back each completed-work preset. Kept in sync so a
  * preset switch does not leave the old cap/retention controls active. */
 export function legacyFieldsForCompletedVisibility(visibility) {
@@ -15,14 +28,14 @@ export function legacyFieldsForCompletedVisibility(visibility) {
     case 'last_week':
       return { showRightmostColumnLast50: false, completedItemRetentionDays: 7 };
     default:
-      // all / current_iteration / none all fetch completed work uncapped.
+      // all / limit / none all fetch completed work without a retention window.
       return { showRightmostColumnLast50: false, completedItemRetentionDays: null };
   }
 }
 
 /**
  * @param {object|null} config loaded board configuration
- * @param {{globalMilestoneIds?: number[], showCompleted?: boolean, showOpenFromCompleted?: boolean, completedVisibility?: string}} [options]
+ * @param {{globalMilestoneIds?: number[], showCompleted?: boolean, showOpenFromCompleted?: boolean, completedVisibility?: string, completedLimit?: number}} [options]
  */
 export function buildBoardConfigurationPayload(config, options = {}) {
   const source = config ?? {};
@@ -31,6 +44,7 @@ export function buildBoardConfigurationPayload(config, options = {}) {
     showCompleted = true,
     showOpenFromCompleted = false,
     completedVisibility,
+    completedLimit,
   } = options;
   const globalMilestoneIdsList = [
     ...new Set(globalMilestoneIds.map(Number).filter(Number.isFinite)),
@@ -39,6 +53,10 @@ export function buildBoardConfigurationPayload(config, options = {}) {
     completedVisibility !== undefined
       ? completedVisibility
       : (source.view_settings?.completed_visibility ?? '');
+  const limit =
+    completedLimit !== undefined
+      ? completedLimit
+      : (source.view_settings?.completed_limit ?? DEFAULT_COMPLETED_LIMIT);
   const legacy = visibility
     ? legacyFieldsForCompletedVisibility(visibility)
     : {
@@ -77,6 +95,7 @@ export function buildBoardConfigurationPayload(config, options = {}) {
         show_open_from_completed: showOpenFromCompleted === true,
       },
       ...(visibility ? { completed_visibility: visibility } : {}),
+      ...(visibility === 'limit' ? { completed_limit: normalizeCompletedLimit(limit) } : {}),
     },
   };
 }

@@ -2954,6 +2954,90 @@ var Catalog = []Migration{
 		Postgres:      `ALTER TABLE jira_import_jobs ADD COLUMN IF NOT EXISTS hidden_at TIMESTAMPTZ;`,
 	},
 	{
+		Version:       "20261109_milestone_comments",
+		Name:          "Markdown comments on milestones",
+		CheckSQLite:   sqliteTableCheck("milestone_comments"),
+		CheckPostgres: pgTableCheck("milestone_comments"),
+		SQLite: `
+			CREATE TABLE milestone_comments (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				milestone_id INTEGER NOT NULL,
+				author_id INTEGER NOT NULL,
+				content TEXT NOT NULL,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (milestone_id) REFERENCES milestones(id) ON DELETE CASCADE,
+				FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+			);
+			CREATE INDEX idx_milestone_comments_milestone ON milestone_comments(milestone_id, created_at, id);
+			CREATE INDEX idx_milestone_comments_author ON milestone_comments(author_id);
+		`,
+		Postgres: `
+			CREATE TABLE milestone_comments (
+				id SERIAL PRIMARY KEY,
+				milestone_id INTEGER NOT NULL,
+				author_id INTEGER NOT NULL,
+				content TEXT NOT NULL,
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (milestone_id) REFERENCES milestones(id) ON DELETE CASCADE,
+				FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+			);
+			CREATE INDEX IF NOT EXISTS idx_milestone_comments_milestone ON milestone_comments(milestone_id, created_at, id);
+			CREATE INDEX IF NOT EXISTS idx_milestone_comments_author ON milestone_comments(author_id);
+		`,
+	},
+	{
+		Version:       "20261109_milestone_activity",
+		Name:          "Milestone history and item milestone-change index for the milestone Activity tab",
+		CheckSQLite:   sqliteTableCheck("milestone_history"),
+		CheckPostgres: pgTableCheck("milestone_history"),
+		SQLite: `
+			CREATE TABLE milestone_history (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				milestone_id INTEGER NOT NULL,
+				user_id INTEGER,
+				field_name TEXT NOT NULL,
+				old_value TEXT,
+				new_value TEXT,
+				changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (milestone_id) REFERENCES milestones(id) ON DELETE CASCADE,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+			);
+			CREATE INDEX idx_milestone_history_milestone ON milestone_history(milestone_id, changed_at, id);
+			CREATE INDEX idx_milestone_history_user ON milestone_history(user_id);
+			CREATE INDEX IF NOT EXISTS idx_item_history_milestones
+				ON item_history(changed_at DESC, id DESC)
+				WHERE field_name = 'milestones';
+		`,
+		Postgres: `
+			CREATE TABLE milestone_history (
+				id SERIAL PRIMARY KEY,
+				milestone_id INTEGER NOT NULL,
+				user_id INTEGER,
+				field_name TEXT NOT NULL,
+				old_value TEXT,
+				new_value TEXT,
+				changed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (milestone_id) REFERENCES milestones(id) ON DELETE CASCADE,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+			);
+			CREATE INDEX IF NOT EXISTS idx_milestone_history_milestone ON milestone_history(milestone_id, changed_at, id);
+			CREATE INDEX IF NOT EXISTS idx_milestone_history_user ON milestone_history(user_id);
+			CREATE INDEX IF NOT EXISTS idx_item_history_milestones
+				ON item_history(changed_at DESC, id DESC)
+				WHERE field_name = 'milestones';
+		`,
+	},
+	{
+		Version:       "20261109_milestone_last_activity",
+		Name:          "Store the time of each milestone's newest Activity entry",
+		CheckSQLite:   sqliteColumnCheck("milestones", "last_activity_at"),
+		CheckPostgres: pgColumnCheck("milestones", "last_activity_at"),
+		SQLite:        `ALTER TABLE milestones ADD COLUMN last_activity_at DATETIME;`,
+		Postgres:      `ALTER TABLE milestones ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMPTZ;`,
+	},
+	{
 		Version:       "20261110_intake_import_existing_mail",
 		Name:          "Let a new email intake start from new mail instead of importing the mailbox history (WI-1775)",
 		CheckSQLite:   sqliteColumnCheck("intakes", "import_existing_mail"),
@@ -3060,7 +3144,44 @@ var Catalog = []Migration{
 		ApplyPostgres: applyItemSearchIndexPostgres,
 	},
 	{
-		Version:       "20261117_plane_import_mappings",
+
+		Version: "20261117_time_project_customer_backfill",
+		Name:    "Backfill NULL time-project customers to the no-customer placeholder",
+		// Effect present when no project lacks a customer. Projects written before
+		// the no-customer placeholder existed can still carry NULL; the worklog
+		// customer is now derived from the project, so the invariant must hold.
+		CheckSQLite:   "SELECT CASE WHEN (SELECT COUNT(*) FROM time_projects WHERE customer_id IS NULL) = 0 THEN 1 ELSE 0 END",
+		CheckPostgres: "SELECT CASE WHEN (SELECT COUNT(*) FROM time_projects WHERE customer_id IS NULL) = 0 THEN 1 ELSE 0 END",
+		SQLite: `
+			UPDATE time_projects
+			SET customer_id = (SELECT id FROM customer_organisations WHERE builtin_key = 'no_customer')
+			WHERE customer_id IS NULL;
+		`,
+		Postgres: `
+			UPDATE time_projects
+			SET customer_id = (SELECT id FROM customer_organisations WHERE builtin_key = 'no_customer')
+			WHERE customer_id IS NULL;
+		`,
+	},
+	{
+		Version: "20261118_drop_time_worklog_customer",
+		Name:    "Drop the denormalised customer reference from time worklogs",
+		// Effect present when the column is gone. Worklogs derive their customer
+		// from the project (customer -> project -> worklog), so deleting an
+		// organisation can no longer cascade into worklog data.
+		CheckSQLite:   "SELECT CASE WHEN (SELECT COUNT(*) FROM pragma_table_info('time_worklogs') WHERE name='customer_id') = 0 THEN 1 ELSE 0 END",
+		CheckPostgres: "SELECT CASE WHEN (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='time_worklogs' AND column_name='customer_id') = 0 THEN 1 ELSE 0 END",
+		// SQLite cannot drop a column used in a foreign key in place; the
+		// ApplySQLite rebuild handles it. The SQL field is the checksum marker.
+		SQLite:      "drop-time-worklog-customer:v1",
+		ApplySQLite: dropTimeWorklogCustomerSQLite,
+		Postgres: `
+			ALTER TABLE time_worklogs DROP COLUMN IF EXISTS customer_id;
+			DROP INDEX IF EXISTS idx_time_worklogs_customer_id;
+		`,
+	},
+	{
+		Version:       "20261119_plane_import_mappings",
 		Name:          "External-id map for the Plane importer (idempotent re-runs, provenance)",
 		CheckSQLite:   `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='plane_import_mappings'`,
 		CheckPostgres: `SELECT COUNT(*) FROM information_schema.tables WHERE table_name='plane_import_mappings'`,
@@ -3089,6 +3210,78 @@ CREATE TABLE IF NOT EXISTS plane_import_mappings (
 );
 CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_mappings(workspace_id, entity_type, windshift_id);`,
 	},
+}
+
+// dropTimeWorklogCustomerSQLite rebuilds time_worklogs without the customer_id
+// column and its foreign key for SQLite, which cannot drop a column referenced
+// by a foreign key in place.
+func dropTimeWorklogCustomerSQLite(db Database) (retErr error) {
+	sqliteDB, ok := db.(*SQLiteDB)
+	if !ok {
+		return fmt.Errorf("expected SQLite database, got %T", db)
+	}
+
+	ctx := context.Background()
+	conn, err := sqliteDB.writeConn.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire SQLite write connection: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	var foreignKeysEnabled bool
+	if err := conn.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&foreignKeysEnabled); err != nil {
+		return fmt.Errorf("read foreign_keys pragma: %w", err)
+	}
+	if foreignKeysEnabled {
+		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=OFF"); err != nil {
+			return fmt.Errorf("disable foreign keys: %w", err)
+		}
+		defer func() {
+			if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=ON"); retErr == nil && err != nil {
+				retErr = fmt.Errorf("restore foreign keys: %w", err)
+			}
+		}()
+	}
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin time_worklogs rebuild: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	statements := []string{
+		`CREATE TABLE time_worklogs_migration (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			project_id INTEGER NOT NULL,
+			user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+			item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
+			description TEXT NOT NULL,
+			date INTEGER NOT NULL,
+			start_time INTEGER NOT NULL,
+			end_time INTEGER NOT NULL,
+			duration_minutes INTEGER NOT NULL,
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL,
+			FOREIGN KEY (project_id) REFERENCES time_projects(id) ON DELETE CASCADE
+		)`,
+		`INSERT INTO time_worklogs_migration (id, project_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at)
+			SELECT id, project_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at FROM time_worklogs`,
+		`DROP TABLE time_worklogs`,
+		`ALTER TABLE time_worklogs_migration RENAME TO time_worklogs`,
+		`CREATE INDEX IF NOT EXISTS idx_time_worklogs_project_id ON time_worklogs(project_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_time_worklogs_date ON time_worklogs(date)`,
+		`CREATE INDEX IF NOT EXISTS idx_time_worklogs_item_id ON time_worklogs(item_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_time_worklogs_user_id ON time_worklogs(user_id)`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("rebuild time_worklogs: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit time_worklogs rebuild: %w", err)
+	}
+	return nil
 }
 
 // itemSearchIndexName is the PostgreSQL GIN index backing token-prefix item

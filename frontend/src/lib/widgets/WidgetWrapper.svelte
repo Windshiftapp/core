@@ -236,19 +236,19 @@
     </div>
 
     <div class="flex items-center gap-1 flex-shrink-0">
-      <!-- Width presets menu (available outside edit mode too) -->
-      <DropdownMenu
-        triggerIcon={MoreHorizontal}
-        iconOnly={true}
-        showChevron={false}
-        triggerLabel={t('widgets.resizeAriaLabel')}
-        triggerClass="!p-1 text-ds-text-subtle hover:text-ds-text hover:bg-ds-surface-hovered rounded"
-        triggerTestid="widget-width-menu"
-        placement="bottom-end"
-        items={menuItems}
-      />
-
       {#if isEditing}
+        <!-- Width presets, row count, density, and widget-specific actions. -->
+        <DropdownMenu
+          triggerIcon={MoreHorizontal}
+          iconOnly={true}
+          showChevron={false}
+          triggerLabel={t('widgets.resizeAriaLabel')}
+          triggerClass="!p-1 text-ds-text-subtle hover:text-ds-text hover:bg-ds-surface-hovered rounded"
+          triggerTestid="widget-width-menu"
+          placement="bottom-end"
+          items={menuItems}
+        />
+
         <button
           class="hover:text-ds-text-danger p-1 text-ds-text-subtlest"
           onclick={handleRemove}
@@ -279,26 +279,26 @@
     {@render children?.()}
   </div>
 
-  <!-- Resize handle (right edge). Available in every mode; the grip is
-       revealed on widget hover and stays visible while editing. -->
-  <button
-    class="widget-resize-handle"
-    class:widget-resize-handle--editing={isEditing}
-    class:widget-resize-handle--active={isResizing}
-    data-testid="widget-resize-handle"
-    role="slider"
-    tabindex={isEditing ? 0 : -1}
-    aria-label={t('widgets.resizeAriaLabel')}
-    aria-valuemin={minWidth}
-    aria-valuemax={maxWidth}
-    aria-valuenow={displayColumns}
-    aria-valuetext={t('widgets.resizeColumnsValue', { count: displayColumns, total: totalColumns })}
-    onmousedown={onResizeStart}
-    ondblclick={onResizeHandleDblClick}
-    onkeydown={handleSliderKeydown}
-  >
-    <span class="widget-resize-grip" data-testid="widget-resize-grip" aria-hidden="true"></span>
-  </button>
+  <!-- Resize handle (right edge), rendered only while editing the layout. -->
+  {#if isEditing}
+    <button
+      class="widget-resize-handle"
+      class:widget-resize-handle--active={isResizing}
+      data-testid="widget-resize-handle"
+      role="slider"
+      tabindex="0"
+      aria-label={t('widgets.resizeAriaLabel')}
+      aria-valuemin={minWidth}
+      aria-valuemax={maxWidth}
+      aria-valuenow={displayColumns}
+      aria-valuetext={t('widgets.resizeColumnsValue', { count: displayColumns, total: totalColumns })}
+      onmousedown={onResizeStart}
+      ondblclick={onResizeHandleDblClick}
+      onkeydown={handleSliderKeydown}
+    >
+      <span class="widget-resize-grip" data-testid="widget-resize-grip" aria-hidden="true"></span>
+    </button>
+  {/if}
 
   {#if isResizing}
     <div class="widget-resize-guide" data-testid="widget-resize-guide">
@@ -344,23 +344,12 @@
     touch-action: none;
   }
 
-  /* Revealed on widget hover and kept visible while editing, so the resize
-     affordance is discoverable without cluttering the resting page. */
   .widget-resize-grip {
     width: 3px;
     height: 2.5rem;
     border-radius: 9999px;
     background-color: var(--ds-text-subtlest);
-    opacity: 0;
-    transition: background-color 140ms ease-in-out, opacity 140ms ease-in-out,
-      transform 140ms ease-in-out;
-  }
-
-  .widget-container:hover .widget-resize-grip,
-  .widget-resize-handle:focus-visible .widget-resize-grip,
-  .widget-resize-handle--active .widget-resize-grip,
-  .widget-resize-handle--editing .widget-resize-grip {
-    opacity: 1;
+    transition: background-color 140ms ease-in-out, transform 140ms ease-in-out;
   }
 
   .widget-resize-handle:hover .widget-resize-grip,

@@ -2,7 +2,7 @@
   import Modal from './Modal.svelte';
   import ModalHeader from './ModalHeader.svelte';
   import DialogFooter from './DialogFooter.svelte';
-  import Input from '../components/Input.svelte';
+  import TextField from '../components/TextField.svelte';
   import TextareaField from '../components/TextareaField.svelte';
   import Toggle from '../components/Toggle.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
@@ -64,17 +64,18 @@
               />
             {/key}
           {:else}
-            <div class="mb-4">
-              <Label color="default" required class="mb-2">{t('common.name')}</Label>
-              <Input
-                type="text"
-                dataTestid="status-modal-name"
-                placeholder={t('statuses.namePlaceholder')}
-                bind:value={formData.name}
-                required
-                size="small"
-              />
-            </div>
+            <TextField
+              class="mb-4"
+              label={t('common.name')}
+              labelColor="default"
+              labelClass="mb-2"
+              required
+              type="text"
+              dataTestid="status-modal-name"
+              placeholder={t('statuses.namePlaceholder')}
+              bind:value={formData.name}
+              size="small"
+            />
           {/if}
 
           <div class="mb-4">

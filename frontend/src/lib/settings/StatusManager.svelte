@@ -1,37 +1,31 @@
 <script>
-  import { onMount } from 'svelte';
   import { statuses as statusesApi } from '../api/workflows.js';
-  import Plus from '@lucide/svelte/icons/plus';
   import Edit from '@lucide/svelte/icons/edit';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import Circle from '@lucide/svelte/icons/circle';
   import GitBranch from '@lucide/svelte/icons/git-branch';
-  import Button from '../components/Button.svelte';
   import ColorDot from '../components/ColorDot.svelte';
-  import DataTable from '../components/DataTable.svelte';
-  import Panel from '../components/Panel.svelte';
-  import PageHeader from '../layout/PageHeader.svelte';
-  import { getHexFromColorName } from '../utils/colors.js';
   import Lozenge from '../components/Lozenge.svelte';
-  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
+  import { getHexFromColorName } from '../utils/colors.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
-  import { confirm } from '../composables/useConfirm.js';
   import { loadStatusManagerData } from './statusManagerData.js';
-  import './settings-form.css';
   import { objectDisplayName, objectDisplayValue } from '../utils/systemLabels.js';
   import StatusModal from '../dialogs/StatusModal.svelte';
+  import EntityManagerPage from './EntityManagerPage.svelte';
 
-  let statuses = $state([]);
   let statusCategories = $state([]);
   let workflowTransitions = $state([]);
-  let loading = $state(true);
-  let loadingCategories = $state(true);
-  let showCreateForm = $state(false);
   let editingId = $state(null);
   let editingObject = $state(null);
   let translationEditor = $state(null);
-  let saving = $state(false);
+
+  let formData = $state({
+    name: '',
+    description: '',
+    category_id: null,
+    is_default: false,
+  });
 
   function getStatusDisplayValue(status, field) {
     return objectDisplayValue(status, field);
@@ -45,154 +39,92 @@
     return status?.builtin_key === 'open' || status?.builtin_key === 'done';
   }
 
-  // Form state
-  let formData = $state({
-    name: '',
-    description: '',
-    category_id: null,
-    is_default: false
-  });
+  async function loadStatuses() {
+    const data = await loadStatusManagerData();
+    statusCategories = data.statusCategories;
+    workflowTransitions = data.workflowTransitions;
+    return data.statuses;
+  }
 
-  onMount(async () => {
-    try {
-      loading = true;
-      loadingCategories = true;
-      const data = await loadStatusManagerData();
-      statusCategories = data.statusCategories;
-      workflowTransitions = data.workflowTransitions;
-      statuses = data.statuses;
-      // Set default category if none selected
-      if (statusCategories.length > 0 && !formData.category_id) {
-        formData.category_id = statusCategories[0].id;
-      }
-    } catch (error) {
-      console.error('Failed to load statuses:', error);
-      statusCategories = [];
-      workflowTransitions = [];
-      statuses = [];
-    } finally {
-      loading = false;
-      loadingCategories = false;
-    }
-  });
-
-  function startCreate() {
+  function openCreate() {
     formData = {
       name: '',
       description: '',
       category_id: statusCategories.length > 0 ? statusCategories[0].id : null,
-      is_default: false
+      is_default: false,
     };
     editingId = null;
     editingObject = null;
-    showCreateForm = true;
   }
 
-  function startEdit(status) {
+  function openEdit(status) {
     editingObject = status;
     formData = {
       name: status.name || '',
       description: status.description || '',
       category_id: status.category_id,
-      is_default: status.is_default || false
+      is_default: status.is_default || false,
     };
     editingId = status.id;
-    showCreateForm = true;
-  }
-
-  function cancelForm() {
-    showCreateForm = false;
-    editingId = null;
-    editingObject = null;
-    formData = {
-      name: '',
-      description: '',
-      category_id: statusCategories.length > 0 ? statusCategories[0].id : null,
-      is_default: false
-    };
   }
 
   async function saveStatus() {
-    if (saving) return;
-    saving = true;
-    try {
-      if (!formData.name.trim()) {
-        errorToast(t('dialogs.alerts.nameRequired'));
-        return;
-      }
-
-      if (editingId) {
-        translationEditor?.validate();
-        await statusesApi.update(editingId, formData);
-        await translationEditor?.save();
-        const reloaded = await loadStatusManagerData();
-        statuses = reloaded.statuses;
-        statusCategories = reloaded.statusCategories;
-        workflowTransitions = reloaded.workflowTransitions;
-      } else {
-        const created = await statusesApi.create(formData);
-        statuses = [...statuses, { ...created, transitionCount: 0 }];
-      }
-      
-      cancelForm();
-      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
-    } catch (error) {
-      console.error('Failed to save status:', error);
-      errorToast(t('dialogs.alerts.failedToSave', { error: error.message || error }));
-    } finally {
-      saving = false;
+    if (editingId) {
+      translationEditor?.validate();
+      await statusesApi.update(editingId, formData);
+      await translationEditor?.save();
+    } else {
+      await statusesApi.create(formData);
     }
+    window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
   }
 
   async function deleteStatus(status) {
-    // Protect system-critical statuses
-    if (isProtectedStatus(status)) {
-      return; // Silently ignore - button should already be disabled
-    }
-
+    if (isProtectedStatus(status)) return;
     if (status.transitionCount > 0) {
-      errorToast(t('dialogs.alerts.statusInUseByTransitions', {
-        name: getStatusDisplayValue(status, 'name'),
-        count: status.transitionCount
-      }));
+      errorToast(
+        t('dialogs.alerts.statusInUseByTransitions', {
+          name: getStatusDisplayValue(status, 'name'),
+          count: status.transitionCount,
+        })
+      );
       return;
     }
-
-    const confirmed = await confirm({
-      title: t('common.delete'),
-      message: t('dialogs.confirmations.deleteItem', {
-        name: getStatusDisplayValue(status, 'name')
-      }),
-      confirmText: t('common.delete'),
-      cancelText: t('common.cancel'),
-      variant: 'danger'
-    });
-    if (!confirmed) return;
-
-    try {
-      await statusesApi.delete(status.id);
-      statuses = statuses.filter(s => s.id !== status.id);
-      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
-    } catch (error) {
-      console.error('Failed to delete status:', error);
-      errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
-    }
+    await statusesApi.delete(status.id);
+    window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
   }
 
   function getCategoryColor(categoryId) {
-    const category = statusCategories.find(cat => cat.id === categoryId);
+    const category = statusCategories.find((cat) => cat.id === categoryId);
     if (!category) return '#6b7280';
-
-    // If color is a hex code, return it directly; otherwise convert from color name
     return category.color.startsWith('#') ? category.color : getHexFromColorName(category.color);
   }
 
   function getCategoryName(categoryId) {
-    const category = statusCategories.find(cat => cat.id === categoryId);
+    const category = statusCategories.find((cat) => cat.id === categoryId);
     return category ? getStatusCategoryDisplayName(category) : t('common.unknown');
   }
 
-  function buildStatusDropdownItems(status) {
+  const statusColumns = [
+    { key: 'status_info', label: t('common.status'), slot: 'status' },
+    { key: 'category_info', label: t('common.category'), slot: 'category' },
+    {
+      key: 'description',
+      label: t('common.description'),
+      render: (status) => getStatusDisplayValue(status, 'description') || '—',
+      textColor: 'var(--ds-text-subtle)',
+    },
+    {
+      key: 'transitions',
+      label: t('workflows.transitions'),
+      render: (status) =>
+        t('statuses.transitionCount', { count: status.transitionCount || 0 }),
+      textColor: 'var(--ds-text-subtle)',
+    },
+    { key: 'actions', label: t('common.actions') },
+  ];
+
+  function buildStatusDropdownItems(status, { edit, remove }) {
     const isProtected = isProtectedStatus(status);
     const inUse = status.transitionCount > 0;
 
@@ -204,11 +136,10 @@
         title: t('common.edit'),
         hoverClass: 'hover-bg',
         testid: `status-edit-${status.id}`,
-        onClick: () => startEdit(status)
-      }
+        onClick: () => edit(status),
+      },
     ];
 
-    // Only show delete option for non-protected statuses
     if (!isProtected) {
       items.push({
         id: 'delete',
@@ -218,109 +149,64 @@
         color: 'var(--ds-text-danger)',
         hoverClass: 'hover-danger',
         testid: `status-delete-${status.id}`,
-        onClick: () => deleteStatus(status),
-        disabled: inUse
+        onClick: () => remove(status),
+        disabled: inUse,
       });
     }
 
     return items;
   }
-
-  // Table column definitions
-  const statusColumns = $derived([
-    {
-      key: 'status_info',
-      label: t('common.status'),
-      slot: 'status'
-    },
-    {
-      key: 'category_info',
-      label: t('common.category'),
-      slot: 'category'
-    },
-    {
-      key: 'description',
-      label: t('common.description'),
-      render: (status) => getStatusDisplayValue(status, 'description') || '—',
-      textColor: 'var(--ds-text-subtle)'
-    },
-    {
-      key: 'transitions',
-      label: t('workflows.transitions'),
-      render: (status) => t('statuses.transitionCount', {
-        count: status.transitionCount || 0
-      }),
-      textColor: 'var(--ds-text-subtle)'
-    },
-    {
-      key: 'actions',
-      label: t('common.actions')
-    }
-  ]);
 </script>
 
-<div style="background-color: var(--ds-surface); min-height: 100vh;">
-  <PageHeader
-    icon={GitBranch}
-    title={t('statuses.title')}
-    subtitle={t('statuses.subtitle')}
-    count={t('statuses.statuses', { count: statuses.length })}
-  >
-    {#snippet actions()}
-      <Button
-        variant="primary"
-        icon={Plus}
-        onclick={startCreate}
-        disabled={statusCategories.length === 0}
-        keyboardHint="A"
-        hotkeyConfig={{ key: toHotkeyString('statuses', 'add'), guard: () => !showCreateForm }}
-        dataTestid="status-add"
-      >
-        {t('statuses.createStatus')}
-      </Button>
-    {/snippet}
-  </PageHeader>
+<EntityManagerPage
+  icon={GitBranch}
+  title={t('statuses.title')}
+  subtitle={t('statuses.subtitle')}
+  addLabel={t('statuses.createStatus')}
+  addTestid="status-add"
+  hotkeyScope="statuses"
+  emptyMessage={t('statuses.noStatuses')}
+  emptyIcon={Circle}
+  columns={statusColumns}
+  load={loadStatuses}
+  create={saveStatus}
+  update={saveStatus}
+  remove={deleteStatus}
+  onOpenCreate={openCreate}
+  onOpenEdit={openEdit}
+  confirmDeleteMessage={(status) =>
+    t('dialogs.confirmations.deleteItem', { name: getStatusDisplayValue(status, 'name') })}
+  rowTestid={(status) => `status-row-${status.id}`}
+  actionItems={buildStatusDropdownItems}
+  actionTriggerTestid={(status) => `status-actions-${status.id}`}
+  errorLabels={{ save: t('dialogs.alerts.failedToSave', { error: '' }) }}
+  cellSnippets={{ status: statusNameCell, category: statusCategoryCell }}
+  formModal={statusFormModal}
+>
+</EntityManagerPage>
 
-  {#if statusCategories.length === 0 && !loadingCategories}
-    <Panel padding="spacious" class="text-center">
-      <Circle class="w-12 h-12 text-ds-icon-subtle mx-auto mb-4" />
-      <h3 class="text-lg font-medium text-ds-text mb-2">{t('categories.noCategories')}</h3>
-      <p class="text-ds-text-subtle mb-6">{t('statuses.noStatuses')}</p>
-      <Button href="/admin/status-categories" variant="primary">
-        {t('categories.title')}
-      </Button>
-    </Panel>
-  {:else}
-    <DataTable
-      columns={statusColumns}
-      data={statuses}
-      keyField="id"
-      emptyMessage={t('statuses.noStatuses')}
-      emptyIcon={Circle}
-      actionItems={buildStatusDropdownItems}
-      rowAttrs={(status) => ({ 'data-testid': `status-row-${status.id}` })}
-      actionTriggerTestid={(status) => `status-actions-${status.id}`}
-    >
-      {#snippet status(status)}
-        <div class="flex items-center gap-3">
-          <h3 class="font-medium" style="color: var(--ds-text);">{getStatusDisplayValue(status, 'name')}</h3>
-          {#if status.is_default}
-            <Lozenge color="green" text={t('common.default')} />
-          {/if}
-        </div>
-      {/snippet}
+{#snippet statusNameCell(status)}
+  <div class="flex items-center gap-3">
+    <h3 class="font-medium" style="color: var(--ds-text);">{getStatusDisplayValue(status, 'name')}</h3>
+    {#if status.is_default}
+      <Lozenge color="green" text={t('common.default')} />
+    {/if}
+  </div>
+{/snippet}
 
-      {#snippet category(status)}
-        <div class="flex items-center gap-2">
-          <ColorDot color={getCategoryColor(status.category_id)} class="w-4 h-4 border border-[var(--ds-border)]" />
-          <span class="font-medium" style="color: var(--ds-text);">{getCategoryName(status.category_id)}</span>
-        </div>
-      {/snippet}
-    </DataTable>
-  {/if}
+{#snippet statusCategoryCell(status)}
+  <div class="flex items-center gap-2">
+    <ColorDot
+      color={getCategoryColor(status.category_id)}
+      class="w-4 h-4 border border-[var(--ds-border)]"
+    />
+    <span class="font-medium" style="color: var(--ds-text);">{getCategoryName(status.category_id)}</span>
+  </div>
+{/snippet}
 
+{#snippet statusFormModal({ save, close, saving })}
   <StatusModal
-    isOpen={showCreateForm}
+    isOpen={true}
     bind:formData
     categories={statusCategories}
     isEditing={editingId !== null}
@@ -328,8 +214,8 @@
     displayName={editingObject?.display_name || editingObject?.name}
     displayDescription={editingObject?.display_description || editingObject?.description}
     bind:translationEditor
-    saving={saving}
-    onsave={saveStatus}
-    oncancel={cancelForm}
+    {saving}
+    onsave={save}
+    oncancel={close}
   />
-</div>
+{/snippet}

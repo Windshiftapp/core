@@ -652,6 +652,8 @@ export default {
       "completedVisibility": "已完成工作",
       "completedVisibilityCustom": "自定义（使用下方选项）",
       "completedVisibilityHint": "设置此看板加载多少已完成工作。对所有查看者生效。",
+      "completedLimit": "已完成事项数量",
+      "completedLimitHint": "看板最多显示这么多已完成事项（1–{max}）。",
       "retentionWindowHint": "在此期间内无活动的已完成事项将被隐藏。",
       "systemFieldNames": {
         "created_at": "创建时间",

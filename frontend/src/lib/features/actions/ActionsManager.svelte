@@ -44,6 +44,7 @@
   function getTriggerTypeLabel(triggerType) {
     const labels = {
       'status_transition': t('actions.trigger.statusTransition'),
+      'status_loop': t('actions.trigger.statusLoop'),
       'item_created': t('actions.trigger.itemCreated'),
       'sla_breached': t('actions.trigger.slaBreached'),
       'sla_warning': t('actions.trigger.slaWarning'),

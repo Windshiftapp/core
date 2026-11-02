@@ -478,6 +478,32 @@ type Comment struct {
 	UpdatedAt time.Time    `json:"updated_at"`
 }
 
+// MilestoneComment is one Markdown comment on a milestone, as returned by
+// /rest/api/v2/milestones/{milestone_id}/comments.
+type MilestoneComment struct {
+	ID          int       `json:"id"`
+	MilestoneID int       `json:"milestone_id"`
+	AuthorID    int       `json:"author_id"`
+	AuthorName  string    `json:"author_name,omitempty"`
+	IsAgent     bool      `json:"is_agent,omitempty"`
+	Content     string    `json:"content"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// MilestonePageLink links a workspace milestone to a page in its workspace,
+// as returned by /rest/api/v2/milestones/{milestone_id}/page-links.
+type MilestonePageLink struct {
+	ID            int       `json:"id"`
+	MilestoneID   int       `json:"milestone_id"`
+	PageID        int       `json:"page_id"`
+	PageTitle     string    `json:"page_title"`
+	WorkspaceID   int       `json:"workspace_id"`
+	CreatedBy     *int      `json:"created_by,omitempty"`
+	CreatedByName string    `json:"created_by_name,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
 // ============================================
 // Diagrams
 // ============================================

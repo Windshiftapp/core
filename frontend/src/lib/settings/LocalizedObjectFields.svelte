@@ -288,15 +288,13 @@
       {:else}
         {#if loadError}<AlertBox variant="error" message={loadError} class="mb-3" />{/if}
         <div class="space-y-3">
-          <div>
-            <Label required>{t('common.name')}</Label>
-            <Input
-              value={primaryValues.name}
-              oninput={(event) => setPrimary('name', event.currentTarget.value)}
-              dataTestid={`localized-object-name-${activeLocale}`}
-              required
-            />
-          </div>
+          <TextField
+            label={t('common.name')}
+            required
+            value={primaryValues.name}
+            oninput={(event) => setPrimary('name', event.currentTarget.value)}
+            dataTestid={`localized-object-name-${activeLocale}`}
+          />
           {#if includesDescription}
             <div>
               <Label>{t('common.description')}</Label>

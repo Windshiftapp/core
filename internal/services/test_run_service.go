@@ -527,12 +527,16 @@ func (s *TestRunService) ListExampleResults(runID, workspaceID int) ([]models.Te
 	if err != nil {
 		return nil, err
 	}
+	ids := make([]int, 0, len(results))
 	for i := range results {
-		steps, err := s.bddRepo.FindStepResultsForExample(results[i].ID)
-		if err != nil {
-			return nil, err
-		}
-		results[i].StepResults = steps
+		ids = append(ids, results[i].ID)
+	}
+	stepsByExample, err := s.bddRepo.FindStepResultsForExamples(ids)
+	if err != nil {
+		return nil, err
+	}
+	for i := range results {
+		results[i].StepResults = stepsByExample[results[i].ID]
 	}
 	return results, nil
 }

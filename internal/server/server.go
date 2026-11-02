@@ -206,11 +206,13 @@ type Server struct {
 	portalAuthLimiter     *ratelimit.Limiter
 	oauthTokenLimiter     *ratelimit.Limiter
 	aiRateLimiter         *ratelimit.Limiter
+	widgetGenerateLimiter *ratelimit.Limiter
 	uploadLimiter         *ratelimit.Limiter
 	webhookLimiter        *ratelimit.Limiter
 	searchLimiter         *ratelimit.Limiter
 	calendarFeedLimiter   *ratelimit.Limiter
 	publicBoardLimiter    *ratelimit.Limiter
+	pluginPublicLimiter   *ratelimit.Limiter
 	v2RateLimiter         *ratelimit.Limiter
 	loginLockout          *middleware.LoginLockout
 	userConcurrency       *middleware.UserConcurrencyLimiter
@@ -433,9 +435,13 @@ func (s *Server) initialize() error {
 	s.portalAuthLimiter = ratelimit.New(3.0/60.0, 3, ipKey)
 	s.calendarFeedLimiter = ratelimit.New(10.0/60.0, 15, ipKey)
 	s.publicBoardLimiter = ratelimit.New(30.0/60.0, 60, ipKey)
+	s.pluginPublicLimiter = ratelimit.New(30.0/60.0, 60, ipKey)
 	s.oauthTokenLimiter = ratelimit.New(20.0/60.0, 30, ipKey)
 	s.authRateLimiter = ratelimit.New(20.0/60.0, 30, userKey)
 	s.aiRateLimiter = ratelimit.New(20.0/60.0, 30, userKey)
+	// Widget generation is a much heavier call than a chat turn and users create
+	// widgets rarely, so it gets its own tighter per-user bucket: 20/hour.
+	s.widgetGenerateLimiter = ratelimit.New(20.0/3600.0, 20, userKey)
 	s.uploadLimiter = ratelimit.New(10.0/60.0, 15, userKey)
 	s.webhookLimiter = ratelimit.New(10.0/60.0, 15, userKey)
 	s.searchLimiter = ratelimit.New(20.0/60.0, 30, userKey)
@@ -1428,12 +1434,27 @@ func (s *Server) initialize() error {
 
 	itemDiagramService := services.NewItemDiagramService(repository.NewDiagramRepository(s.db))
 
+	// CSRF origins are shared by the /api middleware chain and the plugin
+	// router, which mounts on the raw mux outside that chain. Derive the scheme
+	// from BASE_URL for origin construction.
+	corsScheme := ""
+	if cfg.BaseURL != "" {
+		if parsed, err := url.Parse(cfg.BaseURL); err == nil {
+			corsScheme = parsed.Scheme
+		}
+	}
+	csrfOrigins := buildAllowedOrigins(cfg.AllowedHosts, effectivePort, corsScheme, cfg.UseProxy)
+	csrfValidator := middleware.NewDisabledCSRFValidator()
+	if !cfg.DisableCSRF {
+		csrfValidator = middleware.NewCSRFValidator(csrfOrigins)
+	}
+
 	var pluginRouter *plugins.Router
 	var pluginLicenseVerifier plugins.LicenseVerifier
 	var instanceService *services.InstanceService
 	if !cfg.Plugins.Disabled {
 		var pluginOpts []plugins.Option
-		pluginOpts = append(pluginOpts, plugins.WithDatabase(s.db), plugins.WithSCMService(scmSyncService), plugins.WithCommentService(commentService))
+		pluginOpts = append(pluginOpts, plugins.WithDatabase(s.db), plugins.WithSCMService(scmSyncService), plugins.WithCommentService(commentService), plugins.WithAllowPublicRoutes(cfg.Plugins.AllowPublicRoutes))
 
 		// License enforcement: when a license public key is configured, a
 		// plugin only contributes capabilities if its license verifies against
@@ -1492,7 +1513,14 @@ func (s *Server) initialize() error {
 		}
 		cancel()
 
-		pluginRouter = plugins.NewRouter(s.pluginManager)
+		pluginRouter = plugins.NewRouter(s.pluginManager, plugins.RouterDeps{
+			RequireAuth:  authMiddleware.RequireAuth,
+			RequireAdmin: permissionMiddleware.RequireSystemAdmin(),
+			CSRF:         csrfValidator,
+			PublicLimit:  s.pluginPublicLimiter.Limit,
+			Permissions:  permService,
+			Logger:       logger.Get(),
+		})
 
 		// Plugin schedule scheduler — invokes plugin handlers on their declared
 		// interval (manifest `schedules:` field). Must start after LoadPlugins
@@ -1610,14 +1638,6 @@ func (s *Server) initialize() error {
 	}
 
 	// Build API middleware chain
-	// Derive scheme from BASE_URL for CORS origin construction
-	corsScheme := ""
-	if cfg.BaseURL != "" {
-		if parsed, err := url.Parse(cfg.BaseURL); err == nil {
-			corsScheme = parsed.Scheme
-		}
-	}
-	csrfOrigins := buildAllowedOrigins(cfg.AllowedHosts, effectivePort, corsScheme, cfg.UseProxy)
 	corsMiddleware := createCORSMiddleware(cfg.AllowedHosts, effectivePort, corsScheme, cfg.DisableCSRF, cfg.UseProxy, cfg.AllowInsecureHTTP)
 	apiCORSMiddleware := createFormEmbedCORSMiddleware(cfg.FormEmbedOrigins, csrfOrigins, corsMiddleware)
 	apiMiddleware := router.MiddlewareChain{
@@ -1691,6 +1711,7 @@ func (s *Server) initialize() error {
 		EmailVerifyLimiter:    s.emailVerifyLimiter,
 		SetupLimiter:          s.setupLimiter,
 		AIRateLimiter:         s.aiRateLimiter,
+		WidgetGenerateLimiter: s.widgetGenerateLimiter,
 		UploadLimiter:         s.uploadLimiter,
 		WebhookLimiter:        s.webhookLimiter,
 		CalendarFeedLimiter:   s.calendarFeedLimiter,
@@ -1958,6 +1979,22 @@ func (s *Server) initialize() error {
 			return planningReleaseProviderAdapter{provider: releaseProvider}, nil
 		},
 	)
+	milestoneCommentService := services.NewMilestoneCommentService(
+		repository.NewMilestoneCommentRepository(s.db),
+		planningApplication,
+		permService,
+	)
+	milestonePageLinkService := services.NewMilestonePageLinkService(
+		repository.NewMilestonePageLinkRepository(s.db),
+		planningApplication,
+		pagePermissionService,
+	)
+	milestoneActivityService := services.NewMilestoneActivityService(
+		repository.NewMilestoneActivityRepository(s.db),
+		planningApplication,
+		permService,
+		milestonePageLinkService,
+	)
 	agentRunApplication := services.NewAgentRunReadService(
 		repository.NewItemRepository(s.db),
 		repository.NewAgentRunRepository(s.db),
@@ -2064,6 +2101,9 @@ func (s *Server) initialize() error {
 		PageAttachments:              services.NewPageAttachmentUploadService(s.db, attachmentStorage, permService, pagePermissionService),
 		Collections:                  services.NewCollectionApplicationService(s.db, permService),
 		Planning:                     planningApplication,
+		MilestoneComments:            milestoneCommentService,
+		MilestonePageLinks:           milestonePageLinkService,
+		MilestoneActivity:            milestoneActivityService,
 		Links:                        itemLinkService,
 		AgentRuns:                    agentRunApplication,
 		AgentSkills:                  services.NewAgentSkillApplicationService(s.db, permService),
@@ -2616,6 +2656,9 @@ func (s *Server) cleanup() {
 	if s.aiRateLimiter != nil {
 		s.aiRateLimiter.Stop()
 	}
+	if s.widgetGenerateLimiter != nil {
+		s.widgetGenerateLimiter.Stop()
+	}
 	if s.uploadLimiter != nil {
 		s.uploadLimiter.Stop()
 	}
@@ -2630,6 +2673,9 @@ func (s *Server) cleanup() {
 	}
 	if s.publicBoardLimiter != nil {
 		s.publicBoardLimiter.Stop()
+	}
+	if s.pluginPublicLimiter != nil {
+		s.pluginPublicLimiter.Stop()
 	}
 	if s.v2RateLimiter != nil {
 		s.v2RateLimiter.Stop()

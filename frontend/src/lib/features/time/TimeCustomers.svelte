@@ -127,6 +127,7 @@
         await loadCustomers();
       } catch (error) {
         console.error('Failed to delete customer:', error);
+        errorToast(t('time.organizations.failedToDelete') + ': ' + (error.message || error));
       }
     }
   }
@@ -151,6 +152,7 @@
         icon: Edit,
         title: t('common.edit'),
         hoverClass: 'hover-bg',
+        testid: 'time-customer-edit',
         onClick: () => startEdit(customer)
       },
       {
@@ -159,6 +161,7 @@
         icon: Trash2,
         title: t('common.delete'),
         hoverClass: 'hover-danger',
+        testid: 'time-customer-delete',
         onClick: () => deleteCustomer(customer)
       }
     ];
@@ -204,6 +207,7 @@
     emptyMessage={t('time.organizations.noOrganizations')}
     emptyIcon={Users}
     actionItems={buildCustomerDropdownItems}
+    actionTriggerTestid={(customer) => `time-customer-actions-${customer.id}`}
   >
     <!-- Customer name with avatar/initials and description -->
     {#snippet name(customer)}

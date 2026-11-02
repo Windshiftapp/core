@@ -44,6 +44,10 @@
     customFieldDefinitions = [],
     onitemUpdated = undefined,
     onupdateError = undefined,
+    // Rendered before the item key in the Key column. The tree view uses it for
+    // the parent-reference chip so the parent context cannot push a row's
+    // leading type icon and title past its children's.
+    keyBefore = null,
   } = $props();
 
   // Get the field definition for custom fields
@@ -120,8 +124,9 @@
 
 {:else if column.field_type === 'system'}
   {#if column.field_identifier === 'key'}
-    <!-- Item Key -->
-    <div class="flex items-center gap-2 min-w-0">
+    <!-- Item Key, with the tree's parent reference in front when present -->
+    <div class="flex items-center gap-1.5 min-w-0">
+      {#if keyBefore}{@render keyBefore({ item })}{/if}
       <ItemKey
         {item}
         {workspace}
@@ -154,12 +159,12 @@
             fieldType="text"
             placeholder="Enter title..."
             required={true}
-            className=""
+            maxLines={2}
             onitemUpdated={(detail) => onitemUpdated?.(detail)}
             onupdateError={(detail) => onupdateError?.(detail)}
           />
         {:else}
-          <span class="truncate text-sm" style="color: var(--ds-text);">{item.title}</span>
+          <span class="text-sm line-clamp-2" style="color: var(--ds-text);">{item.title}</span>
         {/if}
       </div>
     </div>

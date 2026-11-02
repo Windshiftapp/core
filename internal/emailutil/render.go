@@ -15,7 +15,15 @@ import (
 // Markdown field to sanitized HTML so formatting, links, and tables survive
 // into the HTML part of the email.
 var templateFuncs = htmltemplate.FuncMap{
-	"markdown": renderMarkdown,
+	"markdown":      renderMarkdown,
+	"plainMentions": plainMentions,
+}
+
+// plainMentions strips the embedded id from @{Display Name#123} tokens for the
+// plain-text email part, which cannot run the Markdown renderer. The HTML part
+// goes through markdown.Render, which handles the token there.
+func plainMentions(source string) string {
+	return markdown.StripMentionIDs(source)
 }
 
 // renderMarkdown converts stored Markdown to sanitized HTML for the HTML email

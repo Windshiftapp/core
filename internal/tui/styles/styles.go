@@ -88,7 +88,6 @@ type DialogStyles struct {
 }
 
 type SplashStyles struct {
-	Logo     lipgloss.Style
 	Wordmark lipgloss.Style
 	Tagline  lipgloss.Style
 	Loading  lipgloss.Style
@@ -181,7 +180,6 @@ func New(p Palette) *Styles {
 	}
 
 	s.Splash = SplashStyles{
-		Logo:     lipgloss.NewStyle().Bold(true),
 		Wordmark: lipgloss.NewStyle().Foreground(p.FgBase).Bold(true),
 		Tagline:  lipgloss.NewStyle().Foreground(p.FgSubtle).Italic(true),
 		Loading:  lipgloss.NewStyle().Foreground(p.FgMuted),

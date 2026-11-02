@@ -898,6 +898,9 @@ func validateViewSettings(settings *models.ViewSettings, collectionScope bool) e
 	if settings.CompletedVisibility != nil && !models.IsCompletedVisibility(*settings.CompletedVisibility) {
 		return collectionValidation(fmt.Sprintf("unknown completed_visibility %q", *settings.CompletedVisibility))
 	}
+	if settings.CompletedLimit != nil && (*settings.CompletedLimit < models.MinCompletedLimit || *settings.CompletedLimit > models.MaxCompletedLimit) {
+		return collectionValidation(fmt.Sprintf("completed_limit must be between %d and %d", models.MinCompletedLimit, models.MaxCompletedLimit))
+	}
 	if settings.EnabledViews == nil {
 		return nil
 	}
@@ -967,6 +970,9 @@ func mergeViewSettings(current, update *models.ViewSettings) *models.ViewSetting
 	if update.CompletedVisibility != nil {
 		merged.CompletedVisibility = update.CompletedVisibility
 	}
+	if update.CompletedLimit != nil {
+		merged.CompletedLimit = update.CompletedLimit
+	}
 	return &merged
 }
 
@@ -1018,11 +1024,22 @@ func (s *CollectionApplicationService) applyEffectiveViewSettings(config *models
 	if resolvedCompletedVisibility == nil && wsErr == nil && wsConfig.ViewSettings != nil {
 		resolvedCompletedVisibility = wsConfig.ViewSettings.CompletedVisibility
 	}
+	// The cap inherits alongside the preset, so a collection that selects
+	// "limit" without its own value uses the workspace's cap.
+	var ownCompletedLimit *int
+	if config.ViewSettings != nil {
+		ownCompletedLimit = config.ViewSettings.CompletedLimit
+	}
+	resolvedCompletedLimit := ownCompletedLimit
+	if resolvedCompletedLimit == nil && wsErr == nil && wsConfig.ViewSettings != nil {
+		resolvedCompletedLimit = wsConfig.ViewSettings.CompletedLimit
+	}
 	settingsWith := func(views *[]string) *models.ViewSettings {
 		return &models.ViewSettings{
 			EnabledViews:        views,
 			MilestoneSwimlanes:  resolvedMilestones,
 			CompletedVisibility: resolvedCompletedVisibility,
+			CompletedLimit:      resolvedCompletedLimit,
 		}
 	}
 	allViews := func() *models.ViewSettings {
@@ -1043,6 +1060,7 @@ func (s *CollectionApplicationService) applyEffectiveViewSettings(config *models
 	if config.ViewSettings.HasEnabledViewsOverride() {
 		config.ViewSettings.MilestoneSwimlanes = resolvedMilestones
 		config.ViewSettings.CompletedVisibility = resolvedCompletedVisibility
+		config.ViewSettings.CompletedLimit = resolvedCompletedLimit
 		return nil
 	}
 	config.ViewSettingsInherited = true

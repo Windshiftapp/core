@@ -54,10 +54,15 @@ type PluginInfo struct {
 	Enabled     bool   `json:"enabled"`
 	// Licensed reports whether the plugin's license verified for this install.
 	// Always true when license enforcement is not configured.
-	Licensed    bool                `json:"licensed"`
-	Routes      []map[string]string `json:"routes"`
-	Extensions  []plugins.Extension `json:"extensions,omitempty"`
-	InstalledAt string              `json:"installed_at"`
+	Licensed bool                `json:"licensed"`
+	Routes   []map[string]string `json:"routes"`
+	// RequestedPermissions is what the plugin's manifest declares;
+	// EffectivePermissions is what it actually holds after manifest validation
+	// and license gating. Undeclared host functions are denied.
+	RequestedPermissions []string            `json:"requested_permissions,omitempty"`
+	EffectivePermissions []string            `json:"effective_permissions,omitempty"`
+	Extensions           []plugins.Extension `json:"extensions,omitempty"`
+	InstalledAt          string              `json:"installed_at"`
 }
 
 // ListPlugins returns all installed plugins
@@ -98,8 +103,11 @@ func (h *PluginHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 			for i := range pluginList {
 				dbPlugin := &pluginList[i]
 				if dbPlugin.Name == loadedPlugin.Manifest.Name {
-					// The loaded state is the source of truth for licensing.
+					// The loaded state is the source of truth for licensing and
+					// effective host-function permissions.
 					dbPlugin.Licensed = loadedPlugin.Licensed
+					dbPlugin.RequestedPermissions = loadedPlugin.Manifest.Permissions
+					dbPlugin.EffectivePermissions = loadedPlugin.Permissions
 					found = true
 					break
 				}
@@ -113,17 +121,20 @@ func (h *PluginHandler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 						"method":      r.Method,
 						"path":        r.Path,
 						"description": r.Description,
+						"auth":        string(r.Auth),
 					})
 				}
 
 				pluginList = append(pluginList, PluginInfo{
-					Name:        loadedPlugin.Manifest.Name,
-					Version:     loadedPlugin.Manifest.Version,
-					Description: loadedPlugin.Manifest.Description,
-					Author:      loadedPlugin.Manifest.Author,
-					Enabled:     loadedPlugin.Enabled,
-					Licensed:    loadedPlugin.Licensed,
-					Routes:      routes,
+					Name:                 loadedPlugin.Manifest.Name,
+					Version:              loadedPlugin.Manifest.Version,
+					Description:          loadedPlugin.Manifest.Description,
+					Author:               loadedPlugin.Manifest.Author,
+					Enabled:              loadedPlugin.Enabled,
+					Licensed:             loadedPlugin.Licensed,
+					Routes:               routes,
+					RequestedPermissions: loadedPlugin.Manifest.Permissions,
+					EffectivePermissions: loadedPlugin.Permissions,
 				})
 			}
 		}
@@ -396,6 +407,7 @@ func (h *PluginHandler) syncPluginToDatabase() {
 				"method":      r.Method,
 				"path":        r.Path,
 				"description": r.Description,
+				"auth":        string(r.Auth),
 			})
 		}
 		extensionsJSON, _ := json.Marshal(p.Manifest.Extensions)

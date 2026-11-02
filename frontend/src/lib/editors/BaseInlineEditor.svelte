@@ -1,8 +1,6 @@
 <script>
-  import Check from '@lucide/svelte/icons/check';
-  import X from '@lucide/svelte/icons/x';
-  import Spinner from '../components/Spinner.svelte';
-  import { t } from '../stores/i18n.svelte.js';
+  import InlineEditorActions from './InlineEditorActions.svelte';
+  import InlineEditorError from './InlineEditorError.svelte';
 
   let {
     disabled = false,
@@ -114,34 +112,11 @@
   <div class="inline-flex items-center gap-1 w-full">
     <div class="flex-1 relative">
       {@render editingInput({ saving, error, onkeydown: handleKeydown, onblur: handleBlur })}
-      {#if error}
-        <div class="absolute top-full left-0 mt-1 text-xs px-2 py-1 border rounded shadow-sm z-10 inline-editor-error">
-          {error}
-        </div>
-      {/if}
+      <InlineEditorError {error} />
     </div>
 
     <div class="flex items-center gap-1">
-      {#if saving}
-        <Spinner size="sm" />
-      {:else}
-        <button
-          type="button"
-          onclick={saveValue}
-          class="p-1 rounded save-btn"
-          title={t('editors.saveEnter')}
-        >
-          <Check class="w-4 h-4" />
-        </button>
-        <button
-          type="button"
-          onclick={cancelEditing}
-          class="p-1 rounded cancel-btn"
-          title={t('editors.cancelEscape')}
-        >
-          <X class="w-4 h-4" />
-        </button>
-      {/if}
+      <InlineEditorActions {saving} onsave={saveValue} oncancel={cancelEditing} />
     </div>
   </div>
 {:else}
@@ -156,27 +131,3 @@
     {@render displayContent()}
   </button>
 {/if}
-
-<style>
-  .inline-editor-error {
-    color: var(--ds-text-danger);
-    background-color: var(--ds-surface-raised);
-    border-color: var(--ds-border-danger);
-  }
-
-  .save-btn {
-    color: var(--ds-text-success);
-  }
-
-  .save-btn:hover {
-    background-color: var(--ds-background-success-subtle);
-  }
-
-  .cancel-btn {
-    color: var(--ds-text-subtle);
-  }
-
-  .cancel-btn:hover {
-    background-color: var(--ds-background-neutral-hovered);
-  }
-</style>

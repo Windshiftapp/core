@@ -196,6 +196,12 @@ CREATE INDEX IF NOT EXISTS idx_item_history_current_status_latest
 	ON item_history(item_id, new_value, changed_at DESC)
 	WHERE field_name = 'status_id';
 
+-- Milestone membership changes for the milestone Activity tab.
+-- The partial predicate keeps the index to 'milestones' rows only.
+CREATE INDEX IF NOT EXISTS idx_item_history_milestones
+	ON item_history(changed_at DESC, id DESC)
+	WHERE field_name = 'milestones';
+
 -- Index for querying history by user
 CREATE INDEX IF NOT EXISTS idx_item_history_user_id ON item_history(user_id);
 

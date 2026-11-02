@@ -15,11 +15,10 @@
   import Card from '../../components/Card.svelte';
   import PageHeader from '../../layout/PageHeader.svelte';
   import DataTable from '../../components/DataTable.svelte';
-  import Input from '../../components/Input.svelte';
+  import TextField from '../../components/TextField.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
-  import Label from '../../components/Label.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import SearchInput from '../../components/SearchInput.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
@@ -318,17 +317,17 @@
   <div class="px-6 py-4">
     <form onsubmit={(e) => { e.preventDefault(); createWorkflow(); }}>
       <div class="space-y-4">
-        <div>
-          <Label color="default" required class="mb-2">{t('common.name')}</Label>
-          <Input
-            type="text"
-            bind:value={newWorkflow.name}
-            bind:inputRef={nameInput}
-            placeholder={t('workflows.workflowNamePlaceholder')}
-            size="small"
-            required
-          />
-        </div>
+        <TextField
+          label={t('common.name')}
+          labelColor="default"
+          labelClass="mb-2"
+          type="text"
+          bind:value={newWorkflow.name}
+          bind:inputRef={nameInput}
+          placeholder={t('workflows.workflowNamePlaceholder')}
+          size="small"
+          required
+        />
 
         <div>
           <TextareaField

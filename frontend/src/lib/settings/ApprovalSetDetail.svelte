@@ -17,6 +17,7 @@
   import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
   import Button from '../components/Button.svelte';
   import BackButton from '../components/BackButton.svelte';
+  import SetDetailActions from './SetDetailActions.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import Radio from '../components/Radio.svelte';
   import Input from '../components/Input.svelte';
@@ -849,16 +850,15 @@
     </section>
 
     <div class="flex justify-end gap-3">
-      <Button variant="ghost" onclick={back}>{t('common.cancel')}</Button>
-      <Button
-        variant="primary"
-        onclick={save}
-        disabled={saving || !hasUnsavedChanges}
-        hotkeyConfig={{ key: toHotkeyString('approvalSets', 'save'), guard: () => !saving && hasUnsavedChanges }}
-        dataTestid="approval-set-save"
-      >
-        {saving ? t('common.saving') : t('common.save')}
-      </Button>
+      <SetDetailActions
+        {hasUnsavedChanges}
+        showUnsaved={false}
+        {saving}
+        onCancel={back}
+        onSave={save}
+        saveTestid="approval-set-save"
+        saveHotkey={{ key: toHotkeyString('approvalSets', 'save'), guard: () => !saving && hasUnsavedChanges }}
+      />
     </div>
   {/if}
   </div>

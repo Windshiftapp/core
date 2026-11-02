@@ -1,11 +1,9 @@
 <script>
-  import { tick } from 'svelte';
-  import Spinner from '../components/Spinner.svelte';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
-  import Check from '@lucide/svelte/icons/check';
-  import X from '@lucide/svelte/icons/x';
   import { t } from '../stores/i18n.svelte.js';
   import Select from '../components/Select.svelte';
+  import InlineEditorActions from './InlineEditorActions.svelte';
+  import InlineEditorError from './InlineEditorError.svelte';
 
   let {
     value = null, options = [], placeholder = '', disabled = false,
@@ -124,35 +122,11 @@
         class={className}
       />
 
-      {#if error}
-        <div class="absolute top-full left-0 mt-1 text-xs text-ds-text-danger bg-ds-surface-raised px-2 py-1 border border-ds-status-danger-border rounded shadow-sm z-10">
-          {error}
-        </div>
-      {/if}
+      <InlineEditorError {error} />
     </div>
 
     <div class="flex items-center gap-1">
-      {#if saving}
-        <Spinner size="sm" />
-      {:else}
-        <button
-          type="button"
-          onclick={saveValue}
-          class="p-1 text-ds-icon-success hover:bg-ds-success-subtle rounded"
-          title={t('editors.saveEnter')}
-        >
-          <Check class="w-4 h-4" />
-        </button>
-        <button
-          type="button"
-          onclick={cancelEditing}
-          class="p-1 rounded hover-bg"
-          style="color: var(--ds-text-subtle);"
-          title={t('editors.cancelEscape')}
-        >
-          <X class="w-4 h-4" />
-        </button>
-      {/if}
+      <InlineEditorActions {saving} onsave={saveValue} oncancel={cancelEditing} />
     </div>
   </div>
 {:else}

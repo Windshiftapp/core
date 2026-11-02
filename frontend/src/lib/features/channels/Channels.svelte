@@ -675,27 +675,25 @@
       </div>
 
       {#if channelFormData.type === 'portal' || channelFormData.type === 'form'}
-        <div>
-          <Label for="channelSlug" required color="default" class="mb-2">
-            {channelFormData.type === 'form' ? 'Public URL' : 'Slug'}
-          </Label>
-          <Input
-            id="channelSlug"
-            bind:value={channelFormData.slug}
-            required
-            minlength={3}
-            maxlength={64}
-            pattern={'[a-z0-9](?:[a-z0-9-]{1,62}[a-z0-9])'}
-            placeholder="e.g., support"
-          />
-          <DescriptionText>
-            {#if channelFormData.type === 'form'}
-              Forms will be shared at /forms/{channelFormData.slug || 'your-url'}.
-            {:else}
-              /portal/{channelFormData.slug || '...'}
-            {/if}
-          </DescriptionText>
-        </div>
+        <TextField
+          label={channelFormData.type === 'form' ? 'Public URL' : 'Slug'}
+          id="channelSlug"
+          labelColor="default"
+          labelClass="mb-2"
+          required
+          minlength={3}
+          maxlength={64}
+          pattern={'[a-z0-9](?:[a-z0-9-]{1,62}[a-z0-9])'}
+          placeholder="e.g., support"
+          bind:value={channelFormData.slug}
+        />
+        <DescriptionText>
+          {#if channelFormData.type === 'form'}
+            Forms will be shared at /forms/{channelFormData.slug || 'your-url'}.
+          {:else}
+            /portal/{channelFormData.slug || '...'}
+          {/if}
+        </DescriptionText>
       {/if}
 
       {#if channelFormData.type !== 'form'}

@@ -1,159 +1,122 @@
 <script>
-  import { onMount } from 'svelte';
   import { statusCategories as statusCategoriesApi, statuses as statusesApi } from '../api/workflows.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
-  import { confirm } from '../composables/useConfirm.js';
-  import Plus from '@lucide/svelte/icons/plus';
   import Edit from '@lucide/svelte/icons/edit';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import Palette from '@lucide/svelte/icons/palette';
   import Folder from '@lucide/svelte/icons/folder';
-  import Button from '../components/Button.svelte';
   import ColorDot from '../components/ColorDot.svelte';
-  import DataTable from '../components/DataTable.svelte';
-  import PageHeader from '../layout/PageHeader.svelte';
-  import StatusCategoryModal from '../dialogs/StatusCategoryModal.svelte';
   import Lozenge from '../components/Lozenge.svelte';
-  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { objectDisplayValue } from '../utils/systemLabels.js';
+  import StatusCategoryModal from '../dialogs/StatusCategoryModal.svelte';
+  import EntityManagerPage from './EntityManagerPage.svelte';
 
-  let statusCategories = $state([]);
-  let loading = $state(true);
-  let showModal = $state(false);
   let editingId = $state(null);
   let editingObject = $state(null);
   let translationEditor = $state(null);
 
-  function getCategoryDisplayValue(category, field) {
-    return objectDisplayValue(category, field);
-  }
-
-  // Form state
   let formData = $state({
     name: '',
     color: '#3b82f6',
     description: '',
     is_default: false,
-    is_completed: false
+    is_completed: false,
   });
 
-  onMount(async () => {
-    await loadStatusCategories();
-  });
-
-  async function loadStatusCategories() {
-    try {
-      loading = true;
-      const [categories, statuses] = await Promise.all([
-        statusCategoriesApi.getAll() || [],
-        statusesApi.getAll() || []
-      ]);
-
-      // Add status count to each category
-      statusCategories = categories.map(category => ({
-        ...category,
-        statusCount: statuses.filter(status => status.category_id === category.id).length
-      }));
-    } catch (error) {
-      console.error('Failed to load status categories:', error);
-      statusCategories = [];
-    } finally {
-      loading = false;
-    }
+  function getCategoryDisplayValue(category, field) {
+    return objectDisplayValue(category, field);
   }
 
-  function startCreate() {
+  async function loadStatusCategories() {
+    const [categories, statuses] = await Promise.all([
+      statusCategoriesApi.getAll() || [],
+      statusesApi.getAll() || [],
+    ]);
+    return categories.map((category) => ({
+      ...category,
+      statusCount: statuses.filter((status) => status.category_id === category.id).length,
+    }));
+  }
+
+  function openCreate() {
     formData = {
       name: '',
       color: '#ef4444',
       description: '',
       is_default: false,
-      is_completed: false
+      is_completed: false,
     };
     editingId = null;
     editingObject = null;
-    showModal = true;
   }
 
-  function startEdit(category) {
+  function openEdit(category) {
     editingObject = category;
     formData = {
       name: category.name || '',
       color: category.color || '#3b82f6',
       description: category.description || '',
       is_default: category.is_default || false,
-      is_completed: category.is_completed || false
+      is_completed: category.is_completed || false,
     };
     editingId = category.id;
-    showModal = true;
-  }
-
-  function cancelForm() {
-    showModal = false;
-    editingId = null;
-    editingObject = null;
-    formData = {
-      name: '',
-      color: '#3b82f6',
-      description: '',
-      is_default: false,
-      is_completed: false
-    };
   }
 
   async function saveCategory() {
-    try {
-      if (!formData.name.trim()) {
-        errorToast(t('settings.statusCategories.nameRequired'));
-        return;
-      }
-
-      if (editingId) {
-        translationEditor?.validate();
-        await statusCategoriesApi.update(editingId, formData);
-        await translationEditor?.save();
-        await loadStatusCategories();
-      } else {
-        const created = await statusCategoriesApi.create(formData);
-        statusCategories = [...statusCategories, { ...created, statusCount: 0 }];
-      }
-      
-      cancelForm();
-      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
-    } catch (error) {
-      console.error('Failed to save status category:', error);
-      errorToast(t('settings.statusCategories.failedToSave'));
+    if (editingId) {
+      translationEditor?.validate();
+      await statusCategoriesApi.update(editingId, formData);
+      await translationEditor?.save();
+    } else {
+      await statusCategoriesApi.create(formData);
     }
+    window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
   }
 
   async function deleteCategory(category) {
-    const displayName = getCategoryDisplayValue(category, 'name');
-    const confirmed = await confirm({
-      title: t('common.delete'),
-      message: t('settings.statusCategories.confirmDelete', { name: displayName }),
-      confirmText: t('common.delete'),
-      cancelText: t('common.cancel'),
-      variant: 'danger'
-    });
-    if (!confirmed) return;
-
-    try {
-      await statusCategoriesApi.delete(category.id);
-      statusCategories = statusCategories.filter(cat => cat.id !== category.id);
-      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
-    } catch (error) {
-      console.error('Failed to delete status category:', error);
-      
-      if (error.status === 409) {
-        errorToast(t('settings.statusCategories.inUseByStatuses', { name: displayName }));
-      } else {
-        errorToast(t('settings.statusCategories.failedToDelete'));
-      }
-    }
+    await statusCategoriesApi.delete(category.id);
+    window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
   }
 
-  function buildCategoryDropdownItems(category) {
+  function handleError(err, phase, item) {
+    if (phase === 'delete') {
+      errorToast(
+        err?.status === 409
+          ? t('settings.statusCategories.inUseByStatuses', {
+              name: getCategoryDisplayValue(item, 'name'),
+            })
+          : t('settings.statusCategories.failedToDelete')
+      );
+      return true;
+    }
+    if (phase === 'save') {
+      errorToast(t('settings.statusCategories.failedToSave'));
+      return true;
+    }
+    return false;
+  }
+
+  const categoryColumns = [
+    { key: 'category_info', label: t('common.name'), slot: 'category' },
+    { key: 'color', label: t('settings.statusCategories.color'), slot: 'color' },
+    {
+      key: 'description',
+      label: t('settings.statusCategories.description'),
+      render: (category) => getCategoryDisplayValue(category, 'description') || '—',
+      textColor: 'var(--ds-text-subtle)',
+    },
+    {
+      key: 'status_count',
+      label: t('statuses.title'),
+      render: (category) =>
+        t('settings.statusCategories.statusCount', { count: category.statusCount || 0 }),
+      textColor: 'var(--ds-text-subtle)',
+    },
+    { key: 'actions', label: t('common.actions') },
+  ];
+
+  function buildCategoryDropdownItems(category, { edit, remove }) {
     return [
       {
         id: 'edit',
@@ -162,7 +125,7 @@
         title: t('common.edit'),
         hoverClass: 'hover-bg',
         testid: `status-category-edit-${category.id}`,
-        onClick: () => startEdit(category)
+        onClick: () => edit(category),
       },
       {
         id: 'delete',
@@ -172,99 +135,69 @@
         color: 'var(--ds-text-danger)',
         hoverClass: 'hover-danger',
         testid: `status-category-delete-${category.id}`,
-        onClick: () => deleteCategory(category),
-        disabled: category.statusCount > 0
-      }
+        onClick: () => remove(category),
+        disabled: category.statusCount > 0,
+      },
     ];
   }
-
-  // Table column definitions
-  const categoryColumns = $derived([
-    {
-      key: 'category_info',
-      label: t('common.name'),
-      slot: 'category'
-    },
-    {
-      key: 'color',
-      label: t('settings.statusCategories.color'),
-      slot: 'color'
-    },
-    {
-      key: 'description',
-      label: t('settings.statusCategories.description'),
-      render: (category) => getCategoryDisplayValue(category, 'description') || '—',
-      textColor: 'var(--ds-text-subtle)'
-    },
-    {
-      key: 'status_count',
-      label: t('statuses.title'),
-      render: (category) => t('settings.statusCategories.statusCount', {
-        count: category.statusCount || 0
-      }),
-      textColor: 'var(--ds-text-subtle)'
-    },
-    {
-      key: 'actions',
-      label: t('common.actions')
-    }
-  ]);
 </script>
 
-<div style="background-color: var(--ds-surface); min-height: 100vh;">
-  <PageHeader
-    icon={Folder}
-    title={t('settings.statusCategories.title')}
-    subtitle={t('settings.statusCategories.subtitle')}
-    count={t('settings.statusCategories.count', { count: statusCategories.length })}
-  >
-    {#snippet actions()}
-      <Button variant="primary" icon={Plus} onclick={startCreate} keyboardHint="A" hotkeyConfig={{ key: toHotkeyString('statusCategories', 'addCategory'), guard: () => !showModal }} dataTestid="status-category-add">
-        {t('settings.statusCategories.addStatusCategory')}
-      </Button>
-    {/snippet}
-  </PageHeader>
+<EntityManagerPage
+  icon={Folder}
+  title={t('settings.statusCategories.title')}
+  subtitle={t('settings.statusCategories.subtitle')}
+  addLabel={t('settings.statusCategories.addStatusCategory')}
+  addTestid="status-category-add"
+  hotkeyScope="statusCategories"
+  emptyMessage={t('settings.statusCategories.empty')}
+  emptyIcon={Palette}
+  columns={categoryColumns}
+  load={loadStatusCategories}
+  create={saveCategory}
+  update={saveCategory}
+  remove={deleteCategory}
+  onOpenCreate={openCreate}
+  onOpenEdit={openEdit}
+  confirmDeleteMessage={(category) =>
+    t('settings.statusCategories.confirmDelete', { name: getCategoryDisplayValue(category, 'name') })}
+  rowTestid={(category) => `status-category-row-${category.id}`}
+  actionItems={buildCategoryDropdownItems}
+  actionTriggerTestid={(category) => `status-category-actions-${category.id}`}
+  onError={handleError}
+  cellSnippets={{ category: categoryNameCell, color: categoryColorCell }}
+  formModal={statusCategoryFormModal}
+>
+</EntityManagerPage>
 
-  <DataTable
-    columns={categoryColumns}
-    data={statusCategories}
-    keyField="id"
-    emptyMessage={t('settings.statusCategories.empty')}
-    emptyIcon={Palette}
-    actionItems={buildCategoryDropdownItems}
-    rowAttrs={(category) => ({ 'data-testid': `status-category-row-${category.id}` })}
-    actionTriggerTestid={(category) => `status-category-actions-${category.id}`}
-  >
-    {#snippet category(category)}
-      <div class="flex items-center gap-3">
-        <h3 class="font-medium" style="color: var(--ds-text);">{getCategoryDisplayValue(category, 'name')}</h3>
-        {#if category.is_default}
-          <Lozenge color="blue" text={t('settings.statusCategories.default')} />
-        {/if}
-        {#if category.is_completed}
-          <Lozenge color="emerald" text={t('settings.statusCategories.completed')} />
-        {/if}
-      </div>
-    {/snippet}
+{#snippet categoryNameCell(category)}
+  <div class="flex items-center gap-3">
+    <h3 class="font-medium" style="color: var(--ds-text);">{getCategoryDisplayValue(category, 'name')}</h3>
+    {#if category.is_default}
+      <Lozenge color="blue" text={t('settings.statusCategories.default')} />
+    {/if}
+    {#if category.is_completed}
+      <Lozenge color="emerald" text={t('settings.statusCategories.completed')} />
+    {/if}
+  </div>
+{/snippet}
 
-    {#snippet color(category)}
-      <div class="flex items-center gap-2">
-        <ColorDot color={category.color} class="w-4 h-4 border border-[var(--ds-border)]" />
-        <span class="text-sm font-mono" style="color: var(--ds-text-subtle);">{category.color}</span>
-      </div>
-    {/snippet}
-  </DataTable>
+{#snippet categoryColorCell(category)}
+  <div class="flex items-center gap-2">
+    <ColorDot color={category.color} class="w-4 h-4 border border-[var(--ds-border)]" />
+    <span class="text-sm font-mono" style="color: var(--ds-text-subtle);">{category.color}</span>
+  </div>
+{/snippet}
 
-  <!-- Status Category Modal -->
+{#snippet statusCategoryFormModal({ save, close })}
   <StatusCategoryModal
-    isOpen={showModal}
+    isOpen={true}
     bind:formData
     bind:translationEditor
     isEditing={!!editingId}
     objectId={editingId}
     displayName={editingObject?.display_name || editingObject?.name}
     displayDescription={editingObject?.display_description || editingObject?.description}
-    onsave={saveCategory}
-    oncancel={cancelForm}
+    onsave={save}
+    oncancel={close}
   />
-</div>
+{/snippet}

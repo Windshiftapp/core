@@ -35,6 +35,11 @@ import Stack from './components/Stack.svelte';
 import Text from './components/Text.svelte';
 import Title from './components/Title.svelte';
 
+// Zod's JIT compiler probes `new Function`, which the app's nonce-based CSP
+// reports as a securitypolicyviolation even though Zod catches the throw.
+// Disable JIT so widget parsing stays inside the script-src policy.
+z.config({ jitless: true });
+
 const entity = z
   .enum(['item', 'asset'])
   .optional()

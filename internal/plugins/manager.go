@@ -40,9 +40,15 @@ type LoadedPlugin struct {
 	Path       string
 	Enabled    bool
 	// Licensed reports whether the plugin's license verified. It only gates
-	// capabilities when a LicenseVerifier is configured.
+	// capabilities and host-function permissions when a LicenseVerifier is
+	// configured.
 	Licensed bool
-	compiled *extism.CompiledPlugin
+	// Permissions is the effective host-function permission set after manifest
+	// validation and license gating. Only these permissions can reach host
+	// functions; an empty set leaves only log available. Manifest.Permissions
+	// holds what the plugin requested.
+	Permissions []string
+	compiled    *extism.CompiledPlugin
 }
 
 // Manager handles plugin loading and lifecycle.
@@ -58,8 +64,10 @@ type Manager struct {
 	pluginTimeout   time.Duration
 	memoryLimit     uint64
 	licenseVerifier LicenseVerifier
-	hostFuncs       []extism.HostFunction
-	db              database.Database
+	// allowPublicRoutes permits plugin routes that declare auth "none".
+	allowPublicRoutes bool
+	hostFuncs         []extism.HostFunction
+	db                database.Database
 
 	// Plugin-declared periodic invocations, keyed by plugin name. Guarded by
 	// its own mutex so DueSchedules from the scheduler tick doesn't contend
@@ -82,6 +90,37 @@ func withPluginName(ctx context.Context, name string) context.Context {
 func pluginNameFromContext(ctx context.Context) string {
 	name, _ := ctx.Value(pluginNameKey{}).(string)
 	return name
+}
+
+// pluginPermissionsKey is the unexported context key under which the executing
+// plugin's effective host-function permissions are carried to host functions.
+type pluginPermissionsKey struct{}
+
+// withPluginPermissions returns a copy of ctx carrying the plugin's effective
+// host-function permissions so host functions can enforce them per-invocation.
+func withPluginPermissions(ctx context.Context, permissions []string) context.Context {
+	return context.WithValue(ctx, pluginPermissionsKey{}, permissions)
+}
+
+// pluginPermissionsFromContext returns the effective permissions stored in ctx,
+// or nil when absent. Absent means deny, not allow.
+func pluginPermissionsFromContext(ctx context.Context) []string {
+	permissions, _ := ctx.Value(pluginPermissionsKey{}).([]string)
+	return permissions
+}
+
+// requirePermission reports whether the plugin executing in ctx declared the
+// permission. It logs every denial; callers return their own typed error
+// response. A missing plugin context denies, so metadata population and any
+// future direct invocation cannot reach a gated host function.
+func (m *Manager) requirePermission(ctx context.Context, permission string) bool {
+	for _, granted := range pluginPermissionsFromContext(ctx) {
+		if granted == permission {
+			return true
+		}
+	}
+	m.logger.Warn("plugin host function denied", "plugin", pluginNameFromContext(ctx), "permission", permission)
+	return false
 }
 
 // NewManager creates a new plugin manager configured for Extism-backed plugins.
@@ -110,20 +149,24 @@ func NewManager(pluginDir string, opts ...Option) *Manager {
 	pluginDirs = append(pluginDirs, options.AdditionalPluginDirs...)
 
 	m := &Manager{
-		plugins:         make(map[string]*LoadedPlugin),
-		schedules:       make(map[string][]*scheduledPlugin),
-		pluginDirs:      pluginDirs,
-		httpClient:      options.HTTPClient,
-		smtpSender:      options.SMTPSender,
-		scmService:      options.SCMService,
-		commentService:  options.CommentService,
-		logger:          options.Logger,
-		pluginTimeout:   options.PluginTimeout,
-		memoryLimit:     options.MemoryLimit,
-		licenseVerifier: options.LicenseVerifier,
-		db:              options.Database,
+		plugins:           make(map[string]*LoadedPlugin),
+		schedules:         make(map[string][]*scheduledPlugin),
+		pluginDirs:        pluginDirs,
+		httpClient:        options.HTTPClient,
+		smtpSender:        options.SMTPSender,
+		scmService:        options.SCMService,
+		commentService:    options.CommentService,
+		logger:            options.Logger,
+		pluginTimeout:     options.PluginTimeout,
+		memoryLimit:       options.MemoryLimit,
+		licenseVerifier:   options.LicenseVerifier,
+		allowPublicRoutes: options.AllowPublicRoutes,
+		db:                options.Database,
 	}
 	m.hostFuncs = m.buildHostFunctions()
+	if err := validateHostFunctionCatalog(m.hostFuncs); err != nil {
+		m.logger.Error("plugin host function catalog is invalid", "error", err)
+	}
 	return m
 }
 
@@ -206,6 +249,14 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 		return fmt.Errorf("invalid plugin schedules: %w", err)
 	}
 
+	// Permissions are validated before compilation so an unknown name fails the
+	// load with the offending value instead of leaving a host function denied.
+	normalizedPermissions, err := normalizePermissions(manifest.Permissions)
+	if err != nil {
+		return fmt.Errorf("invalid plugin permissions: %w", err)
+	}
+	manifest.Permissions = normalizedPermissions
+
 	wasmPath := filepath.Join(pluginPath, manifest.EntryPoint)
 	if _, err = os.Stat(wasmPath); err != nil {
 		return fmt.Errorf("failed to read WASM file: %w", err)
@@ -219,6 +270,14 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 		return fmt.Errorf("failed to compile plugin: %w", err)
 	}
 
+	licensed := m.verifyStoredLicense(pluginPath, manifest.Name)
+	// Capability AND license: an unlicensed plugin gets no host-function
+	// permissions even when its manifest declares them.
+	var effectivePermissions []string
+	if licensed {
+		effectivePermissions = manifest.Permissions
+	}
+
 	plugin := &LoadedPlugin{
 		Manifest: manifest,
 		Metadata: PluginMetadata{
@@ -227,17 +286,42 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 			Description: manifest.Description,
 			Author:      manifest.Author,
 		},
-		Routes:   manifest.Routes,
-		Path:     pluginPath,
-		Enabled:  true,
-		Licensed: m.verifyStoredLicense(pluginPath, manifest.Name),
-		compiled: compiled,
+		Routes:      manifest.Routes,
+		Path:        pluginPath,
+		Enabled:     true,
+		Licensed:    licensed,
+		Permissions: effectivePermissions,
+		compiled:    compiled,
 	}
 
 	if err := m.populateMetadata(ctx, plugin); err != nil {
 		m.logger.Warn("failed to fetch plugin metadata", "name", manifest.Name, "error", err)
 		// Fallback: use manifest extensions even if metadata fetch fails
 		plugin.Extensions = attachPluginName(manifest.Name, manifest.Extensions, nil)
+	}
+
+	// Route auth defaults to session and is validated here so a malformed or
+	// ambiguous manifest fails the load before the plugin is registered.
+	normalizedRoutes, err := normalizePluginRoutes(plugin.Routes, m.allowPublicRoutes)
+	if err != nil {
+		return fmt.Errorf("invalid plugin routes: %w", err)
+	}
+	plugin.Routes = normalizedRoutes
+
+	for _, route := range plugin.Routes {
+		if route.Auth == RouteAuthNone {
+			m.logger.Warn("plugin route is public", "plugin", manifest.Name, "method", route.Method, "path", route.Path)
+		}
+	}
+
+	// Loud load-time notice of the compatibility break: a plugin that predates
+	// host-function permissions still relies on functions it never declared, and
+	// those calls are now denied.
+	if denied := deniedHostFunctions(plugin.Permissions); len(denied) > 0 {
+		m.logger.Warn("plugin host functions are denied because their permission is not granted",
+			"plugin", manifest.Name,
+			"declared_permissions", manifest.Permissions,
+			"denied_host_functions", denied)
 	}
 
 	m.mu.Lock()
@@ -425,6 +509,7 @@ func (m *Manager) invokeEnabledPlugin(
 	ctx, cancel := context.WithTimeout(context.Background(), m.pluginTimeout)
 	defer cancel()
 	ctx = withPluginName(ctx, pluginName)
+	ctx = withPluginPermissions(ctx, p.Permissions)
 
 	instance, err := p.compiled.Instance(ctx, extism.PluginInstanceConfig{})
 	if err != nil {
@@ -706,11 +791,11 @@ func (m *Manager) verifyStoredLicense(pluginPath, pluginName string) bool {
 	}
 	licenseBytes, err := os.ReadFile(filepath.Join(pluginPath, licenseTokenFileName)) //nolint:gosec // G304 — pluginPath from securejoin, fixed name
 	if err != nil || len(licenseBytes) == 0 {
-		m.logger.Warn("plugin has no license; capabilities are disabled for it", "name", pluginName)
+		m.logger.Warn("plugin has no license; capabilities and host-function permissions are disabled for it", "name", pluginName)
 		return false
 	}
 	if err := m.licenseVerifier(pluginName, licenseBytes); err != nil {
-		m.logger.Warn("plugin license verification failed; capabilities are disabled for it", "name", pluginName, "error", err)
+		m.logger.Warn("plugin license verification failed; capabilities and host-function permissions are disabled for it", "name", pluginName, "error", err)
 		return false
 	}
 	return true
@@ -812,6 +897,74 @@ func (m *Manager) pluginConfig() extism.PluginConfig {
 		// access should go through explicit host functions (KV/HTTP/etc.) rather
 		// than ambient access to the Windshift process filesystem.
 		EnableWasi: true,
+	}
+}
+
+// normalizePluginRoutes defaults an unset route auth to session and rejects an
+// unknown value. It also rejects two routes that can match the same request
+// while declaring different auth, so a request's required credential is
+// unambiguous. Called after metadata resolution so manifest, get_routes, and
+// get_metadata routes are all covered.
+func normalizePluginRoutes(routes []Route, allowPublic bool) ([]Route, error) {
+	normalized := make([]Route, len(routes))
+	for i, route := range routes {
+		switch route.Auth {
+		case "":
+			route.Auth = RouteAuthSession
+		case RouteAuthNone:
+			if !allowPublic {
+				return nil, fmt.Errorf("route %s %s declares auth %q but public plugin routes are disabled (set PLUGIN_PUBLIC_ROUTES=true to allow)", route.Method, route.Path, RouteAuthNone)
+			}
+		case RouteAuthSession, RouteAuthAdmin:
+		default:
+			return nil, fmt.Errorf("route %s %s declares unknown auth %q", route.Method, route.Path, route.Auth)
+		}
+		normalized[i] = route
+	}
+	for i := range normalized {
+		for j := i + 1; j < len(normalized); j++ {
+			if normalized[i].Auth == normalized[j].Auth {
+				continue
+			}
+			if routesOverlap(normalized[i], normalized[j]) {
+				return nil, fmt.Errorf(
+					"routes %s %s (%s) and %s %s (%s) can match the same request with different auth",
+					normalized[i].Method, normalized[i].Path, normalized[i].Auth,
+					normalized[j].Method, normalized[j].Path, normalized[j].Auth)
+			}
+		}
+	}
+	return normalized, nil
+}
+
+// routesOverlap reports whether two routes can match the same request. Methods
+// overlap when either is empty (any) or they are equal.
+func routesOverlap(a, b Route) bool {
+	if a.Method != "" && b.Method != "" && a.Method != b.Method {
+		return false
+	}
+	return routePatternsOverlap(a.Path, b.Path)
+}
+
+// routePatternsOverlap reports whether two path patterns can match the same
+// path. A trailing star matches a prefix.
+func routePatternsOverlap(a, b string) bool {
+	if a == b {
+		return true
+	}
+	aStar := strings.HasSuffix(a, "*")
+	bStar := strings.HasSuffix(b, "*")
+	aPrefix := strings.TrimSuffix(a, "*")
+	bPrefix := strings.TrimSuffix(b, "*")
+	switch {
+	case aStar && bStar:
+		return strings.HasPrefix(aPrefix, bPrefix) || strings.HasPrefix(bPrefix, aPrefix)
+	case aStar:
+		return strings.HasPrefix(bPrefix, aPrefix)
+	case bStar:
+		return strings.HasPrefix(aPrefix, bPrefix)
+	default:
+		return false
 	}
 }
 

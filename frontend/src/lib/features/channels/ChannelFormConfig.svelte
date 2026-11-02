@@ -78,15 +78,18 @@
 
   <div class="mt-4 space-y-4">
     <div>
-      <Label color="default" required class="mb-2">
+      {#snippet formSlugLabel()}
         {t('channel.formSlug')} <span class="text-xs font-normal" style="color: var(--ds-text-subtle);">({t('channel.formSlugHelp')})</span>
-      </Label>
-      <Input
-        bind:value={formData.slug}
+      {/snippet}
+      <TextField
+        labelSnippet={formSlugLabel}
+        labelColor="default"
+        labelClass="mb-2"
         required
         placeholder="contact-form"
         pattern="[a-z0-9\-]+"
         title={t('validation.slugInvalid')}
+        bind:value={formData.slug}
       />
       <DescriptionText>
         Forms will be shared at /forms/{formData.slug || 'your-url'}.

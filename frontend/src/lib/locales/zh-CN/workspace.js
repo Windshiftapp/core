@@ -301,6 +301,7 @@ export default {
     clickToAddDescription: '点击添加描述',
     noDescriptionProvided: '暂无描述 - 点击添加',
     addLink: '添加链接',
+    addPage: '添加页面',
     createChild: '创建子项',
     child: '子项',
     attachFile: '附加文件',
@@ -408,6 +409,12 @@ export default {
     range90d: '最近 90 天',
     rangeAll: '全部记录',
     rangeNone: '无',
+  },
+
+  collectionHierarchy: {
+    selectLevel: '选择层级',
+    levelN: '层级 {level}',
+    itemsCount: '{count} 项',
   },
 
   collectionTree: {

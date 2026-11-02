@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"windshift/internal/database"
@@ -49,16 +50,7 @@ func creationHistoryEntries(item models.Item, userID int, portalCustomerID *int,
 			NewValue:  newValue,
 			ChangedAt: changedAt,
 		}
-		switch {
-		case userID > 0:
-			entry.ActorKind = repository.HistoryActorUser
-			entry.UserID = userID
-		case portalCustomerID != nil:
-			entry.ActorKind = repository.HistoryActorPortalCustomer
-			entry.ActorPortalCustomerID = portalCustomerID
-		default:
-			entry.ActorKind = repository.HistoryActorSystem
-		}
+		setCreationHistoryActor(&entry, userID, portalCustomerID)
 		history = append(history, entry)
 	}
 
@@ -88,4 +80,47 @@ func creationHistoryEntries(item models.Item, userID int, portalCustomerID *int,
 	}
 
 	return history
+}
+
+// setCreationHistoryActor sets a creation row's actor: the internal user
+// when one acted, otherwise the portal customer, otherwise the system.
+func setCreationHistoryActor(entry *HistoryEntry, userID int, portalCustomerID *int) {
+	switch {
+	case userID > 0:
+		entry.ActorKind = repository.HistoryActorUser
+		entry.UserID = userID
+	case portalCustomerID != nil:
+		entry.ActorKind = repository.HistoryActorPortalCustomer
+		entry.ActorPortalCustomerID = portalCustomerID
+	default:
+		entry.ActorKind = repository.HistoryActorSystem
+	}
+}
+
+// RecordItemCreationMilestonesHistory writes the milestones row for an item
+// created directly in milestones, in the old/new CSV form the update path
+// writes, so the milestone Activity feed shows "item added" from it. Items
+// created without milestones get no row. The actor follows
+// RecordItemCreationHistory.
+func RecordItemCreationMilestonesHistory(
+	db database.Database,
+	tx database.Tx,
+	itemID int,
+	milestoneIDs []int,
+	actorUserID int,
+	portalCustomerID *int,
+	metadata itemevents.Metadata,
+) error {
+	if len(milestoneIDs) == 0 {
+		return nil
+	}
+	changedAt := metadata.OccurredAt
+	if changedAt.IsZero() {
+		changedAt = time.Now()
+	}
+	ids := append([]int(nil), milestoneIDs...)
+	sort.Ints(ids)
+	entry := HistoryEntry{ItemID: itemID, FieldName: "milestones", OldValue: "", NewValue: joinIntsCSV(ids), ChangedAt: changedAt}
+	setCreationHistoryActor(&entry, actorUserID, portalCustomerID)
+	return repository.NewItemRepository(db).RecordHistoryBatch(tx, stampHistorySource([]HistoryEntry{entry}, metadata))
 }

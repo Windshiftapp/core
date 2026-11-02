@@ -208,6 +208,7 @@ export default {
       emailOptional: 'البريد الإلكتروني (اختياري)',
       contactPersonOptional: 'جهة الاتصال (اختياري)',
       failedToSave: 'فشل حفظ المؤسسة',
+      failedToDelete: 'فشل حذف المؤسسة',
       deleteOrganization: 'حذف المؤسسة',
       confirmDelete: 'هل أنت متأكد أنك تريد حذف "{name}"؟',
     },

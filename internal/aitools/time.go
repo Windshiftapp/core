@@ -269,9 +269,6 @@ func init() {
 			if project.Status != "Active" {
 				return map[string]string{"error": fmt.Sprintf("project %q is not active (status: %s)", project.Name, project.Status)}, nil
 			}
-			if project.CustomerID == nil {
-				return map[string]string{"error": "project has no customer assigned, cannot log time"}, nil
-			}
 			timezone := env.Timezone
 			if args.Timezone != "" {
 				timezone = args.Timezone
@@ -299,7 +296,6 @@ func init() {
 			}
 			id, err := repository.NewTimeWorklogRepository(env.DB).Create(repository.NewWorklog{
 				ProjectID:       args.ProjectID,
-				CustomerID:      *project.CustomerID,
 				UserID:          env.UserID,
 				ItemID:          itemID,
 				Description:     args.Description,

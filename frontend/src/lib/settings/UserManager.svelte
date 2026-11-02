@@ -18,7 +18,6 @@
 	import Link from '@lucide/svelte/icons/link';
 	import CopyButton from '../components/CopyButton.svelte';
 	import Button from '../components/Button.svelte';
-	import Input from '../components/Input.svelte';
 	import DataTable from '../components/DataTable.svelte';
 	import PageHeader from '../layout/PageHeader.svelte';
 	import Modal from '../dialogs/Modal.svelte';
@@ -536,19 +535,16 @@
 				</div>
 
 				{#if !editingUser && !isInviteMode}
-					<div>
-						<Label for="password" color="default" {...formData.is_agent ? {} : { required: true }}>
-							{formData.is_agent ? `${t('common.password')} (not used for agents)` : t('common.password')}
-						</Label>
-						<Input
-							id="password"
-							type="password"
-							bind:value={formData.password}
-							required={!formData.is_agent}
-							disabled={formData.is_agent}
-							placeholder={formData.is_agent ? 'Agents authenticate via API token only' : t('placeholders.enterPassword')}
-						/>
-					</div>
+					<TextField
+						label={formData.is_agent ? `${t('common.password')} (not used for agents)` : t('common.password')}
+						id="password"
+						labelColor="default"
+						type="password"
+						required={!formData.is_agent}
+						disabled={formData.is_agent}
+						placeholder={formData.is_agent ? 'Agents authenticate via API token only' : t('placeholders.enterPassword')}
+						bind:value={formData.password}
+					/>
 
 					<div class="flex items-start gap-3 p-3 rounded border" style="border-color: var(--ds-border); background-color: var(--ds-background-neutral);">
 						<Checkbox

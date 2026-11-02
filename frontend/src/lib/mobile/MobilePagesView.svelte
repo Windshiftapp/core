@@ -127,7 +127,7 @@
             class="row"
             style:padding-left={`calc(0.875rem + ${Math.min(page.depth ?? 0, 6) * 0.75}rem)`}
             onclick={() => openPage(section.workspace.id, page.id)}
-            data-testid="mobile-page-row"
+            data-testid={`mobile-page-row-${page.id}`}
             data-page-id={page.id}
             type="button"
           >

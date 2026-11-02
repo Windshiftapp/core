@@ -395,6 +395,10 @@ func (s *ItemWorkspaceMoveService) populatePreviewMappings(preview *ItemWorkspac
 		return err
 	}
 	preview.LabelsKept, preview.LabelsDropped = keptLabels, droppedLabels
+	keptMilestones, droppedMilestones, err := s.previewMilestones(item.ID)
+	if err != nil {
+		return err
+	}
 
 	_, keptCustom, droppedCustom, err := s.destinationCustomFields(item.CustomFieldValues, preview.DestinationWorkspaceID, preview.TargetItemTypeID)
 	if err != nil {
@@ -421,7 +425,7 @@ func (s *ItemWorkspaceMoveService) populatePreviewMappings(preview *ItemWorkspac
 		{Field: "labels", Action: collectionMoveAction(len(keptLabels), len(droppedLabels)), From: strings.Join(append(append([]string{}, keptLabels...), droppedLabels...), ", "), To: strings.Join(keptLabels, ", ")},
 		{Field: "custom_fields", Action: collectionMoveAction(len(keptCustom), len(droppedCustom)), From: strings.Join(append(append([]string{}, keptCustom...), droppedCustom...), ", "), To: strings.Join(keptCustom, ", ")},
 		{Field: "iteration", Action: "drop", From: presenceMoveValue(item.IterationID), To: "None"},
-		{Field: "milestones", Action: "drop", From: "Current assignments", To: "None"},
+		{Field: "milestones", Action: collectionMoveAction(len(keptMilestones), len(droppedMilestones)), From: strings.Join(append(append([]string{}, keptMilestones...), droppedMilestones...), ", "), To: strings.Join(keptMilestones, ", ")},
 		{Field: "project", Action: "drop", From: presenceMoveValue(item.ProjectID), To: "None"},
 		{Field: "time_project", Action: "drop", From: presenceMoveValue(item.TimeProjectID), To: "None"},
 		{Field: "channel", Action: "drop", From: presenceMoveValue(item.ChannelID), To: "None"},
@@ -490,6 +494,36 @@ func (s *ItemWorkspaceMoveService) previewLabels(itemID int) (kept, dropped []st
 		kept = append(kept, name)
 	}
 	return kept, []string{}, rows.Err()
+}
+
+// previewMilestones lists the item's milestones by name: global milestones
+// stay on a move, workspace milestones are dropped.
+func (s *ItemWorkspaceMoveService) previewMilestones(itemID int) (kept, dropped []string, err error) {
+	rows, err := s.db.Query(`
+		SELECT m.name, m.is_global
+		FROM item_milestones im
+		JOIN milestones m ON m.id = im.milestone_id
+		WHERE im.item_id = ?
+		ORDER BY m.name
+	`, itemID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("preview item milestones: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	kept, dropped = []string{}, []string{}
+	for rows.Next() {
+		var name string
+		var global bool
+		if err := rows.Scan(&name, &global); err != nil {
+			return nil, nil, err
+		}
+		if global {
+			kept = append(kept, name)
+		} else {
+			dropped = append(dropped, name)
+		}
+	}
+	return kept, dropped, rows.Err()
 }
 
 func (s *ItemWorkspaceMoveService) destinationCustomFields(values map[string]any, workspaceID, itemTypeID int) (keptValues map[string]any, kept, dropped []string, err error) {
@@ -613,8 +647,9 @@ func (s *ItemWorkspaceMoveService) MoveContext(ctx context.Context, itemID, acto
 	if err != nil {
 		return nil, err
 	}
-	if _, err := tx.Exec(`DELETE FROM item_milestones WHERE item_id = ?`, itemID); err != nil {
-		return nil, fmt.Errorf("clear milestones: %w", err)
+	oldMilestoneIDs, newMilestoneIDs, err := dropMoveWorkspaceMilestones(tx, itemID)
+	if err != nil {
+		return nil, err
 	}
 	if _, err := tx.Exec(`UPDATE recurrence_rules SET workspace_id = ?, status_on_create = NULL, updated_at = ? WHERE template_item_id = ?`, input.DestinationWorkspaceID, now, itemID); err != nil {
 		return nil, fmt.Errorf("remap recurrence: %w", err)
@@ -650,11 +685,19 @@ func (s *ItemWorkspaceMoveService) MoveContext(ctx context.Context, itemID, acto
 	if err != nil {
 		return nil, fmt.Errorf("encode move history: %w", err)
 	}
-	history := repository.HistoryEntry{
+	history := []repository.HistoryEntry{{
 		ItemID: itemID, UserID: actorUserID, FieldName: "workspace_move",
 		OldValue: preview.SourceKey, NewValue: string(historyJSON), ChangedAt: now,
+	}}
+	if oldCSV, newCSV := joinIntsCSV(oldMilestoneIDs), joinIntsCSV(newMilestoneIDs); oldCSV != newCSV {
+		// The milestone Activity feed reads this row as "item removed" for
+		// each workspace milestone the item left.
+		history = append(history, repository.HistoryEntry{
+			ItemID: itemID, UserID: actorUserID, FieldName: "milestones",
+			OldValue: oldCSV, NewValue: newCSV, ChangedAt: now,
+		})
 	}
-	if err := itemRepo.RecordHistory(tx, history); err != nil {
+	if err := itemRepo.RecordHistoryBatch(tx, history); err != nil {
 		return nil, err
 	}
 	updatedInTx, err := itemRepo.FindByIDForUpdate(tx, itemID)
@@ -787,6 +830,27 @@ func (s *ItemWorkspaceMoveService) validateWorkflowGuards(ctx context.Context, i
 		}
 	}
 	return nil
+}
+
+// dropMoveWorkspaceMilestones removes the item from its workspace milestones,
+// which belong to the workspace it leaves. Global milestone memberships stay.
+// It returns the item's sorted milestone IDs before and after.
+func dropMoveWorkspaceMilestones(tx database.Tx, itemID int) (before, after []int, err error) {
+	before, err = readItemMilestoneIDsForHistory(tx, itemID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if _, err := tx.Exec(`
+		DELETE FROM item_milestones
+		WHERE item_id = ? AND milestone_id IN (SELECT id FROM milestones WHERE is_global = false)
+	`, itemID); err != nil {
+		return nil, nil, fmt.Errorf("clear workspace milestones: %w", err)
+	}
+	after, err = readItemMilestoneIDsForHistory(tx, itemID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return before, after, nil
 }
 
 func detachMoveChildren(tx database.Tx, itemID int, changedAt time.Time) ([]int, error) {

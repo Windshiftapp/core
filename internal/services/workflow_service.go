@@ -399,6 +399,11 @@ type PerformTransitionResult struct {
 	OldStatusID *int
 	NewStatusID *int
 	NoOp        bool
+	// Loop reports that the request targeted the item's current status and the
+	// workflow declares a self-transition for it. The status does not change, so
+	// NoOp stays true; the loop is recorded in history and emitted as a
+	// status_loop action event.
+	Loop bool
 }
 
 type transitionApprovalService interface {
@@ -476,13 +481,25 @@ func (s *WorkflowService) PerformTransition(
 		oldStatusID = *item.StatusID
 	}
 
-	// No-op: target equals current status.
+	// No-op: target equals current status. When the item's workflow declares a
+	// self-transition for that status it is a status loop, recorded in history
+	// and emitted as a status_loop event. Otherwise it stays a plain no-op.
 	if !missingStatus && oldStatusID == req.ToStatusID {
+		loop, err := s.hasDeclaredStatusLoop(item.WorkspaceID, item.ItemTypeID, oldStatusID)
+		if err != nil {
+			return nil, err
+		}
+		if loop {
+			if err := s.recordStatusLoop(ctx, itemRepo, item, oldStatusID, req.ActorUserID, req.EventMetadata); err != nil {
+				return nil, err
+			}
+		}
 		return &PerformTransitionResult{
 			Item:        item,
 			OldStatusID: &oldStatusID,
 			NewStatusID: &oldStatusID,
 			NoOp:        true,
+			Loop:        loop,
 		}, nil
 	}
 
@@ -650,6 +667,58 @@ func (s *WorkflowService) CommitTransition(
 		return err
 	}
 	return nil
+}
+
+// hasDeclaredStatusLoop reports whether the item's workflow declares a
+// self-transition (from == to) for statusID. A same-status update is a status
+// loop only when the workflow graph explicitly allows it.
+func (s *WorkflowService) hasDeclaredStatusLoop(workspaceID int, itemTypeID *int, statusID int) (bool, error) {
+	workflowID, err := s.GetWorkflowIDForItem(workspaceID, itemTypeID)
+	if err != nil {
+		return false, err
+	}
+	if workflowID == nil {
+		return false, nil
+	}
+	var exists bool
+	if err := s.db.QueryRow(`
+		SELECT EXISTS(
+			SELECT 1 FROM workflow_transitions
+			WHERE workflow_id = ? AND from_status_id = ? AND to_status_id = ?
+		)
+	`, *workflowID, statusID, statusID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("check status loop transition: %w", err)
+	}
+	return exists, nil
+}
+
+// recordStatusLoop persists the history row and the loop fact for a same-status
+// transition the workflow declares. The item's status does not change, so only
+// history and the loop event are written.
+func (s *WorkflowService) recordStatusLoop(ctx context.Context, itemRepo *repository.ItemRepository, item *models.Item, statusID, actorUserID int, metadata itemevents.Metadata) error {
+	changedAt := time.Now()
+	if metadata.OccurredAt.IsZero() {
+		metadata.OccurredAt = changedAt
+	}
+	return database.WithTx(s.db, func(tx database.Tx) error {
+		if err := itemRepo.RecordHistory(tx, repository.HistoryEntry{
+			ItemID:     item.ID,
+			UserID:     actorUserID,
+			FieldName:  "status_id",
+			OldValue:   fmt.Sprintf("%d", statusID),
+			NewValue:   fmt.Sprintf("%d", statusID),
+			ChangedAt:  changedAt,
+			Source:     historySourceForAgent(metadata),
+			AgentRunID: historyRunForAgent(metadata),
+		}); err != nil {
+			return fmt.Errorf("record status loop history: %w", err)
+		}
+		changes := []itemevents.FieldChange{{Field: "status_id", OldValue: statusID, NewValue: statusID}}
+		if _, err := itemevents.NewRecorder(s.db).StatusLooped(ctx, tx, item, statusID, changes, metadata); err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 // statusCompleted reports whether a status belongs to a completed category.

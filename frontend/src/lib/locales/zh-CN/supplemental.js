@@ -348,11 +348,6 @@ export default {
     }
   },
   "testing": {
-    "generateWithAI": "使用 AI 生成",
-    "overwriteDescriptionTitle": "覆盖描述？",
-    "overwriteDescriptionConfirm": "用 AI 生成的摘要替换现有描述？",
-    "overwrite": "覆盖",
-    "generateFailed": "无法生成描述。",
     "actualResult": "实际结果",
     "editTestPlan": "编辑测试计划",
     "execute": "执行",
@@ -731,8 +726,8 @@ export default {
     "completedLastDayDescription": "最近 24 小时内有活动的已完成事项",
     "completedLastWeek": "最近一周",
     "completedLastWeekDescription": "最近 7 天内有活动的已完成事项",
-    "completedCurrentIteration": "当前迭代",
-    "completedCurrentIterationDescription": "当前活动迭代中的已完成事项",
+    "completedLimit": "限制为",
+    "completedLimitDescription": "仅加载最新的已完成事项",
     "completedNone": "隐藏已完成",
     "completedNoneDescription": "不在此看板加载已完成工作",
     "completedLatestFifty": "最近 50 项",

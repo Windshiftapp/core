@@ -10,7 +10,7 @@
   import BasePicker from '../../pickers/BasePicker.svelte';
   import Label from '../../components/Label.svelte';
 	import TextField from '../../components/TextField.svelte';
-	import TextareaField from '../../components/TextareaField.svelte';
+  import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
 
   let {
     isOpen = $bindable(false),
@@ -163,12 +163,14 @@
           {/if}
 
           <div class="md:col-span-2">
-            <TextareaField
-              label={t('common.description')}
-              id="milestone-description"
-              rows={3}
+            <Label class="mb-2">{t('common.description')}</Label>
+            <MilkdownEditor
+              bind:content={formData.description}
               placeholder={t('milestones.descriptionPlaceholder')}
-              bind:value={formData.description}
+              showToolbar={true}
+              compact={true}
+              allowImageUpload={false}
+              testId="milestone-description-editor"
             />
           </div>
         </div>

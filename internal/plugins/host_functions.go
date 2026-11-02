@@ -66,6 +66,11 @@ func (m *Manager) logHostFunction(ctx context.Context, plugin *extism.CurrentPlu
 }
 
 func (m *Manager) smtpHostFunction(ctx context.Context, plugin *extism.CurrentPlugin, stack []uint64) {
+	if !m.requirePermission(ctx, PermissionMailSend) {
+		m.writeHostResponse(plugin, stack, SMTPSendResponse{Status: "error", Error: permissionDeniedMessage(PermissionMailSend)})
+		return
+	}
+
 	payload, err := plugin.ReadBytes(stack[0])
 	if err != nil {
 		m.logger.Warn("smtp_send host function failed to read payload", "error", err)
@@ -93,6 +98,11 @@ func (m *Manager) smtpHostFunction(ctx context.Context, plugin *extism.CurrentPl
 }
 
 func (m *Manager) httpFetchHostFunction(ctx context.Context, plugin *extism.CurrentPlugin, stack []uint64) {
+	if !m.requirePermission(ctx, PermissionNetworkEgress) {
+		m.writeHostResponse(plugin, stack, HTTPFetchResponse{Status: http.StatusForbidden, Body: []byte(permissionDeniedMessage(PermissionNetworkEgress))})
+		return
+	}
+
 	payload, err := plugin.ReadBytes(stack[0])
 	if err != nil {
 		m.logger.Warn("http_fetch host function failed to read payload", "error", err)
@@ -184,6 +194,11 @@ func (m *Manager) writeHostResponse(plugin *extism.CurrentPlugin, stack []uint64
 }
 
 func (m *Manager) kvGetHostFunction(ctx context.Context, plugin *extism.CurrentPlugin, stack []uint64) {
+	if !m.requirePermission(ctx, PermissionStorageKV) {
+		m.writeHostResponse(plugin, stack, KVGetResponse{Status: "error", Error: permissionDeniedMessage(PermissionStorageKV)})
+		return
+	}
+
 	payload, err := plugin.ReadBytes(stack[0])
 	if err != nil {
 		m.logger.Warn("kv_get host function failed to read payload", "error", err)
@@ -234,6 +249,11 @@ func (m *Manager) kvGetHostFunction(ctx context.Context, plugin *extism.CurrentP
 }
 
 func (m *Manager) kvSetHostFunction(ctx context.Context, plugin *extism.CurrentPlugin, stack []uint64) {
+	if !m.requirePermission(ctx, PermissionStorageKV) {
+		m.writeHostResponse(plugin, stack, KVSetResponse{Status: "error", Error: permissionDeniedMessage(PermissionStorageKV)})
+		return
+	}
+
 	payload, err := plugin.ReadBytes(stack[0])
 	if err != nil {
 		m.logger.Warn("kv_set host function failed to read payload", "error", err)
@@ -292,6 +312,11 @@ func (m *Manager) kvSetHostFunction(ctx context.Context, plugin *extism.CurrentP
 }
 
 func (m *Manager) kvDeleteHostFunction(ctx context.Context, plugin *extism.CurrentPlugin, stack []uint64) {
+	if !m.requirePermission(ctx, PermissionStorageKV) {
+		m.writeHostResponse(plugin, stack, KVDeleteResponse{Status: "error", Error: permissionDeniedMessage(PermissionStorageKV)})
+		return
+	}
+
 	payload, err := plugin.ReadBytes(stack[0])
 	if err != nil {
 		m.logger.Warn("kv_delete host function failed to read payload", "error", err)
@@ -336,6 +361,11 @@ func (m *Manager) kvDeleteHostFunction(ctx context.Context, plugin *extism.Curre
 }
 
 func (m *Manager) createCommentHostFunction(ctx context.Context, plugin *extism.CurrentPlugin, stack []uint64) {
+	if !m.requirePermission(ctx, PermissionCommentsWrite) {
+		m.writeHostResponse(plugin, stack, CreateCommentResponse{Status: "error", Error: permissionDeniedMessage(PermissionCommentsWrite)})
+		return
+	}
+
 	payload, err := plugin.ReadBytes(stack[0])
 	if err != nil {
 		m.logger.Warn("create_comment host function failed to read payload", "error", err)
@@ -393,6 +423,11 @@ func (m *Manager) createCommentHostFunction(ctx context.Context, plugin *extism.
 }
 
 func (m *Manager) scmCreateBranchHostFunction(ctx context.Context, plugin *extism.CurrentPlugin, stack []uint64) {
+	if !m.requirePermission(ctx, PermissionSCMWrite) {
+		m.writeHostResponse(plugin, stack, SCMCreateBranchResponse{Status: "error", Error: permissionDeniedMessage(PermissionSCMWrite)})
+		return
+	}
+
 	payload, err := plugin.ReadBytes(stack[0])
 	if err != nil {
 		m.logger.Warn("scm_create_branch host function failed to read payload", "error", err)
@@ -439,6 +474,11 @@ func (m *Manager) scmCreateBranchHostFunction(ctx context.Context, plugin *extis
 }
 
 func (m *Manager) scmCreateItemLinkHostFunction(ctx context.Context, plugin *extism.CurrentPlugin, stack []uint64) {
+	if !m.requirePermission(ctx, PermissionSCMWrite) {
+		m.writeHostResponse(plugin, stack, SCMCreateItemLinkResponse{Status: "error", Error: permissionDeniedMessage(PermissionSCMWrite)})
+		return
+	}
+
 	payload, err := plugin.ReadBytes(stack[0])
 	if err != nil {
 		m.logger.Warn("scm_create_item_link host function failed to read payload", "error", err)

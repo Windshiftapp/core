@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,9 +16,15 @@ import (
 	"windshift/internal/repository"
 )
 
-// MentionPattern matches @username or @"Display Name" patterns
-// Supports: @username, @"John Doe"
-var MentionPattern = regexp.MustCompile(`(?:^|[^a-zA-Z0-9.])@([a-zA-Z0-9_.-]+)|(?:^|[^a-zA-Z0-9.])@"([^"]+)"`)
+// MentionPattern matches @{Display Name#123} (id-embedded, preferred),
+// @username, and @"Display Name". The id-embedded form resolves the recipient
+// without depending on a name being unique; the other two remain for content
+// authored before ids were embedded and for name-based input from imports.
+var MentionPattern = regexp.MustCompile(
+	`(?:^|[^a-zA-Z0-9.])@\{([^}\n]*)#(\d+)\}` +
+		`|(?:^|[^a-zA-Z0-9.])@([a-zA-Z0-9_.-]+)` +
+		`|(?:^|[^a-zA-Z0-9.])@"([^"]+)"`,
+)
 
 // ProcessMentionsParams contains parameters for processing mentions
 type ProcessMentionsParams struct {
@@ -69,25 +76,50 @@ func NewMentionService(db database.Database, notificationService *NotificationSe
 	}
 }
 
-// ExtractMentionIdentifiers parses content and returns list of mention identifiers
-func (s *MentionService) ExtractMentionIdentifiers(content string) []string {
+// MentionRef is one parsed mention. UserID is set for id-embedded tokens and
+// zero for legacy @username / @"Display Name" mentions that still need a name
+// lookup. Identifier carries the display text for legacy refs.
+type MentionRef struct {
+	UserID     int
+	Identifier string
+}
+
+// ExtractMentionRefs parses content and returns every mention, deduplicated by
+// user id when present and by identifier otherwise.
+func (s *MentionService) ExtractMentionRefs(content string) []MentionRef {
 	matches := MentionPattern.FindAllStringSubmatch(content, -1)
-	identifiers := make([]string, 0)
+	refs := make([]MentionRef, 0, len(matches))
 	seen := make(map[string]bool)
 
 	for _, match := range matches {
-		identifier := match[1] // username pattern
-		if identifier == "" {
-			identifier = match[2] // "Display Name" pattern
+		var ref MentionRef
+		switch {
+		case match[2] != "":
+			userID, err := strconv.Atoi(match[2])
+			if err != nil || userID <= 0 {
+				continue
+			}
+			ref = MentionRef{UserID: userID, Identifier: match[1]}
+		case match[3] != "":
+			ref = MentionRef{Identifier: match[3]}
+		case match[4] != "":
+			ref = MentionRef{Identifier: match[4]}
+		default:
+			continue
 		}
 
-		if identifier != "" && !seen[identifier] {
-			seen[identifier] = true
-			identifiers = append(identifiers, identifier)
+		key := ref.Identifier
+		if ref.UserID > 0 {
+			key = "id:" + strconv.Itoa(ref.UserID)
 		}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		refs = append(refs, ref)
 	}
 
-	return identifiers
+	return refs
 }
 
 // ResolveMentionedUserIDs parses content and resolves every @mention to an
@@ -95,16 +127,16 @@ func (s *MentionService) ExtractMentionIdentifiers(content string) []string {
 // appearance order and are deduplicated. Workspace-sensitive callers should
 // use ResolveActionableMentionedUserIDs.
 func (s *MentionService) ResolveMentionedUserIDs(content string) ([]int, error) {
-	identifiers := s.ExtractMentionIdentifiers(content)
-	if len(identifiers) == 0 {
+	refs := s.ExtractMentionRefs(content)
+	if len(refs) == 0 {
 		return nil, nil
 	}
-	ids := make([]int, 0, len(identifiers))
-	seen := make(map[int]bool, len(identifiers))
-	for _, identifier := range identifiers {
-		userID, _, err := s.resolveUserIdentifier(identifier)
+	ids := make([]int, 0, len(refs))
+	seen := make(map[int]bool, len(refs))
+	for _, ref := range refs {
+		userID, _, err := s.resolveMentionRef(ref)
 		if err != nil {
-			return nil, fmt.Errorf("resolve mention %q: %w", identifier, err)
+			return nil, fmt.Errorf("resolve mention %q: %w", ref.Identifier, err)
 		}
 		if userID == 0 || seen[userID] {
 			continue
@@ -157,42 +189,92 @@ func (s *MentionService) actionableUserIDs(ctx context.Context, workspaceID int)
 	return ids, nil
 }
 
-// resolveUserIdentifier looks up a user by username or display name
-// FIXME: require unique mention identifiers; display-name matches are ambiguous.
-func (s *MentionService) resolveUserIdentifier(identifier string) (userID int, displayName string, err error) {
-	var firstName, lastName string
+// resolveMentionRef resolves a parsed mention. Id-embedded refs use the id as
+// the authoritative key; legacy refs fall back to a name lookup.
+func (s *MentionService) resolveMentionRef(ref MentionRef) (userID int, displayName string, err error) {
+	if ref.UserID > 0 {
+		return s.resolveUserByID(ref.UserID)
+	}
+	return s.resolveUserIdentifier(ref.Identifier)
+}
 
+// resolveUserByID loads an active user by primary key. No name is consulted.
+func (s *MentionService) resolveUserByID(id int) (userID int, displayName string, err error) {
+	var firstName, lastName string
 	err = s.db.QueryRow(`
+		SELECT id, first_name, last_name
+		FROM users
+		WHERE id = ? AND is_active = true
+	`, id).Scan(&userID, &firstName, &lastName)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, "", nil
+	}
+	if err != nil {
+		return 0, "", err
+	}
+	return userID, strings.TrimSpace(firstName + " " + lastName), nil
+}
+
+// resolveUserIdentifier looks up a user by username or display name. Usernames
+// are unique; a display name only resolves when exactly one active user matches.
+func (s *MentionService) resolveUserIdentifier(identifier string) (userID int, displayName string, err error) {
+	userID, displayName, ok, err := s.findUniqueActiveUser(`
 		SELECT id, first_name, last_name
 		FROM users
 		WHERE LOWER(username) = LOWER(?) AND is_active = true
-	`, identifier).Scan(&userID, &firstName, &lastName)
-
-	if err == nil {
-		displayName = strings.TrimSpace(firstName + " " + lastName)
-		return userID, displayName, nil
+		ORDER BY id
+		LIMIT 2
+	`, identifier)
+	if err != nil || ok {
+		return userID, displayName, err
 	}
 
-	if !errors.Is(err, sql.ErrNoRows) {
-		return 0, "", err
-	}
-
-	err = s.db.QueryRow(`
+	userID, displayName, _, err = s.findUniqueActiveUser(`
 		SELECT id, first_name, last_name
 		FROM users
 		WHERE LOWER(TRIM(first_name || ' ' || last_name)) = LOWER(?) AND is_active = true
-	`, identifier).Scan(&userID, &firstName, &lastName)
+		ORDER BY id
+		LIMIT 2
+	`, identifier)
+	return userID, displayName, err
+}
 
-	if err == nil {
-		displayName = strings.TrimSpace(firstName + " " + lastName)
-		return userID, displayName, nil
+// findUniqueActiveUser returns the single active user a lookup matches. It
+// reports ok=false for no match and for an ambiguous match, so a duplicated
+// display name can never resolve to an arbitrary recipient.
+func (s *MentionService) findUniqueActiveUser(query, identifier string) (userID int, displayName string, ok bool, err error) {
+	rows, err := s.db.Query(query, identifier)
+	if err != nil {
+		return 0, "", false, err
 	}
+	defer rows.Close()
 
-	if errors.Is(err, sql.ErrNoRows) {
-		return 0, "", nil // User not found, not an error
+	matches := 0
+	for rows.Next() {
+		var id int
+		var firstName, lastName string
+		if err := rows.Scan(&id, &firstName, &lastName); err != nil {
+			return 0, "", false, err
+		}
+		if matches == 0 {
+			userID = id
+			displayName = strings.TrimSpace(firstName + " " + lastName)
+		}
+		matches++
 	}
-
-	return 0, "", err
+	if err := rows.Err(); err != nil {
+		return 0, "", false, err
+	}
+	if matches != 1 {
+		if matches > 1 {
+			slog.Warn("ambiguous mention identifier; skipping",
+				slog.String("component", "mentions"),
+				slog.String("identifier", identifier),
+				slog.Int("matches", matches))
+		}
+		return 0, "", false, nil
+	}
+	return userID, displayName, true, nil
 }
 
 // ProcessMentions handles mention diff and creates/removes mention records
@@ -200,9 +282,9 @@ func (s *MentionService) ProcessMentions(params ProcessMentionsParams) error {
 	slog.Debug("Processing mentions", slog.String("component", "mentions"), slog.String("source_type", params.SourceType), slog.Int("source_id", params.SourceID), slog.Int("item_id", params.ItemID))
 
 	// Resolve active, actionable recipients, then diff them against stored mentions.
-	identifiers := s.ExtractMentionIdentifiers(params.Content)
+	refs := s.ExtractMentionRefs(params.Content)
 	var actionable map[int]struct{}
-	if s.workspaceUsers != nil && len(identifiers) > 0 {
+	if s.workspaceUsers != nil && len(refs) > 0 {
 		var err error
 		actionable, err = s.actionableUserIDs(context.Background(), params.WorkspaceID)
 		if err != nil {
@@ -211,10 +293,10 @@ func (s *MentionService) ProcessMentions(params ProcessMentionsParams) error {
 	}
 
 	currentMentions := make(map[int]string) // userID -> displayName
-	for _, identifier := range identifiers {
-		userID, displayName, err := s.resolveUserIdentifier(identifier)
+	for _, ref := range refs {
+		userID, displayName, err := s.resolveMentionRef(ref)
 		if err != nil {
-			slog.Error("Error resolving identifier", slog.String("component", "mentions"), slog.String("identifier", identifier), slog.Any("error", err))
+			slog.Error("Error resolving identifier", slog.String("component", "mentions"), slog.String("identifier", ref.Identifier), slog.Any("error", err))
 			continue
 		}
 		if userID == 0 {

@@ -112,16 +112,6 @@ func (s *TimerService) StartTimer(
 	if projectStatus != "Active" {
 		return nil, ErrTimerProjectInactive
 	}
-	projectCustomerID, err := s.repo.GetProjectCustomerID(projectID)
-	if errors.Is(err, repository.ErrNotFound) {
-		return nil, fmt.Errorf("%w: project", ErrTimerNotFound)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if projectCustomerID == nil {
-		return nil, fmt.Errorf("%w: project has no customer assigned", ErrTimerValidation)
-	}
 
 	// Workspace access: 404 (not 403) on failure per project policy.
 	canViewWS, err := s.permService.HasWorkspacePermission(userID, workspaceID, models.PermissionItemView)
@@ -266,20 +256,6 @@ func (s *TimerService) StopTimerByID(userID, timerID int) (*StopResult, error) {
 	durationSeconds := endTimeUTC - timer.StartTimeUTC
 	durationMinutes := int(durationSeconds / 60)
 
-	customerID, err := s.repo.GetProjectCustomerID(timer.ProjectID)
-	if err != nil {
-		return nil, err
-	}
-	if customerID == nil {
-		// The project may have lost its customer after this timer started, or
-		// the row may predate start-time validation. No valid worklog can be
-		// created, but deleting the timer prevents the user from being wedged.
-		if err := s.repo.DeleteTimer(timer.ID); err != nil {
-			return nil, err
-		}
-		return buildStopResult(timer, endTimeUTC, durationSeconds, durationMinutes, false, metadataVisible), nil
-	}
-
 	timezone, err := s.repo.GetUserTimezone(userID)
 	if err != nil {
 		return nil, err
@@ -296,7 +272,6 @@ func (s *TimerService) StopTimerByID(userID, timerID int) (*StopResult, error) {
 
 	if err := s.repo.FinalizeTimer(timer.ID, repository.CreateWorklogInput{
 		ProjectID:       timer.ProjectID,
-		CustomerID:      *customerID,
 		UserID:          userID,
 		ItemID:          itemID,
 		Description:     timer.Description,

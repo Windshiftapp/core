@@ -13,6 +13,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/emailutil"
+	"windshift/internal/markdown"
 	"windshift/internal/models"
 	"windshift/internal/smtp"
 )
@@ -294,8 +295,10 @@ func (s *MentionEmailService) deliverPendingMention(ctx context.Context, outboxI
 		ItemKey:       row.ItemKey,
 		ItemTitle:     row.ItemTitle,
 		SourceLabel:   mentionSourceLabel(row.SourceType),
-		Content:       row.Content,
-		ActionURL:     smtp.AbsoluteActionURL(s.baseURL, row.ActionURL),
+		// Strip the embedded id once so every template, including an admin
+		// override that renders .Content directly, shows the display name.
+		Content:   markdown.StripMentionIDs(row.Content),
+		ActionURL: smtp.AbsoluteActionURL(s.baseURL, row.ActionURL),
 	}
 	if err := s.sender.SendTransactionalContext(ctx, row.ToEmail, emailutil.TemplateMention, data); err != nil {
 		s.recordMentionFailure(row.ID, row.AttemptCount, err)

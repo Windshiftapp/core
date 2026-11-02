@@ -212,6 +212,7 @@ export default {
       "emailOptional": "이메일(선택 사항)",
       "contactPersonOptional": "연락 담당자(선택 사항)",
       "failedToSave": "조직을 저장하지 못했습니다",
+      "failedToDelete": "조직을 삭제하지 못했습니다",
       "deleteOrganization": "조직 삭제",
       "confirmDelete": "\"{name}\"을(를) 삭제하시겠습니까?"
     },

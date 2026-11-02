@@ -20,9 +20,14 @@ import (
 )
 
 const (
-	Created        = "item.created"
-	Updated        = "item.updated"
-	StatusChanged  = "item.status_changed"
+	Created       = "item.created"
+	Updated       = "item.updated"
+	StatusChanged = "item.status_changed"
+	// StatusLooped is a same-status transition the workflow declares as a
+	// self-transition. It is a distinct fact so notifications and SLA facts,
+	// which subscribe to StatusChanged, do not react to a loop; only the action
+	// consumer maps it to the status_loop trigger.
+	StatusLooped   = "item.status_looped"
 	Deleted        = "item.deleted"
 	CommentCreated = "item.comment_created"
 	Linked         = "item.linked"
@@ -496,6 +501,14 @@ func (r *Recorder) UpdatedBatch(ctx context.Context, tx database.Tx, records []U
 func (r *Recorder) StatusChanged(ctx context.Context, tx database.Tx, item *models.Item, oldStatusID, newStatusID *int, changes []FieldChange, metadata Metadata) (*events.Event, error) {
 	return r.append(ctx, tx, StatusChanged, item.WorkspaceID, item.ID, metadata, StatusChangedV1{
 		Item: Snapshot(item), OldStatusID: oldStatusID, NewStatusID: newStatusID, Changes: changes, Automation: metadata.Automation,
+	})
+}
+
+// StatusLooped appends the same-status transition fact. The status does not
+// change, so both status ids are the looped status.
+func (r *Recorder) StatusLooped(ctx context.Context, tx database.Tx, item *models.Item, statusID int, changes []FieldChange, metadata Metadata) (*events.Event, error) {
+	return r.append(ctx, tx, StatusLooped, item.WorkspaceID, item.ID, metadata, StatusChangedV1{
+		Item: Snapshot(item), OldStatusID: &statusID, NewStatusID: &statusID, Changes: changes, Automation: metadata.Automation,
 	})
 }
 

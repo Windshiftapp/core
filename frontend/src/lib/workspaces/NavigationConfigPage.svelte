@@ -37,12 +37,11 @@
   let collectionName = $state('');
   let defaultView = $state(null);
 
-  // Mirrors the sidebar's row order: overview, views, tests, tools. Fixed
-  // sections render without toggles for orientation; test entries are not
-  // nav-configurable (module and permission gating decide their visibility).
-  // A global collection lives outside any workspace nav, so only the views
-  // section applies there. A workspace collection cannot toggle the
-  // workspace-only tools either — they follow the workspace setting.
+  // Mirrors the collection-context sidebar: overview plus the configurable
+  // views. A workspace collection has no test entries in its nav, so its
+  // config page must not offer them; the workspace scope keeps the tests and
+  // tools sections for orientation. A global collection lives outside any
+  // workspace nav, so only the views section applies there.
   const isCollectionScope = $derived(Boolean(collectionId));
   const sections = $derived.by(() => {
     // Collection scopes may only toggle the collection-scoped views; the
@@ -61,13 +60,13 @@
     const scoped = [
       { id: 'overview', title: null, fixed: true, rows: [{ id: 'overview', labelKey: 'workspaceSettings.views.overview', icon: Home }] },
       viewsSection,
-      { id: 'tests', title: t('commandPalette.commands.tests.label'), fixed: true, moduleGated: true, rows: testNavigationItems },
     ];
     if (isCollectionScope) {
       return scoped;
     }
     return [
       ...scoped,
+      { id: 'tests', title: t('commandPalette.commands.tests.label'), fixed: true, moduleGated: true, rows: testNavigationItems },
       {
         id: 'tools',
         title: t('actions.config.tools'),

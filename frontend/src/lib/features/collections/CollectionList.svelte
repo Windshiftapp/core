@@ -22,22 +22,18 @@
   import { collectionFieldLinks } from '../../stores/collectionFieldLinks.svelte.js';
   import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
   import { workspaceDataStore } from '../../stores/workspaceDataStore.svelte.js';
-  import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
-  import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import SearchInput from '../../components/SearchInput.svelte';
-  import DropdownMenu from '../../layout/DropdownMenu.svelte';
-  import Pagination from '../../components/Pagination.svelte';
   import ViewHeader from '../../layout/ViewHeader.svelte';
   import StaticViewBackground from '../../layout/StaticViewBackground.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import TableHeaderBar from '../../components/TableHeaderBar.svelte';
-  import ListCellRenderer from './ListCellRenderer.svelte';
+  import WorkItemListRow from './WorkItemListRow.svelte';
+  import WorkItemListFooter from './WorkItemListFooter.svelte';
   import ColumnSelector from './ColumnSelector.svelte';
   import SubFilterBar from './SubFilterBar.svelte';
-  import LazyRender from '../../components/LazyRender.svelte';
   import { useListColumnConfig } from './listColumnConfig.svelte.js';
 
   let { workspaceId, collectionId = null } = $props();
@@ -150,7 +146,6 @@
     () => `${workspaceId ?? ''}|${collectionId ?? ''}|${collectionStore.effectiveSubFilterQL}`
   );
   let filteredItems = $derived(search.items);
-  let filteredItemsById = $derived(new Map(filteredItems.map((item) => [item.id, item])));
 
   // Resolve only the assignees the visible rows reference instead of waiting
   // for the whole directory before the list can render.
@@ -158,28 +153,6 @@
     const ids = filteredItems.map((item) => item.assignee_id).filter(Boolean);
     if (ids.length > 0) void workspaceDataStore.hydrateUsers(ids);
   });
-
-  function registerListRow(element, itemId) {
-    const cleanup = draggable({
-      element,
-      getInitialData: () => ({
-        item: filteredItemsById.get(itemId),
-        type: 'work-item'
-      }),
-      onDragStart: () => {
-        element.style.opacity = '0.5';
-      },
-      onDrop: () => {
-        element.style.opacity = '';
-      }
-    });
-    return {
-      destroy() {
-        element.style.opacity = '';
-        cleanup();
-      }
-    };
-  }
 
   // Linking fields live in item_links rather than custom_field_values. Hydrate
   // all visible rows through the bounded batch endpoint so adding one linking
@@ -328,48 +301,28 @@
           <!-- Table Body -->
           <div>
             {#each filteredItems as item (item.id)}
-              <div use:registerListRow={item.id} class="px-4 py-3 list-row transition-colors" style="border-top: 1px solid var(--ds-border);" data-item-row data-item-id={item.id} data-testid={`workspace-item-row-${item.id}`}>
-                <LazyRender>
-                  {#snippet children()}
-                    <div
-                      class="grid gap-4 items-center"
-                      style="grid-template-columns: {gridTemplateColumns}; min-width: {gridMinWidth};"
-                    >
-                      {#each listColumns as column (column.field_identifier)}
-                        <div class="min-w-0 overflow-hidden">
-                          <ListCellRenderer
-                            {item}
-                            {column}
-                            {workspace}
-                            canEdit={workspacePermissions.canEdit(item.workspace_id)}
-                            {statuses}
-                            {statusCategories}
-                            {priorities}
-                            {milestones}
-                            {iterations}
-                            {users}
-                            {projects}
-                            {itemTypes}
-                            {customFieldDefinitions}
-                            onitemUpdated={handleItemUpdated}
-                            onupdateError={handleUpdateError}
-                          />
-                        </div>
-                      {/each}
-
-                      <!-- Actions -->
-                      <div>
-                        <DropdownMenu
-                          triggerText=""
-                          triggerIcon={MoreHorizontal}
-                          triggerClass="p-2 rounded action-btn transition-colors"
-                          items={buildItemActions(item)}
-                        />
-                      </div>
-                    </div>
-                  {/snippet}
-                </LazyRender>
-              </div>
+              <WorkItemListRow
+                {item}
+                columns={listColumns}
+                {gridTemplateColumns}
+                {gridMinWidth}
+                {workspace}
+                canEdit={workspacePermissions.canEdit(item.workspace_id)}
+                {statuses}
+                {statusCategories}
+                {priorities}
+                {milestones}
+                {iterations}
+                {users}
+                {projects}
+                {itemTypes}
+                {customFieldDefinitions}
+                actions={buildItemActions(item)}
+                onitemUpdated={handleItemUpdated}
+                onupdateError={handleUpdateError}
+                draggable
+                rowTestid={`workspace-item-row-${item.id}`}
+              />
             {/each}
           </div>
         </div>
@@ -398,16 +351,12 @@
             </div>
           {/if}
         {:else if itemsPagination && itemsPagination.total_items > 0 && workItems.length > 0}
-          <div class="mt-6">
-            <Pagination
-              currentPage={itemsPagination.page}
-              totalItems={itemsPagination.total_items}
-              itemsPerPage={itemsPagination.limit}
-              maxItems={10000}
-              onpageChange={handlePageChange}
-              onpageSizeChange={handlePageSizeChange}
-            />
-          </div>
+          <WorkItemListFooter
+            pagination={itemsPagination}
+            itemCount={workItems.length}
+            onpageChange={handlePageChange}
+            onpageSizeChange={handlePageSizeChange}
+          />
         {:else}
           <!-- Results Summary for legacy/non-paginated responses -->
           <div class="mt-4 text-sm  text-center" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
@@ -425,10 +374,6 @@
 {/if}
 
 <style>
-  .list-row:hover {
-    background-color: var(--ds-background-neutral-hovered);
-  }
-
   :global(.item-key:hover) {
     background-color: var(--ds-background-neutral-hovered) !important;
   }

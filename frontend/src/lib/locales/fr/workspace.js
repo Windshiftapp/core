@@ -377,6 +377,7 @@ export default {
     clickToAddDescription: 'Cliquer pour ajouter une description',
     noDescriptionProvided: 'Aucune description fournie - cliquer pour en ajouter une',
     addLink: 'Ajouter un lien',
+    addPage: 'Ajouter une page',
     createChild: 'Créer un enfant',
     child: 'Enfant',
     attachFile: 'Joindre un fichier',
@@ -503,6 +504,12 @@ export default {
     range90d: 'Les 90 derniers jours',
     rangeAll: 'Tout le temps',
     rangeNone: 'Aucun',
+  },
+
+  collectionHierarchy: {
+    selectLevel: 'Sélectionner le niveau hiérarchique',
+    levelN: 'Niveau {level}',
+    itemsCount: '{count} éléments',
   },
 
   collectionTree: {

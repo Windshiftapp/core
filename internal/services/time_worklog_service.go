@@ -16,7 +16,6 @@ import (
 var (
 	ErrWorklogProjectNotFound = errors.New("worklog project not found")
 	ErrWorklogProjectInactive = errors.New("worklog project is not active")
-	ErrWorklogCustomerMissing = errors.New("worklog project has no customer")
 	ErrWorklogInvalidInput    = errors.New("invalid worklog input")
 )
 
@@ -74,7 +73,7 @@ func (s *TimeWorklogService) Create(userID int, input WorklogMutationInput) (*Wo
 		return nil, err
 	}
 	id, err := s.worklogs.Create(repository.NewWorklog{
-		ProjectID: input.ProjectID, CustomerID: prepared.customerID, UserID: userID,
+		ProjectID: input.ProjectID, UserID: userID,
 		ItemID: input.ItemID, Description: prepared.description, DateUnix: WorklogDateUnix(prepared.date),
 		StartTimeUnix: prepared.startUnix, EndTimeUnix: prepared.endUnix, DurationMinutes: prepared.durationMinutes,
 	})
@@ -91,7 +90,7 @@ func (s *TimeWorklogService) Update(userID, worklogID int, input WorklogMutation
 		return nil, err
 	}
 	if err := s.worklogs.Update(repository.UpdateWorklog{
-		ID: worklogID, ProjectID: input.ProjectID, CustomerID: int(prepared.customerID),
+		ID: worklogID, ProjectID: input.ProjectID,
 		ItemID: input.ItemID, Description: prepared.description, DateUnix: WorklogDateUnix(prepared.date),
 		StartTimeUnix: prepared.startUnix, EndTimeUnix: prepared.endUnix, DurationMinutes: prepared.durationMinutes,
 	}); err != nil {
@@ -291,7 +290,6 @@ func (s *TimeWorklogService) Aggregate(ctx context.Context, filter repository.Wo
 }
 
 type preparedWorklog struct {
-	customerID      int64
 	description     string
 	date            time.Time
 	startUnix       int64
@@ -309,9 +307,6 @@ func (s *TimeWorklogService) prepare(userID int, input WorklogMutationInput) (pr
 	}
 	if err != nil {
 		return preparedWorklog{}, err
-	}
-	if project.CustomerID == nil {
-		return preparedWorklog{}, ErrWorklogCustomerMissing
 	}
 	if project.Status != "Active" {
 		return preparedWorklog{}, fmt.Errorf("%w: %s", ErrWorklogProjectInactive, project.Status)
@@ -367,7 +362,7 @@ func (s *TimeWorklogService) prepare(userID int, input WorklogMutationInput) (pr
 		sanitize.Pair{Target: &description, Policy: sanitize.Comment, Label: "Description"},
 	)
 	return preparedWorklog{
-		customerID: *project.CustomerID, description: description, date: date,
+		description: description, date: date,
 		startUnix: startUnix, endUnix: endUnix, durationMinutes: durationMinutes,
 		timezone: resolvedTimezone, location: location, warnings: warnings,
 	}, nil

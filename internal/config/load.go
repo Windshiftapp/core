@@ -257,10 +257,11 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 			Format: resolvedLogFormat,
 		},
 		Plugins: PluginsConfig{
-			Disabled:      pluginsDisabled,
-			Dir:           resolvedPluginDir,
-			ExtraDirs:     extraPluginDirs,
-			LicensePubKey: licensePubKey,
+			Disabled:          pluginsDisabled,
+			Dir:               resolvedPluginDir,
+			ExtraDirs:         extraPluginDirs,
+			LicensePubKey:     licensePubKey,
+			AllowPublicRoutes: parseBoolEnv("PLUGIN_PUBLIC_ROUTES"),
 		},
 		LLM: LLMConfig{
 			Endpoint:      os.Getenv("LLM_ENDPOINT"),

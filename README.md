@@ -56,7 +56,6 @@ It ships as a single Go binary with the Svelte frontend built in, SQLite by defa
 | Jira Automation | Built-in event-driven actions |
 | Jira Service Management | SLAs, queues, approvals, and a customer portal |
 | Jira Assets / Insight | Asset and CMDB register |
-| Confluence | Workspace knowledge base pages |
 | Xray / Zephyr | Test cases, test sets, test runs, and reports |
 | Marketplace apps | Built-in modules, packs, and plugins (extensible via WASM runtime) |
 
@@ -137,7 +136,7 @@ Want to build from source? See [BUILD.md](BUILD.md). For local development and c
 
 ## Contributing
 
-Code contributions, bug reports, and feedback are all welcome here on GitHub. Open pull requests against `main`; use GitHub Issues and Discussions for bug reports and feedback.
+Code contributions, bug reports, and feedback are all welcome here on GitHub. Open pull requests against `main`; use GitHub Issues and Discussions for bug reports and feedback. Contributions require a signed, one-time [CLA](CLA.md) — see the [contributing guide](CONTRIBUTING.md) for details.
 
 We are especially interested in early bug reports and real-world feedback about OIDC providers.
 

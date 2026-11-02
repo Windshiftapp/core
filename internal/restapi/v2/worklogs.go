@@ -560,7 +560,6 @@ func worklogError(err error) error {
 	case errors.Is(err, services.ErrWorklogProjectNotFound):
 		return newError(http.StatusNotFound, "not_found", "Time project was not found")
 	case errors.Is(err, services.ErrWorklogProjectInactive),
-		errors.Is(err, services.ErrWorklogCustomerMissing),
 		errors.Is(err, services.ErrWorklogInvalidInput):
 		return newError(http.StatusBadRequest, "invalid_request", err.Error())
 	default:

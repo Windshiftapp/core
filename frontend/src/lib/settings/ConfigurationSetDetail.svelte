@@ -9,8 +9,7 @@
   import { conditionSets } from '../api/conditionSets.js';
   import { approvalSets } from '../api/approvalSets.js';
   import { workspacesStore } from '../stores/workspaces.svelte.js';
-  import Button from '../components/Button.svelte';
-  import BackButton from '../components/BackButton.svelte';
+  import SetDetailShell from './SetDetailShell.svelte';
   import Tabs from '../components/Tabs.svelte';
   import ConfigurationSetWorkspaces from './ConfigurationSetWorkspaces.svelte';
   import ConfigurationSetItemTypes from './ConfigurationSetItemTypes.svelte';
@@ -94,6 +93,13 @@
 
   // Reactive: Check if form has unsaved changes
   const hasUnsavedChanges = $derived(JSON.stringify(formData) !== JSON.stringify(originalFormData));
+  const displayTitle = $derived(
+    loading
+      ? t('common.loading')
+      : isNewMode
+        ? t('settings.configSets.newConfigSet')
+        : configSet?.name || t('settings.configSets.title')
+  );
 
   // If user toggles is_default while on workspaces tab, switch to general
   $effect(() => {
@@ -334,49 +340,20 @@
   }
 </script>
 
-<div class="flex flex-col h-full" style="background-color: var(--ds-surface);">
-    <!-- Header -->
-    <div class="border-b px-6 py-4" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-4">
-          <BackButton onclick={goBack} tooltip="Back to Configuration Sets" class="p-1" />
-          <div>
-            <h1 class="text-xl font-semibold" style="color: var(--ds-text);">
-              {#if loading}
-                {t('common.loading')}
-              {:else if isNewMode}
-                {t('settings.configSets.newConfigSet')}
-              {:else}
-                {configSet?.name || t('settings.configSets.title')}
-              {/if}
-            </h1>
-            <p class="text-sm mt-0.5" style="color: var(--ds-text-subtle);">
-              {t('settings.configSets.configureDesc')}
-            </p>
-          </div>
-        </div>
-        <div class="flex items-center gap-3">
-          {#if hasUnsavedChanges}
-            <span class="text-sm" style="color: var(--ds-text-subtle);">{t('settings.configSets.unsavedChanges')}</span>
-          {/if}
-          <Button variant="ghost" onclick={goBack}>
-            {t('common.cancel')}
-          </Button>
-          <Button dataTestid="config-set-save" variant="primary" onclick={save} disabled={saving || !hasUnsavedChanges}>
-            {saving ? t('common.saving') : t('common.save')}
-          </Button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Content -->
-    <div class="flex-1 overflow-y-auto p-6" style="background-color: var(--ds-surface);">
-      {#if loading}
-        <div class="flex items-center justify-center h-64">
-          <div style="color: var(--ds-text-subtle);">{t('settings.configSets.loading')}</div>
-        </div>
-      {:else}
-        <div class="max-w-6xl mx-auto">
+<SetDetailShell
+  {loading}
+  title={displayTitle}
+  description={t('settings.configSets.configureDesc')}
+  backTooltip="Back to Configuration Sets"
+  onBack={goBack}
+  {hasUnsavedChanges}
+  {saving}
+  onSave={save}
+  saveTestid="config-set-save"
+  loadingLabel={t('settings.configSets.loading')}
+  contentClass="max-w-6xl mx-auto"
+>
+  {#snippet children()}
           <Tabs {tabs} bind:activeTab>
             {#if activeTab === 'general'}
               <!-- Basic Information -->
@@ -612,10 +589,8 @@
               />
             {/if}
           </Tabs>
-        </div>
-      {/if}
-    </div>
-</div>
+  {/snippet}
+</SetDetailShell>
 
 <MigrationAssistant
   configurationSet={configSet}

@@ -1,4 +1,5 @@
 import { navigate } from '../router.js';
+import { itemModalStore } from '../stores/itemModalStore.svelte.js';
 import { addToast, removeToast } from '../stores/toasts.svelte.js';
 import { isTypingInField } from './keyboardShortcuts.js';
 
@@ -17,19 +18,11 @@ function getItemUrl(item) {
 }
 
 /**
- * Show a success toast for a newly-created work item. The toast is clickable
- * and registers a short-lived "O" shortcut to open the item detail page.
- *
- * @param {object} item
- * @param {{ messagePrefix?: string, duration?: number }} [options]
+ * Render a clickable toast for a work item and register a short-lived "O"
+ * shortcut that runs `openItem`. Clicking the toast or pressing the shortcut
+ * dismisses the toast and opens the item.
  */
-export function showCreatedItemToast(item, options = {}) {
-  if (!item?.id) return null;
-
-  const itemKey = getItemKey(item);
-  const duration = options.duration ?? DEFAULT_DURATION;
-  const openItem = () => navigate(getItemUrl(item));
-
+function showItemActionToast({ title, message, variant, duration, openItem }) {
   let toastId = null;
   let cleanupTimer = null;
 
@@ -61,9 +54,9 @@ export function showCreatedItemToast(item, options = {}) {
   cleanupTimer = setTimeout(cleanup, duration + 250);
 
   toastId = addToast({
-    title: `${itemKey} created`,
-    message: `${options.messagePrefix ? `${options.messagePrefix} ` : ''}${item.title || 'Untitled'}`,
-    variant: 'success',
+    title,
+    message,
+    variant,
     duration,
     clickable: true,
     actionLabel: 'Open item',
@@ -73,4 +66,51 @@ export function showCreatedItemToast(item, options = {}) {
   });
 
   return toastId;
+}
+
+/**
+ * Show a success toast for a newly-created work item. The toast is clickable
+ * and registers a short-lived "O" shortcut to open the item detail page.
+ *
+ * @param {object} item
+ * @param {{ messagePrefix?: string, duration?: number }} [options]
+ */
+export function showCreatedItemToast(item, options = {}) {
+  if (!item?.id) return null;
+
+  const itemKey = getItemKey(item);
+  const duration = options.duration ?? DEFAULT_DURATION;
+
+  return showItemActionToast({
+    title: `${itemKey} created`,
+    message: `${options.messagePrefix ? `${options.messagePrefix} ` : ''}${item.title || 'Untitled'}`,
+    variant: 'success',
+    duration,
+    openItem: () => navigate(getItemUrl(item)),
+  });
+}
+
+/**
+ * Show an info toast for a work item that was created but is hidden by the
+ * current collection filters. The title carries the item key and the toast
+ * opens the item modal so the user can adjust it (for example by adding a
+ * label) without leaving the collection.
+ *
+ * @param {object} item
+ * @param {{ message?: string, onOpen?: () => void, duration?: number }} [options]
+ */
+export function showCreatedItemOutsideViewToast(item, options = {}) {
+  if (!item?.id) return null;
+
+  const itemKey = getItemKey(item);
+  const duration = options.duration ?? DEFAULT_DURATION;
+  const onOpen = options.onOpen ?? (() => itemModalStore.open(item.id, item.workspace_id ?? null));
+
+  return showItemActionToast({
+    title: `${itemKey} created`,
+    message: options.message ?? (item.title || 'Untitled'),
+    variant: 'info',
+    duration,
+    openItem: onOpen,
+  });
 }

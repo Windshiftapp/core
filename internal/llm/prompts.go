@@ -20,7 +20,6 @@ const (
 	PromptDependencyAnalysis       = "dependency_analysis"
 	PromptAIChat                   = "ai_chat"
 	PromptDailyBriefing            = "daily_briefing"
-	PromptSummarizeTestPlan        = "summarize_test_plan"
 	PromptCodingAgentInitial       = "coding_agent_initial"
 	PromptAgentWorkspaceGuide      = "agent_workspace_guide"
 	PromptAgentWorkItemTriage      = "agent_work_item_triage"
@@ -42,7 +41,6 @@ var allPromptNames = []string{
 	PromptDependencyAnalysis,
 	PromptAIChat,
 	PromptDailyBriefing,
-	PromptSummarizeTestPlan,
 	PromptCodingAgentInitial,
 	PromptAgentWorkspaceGuide,
 	PromptAgentWorkItemTriage,

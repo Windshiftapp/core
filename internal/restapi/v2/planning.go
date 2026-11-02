@@ -520,6 +520,7 @@ func milestoneModel(result *services.MilestoneResult) models.Milestone {
 		CategoryID: result.CategoryID, CategoryName: result.CategoryName, CategoryColor: result.CategoryColor,
 		IsGlobal: result.IsGlobal, WorkspaceID: result.WorkspaceID, WorkspaceName: result.WorkspaceName,
 		ExternalKey: result.ExternalKey, Position: result.Position, CreatedAt: result.CreatedAt, UpdatedAt: result.UpdatedAt,
+		LastActivityAt: result.LastActivityAt,
 	}
 	if result.LatestRelease != nil {
 		latest := milestoneReleaseModel(*result.LatestRelease)

@@ -691,16 +691,16 @@
                     {@const options = parseOptionsJson(field.virtual_field_options)}
                     <div class="mt-1 ml-7 pl-4 py-2 border-l-2 space-y-3" style="border-color: var(--ds-border);">
                       {#if isExpanded}
-                        <div>
-                          <Label color="default" class="mb-1">Label</Label>
-                          <Input
-                            type="text"
-                            value={field.display_name ?? ''}
-                            oninput={(e) => formBuilderStore.updateFieldProperty(index, 'display_name', e.currentTarget.value)}
-                            placeholder={field.field_name || field.field_identifier}
-                            size="small"
-                          />
-                        </div>
+                        <TextField
+                          label="Label"
+                          labelColor="default"
+                          labelClass="mb-1"
+                          type="text"
+                          value={field.display_name ?? ''}
+                          oninput={(e) => formBuilderStore.updateFieldProperty(index, 'display_name', e.currentTarget.value)}
+                          placeholder={field.field_name || field.field_identifier}
+                          size="small"
+                        />
                         <div>
                           <Label color="default" class="mb-1">Help text</Label>
                           <Textarea

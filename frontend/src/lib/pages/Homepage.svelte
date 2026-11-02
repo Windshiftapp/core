@@ -19,6 +19,7 @@
   import X from '@lucide/svelte/icons/x';
   import { useEventListener } from 'runed';
   import { createDashboardWidgetDrag } from '../composables/dashboardWidgetDrag.js';
+  import { useDashboardCustomization } from '../composables/useDashboardCustomization.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
 
   import {
@@ -77,10 +78,13 @@
   let customizationCategory = $state('activity');
 
   // Section editing
-  let editingSectionId = $state(null);
-  let editingSectionTitle = $state('');
-  let editingSectionSubtitle = $state('');
-  let isNewSection = $state(false);
+  const customization = useDashboardCustomization({
+    updateSection: (sectionId, values) => homepageStore.updateSection(sectionId, values),
+    removeSection: (sectionId) => homepageStore.deleteSection(sectionId),
+    findSection: (sectionId) => sections.find((candidate) => candidate.id === sectionId),
+    getSectionDisplay: (section) => getDashboardSectionDisplay(section, t),
+    getSectionSaveValues: (section, draft) => getDashboardSectionSaveValues(section, draft, t),
+  });
 
   // Drag state
   let draggedWidget = $state(null);
@@ -114,15 +118,11 @@
 
   function toggleEditMode() {
     // If exiting edit mode while creating a new section, keep or discard it.
-    if (homepageStore.isEditMode && isNewSection && editingSectionId) {
-      if (editingSectionTitle.trim()) {
-        saveSection();
-      } else {
-        homepageStore.deleteSection(editingSectionId);
-      }
+    if (homepageStore.isEditMode) {
+      customization.commitOrDiscardDraft();
+    } else {
+      customization.resetDraft();
     }
-    editingSectionId = null;
-    isNewSection = false;
     homepageStore.toggleEditMode();
   }
 
@@ -132,10 +132,7 @@
 
   async function addSection() {
     const created = homepageStore.addSection(t('dashboard.editor.newSection'), '');
-    editingSectionId = created.id;
-    editingSectionTitle = created.title;
-    editingSectionSubtitle = created.subtitle;
-    isNewSection = true;
+    customization.beginNewSection(created);
 
     await tick();
     const titleInput = /** @type {HTMLInputElement | null} */ (
@@ -147,47 +144,6 @@
       behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
       block: 'center',
     });
-  }
-
-  function startEditingSection(section) {
-    const display = getDashboardSectionDisplay(section, t);
-    editingSectionId = section.id;
-    editingSectionTitle = display.title;
-    editingSectionSubtitle = display.subtitle || '';
-    isNewSection = false;
-  }
-
-  function saveSection() {
-    if (!editingSectionId) return;
-    const draft = {
-      title: editingSectionTitle,
-      subtitle: editingSectionSubtitle,
-    };
-    const section = sections.find((candidate) => candidate.id === editingSectionId);
-    homepageStore.updateSection(
-      editingSectionId,
-      section ? getDashboardSectionSaveValues(section, draft, t) : draft
-    );
-    editingSectionId = null;
-    isNewSection = false;
-  }
-
-  function cancelEditingSection() {
-    if (isNewSection && editingSectionId) {
-      homepageStore.deleteSection(editingSectionId);
-    }
-    editingSectionId = null;
-    isNewSection = false;
-  }
-
-  function handleSectionEditKeydown(event) {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      saveSection();
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      cancelEditingSection();
-    }
   }
 
   async function handleDeleteSection(sectionId) {
@@ -403,28 +359,28 @@
           >
             <!-- Section header -->
             <div class="flex items-center justify-between mb-4">
-              {#if editingSectionId === section.id}
+              {#if customization.editingSectionId === section.id}
                 <div class="flex-1 flex items-center gap-2 flex-wrap">
                   <Input
                     id={`dashboard-section-title-${section.id}`}
                     type="text"
-                    bind:value={editingSectionTitle}
+                    bind:value={customization.editingSectionTitle}
                     class="text-lg font-semibold"
                     placeholder={t('dashboard.editor.sectionTitlePlaceholder')}
-                    onkeydown={handleSectionEditKeydown}
+                    onkeydown={customization.handleSectionEditKeydown}
                     dataTestid="dashboard-section-title-input"
                   />
                   <Input
                     type="text"
-                    bind:value={editingSectionSubtitle}
+                    bind:value={customization.editingSectionSubtitle}
                     placeholder={t('dashboard.editor.sectionSubtitlePlaceholder')}
-                    onkeydown={handleSectionEditKeydown}
+                    onkeydown={customization.handleSectionEditKeydown}
                     size="small"
                   />
-                  <Button variant="primary" size="small" onclick={saveSection}>
+                  <Button variant="primary" size="small" onclick={customization.save}>
                     {t('common.save')} <span class="ml-1 opacity-60">⏎</span>
                   </Button>
-                  <Button variant="default" size="small" onclick={cancelEditingSection}>
+                  <Button variant="default" size="small" onclick={customization.cancel}>
                     {t('common.cancel')} <span class="ml-1 opacity-60">Esc</span>
                   </Button>
                 </div>
@@ -469,7 +425,7 @@
                       type="button"
                       class="p-2 rounded transition-colors hover:bg-[var(--ds-background-neutral-hovered)]"
                       style={homepageStore.backgroundSubtleTextStyle}
-                      onclick={() => startEditingSection(section)}
+                      onclick={() => customization.startEditing(section)}
                       title={t('dashboard.editor.renameSection')}
                       aria-label={t('dashboard.editor.renameSection')}
                     >

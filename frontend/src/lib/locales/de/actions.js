@@ -29,6 +29,7 @@ export default {
 
     trigger: {
       statusTransition: 'Statusänderung',
+      statusLoop: 'Status-Schleife',
       itemCreated: 'Vorgang erstellt',
       itemUpdated: 'Vorgang aktualisiert',
       itemLinked: 'Vorgang verknüpft',
@@ -92,6 +93,7 @@ export default {
       triggerType: 'Auslösertyp',
       fromStatus: 'Von Status',
       toStatus: 'Nach Status',
+      loopStatus: 'Wiederholter Status',
       anyStatus: 'Beliebiger Status',
       recipientType: 'Empfänger',
       notifyMessage: 'Nachricht',

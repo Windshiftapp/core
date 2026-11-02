@@ -1,6 +1,5 @@
 <script>
   import { t } from '../../stores/i18n.svelte.js';
-  import Input from '../../components/Input.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import Label from '../../components/Label.svelte';
   import Select from '../../components/Select.svelte';
@@ -68,15 +67,18 @@
 
   <div class="space-y-4">
     <div>
-      <Label color="default" required class="mb-2">
+      {#snippet portalSlugLabel()}
         {t('channel.portalSlug')} <span class="text-xs font-normal" style="color: var(--ds-text-subtle);">({t('channel.portalSlugHelp')})</span>
-      </Label>
-      <Input
-        bind:value={formData.slug}
+      {/snippet}
+      <TextField
+        labelSnippet={portalSlugLabel}
+        labelColor="default"
+        labelClass="mb-2"
         required
         placeholder="support-portal"
         pattern="[a-z0-9\-]+"
         title={t('validation.slugInvalid')}
+        bind:value={formData.slug}
       />
       <DescriptionText>
         {t('channel.portalUrl')}: /portal/{formData.slug || 'your-slug'}
@@ -159,12 +161,12 @@
         </div>
 
         <div>
-          <Label color="default" class="mb-2">
-            {t('channel.portalAllowedDomains', 'Allowed Email Domains')}
-          </Label>
-          <Input
-            bind:value={formData.allowed_domains}
+          <TextField
+            label={t('channel.portalAllowedDomains', 'Allowed Email Domains')}
+            labelColor="default"
+            labelClass="mb-2"
             placeholder="acme.com, partner.io"
+            bind:value={formData.allowed_domains}
           />
           <DescriptionText>
             {t('channel.portalAllowedDomainsHelp', 'Comma-separated list. Leave empty to allow any domain. Applies to both open and manual registration.')}

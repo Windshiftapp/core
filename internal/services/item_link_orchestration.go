@@ -417,6 +417,11 @@ func (s *ItemLinkService) DeleteLinkWithChecks(userID, linkID int) error {
 	if link == nil {
 		return ErrLinkNotFound
 	}
+	// Rows with other endpoint types (milestone page links) are
+	// managed by their own routes; the generic route does not see them.
+	if !isValidLinkEntityType(link.SourceType) || !isValidLinkEntityType(link.TargetType) {
+		return ErrLinkNotFound
+	}
 
 	if err := s.CheckEntityPermission(userID, link.SourceType, link.SourceID, models.PermissionItemEdit, AssetPermissionKeyEdit); err != nil {
 		return err

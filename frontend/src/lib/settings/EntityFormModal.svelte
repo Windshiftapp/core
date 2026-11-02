@@ -12,6 +12,7 @@
     saving = false,
     confirmLabel = t('common.save'),
     submitId = undefined,
+    confirmTestid = 'entity-form-confirm',
     maxWidth = 'max-w-lg',
     fields,
   } = $props();
@@ -33,7 +34,7 @@
           loading={saving}
           disabled={disabled || saving}
           keyboardHint={submitHint}
-          dataTestid="entity-form-confirm"
+          dataTestid={confirmTestid}
         >
           {confirmLabel}
         </Button>

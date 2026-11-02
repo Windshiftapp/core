@@ -350,11 +350,6 @@ export default {
     "libCharmbracelet": "Acceso TUI y SSH (Bubble Tea, Wish)"
   },
   "testing": {
-    "generateWithAI": "Generar con AI",
-    "overwriteDescriptionTitle": "¿Sobrescribir descripción?",
-    "overwriteDescriptionConfirm": "¿Reemplazar la descripción existente con un resumen generado por IA?",
-    "overwrite": "Sobrescribir",
-    "generateFailed": "No se pudo generar la descripción.",
     "actualResult": "Resultado real",
     "editTestPlan": "Editar plan de prueba",
     "execute": "Ejecutar",

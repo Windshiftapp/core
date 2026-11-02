@@ -1,94 +1,46 @@
 <script>
-  import { onMount } from 'svelte';
-  import StateDisplay from '../components/StateDisplay.svelte';
   import { notificationSettings as notificationSettingsApi } from '../api/notifications.js';
   import { authStore } from '../stores/auth.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { currentWorkspace } from '../stores/workspaces.svelte.js';
   import { navigate } from '../router.js';
-  import { confirm } from '../composables/useConfirm.js';
   import Bell from '@lucide/svelte/icons/bell';
   import Plus from '@lucide/svelte/icons/plus';
   import Edit from '@lucide/svelte/icons/edit';
   import Trash2 from '@lucide/svelte/icons/trash-2';
-  import Save from '@lucide/svelte/icons/save';
-  import X from '@lucide/svelte/icons/x';
-  import Check from '@lucide/svelte/icons/check';
-  import AlertCircle from '@lucide/svelte/icons/alert-circle';
   import Settings from '@lucide/svelte/icons/settings';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
-  import DataTable from '../components/DataTable.svelte';
-  import PageHeader from '../layout/PageHeader.svelte';
   import Button from '../components/Button.svelte';
-  import Modal from '../dialogs/Modal.svelte';
-  import ModalHeader from '../dialogs/ModalHeader.svelte';
   import Textarea from '../components/Textarea.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
   import Label from '../components/Label.svelte';
   import Checkbox from '../components/Checkbox.svelte';
-  import DialogFooter from '../dialogs/DialogFooter.svelte';
-  import { toHotkeyString } from '../utils/keyboardShortcuts.js';
-  import DescriptionText from '../components/DescriptionText.svelte';
   import EmptyState from '../components/EmptyState.svelte';
-  import AlertBox from '../components/AlertBox.svelte';
   import LocalizedObjectFields from './LocalizedObjectFields.svelte';
-	import TextareaField from '../components/TextareaField.svelte';
-	import TextField from '../components/TextField.svelte';
+  import TextareaField from '../components/TextareaField.svelte';
+  import TextField from '../components/TextField.svelte';
+  import EntityManagerPage from './EntityManagerPage.svelte';
 
-  let notificationSettings = $state([]);
   let availableEvents = $state([]);
-  let loading = $state(true);
-  let error = $state(null);
-  let showCreateModal = $state(false);
-  let showEditModal = $state(false);
   let editingSetting = $state(null);
   let translationEditor = $state(null);
+  let showCustomMessage = $state([]);
 
-  // Form state
   let formData = $state({
     name: '',
     description: '',
     is_active: true,
     event_rules: [],
-    created_by: undefined
+    created_by: undefined,
   });
 
-  // Load notification settings and available events
-  onMount(async () => {
-    await loadNotificationSettings();
-    await loadAvailableEvents();
-  });
-
-  async function loadNotificationSettings() {
-    try {
-      loading = true;
-      const data = await notificationSettingsApi.getAll();
-      notificationSettings = data || [];
-    } catch (err) {
-      console.error('Failed to load notification settings:', err);
-      error = t('settings.notifications.failedToLoad');
-    } finally {
-      loading = false;
-    }
-  }
-
-  async function loadAvailableEvents() {
-    try {
-      const data = await notificationSettingsApi.getAvailableEvents();
-      availableEvents = data || [];
-    } catch (err) {
-      console.error('Failed to load available events:', err);
-    }
-  }
-
-  // Recipient picker helpers
-  const recipientItems = $derived([
+  const recipientItems = [
     { id: 'assignee', name: t('settings.notifications.assignee') },
     { id: 'creator', name: t('settings.notifications.creator') },
     { id: 'watchers', name: t('settings.notifications.watchers') },
-    { id: 'workspace_admins', name: t('settings.notifications.workspaceAdmins') }
-  ]);
+    { id: 'workspace_admins', name: t('settings.notifications.workspaceAdmins') },
+  ];
 
   function getRecipientValue(rule) {
     const result = [];
@@ -105,95 +57,82 @@
       notify_assignee: selectedIds.includes('assignee'),
       notify_creator: selectedIds.includes('creator'),
       notify_watchers: selectedIds.includes('watchers'),
-      notify_workspace_admins: selectedIds.includes('workspace_admins')
+      notify_workspace_admins: selectedIds.includes('workspace_admins'),
     };
   }
 
-  function openCreateModal() {
+  async function loadSettings() {
+    const [settings] = await Promise.all([
+      notificationSettingsApi.getAll(),
+      loadAvailableEvents(),
+    ]);
+    return settings || [];
+  }
+
+  async function loadAvailableEvents() {
+    try {
+      availableEvents = (await notificationSettingsApi.getAvailableEvents()) || [];
+    } catch {
+      availableEvents = [];
+    }
+  }
+
+  function openCreate() {
     formData = {
       name: '',
       description: '',
       is_active: true,
       event_rules: [],
-      created_by: undefined
+      created_by: undefined,
     };
     showCustomMessage = [];
-    showCreateModal = true;
+    editingSetting = null;
   }
 
-  function openEditModal(setting) {
+  function openEdit(setting) {
     editingSetting = setting;
     formData = {
       name: setting.name,
       description: setting.description || '',
       is_active: setting.is_active,
       event_rules: [...(setting.event_rules || [])],
-      created_by: setting.created_by
+      created_by: setting.created_by,
     };
-    showCustomMessage = (setting.event_rules || []).map(rule => !!(rule.message_template));
-    showEditModal = true;
+    showCustomMessage = (setting.event_rules || []).map((rule) => !!rule.message_template);
   }
 
-  function closeModals() {
-    showCreateModal = false;
-    showEditModal = false;
-    editingSetting = null;
-    formData = {
-      name: '',
-      description: '',
-      is_active: true,
-      event_rules: [],
-      created_by: undefined
-    };
-    showCustomMessage = [];
-  }
+  class ValidationError extends Error {}
 
-  async function handleSubmit() {
+  async function saveSetting() {
     if (!formData.name.trim()) {
       errorToast(t('settings.notifications.nameRequired'));
-      return;
+      throw new ValidationError();
     }
 
-    try {
-      if (editingSetting) {
-        translationEditor?.validate();
-        await notificationSettingsApi.update(editingSetting.id, formData);
-        await translationEditor?.save();
-      } else {
-        // Add created_by from current user
-        formData.created_by = /** @type {any} */ (authStore.currentUser)?.id;
-        await notificationSettingsApi.create(formData);
-      }
-
-      await loadNotificationSettings();
-      closeModals();
-    } catch (err) {
-      console.error('Failed to save notification setting:', err);
-      errorToast(t('settings.notifications.failedToSave') + ': ' + err.message);
+    if (editingSetting) {
+      translationEditor?.validate();
+      await notificationSettingsApi.update(editingSetting.id, formData);
+      await translationEditor?.save();
+    } else {
+      formData.created_by = authStore.currentUser?.id;
+      await notificationSettingsApi.create(formData);
     }
   }
 
-  async function handleDelete(setting) {
-    const confirmed = await confirm({
-      title: t('common.delete'),
-      message: t('settings.notifications.confirmDelete', { name: setting.name }),
-      confirmText: t('common.delete'),
-      cancelText: t('common.cancel'),
-      variant: 'danger'
-    });
-    if (!confirmed) return;
-
-    try {
-      await notificationSettingsApi.delete(setting.id);
-      await loadNotificationSettings();
-    } catch (err) {
-      console.error('Failed to delete notification setting:', err);
-      errorToast(t('settings.notifications.failedToDelete') + ': ' + err.message);
-    }
+  async function deleteSetting(setting) {
+    await notificationSettingsApi.delete(setting.id);
   }
 
-  // Custom message toggle state
-  let showCustomMessage = $state([]);
+  function handleError(err, phase) {
+    if (err instanceof ValidationError) return true;
+    const prefix = {
+      load: t('settings.notifications.failedToLoad'),
+      save: t('settings.notifications.failedToSave'),
+      delete: t('settings.notifications.failedToDelete'),
+    }[phase];
+    errorToast(`${prefix}: ${err?.message || err}`);
+    return true;
+  }
 
   function addEventRule() {
     formData.event_rules = [
@@ -205,8 +144,8 @@
         notify_creator: false,
         notify_watchers: false,
         notify_workspace_admins: false,
-        message_template: ''
-      }
+        message_template: '',
+      },
     ];
     showCustomMessage = [...showCustomMessage, false];
   }
@@ -216,22 +155,33 @@
     showCustomMessage = showCustomMessage.filter((_, i) => i !== index);
   }
 
-  function groupEventsByCategory(events) {
-    if (!events || events.length === 0) {
-      return {};
-    }
-    const grouped = {};
-    events.forEach(event => {
-      if (!event || !event.category) return; // Safety check
-      if (!grouped[event.category]) {
-        grouped[event.category] = [];
-      }
-      grouped[event.category].push(event);
-    });
-    return grouped;
-  }
+  const notificationColumns = [
+    {
+      key: 'setting_info',
+      label: t('settings.notifications.setting'),
+      render: (setting) =>
+        setting.name + (setting.description ? ` - ${setting.description}` : ''),
+    },
+    {
+      key: 'event_rules_info',
+      label: t('settings.notifications.eventRules'),
+      render: (setting) => {
+        const rulesCount = setting.event_rules?.length || 0;
+        const enabledCount = setting.event_rules?.filter((rule) => rule.is_enabled).length || 0;
+        return rulesCount > 0
+          ? t('settings.notifications.rulesConfigured', { count: rulesCount, enabled: enabledCount })
+          : t('settings.notifications.noRules');
+      },
+    },
+    {
+      key: 'created_by_name',
+      label: t('settings.notifications.createdBy'),
+      render: (setting) => setting.created_by_name || `User ${setting.created_by}`,
+    },
+    { key: 'actions', label: t('common.actions') },
+  ];
 
-  function buildNotificationDropdownItems(setting) {
+  function buildNotificationDropdownItems(setting, { edit, remove }) {
     return [
       {
         id: 'edit',
@@ -239,7 +189,7 @@
         icon: Edit,
         title: t('common.edit'),
         hoverClass: 'hover-bg',
-        onClick: () => openEditModal(setting)
+        onClick: () => edit(setting),
       },
       {
         id: 'delete',
@@ -248,248 +198,183 @@
         title: t('common.delete'),
         color: 'var(--ds-text-danger)',
         hoverClass: 'hover-danger',
-        onClick: () => handleDelete(setting)
-      }
+        onClick: () => remove(setting),
+      },
     ];
   }
-
-  // Table column definitions - reactive for i18n
-  const notificationColumns = $derived([
-    {
-      key: 'setting_info',
-      label: t('settings.notifications.setting'),
-      render: (setting) => setting.name + (setting.description ? ` - ${setting.description}` : '')
-    },
-    {
-      key: 'event_rules_info',
-      label: t('settings.notifications.eventRules'),
-      render: (setting) => {
-        const rulesCount = setting.event_rules?.length || 0;
-        const enabledCount = setting.event_rules?.filter(rule => rule.is_enabled).length || 0;
-        return rulesCount > 0 ? t('settings.notifications.rulesConfigured', { count: rulesCount, enabled: enabledCount }) : t('settings.notifications.noRules');
-      }
-    },
-    {
-      key: 'created_by_name',
-      label: t('settings.notifications.createdBy'),
-      render: (setting) => setting.created_by_name || `User ${setting.created_by}`
-    },
-    {
-      key: 'actions',
-      label: t('common.actions')
-    }
-  ]);
-
 </script>
 
-<div class="space-y-6">
-  <PageHeader
-    icon={Bell}
-    title={t('settings.notifications.title')}
-    subtitle={t('settings.notifications.subtitle')}
-  >
-    {#snippet actions()}
-      <Button
-        variant="primary"
-        icon={Plus}
-        onclick={openCreateModal}
-        keyboardHint="A"
-        hotkeyConfig={{ key: toHotkeyString('notifications', 'add'), guard: () => !showCreateModal && !showEditModal }}
-      >
-        {t('settings.notifications.createSetting')}
-      </Button>
-    {/snippet}
-  </PageHeader>
+<EntityManagerPage
+  icon={Bell}
+  title={t('settings.notifications.title')}
+  subtitle={t('settings.notifications.subtitle')}
+  addLabel={t('settings.notifications.createSetting')}
+  hotkeyScope="notifications"
+  emptyMessage={t('settings.notifications.noSettingsFound')}
+  emptyIcon={Bell}
+  columns={notificationColumns}
+  load={loadSettings}
+  create={saveSetting}
+  update={saveSetting}
+  remove={deleteSetting}
+  onOpenCreate={openCreate}
+  onOpenEdit={openEdit}
+  confirmDeleteMessage={(setting) =>
+    t('settings.notifications.confirmDelete', { name: setting.name })}
+  createTitle={t('settings.notifications.createSetting')}
+  editTitle={t('settings.notifications.editSetting')}
+  confirmTestid="dialog-confirm"
+  formMaxWidth="max-w-4xl"
+  onError={handleError}
+  actionItems={buildNotificationDropdownItems}
+  formFields={notificationForm}
+>
+</EntityManagerPage>
 
-  {#if loading}
-    <StateDisplay type="loading" />
-  {:else if error}
-    <AlertBox variant="error" message={error} />
-  {:else}
-    <DataTable
-      columns={notificationColumns}
-      data={notificationSettings}
-      keyField="id"
-      emptyMessage={t('settings.notifications.noSettingsFound')}
-      emptyIcon={Bell}
-      actionItems={buildNotificationDropdownItems}
-    />
-
-  {/if}
-</div>
-
-<Modal isOpen={showCreateModal || showEditModal} onclose={closeModals} maxWidth="max-w-4xl">
-  <ModalHeader
-    icon={Bell}
-    title={editingSetting ? t('settings.notifications.editSetting') : t('settings.notifications.createSetting')}
-    showCloseButton={false}
-  />
-
-  <!-- Modal content -->
-  <div class="px-6 py-4 space-y-6 max-h-[60vh] overflow-y-auto">
-    <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
-      <div class="space-y-6">
-        <!-- Basic Information -->
-        {#if editingSetting}
-          {#key editingSetting.id}
-            <LocalizedObjectFields
-              bind:this={translationEditor}
-              objectType="notification_setting"
-              objectId={editingSetting.id}
-              bind:canonicalName={formData.name}
-              bind:canonicalDescription={formData.description}
-              displayName={editingSetting.display_name || editingSetting.name}
-              displayDescription={editingSetting.display_description || editingSetting.description}
-            />
-          {/key}
-        {:else}
-        <div class="grid grid-cols-1 gap-4">
-          <div>
-            <TextField
-              label={t('settings.notifications.name')}
-              id="name"
-              required
-              labelColor="default"
-              type="text"
-              placeholder={t('settings.notifications.namePlaceholder')}
-              size="small"
-              bind:value={formData.name}
-            />
-          </div>
-
-          <div>
-            <TextareaField
-              label={t('settings.notifications.description')}
-              id="description"
-              labelColor="default"
-              placeholder={t('settings.notifications.descriptionPlaceholder')}
-              rows={3}
-              bind:value={formData.description}
-            />
-          </div>
-
-        </div>
-        {/if}
-
-        <!-- Event Rules -->
+{#snippet notificationForm()}
+  <div class="max-h-[60vh] overflow-y-auto space-y-6">
+    {#if editingSetting}
+      {#key editingSetting.id}
+        <LocalizedObjectFields
+          bind:this={translationEditor}
+          objectType="notification_setting"
+          objectId={editingSetting.id}
+          bind:canonicalName={formData.name}
+          bind:canonicalDescription={formData.description}
+          displayName={editingSetting.display_name || editingSetting.name}
+          displayDescription={editingSetting.display_description || editingSetting.description}
+        />
+      {/key}
+    {:else}
+      <div class="grid grid-cols-1 gap-4">
         <div>
-          <div class="flex items-center justify-between mb-4">
-            <h4 class="text-sm font-medium" style="color: var(--ds-text)">{t('settings.notifications.eventRules')}</h4>
-            <Button
-              variant="primary"
-              size="sm"
-              icon={Plus}
-              onclick={addEventRule}
-            >
-              {t('settings.notifications.addRule')}
-            </Button>
-          </div>
+          <TextField
+            label={t('settings.notifications.name')}
+            id="name"
+            required
+            labelColor="default"
+            type="text"
+            placeholder={t('settings.notifications.namePlaceholder')}
+            size="small"
+            bind:value={formData.name}
+          />
+        </div>
 
-          {#if formData.event_rules.length === 0}
-            <EmptyState
-              icon={Settings}
-              title={t('settings.notifications.noEventRulesConfigured')}
-              description={t('settings.notifications.noEventRulesDesc')}
-            />
-          {:else}
-            <div class="space-y-4">
-              {#each formData.event_rules as rule, index (index)}
-                <div class="border rounded p-4" style="border-color: var(--ds-border)">
-                  <!-- Event Type + Enable + Delete inline -->
-                  <div class="flex items-end gap-3">
-                    <div class="flex-1">
-                      <Label color="default" required class="mb-1">{t('settings.notifications.eventType')}</Label>
-                      <BasePicker
-                        bind:value={rule.event_type}
-                        items={availableEvents || []}
-                        placeholder={t('settings.notifications.selectEventType')}
-                        showUnassigned={true}
-                        unassignedLabel={t('settings.notifications.selectEventType')}
-                        getValue={(event) => event.type}
-                        getLabel={(event) => `${event.category ? event.category.charAt(0).toUpperCase() + event.category.slice(1) + ': ' : ''}${event.name}`}
-                      />
-                    </div>
-                    <div class="flex items-center pb-1.5">
-                      <Checkbox
-                        bind:checked={rule.is_enabled}
-                        label={t('common.enable')}
-                        size="small"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onclick={() => removeEventRule(index)}
-                      class="text-ds-text-danger hover:opacity-80 transition-colors pb-1.5"
-                    >
-                      <Trash2 class="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {#if rule.event_type === 'sla.warning' && $currentWorkspace}
-                    <button
-                      type="button"
-                      class="mt-1 inline-flex items-center gap-1 text-xs"
-                      style="color: var(--ds-text-link);"
-                      data-testid="sla-warning-thresholds-link-{index}"
-                      onclick={() => navigate(`/workspaces/${$currentWorkspace.id}/settings/service-levels?subtab=warnings`)}
-                    >
-                      {t('settings.notifications.configureSlaWarningThresholds')}
-                      <ArrowRight class="w-3 h-3" />
-                    </button>
-                  {/if}
-
-                  <!-- Notification Recipients (multiselect) -->
-                  <div class="mt-3">
-                    <Label color="default" class="mb-1">{t('settings.notifications.notifyRecipients')}</Label>
-                    <BasePicker
-                      value={getRecipientValue(rule)}
-                      items={recipientItems}
-                      multiple={true}
-                      placeholder={t('settings.notifications.selectRecipients')}
-                      onChange={(selectedIds) => handleRecipientsChange(index, selectedIds)}
-                    />
-                  </div>
-
-                  <!-- Custom Message Toggle -->
-                  <div class="mt-3">
-                    <Checkbox
-                      checked={showCustomMessage[index] || false}
-                      label={t('settings.notifications.customizeMessage')}
-                      size="small"
-                      onchange={(val) => {
-                        showCustomMessage[index] = val;
-                        if (!val) {
-                          formData.event_rules[index] = { ...formData.event_rules[index], message_template: '' };
-                        }
-                      }}
-                    />
-                    {#if showCustomMessage[index]}
-                      <div class="mt-2">
-                        <Textarea
-                          bind:value={rule.message_template}
-                          placeholder={t('settings.notifications.messageTemplatePlaceholder')}
-                          rows={3}
-                          class="text-sm"
-                        />
-                        <div class="mt-1 text-xs" style="color: var(--ds-text-subtle)">
-                          <strong>{t('settings.notifications.availableVariables')}:</strong> &#123;item.title&#125;, &#123;item.key&#125;, &#123;user.name&#125;, &#123;workspace.name&#125;, &#123;event.type&#125;<br>
-                          <strong>{t('settings.notifications.example')}:</strong> "Work item &#123;item.key&#125; '&#123;item.title&#125;' was updated in &#123;workspace.name&#125; by &#123;user.name&#125;"
-                        </div>
-                      </div>
-                    {/if}
-                  </div>
-                </div>
-              {/each}
-            </div>
-          {/if}
+        <div>
+          <TextareaField
+            label={t('settings.notifications.description')}
+            id="description"
+            labelColor="default"
+            placeholder={t('settings.notifications.descriptionPlaceholder')}
+            rows={3}
+            bind:value={formData.description}
+          />
         </div>
       </div>
-    </form>
-  </div>
+    {/if}
 
-  <DialogFooter
-    onCancel={closeModals}
-    onConfirm={handleSubmit}
-    confirmLabel={editingSetting ? t('settings.notifications.updateSetting') : t('settings.notifications.createSetting')}
-  />
-</Modal>
+    <div>
+      <div class="flex items-center justify-between mb-4">
+        <h4 class="text-sm font-medium" style="color: var(--ds-text)">{t('settings.notifications.eventRules')}</h4>
+        <!-- shortcut-guard-exempt: contextual in-form action; the page-level create button owns the shortcut. -->
+        <Button variant="primary" size="sm" icon={Plus} onclick={addEventRule}>
+          {t('settings.notifications.addRule')}
+        </Button>
+      </div>
+
+      {#if formData.event_rules.length === 0}
+        <EmptyState
+          icon={Settings}
+          title={t('settings.notifications.noEventRulesConfigured')}
+          description={t('settings.notifications.noEventRulesDesc')}
+        />
+      {:else}
+        <div class="space-y-4">
+          {#each formData.event_rules as rule, index (index)}
+            <div class="border rounded p-4" style="border-color: var(--ds-border)">
+              <div class="flex items-end gap-3">
+                <div class="flex-1">
+                  <Label color="default" required class="mb-1">{t('settings.notifications.eventType')}</Label>
+                  <BasePicker
+                    bind:value={rule.event_type}
+                    items={availableEvents || []}
+                    placeholder={t('settings.notifications.selectEventType')}
+                    showUnassigned={true}
+                    unassignedLabel={t('settings.notifications.selectEventType')}
+                    getValue={(event) => event.type}
+                    getLabel={(event) => `${event.category ? event.category.charAt(0).toUpperCase() + event.category.slice(1) + ': ' : ''}${event.name}`}
+                  />
+                </div>
+                <div class="flex items-center pb-1.5">
+                  <Checkbox bind:checked={rule.is_enabled} label={t('common.enable')} size="small" />
+                </div>
+                <button
+                  type="button"
+                  onclick={() => removeEventRule(index)}
+                  class="text-ds-text-danger hover:opacity-80 transition-colors pb-1.5"
+                >
+                  <Trash2 class="w-4 h-4" />
+                </button>
+              </div>
+
+              {#if rule.event_type === 'sla.warning' && $currentWorkspace}
+                <button
+                  type="button"
+                  class="mt-1 inline-flex items-center gap-1 text-xs"
+                  style="color: var(--ds-text-link);"
+                  data-testid="sla-warning-thresholds-link-{index}"
+                  onclick={() => navigate(`/workspaces/${$currentWorkspace.id}/settings/service-levels?subtab=warnings`)}
+                >
+                  {t('settings.notifications.configureSlaWarningThresholds')}
+                  <ArrowRight class="w-3 h-3" />
+                </button>
+              {/if}
+
+              <div class="mt-3">
+                <Label color="default" class="mb-1">{t('settings.notifications.notifyRecipients')}</Label>
+                <BasePicker
+                  value={getRecipientValue(rule)}
+                  items={recipientItems}
+                  multiple={true}
+                  placeholder={t('settings.notifications.selectRecipients')}
+                  onChange={(selectedIds) => handleRecipientsChange(index, selectedIds)}
+                />
+              </div>
+
+              <div class="mt-3">
+                <Checkbox
+                  checked={showCustomMessage[index] || false}
+                  label={t('settings.notifications.customizeMessage')}
+                  size="small"
+                  onchange={(val) => {
+                    showCustomMessage[index] = val;
+                    if (!val) {
+                      formData.event_rules[index] = {
+                        ...formData.event_rules[index],
+                        message_template: '',
+                      };
+                    }
+                  }}
+                />
+                {#if showCustomMessage[index]}
+                  <div class="mt-2">
+                    <Textarea
+                      bind:value={rule.message_template}
+                      placeholder={t('settings.notifications.messageTemplatePlaceholder')}
+                      rows={3}
+                      class="text-sm"
+                    />
+                    <div class="mt-1 text-xs" style="color: var(--ds-text-subtle)">
+                      <strong>{t('settings.notifications.availableVariables')}:</strong> &#123;item.title&#125;, &#123;item.key&#125;, &#123;user.name&#125;, &#123;workspace.name&#125;, &#123;event.type&#125;<br>
+                      <strong>{t('settings.notifications.example')}:</strong> "Work item &#123;item.key&#125; '&#123;item.title&#125;' was updated in &#123;workspace.name&#125; by &#123;user.name&#125;"
+                    </div>
+                  </div>
+                {/if}
+              </div>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  </div>
+{/snippet}

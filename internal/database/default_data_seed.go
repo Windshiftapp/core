@@ -354,8 +354,9 @@ func seedDefaultData(w seedWriter) error {
 		return fmt.Errorf("failed to link notification setting to configuration set: %w", err)
 	}
 
-	// 19. Placeholder organisation that absorbs projects and worklogs created
-	// without a real customer, keeping the required-customer invariant.
+	// 19. Placeholder organisation that absorbs projects created without a real
+	// customer, keeping the required-customer invariant. Worklogs derive their
+	// customer from the project.
 	if _, err := w.Exec(
 		"INSERT INTO customer_organisations (builtin_key, name, description, active) VALUES (?, ?, ?, ?)",
 		models.CustomerOrganisationBuiltinNoCustomer, "No customer",
