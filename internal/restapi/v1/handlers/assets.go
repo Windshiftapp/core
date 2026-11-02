@@ -638,13 +638,17 @@ func (h *AssetHandler) ListTypes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := make([]dto.AssetTypeResponse, 0, len(types))
+	typeIDs := make([]int, 0, len(types))
 	for i := range types {
-		fields, err := h.repo.FindAssetTypeFields(types[i].ID)
-		if err != nil {
-			h.RespondInternalError(w, r)
-			return
-		}
-		types[i].Fields = fields
+		typeIDs = append(typeIDs, types[i].ID)
+	}
+	fieldsByType, err := h.repo.FindAssetTypeFieldsForTypes(typeIDs)
+	if err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+	for i := range types {
+		types[i].Fields = fieldsByType[types[i].ID]
 		out = append(out, dto.MapAssetTypeToResponse(&types[i]))
 	}
 	h.RespondOK(w, out)

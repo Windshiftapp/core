@@ -479,27 +479,36 @@ func (ps *PermissionService) invalidateUserCaches(userIDs []int) error {
 	return nil
 }
 
-func (ps *PermissionService) ownedAgentIDs(ownerID int) ([]int, error) {
+// ownedAgentIDsForOwners resolves the agents owned by many users in one query,
+// grouped by owner id. Owners with no agents are absent from the map.
+func (ps *PermissionService) ownedAgentIDsForOwners(ownerIDs []int) (map[int][]int, error) {
+	owned := make(map[int][]int, len(ownerIDs))
+	if len(ownerIDs) == 0 {
+		return owned, nil
+	}
+	args := make([]any, 0, len(ownerIDs))
+	for _, ownerID := range ownerIDs {
+		args = append(args, ownerID)
+	}
 	rows, err := ps.db.Query(
-		"SELECT id FROM users WHERE agent_owner_user_id = ?",
-		ownerID,
+		"SELECT id, agent_owner_user_id FROM users WHERE agent_owner_user_id IN ("+placeholders(len(ownerIDs))+")",
+		args...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("enumerate agents owned by user %d: %w", ownerID, err)
+		return nil, fmt.Errorf("enumerate agents owned by users: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
-	var agentIDs []int
 	for rows.Next() {
-		var agentID int
-		if err := rows.Scan(&agentID); err != nil {
-			return nil, fmt.Errorf("scan agent owned by user %d: %w", ownerID, err)
+		var agentID, ownerID int
+		if err := rows.Scan(&agentID, &ownerID); err != nil {
+			return nil, fmt.Errorf("scan agent owned by user: %w", err)
 		}
-		agentIDs = append(agentIDs, agentID)
+		owned[ownerID] = append(owned[ownerID], agentID)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate agents owned by user %d: %w", ownerID, err)
+		return nil, fmt.Errorf("iterate agents owned by users: %w", err)
 	}
-	return agentIDs, nil
+	return owned, nil
 }
 
 // InvalidateMultipleUserCaches removes permission caches for multiple users
@@ -507,10 +516,14 @@ func (ps *PermissionService) InvalidateMultipleUserCaches(userIDs []int) error {
 	allIDs := make(map[int]struct{}, len(userIDs))
 	for _, userID := range userIDs {
 		allIDs[userID] = struct{}{}
-		agentIDs, err := ps.ownedAgentIDs(userID)
-		if err != nil {
-			return err
-		}
+	}
+	// Resolve every owner's agents in one query instead of one query per user;
+	// workspace-wide invalidation can pass hundreds of users.
+	agentsByOwner, err := ps.ownedAgentIDsForOwners(userIDs)
+	if err != nil {
+		return err
+	}
+	for _, agentIDs := range agentsByOwner {
 		for _, agentID := range agentIDs {
 			allIDs[agentID] = struct{}{}
 		}

@@ -217,6 +217,57 @@ func (r *ItemRepository) GetAncestors(itemID int) ([]*models.Item, error) {
 	return scanItemsWithDetails(rows)
 }
 
+// FindRootIDForItemContext walks the parent chain to the top-level item in a
+// single recursive query instead of one query per level. It returns (nil, nil)
+// when the item does not exist, and an error when the walk stops on a missing
+// parent or hits maxDepth without reaching a root (a stored cycle).
+func (r *ItemRepository) FindRootIDForItemContext(ctx context.Context, itemID, maxDepth int) (*int, error) {
+	if maxDepth <= 0 || maxDepth > maxItemHierarchyDepth {
+		maxDepth = maxItemHierarchyDepth
+	}
+	var id, parentID, hierarchyLevel sql.NullInt64
+	var depth int
+	err := r.db.QueryRowContext(ctx, `
+		WITH RECURSIVE chain AS (
+			SELECT i.id, i.parent_id, it.hierarchy_level, 0 AS depth
+			FROM items i
+			LEFT JOIN item_types it ON i.item_type_id = it.id
+			WHERE i.id = ?
+
+			UNION ALL
+
+			SELECT p.id, p.parent_id, it.hierarchy_level, c.depth + 1
+			FROM items p
+			JOIN chain c ON p.id = c.parent_id
+			LEFT JOIN item_types it ON p.item_type_id = it.id
+			WHERE c.depth < ?
+			  AND COALESCE(c.hierarchy_level, -999) != 0
+		)
+		SELECT id, parent_id, hierarchy_level, depth
+		FROM chain
+		ORDER BY depth DESC
+		LIMIT 1
+	`, itemID, maxDepth).Scan(&id, &parentID, &hierarchyLevel, &depth)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to walk hierarchy: %w", err)
+	}
+
+	// A root has no parent or a type whose hierarchy level is 0. Anything else
+	// means the walk stopped early: either the parent row is gone, or the depth
+	// cap was reached on a stored cycle.
+	if !parentID.Valid || (hierarchyLevel.Valid && hierarchyLevel.Int64 == 0) {
+		rootID := int(id.Int64)
+		return &rootID, nil
+	}
+	if depth < maxDepth {
+		return nil, fmt.Errorf("hierarchy parent %d referenced by item %d was not found", parentID.Int64, itemID)
+	}
+	return nil, fmt.Errorf("hierarchy walk exceeded %d levels without finding a root (item %d, likely cyclic)", maxDepth, itemID)
+}
+
 // GetAncestorsForHierarchy returns ancestors using the lightweight projection
 // consumed by HierarchyService. It intentionally avoids status/priority joins
 // so cycle-safety tests and callers with minimal hierarchy fixtures do not need

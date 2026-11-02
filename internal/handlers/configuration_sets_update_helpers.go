@@ -214,10 +214,14 @@ func (h *ConfigurationSetHandler) respondIntraSetWorkflowConflictIfNeeded(
 	}
 
 	itemRepo := repository.NewItemRepository(h.db)
+	workspaceCounts, err := itemRepo.CountByFieldIn("workspace_id", retainedWorkspaceIDs)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return true
+	}
 	totalItems := 0
 	for _, wsID := range retainedWorkspaceIDs {
-		n, _ := itemRepo.CountByField("workspace_id", wsID)
-		totalItems += n
+		totalItems += workspaceCounts[wsID]
 	}
 
 	analysis := models.ComprehensiveMigrationAnalysis{
