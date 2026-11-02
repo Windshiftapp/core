@@ -1,6 +1,5 @@
 <script>
   import { onMount } from 'svelte';
-  import { useEventListener } from 'runed';
   import { items } from '../../api/items.js';
   import { iterations } from '../../api/milestones.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -24,6 +23,7 @@
   import { sortBacklogIterations } from './backlogIterationOrder.js';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import { backlogStore } from '../../stores/backlogStore.svelte.js';
+  import { onWorkItemRefresh } from '../../stores/workItemRefresh.js';
   import { workspaceDataStore } from '../../stores/workspaceDataStore.svelte.js';
   import { collectionPreferences } from '../../stores/collectionPreferences.svelte.js';
   import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
@@ -228,10 +228,10 @@
   const styles = useGradientStyles();
 
   // Listen for newly created items
-  async function handleRefreshWorkItems(event) {
-    if (!event.detail?.itemId) return;
+  async function handleRefreshWorkItems(detail) {
+    if (!detail?.itemId) return;
     try {
-      const newItem = event.detail.item ?? await items.get(event.detail.itemId);
+      const newItem = detail.item ?? await items.get(detail.itemId);
       // Collection QL and sub-filters depend on server state, so verify rather
       // than assume membership. Unknown never permits an insert; it reconciles.
       const membership = await resolveCreatedItemMembership(newItem, {
@@ -251,7 +251,7 @@
     }
   }
 
-  useEventListener(() => window, 'refresh-work-items', handleRefreshWorkItems);
+  $effect(() => onWorkItemRefresh(handleRefreshWorkItems));
 
   onMount(async () => {
     if (workspaceId) {

@@ -18,6 +18,7 @@
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import X from '@lucide/svelte/icons/x';
   import { useEventListener } from 'runed';
+  import { onWorkItemRefresh } from '../stores/workItemRefresh.js';
   import { createDashboardWidgetDrag } from '../composables/dashboardWidgetDrag.js';
   import { useDashboardCustomization } from '../composables/useDashboardCustomization.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
@@ -112,7 +113,7 @@
   }
 
   useEventListener(() => window, 'refresh-workspaces', handleRefresh);
-  useEventListener(() => window, 'refresh-work-items', handleRefresh);
+  $effect(() => onWorkItemRefresh(handleRefresh));
 
   // --- Layout / mode handlers ---
 

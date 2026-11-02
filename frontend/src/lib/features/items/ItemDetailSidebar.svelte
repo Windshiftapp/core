@@ -659,7 +659,7 @@
       />
     {/snippet}
     {#if item?.id}
-      <ItemSLAPanel itemId={item.id} />
+      <ItemSLAPanel itemId={item.id} workspaceId={item.workspace_id} />
     {/if}
     <!-- DETAILS Section Header -->
     <div class="flex items-center justify-between mb-2">
