@@ -18,20 +18,33 @@ import (
 const (
 	itemListCountCacheTTL         = 2 * time.Second
 	itemListCountCacheLoadTimeout = 12 * time.Second
+	// Entries are keyed per workspace, so the map only grows under workspace
+	// churn. Sweep expired entries opportunistically and keep a hard bound even
+	// when a burst of distinct workspaces arrives inside one TTL window.
+	itemListCountCacheSweepInterval = time.Minute
+	itemListCountCacheMaxEntries    = 4096
+	// A generation tombstone is only dropped once it has been expired for
+	// longer than a load can still be in flight, so an invalidated in-flight
+	// load can never store its stale count after the tombstone is gone.
+	itemListCountCacheSweepGrace = itemListCountCacheLoadTimeout + 18*time.Second
 )
 
 type itemListCountCacheEntry struct {
 	count     int
 	expiresAt time.Time
+	// generation is bumped by invalidation. A load captures it before querying
+	// and only stores when it is unchanged, so a mutation that lands mid-flight
+	// wins. The entry is kept as a tombstone after invalidation so the
+	// generation survives until the sweep prunes it.
+	generation uint64
 }
 
 var itemListCountCache = struct {
 	sync.Mutex
-	entries     map[string]itemListCountCacheEntry
-	generations map[string]uint64
+	entries   map[string]itemListCountCacheEntry
+	lastSweep time.Time
 }{
-	entries:     make(map[string]itemListCountCacheEntry),
-	generations: make(map[string]uint64),
+	entries: make(map[string]itemListCountCacheEntry),
 }
 
 var itemListCountFlights singleflight.Group
@@ -69,7 +82,8 @@ func cachedItemListCount(ctx context.Context, db database.Database, workspaceID 
 			itemListCountCache.Unlock()
 			return entry.count, nil
 		}
-		generation := itemListCountCache.generations[key]
+		generation := entry.generation
+		sweepItemListCountCacheLocked(now)
 		itemListCountCache.Unlock()
 
 		loadCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), itemListCountCacheLoadTimeout)
@@ -80,10 +94,11 @@ func cachedItemListCount(ctx context.Context, db database.Database, workspaceID 
 		}
 
 		itemListCountCache.Lock()
-		if itemListCountCache.generations[key] == generation {
+		if itemListCountCache.entries[key].generation == generation {
 			itemListCountCache.entries[key] = itemListCountCacheEntry{
-				count:     count,
-				expiresAt: time.Now().Add(itemListCountCacheTTL),
+				count:      count,
+				expiresAt:  time.Now().Add(itemListCountCacheTTL),
+				generation: generation,
 			}
 		}
 		itemListCountCache.Unlock()
@@ -106,6 +121,32 @@ func cachedItemListCount(ctx context.Context, db database.Database, workspaceID 
 	}
 }
 
+// sweepItemListCountCacheLocked drops entries that have been expired for longer
+// than a load can still be running, then evicts arbitrary entries if a burst
+// pushed the map past its bound. Called with itemListCountCache held.
+func sweepItemListCountCacheLocked(now time.Time) {
+	if now.Sub(itemListCountCache.lastSweep) < itemListCountCacheSweepInterval &&
+		len(itemListCountCache.entries) <= itemListCountCacheMaxEntries {
+		return
+	}
+	itemListCountCache.lastSweep = now
+
+	cutoff := now.Add(-itemListCountCacheSweepGrace)
+	for key, entry := range itemListCountCache.entries {
+		if entry.expiresAt.Before(cutoff) {
+			delete(itemListCountCache.entries, key)
+		}
+	}
+	// Still over the bound: a burst of distinct workspaces inside one TTL
+	// window. Drop arbitrary entries; the next read re-resolves them.
+	for key := range itemListCountCache.entries {
+		if len(itemListCountCache.entries) <= itemListCountCacheMaxEntries {
+			break
+		}
+		delete(itemListCountCache.entries, key)
+	}
+}
+
 // invalidateItemListCountCache drops one workspace total after a committed
 // membership change. Other replicas are bounded by the short TTL above.
 func invalidateItemListCountCache(db database.Database, workspaceID int) {
@@ -114,8 +155,11 @@ func invalidateItemListCountCache(db database.Database, workspaceID int) {
 	}
 	key := itemListCountCacheKey(db, workspaceID)
 	itemListCountCache.Lock()
-	itemListCountCache.generations[key]++
-	delete(itemListCountCache.entries, key)
+	entry := itemListCountCache.entries[key]
+	entry.generation++
+	// Keep the tombstone but force the next read to reload.
+	entry.expiresAt = time.Time{}
+	itemListCountCache.entries[key] = entry
 	itemListCountFlights.Forget(key)
 	itemListCountCache.Unlock()
 }

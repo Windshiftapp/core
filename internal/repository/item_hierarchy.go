@@ -608,9 +608,6 @@ func (r *ItemRepository) GetTimeRollup(itemID, maxDepth, maxItems int, workspace
 	for _, id := range ids {
 		args = append(args, id)
 	}
-	for i, id := range ids {
-		args[i] = id
-	}
 	if err := r.db.QueryRow(query, args...).Scan(&rollup.TotalLoggedMinutes); err != nil {
 		return nil, fmt.Errorf("failed to sum worklog duration: %w", err)
 	}
