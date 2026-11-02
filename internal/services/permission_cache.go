@@ -23,6 +23,7 @@ import (
 type PermissionService struct {
 	cache           *cacheutil.TypedCache[*models.UserPermissionCache]
 	db              database.Database
+	itemRepo        *repository.ItemRepository
 	cacheCommitMu   sync.RWMutex
 	cacheGeneration atomic.Uint64
 
@@ -102,6 +103,7 @@ func NewPermissionService(db database.Database, config PermissionCacheConfig) (*
 			Shards:     64,
 		}),
 		db:              db,
+		itemRepo:        repository.NewItemRepository(db),
 		workspaceAccess: newWorkspaceAccessCache(),
 		ttl:             config.TTL,
 		batchSize:       config.BatchSize,
@@ -328,7 +330,7 @@ func (ps *PermissionService) IsSystemAdminContext(ctx context.Context, userID in
 // is intentionally not stored in permission snapshots because doing so would
 // couple item moves to authorization-cache invalidation.
 func (ps *PermissionService) GetItemWorkspaceID(_, itemID int) (int, error) {
-	workspaceID, err := repository.NewItemRepository(ps.db).GetWorkspaceID(itemID)
+	workspaceID, err := ps.itemRepo.GetWorkspaceID(itemID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return 0, fmt.Errorf("item not found: %d", itemID)
