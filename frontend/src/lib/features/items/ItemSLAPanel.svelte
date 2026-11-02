@@ -1,14 +1,14 @@
 <script>
-  import { useEventListener } from 'runed';
-  import { sla } from '../../api/sla.js';
   import Lozenge from '../../components/Lozenge.svelte';
   import Tooltip from '../../components/Tooltip.svelte';
   import Gauge from '@lucide/svelte/icons/gauge';
   import Clock from '@lucide/svelte/icons/clock';
   import { t } from '../../stores/i18n.svelte.js';
   import { formatInstant } from '../../utils/dateFormatter.js';
+  import { onWorkItemRefresh, workItemRefreshTouchesWorkspace } from '../../stores/workItemRefresh.js';
+  import { getItemSLA } from '../sla/slaState.js';
 
-  let { itemId = null } = $props();
+  let { itemId = null, workspaceId = null } = $props();
 
   // Server-computed remaining/breach state has to be re-read while a timer is
   // visible; elapsed time and business-hours transitions never reach the client
@@ -25,7 +25,7 @@
     const requestedItemId = itemId;
     loading = true;
     try {
-      const result = (await sla.getItemSLA(requestedItemId)) ?? [];
+      const result = (await getItemSLA(requestedItemId, workspaceId)) ?? [];
       // A newer request or an item switch supersedes this response.
       if (token !== requestToken) return;
       states = result;
@@ -51,8 +51,15 @@
   });
 
   // Item mutations (status, assignee, comments, etc.) are broadcast globally;
-  // refresh the derived SLA state when they happen.
-  useEventListener(() => window, 'refresh-work-items', () => void load());
+  // refresh the derived SLA state when they happen. Reading through slaState
+  // means the panel and any SLA badges in the same workspace share one batch,
+  // and a burst in another workspace is skipped entirely.
+  $effect(() =>
+    onWorkItemRefresh((detail) => {
+      if (!workItemRefreshTouchesWorkspace(detail, workspaceId)) return;
+      void load();
+    })
+  );
 
   function formatDuration(ms) {
     if (ms == null) return '';

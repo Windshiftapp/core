@@ -2,6 +2,7 @@
   import { onMount, untrack } from 'svelte';
   import { useEventListener } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
+  import { onWorkItemRefresh } from '../../stores/workItemRefresh.js';
   import { items as itemsApi } from '../../api/items.js';
   import { getAssignableUsers } from '../../api/users.js';
   import { labels as labelsApi } from '../../api/misc.js';
@@ -263,10 +264,10 @@
   }
 
   // Listen for newly created items
-  async function handleRefreshWorkItems(event) {
-    if (!event.detail?.itemId) return;
+  async function handleRefreshWorkItems(detail) {
+    if (!detail?.itemId) return;
     try {
-      const newItem = event.detail.item ?? (await itemsApi.get(event.detail.itemId));
+      const newItem = detail.item ?? (await itemsApi.get(detail.itemId));
       const membership = await resolveCreatedItemMembership(newItem, createdItemScope());
       if (membership === 'member') {
         // A create event can arrive more than once (modal event plus a delta or
@@ -281,7 +282,7 @@
     }
   }
 
-  useEventListener(() => window, 'refresh-work-items', handleRefreshWorkItems);
+  $effect(() => onWorkItemRefresh(handleRefreshWorkItems));
 
   // Quick-add functions
 
