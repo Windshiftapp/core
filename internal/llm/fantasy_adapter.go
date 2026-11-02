@@ -686,9 +686,15 @@ func fantasyProviderCost(metadata fantasy.ProviderMetadata) *float64 {
 }
 
 func normalizedFantasyResponse(content string, toolCalls []ToolCall, providerState json.RawMessage, usage Usage, finish fantasy.FinishReason) *CompletionResponse {
+	// Normalize the library's finish reasons to this package's stable spelling.
+	// Fantasy owns the provider values; the agent loop and StopReason consumers
+	// read the normalized form.
 	finishReason := string(finish)
-	if finish == fantasy.FinishReasonToolCalls {
+	switch finish {
+	case fantasy.FinishReasonToolCalls:
 		finishReason = "tool_calls"
+	case fantasy.FinishReasonContentFilter:
+		finishReason = "content_filter"
 	}
 	return &CompletionResponse{
 		Object:  "chat.completion",
