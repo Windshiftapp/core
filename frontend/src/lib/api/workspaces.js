@@ -5,6 +5,9 @@ import { normalizeStatuses } from './workflows.js';
 
 const workspaceCRUD = createCrudClient('/workspaces', { v2: true, allV2: true });
 
+// Matches the server's cap on a direct workspace id resolve.
+const WORKSPACE_ID_BATCH = 200;
+
 export const workspaces = {
   ...workspaceCRUD,
   getAll: (filters = {}, requestOptions = {}) =>
@@ -14,6 +17,29 @@ export const workspaces = {
   // the cached first page reachable without fetch-all loops (WI-1442).
   getPage: (filters = {}, requestOptions = {}) =>
     fetchAPIV2(`/workspaces${buildQueryString(filters)}`, requestOptions),
+  // Directly resolve a known id set in one read per chunk instead of one read
+  // per id. The server omits ids the caller cannot view, so callers compare
+  // the requested and returned sets to report unresolvable ids.
+  getByIds: async (ids, requestOptions = {}) => {
+    const unique = [
+      ...new Set((ids || []).map(Number).filter((id) => Number.isInteger(id) && id > 0)),
+    ];
+    if (unique.length === 0) return [];
+    const chunks = [];
+    for (let i = 0; i < unique.length; i += WORKSPACE_ID_BATCH) {
+      chunks.push(unique.slice(i, i + WORKSPACE_ID_BATCH));
+    }
+    const pages = await Promise.allSettled(
+      chunks.map((chunk) =>
+        fetchAPIV2(`/workspaces?ids=${chunk.join(',')}&page_size=${chunk.length}`, requestOptions)
+      )
+    );
+    const resolved = [];
+    for (const page of pages) {
+      if (page.status === 'fulfilled') resolved.push(...(page.value?.data || []));
+    }
+    return resolved;
+  },
   get: (id, requestOptions = {}) => fetchV2Data(`/workspaces/${id}`, requestOptions),
   getBootstrap: (id, requestOptions = {}) =>
     fetchAPI(`/workspaces/${id}/bootstrap`, requestOptions),

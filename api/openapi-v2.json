@@ -121157,6 +121157,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Comma-separated workspace IDs to resolve directly, at most 200. When set, the response contains exactly those workspaces the caller can view; search and pagination are ignored.",
+            "in": "query",
+            "name": "ids",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
