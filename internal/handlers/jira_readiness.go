@@ -224,7 +224,6 @@ func (h *JiraImportHandler) jiraConfigurationReadinessFindings(
 		transitionCount := 0
 		nonInitialTransitionCount := 0
 		guardedCount := 0
-		loopCount := 0
 		actionCount := 0
 		triggerCount := 0
 		for _, workflow := range config.Workflows {
@@ -235,16 +234,6 @@ func (h *JiraImportHandler) jiraConfigurationReadinessFindings(
 				}
 				if transition.ValidatorCount > 0 || transition.ConditionCount > 0 {
 					guardedCount++
-				}
-				switch transition.Type {
-				case jira.JiraWorkflowTransitionDirected:
-					for _, fromStatusID := range transition.FromStatusIDs {
-						if fromStatusID == transition.ToStatusID {
-							loopCount++
-						}
-					}
-				case jira.JiraWorkflowTransitionGlobal:
-					loopCount++
 				}
 				actionCount += transition.ActionCount
 				triggerCount += transition.TriggerCount
@@ -282,15 +271,6 @@ func (h *JiraImportHandler) jiraConfigurationReadinessFindings(
 				Severity:   jira.SeverityLossy,
 				Reason:     "Transition topology imports, but Jira post-functions/actions and triggers have no portable Windshift equivalent and are recorded only as import fidelity metadata.",
 				UsageCount: actionCount + triggerCount,
-			})
-		}
-		if loopCount > 0 {
-			findings = append(findings, jira.Finding{
-				Entity:     "Workflow loop transitions",
-				Category:   "workflow_rule",
-				Severity:   jira.SeverityBlocked,
-				Reason:     "Windshift treats a same-status update as a no-op before transition rules execute. Jira loop transitions are omitted so their conditions, post-functions, or triggers cannot be bypassed.",
-				UsageCount: loopCount,
 			})
 		}
 	}
