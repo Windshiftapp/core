@@ -723,18 +723,15 @@ func (s *BindingService) UpdateAgentConfig(ctx context.Context, workspaceID, bin
 			return ErrLLMConnectionInvalid
 		}
 	}
-	if err := s.repo.UpdateInstructions(ctx, bindingID, workspaceID, instructions); err != nil {
-		return err
-	}
-	if llmConnectionID != nil {
-		if err := s.repo.UpdateLLMConnection(ctx, bindingID, workspaceID, *llmConnectionID); err != nil {
-			return err
-		}
-	}
+	var runnerImageArg *string
 	if runnerImage != nil {
-		if err := s.repo.UpdateRunnerImage(ctx, bindingID, workspaceID, newRunnerImage); err != nil {
-			return err
-		}
+		runnerImageArg = &newRunnerImage
+	}
+	// One atomic write so the model connection, readiness invalidation, and the
+	// single version bump land together; a concurrent activation must never see
+	// the old connection with a fresh version.
+	if err := s.repo.UpdateAgentConfig(ctx, bindingID, workspaceID, instructions, llmConnectionID, runnerImageArg); err != nil {
+		return err
 	}
 	if s.skills == nil {
 		if len(skillIDs) > 0 {
