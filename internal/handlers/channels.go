@@ -1747,24 +1747,7 @@ func (h *ChannelHandler) DiscardEmailReply(w http.ResponseWriter, r *http.Reques
 	}
 
 	outcome, err := h.channelRepo.DiscardEmailReply(ctx, id, commentID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if outcome == repository.EmailReplySending {
-		respondError(w, r, &restapi.APIError{
-			StatusCode: http.StatusConflict,
-			Code:       "EMAIL_REPLY_SENDING",
-			Message:    "Reply is being delivered right now and can no longer be canceled",
-		})
-		return
-	}
-	if outcome != repository.EmailReplyDiscarded {
-		respondError(w, r, &restapi.APIError{
-			StatusCode: http.StatusConflict,
-			Code:       "EMAIL_REPLY_NOT_DISCARDABLE",
-			Message:    "Reply is already delivered, discarded, or does not exist",
-		})
+	if !h.writeEmailReplyDiscardOutcome(w, r, outcome, err) {
 		return
 	}
 
@@ -1773,6 +1756,68 @@ func (h *ChannelHandler) DiscardEmailReply(w http.ResponseWriter, r *http.Reques
 		"discarded":  true,
 		"comment_id": commentID,
 	})
+}
+
+// DiscardEmailReplyByID marks one queued outbox row as never-send. It is the
+// row-scoped sibling of DiscardEmailReply: intake receipts carry no comment_id,
+// so operators cancel a stuck receipt through its outbox row id.
+// POST /channels/{id}/email/outbox/{replyId}/discard
+func (h *ChannelHandler) DiscardEmailReplyByID(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	replyID, ok := requireIDParam(w, r, "replyId")
+	if !ok {
+		return
+	}
+	if _, ok := h.requireChannelManageAccess(ctx, w, r, id); !ok {
+		return
+	}
+	if !h.requireReplyOutboxChannel(ctx, w, r, id) {
+		return
+	}
+
+	outcome, err := h.channelRepo.DiscardEmailReplyByID(ctx, id, replyID)
+	if !h.writeEmailReplyDiscardOutcome(w, r, outcome, err) {
+		return
+	}
+
+	slog.Info("discarded queued email reply", "channel_id", id, "reply_id", replyID)
+	respondJSONOK(w, map[string]any{
+		"discarded": true,
+		"reply_id":  replyID,
+	})
+}
+
+// writeEmailReplyDiscardOutcome maps a discard result to its conflict response
+// and reports whether the caller may proceed to a success body.
+func (h *ChannelHandler) writeEmailReplyDiscardOutcome(w http.ResponseWriter, r *http.Request, outcome repository.EmailReplyDiscardOutcome, err error) bool {
+	if err != nil {
+		respondInternalError(w, r, err)
+		return false
+	}
+	switch outcome {
+	case repository.EmailReplyDiscarded:
+		return true
+	case repository.EmailReplySending:
+		respondError(w, r, &restapi.APIError{
+			StatusCode: http.StatusConflict,
+			Code:       "EMAIL_REPLY_SENDING",
+			Message:    "Reply is being delivered right now and can no longer be canceled",
+		})
+		return false
+	default:
+		respondError(w, r, &restapi.APIError{
+			StatusCode: http.StatusConflict,
+			Code:       "EMAIL_REPLY_NOT_DISCARDABLE",
+			Message:    "Reply is already delivered, discarded, or does not exist",
+		})
+		return false
+	}
 }
 
 // GetEmailLog returns the email processing log for a channel
