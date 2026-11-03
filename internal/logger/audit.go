@@ -709,6 +709,13 @@ const (
 	ActionMilestoneCategoryUpdate = "milestone_category.update"
 	ActionMilestoneCategoryDelete = "milestone_category.delete"
 
+	// Milestone comments and page links
+	ActionMilestoneCommentCreate  = "milestone_comment.create"
+	ActionMilestoneCommentUpdate  = "milestone_comment.update"
+	ActionMilestoneCommentDelete  = "milestone_comment.delete"
+	ActionMilestonePageLinkCreate = "milestone_page_link.create"
+	ActionMilestonePageLinkDelete = "milestone_page_link.delete"
+
 	// Collection management
 	ActionCollectionCreate = "collection.create"
 	ActionCollectionUpdate = "collection.update"
@@ -1153,6 +1160,8 @@ const (
 	ResourceTimeProject          = "time_project"
 	ResourceMilestone            = "milestone"
 	ResourceMilestoneCategory    = "milestone_category"
+	ResourceMilestoneComment     = "milestone_comment"
+	ResourceMilestonePageLink    = "milestone_page_link"
 	ResourceCollection           = "collection"
 	ResourceTestCase             = "test_case"
 	ResourceTestRun              = "test_run"
