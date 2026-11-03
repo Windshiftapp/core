@@ -107,6 +107,9 @@ func NewItemApplicationService(
 
 func (s *ItemApplicationService) WithCache(cache *ItemCacheService) *ItemApplicationService {
 	s.cache = cache
+	// The item read path resolves the effective project through ItemCRUDService,
+	// so it needs the same cache.
+	s.crud.WithCache(cache)
 	return s
 }
 
