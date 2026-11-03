@@ -17,6 +17,7 @@ export const SUPPORTED_LOCALES = [
   { code: 'zh-CN', name: '简体中文', direction: 'ltr' },
   { code: 'fr', name: 'Français', direction: 'ltr' },
   { code: 'ko', name: '한국어', direction: 'ltr' },
+  { code: 'it', name: 'Italiano', direction: 'ltr' },
 ];
 
 // Reactive locale state.
