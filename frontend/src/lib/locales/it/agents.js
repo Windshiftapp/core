@@ -1,0 +1,60 @@
+/** Workspace agents and Agent Studio. */
+
+export default {
+  workspaceAgents: {
+    availability: {
+      ready: 'Pronto',
+      offline: 'Offline · accoda il lavoro',
+      needsSetup: 'Da configurare',
+      draft: 'Bozza',
+      paused: 'In pausa',
+      invalid: 'Non valido',
+      archived: 'Archiviato',
+      unavailable: 'Non disponibile',
+    },
+    types: {
+      standard: 'Standard',
+      coding: 'Sviluppo',
+      legacy: 'Legacy',
+    },
+    runtimes: {
+      windshift: 'Runtime Windshift integrato',
+      authorizedRunner: 'Runner di sviluppo autorizzato',
+      legacyLocal: 'Runtime locale legacy',
+    },
+    identities: {
+      workspaceManaged: 'Gestita dal workspace',
+      centralizedService: 'Identità di servizio centrale',
+      userOwned: 'Identità dell’utente',
+    },
+    runStatuses: {
+      queued: 'in coda',
+      running: 'in esecuzione',
+      succeeded: 'completata',
+      completed: 'completata',
+      failed: 'non riuscita',
+      cancelled: 'annullata',
+    },
+    catalog: {
+      title: 'Agenti',
+      subtitle: 'Specialisti disponibili in questo workspace',
+      createAgent: 'Crea agente',
+      searchPlaceholder: 'Cerca agenti',
+      loading: 'Caricamento degli agenti del workspace…',
+      loadErrorTitle: 'Impossibile caricare gli agenti',
+      loadErrorMessage: 'Non è stato possibile caricare gli agenti.',
+      emptyTitle: 'Ancora nessun agente',
+      emptyAdminDescription: 'Crea uno specialista Standard o di Sviluppo per questo workspace.',
+      emptyMemberDescription: 'Un amministratore del workspace può aggiungere specialisti qui.',
+      noMatchesTitle: 'Nessun agente corrispondente',
+      noMatchesDescription: 'Prova con un altro nome, handle, scopo o tipo di profilo.',
+      defaultPurpose: 'Uno specialista del workspace configurato dai tuoi amministratori.',
+      ownedBy: 'Di proprietà di {name}',
+      modelUnavailable: 'Modello non disponibile',
+      standardInteraction: 'Assegnazione, menzioni e chat del workspace',
+      codingInteraction: 'Assegnazione diretta e menzioni',
+      lastRun: 'Ultima esecuzione: {status}',
+      viewProfileVersion: 'Visualizza profilo · Versione {version}',
+    },
+  },
+};
