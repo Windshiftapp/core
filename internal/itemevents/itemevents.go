@@ -91,6 +91,13 @@ func Import(ref string) Metadata {
 	return Metadata{ActorKind: "import", ActorRef: ref, SourceKind: "import"}
 }
 
+// IsImportOrigin reports whether an event was written by a historical import.
+// Imported facts are historical: consumers must not turn them into live
+// outbound side effects such as customer email, notifications, or automation.
+func IsImportOrigin(actorKind, sourceKind string) bool {
+	return actorKind == "import" || sourceKind == "import"
+}
+
 // System records a system-owned mutation.
 func System(sourceKind string) Metadata {
 	return Metadata{ActorKind: "system", SourceKind: sourceKind}

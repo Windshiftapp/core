@@ -45,6 +45,9 @@ type HandleCommentParams struct {
 	PortalCustomerID *int
 	Content          string
 	IsPrivate        bool
+	// SourceKind identifies the write path that created the comment. The
+	// reply service never emails comments written by a historical import.
+	SourceKind string
 }
 
 const (
@@ -469,11 +472,16 @@ func (s *CommentService) CreateContext(ctx context.Context, params CreateComment
 
 // CreateImported creates a comment from an external system without rejecting
 // the surrounding import when its source needs UTF-8 repair or truncation.
+// Imported comments are historical, so every live side effect (notifications,
+// mentions, webhooks, automation, and customer email) is suppressed; the
+// import records its own history and timeline facts directly.
 func (s *CommentService) CreateImported(params CreateCommentParams) (*CreateCommentResult, error) {
 	params.Content = normalizeImportedCommentSource(params.Content)
 	if params.EventMetadata.SourceKind == "" {
 		params.EventMetadata.SourceKind = "import"
 	}
+	params.SuppressNotifications = true
+	params.SuppressActionEvents = true
 	return s.create(context.Background(), params)
 }
 
@@ -749,6 +757,7 @@ func (s *CommentService) create(ctx context.Context, params CreateCommentParams)
 				PortalCustomerID: params.PortalCustomerID,
 				Content:          params.Content,
 				IsPrivate:        params.IsPrivate,
+				SourceKind:       metadata.SourceKind,
 			}); err != nil {
 				slog.Warn("failed to handle email reply for comment",
 					slog.String("component", "comment_service"),

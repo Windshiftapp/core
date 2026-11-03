@@ -72,6 +72,12 @@ func (s *EmailReplyService) handleCommentCreated(params HandleCommentParams, del
 		return nil
 	}
 
+	// Guard: imported comments are historical. Emailing them would send the
+	// whole archive to every customer on the ticket as if it were written now.
+	if params.SourceKind == "import" {
+		return nil
+	}
+
 	// Guard: skip if comment is FROM a portal customer (don't echo back)
 	if params.PortalCustomerID != nil {
 		return nil

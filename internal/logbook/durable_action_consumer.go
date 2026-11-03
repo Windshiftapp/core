@@ -11,6 +11,7 @@ import (
 	"windshift/internal/actionevents"
 	"windshift/internal/database"
 	"windshift/internal/events"
+	"windshift/internal/itemevents"
 	"windshift/internal/logbookevents"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -191,6 +192,10 @@ func NewDurableLogbookActionConsumer(db database.Database, actions *LogbookActio
 
 func (c *DurableLogbookActionConsumer) Handle(ctx context.Context, event events.Event) error {
 	if event.Type == DurableLogbookActionCompatibilityEvent && c.cutoverStartID > 0 && event.ID >= c.cutoverStartID {
+		return nil
+	}
+	// Imported facts are historical: never let them trigger automation.
+	if itemevents.IsImportOrigin(event.ActorKind, event.SourceKind) {
 		return nil
 	}
 	actionEvent, consumerKey, err := logbookActionEventFromDomainEvent(event)

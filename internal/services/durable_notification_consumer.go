@@ -113,6 +113,10 @@ func (c *DurableNotificationConsumer) notificationEvents(ctx context.Context, ev
 	if event.PayloadVersion != 1 {
 		return nil, events.Permanent(fmt.Errorf("unsupported notification event %s payload version %d", event.Type, event.PayloadVersion))
 	}
+	// Imported facts are historical: never turn them into live notifications.
+	if itemevents.IsImportOrigin(event.ActorKind, event.SourceKind) {
+		return nil, nil
+	}
 	if event.Type == DurableNotificationCompatibilityEvent {
 		var notificationEvent NotificationEvent
 		if err := json.Unmarshal(event.Payload, &notificationEvent); err != nil {
