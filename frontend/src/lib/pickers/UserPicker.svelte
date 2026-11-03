@@ -43,6 +43,23 @@
   onMount(() => { if (!users) loader.load(); });
   onDestroy(() => loader.dispose());
 
+  // The workspace can resolve after mount (the create form applies its scope
+  // asynchronously), and switching workspaces changes the roster. Reload when
+  // the scope changes so options never come from the unscoped fallback or a
+  // previously selected workspace. Parent-supplied options own their loading.
+  let optionsScope = $state(undefined);
+  $effect(() => {
+    if (users) return;
+    const nextScope = workspaceId ?? null;
+    if (optionsScope === undefined) {
+      optionsScope = nextScope;
+      return;
+    }
+    if (optionsScope === nextScope) return;
+    optionsScope = nextScope;
+    loader.reload();
+  });
+
   let usersList = $derived(users ?? loader.data ?? []);
 
   // Selected user lookup

@@ -1,6 +1,7 @@
 import { onDestroy } from 'svelte';
 import { attachments as attachmentsApi } from '../api/misc.js';
 import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
+import { runWithConcurrency } from '../utils/concurrency.js';
 
 /**
  * Composable for managing item attachments
@@ -140,13 +141,13 @@ export function useItemAttachments(getItemId, showError = console.error) {
     const itemId = getItemId();
     if (!itemId) return;
 
-    for (const file of files) {
-      try {
-        await attachmentsApi.uploadToItem(itemId, file);
-      } catch (err) {
-        console.error('Upload error:', err);
-        showError('Failed to upload attachment', err.message || String(err));
-      }
+    const results = await runWithConcurrency(files, (file) =>
+      attachmentsApi.uploadToItem(itemId, file)
+    );
+    for (const result of results) {
+      if (result.ok) continue;
+      console.error('Upload error:', result.error);
+      showError('Failed to upload attachment', result.error?.message || String(result.error));
     }
 
     // Reload attachments after all uploads complete

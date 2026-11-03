@@ -2,6 +2,7 @@
   import { workspaces } from '../api/workspaces.js';
   import { requestTypes } from '../api/channels.js';
   import { workspacesStore } from '../stores/workspaces.svelte.js';
+  import { FOREGROUND_READ } from '../api/readScheduler.js';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import BasePicker from '../pickers/BasePicker.svelte';
@@ -53,9 +54,9 @@
 
   // Load workspaces filtered to channel's configured IDs. The directory
   // store caches only the first server page, so a restricted channel
-  // resolves each configured id it names explicitly — the allowed set is the
-  // channel's own small list, not whatever the cache happens to hold
-  // (WI-1585). Unrestricted channels keep the cached page and gain
+  // resolves the configured ids it names explicitly in one batched read — the
+  // allowed set is the channel's own list, not whatever the cache happens to
+  // hold (WI-1585). Unrestricted channels keep the cached page and gain
   // server-backed search over the rest of the directory.
   let workspaceSearchResults = $state(null);
 
@@ -65,12 +66,14 @@
       const byId = new Map(cached.map(ws => [ws.id, ws]));
       const configured = channelWorkspaceIds || [];
       const missing = configured.filter(id => !byId.has(id));
-      const fetched = await Promise.allSettled(missing.map(id => workspaces.get(id)));
-      for (const result of fetched) {
-        if (result.status === 'fulfilled' && result.value?.id) {
-          byId.set(result.value.id, result.value);
-        } else if (result.status === 'rejected') {
-          console.error('Failed to resolve configured workspace:', result.reason);
+      if (missing.length > 0) {
+        const resolved = await workspaces.getByIds(missing, FOREGROUND_READ);
+        for (const workspace of resolved) {
+          if (workspace?.id != null) byId.set(workspace.id, workspace);
+        }
+        const unresolved = missing.filter(id => !byId.has(id));
+        if (unresolved.length > 0) {
+          console.error('Failed to resolve configured workspaces:', unresolved.join(', '));
         }
       }
       availableWorkspaces = configured.length > 0

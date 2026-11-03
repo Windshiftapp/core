@@ -19,12 +19,13 @@ const maxHierarchyDepth = 30
 
 // HierarchyService handles all hierarchy-related operations using only parent_id
 type HierarchyService struct {
-	db database.Database
+	db   database.Database
+	repo *repository.ItemRepository
 }
 
 // NewHierarchyService creates a new hierarchy service
 func NewHierarchyService(db database.Database) *HierarchyService {
-	return &HierarchyService{db: db}
+	return &HierarchyService{db: db, repo: repository.NewItemRepository(db)}
 }
 
 func itemPtrsToValues(items []*models.Item) []models.Item {
@@ -50,7 +51,7 @@ func itemPtrsToValues(items []*models.Item) []models.Item {
 // mutate parent_id must use WouldCreateCycleTx so the check and the write
 // are atomic.
 func (h *HierarchyService) WouldCreateCycle(ancestorCandidateID, newParentID int) (bool, error) {
-	itemRepo := repository.NewItemRepository(h.db)
+	itemRepo := h.repo
 	return walkForCycle(ancestorCandidateID, newParentID, itemRepo.GetParentID)
 }
 
@@ -61,7 +62,7 @@ func (h *HierarchyService) WouldCreateCycle(ancestorCandidateID, newParentID int
 // where two concurrent reparents could each pass their cycle check and
 // together create a cycle.
 func (h *HierarchyService) WouldCreateCycleTx(tx database.Tx, ancestorCandidateID, newParentID int) (bool, error) {
-	itemRepo := repository.NewItemRepository(h.db)
+	itemRepo := h.repo
 	return walkForCycle(ancestorCandidateID, newParentID, func(id int) (*int, error) {
 		return itemRepo.GetParentIDTx(tx, id)
 	})
@@ -93,18 +94,18 @@ func walkForCycle(ancestorCandidateID, newParentID int, getParent func(int) (*in
 // The recursive walk is capped at maxHierarchyDepth so a stored cycle can't
 // loop the DB.
 func (h *HierarchyService) GetAncestors(itemID int) ([]models.Item, error) {
-	return repository.NewItemRepository(h.db).GetAncestorsForHierarchy(itemID, maxHierarchyDepth)
+	return h.repo.GetAncestorsForHierarchy(itemID, maxHierarchyDepth)
 }
 
 // GetAncestorsContext is the request-aware form of GetAncestors.
 func (h *HierarchyService) GetAncestorsContext(ctx context.Context, itemID int) ([]models.Item, error) {
-	return repository.NewItemRepository(h.db).GetAncestorsForHierarchyContext(ctx, itemID, maxHierarchyDepth)
+	return h.repo.GetAncestorsForHierarchyContext(ctx, itemID, maxHierarchyDepth)
 }
 
 // GetAncestorsForItemsContext resolves ancestor chains for many items in one
 // recursive walk. Chains exclude the items themselves.
 func (h *HierarchyService) GetAncestorsForItemsContext(ctx context.Context, itemIDs []int) (map[int][]models.Item, error) {
-	return repository.NewItemRepository(h.db).GetAncestorsForItemsContext(ctx, itemIDs, maxHierarchyDepth)
+	return h.repo.GetAncestorsForItemsContext(ctx, itemIDs, maxHierarchyDepth)
 }
 
 // GetDescendants returns all descendants of an item
@@ -117,7 +118,7 @@ func (h *HierarchyService) GetDescendantsContext(ctx context.Context, itemID, ma
 	if maxDepth <= 0 || maxDepth > maxHierarchyDepth {
 		maxDepth = maxHierarchyDepth
 	}
-	items, err := repository.NewItemRepository(h.db).GetDescendantsWithMaxDepthContext(ctx, itemID, maxDepth)
+	items, err := h.repo.GetDescendantsWithMaxDepthContext(ctx, itemID, maxDepth)
 	if err != nil {
 		return nil, err
 	}
@@ -128,12 +129,12 @@ func (h *HierarchyService) GetDescendantsContext(ctx context.Context, itemID, ma
 // The recursive walk is capped at maxHierarchyDepth so a stored cycle can't
 // loop the DB.
 func (h *HierarchyService) CountDescendants(itemID int) (int, error) {
-	return repository.NewItemRepository(h.db).CountDescendants(itemID)
+	return h.repo.CountDescendants(itemID)
 }
 
 // CountDescendantsContext is the request-aware form of CountDescendants.
 func (h *HierarchyService) CountDescendantsContext(ctx context.Context, itemID int) (int, error) {
-	return repository.NewItemRepository(h.db).CountDescendantsContext(ctx, itemID)
+	return h.repo.CountDescendantsContext(ctx, itemID)
 }
 
 // GetChildren returns direct children of an item
@@ -143,7 +144,7 @@ func (h *HierarchyService) GetChildren(itemID int) ([]models.Item, error) {
 
 // GetChildrenContext is the request-aware form of GetChildren.
 func (h *HierarchyService) GetChildrenContext(ctx context.Context, itemID int) ([]models.Item, error) {
-	items, err := repository.NewItemRepository(h.db).GetChildrenContext(ctx, itemID)
+	items, err := h.repo.GetChildrenContext(ctx, itemID)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +155,7 @@ func (h *HierarchyService) GetChildrenContext(ctx context.Context, itemID int) (
 // given accessible workspaces, so cross-workspace children are not disclosed
 // through a visible parent.
 func (h *HierarchyService) GetChildrenInWorkspacesContext(ctx context.Context, itemID int, workspaceIDs []int) ([]models.Item, error) {
-	items, err := repository.NewItemRepository(h.db).GetChildrenInWorkspacesContext(ctx, itemID, workspaceIDs)
+	items, err := h.repo.GetChildrenInWorkspacesContext(ctx, itemID, workspaceIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -167,15 +168,14 @@ func (h *HierarchyService) GetChildrenInWorkspacesContext(ctx context.Context, i
 // nil so callers can't confuse it with "no parent". A non-existent input id
 // returns (nil, nil).
 func (h *HierarchyService) GetRoot(itemID int) (*models.Item, error) {
-	repo := repository.NewItemRepository(h.db)
-	rootID, err := repo.FindRootIDForItemContext(context.Background(), itemID, maxHierarchyDepth)
+	rootID, err := h.repo.FindRootIDForItemContext(context.Background(), itemID, maxHierarchyDepth)
 	if err != nil {
 		return nil, err
 	}
 	if rootID == nil {
 		return nil, nil
 	}
-	return repo.FindByIDWithDetails(*rootID)
+	return h.repo.FindByIDWithDetails(*rootID)
 }
 
 // GetEffectiveProject returns the effective project_id for an item by walking
@@ -188,7 +188,7 @@ func (h *HierarchyService) GetRoot(itemID int) (*models.Item, error) {
 // true climbs to its parent's effective project); the legacy project_id = -1
 // sentinel is no longer used.
 func (h *HierarchyService) GetEffectiveProject(itemID int) (projectID *int, inheritanceMode string, err error) {
-	res, err := repository.NewItemRepository(h.db).ResolveEffectiveProject(itemID)
+	res, err := h.repo.ResolveEffectiveProject(itemID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// Non-existent item: nothing to resolve.

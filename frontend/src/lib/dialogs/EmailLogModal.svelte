@@ -38,7 +38,7 @@
   let outboxLoading = $state(false);
   let outboxError = $state(null);
   let outboxPage = $state(1);
-  let actingCommentID = $state(null);
+  let actingReplyID = $state(null);
 
   const debouncedSearch = useDebounce(() => {
     page = 1;
@@ -199,30 +199,35 @@
   }
 
   async function retryReply(reply) {
-    if (actingCommentID !== null) return;
+    if (actingReplyID !== null) return;
     try {
-      actingCommentID = reply.comment_id;
+      actingReplyID = reply.id;
       await channels.retryEmailReply(channel.id, reply.comment_id);
       await loadOutbox();
     } catch (err) {
       console.error('Failed to retry customer reply:', err);
       outboxError = err.message || 'Failed to retry customer reply';
     } finally {
-      actingCommentID = null;
+      actingReplyID = null;
     }
   }
 
   async function discardReply(reply) {
-    if (actingCommentID !== null) return;
+    if (actingReplyID !== null) return;
     try {
-      actingCommentID = reply.comment_id;
-      await channels.discardEmailReply(channel.id, reply.comment_id);
+      actingReplyID = reply.id;
+      // Intake receipts have no comment_id, so they are canceled by outbox row id.
+      if (reply.comment_id) {
+        await channels.discardEmailReply(channel.id, reply.comment_id);
+      } else {
+        await channels.discardEmailReplyById(channel.id, reply.id);
+      }
       await loadOutbox();
     } catch (err) {
       console.error('Failed to discard customer reply:', err);
       outboxError = err.message || 'Failed to discard customer reply';
     } finally {
-      actingCommentID = null;
+      actingReplyID = null;
     }
   }
 
@@ -526,27 +531,31 @@
               {/if}
             {/snippet}
             {#snippet outboxActions(reply)}
-              {#if isReplyPending(reply) && reply.comment_id}
-                <!-- Intake receipts have no comment_id; the retry/discard
-                     endpoints are comment-keyed, so they are not actionable. -->
+              {#if isReplyPending(reply)}
                 <div class="flex items-center gap-1.5">
-                  <Button
-                    onclick={() => retryReply(reply)}
-                    variant="ghost"
-                    size="small"
-                    disabled={actingCommentID !== null}
-                    dataTestid="email-outbox-retry-{reply.id}"
-                  >
-                    {actingCommentID === reply.comment_id ? t('channel.emailLog.outboxRetrying') : t('channel.emailLog.outboxRetry')}
-                  </Button>
+                  {#if reply.comment_id}
+                    <!-- Retry stays comment-keyed; one comment can own several
+                         recipient rows. -->
+                    <Button
+                      onclick={() => retryReply(reply)}
+                      variant="ghost"
+                      size="small"
+                      disabled={actingReplyID !== null}
+                      dataTestid="email-outbox-retry-{reply.id}"
+                    >
+                      {actingReplyID === reply.id ? t('channel.emailLog.outboxRetrying') : t('channel.emailLog.outboxRetry')}
+                    </Button>
+                  {/if}
+                  <!-- Intake receipts have no comment_id and are discarded by
+                       outbox row id. -->
                   <Button
                     onclick={() => discardReply(reply)}
                     variant="ghost"
                     size="small"
-                    disabled={actingCommentID !== null}
+                    disabled={actingReplyID !== null}
                     dataTestid="email-outbox-discard-{reply.id}"
                   >
-                    {actingCommentID === reply.comment_id ? t('channel.emailLog.outboxDiscarding') : t('channel.emailLog.outboxDiscard')}
+                    {actingReplyID === reply.id ? t('channel.emailLog.outboxDiscarding') : t('channel.emailLog.outboxDiscard')}
                   </Button>
                 </div>
               {/if}

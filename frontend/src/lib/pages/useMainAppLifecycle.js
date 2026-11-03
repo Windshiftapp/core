@@ -12,6 +12,7 @@ import { authStore } from '../stores/auth.svelte.js';
 import { capabilitiesStore } from '../stores/capabilities.svelte.js';
 import { homepageStore } from '../stores/homepageStore.svelte.js';
 import { startNotificationPoller, stopNotificationPoller } from '../stores/notifications.js';
+import { onWorkItemRefresh } from '../stores/workItemRefresh.js';
 import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
 import { workspacesStore } from '../stores/workspaces.svelte.js';
 import { initDesktopFocusRefresh } from '../utils/desktopFocusRefresh.svelte.js';
@@ -124,20 +125,22 @@ export function useMainAppLifecycle({
       void workspacesStore.reload();
     };
     const handleRefreshWorkspaceData = () => void workspaceDataStore.refresh();
-    const handleRefreshWorkItems = () => homepageStore.invalidateSnapshot();
+    // The homepage only marks its snapshot stale here; the mounted Homepage
+    // component refreshes it. One coordinator owns the event so this is not a
+    // second independent listener.
+    const unsubscribeRefreshWorkItems = onWorkItemRefresh(() => homepageStore.invalidateSnapshot());
 
     window.addEventListener('show-create-modal', handleShowCreateModal);
     window.addEventListener(ADMIN_UI_MUTATION_EVENT, scheduleAdminUIRefresh);
     window.addEventListener('refresh-workspaces', handleRefreshWorkspaces);
     window.addEventListener('refresh-workspace-data', handleRefreshWorkspaceData);
-    window.addEventListener('refresh-work-items', handleRefreshWorkItems);
 
     return () => {
       window.removeEventListener('show-create-modal', handleShowCreateModal);
       window.removeEventListener(ADMIN_UI_MUTATION_EVENT, scheduleAdminUIRefresh);
       window.removeEventListener('refresh-workspaces', handleRefreshWorkspaces);
       window.removeEventListener('refresh-workspace-data', handleRefreshWorkspaceData);
-      window.removeEventListener('refresh-work-items', handleRefreshWorkItems);
+      unsubscribeRefreshWorkItems();
       if (adminUIRefreshTimer) clearTimeout(adminUIRefreshTimer);
     };
   });

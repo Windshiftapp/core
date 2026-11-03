@@ -186,6 +186,37 @@ export default defineConfig({
               name: 'xterm',
               test: /@xterm/,
             },
+            // Excalidraw, mermaid and cytoscape are large optional editors.
+            // Each gets a stable named chunk so a deploy invalidates only the
+            // library that changed, instead of an opaque `chunk-*` shared with
+            // unrelated code.
+            //
+            // `includeDependenciesRecursively: false` keeps each group to the
+            // modules it names. With the default, Excalidraw would absorb
+            // mermaid (a dependency of @excalidraw/mermaid-to-excalidraw) and
+            // mermaid would absorb cytoscape, producing one multi-megabyte
+            // chunk per group.
+            //
+            // Excalidraw ships its own ~100 locale files, excluded here so they
+            // stay per-locale dynamic imports. The app's own locales and the
+            // shiki grammars are likewise deliberately left ungrouped: each is
+            // imported on demand, so one chunk per locale/language is the whole
+            // point (merging them would make the first switch load every one).
+            {
+              name: 'excalidraw',
+              test: /@excalidraw\/(?!excalidraw\/dist\/(?:prod|dev)\/locales)/,
+              includeDependenciesRecursively: false,
+            },
+            {
+              name: 'mermaid',
+              test: /node_modules\/mermaid\//,
+              includeDependenciesRecursively: false,
+            },
+            {
+              name: 'cytoscape',
+              test: /node_modules\/cytoscape\//,
+              includeDependenciesRecursively: false,
+            },
           ],
         },
       },

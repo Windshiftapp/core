@@ -252,15 +252,17 @@ func (r *WorkspaceAgentBindingRepository) FindByActingUser(ctx context.Context, 
 	return b, nil
 }
 
-// SetLifecycle changes only persisted lifecycle state. Runtime-affecting
-// configuration methods own profile-version increments; validating a Draft
-// and marking it Ready does not create another definition version.
-func (r *WorkspaceAgentBindingRepository) SetLifecycle(ctx context.Context, id, workspaceID int, lifecycle models.AgentLifecycle) (int64, error) {
+// SetLifecycleIfVersion changes persisted lifecycle state only when the profile
+// version still matches the one that was validated. A concurrent configuration
+// change bumps the version, so this refuses to mark a changed definition Ready
+// using validation of an older one. Runtime-affecting configuration methods own
+// profile-version increments; activating a Draft does not create another version.
+func (r *WorkspaceAgentBindingRepository) SetLifecycleIfVersion(ctx context.Context, id, workspaceID int, lifecycle models.AgentLifecycle, expectedVersion int) (int64, error) {
 	res, err := r.db.ExecWriteContext(ctx, `
 		UPDATE workspace_agent_bindings
 		SET lifecycle = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ? AND workspace_id = ? AND lifecycle <> 'archived'
-	`, lifecycle, id, workspaceID)
+		WHERE id = ? AND workspace_id = ? AND lifecycle <> 'archived' AND profile_version = ?
+	`, lifecycle, id, workspaceID, expectedVersion)
 	if err != nil {
 		return 0, fmt.Errorf("set binding lifecycle: %w", err)
 	}
@@ -361,19 +363,34 @@ func (r *WorkspaceAgentBindingRepository) Restore(ctx context.Context, id, works
 	return n, nil
 }
 
-// UpdateInstructions rewrites a binding's custom instructions, scoped by
-// workspace (WI-258).
-func (r *WorkspaceAgentBindingRepository) UpdateInstructions(ctx context.Context, id, workspaceID int, instructions string) error {
-	_, err := r.db.ExecWriteContext(ctx, `
-		UPDATE workspace_agent_bindings
-		SET instructions = ?,
-		    lifecycle = CASE WHEN lifecycle = 'archived' THEN lifecycle ELSE 'draft' END,
-		    profile_version = profile_version + 1,
-		    updated_at = CURRENT_TIMESTAMP
-		WHERE id = ? AND workspace_id = ?
-	`, instructions, id, workspaceID)
-	if err != nil {
-		return fmt.Errorf("update binding instructions: %w", err)
+// UpdateAgentConfig atomically rewrites the Agent Studio overview fields —
+// instructions, model connection, and runner image — and, in the same
+// statement, invalidates readiness and bumps the profile version once. One
+// write keeps a concurrent activation from validating the old connection and
+// marking the profile Ready before the new connection is stored. A nil
+// connection or runner image preserves the current value; a non-nil empty
+// runner image clears the override.
+func (r *WorkspaceAgentBindingRepository) UpdateAgentConfig(ctx context.Context, id, workspaceID int, instructions string, llmConnectionID *int, runnerImage *string) error {
+	set := []string{
+		"instructions = ?",
+		"lifecycle = CASE WHEN lifecycle = 'archived' THEN lifecycle ELSE 'draft' END",
+		"profile_version = profile_version + 1",
+		"updated_at = CURRENT_TIMESTAMP",
+	}
+	args := []any{instructions}
+	if llmConnectionID != nil {
+		set = append(set, "llm_connection_id = ?")
+		args = append(args, *llmConnectionID)
+	}
+	if runnerImage != nil {
+		set = append(set, "runner_image = ?")
+		args = append(args, nullStringArg(*runnerImage))
+	}
+	args = append(args, id, workspaceID)
+	//nolint:gosec // G201: only fixed column fragments are interpolated; every value is bound
+	query := "UPDATE workspace_agent_bindings SET " + strings.Join(set, ", ") + " WHERE id = ? AND workspace_id = ?"
+	if _, err := r.db.ExecWriteContext(ctx, query, args...); err != nil {
+		return fmt.Errorf("update agent config: %w", err)
 	}
 	return nil
 }
@@ -422,23 +439,6 @@ func (r *WorkspaceAgentBindingRepository) UpdateConfig(ctx context.Context, b *m
 		return fmt.Errorf("replace binding repos: %w", err)
 	}
 	b.Repos = repos
-	return nil
-}
-
-// UpdateLLMConnection rewrites a binding's model connection in place, scoped by
-// (id, workspace_id). It does not touch the lifecycle or profile version: the
-// caller's instruction rewrite in UpdateAgentConfig owns the single Draft/version
-// transition for the whole configuration change.
-func (r *WorkspaceAgentBindingRepository) UpdateLLMConnection(ctx context.Context, id, workspaceID, connectionID int) error {
-	_, err := r.db.ExecWriteContext(ctx, `
-		UPDATE workspace_agent_bindings
-		SET llm_connection_id = ?,
-		    updated_at = CURRENT_TIMESTAMP
-		WHERE id = ? AND workspace_id = ?
-	`, connectionID, id, workspaceID)
-	if err != nil {
-		return fmt.Errorf("update binding llm connection: %w", err)
-	}
 	return nil
 }
 

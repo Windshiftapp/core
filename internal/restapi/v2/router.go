@@ -1155,6 +1155,8 @@ func applyParameterCorrections(route *Route) {
 				map[string]any{"type": "string", "pattern": "^[A-Za-z0-9]{2,10}-[1-9][0-9]*$", "example": "WI-1238"},
 			}},
 		})
+	case "GET /workspaces":
+		upsertParameter(route, stringQuery("ids", "Comma-separated workspace IDs to resolve directly, at most 200. When set, the response contains exactly those workspaces the caller can view; search and pagination are ignored."))
 	case "GET /query-language/values":
 		source := enumQuery("source", "Completion value catalog to search.",
 			"workspaces", "statuses", "status_categories", "priorities", "users", "milestones", "iterations", "projects", "item_types", "labels")

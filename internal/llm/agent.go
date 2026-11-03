@@ -252,7 +252,7 @@ func RunAgent(ctx context.Context, client Client, cfg AgentConfig, userMessage s
 				terminalCompletedThisTurn = true
 				// A mutation may have changed what reads return.
 				readResults = map[string]string{}
-			} else if !isTerminalTool && !duplicateSuppressed && !afterTerminalSuppressed && succeeded {
+			} else if !isTerminalTool && !duplicateSuppressed && !afterTerminalSuppressed && succeeded && toolResultCacheable(result) {
 				readResults[key] = result
 			}
 			slog.Info("agent tool call",
@@ -497,4 +497,28 @@ func toolReturnedError(result string) bool {
 		}
 	}
 	return false
+}
+
+// toolResultCacheable reports whether a read tool's result may be reused for a
+// later identical call. Only the HTTP tool reports a status; a transient HTTP
+// failure must not be cached, because the retry may succeed and suppressing it
+// would stall the loop as no_progress without the provider ever being retried.
+func toolResultCacheable(result string) bool {
+	if !strings.Contains(result, `"status_code"`) {
+		return true
+	}
+	var probe struct {
+		StatusCode *int `json:"status_code"`
+	}
+	if err := json.NewDecoder(strings.NewReader(result)).Decode(&probe); err != nil || probe.StatusCode == nil {
+		return true
+	}
+	return !transientHTTPStatus(*probe.StatusCode)
+}
+
+// transientHTTPStatus reports whether an HTTP status is worth retrying rather
+// than reusing a cached read: 408 and 429 are timeout/throttling, and 5xx is a
+// server-side failure. All may clear on a retry.
+func transientHTTPStatus(code int) bool {
+	return code == 408 || code == 429 || code >= 500
 }

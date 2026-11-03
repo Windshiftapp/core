@@ -39,6 +39,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
   import { navigate } from '../router.js';
+  import { runWithConcurrency } from '../utils/concurrency.js';
 
   let {
     content = $bindable(''), placeholder = '', readonly = false,
@@ -382,63 +383,63 @@
       return { nodes: [], attachments: [] };
     }
 
-    const results = await Promise.all(
-      images.map(async (image) => {
-        try {
-          if (deferImageUploads && !effectiveEntityId && !customUploadFn) {
-            const src = URL.createObjectURL(image);
-            onDeferredImageUpload?.({ file: image, url: src });
-            const node = schema?.nodes?.image?.createAndFill({
-              src,
-              alt: image.name,
-            }) || null;
+    const settled = await runWithConcurrency(images, async (image) => {
+      try {
+        if (deferImageUploads && !effectiveEntityId && !customUploadFn) {
+          const src = URL.createObjectURL(image);
+          onDeferredImageUpload?.({ file: image, url: src });
+          const node = schema?.nodes?.image?.createAndFill({
+            src,
+            alt: image.name,
+          }) || null;
 
-            return {
-              node,
-              attachment: null,
-              src,
-              alt: image.name,
-            };
-          }
-
-          let result;
-          if (!customUploadFn && effectiveEntityType === 'item' && effectiveEntityId) {
-            const attachment = await attachmentsApi.uploadToItem(effectiveEntityId, image);
-            result = { success: true, attachment };
-          } else {
-            const formData = new FormData();
-            formData.append('file', image);
-            if (effectiveEntityId && effectiveEntityType) {
-              formData.append('entity_id', effectiveEntityId.toString());
-              formData.append('entity_type', effectiveEntityType);
-            }
-            result = customUploadFn
-              ? await customUploadFn(formData)
-              : await attachmentsApi.upload(formData);
-          }
-          if (result.success && result.attachment) {
-            const src = downloadUrlBase === '/api/attachments'
-              ? attachmentsApi.getContentUrl(result.attachment.id)
-              : `${downloadUrlBase}/${result.attachment.id}/download`;
-            const node = schema?.nodes?.image?.createAndFill({
-              src,
-              alt: image.name,
-            }) || null;
-
-            return {
-              node,
-              attachment: result.attachment,
-              src,
-              alt: image.name,
-            };
-          }
-          return null;
-        } catch (error) {
-          console.error('[MilkdownEditor] Image upload error:', error);
-          return null;
+          return {
+            node,
+            attachment: null,
+            src,
+            alt: image.name,
+          };
         }
-      })
-    );
+
+        let result;
+        if (!customUploadFn && effectiveEntityType === 'item' && effectiveEntityId) {
+          const attachment = await attachmentsApi.uploadToItem(effectiveEntityId, image);
+          result = { success: true, attachment };
+        } else {
+          const formData = new FormData();
+          formData.append('file', image);
+          if (effectiveEntityId && effectiveEntityType) {
+            formData.append('entity_id', effectiveEntityId.toString());
+            formData.append('entity_type', effectiveEntityType);
+          }
+          result = customUploadFn
+            ? await customUploadFn(formData)
+            : await attachmentsApi.upload(formData);
+        }
+        if (result.success && result.attachment) {
+          const src = downloadUrlBase === '/api/attachments'
+            ? attachmentsApi.getContentUrl(result.attachment.id)
+            : `${downloadUrlBase}/${result.attachment.id}/download`;
+          const node = schema?.nodes?.image?.createAndFill({
+            src,
+            alt: image.name,
+          }) || null;
+
+          return {
+            node,
+            attachment: result.attachment,
+            src,
+            alt: image.name,
+          };
+        }
+        return null;
+      } catch (error) {
+        console.error('[MilkdownEditor] Image upload error:', error);
+        return null;
+      }
+    });
+
+    const results = settled.map((entry) => (entry.ok ? entry.value : null));
 
     const nodes = [];
     const attachments = [];

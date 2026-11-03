@@ -451,6 +451,10 @@
 
   async function saveModel() {
     if (!canAdmin || !adminProfile || !modelChanged || savingModel) return;
+    // Capture the submitted connection. A selection made while the request is
+    // in flight must not be recorded as saved when it completes; it stays
+    // unsaved and modelChanged keeps the Save button enabled.
+    const submittedConnectionId = Number(modelConnectionId);
     savingModel = true;
     modelSaved = false;
     actionError = '';
@@ -458,22 +462,22 @@
       await agentBindings.updateAgentConfig(workspaceId, agentId, {
         instructions: adminProfile.instructions || '',
         skill_ids: adminProfile.skill_ids || [],
-        llm_connection_id: Number(modelConnectionId),
+        llm_connection_id: submittedConnectionId,
       });
       const nextVersion = markNewDraftVersion();
       const connection = llmConnections.find(
-        (candidate) => Number(candidate.id) === Number(modelConnectionId)
+        (candidate) => Number(candidate.id) === submittedConnectionId
       );
       adminProfile = {
         ...adminProfile,
-        llm_connection_id: Number(modelConnectionId),
+        llm_connection_id: submittedConnectionId,
         profile_version: nextVersion,
       };
       agent = {
         ...agent,
         model_summary: connection?.model || agent.model_summary,
       };
-      modelSaved = true;
+      modelSaved = Number(modelConnectionId) === submittedConnectionId;
       await checkReadiness();
     } catch (err) {
       actionError = err.message || 'The model could not be changed.';
@@ -772,7 +776,7 @@
               <p class="mt-2 text-sm" style="color: var(--ds-text-subtle);">
                 {label(agent.runtime)} runtime
               </p>
-              <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">
+              <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);" data-testid="agent-model-summary">
                 {agent.model_summary || 'Model unavailable'}
               </p>
             </div>
@@ -1123,11 +1127,12 @@
                 </Button>
               </div>
               {#if modelSaved}
-                <AlertBox
-                  variant="success"
-                  message="Model changed. The profile is now a Draft and must be made Ready again."
-                  class="mt-3"
-                />
+                <div class="mt-3" data-testid="agent-model-saved">
+                  <AlertBox
+                    variant="success"
+                    message="Model changed. The profile is now a Draft and must be made Ready again."
+                  />
+                </div>
               {/if}
             </div>
             {#if agent.profile_type === 'standard'}

@@ -141,11 +141,23 @@ func listWorkspaces(catalog catalogReader) pageOperation[workspaceDTO] {
 		if err != nil {
 			return nil, Pagination{}, 0, err
 		}
+		// An explicit id set resolves exactly those rows in one read. The
+		// page size mirrors the requested set so the page is self-describing
+		// even when the caller omits page_size.
+		var ids []int
+		if strings.TrimSpace(r.URL.Query().Get("ids")) != "" {
+			ids, err = queryItemIDs(r, "ids", maxWorkspaceIDBatch)
+			if err != nil {
+				return nil, Pagination{}, 0, err
+			}
+			page.PageSize = len(ids)
+		}
 		// Server-side directory search over name, key, and description —
 		// the same fields the client-side filter matches, so results are
 		// consistent whether they come from cache or the server.
 		pageParams := catalogPage(page)
 		pageParams.Search = clampSearch(r.URL.Query().Get("search"))
+		pageParams.IDs = ids
 		user, err := principal(r)
 		if err != nil {
 			return nil, Pagination{}, 0, err
@@ -171,6 +183,10 @@ func clampSearch(raw string) string {
 	}
 	return search
 }
+
+// maxWorkspaceIDBatch bounds a direct workspace id resolve so one request
+// cannot name an unbounded set.
+const maxWorkspaceIDBatch = 200
 
 func listWorkspaceTemplates(catalog catalogReader) readOperation[[]workspaceTemplateDTO] {
 	return func(r *http.Request) ([]workspaceTemplateDTO, error) {

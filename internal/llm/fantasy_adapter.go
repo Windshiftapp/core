@@ -228,11 +228,12 @@ func (c *fantasyClient) Complete(ctx context.Context, req CompletionRequest) (*C
 	c.replay.set(replays, responseRequestOverrides(req, c.protocol))
 
 	maxTokens := int64(req.MaxTokens)
+	providerOptions, thinkingEnabled := c.callProviderOptions(req)
 	call := fantasy.Call{
 		Prompt:          prompt,
 		Tools:           toFantasyTools(req.Tools, req.EnablePromptCache),
 		ToolChoice:      toFantasyToolChoice(req.ToolChoice),
-		ProviderOptions: c.callProviderOptions(req),
+		ProviderOptions: providerOptions,
 	}
 	if req.MaxTokens > 0 && (c.protocol != APIContractChatCompletions || c.completionTokens.useLegacy.Load()) {
 		call.MaxOutputTokens = &maxTokens
@@ -242,6 +243,13 @@ func (c *fantasyClient) Complete(ctx context.Context, req CompletionRequest) (*C
 		call.Temperature = &temperature
 	}
 	applyGenericCallOptions(&call, c.providerConfig)
+	if thinkingEnabled {
+		// Fantasy clears sampling parameters only on its explicit-budget
+		// thinking path. The effort path leaves them set, and Anthropic rejects
+		// temperature/top_p alongside thinking.
+		call.Temperature = nil
+		call.TopP = nil
+	}
 
 	if req.StructuredOutput != nil && len(req.StructuredOutput.Schema) > 0 && len(req.Tools) == 0 {
 		return c.generateObject(ctx, call, req.StructuredOutput)
@@ -251,7 +259,7 @@ func (c *fantasyClient) Complete(ctx context.Context, req CompletionRequest) (*C
 		mapped := mapFantasyError(err)
 		if rejectsModernCompletionTokenParameter(mapped) && !c.completionTokens.useLegacy.Load() {
 			c.completionTokens.useLegacy.Store(true)
-			call.ProviderOptions = c.callProviderOptions(req)
+			call.ProviderOptions, _ = c.callProviderOptions(req)
 			call.MaxOutputTokens = &maxTokens
 			response, err = c.generate(ctx, call)
 		}
@@ -520,7 +528,11 @@ func toFantasyToolChoice(choice any) *fantasy.ToolChoice {
 	return &mapped
 }
 
-func (c *fantasyClient) callProviderOptions(req CompletionRequest) fantasy.ProviderOptions {
+// callProviderOptions builds the provider options for a request. The second
+// result reports whether this adapter enabled provider thinking (Anthropic
+// effort), so the caller can drop sampling parameters the provider rejects
+// alongside thinking.
+func (c *fantasyClient) callProviderOptions(req CompletionRequest) (fantasy.ProviderOptions, bool) {
 	if c.protocol == APIContractResponses {
 		store := false
 		options := &openai.ResponsesProviderOptions{
@@ -541,7 +553,7 @@ func (c *fantasyClient) callProviderOptions(req CompletionRequest) fantasy.Provi
 			}
 		}
 		applyResponsesProviderConfig(options, c.providerConfig)
-		return openai.NewResponsesProviderOptions(options)
+		return openai.NewResponsesProviderOptions(options), false
 	}
 	if c.protocol == APIContractAnthropic {
 		options := &anthropic.ProviderOptions{}
@@ -561,14 +573,30 @@ func (c *fantasyClient) callProviderOptions(req CompletionRequest) fantasy.Provi
 			sendReasoning := true
 			options.SendReasoning = &sendReasoning
 		}
-		return anthropic.NewProviderOptions(options)
+		return anthropic.NewProviderOptions(options), options.Effort != nil || thinkingOverrideActive(options.ExtraBody)
 	}
 	options := &openai.ProviderOptions{}
 	if req.MaxTokens > 0 && !c.completionTokens.useLegacy.Load() {
 		maxTokens := int64(req.MaxTokens)
 		options.MaxCompletionTokens = &maxTokens
 	}
-	return openai.NewProviderOptions(options)
+	return openai.NewProviderOptions(options), false
+}
+
+// thinkingOverrideActive reports whether an operator-supplied provider-native
+// thinking override enables Anthropic thinking. A missing type, or any type
+// other than "disabled", counts as enabled.
+func thinkingOverrideActive(extraBody map[string]any) bool {
+	raw, ok := extraBody["thinking"]
+	if !ok {
+		return false
+	}
+	config, ok := raw.(map[string]any)
+	if !ok {
+		return true
+	}
+	kind, _ := config["type"].(string)
+	return !strings.EqualFold(strings.TrimSpace(kind), "disabled")
 }
 
 func applyGenericCallOptions(call *fantasy.Call, raw string) {
@@ -686,9 +714,15 @@ func fantasyProviderCost(metadata fantasy.ProviderMetadata) *float64 {
 }
 
 func normalizedFantasyResponse(content string, toolCalls []ToolCall, providerState json.RawMessage, usage Usage, finish fantasy.FinishReason) *CompletionResponse {
+	// Normalize the library's finish reasons to this package's stable spelling.
+	// Fantasy owns the provider values; the agent loop and StopReason consumers
+	// read the normalized form.
 	finishReason := string(finish)
-	if finish == fantasy.FinishReasonToolCalls {
+	switch finish {
+	case fantasy.FinishReasonToolCalls:
 		finishReason = "tool_calls"
+	case fantasy.FinishReasonContentFilter:
+		finishReason = "content_filter"
 	}
 	return &CompletionResponse{
 		Object:  "chat.completion",

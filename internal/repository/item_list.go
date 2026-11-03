@@ -555,13 +555,32 @@ func itemListCursorWhere(cursor itemListCursor) (where string, args []any, err e
 	return " AND (i.frac_index > ? OR (i.frac_index = ? AND i.id > ?))", []any{cursor.Rank, cursor.Rank, cursor.ID}, nil
 }
 
+// boundedItemListCountLimit caps the filtered, collection, QL and search list
+// count. Those paths run the count over the full filter join set with no bound,
+// so the cost grows with the workspace item count even though the page query
+// beside it is index-bounded. Capping keeps the worst case proportional to the
+// cap instead. The UI already refuses to paginate past 10,000 items and labels
+// the total "(limited to 10,000)" (Pagination.svelte maxItems), so the bound
+// matches the contract the client already assumes.
+const boundedItemListCountLimit = 10000
+
+// boundedItemListCountQuery wraps the filter scan in a LIMIT so the engine can
+// stop after the cap instead of aggregating every matching row. Results below
+// the cap stay exact; results at the cap report the cap.
+func boundedItemListCountQuery(countFromClause, whereClause string) string {
+	return fmt.Sprintf(
+		"SELECT COUNT(*) FROM (SELECT 1 %s%s LIMIT %d) AS bounded_item_count",
+		countFromClause, whereClause, boundedItemListCountLimit,
+	)
+}
+
 func (r *ItemRepository) buildItemListPagePlan(
 	params ItemListParams,
 	countFromClause, whereClause string,
 	args []any,
 ) itemListPagePlan {
 	plan := itemListPagePlan{
-		countQuery:      "SELECT COUNT(*) " + countFromClause + whereClause,
+		countQuery:      boundedItemListCountQuery(countFromClause, whereClause),
 		countArgs:       args,
 		pageFromClause:  countFromClause,
 		pageWhereClause: whereClause,

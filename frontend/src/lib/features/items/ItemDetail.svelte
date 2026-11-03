@@ -36,6 +36,7 @@
   import { useItemEventStream } from '../../composables/useItemEventStream.svelte.js';
   import { notificationActions } from '../../stores/notifications.js';
   import { agentRuns } from '../../stores/agentRuns.svelte.js';
+  import { onWorkItemRefresh } from '../../stores/workItemRefresh.js';
   import {
     registerContextCommands,
     unregisterContextCommands,
@@ -300,17 +301,23 @@ import NativeSelect from '../../components/NativeSelect.svelte';
 
   useEventListener(() => document, 'keydown', handleItemDetailShortcuts);
 
-  // Reload child items when a new child is created against the item currently open.
-  useEventListener(() => window, 'refresh-work-items', (/** @type {CustomEvent<{parentId?: number}>} */ event) => {
-    const parentId = event?.detail?.parentId;
-    if (parentId == null) return;
-    const currentId = itemDetailStore.item?.id;
-    if (currentId == null) return;
-    if (Number(parentId) !== Number(currentId)) return;
-    itemDetailStore.loadChildItems().catch((err) => {
-      console.error('Failed to reload child items after child creation:', err);
-    });
-  });
+  // Reload child items when a new child is created against the item currently
+  // open. The coordinator batches a burst; check every parent it named.
+  $effect(() =>
+    onWorkItemRefresh((detail) => {
+      const currentId = itemDetailStore.item?.id;
+      if (currentId == null) return;
+      const parents = detail?.parentIds?.length
+        ? detail.parentIds
+        : detail?.parentId != null
+          ? [detail.parentId]
+          : [];
+      if (!parents.some((parentId) => Number(parentId) === Number(currentId))) return;
+      itemDetailStore.loadChildItems().catch((err) => {
+        console.error('Failed to reload child items after child creation:', err);
+      });
+    })
+  );
 
   function handleFocusStatus() {
     // Focus the status field by starting edit mode

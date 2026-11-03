@@ -1,7 +1,7 @@
 <script>
-  import { useEventListener } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
+  import { onWorkItemRefresh } from '../../stores/workItemRefresh.js';
   import {
     applyCollectionItem,
     collectionStore,
@@ -98,16 +98,18 @@
 
   let gridMinWidth = $derived(listGridMinWidth(listColumns));
 
-  useEventListener(() => window, 'refresh-work-items', (/** @type {CustomEvent} */ event) => {
-    const item = event.detail?.item;
-    // Workspace-scoped views can apply the item immediately as a display
-    // optimization. Collection membership is verified by the store's
-    // coalesced reconciliation instead of one query per event.
-    if (item && !collectionId && Number(item.workspace_id) === Number(workspaceId)) {
-      applyCollectionItem(item);
-    }
-    scheduleCollectionReconciliation();
-  });
+  $effect(() =>
+    onWorkItemRefresh((detail) => {
+      const item = detail?.item;
+      // Workspace-scoped views can apply the item immediately as a display
+      // optimization. Collection membership is verified by the store's
+      // coalesced reconciliation instead of one query per event.
+      if (item && !collectionId && Number(item.workspace_id) === Number(workspaceId)) {
+        applyCollectionItem(item);
+      }
+      scheduleCollectionReconciliation();
+    })
+  );
 
   // Scoped SSE invalidations (WI-1624): any frame runs the existing delta fetch,
   // and a reconnect reconciles. Without this the list kept showing items that

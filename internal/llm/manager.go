@@ -376,12 +376,17 @@ func (m *ConnectionManager) ConnectionRuntime(ctx context.Context, connectionID 
 // carries neither a context length nor an output cap, and the local provider
 // has no static model list — so refusing to resolve such a connection would
 // take out binding validation, profile creation, and run start along with the
-// inference call. The output default is deliberately generous: modern models
-// commonly support 64k+ output, and the resolved value is still clamped to the
-// model's advertised maximum and to its context window.
+// inference call. The output fallback is deliberately conservative: a model
+// that supports fewer output tokens rejects the request outright, which is
+// worse than truncating an unusually long answer. An operator who knows the
+// model supports more raises the cap per connection via
+// provider_config.max_output_tokens.
 const (
-	fallbackContextWindow   = 128_000
-	FallbackMaxOutputTokens = 65_536
+	fallbackContextWindow = 128_000
+	// FallbackMaxOutputTokens caps output when neither the catalog nor an
+	// operator override names a limit. It must be a value essentially every
+	// chat model accepts; do not raise it to a "generous" default.
+	FallbackMaxOutputTokens = 4_096
 )
 
 // applyFallbackModelLimits fills limits the catalog left unresolved, reporting
