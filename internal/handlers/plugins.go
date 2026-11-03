@@ -256,6 +256,16 @@ func (h *PluginHandler) GetExtensions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	extensions := h.manager.GetExtensions()
+	// Editor surfaces only need the editor providers; ?point= keeps the
+	// response to the requested point so unrelated plugin metadata is not
+	// shipped to them.
+	if point := strings.TrimSpace(r.URL.Query().Get("point")); point != "" {
+		filtered := make(map[string][]plugins.Extension, 1)
+		if list, ok := extensions[point]; ok {
+			filtered[point] = list
+		}
+		extensions = filtered
+	}
 	_ = json.NewEncoder(w).Encode(extensions)
 }
 

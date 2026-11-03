@@ -257,6 +257,14 @@ export default {
     mermaidRendering: 'Rendering diagram',
     mermaidParseError: 'Mermaid parse error',
     mermaidEmpty: 'Empty mermaid block',
+    useProvider: 'Edit with {label}',
+    useRichText: 'Use rich text editor',
+    providerActive: '{label} is active',
+    discardProviderChanges: 'Discard unsaved changes?',
+    discardProviderChangesMessage:
+      'Your edits in {label} have not been saved. Switching editors discards them.',
+    discardChanges: 'Discard',
+    providerError: 'The editor plugin reported an error: {message}',
   },
 
   dialogs: {
