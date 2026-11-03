@@ -474,7 +474,7 @@ func (s *CommentService) CreateContext(ctx context.Context, params CreateComment
 // the surrounding import when its source needs UTF-8 repair or truncation.
 // Imported comments are historical, so every live side effect (notifications,
 // mentions, webhooks, automation, and customer email) is suppressed; the
-// import records its own history and timeline facts directly.
+// import records its own history and timeline facts directly. (GH #439)
 func (s *CommentService) CreateImported(params CreateCommentParams) (*CreateCommentResult, error) {
 	params.Content = normalizeImportedCommentSource(params.Content)
 	if params.EventMetadata.SourceKind == "" {
