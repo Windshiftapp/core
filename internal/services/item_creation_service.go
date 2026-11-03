@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -114,6 +115,11 @@ func (s *ItemCreationService) SetPermissionService(perm *PermissionService) {
 func resolveCreateItemType(db database.Database, workspaceID int, parentID *int) (*int, error) {
 	if parentID != nil && *parentID != 0 {
 		parent, err := repository.NewItemRepository(db).FindByID(*parentID)
+		if errors.Is(err, repository.ErrNotFound) {
+			// A missing parent is a client error, not a repository failure: the
+			// create contract reports it as a parent_id validation error.
+			return nil, &validation.ValidationError{Field: "parent_id", Message: "Parent item not found"}
+		}
 		if err != nil {
 			return nil, err
 		}
