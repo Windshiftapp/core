@@ -25,6 +25,9 @@
   // Resolve the default level once per scope, after the counts have loaded, so
   // a premature all-zero snapshot cannot pin the shallowest level.
   let resolvedScope = null;
+  // The last counts scope requested. The effect can re-run with identical
+  // inputs during mount; the guard keeps that from issuing a second read.
+  let countsScope = null;
 
   const itemTypes = $derived(workspaceDataStore.itemTypes);
 
@@ -63,8 +66,11 @@
     const wsId = workspaceId;
     const colId = collectionId;
     const subQl = collectionStore.effectiveSubFilterQL;
-    const id = ++requestId;
     if (!wsId && !colId) return;
+    const scope = `${wsId ?? ''}|${colId ?? ''}|${subQl}`;
+    if (scope === countsScope) return;
+    countsScope = scope;
+    const id = ++requestId;
     loadingCounts = true;
     itemsApi
       .getLevelCounts(

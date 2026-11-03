@@ -294,9 +294,16 @@ export function useCollectionHierarchy({
       // base row that now reports children.
       if (generationChanged) {
         const roots = new Set(loadedRoots);
+        const nextExpanded = new Set(expanded);
         for (const item of baseItems) {
-          if (item.has_children) roots.add(item.id);
+          if (!item.has_children) continue;
+          roots.add(item.id);
+          // A base root can report children only after the level filter
+          // resolves. It missed the initial default expansion, so expand it
+          // now instead of leaving its subtree behind a collapsed expander.
+          if (!hierarchyIndex.childrenByParent.has(item.id)) nextExpanded.add(item.id);
         }
+        expanded = nextExpanded;
         if (roots.size > 0) void fetchRoots([...roots], { force: true });
       }
       return;

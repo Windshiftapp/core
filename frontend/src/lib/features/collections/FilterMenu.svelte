@@ -1,4 +1,5 @@
 <script>
+  import { untrack } from 'svelte';
   import { createPopover, melt } from '@melt-ui/svelte';
   import { toStore } from 'svelte/store';
   import Filter from '@lucide/svelte/icons/filter';
@@ -126,7 +127,16 @@
   let editingViewName = $state('');
 
   const workspaceKey = $derived(workspaceDataStore.workspace?.key ?? null);
-  const scopeKey = $derived(`${workspaceKey ?? ''}|${collectionId ?? ''}`);
+  // A collection-scoped list ignores the workspace key, so its request scope is
+  // the collection id alone. Keying the effect on the workspace too re-issued
+  // the same read when the shell resolved the workspace during bootstrap.
+  const requestScope = $derived(
+    collectionId
+      ? `collection:${collectionId}`
+      : workspaceKey
+        ? `workspace:${workspaceKey}`
+        : null
+  );
   // The backend lets a collection's owner manage its views; the workspace
   // default view belongs to workspace admins.
   const canAuthor = $derived(
@@ -140,9 +150,12 @@
   );
 
   $effect(() => {
-    const key = scopeKey;
-    if (!key || (!workspaceKey && !collectionId)) return;
-    void loadViews();
+    const scope = requestScope;
+    if (!scope) return;
+    // loadViews reads the workspace key and collection id synchronously; keep
+    // those reads out of the effect so a bootstrap key change for the same
+    // request scope cannot fire a second identical read.
+    untrack(() => loadViews());
   });
 
   async function loadViews() {

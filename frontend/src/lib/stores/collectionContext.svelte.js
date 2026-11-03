@@ -378,11 +378,9 @@ class CollectionStore {
 
     try {
       const boardPartition = await this.#resolveBoardPartition(wsId, colId, view);
-      const collection = colId
-        ? BOARD_VIEWS.has(view)
-          ? (this.boardCollection ?? (await getCollection(colId)))
-          : await getCollection(colId)
-        : null;
+      // Reuse the collection already fetched for this scope. A hierarchy level
+      // change reloads the item page and must not repeat the metadata read.
+      const collection = colId ? (this.boardCollection ?? (await getCollection(colId))) : null;
       if (loadId !== this.#loadId) return; // stale
       // Keep the collection record available to view-scoped controls (shared
       // named views, configure affordances) on every collection view, not just
@@ -424,8 +422,12 @@ class CollectionStore {
         collection,
       });
       this.dataGeneration += 1;
-      // The count is not needed to paint rows; fetch it after they are visible.
-      void this.#requestCollectionTotal();
+      // The count is scope-scoped, not filter-scoped: only a scope change needs
+      // a read. A same-scope reload (level, sub-filter, completed visibility)
+      // keeps the value it already has, and mutations refresh it directly.
+      if (!sameCollection) {
+        void this.#requestCollectionTotal();
+      }
       if (itemsResult && BOARD_VIEWS.has(view)) {
         void this.#loadRemainingBoardItems({
           first: itemsResult,
