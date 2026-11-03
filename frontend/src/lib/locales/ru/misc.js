@@ -87,7 +87,7 @@ export default {
     title: 'Итерации', subtitle: 'Управление итерациями и выпусками', iteration: 'Итерация',
     iterations_one: '{count} итерация', iterations_few: '{count} итерации', iterations_many: '{count} итераций', iterations_other: '{count} итерации',
     createIteration: 'Создать итерацию', editIteration: 'Изменить итерацию', updateIteration: 'Обновить итерацию', deleteIteration: 'Удалить итерацию', startIteration: 'Начать итерацию', completeIteration: 'Завершить итерацию', start: 'Начать',
-    noIterations: 'Итерации не найдены', allTypes: 'Все типы', manageTypes: 'Управление типами', backToIterations: 'Вернуться к итерациям', filterByIteration: 'Фильтр по итерации', addGlobalIteration: 'Добавить итерацию',
+    noIterations: 'Итерации не найдены', allTypes: 'Все типы', manageTypes: 'Управление типами', backToIterations: 'Вернуться к итерациям', filterByIteration: 'Фильтр по итерации', addGlobalIteration: 'Добавить итерацию', showCompletedIterations: 'Показывать завершённые итерации',
     status: { planned: 'Запланирована', active: 'Активна', completed: 'Завершена', cancelled: 'Отменена' },
     statusPlanned: 'Запланирована', statusActive: 'Активна', statusCompleted: 'Завершена', statusCancelled: 'Отменена',
     global: 'Глобальная', local: 'Локальная', thisWorkspace: 'Это рабочее пространство', globalIteration: 'Глобальная итерация', globalIterations: 'Глобальные итерации', globalIterationDescription: 'Видна во всех рабочих пространствах', localIteration: 'Локальная итерация', localIterations: 'Локальные итерации', localIterationDescription: 'Видна только в этом рабочем пространстве', switchTo: 'Переключиться на область «{scope}»', scope: 'Область',

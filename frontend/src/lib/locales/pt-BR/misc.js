@@ -242,6 +242,7 @@ export default {
     backToIterations: 'Voltar para Iterações',
     filterByIteration: 'Filtrar por iteração',
     addGlobalIteration: 'Adicionar Iteração',
+    showCompletedIterations: 'Mostrar iterações concluídas',
 
     // Status
     status: {

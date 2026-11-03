@@ -260,6 +260,7 @@ export default {
     backToIterations: 'Retour aux itérations',
     filterByIteration: 'Filtrer par itération',
     addGlobalIteration: 'Ajouter une itération',
+    showCompletedIterations: 'Afficher les itérations terminées',
 
     // Status
     status: {

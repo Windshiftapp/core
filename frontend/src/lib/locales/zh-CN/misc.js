@@ -240,6 +240,7 @@ export default {
     backToIterations: '返回迭代',
     filterByIteration: '按迭代筛选',
     addGlobalIteration: '添加迭代',
+    showCompletedIterations: '显示已完成的迭代',
 
     // Status
     status: {

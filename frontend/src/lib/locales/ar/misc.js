@@ -260,6 +260,7 @@ export default {
     backToIterations: 'العودة إلى التكرارات',
     filterByIteration: 'التصفية حسب التكرار',
     addGlobalIteration: 'إضافة تكرار',
+    showCompletedIterations: 'إظهار التكرارات المكتملة',
 
     // Status
     status: {

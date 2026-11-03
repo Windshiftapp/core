@@ -13,6 +13,7 @@
   import List from '@lucide/svelte/icons/list';
   import Plus from '@lucide/svelte/icons/plus';
   import EmptyState from '../../components/EmptyState.svelte';
+  import Toggle from '../../components/Toggle.svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
   import ViewHeader from '../../layout/ViewHeader.svelte';
@@ -56,6 +57,10 @@
   let allIterations = $state([]);
   let addedGlobalIds = $state(new Set());
   let collapsedSections = $state(new Set());
+  // Completed and cancelled iterations are terminal, so their sections stay
+  // hidden by default; the toggle mirrors the board's completed-milestone
+  // control and is persisted per view.
+  let showCompletedIterations = $state(false);
   let sectionDropHighlight = $state(new Map()); // iterationId|'unassigned' -> boolean
   let pendingActionItemIds = $state(new Set());
   let pendingStoryPointsItemIds = $state(new Set());
@@ -101,6 +106,23 @@
         if (savedCollapsed) collapsedSections = new Set(JSON.parse(savedCollapsed));
       } catch { /* ignore */ }
     }
+
+    const storedShowCompleted = collectionPreferences.viewStateValue(
+      workspaceId,
+      collectionId,
+      'backlog',
+      'show_completed_iterations'
+    );
+    if (typeof storedShowCompleted === 'boolean') {
+      showCompletedIterations = storedShowCompleted;
+    }
+  }
+
+  function setShowCompletedIterations(value) {
+    showCompletedIterations = value;
+    collectionPreferences.patchViewState(workspaceId, collectionId, 'backlog', {
+      show_completed_iterations: value,
+    });
   }
 
   function persistGlobalIds() {
@@ -116,8 +138,28 @@
   }
 
   // Derived iteration groupings
-  let localIterations = $derived(allIterations.filter(i => !i.is_global));
-  let addedGlobalIterations = $derived(allIterations.filter(i => i.is_global && addedGlobalIds.has(i.id)));
+  function isClosedIteration(iteration) {
+    return iteration?.status === 'completed' || iteration?.status === 'cancelled';
+  }
+
+  let closedIterationIds = $derived(
+    new Set(allIterations.filter(isClosedIteration).map(i => i.id))
+  );
+
+  function isSectionClosed(sectionId) {
+    if (sectionId == null || sectionId === 'unassigned') return false;
+    const id = typeof sectionId === 'string' ? parseInt(sectionId, 10) : sectionId;
+    return closedIterationIds.has(id);
+  }
+
+  let localIterations = $derived(
+    allIterations.filter(i => !i.is_global && (showCompletedIterations || !isClosedIteration(i)))
+  );
+  let addedGlobalIterations = $derived(
+    allIterations.filter(
+      i => i.is_global && addedGlobalIds.has(i.id) && (showCompletedIterations || !isClosedIteration(i))
+    )
+  );
   let assignableIterations = $derived(
     allIterations.filter(i => i.status === 'planned' || i.status === 'active')
   );
@@ -144,7 +186,7 @@
   let availableGlobalIterations = $derived.by(() => {
     const seen = new Set();
     return allIterations.filter(i => {
-      if (!i.is_global || addedGlobalIds.has(i.id) || i.status === 'completed' || i.status === 'cancelled') return false;
+      if (!i.is_global || addedGlobalIds.has(i.id) || isClosedIteration(i)) return false;
       if (seen.has(i.id)) return false;
       seen.add(i.id);
       return true;
@@ -481,7 +523,8 @@
       element,
       canDrop: ({ source }) => {
         const data = /** @type {any} */ (source.data);
-        return data.type === 'work-item' && data.item?.id !== itemId;
+        return data.type === 'work-item' && data.item?.id !== itemId &&
+          !isSectionClosed(element.dataset.sectionId || 'unassigned');
       },
       getData: ({ input, element: targetElement }) => attachClosestEdge(
         { sectionId: element.dataset.sectionId || 'unassigned' },
@@ -529,7 +572,8 @@
     const key = String(iterationId);
     const cleanup = dropTargetForElements({
       element,
-      canDrop: ({ source }) => (/** @type {any} */ (source.data)).type === 'work-item',
+      canDrop: ({ source }) =>
+        (/** @type {any} */ (source.data)).type === 'work-item' && !isSectionClosed(key),
       getData: () => ({ type: 'section-drop', iterationId: key }),
       onDragEnter: ({ source }) => {
         if ((/** @type {any} */ (source.data)).type !== 'work-item') return;
@@ -544,7 +588,7 @@
       },
       onDrop: ({ source }) => {
         const data = /** @type {any} */ (source.data);
-        if (data.type === 'work-item') handleSectionDrop(data.item, key);
+        if (data.type === 'work-item' && !isSectionClosed(key)) handleSectionDrop(data.item, key);
         sectionDropHighlight = new Map();
       },
     });
@@ -591,6 +635,7 @@
   });
 
   async function handleSectionDrop(draggedItem, targetIterationId) {
+    if (isSectionClosed(targetIterationId)) return;
     const dropId = `${draggedItem.id}-section-${targetIterationId}`;
     if (pendingDrops.has(dropId)) return;
     pendingDrops.add(dropId);
@@ -674,8 +719,16 @@
       </div>
 
       <!-- Controls Bar -->
-      <div class="flex items-center mb-6">
+      <div class="flex flex-wrap items-center gap-3 mb-6">
         <SubFilterBar {workspaceId} {collectionId} showCompletionToggle={false} />
+        <Toggle
+          checked={showCompletedIterations}
+          onchange={setShowCompletedIterations}
+          label={t('iterations.showCompletedIterations')}
+          labelPosition="left"
+          size="small"
+          dataTestid="backlog-show-completed-iterations"
+        />
       </div>
 
       {#if backlogItems.length === 0 && visibleIterations.length === 0}
