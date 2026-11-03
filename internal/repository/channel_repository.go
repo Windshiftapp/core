@@ -1589,6 +1589,44 @@ func (r *ChannelRepository) discardEmailReply(ctx context.Context, where string,
 	return EmailReplyNotDiscardable, nil
 }
 
+// CountDiscardableEmailReplies returns how many rows the bulk discard would
+// cancel: pending rows that no worker is currently delivering.
+func (r *ChannelRepository) CountDiscardableEmailReplies(ctx context.Context, channelID int) (int, error) {
+	var total int
+	if err := r.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM email_reply_outbox
+		WHERE channel_id = ?
+		  AND delivered_at IS NULL AND discarded_at IS NULL
+		  AND (lease_owner IS NULL OR next_attempt_at <= CURRENT_TIMESTAMP)
+	`, channelID).Scan(&total); err != nil {
+		return 0, fmt.Errorf("count discardable email_reply_outbox rows: %w", err)
+	}
+	return total, nil
+}
+
+// DiscardPendingEmailReplies marks every pending outbound reply for a channel
+// as never-send in one statement. It is the recovery action after an import or
+// any other event queued a burst of customer mail. Rows a worker is actively
+// delivering keep their lease and are left alone, so an in-flight SMTP send is
+// never misreported as canceled. Returns how many rows were discarded.
+func (r *ChannelRepository) DiscardPendingEmailReplies(ctx context.Context, channelID int) (int64, error) {
+	res, err := r.db.ExecWriteContext(ctx, `
+		UPDATE email_reply_outbox
+		SET discarded_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE channel_id = ?
+		  AND delivered_at IS NULL AND discarded_at IS NULL
+		  AND (lease_owner IS NULL OR next_attempt_at <= CURRENT_TIMESTAMP)
+	`, channelID)
+	if err != nil {
+		return 0, fmt.Errorf("discard pending email_reply_outbox rows: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("count discarded email_reply_outbox rows: %w", err)
+	}
+	return rows, nil
+}
+
 // CreateOAuthState records an in-flight OAuth state for a channel-level
 // OAuth flow. provider_id is NULL (the provider-flow uses non-zero).
 // expiresAt is a hard cutoff the consume call enforces.

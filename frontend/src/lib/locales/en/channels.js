@@ -413,6 +413,12 @@ export default {
       outboxEmpty: 'No customer replies queued',
       outboxFilterPending: 'Pending',
       outboxFilterAll: 'All',
+      outboxDiscardPending: 'Discard all pending ({count})',
+      outboxDiscardPendingTitle: 'Discard all pending customer replies?',
+      outboxDiscardPendingMessage:
+        'This cancels all {count} queued replies for this channel. They stay visible as discarded and nothing is sent. Replies already being delivered cannot be canceled.',
+      outboxDiscardPendingConfirm: 'Discard pending replies',
+      outboxDiscardedCount: 'Discarded {count} queued replies.',
     },
   },
 

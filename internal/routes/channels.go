@@ -36,6 +36,8 @@ func RegisterChannelRoutes(deps *Deps) {
 	api.HandleH("GET /channels/{id}/email-log", channelMgmt(http.HandlerFunc(deps.Channels.Channel.GetEmailLog)))
 	api.HandleH("POST /channels/{id}/email/requeue-rate-limited", channelMgmt(http.HandlerFunc(deps.Channels.Channel.RequeueRateLimitedEmails)))
 	api.HandleH("GET /channels/{id}/email/replies", channelMgmt(http.HandlerFunc(deps.Channels.Channel.ListEmailReplies)))
+	// Bulk recovery after a burst queued a whole channel's pending replies at once.
+	api.HandleH("POST /channels/{id}/email/replies/discard-pending", channelMgmt(http.HandlerFunc(deps.Channels.Channel.DiscardPendingEmailReplies)))
 	api.HandleH("POST /channels/{id}/email/replies/{commentId}/retry", channelMgmt(http.HandlerFunc(deps.Channels.Channel.RetryEmailReply)))
 	api.HandleH("POST /channels/{id}/email/replies/{commentId}/discard", channelMgmt(http.HandlerFunc(deps.Channels.Channel.DiscardEmailReply)))
 	// Row-scoped discard: intake receipts have no comment_id, so a stuck receipt

@@ -1648,11 +1648,20 @@ func (h *ChannelHandler) ListEmailReplies(w http.ResponseWriter, r *http.Request
 		replies = append(replies, reply)
 	}
 
+	// The bulk-discard control reflects what a cancel would actually clear,
+	// so an in-flight delivery never advertises a cancelable row.
+	discardableTotal, err := h.channelRepo.CountDiscardableEmailReplies(ctx, id)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
 	respondJSONOK(w, map[string]any{
-		"replies":   replies,
-		"total":     total,
-		"page":      page,
-		"page_size": pageSize,
+		"replies":           replies,
+		"total":             total,
+		"discardable_total": discardableTotal,
+		"page":              page,
+		"page_size":         pageSize,
 	})
 }
 
@@ -1790,6 +1799,38 @@ func (h *ChannelHandler) DiscardEmailReplyByID(w http.ResponseWriter, r *http.Re
 	respondJSONOK(w, map[string]any{
 		"discarded": true,
 		"reply_id":  replyID,
+	})
+}
+
+// DiscardPendingEmailReplies cancels the channel's whole pending reply queue
+// in one action. It is the recovery path after an import or any other event
+// queued a burst of customer mail: rows a worker is already delivering keep
+// their lease and are not counted.
+// POST /channels/{id}/email/replies/discard-pending
+func (h *ChannelHandler) DiscardPendingEmailReplies(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	id, ok := requireIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	if _, ok := h.requireChannelManageAccess(ctx, w, r, id); !ok {
+		return
+	}
+	if !h.requireReplyOutboxChannel(ctx, w, r, id) {
+		return
+	}
+
+	discarded, err := h.channelRepo.DiscardPendingEmailReplies(ctx, id)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	slog.Info("discarded pending email replies", "channel_id", id, "count", discarded)
+	respondJSONOK(w, map[string]any{
+		"discarded": discarded,
 	})
 }
 

@@ -401,6 +401,11 @@ export default {
       outboxEmpty: 'Ответы заказчикам не ожидаются',
       outboxFilterPending: 'Ожидающие',
       outboxFilterAll: 'Все',
+      outboxDiscardPending: 'Отменить все ожидающие ({count})',
+      outboxDiscardPendingTitle: 'Отменить все ожидающие ответы клиентам?',
+      outboxDiscardPendingMessage: 'Это отменит все {count} ответов, стоящих в очереди для этого канала. Они останутся видимыми как отменённые, и ничего не будет отправлено. Ответы, которые уже доставляются, отменить нельзя.',
+      outboxDiscardPendingConfirm: 'Отменить ожидающие ответы',
+      outboxDiscardedCount: 'Отменено ожидающих ответов: {count}.',
     },
   },
 

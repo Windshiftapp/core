@@ -7,6 +7,7 @@
   import { formatDateSimple } from '../utils/dateFormatter.js';
   import Modal from './Modal.svelte';
   import ModalHeader from './ModalHeader.svelte';
+  import ConfirmDialog from './ConfirmDialog.svelte';
   import Button from '../components/Button.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import DataTable from '../components/DataTable.svelte';
@@ -39,6 +40,9 @@
   let outboxError = $state(null);
   let outboxPage = $state(1);
   let actingReplyID = $state(null);
+  let bulkDiscardOpen = $state(false);
+  let bulkDiscarding = $state(false);
+  let outboxNotice = $state(null);
 
   const debouncedSearch = useDebounce(() => {
     page = 1;
@@ -50,6 +54,7 @@
       search = '';
       page = 1;
       outboxPage = 1;
+      outboxNotice = null;
       untrack(() => {
         loadLog();
         loadOutbox();
@@ -228,6 +233,25 @@
       outboxError = err.message || 'Failed to discard customer reply';
     } finally {
       actingReplyID = null;
+    }
+  }
+
+  // Bulk recovery after an import or any other burst queued a whole channel's
+  // pending replies at once.
+  async function discardPendingReplies() {
+    if (bulkDiscarding) return;
+    try {
+      bulkDiscarding = true;
+      outboxNotice = null;
+      const result = await channels.discardPendingEmailReplies(channel.id);
+      outboxNotice = t('channel.emailLog.outboxDiscardedCount', { count: result.discarded ?? 0 });
+      await loadOutbox();
+    } catch (err) {
+      console.error('Failed to discard pending customer replies:', err);
+      outboxError = err.message || 'Failed to discard pending customer replies';
+    } finally {
+      bulkDiscarding = false;
+      bulkDiscardOpen = false;
     }
   }
 
@@ -475,17 +499,36 @@
           <div class="text-sm" style="color: var(--ds-text-subtle);">
             {t('channel.emailLog.outboxDescription')}
           </div>
-          <div data-testid="email-outbox-status-filter">
-            <SelectField
-              label=""
-              labelColor="default"
-              options={outboxStatusOptions}
-              bind:value={outboxStatus}
-              onchange={onOutboxStatusChange}
-              ariaLabel={t('channel.emailLog.outboxStatus')}
-            />
+          <div class="flex items-center gap-2">
+            {#if outboxData.discardable_total > 0}
+              <Button
+                onclick={() => (bulkDiscardOpen = true)}
+                variant="danger"
+                size="small"
+                disabled={bulkDiscarding}
+                dataTestid="email-outbox-discard-pending"
+              >
+                {t('channel.emailLog.outboxDiscardPending', { count: outboxData.discardable_total })}
+              </Button>
+            {/if}
+            <div data-testid="email-outbox-status-filter">
+              <SelectField
+                label=""
+                labelColor="default"
+                options={outboxStatusOptions}
+                bind:value={outboxStatus}
+                onchange={onOutboxStatusChange}
+                ariaLabel={t('channel.emailLog.outboxStatus')}
+              />
+            </div>
           </div>
         </div>
+
+        {#if outboxNotice}
+          <div class="mb-4 rounded p-2 text-xs" style="background: var(--ds-surface-success, rgba(22, 163, 74, 0.1)); color: var(--ds-text-success, var(--ds-text));" data-testid="email-outbox-notice">
+            {outboxNotice}
+          </div>
+        {/if}
 
         {#if outboxData.replies.length === 0}
           <EmptyState
@@ -592,4 +635,14 @@
     </div>
     {/if}
   </div>
+
+  <ConfirmDialog
+    bind:show={bulkDiscardOpen}
+    variant="danger"
+    title={t('channel.emailLog.outboxDiscardPendingTitle')}
+    message={t('channel.emailLog.outboxDiscardPendingMessage', { count: outboxData?.discardable_total ?? 0 })}
+    confirmText={t('channel.emailLog.outboxDiscardPendingConfirm')}
+    testIdPrefix="email-outbox-discard-pending-dialog"
+    onconfirm={discardPendingReplies}
+  />
 </Modal>
