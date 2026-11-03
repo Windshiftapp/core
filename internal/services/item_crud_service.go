@@ -31,6 +31,7 @@ type ItemCRUDService struct {
 	repo                  *repository.ItemRepository
 	workspaceRepo         *repository.WorkspaceRepository
 	integrationLinkGuards *IntegrationLinkGuards
+	itemCache             *ItemCacheService
 }
 
 // NewItemCRUDService creates a new item CRUD service
@@ -41,6 +42,14 @@ func NewItemCRUDService(db database.Database) *ItemCRUDService {
 		workspaceRepo:         repository.NewWorkspaceRepository(db),
 		integrationLinkGuards: NewIntegrationLinkGuards(db),
 	}
+}
+
+// WithCache makes effective-project resolution read through the shared item
+// cache instead of walking the parent chain on every read. A nil cache keeps
+// the uncached resolver.
+func (s *ItemCRUDService) WithCache(cache *ItemCacheService) *ItemCRUDService {
+	s.itemCache = cache
+	return s
 }
 
 // GetByID retrieves an item by ID with all details
@@ -851,24 +860,15 @@ func (s *ItemCRUDService) GetWithEffectiveProject(id int) (*models.Item, error) 
 		return nil, err
 	}
 
-	// Resolve the effective project through the canonical resolver so this
-	// shares the single source of truth with the item handler and the cache
-	// (it keys off the inherit_project boolean and stops at the first ancestor
-	// with a direct project).
-	res, err := s.repo.ResolveEffectiveProject(id)
+	// Resolve the effective project through the shared cache when one is wired,
+	// so a repeat read does not re-walk the parent chain. The cache and the
+	// uncached path share ResolveEffectiveProject as the single source of truth.
+	effectiveProjectID, inheritanceMode, err := s.resolveEffectiveProject(id)
 	if err != nil {
 		return nil, err
 	}
-	switch {
-	case res.DirectProjectID == nil && !res.InheritProject:
-		item.ProjectInheritanceMode = "none"
-	case res.InheritProject:
-		item.EffectiveProjectID = res.EffectiveProjectID
-		item.ProjectInheritanceMode = "inherit"
-	default:
-		item.EffectiveProjectID = res.EffectiveProjectID
-		item.ProjectInheritanceMode = "direct"
-	}
+	item.EffectiveProjectID = effectiveProjectID
+	item.ProjectInheritanceMode = inheritanceMode
 
 	// Populate the effective project name when one resolved.
 	if item.EffectiveProjectID != nil {
@@ -886,6 +886,26 @@ func (s *ItemCRUDService) GetWithEffectiveProject(id int) (*models.Item, error) 
 	}
 
 	return item, nil
+}
+
+// resolveEffectiveProject returns (effective_project_id, mode, error) for an
+// item, preferring the shared cache when one is wired.
+func (s *ItemCRUDService) resolveEffectiveProject(id int) (effectiveProjectID *int, inheritanceMode string, err error) {
+	if s.itemCache != nil {
+		return s.itemCache.GetEffectiveProjectForItem(id)
+	}
+	res, err := s.repo.ResolveEffectiveProject(id)
+	if err != nil {
+		return nil, "", err
+	}
+	switch {
+	case res.DirectProjectID == nil && !res.InheritProject:
+		return nil, "none", nil
+	case res.InheritProject:
+		return res.EffectiveProjectID, "inherit", nil
+	default:
+		return res.EffectiveProjectID, "direct", nil
+	}
 }
 
 // GetHistory retrieves the change history for an item, with actor names
