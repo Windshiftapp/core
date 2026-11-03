@@ -62,6 +62,7 @@ func mergeItemEventMetadata(metadata, fallback itemevents.Metadata) itemevents.M
 	if metadata.Automation == nil {
 		metadata.Automation = fallback.Automation
 	}
+	metadata.SuppressSideEffects = metadata.SuppressSideEffects || fallback.SuppressSideEffects
 	return metadata
 }
 

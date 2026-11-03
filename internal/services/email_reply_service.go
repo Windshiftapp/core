@@ -16,6 +16,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/emailutil"
+	"windshift/internal/itemevents"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/smtp"
@@ -74,7 +75,7 @@ func (s *EmailReplyService) handleCommentCreated(params HandleCommentParams, del
 
 	// Guard: imported comments are historical. Emailing them would send the
 	// whole archive to every customer on the ticket as if it were written now.
-	if params.SourceKind == "import" {
+	if itemevents.IsImportOrigin(params.ActorKind, params.SourceKind) {
 		return nil
 	}
 

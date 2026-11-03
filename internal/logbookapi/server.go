@@ -28,13 +28,12 @@ var errMissingMainServerSecret = errors.New("logbook: MainServerSecret (SSO_SECR
 
 // ServerConfig holds configuration for the logbook server.
 type ServerConfig struct {
-	Port                   string
-	StoragePath            string
-	LLMEndpoint            string
-	MainServerURL          string
-	MainServerSecret       string
-	BaseURL                string
-	ActivateDurableActions bool
+	Port             string
+	StoragePath      string
+	LLMEndpoint      string
+	MainServerURL    string
+	MainServerSecret string
+	BaseURL          string
 }
 
 // Server represents the logbook HTTP server.
@@ -81,7 +80,7 @@ func NewServer(db database.Database, cfg ServerConfig, articleClient llm.Client)
 	actionRepo := repository.NewLogbookActionRepository(db)
 	actionService := logbook.NewLogbookActionService(db, actionRepo, cfg.MainServerURL, cfg.MainServerSecret, cfg.BaseURL)
 	eventEngine := events.NewEngine(db, events.DefaultConfig())
-	if err := logbook.PrepareDurableLogbookActionEngine(context.Background(), eventEngine, actionService, cfg.ActivateDurableActions); err != nil {
+	if err := logbook.PrepareDurableLogbookActionEngine(context.Background(), eventEngine, actionService); err != nil {
 		actionService.Stop()
 		return nil, err
 	}

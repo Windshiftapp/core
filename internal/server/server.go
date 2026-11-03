@@ -585,7 +585,7 @@ func (s *Server) initialize() error {
 	s.actionService = services.NewActionService(s.db, services.DefaultActionServiceConfig(), chainStore)
 	s.actionService.SetNotificationService(s.notificationService)
 	s.actionService.SetPermissionService(permService)
-	if err := services.PrepareDurableActionEngine(context.Background(), s.eventEngine, s.actionService, cfg.ActivateDurableActions); err != nil {
+	if err := services.PrepareDurableActionEngine(context.Background(), s.eventEngine, s.actionService); err != nil {
 		return fmt.Errorf("prepare durable action consumers: %w", err)
 	}
 	slog.Info("action service initialized")
@@ -593,7 +593,7 @@ func (s *Server) initialize() error {
 	s.assetActionService = services.NewAssetActionService(s.db, services.DefaultActionServiceConfig(), chainStore)
 	s.assetActionService.SetNotificationService(s.notificationService)
 	s.assetActionService.SetPermissionService(permService)
-	if err := services.PrepareDurableAssetActionEngine(context.Background(), s.eventEngine, s.assetActionService, cfg.ActivateDurableAssetActions); err != nil {
+	if err := services.PrepareDurableAssetActionEngine(context.Background(), s.eventEngine, s.assetActionService); err != nil {
 		return fmt.Errorf("prepare durable asset action consumers: %w", err)
 	}
 	slog.Info("asset action service initialized")

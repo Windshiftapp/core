@@ -12,7 +12,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"windshift/internal/database"
@@ -51,9 +50,8 @@ type LogbookActionService struct {
 	actionCache map[string][]*models.LogbookAction
 	cacheMu     sync.RWMutex
 
-	durableIngress *DurableLogbookActionIngress
-	stopChan       chan struct{}
-	wg             sync.WaitGroup
+	stopChan chan struct{}
+	wg       sync.WaitGroup
 
 	// Statistics
 	eventsProcessed int64
@@ -70,7 +68,6 @@ func NewLogbookActionService(db database.Database, repo *repository.LogbookActio
 		mainServerSecret: mainServerSecret,
 		baseURL:          baseURL,
 		actionCache:      make(map[string][]*models.LogbookAction),
-		durableIngress:   NewDurableLogbookActionIngress(db),
 		stopChan:         make(chan struct{}),
 	}
 
@@ -88,22 +85,6 @@ func NewLogbookActionService(db database.Database, repo *repository.LogbookActio
 	slog.Info("logbook action service initialized", slog.String("component", "logbook-actions"))
 
 	return service
-}
-
-// EmitEvent durably admits a compatibility trigger before canonical cutover.
-func (s *LogbookActionService) EmitEvent(event *models.LogbookActionEvent) {
-	if event == nil {
-		return
-	}
-	if err := s.durableIngress.Emit(context.Background(), event); err != nil {
-		slog.Error("failed to persist logbook action event",
-			slog.String("component", "logbook-actions"),
-			slog.String("event_type", string(event.EventType)),
-			slog.String("bucket_id", event.BucketID),
-			slog.Any("error", err),
-		)
-		atomic.AddInt64(&s.errors, 1)
-	}
 }
 
 // ExecuteActionDirectly loads an action by ID and executes it with the given event.

@@ -81,13 +81,12 @@ func main() {
 
 	// Create and start logbook server
 	srvCfg := logbookapi.ServerConfig{
-		Port:                   cfg.Port,
-		StoragePath:            cfg.StoragePath,
-		LLMEndpoint:            cfg.LLMEndpoint,
-		MainServerURL:          cfg.MainServerURL,
-		MainServerSecret:       cfg.MainServerSecret,
-		BaseURL:                cfg.BaseURL,
-		ActivateDurableActions: cfg.ActivateDurableActions,
+		Port:             cfg.Port,
+		StoragePath:      cfg.StoragePath,
+		LLMEndpoint:      cfg.LLMEndpoint,
+		MainServerURL:    cfg.MainServerURL,
+		MainServerSecret: cfg.MainServerSecret,
+		BaseURL:          cfg.BaseURL,
 	}
 
 	srv, err := logbookapi.NewServer(db, srvCfg, articleClient)

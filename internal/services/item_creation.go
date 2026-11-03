@@ -25,6 +25,9 @@ type itemCreation struct {
 	updatedAt  time.Time
 	statusID   *int
 	priorityID *int
+	// eventMetadata is the merged provenance recorded with the creation fact.
+	// finish() consults it so import-origin writes never start an agent run.
+	eventMetadata itemevents.Metadata
 }
 
 func prepareItemCreation(ctx context.Context, db database.Database, params ItemCreationParams) (*itemCreation, error) {
@@ -345,6 +348,7 @@ func (c *itemCreation) recordCreation(tx database.Tx, itemID, itemNumber int) er
 		return err
 	}
 	metadata := itemCreateEventMetadata(c.params, c.createdAt)
+	c.eventMetadata = metadata
 	creatorUserID := 0
 	if c.params.CreatorID != nil {
 		creatorUserID = *c.params.CreatorID
@@ -399,7 +403,11 @@ func decodeItemEventFields(raw, name string) (map[string]any, error) {
 func (c *itemCreation) finish(itemID int) {
 	p := c.params
 	maybeRecordPortalThreadAnchor(c.db, int64(itemID), p.ChannelID, p.CreatorPortalCustomerID, p.Title)
-	if !p.SkipAssigneeTrigger && p.AssigneeID != nil {
+	// A bulk import of pre-assigned items must not start one agent run per row.
+	// The import marker on the creation fact is authoritative, so a caller that
+	// forgets SkipAssigneeTrigger is still safe.
+	if !p.SkipAssigneeTrigger && p.AssigneeID != nil &&
+		!itemevents.IsImportOrigin(c.eventMetadata.ActorKind, c.eventMetadata.SourceKind) {
 		triggeredBy := p.ValidatingUserID
 		if triggeredBy == 0 && p.CreatorID != nil {
 			triggeredBy = *p.CreatorID

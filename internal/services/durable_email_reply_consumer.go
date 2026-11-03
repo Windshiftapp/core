@@ -77,6 +77,7 @@ func (c *DurableEmailReplyConsumer) Handle(ctx context.Context, event events.Eve
 	}
 	return c.replies.handleCommentCreated(HandleCommentParams{
 		CommentID: int(payload.CommentID), ItemID: payload.ItemID,
-		AuthorID: *payload.AuthorID, Content: content, SourceKind: event.SourceKind,
+		AuthorID: *payload.AuthorID, Content: content,
+		SourceKind: event.SourceKind, ActorKind: event.ActorKind,
 	}, false)
 }

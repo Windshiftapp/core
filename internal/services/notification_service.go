@@ -46,6 +46,11 @@ type NotificationEvent struct {
 	ReferencedWorkspacePermission string         // Permission required to receive secondary-entity data
 	ReferencedEntityType          string         // Entity whose rendered data requires independent authorization
 	ReferencedEntityID            int            // Referenced entity ID
+	// ActorKind/SourceKind preserve provenance on the durable side-effect event
+	// so consumers can apply the same import and suppression rules as canonical
+	// domain facts. Empty defaults to system/side_effect.
+	ActorKind  string
+	SourceKind string
 }
 
 // RuleCache stores cached notification rules for fast lookup

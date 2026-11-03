@@ -21,15 +21,14 @@ func LoadLogbookSidecar() LogbookSidecarConfig {
 	}
 
 	return LogbookSidecarConfig{
-		PostgresConn:           pgConn,
-		Port:                   firstNonEmpty(os.Getenv("LOGBOOK_PORT"), "8090"),
-		StoragePath:            firstNonEmpty(os.Getenv("LOGBOOK_STORAGE_PATH"), "/data/logbook"),
-		LLMEndpoint:            os.Getenv("LLM_ENDPOINT"),
-		ArticleEndpoint:        os.Getenv("LOGBOOK_ARTICLE_ENDPOINT"),
-		MainServerURL:          os.Getenv("WINDSHIFT_URL"),
-		MainServerSecret:       os.Getenv("SSO_SECRET"),
-		BaseURL:                os.Getenv("BASE_URL"),
-		ActivateDurableActions: parseBoolEnv("LOGBOOK_ACTIVATE_DURABLE_ACTIONS"),
+		PostgresConn:     pgConn,
+		Port:             firstNonEmpty(os.Getenv("LOGBOOK_PORT"), "8090"),
+		StoragePath:      firstNonEmpty(os.Getenv("LOGBOOK_STORAGE_PATH"), "/data/logbook"),
+		LLMEndpoint:      os.Getenv("LLM_ENDPOINT"),
+		ArticleEndpoint:  os.Getenv("LOGBOOK_ARTICLE_ENDPOINT"),
+		MainServerURL:    os.Getenv("WINDSHIFT_URL"),
+		MainServerSecret: os.Getenv("SSO_SECRET"),
+		BaseURL:          os.Getenv("BASE_URL"),
 		Logging: LoggingConfig{
 			Level:  firstNonEmpty(os.Getenv("LOG_LEVEL"), "info"),
 			Format: firstNonEmpty(os.Getenv("LOG_FORMAT"), "text"),

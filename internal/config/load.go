@@ -25,46 +25,44 @@ import (
 func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 	// Flag definitions mirror the historic main.go flags verbatim.
 	var (
-		portFlag                    = flag.String("port", "8080", "Port to run the HTTP server on")
-		portShort                   = flag.String("p", "8080", "Port to run the HTTP server on (shorthand)")
-		dbPath                      = flag.String("db", "windshift.db", "Database file path (SQLite)")
-		postgresConn                = flag.String("postgres-connection-string", "", "PostgreSQL connection string")
-		postgresConnShort           = flag.String("pg-conn", "", "PostgreSQL connection string (shorthand)")
-		attachmentPath              = flag.String("attachment-path", "", "Path to store attachments")
-		disableCSRF                 = flag.Bool("no-csrf", false, "Disable CSRF protection (development only)")
-		allowLocalConnections       = flag.Bool("allow-local-connections", true, "Allow server-side HTTP clients (SCM, Jira, LLM, webhooks) to reach loopback/private IPs; set to false to block local connections")
-		allowedHosts                = flag.String("allowed-hosts", "", "Comma-separated allowed hostnames for CSRF")
-		allowedPort                 = flag.String("allowed-port", "", "Port for CORS/WebAuthn trusted origins")
-		useProxy                    = flag.Bool("use-proxy", false, "Enable proxy mode (trust X-Forwarded-Proto from private IPs)")
-		allowInsecureHTTP           = flag.Bool("allow-insecure-http", false, "Allow browser access via plain http on non-localhost origins — trusted LANs/testing only")
-		baseURL                     = flag.String("base-url", "", "Public URL for the server")
-		contextPath                 = flag.String("context-path", "", "Public context path to serve Windshift under, e.g. /windshift")
-		additionalProxies           = flag.String("additional-proxies", "", "Additional proxy IPs to trust")
-		enableSSH                   = flag.Bool("ssh", false, "Enable SSH TUI server")
-		enableMCP                   = flag.Bool("mcp", false, "Enable MCP server at /mcp")
-		sshPort                     = flag.String("ssh-port", "23234", "SSH server port")
-		sshHost                     = flag.String("ssh-host", "localhost", "SSH server host")
-		sshKeyPath                  = flag.String("ssh-key", ".ssh/windshift_host_key", "SSH host key file path")
-		maxReadConns                = flag.Int("max-read-conns", 30, "Max read connections (per pool; sum across pools × replicas must stay under Postgres max_connections)")
-		postgresReplicaCount        = flag.Int("postgres-replica-count", 1, "Number of Windshift replicas sharing PostgreSQL for aggregate pool budgeting")
-		postgresHeadroom            = flag.Int("postgres-connection-headroom", 10, "PostgreSQL connections reserved for migrations, administration, and other clients")
-		maxUserConcurrency          = flag.Int("max-user-concurrency", 16, "Max simultaneous in-flight /api requests per authenticated user (0 disables)")
-		maxTemplateSeedItems        = flag.Int("max-template-seed-items", 1000, "Maximum seed items copied when creating a workspace from a template")
-		maxWriteConns               = flag.Int("max-write-conns", 1, "Max write connections")
-		dbRequestTimeout            = flag.Duration("db-request-timeout", 12*time.Second, "Maximum database-work duration for ordinary HTTP requests")
-		logLevel                    = flag.String("log-level", "info", "Log level (debug, info, warn, error)")
-		logFormat                   = flag.String("log-format", "text", "Log format (text, json, logfmt)")
-		tlsCertPath                 = flag.String("tls-cert", "", "TLS certificate file path")
-		tlsKeyPath                  = flag.String("tls-key", "", "TLS key file path")
-		disablePlugins              = flag.Bool("disable-plugins", false, "Disable the plugin system")
-		disableIPRateLimit          = flag.Bool("disable-ip-rate-limit", false, "Disable IP-based rate limiting")
-		enableAdminFallback         = flag.Bool("enable-fallback", false, "Enable admin password fallback")
-		enableCodingAgent           = flag.Bool("enable-coding-agent", false, "Enable the coding-agent harness")
-		activateDurableActions      = flag.Bool("activate-durable-actions", false, "Record the one-way cutover to canonical durable item actions")
-		activateDurableAssetActions = flag.Bool("activate-durable-asset-actions", false, "Record the one-way cutover to canonical durable asset actions")
-		llmProvidersFile            = flag.String("llm-providers", "", "Path to custom LLM providers JSON file")
-		aiPromptsDir                = flag.String("ai-prompts-dir", "", "Directory of custom AI prompt override files")
-		memoryLimitMB               = flag.Int("memory-limit-mb", DefaultMemoryLimitMB, "Total Windshift process memory budget in MiB")
+		portFlag              = flag.String("port", "8080", "Port to run the HTTP server on")
+		portShort             = flag.String("p", "8080", "Port to run the HTTP server on (shorthand)")
+		dbPath                = flag.String("db", "windshift.db", "Database file path (SQLite)")
+		postgresConn          = flag.String("postgres-connection-string", "", "PostgreSQL connection string")
+		postgresConnShort     = flag.String("pg-conn", "", "PostgreSQL connection string (shorthand)")
+		attachmentPath        = flag.String("attachment-path", "", "Path to store attachments")
+		disableCSRF           = flag.Bool("no-csrf", false, "Disable CSRF protection (development only)")
+		allowLocalConnections = flag.Bool("allow-local-connections", true, "Allow server-side HTTP clients (SCM, Jira, LLM, webhooks) to reach loopback/private IPs; set to false to block local connections")
+		allowedHosts          = flag.String("allowed-hosts", "", "Comma-separated allowed hostnames for CSRF")
+		allowedPort           = flag.String("allowed-port", "", "Port for CORS/WebAuthn trusted origins")
+		useProxy              = flag.Bool("use-proxy", false, "Enable proxy mode (trust X-Forwarded-Proto from private IPs)")
+		allowInsecureHTTP     = flag.Bool("allow-insecure-http", false, "Allow browser access via plain http on non-localhost origins — trusted LANs/testing only")
+		baseURL               = flag.String("base-url", "", "Public URL for the server")
+		contextPath           = flag.String("context-path", "", "Public context path to serve Windshift under, e.g. /windshift")
+		additionalProxies     = flag.String("additional-proxies", "", "Additional proxy IPs to trust")
+		enableSSH             = flag.Bool("ssh", false, "Enable SSH TUI server")
+		enableMCP             = flag.Bool("mcp", false, "Enable MCP server at /mcp")
+		sshPort               = flag.String("ssh-port", "23234", "SSH server port")
+		sshHost               = flag.String("ssh-host", "localhost", "SSH server host")
+		sshKeyPath            = flag.String("ssh-key", ".ssh/windshift_host_key", "SSH host key file path")
+		maxReadConns          = flag.Int("max-read-conns", 30, "Max read connections (per pool; sum across pools × replicas must stay under Postgres max_connections)")
+		postgresReplicaCount  = flag.Int("postgres-replica-count", 1, "Number of Windshift replicas sharing PostgreSQL for aggregate pool budgeting")
+		postgresHeadroom      = flag.Int("postgres-connection-headroom", 10, "PostgreSQL connections reserved for migrations, administration, and other clients")
+		maxUserConcurrency    = flag.Int("max-user-concurrency", 16, "Max simultaneous in-flight /api requests per authenticated user (0 disables)")
+		maxTemplateSeedItems  = flag.Int("max-template-seed-items", 1000, "Maximum seed items copied when creating a workspace from a template")
+		maxWriteConns         = flag.Int("max-write-conns", 1, "Max write connections")
+		dbRequestTimeout      = flag.Duration("db-request-timeout", 12*time.Second, "Maximum database-work duration for ordinary HTTP requests")
+		logLevel              = flag.String("log-level", "info", "Log level (debug, info, warn, error)")
+		logFormat             = flag.String("log-format", "text", "Log format (text, json, logfmt)")
+		tlsCertPath           = flag.String("tls-cert", "", "TLS certificate file path")
+		tlsKeyPath            = flag.String("tls-key", "", "TLS key file path")
+		disablePlugins        = flag.Bool("disable-plugins", false, "Disable the plugin system")
+		disableIPRateLimit    = flag.Bool("disable-ip-rate-limit", false, "Disable IP-based rate limiting")
+		enableAdminFallback   = flag.Bool("enable-fallback", false, "Enable admin password fallback")
+		enableCodingAgent     = flag.Bool("enable-coding-agent", false, "Enable the coding-agent harness")
+		llmProvidersFile      = flag.String("llm-providers", "", "Path to custom LLM providers JSON file")
+		aiPromptsDir          = flag.String("ai-prompts-dir", "", "Directory of custom AI prompt override files")
+		memoryLimitMB         = flag.Int("memory-limit-mb", DefaultMemoryLimitMB, "Total Windshift process memory budget in MiB")
 	)
 	flag.Parse()
 
@@ -306,15 +304,13 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 		Memory:  MemoryConfig{LimitMB: resolvedMemoryLimitMB},
 		Storage: storageConfig,
 
-		AttachmentPath:              attachPath,
-		EnableAdminFallback:         adminFallbackEnabled,
-		DisableIPRateLimit:          ipRateLimitDisabled,
-		MaxUserConcurrency:          parseIntEnv("MAX_USER_CONCURRENCY", *maxUserConcurrency),
-		MaxTemplateSeedItems:        parseIntEnv("MAX_TEMPLATE_SEED_ITEMS", *maxTemplateSeedItems),
-		MCPEnabled:                  mcpEnabled,
-		RecoverUser:                 os.Getenv("RECOVER_USER"),
-		ActivateDurableActions:      *activateDurableActions || parseBoolEnv("WINDSHIFT_ACTIVATE_DURABLE_ACTIONS"),
-		ActivateDurableAssetActions: *activateDurableAssetActions || parseBoolEnv("WINDSHIFT_ACTIVATE_DURABLE_ASSET_ACTIONS"),
+		AttachmentPath:       attachPath,
+		EnableAdminFallback:  adminFallbackEnabled,
+		DisableIPRateLimit:   ipRateLimitDisabled,
+		MaxUserConcurrency:   parseIntEnv("MAX_USER_CONCURRENCY", *maxUserConcurrency),
+		MaxTemplateSeedItems: parseIntEnv("MAX_TEMPLATE_SEED_ITEMS", *maxTemplateSeedItems),
+		MCPEnabled:           mcpEnabled,
+		RecoverUser:          os.Getenv("RECOVER_USER"),
 
 		MetricsToken: os.Getenv("WINDSHIFT_METRICS_TOKEN"),
 

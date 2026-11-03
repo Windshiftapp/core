@@ -1058,6 +1058,11 @@ type ActionEvent struct {
 	// trigger across cascades. Customer-visible nodes must not emit
 	// outward-facing output when it is set.
 	TriggerCommentIsPrivate bool `json:"trigger_comment_is_private,omitempty"`
+	// ActorKind/SourceKind preserve provenance on the durable side-effect event
+	// so consumers can apply the same import and suppression rules as canonical
+	// domain facts. Empty defaults to system/side_effect.
+	ActorKind  string `json:"actor_kind,omitempty"`
+	SourceKind string `json:"source_kind,omitempty"`
 }
 
 // ExecutionContext holds context during action execution

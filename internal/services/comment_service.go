@@ -45,9 +45,11 @@ type HandleCommentParams struct {
 	PortalCustomerID *int
 	Content          string
 	IsPrivate        bool
-	// SourceKind identifies the write path that created the comment. The
-	// reply service never emails comments written by a historical import.
+	// SourceKind and ActorKind identify the write path that created the
+	// comment. The reply service never emails comments written by a historical
+	// import, whichever field carries the import marker.
 	SourceKind string
+	ActorKind  string
 }
 
 const (
@@ -472,9 +474,11 @@ func (s *CommentService) CreateContext(ctx context.Context, params CreateComment
 
 // CreateImported creates a comment from an external system without rejecting
 // the surrounding import when its source needs UTF-8 repair or truncation.
-// Imported comments are historical, so every live side effect (notifications,
-// mentions, webhooks, automation, and customer email) is suppressed; the
-// import records its own history and timeline facts directly. (GH #439)
+// Imported comments are historical, so live side effects (notifications,
+// mentions, webhooks, automation, customer email, per-comment audit, and
+// activity tracking) are suppressed; the canonical fact and the support
+// first-response metric are still recorded so imported history stays accurate.
+// (GH #439)
 func (s *CommentService) CreateImported(params CreateCommentParams) (*CreateCommentResult, error) {
 	params.Content = normalizeImportedCommentSource(params.Content)
 	if params.EventMetadata.SourceKind == "" {
@@ -565,6 +569,10 @@ func (s *CommentService) create(ctx context.Context, params CreateCommentParams)
 	}
 	fallback.OccurredAt = now
 	metadata := mergeItemEventMetadata(params.EventMetadata, fallback)
+	// Imported comments are historical. They keep the canonical fact and the
+	// support first-response metric, but must not drive live operational side
+	// effects such as per-comment audit entries or presence tracking.
+	importOrigin := itemevents.IsImportOrigin(metadata.ActorKind, metadata.SourceKind)
 	if _, err := itemevents.NewRecorder(s.db).CommentCreated(ctx, tx, item.WorkspaceID, itemevents.CommentCreatedV1{
 		ItemID: params.ItemID, CommentID: commentID, AuthorID: authorID,
 		PortalCustomerID: params.PortalCustomerID, IsPrivate: params.IsPrivate,
@@ -583,8 +591,10 @@ func (s *CommentService) create(ctx context.Context, params CreateCommentParams)
 
 	// Agent replies on customer-facing tickets are the helpdesk communication
 	// history (WI-1142); internal notes, internal items, and portal replies
-	// are not audited here.
-	if isPublicAgentComment(params.IsPrivate, params.AuthorID, params.PortalCustomerID) &&
+	// are not audited here. Imported comments are historical and are recorded
+	// by the import job's own audit entry instead.
+	if !importOrigin &&
+		isPublicAgentComment(params.IsPrivate, params.AuthorID, params.PortalCustomerID) &&
 		(item.ChannelID != nil || item.CreatorPortalCustomerID != nil) {
 		commentID := int(commentID)
 		emitServiceAudit(s.db, AuditActor{UserID: params.ActorUserID, Username: ""},
@@ -594,8 +604,9 @@ func (s *CommentService) create(ctx context.Context, params CreateCommentParams)
 			})
 	}
 
-	// 4. Track activity (if activityTracker != nil)
-	if s.activityTracker != nil {
+	// 4. Track activity (if activityTracker != nil). Imports do not make their
+	// historical authors look currently active.
+	if s.activityTracker != nil && !importOrigin {
 		if err := s.activityTracker.TrackItemActivity(params.ActorUserID, params.ItemID, ActivityComment); err != nil {
 			// Don't fail the request if activity tracking fails, just log it
 			slog.Warn("failed to track comment activity",
@@ -758,6 +769,7 @@ func (s *CommentService) create(ctx context.Context, params CreateCommentParams)
 				Content:          params.Content,
 				IsPrivate:        params.IsPrivate,
 				SourceKind:       metadata.SourceKind,
+				ActorKind:        metadata.ActorKind,
 			}); err != nil {
 				slog.Warn("failed to handle email reply for comment",
 					slog.String("component", "comment_service"),

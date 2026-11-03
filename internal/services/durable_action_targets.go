@@ -35,6 +35,10 @@ func handleDurableActionEvent[T any](
 	if itemevents.IsImportOrigin(event.ActorKind, event.SourceKind) {
 		return nil
 	}
+	// Machine-driven writes can opt out of live side effects explicitly.
+	if itemevents.SuppressesSideEffects(event.Type, event.Payload) {
+		return nil
+	}
 	actionEvent, consumerKey, err := decode(event)
 	if err != nil {
 		return events.Permanent(err)

@@ -152,14 +152,14 @@ type AssetService struct {
 	db            database.Database
 	repo          *repository.AssetRepository
 	eventRecorder assetEventRecorder
-	compatibility *DurableAssetActionIngress
+	sideEffect    *DurableAssetActionIngress
 }
 
 // NewAssetService constructs an AssetService backed by the given repository.
 func NewAssetService(db database.Database, repo *repository.AssetRepository) *AssetService {
 	return &AssetService{
 		db: db, repo: repo, eventRecorder: assetevents.NewRecorder(db),
-		compatibility: NewDurableAssetActionIngress(db),
+		sideEffect: NewDurableAssetActionIngress(db),
 	}
 }
 
@@ -177,11 +177,11 @@ func (s *AssetService) events() assetEventRecorder {
 	return s.eventRecorder
 }
 
-func (s *AssetService) compatibilityEvents() *DurableAssetActionIngress {
-	if s.compatibility == nil {
+func (s *AssetService) sideEffectEvents() *DurableAssetActionIngress {
+	if s.sideEffect == nil {
 		return NewDurableAssetActionIngress(s.db)
 	}
-	return s.compatibility
+	return s.sideEffect
 }
 
 // ValidateActionTaxonomyReferences rejects asset action nodes whose taxonomy
@@ -274,7 +274,7 @@ func assetEventSnapshot(assetID, setID, assetTypeID int, categoryID, statusID *i
 	}
 }
 
-func assetCompatibilityEvent(eventType models.AssetActionTriggerType, snapshot assetevents.AssetSnapshot, actorUserID int, oldValues, newValues map[string]any, automation AssetAutomationContext) *models.AssetActionEvent {
+func assetActionEvent(eventType models.AssetActionTriggerType, snapshot assetevents.AssetSnapshot, actorUserID int, oldValues, newValues map[string]any, automation AssetAutomationContext) *models.AssetActionEvent {
 	return &models.AssetActionEvent{
 		EventType: eventType, SetID: snapshot.SetID, AssetID: snapshot.ID, ActorUserID: actorUserID,
 		OldValues: oldValues, NewValues: newValues,
@@ -729,7 +729,7 @@ func (s *AssetService) CreateAssetWithContext(actor AuditActor, in repository.Cr
 		if err != nil {
 			return err
 		}
-		return s.compatibilityEvents().EmitInTx(stdctx.Background(), tx, assetCompatibilityEvent(
+		return s.sideEffectEvents().EmitInTx(stdctx.Background(), tx, assetActionEvent(
 			models.AssetTriggerAssetCreated, snapshot, actor.UserID, nil, newValues, context,
 		))
 	})
@@ -769,7 +769,7 @@ func (s *AssetService) InsertImportedAsset(in repository.ImportAssetRowInput) (i
 		if err != nil {
 			return err
 		}
-		return s.compatibilityEvents().EmitInTx(stdctx.Background(), tx, assetCompatibilityEvent(
+		return s.sideEffectEvents().EmitInTx(stdctx.Background(), tx, assetActionEvent(
 			models.AssetTriggerAssetCreated, snapshot, in.CreatedBy, nil, newValues, AssetAutomationContext{},
 		))
 	})
@@ -851,7 +851,7 @@ func (s *AssetService) UpdateAssetWithContext(actor AuditActor, assetID int, old
 			if _, err := recorder.StatusChanged(stdctx.Background(), tx, snapshot, oldStatusID, newStatusID, oldValues, newValues, metadata); err != nil {
 				return err
 			}
-			if err := s.compatibilityEvents().EmitInTx(stdctx.Background(), tx, assetCompatibilityEvent(
+			if err := s.sideEffectEvents().EmitInTx(stdctx.Background(), tx, assetActionEvent(
 				models.AssetTriggerAssetStatusChanged, snapshot, actor.UserID, oldValues, newValues, context,
 			)); err != nil {
 				return err
@@ -860,7 +860,7 @@ func (s *AssetService) UpdateAssetWithContext(actor AuditActor, assetID int, old
 		if _, err := recorder.Updated(stdctx.Background(), tx, snapshot, nil, newValues, metadata); err != nil {
 			return err
 		}
-		return s.compatibilityEvents().EmitInTx(stdctx.Background(), tx, assetCompatibilityEvent(
+		return s.sideEffectEvents().EmitInTx(stdctx.Background(), tx, assetActionEvent(
 			models.AssetTriggerAssetUpdated, snapshot, actor.UserID, nil, newValues, context,
 		))
 	})
@@ -1019,7 +1019,7 @@ func (s *AssetService) DeleteAsset(actor AuditActor, assetID int) error {
 		if _, err := s.events().Deleted(stdctx.Background(), tx, snapshot, oldValues, metadata); err != nil {
 			return err
 		}
-		return s.compatibilityEvents().EmitInTx(stdctx.Background(), tx, assetCompatibilityEvent(
+		return s.sideEffectEvents().EmitInTx(stdctx.Background(), tx, assetActionEvent(
 			models.AssetTriggerAssetDeleted, snapshot, actor.UserID, oldValues, nil, AssetAutomationContext{},
 		))
 	})

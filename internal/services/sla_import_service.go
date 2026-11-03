@@ -53,13 +53,16 @@ type SLAImportCalendar struct {
 }
 
 type SLAImportMetric struct {
-	SourceID      string               `json:"source_id"`
-	SourcePayload json.RawMessage      `json:"source_payload,omitempty"`
-	Name          string               `json:"name"`
-	DisplayFormat string               `json:"display_format"`
-	IsActive      *bool                `json:"is_active"`
-	Conditions    []SLAImportCondition `json:"conditions"`
-	Goals         []SLAImportGoal      `json:"goals"`
+	SourceID      string          `json:"source_id"`
+	SourcePayload json.RawMessage `json:"source_payload,omitempty"`
+	Name          string          `json:"name"`
+	DisplayFormat string          `json:"display_format"`
+	// IsActive opts a metric into live evaluation. Imported metrics default to
+	// inactive so an import can never arm timers, breach jobs, or side effects;
+	// an operator activates the metrics they want after reviewing the import.
+	IsActive   *bool                `json:"is_active"`
+	Conditions []SLAImportCondition `json:"conditions"`
+	Goals      []SLAImportGoal      `json:"goals"`
 }
 
 type SLAImportCondition struct {
@@ -178,6 +181,13 @@ func (s *SLAImportService) Import(ctx context.Context, workspaceID int, document
 	}
 	result.Mode = mode
 
+	// Cycles of inactive metrics keep their historical rows but must not arm
+	// live breach jobs; activating the metric later triggers a recalculation.
+	metricActiveBySource := make(map[string]bool, len(metrics))
+	for _, resolved := range metrics {
+		metricActiveBySource[valueOrEmpty(resolved.metric.SourceID)] = resolved.metric.IsActive
+	}
+
 	// Persist calendars first: metrics and cycles reference them.
 	calendarIDs := map[string]int{}
 	err = database.WithTx(s.db, func(tx database.Tx) error {
@@ -237,14 +247,15 @@ func (s *SLAImportService) Import(ctx context.Context, workspaceID int, document
 	// writers, so repository reads must not run while the transaction holds the
 	// write lock.
 	type cycleWrite struct {
-		cycle      *SLAImportCycle
-		metricID   int
-		itemID     int
-		calendarID int
-		goalID     int
-		goalQuery  string
-		snapshot   json.RawMessage
-		existingID int64
+		cycle        *SLAImportCycle
+		metricID     int
+		metricActive bool
+		itemID       int
+		calendarID   int
+		goalID       int
+		goalQuery    string
+		snapshot     json.RawMessage
+		existingID   int64
 	}
 	writes := make([]cycleWrite, 0, len(cycles))
 	for i := range cycles {
@@ -277,19 +288,20 @@ func (s *SLAImportService) Import(ctx context.Context, workspaceID int, document
 			return nil, err
 		}
 		writes = append(writes, cycleWrite{
-			cycle:      cycle,
-			metricID:   metricID,
-			itemID:     itemID,
-			calendarID: calendarID,
-			goalID:     goalIDsByMetric[cycle.MetricSourceID][cycle.GoalSourceID],
-			goalQuery:  goalQueriesByMetric[cycle.MetricSourceID][cycle.GoalSourceID],
-			snapshot:   snapshot,
-			existingID: existingID,
+			cycle:        cycle,
+			metricID:     metricID,
+			metricActive: metricActiveBySource[cycle.MetricSourceID],
+			itemID:       itemID,
+			calendarID:   calendarID,
+			goalID:       goalIDsByMetric[cycle.MetricSourceID][cycle.GoalSourceID],
+			goalQuery:    goalQueriesByMetric[cycle.MetricSourceID][cycle.GoalSourceID],
+			snapshot:     snapshot,
+			existingID:   existingID,
 		})
 	}
 	err = database.WithTx(s.db, func(tx database.Tx) error {
 		for _, write := range writes {
-			if err := s.writeCycle(ctx, tx, write.metricID, write.itemID, write.calendarID, write.goalID, write.goalQuery, write.snapshot, write.existingID, write.cycle); err != nil {
+			if err := s.writeCycle(ctx, tx, write.metricID, write.itemID, write.calendarID, write.goalID, write.goalQuery, write.snapshot, write.existingID, write.metricActive, write.cycle); err != nil {
 				return err
 			}
 		}
@@ -424,7 +436,9 @@ func (s *SLAImportService) resolveMetric(ctx context.Context, workspaceID int, s
 		WorkspaceID:   workspaceID,
 		Name:          strings.TrimSpace(source.Name),
 		DisplayFormat: source.DisplayFormat,
-		IsActive:      source.IsActive == nil || *source.IsActive,
+		// Imported metrics stay inactive unless the document opts in, so an
+		// import never arms live SLA timers or breach side effects.
+		IsActive:      source.IsActive != nil && *source.IsActive,
 		ImportStatus:  "ready",
 		Source:        stringPtr(SLAImportSource),
 		SourceID:      stringPtr(source.SourceID),
@@ -653,7 +667,7 @@ func (s *SLAImportService) persistMetric(ctx context.Context, tx database.Tx, re
 	return metricID, goalIDs, nil
 }
 
-func (s *SLAImportService) writeCycle(ctx context.Context, tx database.Tx, metricID, itemID, calendarID, goalID int, goalQuery string, snapshot json.RawMessage, existingID int64, source *SLAImportCycle) error {
+func (s *SLAImportService) writeCycle(ctx context.Context, tx database.Tx, metricID, itemID, calendarID, goalID int, goalQuery string, snapshot json.RawMessage, existingID int64, metricActive bool, source *SLAImportCycle) error {
 	status := source.Status
 	if status == "" {
 		status = models.SLACycleOngoing
@@ -735,7 +749,7 @@ func (s *SLAImportService) writeCycle(ctx context.Context, tx database.Tx, metri
 	if err := s.repo.DeleteJobsForCycle(ctx, tx, cycle.ID); err != nil {
 		return err
 	}
-	if cycle.Status == models.SLACycleOngoing && !cycle.Paused && cycle.NextDeadlineAt != nil {
+	if metricActive && cycle.Status == models.SLACycleOngoing && !cycle.Paused && cycle.NextDeadlineAt != nil {
 		deadline := *cycle.NextDeadlineAt
 		cycleRef := cycle.ID
 		job := &models.SLAJob{Kind: models.SLAJobBreach, CycleID: &cycleRef, DueAt: deadline, DeadlineAt: &deadline}

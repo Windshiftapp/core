@@ -18,21 +18,23 @@ import (
 )
 
 const (
-	DurableActionCompatibilityEvent = "action.triggered.v1"
-	DurableSCMObservationEvent      = "scm.action_observed.v1"
+	DurableActionRequestedEvent = "action.triggered.v1"
+	DurableSCMObservationEvent  = "scm.action_observed.v1"
 
-	DurableCompatibilityActionConsumerKey = "actions.compatibility.v1"
-	DurableItemActionConsumerKey          = "actions.items.v1"
-	DurableSCMActionConsumerKey           = "actions.scm.v1"
+	// Consumer key strings keep their historic names so an upgrade does not
+	// re-deliver side effects that were already processed.
+	DurableSideEffectActionConsumerKey = "actions.compatibility.v1"
+	DurableItemActionConsumerKey       = "actions.items.v1"
+	DurableSCMActionConsumerKey        = "actions.scm.v1"
 
 	durableItemActionCutoverKey = "actions.items.canonical.v1"
 )
 
-// ActionCutover is the durable boundary after which canonical domain events
-// are authoritative for automation admission.
+// ActionCutover is the durable event boundary after which canonical domain
+// events are authoritative for automation admission.
 type ActionCutover = actionevents.Cutover
 
-// DurableActionIngress persists compatibility and SCM action facts without an
+// DurableActionIngress persists side-effect and SCM action facts without an
 // in-memory admission queue.
 type DurableActionIngress struct {
 	db    database.Database
@@ -85,10 +87,11 @@ func (i *DurableActionIngress) EmitInTx(ctx context.Context, tx database.Tx, act
 
 func durableActionEventInput(actionEvent *models.ActionEvent) (events.NewEvent, error) {
 	workspaceID := actionEvent.WorkspaceID
-	input, err := actionevents.NewCompatibilityEvent(actionevents.CompatibilityInput{
+	input, err := actionevents.NewSideEffectEvent(actionevents.SideEffectInput{
 		Payload: actionEvent, WorkspaceID: &workspaceID,
 		AggregateType: "action_workspace", AggregateID: strconv.Itoa(workspaceID),
-		EventType: DurableActionCompatibilityEvent, ActorUserID: actionEvent.ActorUserID,
+		EventType: DurableActionRequestedEvent, ActorUserID: actionEvent.ActorUserID,
+		ActorKind: actionEvent.ActorKind, SourceKind: actionEvent.SourceKind,
 		CorrelationID: actionEvent.ExecutionChainID,
 	})
 	if err != nil {
@@ -141,15 +144,15 @@ func ConfigureDurableActionConsumers(ctx context.Context, store *events.Store, c
 		Key: DurableItemActionConsumerKey, HandlerVersion: 1,
 		EventTypes: []string{itemevents.Created, itemevents.Updated, itemevents.StatusChanged, itemevents.StatusLooped, itemevents.Linked},
 	},
-		events.Consumer{Key: DurableCompatibilityActionConsumerKey, HandlerVersion: 1, Active: true, StartEventID: 1, EventTypes: []string{DurableActionCompatibilityEvent}},
+		events.Consumer{Key: DurableSideEffectActionConsumerKey, HandlerVersion: 1, Active: true, StartEventID: 1, EventTypes: []string{DurableActionRequestedEvent}},
 		events.Consumer{Key: DurableSCMActionConsumerKey, HandlerVersion: 1, Active: true, StartEventID: 1, EventTypes: []string{DurableSCMObservationEvent}},
 	)
 }
 
 // PrepareDurableActionEngine installs subscriptions and handlers before the
-// shared engine starts. Activation is a one-way deployment operation recorded
-// in the database, so later replicas do not need the activation flag.
-func PrepareDurableActionEngine(ctx context.Context, engine *events.Engine, actions *ActionService, activate bool) error {
+// shared engine starts. The canonical cutover is recorded on first start and
+// only anchors the consumer's start event id on later starts.
+func PrepareDurableActionEngine(ctx context.Context, engine *events.Engine, actions *ActionService) error {
 	if engine == nil || actions == nil {
 		return errors.New("domain event engine and action service are required")
 	}
@@ -157,7 +160,7 @@ func PrepareDurableActionEngine(ctx context.Context, engine *events.Engine, acti
 	if err != nil {
 		return err
 	}
-	if activate && cutover == nil {
+	if cutover == nil {
 		cutover, err = actions.durableIngress.ActivateCanonicalItems(ctx)
 		if err != nil {
 			return err
@@ -168,7 +171,7 @@ func PrepareDurableActionEngine(ctx context.Context, engine *events.Engine, acti
 	}
 	handler := NewDurableActionConsumer(actions.db, actions)
 	for _, key := range []string{
-		DurableCompatibilityActionConsumerKey,
+		DurableSideEffectActionConsumerKey,
 		DurableItemActionConsumerKey,
 		DurableSCMActionConsumerKey,
 	} {
@@ -238,12 +241,12 @@ func actionEventFromDomainEvent(event events.Event) (*models.ActionEvent, string
 	if event.PayloadVersion != 1 {
 		return nil, "", fmt.Errorf("unsupported action event %s payload version %d", event.Type, event.PayloadVersion)
 	}
-	if event.Type == DurableActionCompatibilityEvent || event.Type == DurableSCMObservationEvent {
+	if event.Type == DurableActionRequestedEvent || event.Type == DurableSCMObservationEvent {
 		var actionEvent models.ActionEvent
 		if err := json.Unmarshal(event.Payload, &actionEvent); err != nil {
 			return nil, "", fmt.Errorf("decode %s payload: %w", event.Type, err)
 		}
-		consumerKey := DurableCompatibilityActionConsumerKey
+		consumerKey := DurableSideEffectActionConsumerKey
 		if event.Type == DurableSCMObservationEvent {
 			consumerKey = DurableSCMActionConsumerKey
 		}

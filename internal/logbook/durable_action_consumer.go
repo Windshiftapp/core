@@ -18,10 +18,7 @@ import (
 )
 
 const (
-	DurableLogbookActionCompatibilityEvent = "logbook.action_triggered.v1"
-
-	DurableLogbookCompatibilityConsumerKey = "actions.logbook.compatibility.v1"
-	DurableLogbookActionConsumerKey        = "actions.logbook.v1"
+	DurableLogbookActionConsumerKey = "actions.logbook.v1"
 
 	durableLogbookActionCutoverKey = "actions.logbook.canonical.v1"
 )
@@ -32,132 +29,40 @@ type DocumentEventRecorder interface {
 	RecordClassified(context.Context, database.Tx, logbookevents.ClassifiedInput) error
 }
 
-// DurableLogbookActionIngress persists compatibility triggers until cutover.
-type DurableLogbookActionIngress struct {
-	db    database.Database
-	store *events.Store
-}
-
-func NewDurableLogbookActionIngress(db database.Database) *DurableLogbookActionIngress {
-	return &DurableLogbookActionIngress{db: db, store: events.NewStore(db)}
-}
-
-func (i *DurableLogbookActionIngress) Emit(ctx context.Context, actionEvent *models.LogbookActionEvent) error {
-	if actionEvent == nil {
-		return errors.New("logbook action event is required")
-	}
-	cutover, err := i.CurrentCanonicalDocumentsCutover(ctx)
-	if err != nil {
-		return err
-	}
-	if cutover != nil {
-		return nil
-	}
-	input, err := durableLogbookActionEventInput(actionEvent)
-	if err != nil {
-		return err
-	}
-	return actionevents.AppendStandalone(ctx, i.db, i.store, input, "logbook action")
-}
-
-func (i *DurableLogbookActionIngress) EmitInTx(ctx context.Context, tx database.Tx, actionEvent *models.LogbookActionEvent) error {
-	if actionEvent == nil {
-		return errors.New("logbook action event is required")
-	}
-	cutover, err := actionevents.CurrentCutover(ctx, tx, durableLogbookActionCutoverKey)
-	if err != nil {
-		return err
-	}
-	if cutover != nil {
-		return nil
-	}
-	input, err := durableLogbookActionEventInput(actionEvent)
-	if err != nil {
-		return err
-	}
-	if _, err := i.store.Append(ctx, tx, input); err != nil {
-		return fmt.Errorf("append transactional logbook action event: %w", err)
-	}
-	return nil
-}
-
-func durableLogbookActionEventInput(actionEvent *models.LogbookActionEvent) (events.NewEvent, error) {
-	input, err := actionevents.NewCompatibilityEvent(actionevents.CompatibilityInput{
-		Payload: actionEvent, AggregateType: "logbook_document", AggregateID: actionEvent.DocumentID,
-		EventType: DurableLogbookActionCompatibilityEvent, ActorUserID: actionEvent.ActorUserID,
-		CorrelationID: actionEvent.ExecutionChainID, CausationEventKey: actionEvent.CausationEventKey,
-	})
-	if err != nil {
-		return events.NewEvent{}, fmt.Errorf("encode durable logbook action event: %w", err)
-	}
-	return input, nil
-}
-
-func (i *DurableLogbookActionIngress) ActivateCanonicalDocuments(ctx context.Context) (*actionevents.Cutover, error) {
-	return actionevents.ActivateCutover(ctx, i.db, durableLogbookActionCutoverKey, "logbook action")
-}
-
-func (i *DurableLogbookActionIngress) CurrentCanonicalDocumentsCutover(ctx context.Context) (*actionevents.Cutover, error) {
-	return actionevents.CurrentCutover(ctx, i.db, durableLogbookActionCutoverKey)
-}
-
-// DurableDocumentEventRecorder writes canonical and pre-cutover compatibility
-// facts through one source transaction.
+// DurableDocumentEventRecorder records a classified document's canonical fact.
 type DurableDocumentEventRecorder struct {
-	canonical     *logbookevents.Recorder
-	compatibility *DurableLogbookActionIngress
+	canonical *logbookevents.Recorder
 }
 
 func NewDurableDocumentEventRecorder(db database.Database) *DurableDocumentEventRecorder {
-	return &DurableDocumentEventRecorder{
-		canonical:     logbookevents.NewRecorder(db),
-		compatibility: NewDurableLogbookActionIngress(db),
-	}
+	return &DurableDocumentEventRecorder{canonical: logbookevents.NewRecorder(db)}
 }
 
 func (r *DurableDocumentEventRecorder) RecordClassified(ctx context.Context, tx database.Tx, input logbookevents.ClassifiedInput) error {
-	fact, err := r.canonical.RecordClassified(ctx, tx, input)
-	if err != nil {
-		return err
-	}
-	actionEvent := &models.LogbookActionEvent{
-		EventType: models.LogbookTriggerDocumentClassified,
-		BucketID:  input.Document.BucketID, DocumentID: input.Document.ID,
-		ActorUserID: input.ActorUserID, ContentType: input.Document.ContentType,
-		MimeType: input.Document.MimeType, Title: input.Document.Title,
-		SourceType: input.Document.SourceType, Author: input.Document.Author,
-		RawContent: input.Document.RawContent, CausationEventKey: fact.Key,
-	}
-	if input.Automation != nil {
-		actionEvent.TriggeredByAction = input.Automation.TriggeredByAction
-		actionEvent.ExecutionChainID = input.Automation.ExecutionChainID
-		actionEvent.CascadeDepth = input.Automation.CascadeDepth
-		actionEvent.SourceApplication = input.Automation.SourceApplication
-	}
-	return r.compatibility.EmitInTx(ctx, tx, actionEvent)
+	_, err := r.canonical.RecordClassified(ctx, tx, input)
+	return err
 }
 
 func ConfigureDurableLogbookActionConsumers(ctx context.Context, store *events.Store, cutover *actionevents.Cutover) error {
 	return actionevents.ConfigureCutoverConsumers(ctx, store, cutover, events.Consumer{
 		Key: DurableLogbookActionConsumerKey, HandlerVersion: 1,
 		EventTypes: []string{logbookevents.Classified},
-	},
-		events.Consumer{Key: DurableLogbookCompatibilityConsumerKey, HandlerVersion: 1, Active: true, StartEventID: 1, EventTypes: []string{DurableLogbookActionCompatibilityEvent}},
-	)
+	})
 }
 
-// PrepareDurableLogbookActionEngine installs logbook consumers on the shared
-// event engine implementation.
-func PrepareDurableLogbookActionEngine(ctx context.Context, engine *events.Engine, actions *LogbookActionService, activate bool) error {
+// PrepareDurableLogbookActionEngine installs the canonical logbook document
+// consumer on the shared event engine implementation. The canonical consumer is
+// always active; the cutover record only anchors its start event id.
+func PrepareDurableLogbookActionEngine(ctx context.Context, engine *events.Engine, actions *LogbookActionService) error {
 	if engine == nil || actions == nil {
 		return errors.New("domain event engine and logbook action service are required")
 	}
-	cutover, err := actions.durableIngress.CurrentCanonicalDocumentsCutover(ctx)
+	cutover, err := actionevents.CurrentCutover(ctx, actions.db, durableLogbookActionCutoverKey)
 	if err != nil {
 		return err
 	}
-	if activate && cutover == nil {
-		cutover, err = actions.durableIngress.ActivateCanonicalDocuments(ctx)
+	if cutover == nil {
+		cutover, err = actionevents.ActivateCutover(ctx, actions.db, durableLogbookActionCutoverKey, "logbook action")
 		if err != nil {
 			return err
 		}
@@ -165,11 +70,9 @@ func PrepareDurableLogbookActionEngine(ctx context.Context, engine *events.Engin
 	if err := ConfigureDurableLogbookActionConsumers(ctx, engine.Store(), cutover); err != nil {
 		return err
 	}
-	handler := NewDurableLogbookActionConsumer(actions.db, actions, cutover)
-	for _, key := range []string{DurableLogbookCompatibilityConsumerKey, DurableLogbookActionConsumerKey} {
-		if err := engine.RegisterHandler(key, handler); err != nil {
-			return err
-		}
+	handler := NewDurableLogbookActionConsumer(actions.db, actions)
+	if err := engine.RegisterHandler(DurableLogbookActionConsumerKey, handler); err != nil {
+		return err
 	}
 	return nil
 }
@@ -177,23 +80,15 @@ func PrepareDurableLogbookActionEngine(ctx context.Context, engine *events.Engin
 // DurableLogbookActionConsumer adapts document facts to the existing action
 // matcher and executor while using shared frozen-target state.
 type DurableLogbookActionConsumer struct {
-	actions        *LogbookActionService
-	targets        *actionevents.TargetStore
-	cutoverStartID int64
+	actions *LogbookActionService
+	targets *actionevents.TargetStore
 }
 
-func NewDurableLogbookActionConsumer(db database.Database, actions *LogbookActionService, cutover *actionevents.Cutover) *DurableLogbookActionConsumer {
-	consumer := &DurableLogbookActionConsumer{actions: actions, targets: actionevents.NewTargetStore(db)}
-	if cutover != nil {
-		consumer.cutoverStartID = cutover.StartEventID
-	}
-	return consumer
+func NewDurableLogbookActionConsumer(db database.Database, actions *LogbookActionService) *DurableLogbookActionConsumer {
+	return &DurableLogbookActionConsumer{actions: actions, targets: actionevents.NewTargetStore(db)}
 }
 
 func (c *DurableLogbookActionConsumer) Handle(ctx context.Context, event events.Event) error {
-	if event.Type == DurableLogbookActionCompatibilityEvent && c.cutoverStartID > 0 && event.ID >= c.cutoverStartID {
-		return nil
-	}
 	// Imported facts are historical: never let them trigger automation.
 	if itemevents.IsImportOrigin(event.ActorKind, event.SourceKind) {
 		return nil
@@ -259,14 +154,6 @@ func (c *DurableLogbookActionConsumer) materializeTargets(ctx context.Context, e
 func logbookActionEventFromDomainEvent(event events.Event) (*models.LogbookActionEvent, string, error) {
 	if event.PayloadVersion != logbookevents.PayloadVersion {
 		return nil, "", fmt.Errorf("unsupported logbook action event %s payload version %d", event.Type, event.PayloadVersion)
-	}
-	if event.Type == DurableLogbookActionCompatibilityEvent {
-		var actionEvent models.LogbookActionEvent
-		if err := json.Unmarshal(event.Payload, &actionEvent); err != nil {
-			return nil, "", fmt.Errorf("decode %s payload: %w", event.Type, err)
-		}
-		actionEvent.CausationEventKey = event.Key
-		return &actionEvent, DurableLogbookCompatibilityConsumerKey, nil
 	}
 	if event.Type != logbookevents.Classified {
 		return nil, "", fmt.Errorf("unsupported durable logbook action event type %q", event.Type)

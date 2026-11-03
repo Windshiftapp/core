@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"windshift/internal/database"
+	"windshift/internal/itemevents"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/utils"
@@ -105,6 +106,11 @@ func (s *ExternalItemReconciliationService) Create(ctx context.Context, req Exte
 	if req.Policy.RecordHistory {
 		creatorID = &req.Policy.ActorUserID
 	}
+	// External reconciliation is machine-driven: keep the canonical fact for the
+	// event log but never let it drive live notifications, automation, or
+	// webhooks, matching the policy contract.
+	eventMetadata := itemevents.System(string(req.Policy.Source))
+	eventMetadata.SuppressSideEffects = true
 	itemID, err := createItem(ctx, s.db, ItemCreationParams{
 		WorkspaceID:           req.Input.WorkspaceID,
 		Title:                 req.Input.Title,
@@ -132,6 +138,7 @@ func (s *ExternalItemReconciliationService) Create(ctx context.Context, req Exte
 		SkipPublish:           !req.Policy.PublishLiveUpdates,
 		SkipMandatoryTemplate: !req.Policy.ApplyMandatoryTemplates,
 		AfterCreate:           req.AfterCreate,
+		EventMetadata:         eventMetadata,
 	})
 	if err != nil {
 		return nil, err
@@ -175,7 +182,7 @@ func (s *ExternalItemReconciliationService) Update(ctx context.Context, req Exte
 		ItemID:        req.ItemID,
 		UpdateData:    req.UpdateData,
 		UserID:        req.Policy.ActorUserID,
-		EventMetadata: itemEventMetadata(req.Policy.ActorUserID, string(req.Policy.Source), nil),
+		EventMetadata: externalReconciliationMetadata(req.Policy),
 	}, itemUpdateOptions{
 		allowStatus:             true,
 		recordHistory:           req.Policy.RecordHistory,
@@ -184,6 +191,15 @@ func (s *ExternalItemReconciliationService) Update(ctx context.Context, req Exte
 		beforeUpdateTransaction: beforeUpdate,
 		afterUpdateTransaction:  req.AfterUpdate,
 	})
+}
+
+// externalReconciliationMetadata stamps inbound external state with its source
+// and disables live side effects. The policy contract promises this path never
+// emits notifications, automation, webhooks, or mentions.
+func externalReconciliationMetadata(policy ExternalItemReconciliationPolicy) itemevents.Metadata {
+	metadata := itemEventMetadata(policy.ActorUserID, string(policy.Source), nil)
+	metadata.SuppressSideEffects = true
+	return metadata
 }
 
 func validateExternalReconciliationRequest(ctx context.Context, db database.Database, policy ExternalItemReconciliationPolicy) error {
