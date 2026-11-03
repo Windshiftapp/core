@@ -107,7 +107,7 @@ func (h *CustomWidgetGenerateHandler) GenerateCustomWidget(w http.ResponseWriter
 			},
 		})
 		if err != nil {
-			respondLLMError(w, r, err)
+			respondLLMError(w, r, err, nil)
 			return
 		}
 

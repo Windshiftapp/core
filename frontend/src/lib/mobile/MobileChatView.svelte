@@ -82,6 +82,9 @@
         <div class="msg assistant" data-testid="chat-msg-assistant">
           {#if msg.error}
             <p class="err">{msg.error}</p>
+            {#if msg.errorDetail}
+              <p class="err-detail" data-testid="chat-provider-error">{msg.errorDetail}</p>
+            {/if}
           {:else}
             <div class="html-content">
               <LazyMilkdownEditor
@@ -149,6 +152,7 @@
   .assistant { align-self: flex-start; background-color: var(--ds-surface-raised); color: var(--ds-text); border: 1px solid var(--ds-border); border-bottom-left-radius: var(--radius-sm, 4px); }
   .assistant :global(.html-content) { font-size: 0.9375rem; }
   .err { margin: 0; color: var(--ds-text-danger, var(--ds-danger)); }
+  .err-detail { margin: 4px 0 0; font-size: 12px; word-break: break-word; color: var(--ds-text-subtle); }
   .review { margin: 0.4rem 0 0; font-size: 0.75rem; color: var(--ds-text-warning, var(--ds-text-subtle)); }
   .thinking { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--ds-text-subtle); }
   :global(.spin) { animation: spin 1s linear infinite; }

@@ -111,7 +111,7 @@ func (h *AIHandler) GenerateReleaseNotes(w http.ResponseWriter, r *http.Request)
 		Temperature: 0.2,
 	})
 	if err != nil {
-		respondLLMError(w, r, err)
+		respondLLMError(w, r, err, h.permService)
 		return
 	}
 	if len(resp.Choices) == 0 {

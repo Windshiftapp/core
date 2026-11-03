@@ -282,6 +282,9 @@ async function sendMessage(text, context) {
       role: 'assistant',
       content: '',
       error: error,
+      // The server attaches the provider's message only for system admins; it
+      // is the actionable part of a rejected request.
+      errorDetail: err?.details?.provider_error || '',
     };
     messages = [...messages, errorMsg];
   } finally {

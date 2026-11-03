@@ -259,7 +259,7 @@ func (h *AIHandler) PlanMyDay(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 	if err != nil {
-		respondLLMError(w, r, err)
+		respondLLMError(w, r, err, h.permService)
 		return
 	}
 

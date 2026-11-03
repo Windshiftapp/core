@@ -16,6 +16,7 @@ import (
 	"windshift/internal/itemevents"
 	"windshift/internal/llm"
 	"windshift/internal/models"
+	"windshift/internal/redact"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 	"windshift/internal/services"
@@ -342,7 +343,7 @@ func (h *AIHandler) AnalyzeDependencies(w http.ResponseWriter, r *http.Request) 
 		},
 	})
 	if err != nil {
-		respondLLMError(w, r, err)
+		respondLLMError(w, r, err, h.permService)
 		return
 	}
 
@@ -853,7 +854,7 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		_ = runRepo.Finalize(r.Context(), begun.RunID, models.AgentRunStatusFailed,
 			"Configured LLM is unavailable", time.Now().UTC())
-		respondLLMError(w, r, err)
+		respondLLMError(w, r, err, h.permService)
 		return
 	}
 
@@ -910,13 +911,16 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		SystemPrompt:  systemPrompt,
 		Tools:         aitooladapter.BuildTools(mode.entries),
 		MaxTokens:     chatMaxOutputTokens(llmDescriptor),
-		Temperature:   0.1,
+		Temperature:   llm.ChatTemperature,
 		MaxIterations: 12,
 		TerminalTools: mode.terminalTools,
 	}, promptMessage, executor.Execute, history)
 	if err != nil {
+		// Persist the provider's own message (redacted) so the failed turn is
+		// diagnosable from the run history, not just the process log.
+		detail := redact.String(err.Error())
 		_ = runRepo.Finalize(context.Background(), begun.RunID, models.AgentRunStatusFailed,
-			"Agent chat execution failed", time.Now().UTC())
+			detail, time.Now().UTC())
 		slog.ErrorContext(r.Context(), "chat agent run failed",
 			slog.Int("user_id", user.ID),
 			slog.String("ctx_view", chatContextView(req.Context)),
@@ -926,8 +930,9 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 			slog.Int("ctx_item_id", chatContextItemID(req.Context)),
 			slog.String("ctx_item_key", chatContextItemKey(req.Context)),
 			slog.String("error_type", fmt.Sprintf("%T", err)),
+			slog.String("error", detail),
 		)
-		respondLLMError(w, r, err)
+		respondLLMError(w, r, err, h.permService)
 		return
 	}
 

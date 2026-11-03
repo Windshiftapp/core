@@ -353,8 +353,11 @@ func (c *fantasyClient) generateObject(ctx context.Context, call fantasy.Call, c
 	return normalizedFantasyResponse(content, nil, nil, normalizeFantasyUsage(response.Usage, response.ProviderMetadata), response.FinishReason), nil
 }
 
+// Health exercises the same request shape in-product chat sends so a provider
+// that rejects chat's temperature, tools, or configured reasoning also fails
+// the admin connection test.
 func (c *fantasyClient) Health(ctx context.Context) error {
-	_, err := c.Complete(ctx, CompletionRequest{Messages: []Message{{Role: "user", Content: "hi"}}, MaxTokens: 1})
+	_, err := c.Complete(ctx, ConnectionProbeRequest())
 	if err != nil {
 		if isCompletionTokenLimitError(err) {
 			return nil
