@@ -172,6 +172,14 @@ export default {
 
   editors: {
     enterText: 'Введите текст…',
+    useProvider: 'Редактировать с помощью {label}',
+    useRichText: 'Использовать визуальный редактор',
+    providerActive: '{label} активен',
+    discardProviderChanges: 'Отменить несохранённые изменения?',
+    discardProviderChangesMessage:
+      'Ваши изменения в {label} не сохранены. При смене редактора они будут потеряны.',
+    discardChanges: 'Отменить',
+    providerError: 'Плагин редактора сообщил об ошибке: {message}',
     selectDate: 'Выберите дату…',
     clickToChangeColor: 'Нажмите, чтобы изменить цвет',
     saveEnter: 'Сохранить (Enter)',

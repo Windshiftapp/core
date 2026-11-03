@@ -257,6 +257,12 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 	}
 	manifest.Permissions = normalizedPermissions
 
+	// Validate editor-provider extensions before compilation so a malformed
+	// manifest fails the load with the offending value.
+	if err = normalizeEditorExtensions(manifest.Extensions); err != nil {
+		return fmt.Errorf("invalid plugin extensions: %w", err)
+	}
+
 	wasmPath := filepath.Join(pluginPath, manifest.EntryPoint)
 	if _, err = os.Stat(wasmPath); err != nil {
 		return fmt.Errorf("failed to read WASM file: %w", err)
@@ -298,6 +304,12 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 		m.logger.Warn("failed to fetch plugin metadata", "name", manifest.Name, "error", err)
 		// Fallback: use manifest extensions even if metadata fetch fails
 		plugin.Extensions = attachPluginName(manifest.Name, manifest.Extensions, nil)
+	}
+
+	// get_metadata can add editor providers the manifest did not declare, so
+	// validate the resolved set as well.
+	if err := normalizeEditorExtensions(plugin.Extensions); err != nil {
+		return fmt.Errorf("invalid plugin extensions: %w", err)
 	}
 
 	// Route auth defaults to session and is validated here so a malformed or
@@ -859,6 +871,9 @@ func (m *Manager) GetExtensions() map[string][]Extension {
 		if !p.Enabled {
 			continue
 		}
+		if m.licenseVerifier != nil && !p.Licensed {
+			continue
+		}
 
 		for _, ext := range p.Extensions {
 			extensionsByPoint[ext.Point] = append(extensionsByPoint[ext.Point], ext)
@@ -935,6 +950,43 @@ func normalizePluginRoutes(routes []Route, allowPublic bool) ([]Route, error) {
 		}
 	}
 	return normalized, nil
+}
+
+// normalizeEditorExtensions validates editor-provider extensions and defaults
+// an unset mode to toggle. Non-editor extension points pass through unchanged.
+// Called for the manifest extensions before compilation and again for the
+// resolved set (manifest plus get_metadata) afterwards, so a provider declared
+// either way is validated.
+func normalizeEditorExtensions(extensions []Extension) error {
+	for i := range extensions {
+		ext := &extensions[i]
+		if ext.Point != ExtensionPointEditorMarkdown {
+			continue
+		}
+		if strings.TrimSpace(ext.Component) == "" {
+			return fmt.Errorf("editor.markdown extension %q: component is required", ext.ID)
+		}
+		switch ext.Mode {
+		case "":
+			ext.Mode = EditorModeToggle
+		case EditorModeToggle, EditorModeReplace:
+		default:
+			return fmt.Errorf("editor.markdown extension %q: mode must be %q or %q", ext.ID, EditorModeToggle, EditorModeReplace)
+		}
+		for _, entityType := range ext.EntityTypes {
+			if _, ok := editorEntityTypes[entityType]; !ok {
+				return fmt.Errorf("editor.markdown extension %q: unknown entity type %q", ext.ID, entityType)
+			}
+		}
+	}
+	return nil
+}
+
+// editorEntityTypes is the closed set of surfaces an editor provider may edit.
+var editorEntityTypes = map[string]struct{}{
+	"item":    {},
+	"page":    {},
+	"comment": {},
 }
 
 // routesOverlap reports whether two routes can match the same request. Methods

@@ -216,6 +216,14 @@ export default {
 
   editors: {
     enterText: 'Saisir du texte…',
+    useProvider: 'Modifier avec {label}',
+    useRichText: 'Utiliser l’éditeur de texte enrichi',
+    providerActive: '{label} est actif',
+    discardProviderChanges: 'Ignorer les modifications non enregistrées ?',
+    discardProviderChangesMessage:
+      'Vos modifications dans {label} n’ont pas été enregistrées. Changer d’éditeur les supprime.',
+    discardChanges: 'Ignorer',
+    providerError: 'Le plugin d’éditeur a signalé une erreur : {message}',
     selectDate: 'Sélectionner une date…',
     clickToChangeColor: 'Cliquer pour changer la couleur',
     saveEnter: 'Enregistrer (Entrée)',

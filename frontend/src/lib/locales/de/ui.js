@@ -221,6 +221,14 @@ export default {
   },
   editors: {
     enterText: 'Text eingeben...',
+    useProvider: 'Mit {label} bearbeiten',
+    useRichText: 'Rich-Text-Editor verwenden',
+    providerActive: '{label} ist aktiv',
+    discardProviderChanges: 'Ungespeicherte Änderungen verwerfen?',
+    discardProviderChangesMessage:
+      'Ihre Änderungen in {label} wurden nicht gespeichert. Beim Wechseln des Editors werden sie verworfen.',
+    discardChanges: 'Verwerfen',
+    providerError: 'Das Editor-Plugin hat einen Fehler gemeldet: {message}',
     selectDate: 'Datum auswählen...',
     clickToChangeColor: 'Klicken zum Ändern der Farbe',
     saveEnter: 'Speichern (Enter)',

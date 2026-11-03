@@ -152,6 +152,13 @@ export default {
 
   editors: {
     enterText: '输入文本...',
+    useProvider: '使用 {label} 编辑',
+    useRichText: '使用富文本编辑器',
+    providerActive: '{label} 已启用',
+    discardProviderChanges: '放弃未保存的更改？',
+    discardProviderChangesMessage: '您在 {label} 中的编辑尚未保存。切换编辑器将放弃这些更改。',
+    discardChanges: '放弃',
+    providerError: '编辑器插件报告错误：{message}',
     selectDate: '选择日期...',
     clickToChangeColor: '点击更改颜色',
     saveEnter: '保存（Enter）',

@@ -9,6 +9,7 @@
   import Button from '../../components/Button.svelte';
   import FileInput from '../../components/FileInput.svelte';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
+  import PluginEditorHost from '../../editors/PluginEditorHost.svelte';
   import AttachmentDiagramList from '../assets/AttachmentDiagramList.svelte';
   import AIActionsDropdown from './AIActionsDropdown.svelte';
   import { getShortcut, matchesShortcut, getDisplayString } from '../../utils/keyboardShortcuts.js';
@@ -177,14 +178,17 @@
   {#if editingDescription}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="space-y-3" onkeydown={handleKeydown} data-testid="item-description-editor">
-      <MilkdownEditor
+      <PluginEditorHost
         bind:this={milkdownEditor}
         bind:content={editorContent}
         placeholder={t('items.enterDescription')}
         showToolbar={true}
         itemId={item.id}
+        entityType="item"
+        entityId={item.id}
         workspaceId={item.workspace_id}
         onImageInsert={handleImageInsert}
+        editorProviders={true}
       />
       <div class="flex items-center gap-2">
         <Button variant="primary" onclick={saveDescription} disabled={saving} keyboardHint={getDisplayString(saveShortcut)} dataTestid="item-description-save">
