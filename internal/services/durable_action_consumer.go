@@ -45,20 +45,14 @@ func NewDurableActionIngress(db database.Database) *DurableActionIngress {
 	return &DurableActionIngress{db: db, store: events.NewStore(db)}
 }
 
-// Emit appends one durable trigger. Canonical item events replace legacy item
-// trigger shapes after the recorded cutover.
+// Emit appends one durable side-effect trigger. Item triggers are derived from
+// canonical item facts, so their synchronous legacy shape is never journaled.
 func (i *DurableActionIngress) Emit(ctx context.Context, actionEvent *models.ActionEvent) error {
 	if actionEvent == nil {
 		return errors.New("action event is required")
 	}
 	if isItemActionTrigger(actionEvent.EventType) {
-		cutover, err := i.CurrentCanonicalItemsCutover(ctx)
-		if err != nil {
-			return err
-		}
-		if cutover != nil {
-			return nil
-		}
+		return nil
 	}
 
 	input, err := durableActionEventInput(actionEvent)

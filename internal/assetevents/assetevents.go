@@ -50,6 +50,12 @@ func System(sourceKind string) Metadata {
 	return Metadata{ActorKind: "system", SourceKind: sourceKind}
 }
 
+// Import records an import job as the actor. Imported facts are historical and
+// must not drive live side effects.
+func Import(ref string) Metadata {
+	return Metadata{ActorKind: "import", ActorRef: ref, SourceKind: "import"}
+}
+
 // AssetSnapshot is the stable asset state carried by version-one facts.
 type AssetSnapshot struct {
 	ID          int    `json:"id"`

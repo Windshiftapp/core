@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 
 	"windshift/internal/actionevents"
 	"windshift/internal/assetevents"
@@ -24,66 +23,15 @@ const (
 	durableAssetActionCutoverKey = "actions.assets.canonical.v1"
 )
 
-// DurableAssetActionIngress persists compatibility events until the recorded
-// canonical asset cutover.
+// DurableAssetActionIngress anchors the canonical asset action boundary. Asset
+// triggers are derived from canonical asset events, so no side-effect events
+// are journaled for them.
 type DurableAssetActionIngress struct {
-	db    database.Database
-	store *events.Store
+	db database.Database
 }
 
 func NewDurableAssetActionIngress(db database.Database) *DurableAssetActionIngress {
-	return &DurableAssetActionIngress{db: db, store: events.NewStore(db)}
-}
-
-func (i *DurableAssetActionIngress) Emit(ctx context.Context, actionEvent *models.AssetActionEvent) error {
-	if actionEvent == nil {
-		return errors.New("asset action event is required")
-	}
-	cutover, err := i.CurrentCanonicalAssetsCutover(ctx)
-	if err != nil {
-		return err
-	}
-	if cutover != nil {
-		return nil
-	}
-	input, err := durableAssetActionEventInput(actionEvent)
-	if err != nil {
-		return err
-	}
-	return appendStandaloneDurableActionEvent(ctx, i.db, i.store, input, "asset action")
-}
-
-func (i *DurableAssetActionIngress) EmitInTx(ctx context.Context, tx database.Tx, actionEvent *models.AssetActionEvent) error {
-	if actionEvent == nil {
-		return errors.New("asset action event is required")
-	}
-	cutover, err := currentActionCutover(ctx, tx, durableAssetActionCutoverKey)
-	if err != nil {
-		return err
-	}
-	if cutover != nil {
-		return nil
-	}
-	input, err := durableAssetActionEventInput(actionEvent)
-	if err != nil {
-		return err
-	}
-	if _, err := i.store.Append(ctx, tx, input); err != nil {
-		return fmt.Errorf("append transactional asset action event: %w", err)
-	}
-	return nil
-}
-
-func durableAssetActionEventInput(actionEvent *models.AssetActionEvent) (events.NewEvent, error) {
-	input, err := actionevents.NewSideEffectEvent(actionevents.SideEffectInput{
-		Payload: actionEvent, AggregateType: "asset", AggregateID: strconv.Itoa(actionEvent.AssetID),
-		EventType: DurableAssetActionRequestedEvent, ActorUserID: actionEvent.ActorUserID,
-		CorrelationID: actionEvent.ExecutionChainID, CausationEventKey: actionEvent.CausationEventKey,
-	})
-	if err != nil {
-		return events.NewEvent{}, fmt.Errorf("encode durable asset action event: %w", err)
-	}
-	return input, nil
+	return &DurableAssetActionIngress{db: db}
 }
 
 func (i *DurableAssetActionIngress) ActivateCanonicalAssets(ctx context.Context) (*ActionCutover, error) {
