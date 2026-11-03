@@ -164,8 +164,11 @@ func NewManager(pluginDir string, opts ...Option) *Manager {
 		db:                options.Database,
 	}
 	m.hostFuncs = m.buildHostFunctions()
+	// A host function without a permission mapping is a programming error: it
+	// would be callable without any declared permission. Fail the construction
+	// (and therefore startup) rather than exposing it.
 	if err := validateHostFunctionCatalog(m.hostFuncs); err != nil {
-		m.logger.Error("plugin host function catalog is invalid", "error", err)
+		panic(fmt.Sprintf("plugins: invalid host function catalog: %v", err))
 	}
 	return m
 }
