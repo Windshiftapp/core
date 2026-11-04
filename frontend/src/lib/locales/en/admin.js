@@ -596,6 +596,9 @@ export default {
       notConfigured: 'Not configured',
       callbackUrl: 'Callback URL',
       callbackUrlHelp: 'Configure this URL as the redirect/callback URL in your identity provider',
+      baseUrlWarningTitle: 'Server base URL is not configured',
+      baseUrlWarningBody:
+        'Windshift is falling back to {url} for links and OAuth callbacks, so SSO sign-in sends that address to your identity provider. Set the BASE_URL environment variable and restart Windshift before registering the callback URL.',
       scopes: 'Scopes',
       scopesHelp: 'Space-separated list of OIDC scopes',
       nameClaimsHelp:

@@ -40,6 +40,7 @@
   import DescriptionText from '../components/DescriptionText.svelte';
   import { confirm } from '../composables/useConfirm.js';
   import { publicBaseURL } from '../runtime/contextPath.js';
+  import { isServerBaseURLConfigured, serverBaseURL } from '../runtime/serverInfo.js';
 	import TextField from '../components/TextField.svelte';
 
   let providers = $state([]);
@@ -70,6 +71,15 @@
   });
 
   let canAddProvider = $derived(providers.length === 0 || capabilitiesStore.has('sso.multi-provider'));
+
+  // SSO callbacks are built from the server's BASE_URL, which can differ from
+  // the browser origin (reverse proxy, internal hostname) or be missing
+  // entirely. Prefer the injected server value so this page shows the URL the
+  // identity provider will actually receive.
+  const serverBase = serverBaseURL();
+  const serverBaseConfigured = isServerBaseURLConfigured();
+  const baseURLUnconfigured = serverBaseConfigured === false;
+  const callbackBaseURL = serverBase || publicBaseURL();
 
   /** @type {Record<string, string>} */
   let formErrors = $state({});
@@ -188,7 +198,7 @@
   }
 
   const callbackUrl = () =>
-    `${publicBaseURL()}/api/sso/callback/${formData.slug || 'slug'}`;
+    `${callbackBaseURL}/api/sso/callback/${formData.slug || 'slug'}`;
 
   function validateForm() {
     formErrors = {};
@@ -329,6 +339,16 @@
   <!-- Error Message -->
   {#if error}
     <AlertBox type="error">{error}</AlertBox>
+  {/if}
+
+  <!-- Missing BASE_URL makes every generated callback point at the fallback -->
+  {#if baseURLUnconfigured}
+    <div data-testid="sso-base-url-warning">
+      <AlertBox type="warning">
+        <strong>{t('settings.sso.baseUrlWarningTitle')}</strong>
+        <div class="mt-1">{t('settings.sso.baseUrlWarningBody', { url: callbackBaseURL })}</div>
+      </AlertBox>
+    </div>
   {/if}
 
   <!-- Loading State -->
@@ -501,14 +521,23 @@
         <Label color="default" class="mb-1">{t('settings.sso.callbackUrl')}</Label>
         <div class="flex items-center gap-2">
           <div class="flex-1 px-3 py-2 border rounded-md font-mono text-sm overflow-x-auto"
+               data-testid="sso-callback-url"
                style="background-color: var(--ds-surface); border-color: var(--ds-border); color: var(--ds-text);">
-            {publicBaseURL()}/api/sso/callback/{formData.slug || 'slug'}
+            {callbackBaseURL}/api/sso/callback/{formData.slug || 'slug'}
           </div>
           <CopyButton getText={callbackUrl} title={t('toast.copied')} />
         </div>
         <DescriptionText>
           {t('settings.sso.callbackUrlHelp')}
         </DescriptionText>
+        {#if baseURLUnconfigured}
+          <div data-testid="sso-callback-url-warning" class="mt-2">
+            <AlertBox type="warning">
+              <strong>{t('settings.sso.baseUrlWarningTitle')}</strong>
+              <div class="mt-1">{t('settings.sso.baseUrlWarningBody', { url: callbackBaseURL })}</div>
+            </AlertBox>
+          </div>
+        {/if}
       </div>
 
       <!-- Issuer URL -->

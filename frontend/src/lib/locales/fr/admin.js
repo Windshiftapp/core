@@ -547,6 +547,9 @@ export default {
       notConfigured: 'Non configuré',
       callbackUrl: 'URL de rappel (Callback)',
       callbackUrlHelp: 'Configurez cette URL comme URL de redirection dans votre fournisseur d\'identité',
+      baseUrlWarningTitle: 'L\'URL de base du serveur n\'est pas configurée',
+      baseUrlWarningBody:
+        'Windshift utilise {url} par défaut pour les liens et les callbacks OAuth. La connexion SSO enverra donc cette adresse à votre fournisseur d\'identité. Définissez la variable d\'environnement BASE_URL et redémarrez Windshift avant d\'enregistrer l\'URL de rappel.',
       scopes: 'Portées (Scopes)',
       scopesHelp: 'Liste des portées OIDC séparées par des espaces',
       nameClaimsHelp:

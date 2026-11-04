@@ -451,6 +451,9 @@ export default {
       notConfigured: '未配置',
       callbackUrl: '回调 URL',
       callbackUrlHelp: '在您的身份提供商中配置此 URL 作为重定向/回调 URL',
+      baseUrlWarningTitle: '服务器基础 URL 未配置',
+      baseUrlWarningBody:
+        'Windshift 目前回退使用 {url} 生成链接和 OAuth 回调，因此 SSO 登录会将该地址发送给您的身份提供商。请先设置 BASE_URL 环境变量并重启 Windshift，然后再注册回调 URL。',
       scopes: '范围',
       scopesHelp: '以空格分隔的 OIDC 范围列表',
       nameClaimsHelp:

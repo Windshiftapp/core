@@ -555,6 +555,9 @@ export default {
       notConfigured: 'Nicht konfiguriert',
       callbackUrl: 'Callback-URL',
       callbackUrlHelp: 'Konfigurieren Sie diese URL als Redirect/Callback-URL in Ihrem Identitätsanbieter',
+      baseUrlWarningTitle: 'Server-Basis-URL ist nicht konfiguriert',
+      baseUrlWarningBody:
+        'Windshift verwendet ersatzweise {url} für Links und OAuth-Callbacks. Bei der SSO-Anmeldung wird diese Adresse an Ihren Identitätsanbieter gesendet. Legen Sie die Umgebungsvariable BASE_URL fest und starten Sie Windshift neu, bevor Sie die Callback-URL registrieren.',
       scopes: 'Scopes',
       scopesHelp: 'Leerzeichen-getrennte Liste von OIDC-Scopes',
       nameClaimsHelp:

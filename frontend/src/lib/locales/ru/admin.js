@@ -647,6 +647,9 @@ export default {
       callbackUrl: 'URL перенаправления OAuth',
       callbackUrlHelp:
         'Укажите этот адрес как URL перенаправления у провайдера идентификации',
+      baseUrlWarningTitle: 'Базовый URL сервера не настроен',
+      baseUrlWarningBody:
+        'Windshift использует {url} для ссылок и OAuth-callback-запросов, поэтому при входе через SSO этот адрес будет отправлен поставщику удостоверений. Задайте переменную окружения BASE_URL и перезапустите Windshift, прежде чем регистрировать URL обратного вызова.',
       scopes: 'Области доступа',
       scopesHelp: 'Список областей доступа OIDC через пробел',
       nameClaimsHelp:
