@@ -47,6 +47,9 @@ const TREE_PAGE_SIZE = 100;
 const LARGE_COLLECTION_PAGE_SIZE = 250;
 const BOARD_UNFINISHED_PAGE_SIZE = 1000;
 const BOARD_UNTHROTTLED_ITEM_COUNT = 1000;
+// The items API clamps `page_size` to this. A hierarchy refresh that has
+// accumulated more rows than this must replay its pages instead of one request.
+const MAX_ITEMS_PAGE_SIZE = 1000;
 const BOARD_BACKGROUND_PAGE_DELAY_MS = 250;
 const SEARCH_PAGE_SIZE = 100;
 // Local refresh-work-items bursts coalesce into one authoritative delta
@@ -784,16 +787,51 @@ class CollectionStore {
     isBoard,
     page = 1
   ) {
+    // A hierarchy view accumulates pages. While the loaded set fits one request
+    // it reloads from page 1 in one go; past the API page cap it replays the
+    // accumulated pages with the view's own page size, so the pagination cursor
+    // stays aligned with the loaded set instead of offsetting past it.
+    const replaysHierarchyPages =
+      !isBoard && HIERARCHY_VIEWS.has(this.#currentView) && limit > MAX_ITEMS_PAGE_SIZE;
+    const firstLimit = replaysHierarchyPages ? initialItemsPageSize(this.#currentView) : limit;
     const first = await this.#fetchMainItems(
       wsId,
       colId,
-      limit,
+      firstLimit,
       boardPartition,
       collection,
       isBoard,
       page
     );
     const totalPages = first.pagination?.total_pages ?? 1;
+
+    if (replaysHierarchyPages) {
+      const target = Math.min(limit, first.pagination?.total_items ?? limit);
+      const pages = [first];
+      let loadedCount = first.items.length;
+      for (let next = 2; loadedCount < target && next <= totalPages; next += 1) {
+        if (loadId !== this.#loadId) return first;
+        const result = await this.#fetchMainItems(
+          wsId,
+          colId,
+          firstLimit,
+          boardPartition,
+          collection,
+          false,
+          next
+        );
+        if (result.items.length === 0) break;
+        pages.push(result);
+        loadedCount += result.items.length;
+      }
+      return {
+        ...first,
+        items: pages.flatMap((result) => result.items),
+        pagination: pages.at(-1).pagination,
+        watermark: snapshotWatermark(...pages),
+      };
+    }
+
     if (!isBoard || totalPages <= 1) return first;
 
     const pages = [first];
@@ -1109,8 +1147,12 @@ class CollectionStore {
     const itemsLimit = Math.max(initialItemsPageSize(this.#currentView), this.mainItemsLoadedCount);
     // Page-based list views replace their rows per page, so a background
     // refresh must reload the page the user is on instead of jumping to the
-    // first page. Board views keep starting at page 1 and accumulate.
-    const itemsPage = BOARD_VIEWS.has(this.#currentView) ? 1 : (this.itemsPagination?.page ?? 1);
+    // first page. Board and hierarchy views accumulate their pages, so a
+    // refresh must reload from page 1; otherwise page N with limit = loaded
+    // count offsets past the loaded set and blanks the view.
+    const accumulatesPages =
+      BOARD_VIEWS.has(this.#currentView) || HIERARCHY_VIEWS.has(this.#currentView);
+    const itemsPage = accumulatesPages ? 1 : (this.itemsPagination?.page ?? 1);
     const backlogLimit = Math.max(DEFAULT_PAGE_SIZE, this.backlogItems.length);
 
     try {
