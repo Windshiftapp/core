@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"windshift/internal/utils"
@@ -106,6 +108,7 @@ type cloudClient struct {
 	authHeader     string
 	httpClient     *http.Client
 	limiter        *rate.Limiter
+	throttle       *jiraThrottle
 	retryWait      func(context.Context, time.Duration) error
 	retryAttempts  int
 }
@@ -156,6 +159,7 @@ func NewClient(cfg Config) (Client, error) {
 		Transport: utils.ConfigureHTTPTransport(&http.Transport{DialContext: utils.SafeNetDialer(timeout).DialContext}),
 	}
 	limiter := rate.NewLimiter(rate.Limit(rateLimit), rateLimit)
+	throttle := &jiraThrottle{}
 
 	if cfg.DeploymentType == DeploymentDataCenter {
 		return &dataCenterClient{
@@ -166,6 +170,7 @@ func NewClient(cfg Config) (Client, error) {
 			authHeader:     authHeader,
 			httpClient:     httpClient,
 			limiter:        limiter,
+			throttle:       throttle,
 		}, nil
 	}
 
@@ -179,6 +184,7 @@ func NewClient(cfg Config) (Client, error) {
 		authHeader:     authHeader,
 		httpClient:     httpClient,
 		limiter:        limiter,
+		throttle:       throttle,
 	}, nil
 }
 
@@ -392,7 +398,7 @@ func gatewayAuthProbe(gatewayBase, authHeader string, httpClient *http.Client) b
 // do performs an HTTP request with rate limiting
 func (c *cloudClient) do(ctx context.Context, method, reqURL string, body any) (*http.Response, error) {
 	return doReadOnlyJiraRequest(
-		ctx, c.httpClient, c.limiter, c.authHeader, method, reqURL, body,
+		ctx, c.httpClient, c.limiter, c.throttle, c.authHeader, method, reqURL, body,
 		c.retryAttempts, c.retryWait,
 	)
 }
@@ -403,10 +409,46 @@ const (
 	jiraRetryMaxDelay        = 5 * time.Second
 )
 
+// jiraThrottle is a per-client cooldown that every request observes. When one
+// request is rate limited with a Retry-After window, the whole client pauses
+// instead of each worker retrying in lockstep and extending the throttling.
+type jiraThrottle struct {
+	mu    sync.Mutex
+	until time.Time
+}
+
+// wait blocks until the current cooldown elapses.
+func (t *jiraThrottle) wait(ctx context.Context) error {
+	if t == nil {
+		return nil
+	}
+	t.mu.Lock()
+	until := t.until
+	t.mu.Unlock()
+	if delay := time.Until(until); delay > 0 {
+		return waitForJiraRetry(ctx, delay)
+	}
+	return nil
+}
+
+// pause extends the cooldown so it lasts at least delay from now. It never
+// shortens an existing cooldown.
+func (t *jiraThrottle) pause(delay time.Duration) {
+	if t == nil || delay <= 0 {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if until := time.Now().Add(delay); until.After(t.until) {
+		t.until = until
+	}
+}
+
 func doReadOnlyJiraRequest(
 	ctx context.Context,
 	httpClient *http.Client,
 	limiter *rate.Limiter,
+	throttle *jiraThrottle,
 	authHeader string,
 	method string,
 	reqURL string,
@@ -425,17 +467,7 @@ func doReadOnlyJiraRequest(
 			return nil, err
 		}
 	}
-	if retryAttempts <= 0 {
-		retryAttempts = defaultJiraRetryAttempts
-	}
-	if retryWait == nil {
-		retryWait = waitForJiraRetry
-	}
-
-	for attempt := 0; ; attempt++ {
-		if err := limiter.Wait(ctx); err != nil {
-			return nil, err
-		}
+	return jiraRetryRequest(ctx, httpClient, limiter, throttle, retryAttempts, retryWait, func() (*http.Request, error) {
 		var bodyReader io.Reader
 		if bodyBytes != nil {
 			bodyReader = bytes.NewReader(bodyBytes)
@@ -449,15 +481,65 @@ func doReadOnlyJiraRequest(
 		if bodyBytes != nil {
 			req.Header.Set("Content-Type", "application/json")
 		}
-		resp, err := httpClient.Do(req) //nolint:gosec // G704: URL constructed from configured Jira base URL
+		return req, nil
+	})
+}
+
+// jiraRetryRequest executes an idempotent read-only request with the shared
+// rate-limit, cooldown, and backoff contract. build must return a fresh request
+// for each attempt. Retryable responses are drained and closed before the next
+// attempt so the connection can be reused.
+func jiraRetryRequest(
+	ctx context.Context,
+	httpClient *http.Client,
+	limiter *rate.Limiter,
+	throttle *jiraThrottle,
+	retryAttempts int,
+	retryWait func(context.Context, time.Duration) error,
+	build func() (*http.Request, error),
+) (*http.Response, error) {
+	if retryAttempts <= 0 {
+		retryAttempts = defaultJiraRetryAttempts
+	}
+	if retryWait == nil {
+		retryWait = waitForJiraRetry
+	}
+
+	for attempt := 0; ; attempt++ {
+		if err := throttle.wait(ctx); err != nil {
+			return nil, err
+		}
+		if err := limiter.Wait(ctx); err != nil {
+			return nil, err
+		}
+		req, err := build()
 		if err != nil {
 			return nil, err
+		}
+		resp, err := httpClient.Do(req) //nolint:gosec // G704: URL constructed from configured Jira base URL
+		if err != nil {
+			if attempt >= retryAttempts {
+				return nil, err
+			}
+			delay := jiraBackoffDelay(attempt)
+			slog.Warn("Jira request failed; retrying",
+				slog.String("component", "jira"),
+				slog.Int("attempt", attempt+1),
+				slog.Duration("delay", delay),
+				slog.Any("error", err))
+			if waitErr := retryWait(ctx, delay); waitErr != nil {
+				return nil, waitErr
+			}
+			continue
 		}
 		if !jiraResponseIsRetryable(resp.StatusCode) || attempt >= retryAttempts {
 			return resp, nil
 		}
 
 		delay := jiraRetryDelay(resp.Header.Get("Retry-After"), attempt, time.Now())
+		// Pause every worker, not just this one, so a throttled import backs off
+		// as a whole instead of stampeding the rate limit.
+		throttle.pause(delay)
 		// Make upstream throttling diagnosable: without this a slow import cannot
 		// be told apart from a rate-limited one.
 		slog.Warn("Jira request throttled; retrying",
@@ -473,8 +555,19 @@ func doReadOnlyJiraRequest(
 	}
 }
 
+// jiraResponseIsRetryable reports whether a response status is transient.
+// Every Jira request the importer makes is read-only, so retrying is safe.
 func jiraResponseIsRetryable(status int) bool {
-	return status == http.StatusTooManyRequests || status == http.StatusServiceUnavailable
+	switch status {
+	case http.StatusTooManyRequests,
+		http.StatusInternalServerError,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
 }
 
 func jiraRetryDelay(retryAfter string, attempt int, now time.Time) time.Duration {
@@ -488,11 +581,22 @@ func jiraRetryDelay(retryAfter string, attempt int, now time.Time) time.Duration
 		}
 		return 0
 	}
-	delay := jiraRetryBaseDelay * time.Duration(1<<min(attempt, 4))
-	if delay > jiraRetryMaxDelay {
-		return jiraRetryMaxDelay
+	return jiraBackoffDelay(attempt)
+}
+
+// jiraBackoffDelay returns an exponential backoff for the attempt with equal
+// jitter, so concurrent workers do not retry in lockstep when the server does
+// not send Retry-After.
+func jiraBackoffDelay(attempt int) time.Duration {
+	base := jiraRetryBaseDelay * time.Duration(1<<min(attempt, 4))
+	if base > jiraRetryMaxDelay {
+		base = jiraRetryMaxDelay
 	}
-	return delay
+	half := base / 2
+	if half <= 0 {
+		return base
+	}
+	return half + time.Duration(rand.Int64N(int64(half))) //nolint:gosec // G404: retry jitter, not a security decision
 }
 
 func waitForJiraRetry(ctx context.Context, delay time.Duration) error {
@@ -1564,7 +1668,7 @@ func (c *cloudClient) GetBoardSprints(ctx context.Context, boardID int) (*Sprint
 
 // DownloadAttachment downloads an attachment and returns the reader and content type
 func (c *cloudClient) DownloadAttachment(ctx context.Context, attachmentURL string) (io.ReadCloser, string, error) {
-	return jiraDownloadAttachment(ctx, c.httpClient, c.limiter, c.authHeader, attachmentURL)
+	return jiraDownloadAttachment(ctx, c.httpClient, c.limiter, c.throttle, c.authHeader, attachmentURL)
 }
 
 // ================================================================

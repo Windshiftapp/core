@@ -22,6 +22,7 @@ type dataCenterClient struct {
 	authHeader     string
 	httpClient     *http.Client
 	limiter        *rate.Limiter
+	throttle       *jiraThrottle
 	retryWait      func(context.Context, time.Duration) error
 	retryAttempts  int
 }
@@ -31,7 +32,7 @@ type dataCenterClient struct {
 //nolint:unparam // method is always "GET" currently but kept for future flexibility
 func (c *dataCenterClient) do(ctx context.Context, method, reqURL string, body any) (*http.Response, error) {
 	return doReadOnlyJiraRequest(
-		ctx, c.httpClient, c.limiter, c.authHeader, method, reqURL, body,
+		ctx, c.httpClient, c.limiter, c.throttle, c.authHeader, method, reqURL, body,
 		c.retryAttempts, c.retryWait,
 	)
 }
@@ -487,7 +488,7 @@ func (c *dataCenterClient) GetBoardSprints(ctx context.Context, boardID int) (*S
 
 // DownloadAttachment downloads an attachment and returns the reader and content type
 func (c *dataCenterClient) DownloadAttachment(ctx context.Context, attachmentURL string) (io.ReadCloser, string, error) {
-	return jiraDownloadAttachment(ctx, c.httpClient, c.limiter, c.authHeader, attachmentURL)
+	return jiraDownloadAttachment(ctx, c.httpClient, c.limiter, c.throttle, c.authHeader, attachmentURL)
 }
 
 // ================================================================

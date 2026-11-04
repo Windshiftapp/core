@@ -268,26 +268,26 @@ func jiraStartAtPageURL(base string, startAt, maxResults int, extra url.Values) 
 }
 
 // jiraDownloadAttachment streams an attachment from a URL previously returned
-// by the Jira API. The body stays open; the caller owns closing it.
+// by the Jira API. It shares the client's rate limit, throttle cooldown, and
+// retry/backoff contract with the JSON endpoints. The body stays open; the
+// caller owns closing it.
 func jiraDownloadAttachment(
 	ctx context.Context,
 	httpClient *http.Client,
 	limiter *rate.Limiter,
+	throttle *jiraThrottle,
 	authHeader string,
 	attachmentURL string,
 ) (io.ReadCloser, string, error) {
-	if err := limiter.Wait(ctx); err != nil {
-		return nil, "", err
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, attachmentURL, http.NoBody)
-	if err != nil {
-		return nil, "", err
-	}
-	req.Header.Set("Authorization", authHeader)
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := httpClient.Do(req) //nolint:gosec // G704: attachment URL from trusted Jira API response
+	resp, err := jiraRetryRequest(ctx, httpClient, limiter, throttle, 0, nil, func() (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, attachmentURL, http.NoBody)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", authHeader)
+		req.Header.Set("Accept", "application/json")
+		return req, nil
+	})
 	if err != nil {
 		return nil, "", err
 	}
