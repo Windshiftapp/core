@@ -40,6 +40,8 @@ type JiraImportHandler struct {
 	importMaxDuration time.Duration
 	// importWatchers enables the per-issue watcher fetch and item-watch import.
 	importWatchers bool
+	// importConcurrency bounds in-flight Jira requests for independent work.
+	importConcurrency int
 }
 
 func (h *JiraImportHandler) WithAuthorizationCacheInvalidator(invalidator *services.AuthorizationCacheInvalidator) *JiraImportHandler {
@@ -61,6 +63,20 @@ func (h *JiraImportHandler) WithImportWatchers(enabled bool) *JiraImportHandler 
 	return h
 }
 
+// WithImportConcurrency overrides how many independent Jira requests the import
+// keeps in flight. Values below 1 keep the default; values above the maximum
+// are clamped so a misconfiguration cannot spawn an unbounded pool.
+func (h *JiraImportHandler) WithImportConcurrency(workers int) *JiraImportHandler {
+	if workers <= 0 {
+		return h
+	}
+	if workers > jiraImportMaxConcurrency {
+		workers = jiraImportMaxConcurrency
+	}
+	h.importConcurrency = workers
+	return h
+}
+
 // NewJiraImportHandler creates a new Jira import handler.
 // sessionSecret: session-signing secret (resolved upstream by config.Load).
 // capturePayloadsDir: optional directory for request/response capture (empty = disabled).
@@ -76,6 +92,7 @@ func NewJiraImportHandler(db database.Database, sessionSecret, capturePayloadsDi
 		encryption:         sso.NewSecretEncryption(sessionSecret),
 		capturePayloadsDir: capturePayloadsDir,
 		mappingFailures:    make(map[string]error),
+		importConcurrency:  jiraImportDefaultConcurrency,
 	}
 }
 

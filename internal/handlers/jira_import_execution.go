@@ -736,16 +736,25 @@ func (h *JiraImportHandler) importJiraIssueBatches(
 // comment/worklog page in issue payloads; fetching the rest here lets author
 // mapping include every referenced user.
 func (h *JiraImportHandler) completeJiraBatchSubresources(ctx context.Context, im *jiraImportContext, projectKey string, issues []jira.JiraIssue, xrayPlan *xrayImportPlan) {
-	for idx := range issues {
+	// Each issue's subresource work is independent, so run it concurrently and
+	// fold the failure counts back into the shared progress on this goroutine.
+	type subresourceFailures struct {
+		comments int
+		worklogs int
+	}
+	failures := make([]subresourceFailures, len(issues))
+	jiraParallel(ctx, h.importConcurrency, len(issues), func(ctx context.Context, idx int) {
 		if xrayPlan.isTest(projectKey, issues[idx].Key) {
-			continue
+			return
 		}
-		if err := h.completePagedIssueContainers(ctx, &issues[idx], im.client, im.progress); err != nil {
+		comments, worklogs, err := h.completeJiraIssueSubresources(ctx, &issues[idx], im.client)
+		if err != nil {
 			slog.Warn("Failed to complete paged Jira issue containers",
 				slog.String("component", "jira"),
 				slog.String("issue", issues[idx].Key),
 				slog.Any("error", err))
 		}
+		failures[idx] = subresourceFailures{comments: comments, worklogs: worklogs}
 		if h.importWatchers {
 			h.completeIssueWatchers(ctx, &issues[idx], im.client)
 		}
@@ -757,6 +766,10 @@ func (h *JiraImportHandler) completeJiraBatchSubresources(ctx context.Context, i
 					slog.Any("error", err))
 			}
 		}
+	})
+	for _, failure := range failures {
+		im.progress.FailedComments += failure.comments
+		im.progress.FailedWorklogs += failure.worklogs
 	}
 }
 
@@ -1466,24 +1479,23 @@ func (h *JiraImportHandler) bindJiraImportFieldsToWorkspace(
 	return h.imports.BindFieldsToWorkspace(workspaceID, projectKey, fieldIDs)
 }
 
-func (h *JiraImportHandler) completePagedIssueContainers(ctx context.Context, issue *jira.JiraIssue, client jira.Client, progress *ImportProgress) error {
+// completeJiraIssueSubresources completes one issue's paginated comment and
+// worklog containers. It reports the failure counts instead of mutating the
+// shared progress so it can run concurrently across a batch.
+func (h *JiraImportHandler) completeJiraIssueSubresources(ctx context.Context, issue *jira.JiraIssue, client jira.Client) (failedComments, failedWorklogs int, err error) {
 	if issue == nil || issue.Key == "" {
-		return nil
+		return 0, 0, nil
 	}
 	var errs []error
 	if err := h.completeIssueComments(ctx, issue, client); err != nil {
-		if progress != nil {
-			progress.FailedComments++
-		}
+		failedComments = 1
 		errs = append(errs, err)
 	}
 	if err := h.completeIssueWorklogs(ctx, issue, client); err != nil {
-		if progress != nil {
-			progress.FailedWorklogs++
-		}
+		failedWorklogs = 1
 		errs = append(errs, err)
 	}
-	return errors.Join(errs...)
+	return failedComments, failedWorklogs, errors.Join(errs...)
 }
 
 func (h *JiraImportHandler) completeIssueWatchers(ctx context.Context, issue *jira.JiraIssue, client jira.Client) {

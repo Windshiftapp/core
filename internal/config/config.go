@@ -313,6 +313,9 @@ type JiraConfig struct {
 	// watches. It is off by default: the identities require one extra Jira
 	// request per issue, which dominates large imports for a low-value mapping.
 	ImportWatchers bool
+	// ImportConcurrency overrides how many independent Jira requests an import
+	// keeps in flight. Zero uses the built-in default.
+	ImportConcurrency int
 }
 
 // LogbookSidecarConfig is the sibling of Config for the standalone logbook

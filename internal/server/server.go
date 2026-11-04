@@ -1069,7 +1069,8 @@ func (s *Server) initialize() error {
 	jiraImportHandler := handlers.NewJiraImportHandler(s.db, cfg.Auth.SessionSecret, cfg.Jira.CapturePayloadsDir, attachmentStorage).
 		WithAuthorizationCacheInvalidator(authorizationCacheInvalidator).
 		WithImportMaxDuration(cfg.Jira.ImportMaxDuration).
-		WithImportWatchers(cfg.Jira.ImportWatchers)
+		WithImportWatchers(cfg.Jira.ImportWatchers).
+		WithImportConcurrency(cfg.Jira.ImportConcurrency)
 	if n, err := jiraImportHandler.ReconcileInterruptedImports(); err != nil {
 		slog.Warn("failed to reconcile interrupted Jira imports", slog.Any("error", err))
 	} else if n > 0 {

@@ -302,6 +302,7 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 			CapturePayloadsDir: os.Getenv("JIRA_CAPTURE_PAYLOADS"),
 			ImportMaxDuration:  parseDurationEnv("JIRA_IMPORT_MAX_DURATION", 0),
 			ImportWatchers:     parseBoolEnv("JIRA_IMPORT_WATCHERS"),
+			ImportConcurrency:  parseIntEnv("JIRA_IMPORT_CONCURRENCY", 0),
 		},
 		Memory:  MemoryConfig{LimitMB: resolvedMemoryLimitMB},
 		Storage: storageConfig,
