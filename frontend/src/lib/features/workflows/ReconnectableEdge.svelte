@@ -6,6 +6,7 @@
     Position
   } from '@xyflow/svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import Monitor from '@lucide/svelte/icons/monitor';
 
   let {
     id,
@@ -61,6 +62,19 @@
     markerEnd="url(#workflow-arrowhead)"
     style={`stroke: var(--workflow-edge-stroke, #d1d5db); stroke-width: 1;`}
   />
+{/if}
+
+<!-- A bound transition screen is visible at a glance, not only on selection. -->
+{#if data?.screen}
+  <foreignObject x={labelX - 12} y={labelY + 8} width="24" height="20" style="overflow: visible;">
+    <div
+      class="edge-screen-badge"
+      title={data.screen.name}
+      data-testid="transition-screen-badge"
+    >
+      <Monitor class="w-3 h-3" />
+    </div>
+  </foreignObject>
 {/if}
 
 <!-- Show reconnection anchors when edge is selected -->
@@ -125,5 +139,18 @@
     background: var(--workflow-panel-hover);
     color: var(--workflow-accent);
     border-color: var(--workflow-accent);
+  }
+
+  .edge-screen-badge {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid var(--workflow-accent, #3b82f6);
+    background: var(--workflow-panel, #fff);
+    color: var(--workflow-accent, #3b82f6);
+    pointer-events: all;
   }
 </style>

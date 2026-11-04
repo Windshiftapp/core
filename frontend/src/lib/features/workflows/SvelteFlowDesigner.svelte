@@ -34,6 +34,8 @@
   import Plus from '@lucide/svelte/icons/plus';
   import SearchInput from '../../components/SearchInput.svelte';
   import StatusModal from '../../dialogs/StatusModal.svelte';
+  import TransitionInspector from './TransitionInspector.svelte';
+  import { transitions as transitionsApi } from '../../api/transitions.js';
 
   let { workflow, statuses = [], statusCategories = [], onSave, onCancel } = $props();
 
@@ -42,6 +44,10 @@
   let edges = $state([]);
   let workflowStatuses = $state([]);
   let workingTransitions = $state([]);
+  // Selected transition (edge) for the right-hand inspector and the screen
+  // binding map that drives the edge badges (WI-1835).
+  let selectedTransition = $state(null);
+  let screenByTransition = $state({});
   let savingTransitions = $state(false);
   let initialStatusId = $state(null);
 
@@ -139,6 +145,51 @@
       initialStatusId = nodes[0].data.statusId;
       nodes = markInitialNode(nodes, initialStatusId);
     }
+
+    void loadTransitionScreens();
+  }
+
+  // The graph payload deliberately omits screen_id, so the designer resolves
+  // the binding per transition through governance and badges the edges.
+  async function loadTransitionScreens() {
+    const ids = edges.map((edge) => edge.data?.transitionId).filter(Boolean);
+    if (ids.length === 0) {
+      screenByTransition = {};
+      return;
+    }
+    const entries = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const governance = await transitionsApi.governance(id);
+          return [id, governance?.screen || null];
+        } catch {
+          return [id, null];
+        }
+      })
+    );
+    screenByTransition = Object.fromEntries(entries);
+    applyScreenBadges();
+  }
+
+  // Mirror the resolved bindings onto the edge data so ReconnectableEdge can
+  // render a badge without another lookup.
+  function applyScreenBadges() {
+    edges = edges.map((edge) => ({
+      ...edge,
+      data: { ...edge.data, screen: screenByTransition[edge.data?.transitionId] || null },
+    }));
+  }
+
+  function handleScreenChanged({ transitionId, screen }) {
+    screenByTransition = { ...screenByTransition, [transitionId]: screen };
+    applyScreenBadges();
+  }
+
+  function handleEdgeClick(event) {
+    const edge = event?.detail?.edge ?? event?.detail;
+    const transitionId = edge?.data?.transitionId;
+    if (!transitionId) return;
+    selectedTransition = { ...edge.data };
   }
 
   function onConnect(params) {
@@ -620,6 +671,7 @@
       {edgeTypes}
       onconnect={onConnect}
       onnodedragstop={onNodeDragStop}
+      onedgeclick={handleEdgeClick}
       {...legacyChangeHandlers}
       {...flowOptions}
       fitView
@@ -698,6 +750,15 @@
   </div>
 
   <!-- Shared create-status dialog -->
+  {#if selectedTransition}
+    <TransitionInspector
+      transition={selectedTransition}
+      {statuses}
+      onClose={() => (selectedTransition = null)}
+      onChanged={handleScreenChanged}
+    />
+  {/if}
+
   <StatusModal
     isOpen={showStatusModal}
     bind:formData={statusFormData}

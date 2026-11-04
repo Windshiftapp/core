@@ -12,6 +12,7 @@
   import Pencil from '@lucide/svelte/icons/pencil';
   import { getAssignableUsers } from '../api/users.js';
   import { items } from '../api/items.js';
+  import TransitionScreenModal from '../dialogs/TransitionScreenModal.svelte';
   import { loadMobileItemDetailSummary } from './mobileItemDetailData.js';
   import { agentRuns as agentRunBus } from '../stores/agentRuns.svelte.js';
   import { navigate } from '../router.js';
@@ -40,6 +41,9 @@
   let loading = $state(true);
   let errored = $state(false);
   let transitions = $state([]);
+  // Screen-bearing move requested from the mobile status sheet (WI-1835).
+  let mobileTransition = $state(null);
+  let showMobileTransition = $state(false);
   let transitioning = $state(false);
   let isWatching = $state(false);
   let watcherCount = $state(0);
@@ -167,16 +171,36 @@
 
   async function changeStatus(statusId) {
     if (transitioning) return;
+    const option = transitions.find((transition) => transition.id === statusId);
+    if (option?.screen) {
+      mobileTransition = { statusId, screen: option.screen, statusName: option.name || '' };
+      showMobileTransition = true;
+      statusSheetOpen = false;
+      return;
+    }
+    await performChangeStatus(statusId, null);
+  }
+
+  async function performChangeStatus(statusId, fields) {
+    if (transitioning) return;
     transitioning = true;
     try {
-      const updated = await items.transition(itemId, statusId);
+      const updated = await items.transition(itemId, statusId, fields);
       item = { ...item, ...updated };
       await refreshTransitionState(itemId, loadToken);
     } catch (err) {
       console.error('Failed to transition item:', err);
+      throw err;
     } finally {
       transitioning = false;
     }
+  }
+
+  async function handleMobileTransitionConfirm(fields) {
+    if (!mobileTransition) return;
+    const { statusId } = mobileTransition;
+    await performChangeStatus(statusId, fields);
+    mobileTransition = null;
   }
 
   // Personal-workspace (workflow-less) tasks get no available status
@@ -648,6 +672,17 @@
       </span>
     {/snippet}
   </MobileOptionSheet>
+{/if}
+
+{#if showMobileTransition && mobileTransition}
+  <TransitionScreenModal
+    bind:show={showMobileTransition}
+    screen={mobileTransition.screen}
+    targetStatusName={mobileTransition.statusName}
+    workspaceId={item?.workspace_id}
+    onconfirm={handleMobileTransitionConfirm}
+    oncancel={() => (mobileTransition = null)}
+  />
 {/if}
 
 <style>

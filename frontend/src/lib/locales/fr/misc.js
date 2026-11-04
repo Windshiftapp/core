@@ -874,4 +874,13 @@ export default {
     page: 'Page',
     database: 'Base de données',
   },
+  transitionScreen: {
+    title: 'Écran de transition',
+    moveTo: 'Déplacer vers {status}',
+    comment: 'Commentaire',
+    commentPlaceholder: 'Ajouter un commentaire (facultatif)',
+    confirm: 'Déplacer',
+    failed: 'Impossible de terminer la transition.',
+    missingFields: 'Renseignez les champs obligatoires pour continuer :',
+  },
 };

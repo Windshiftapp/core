@@ -758,4 +758,13 @@ export default {
     pleaseSelectImage: '请选择图片文件',
     failedToUploadAvatar: '上传头像失败',
   },
+  transitionScreen: {
+    title: '转场界面',
+    moveTo: '移动到 {status}',
+    comment: '评论',
+    commentPlaceholder: '添加评论（可选）',
+    confirm: '移动',
+    failed: '无法完成转场。',
+    missingFields: '请填写必填字段以继续：',
+  },
 };

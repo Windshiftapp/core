@@ -376,4 +376,18 @@ export default {
     updateCategory: 'Update Category',
     createCategory: 'Create Category',
   },
+  workflowInspector: {
+    subtitle: 'Transition settings',
+    screen: 'Screen',
+    noScreen: 'No screen is attached to this transition.',
+    chooseScreen: 'Choose a screen…',
+    changeScreen: 'Change screen…',
+    unbind: 'Unbind',
+    fieldSummary: '{fields} field(s), {required} required',
+    newScreenPlaceholder: 'New screen name',
+    createAndBind: 'Create & bind',
+    screenSaved: 'Transition screen saved',
+    screenSaveFailed: 'Could not save the transition screen',
+    screenCreateFailed: 'Could not create the screen',
+  },
 };

@@ -223,4 +223,13 @@ export default {
     builtinRemoved: 'Встроенная очередь убрана',
     saveFailed: 'Не удалось сохранить очередь',
   },
+  transitionScreen: {
+    title: 'Экран перехода',
+    moveTo: 'Перейти в {status}',
+    comment: 'Комментарий',
+    commentPlaceholder: 'Добавить комментарий (необязательно)',
+    confirm: 'Перейти',
+    failed: 'Не удалось выполнить переход.',
+    missingFields: 'Заполните обязательные поля, чтобы продолжить:',
+  },
 };

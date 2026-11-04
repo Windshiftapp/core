@@ -11,6 +11,7 @@
   import { time } from '../../api/time.js';
   import { recurrence } from '../../api/recurrence.js';
   import { items as itemsApi } from '../../api/items.js';
+  import TransitionScreenModal from '../../dialogs/TransitionScreenModal.svelte';
   import { ai } from '../../api/ai.js';
   import { navigate, currentRoute } from '../../router.js';
   import { publicBaseURL } from '../../runtime/contextPath.js';
@@ -200,6 +201,9 @@ import NativeSelect from '../../components/NativeSelect.svelte';
   // Recurrence state
   let recurrenceRule = $state(null);
   let showRecurrenceModal = $state(false);
+  // Transition screen requested from the status picker (WI-1835).
+  let transitionScreen = $state(null);
+  let showTransitionScreen = $state(false);
   let recurrenceEditorRef = $state(null);
   let recurrenceSaving = $state(false);
 
@@ -418,8 +422,24 @@ import NativeSelect from '../../components/NativeSelect.svelte';
   }
   
   async function handleSaveField(detail) {
-    const { field, value, assigneeName, iterationName, teamName } = detail;
+    const { field, value, assigneeName, iterationName, teamName, screen, statusName } = detail;
+    // A move whose transition carries a screen opens the modal first; the
+    // modal's confirm submits the collected fields with the transition.
+    if (field === 'status_id' && screen) {
+      transitionScreen = { statusId: value, screen, statusName };
+      showTransitionScreen = true;
+      return;
+    }
     await saveField(field, value, assigneeName, iterationName, teamName);
+  }
+
+  async function handleTransitionConfirm(fields) {
+    if (!transitionScreen) return;
+    const { statusId } = transitionScreen;
+    // Errors propagate back to the modal so it can render screen_required
+    // missing fields inline instead of a toast.
+    await itemDetailStore.saveField('status_id', statusId, null, null, null, fields);
+    transitionScreen = null;
   }
 
   function handleCancelEdit(detail) {
@@ -1763,6 +1783,19 @@ import NativeSelect from '../../components/NativeSelect.svelte';
       onsave={handleRecurrenceSave}
     />
   </FormModal>
+{/if}
+
+{#if showTransitionScreen && transitionScreen}
+  <TransitionScreenModal
+    bind:show={showTransitionScreen}
+    screen={transitionScreen.screen}
+    targetStatusName={transitionScreen.statusName}
+    workspaceId={itemDetailStore.item?.workspace_id}
+    milestones={itemDetailStore.milestones}
+    iterations={itemDetailStore.iterations}
+    onconfirm={handleTransitionConfirm}
+    oncancel={() => (transitionScreen = null)}
+  />
 {/if}
 
 <style>

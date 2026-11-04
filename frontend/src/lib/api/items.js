@@ -242,11 +242,17 @@ export const items = {
   // Perform a workflow status transition. Use this instead of passing
   // status_id to update() — the update endpoint rejects status_id so that
   // validator-mode and condition-mode workflow rules are always enforced.
+  // `fields` carries the transition screen's submitted values; the server
+  // validates required screen fields and applies them atomically with the move.
   // Returns the updated item (unwrapped from the {item, old_status_id, ...} envelope).
-  transition: withCrossTabNotice(async (id, toStatusId) => {
+  transition: withCrossTabNotice(async (id, toStatusId, fields = null) => {
+    const body = { to_status_id: toStatusId };
+    if (fields && Object.keys(fields).length > 0) {
+      body.fields = fields;
+    }
     const response = await fetchV2Data(`/items/${id}/transition`, {
       method: 'POST',
-      body: JSON.stringify({ to_status_id: toStatusId }),
+      body: JSON.stringify(body),
     });
     return response.item;
   }, 'transition'),

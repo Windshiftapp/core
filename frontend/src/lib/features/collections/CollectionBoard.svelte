@@ -6,6 +6,8 @@
   import { items as itemsApi } from '../../api/items.js';
   import { getAssignableUsers } from '../../api/users.js';
   import { labels as labelsApi } from '../../api/misc.js';
+  import TransitionScreenModal from '../../dialogs/TransitionScreenModal.svelte';
+  import { resolveTransitionScreen } from '../../utils/transitionScreens.js';
   import { collections as collectionsApi } from '../../api/collections.js';
   import { workspaces as workspacesApi } from '../../api/workspaces.js';
   import { iterations as iterationsApi } from '../../api/milestones.js';
@@ -149,6 +151,10 @@
     if (ids.length > 0) void workspaceDataStore.hydrateUsers(ids);
   });
   let transitions = $state([]);
+  // A board move whose transition carries a screen pauses here until the
+  // modal collects the fields (WI-1835).
+  let boardTransition = $state(null);
+  let showBoardTransition = $state(false);
   let boardConfig = $state(null);
   let cardFields = $derived((boardConfig?.card_fields || []).slice().sort((a, b) => a.display_order - b.display_order));
   // Milestone-swimlane preferences live on the board configuration so they are
@@ -1838,10 +1844,27 @@
   }
 
   async function moveItemToStatus(item, targetStatusId, targetName) {
+    const screen = await resolveTransitionScreen(item.id, targetStatusId);
+    if (screen) {
+      boardTransition = { item, targetStatusId, targetName, screen };
+      showBoardTransition = true;
+      return;
+    }
+    await performMoveItemToStatus(item, targetStatusId, targetName, null);
+  }
+
+  async function handleBoardTransitionConfirm(fields) {
+    if (!boardTransition) return;
+    const { item, targetStatusId, targetName } = boardTransition;
+    boardTransition = null;
+    await performMoveItemToStatus(item, targetStatusId, targetName, fields);
+  }
+
+  async function performMoveItemToStatus(item, targetStatusId, targetName, fields) {
     const previousStatusId = item.status_id;
     updateLocalItemStatus(item.id, targetStatusId);
     try {
-      const transitionedItem = await itemsApi.transition(item.id, targetStatusId);
+      const transitionedItem = await itemsApi.transition(item.id, targetStatusId, fields);
       mergeLocalItem(item.id, transitionedItem);
       boardAnnouncement = `Moved ${item.title} to ${targetName}`;
       successToast(boardAnnouncement);
@@ -2111,6 +2134,19 @@
 
       // If changing status, update the status first
       if (!isSameStatus) {
+        // A screen-bearing move opens the modal instead of moving optimistically.
+        const screen = await resolveTransitionScreen(preparedItem.id, targetStatusId);
+        if (screen) {
+          const targetStatus = statuses.find((status) => status.id === targetStatusId);
+          boardTransition = {
+            item: preparedItem,
+            targetStatusId,
+            targetName: targetStatus?.name || '',
+            screen,
+          };
+          showBoardTransition = true;
+          return null;
+        }
         updateLocalItemStatus(preparedItem.id, targetStatusId);
         try {
           const transitionedItem = await itemsApi.transition(preparedItem.id, targetStatusId);
@@ -2729,6 +2765,17 @@
   onclose={() => (milestoneSwimlaneDialogOpen = false)}
   onsave={saveMilestoneSwimlaneConfig}
 />
+
+{#if showBoardTransition && boardTransition}
+  <TransitionScreenModal
+    bind:show={showBoardTransition}
+    screen={boardTransition.screen}
+    targetStatusName={boardTransition.targetName}
+    workspaceId={boardTransition.item?.workspace_id}
+    onconfirm={handleBoardTransitionConfirm}
+    oncancel={() => (boardTransition = null)}
+  />
+{/if}
 
 <style>
   /* Collapsed board column: write the column name vertically so the narrow

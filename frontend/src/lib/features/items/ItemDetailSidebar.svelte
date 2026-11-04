@@ -733,7 +733,9 @@
         onSelect={(selectedStatus) => {
           onsaveField?.({
             field: 'status_id',
-            value: selectedStatus?.id || null
+            value: selectedStatus?.id || null,
+            screen: selectedStatus?.screen || null,
+            statusName: selectedStatus?.label || ''
           });
         }}
         onCancel={() => {

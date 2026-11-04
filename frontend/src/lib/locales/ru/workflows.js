@@ -382,4 +382,18 @@ export default {
     updateCategory: 'Обновить категорию',
     createCategory: 'Создать категорию',
   },
+  workflowInspector: {
+    subtitle: 'Настройки перехода',
+    screen: 'Экран',
+    noScreen: 'К этому переходу не привязан экран.',
+    chooseScreen: 'Выбрать экран…',
+    changeScreen: 'Изменить экран…',
+    unbind: 'Отвязать',
+    fieldSummary: '{fields} полей, {required} обязательных',
+    newScreenPlaceholder: 'Название нового экрана',
+    createAndBind: 'Создать и привязать',
+    screenSaved: 'Экран перехода сохранён',
+    screenSaveFailed: 'Не удалось сохранить экран перехода',
+    screenCreateFailed: 'Не удалось создать экран',
+  },
 };

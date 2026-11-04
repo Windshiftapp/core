@@ -746,4 +746,13 @@ export default {
     projectUpdated: 'Projekt erfolgreich aktualisiert',
     projectDeleted: 'Projekt erfolgreich gelöscht',
   },
+  transitionScreen: {
+    title: 'Übergangsbildschirm',
+    moveTo: 'Nach {status} verschieben',
+    comment: 'Kommentar',
+    commentPlaceholder: 'Kommentar hinzufügen (optional)',
+    confirm: 'Verschieben',
+    failed: 'Der Übergang konnte nicht abgeschlossen werden.',
+    missingFields: 'Füllen Sie die erforderlichen Felder aus:',
+  },
 };

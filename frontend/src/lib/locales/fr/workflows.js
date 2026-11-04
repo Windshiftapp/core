@@ -376,4 +376,18 @@ export default {
     updateCategory: 'Mettre à jour la catégorie',
     createCategory: 'Créer la catégorie',
   },
+  workflowInspector: {
+    subtitle: 'Paramètres de transition',
+    screen: 'Écran',
+    noScreen: 'Aucun écran n\'est associé à cette transition.',
+    chooseScreen: 'Choisir un écran…',
+    changeScreen: 'Changer d\'écran…',
+    unbind: 'Dissocier',
+    fieldSummary: '{fields} champ(s), {required} obligatoire(s)',
+    newScreenPlaceholder: 'Nom du nouvel écran',
+    createAndBind: 'Créer et associer',
+    screenSaved: 'Écran de transition enregistré',
+    screenSaveFailed: 'Impossible d\'enregistrer l\'écran de transition',
+    screenCreateFailed: 'Impossible de créer l\'écran',
+  },
 };

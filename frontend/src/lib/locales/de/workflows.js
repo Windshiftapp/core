@@ -196,4 +196,18 @@ export default {
     updateCategory: 'Kategorie aktualisieren',
     createCategory: 'Kategorie erstellen',
   },
+  workflowInspector: {
+    subtitle: 'Übergangseinstellungen',
+    screen: 'Bildschirm',
+    noScreen: 'Diesem Übergang ist kein Bildschirm zugeordnet.',
+    chooseScreen: 'Bildschirm auswählen…',
+    changeScreen: 'Bildschirm ändern…',
+    unbind: 'Trennen',
+    fieldSummary: '{fields} Feld(er), {required} erforderlich',
+    newScreenPlaceholder: 'Name des neuen Bildschirms',
+    createAndBind: 'Erstellen & binden',
+    screenSaved: 'Übergangsbildschirm gespeichert',
+    screenSaveFailed: 'Der Übergangsbildschirm konnte nicht gespeichert werden',
+    screenCreateFailed: 'Der Bildschirm konnte nicht erstellt werden',
+  },
 };

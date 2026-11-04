@@ -185,4 +185,18 @@ export default {
     updateCategory: '更新分类',
     createCategory: '创建分类',
   },
+  workflowInspector: {
+    subtitle: '转场设置',
+    screen: '界面',
+    noScreen: '此转场未绑定界面。',
+    chooseScreen: '选择界面…',
+    changeScreen: '更换界面…',
+    unbind: '取消绑定',
+    fieldSummary: '{fields} 个字段，{required} 个必填',
+    newScreenPlaceholder: '新界面名称',
+    createAndBind: '创建并绑定',
+    screenSaved: '转场界面已保存',
+    screenSaveFailed: '无法保存转场界面',
+    screenCreateFailed: '无法创建界面',
+  },
 };

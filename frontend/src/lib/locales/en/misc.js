@@ -931,4 +931,13 @@ export default {
     builtinRemoved: 'Built-in queue removed',
     saveFailed: 'Failed to save the queue',
   },
+  transitionScreen: {
+    title: 'Transition screen',
+    moveTo: 'Move to {status}',
+    comment: 'Comment',
+    commentPlaceholder: 'Add a comment (optional)',
+    confirm: 'Move',
+    failed: 'Could not complete the transition.',
+    missingFields: 'Fill the required fields to continue:',
+  },
 };

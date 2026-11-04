@@ -231,6 +231,8 @@ class ItemDetailStore {
         label: transition.name,
         builtin_key: transition.builtin_key,
         categoryColor: transition.category_color || null,
+        // Screen summary the transition modal opens before moving (WI-1835).
+        screen: transition.screen || null,
       }));
     }
     return this.loadingStatusTransitions ? [{ value: '', label: 'Loading...' }] : [];
@@ -900,7 +902,8 @@ class ItemDetailStore {
     directValue = null,
     assigneeName = null,
     iterationName = null,
-    teamName = null
+    teamName = null,
+    transitionFields = null
   ) {
     if (this.saving) {
       // A save is in flight; remember the latest requested value per field
@@ -939,7 +942,9 @@ class ItemDetailStore {
           return;
         }
         // Status changes must use the transition endpoint for workflow validation.
-        const updatedItem = await items.transition(this.item.id, newStatusId);
+        const updatedItem = transitionFields
+          ? await items.transition(this.item.id, newStatusId, transitionFields)
+          : await items.transition(this.item.id, newStatusId);
         this.item = { ...this.item, ...updatedItem };
         this.cancelEditing('status');
         await this.refreshAvailableTransitions();
