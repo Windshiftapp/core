@@ -558,6 +558,9 @@ const (
 	ActionWorkflowCreate = "workflow.create"
 	ActionWorkflowUpdate = "workflow.update"
 	ActionWorkflowDelete = "workflow.delete"
+	// ActionTransitionScreenUpdate binds or clears the screen attached to a
+	// workflow transition (WI-1835).
+	ActionTransitionScreenUpdate = "transition.screen_update"
 
 	// Status management
 	ActionStatusCategoryCreate = "status_category.create"
@@ -1136,6 +1139,7 @@ const (
 	ResourceGroup                = "group"
 	ResourceConfigurationSet     = "configuration_set"
 	ResourceWorkflow             = "workflow"
+	ResourceWorkflowTransition   = "workflow_transition"
 	ResourceStatusCategory       = "status_category"
 	ResourceStatus               = "status"
 	ResourceCustomField          = "custom_field"

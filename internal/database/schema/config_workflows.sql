@@ -177,6 +177,7 @@ CREATE TABLE IF NOT EXISTS workflow_transitions (
 	display_order INTEGER DEFAULT 0,
 	source_handle TEXT,  -- Connection point on source status (top, right, bottom, left)
 	target_handle TEXT,  -- Connection point on target status (top, right, bottom, left)
+	screen_id INTEGER REFERENCES screens(id) ON DELETE RESTRICT,  -- Transition screen shown when this edge is taken (WI-1835)
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE,
 	FOREIGN KEY (from_status_id) REFERENCES statuses(id) ON DELETE CASCADE,
@@ -189,6 +190,7 @@ CREATE INDEX IF NOT EXISTS idx_statuses_category_id ON statuses(category_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_transitions_workflow_id ON workflow_transitions(workflow_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_transitions_from_status ON workflow_transitions(from_status_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_transitions_to_status ON workflow_transitions(to_status_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_transitions_screen_id ON workflow_transitions(screen_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_configuration_sets_builtin_key ON configuration_sets(builtin_key) WHERE builtin_key IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_item_types_builtin_key ON item_types(builtin_key) WHERE builtin_key IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_priorities_builtin_key ON priorities(builtin_key) WHERE builtin_key IS NOT NULL;

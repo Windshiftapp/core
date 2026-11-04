@@ -390,6 +390,17 @@ type PerformTransitionRequest struct {
 	// gated by workflow validity). Callers pass this through to
 	// ConditionService.EvaluateTransitionConditions.
 	Modes []string
+	// Fields are the values submitted with a transition screen. They are
+	// validated against the governing transition's screen and applied
+	// atomically with the status change. Only user-initiated callers set them.
+	Fields map[string]any
+	// EnforceScreen makes PerformTransition resolve the governing transition's
+	// screen and reject the move when a required field is missing. Automation
+	// leaves this false so screens stay a user-input gate.
+	EnforceScreen bool
+	// ApplyFields persists Fields inside the transition transaction. Required
+	// when Fields is non-nil and EnforceScreen is true.
+	ApplyFields func(ctx context.Context, tx database.Tx, item *models.Item) error
 }
 
 // PerformTransitionResult is returned once a transition commits, including
@@ -515,6 +526,37 @@ func (s *WorkflowService) PerformTransition(
 	}
 
 	itemCtx := BuildItemContext(s.db, req.ItemID, item.WorkspaceID, currentStatusSQL, itemTypeSQL)
+
+	// A transition screen is a user-input gate: resolve the governing row,
+	// reject missing required fields against the merged state, and let
+	// validators see the submitted values. Automation leaves EnforceScreen
+	// false and keeps bypassing screens.
+	if req.EnforceScreen {
+		transitionID, err := s.resolveGoverningTransitionID(item.WorkspaceID, itemTypeIDPtr, int64(oldStatusID), int64(req.ToStatusID))
+		if err != nil {
+			return nil, err
+		}
+		if transitionID != 0 {
+			screenFields, err := repository.NewTransitionRepository(s.db).GetScreenFields(transitionID)
+			if err != nil {
+				return nil, err
+			}
+			if len(screenFields) > 0 {
+				missing, err := s.validateTransitionScreenFields(item, screenFields, req.Fields)
+				if err != nil {
+					return nil, err
+				}
+				if len(missing) > 0 {
+					return nil, &TransitionRejection{
+						Code:    "screen_required",
+						Message: "transition screen has missing required fields",
+						Details: map[string]any{"missing_fields": missing},
+					}
+				}
+			}
+		}
+	}
+	overlayTransitionFields(itemCtx, req.Fields)
 	valid, failureMsg, err := s.IsValidStatusTransitionForUser(
 		ctx, item.WorkspaceID, itemTypeIDPtr,
 		int64(oldStatusID), int64(req.ToStatusID),
@@ -552,8 +594,19 @@ func (s *WorkflowService) PerformTransition(
 		}
 	}
 
-	// Transactional write + history entry.
+	// Transactional write + history entry. Submitted screen fields are applied
+	// first so the status commit and the field values share one transaction and
+	// a failure rolls back both.
 	if err := database.WithTx(s.db, func(tx database.Tx) error {
+		if req.ApplyFields != nil {
+			lockedItem, err := itemRepo.FindByIDForUpdate(tx, req.ItemID)
+			if err != nil {
+				return err
+			}
+			if err := req.ApplyFields(ctx, tx, lockedItem); err != nil {
+				return err
+			}
+		}
 		metadata := mergeItemEventMetadata(req.EventMetadata, itemEventMetadata(req.ActorUserID, "application", nil))
 		return s.CommitTransition(ctx, tx, itemRepo, req.ItemID, oldStatusID, req.ToStatusID, req.ActorUserID, metadata)
 	}); err != nil {

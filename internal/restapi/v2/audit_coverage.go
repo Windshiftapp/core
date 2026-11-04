@@ -298,6 +298,7 @@ var auditSpecRegistry = map[string]AuditKind{
 	"putScreensScreenIdFields":                                     AuditService,
 	"putScreensScreenIdSystemFields":                               AuditService,
 	"putTimeProjectCategoriesOrder":                                AuditService,
+	"putTransitionsTransitionIdScreen":                             AuditRecorder,
 	"putWorkflowsWorkflowIdTransitions":                            AuditService,
 	"putWorkspaceRolesWorkspaceRoleId":                             AuditService,
 	"putWorkspacesWorkspaceIdBoardConfiguration":                   AuditService,

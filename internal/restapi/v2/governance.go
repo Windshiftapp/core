@@ -33,6 +33,7 @@ type governanceApplication interface {
 	RefreshApprovalApprovers(context.Context, services.AuditActor, int, int, string) (*models.ApprovalRequest, error)
 	EscalateApproval(context.Context, services.AuditActor, int, int) (*models.ApprovalRequest, error)
 	GetTransitionGovernance(context.Context, int) (*services.TransitionGovernance, error)
+	SetTransitionScreen(context.Context, services.AuditActor, int, *int) error
 }
 
 func registerGovernanceRoutes(builder *routeBuilder, conditions conditionSetApplication, governance governanceApplication) {
@@ -43,6 +44,7 @@ func registerGovernanceRoutes(builder *routeBuilder, conditions conditionSetAppl
 	builder.Command(http.MethodDelete, "/condition-sets/{condition_set_id}", AuthAuthenticated, []string{"workflows:write"}, deleteConditionSet(conditions))
 	builder.Read("/workflows/{workflow_id}/condition-sets", AuthAuthenticated, []string{"workflows:read"}, listWorkflowConditionSets(conditions))
 	builder.Read("/transitions/{transition_id}/governance", AuthAuthenticated, []string{"workflows:read"}, getTransitionGovernance(governance))
+	builder.JSON(http.MethodPut, "/transitions/{transition_id}/screen", http.StatusOK, false, AuthAuthenticated, []string{"workflows:write"}, setTransitionScreen(governance))
 	builder.Page("/approval-sets", AuthAuthenticated, []string{"workflows:read"}, listApprovalSets(governance))
 	builder.JSON(http.MethodPost, "/approval-sets", http.StatusCreated, false, AuthAuthenticated, []string{"workflows:write"}, createApprovalSet(governance))
 	builder.Read("/approval-sets/{approval_set_id}", AuthAuthenticated, []string{"workflows:read"}, getApprovalSet(governance))
@@ -75,6 +77,12 @@ type approvalSetPatchRequest struct {
 
 type approvalCommentRequest struct {
 	Comment string `json:"comment"`
+}
+
+// transitionScreenRequest binds a screen to a transition. A null screen_id
+// clears the binding; the request is a full replacement of the binding.
+type transitionScreenRequest struct {
+	ScreenID *int `json:"screen_id"`
 }
 type approvalDecisionRequest struct {
 	Decision string `json:"decision"`
@@ -360,6 +368,26 @@ func getTransitionGovernance(app governanceApplication) readOperation[services.T
 		id, err := pathID(r, "transition_id")
 		if err != nil {
 			return services.TransitionGovernance{}, err
+		}
+		item, err := app.GetTransitionGovernance(r.Context(), id)
+		if err != nil {
+			return services.TransitionGovernance{}, governanceError(err)
+		}
+		return *item, nil
+	}
+}
+
+// setTransitionScreen binds or clears the screen on a transition and returns
+// the refreshed governance so the designer inspector can render in one round
+// trip (WI-1835).
+func setTransitionScreen(app governanceApplication) jsonOperation[transitionScreenRequest, services.TransitionGovernance] {
+	return func(r *http.Request, input transitionScreenRequest) (services.TransitionGovernance, error) {
+		user, id, err := governancePrincipalAndID(r, "transition_id")
+		if err != nil {
+			return services.TransitionGovernance{}, err
+		}
+		if err := app.SetTransitionScreen(r.Context(), auditActor(r, user), id, input.ScreenID); err != nil {
+			return services.TransitionGovernance{}, governanceError(err)
 		}
 		item, err := app.GetTransitionGovernance(r.Context(), id)
 		if err != nil {

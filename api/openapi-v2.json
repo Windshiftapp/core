@@ -12892,6 +12892,36 @@
                       "description": "The name value.",
                       "type": "string"
                     },
+                    "screen": {
+                      "additionalProperties": false,
+                      "description": "The screen value.",
+                      "nullable": true,
+                      "properties": {
+                        "field_count": {
+                          "description": "The field count value.",
+                          "type": "integer"
+                        },
+                        "id": {
+                          "description": "The id value.",
+                          "type": "integer"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "required_field_count": {
+                          "description": "The required field count value.",
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "field_count",
+                        "id",
+                        "name",
+                        "required_field_count"
+                      ],
+                      "type": "object"
+                    },
                     "value": {
                       "description": "The value value.",
                       "type": "string"
@@ -19435,6 +19465,36 @@
                         "name": {
                           "description": "The name value.",
                           "type": "string"
+                        },
+                        "screen": {
+                          "additionalProperties": false,
+                          "description": "The screen value.",
+                          "nullable": true,
+                          "properties": {
+                            "field_count": {
+                              "description": "The field count value.",
+                              "type": "integer"
+                            },
+                            "id": {
+                              "description": "The id value.",
+                              "type": "integer"
+                            },
+                            "name": {
+                              "description": "The name value.",
+                              "type": "string"
+                            },
+                            "required_field_count": {
+                              "description": "The required field count value.",
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "field_count",
+                            "id",
+                            "name",
+                            "required_field_count"
+                          ],
+                          "type": "object"
                         },
                         "value": {
                           "description": "The value value.",
@@ -31264,6 +31324,36 @@
               "from_status_name": {
                 "description": "The from status name value.",
                 "type": "string"
+              },
+              "screen": {
+                "additionalProperties": false,
+                "description": "The screen value.",
+                "nullable": true,
+                "properties": {
+                  "field_count": {
+                    "description": "The field count value.",
+                    "type": "integer"
+                  },
+                  "id": {
+                    "description": "The id value.",
+                    "type": "integer"
+                  },
+                  "name": {
+                    "description": "The name value.",
+                    "type": "string"
+                  },
+                  "required_field_count": {
+                    "description": "The required field count value.",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "field_count",
+                  "id",
+                  "name",
+                  "required_field_count"
+                ],
+                "type": "object"
               },
               "to_status_id": {
                 "description": "The to status id value.",
@@ -45130,6 +45220,36 @@
                         "description": "The name value.",
                         "type": "string"
                       },
+                      "screen": {
+                        "additionalProperties": false,
+                        "description": "The screen value.",
+                        "nullable": true,
+                        "properties": {
+                          "field_count": {
+                            "description": "The field count value.",
+                            "type": "integer"
+                          },
+                          "id": {
+                            "description": "The id value.",
+                            "type": "integer"
+                          },
+                          "name": {
+                            "description": "The name value.",
+                            "type": "string"
+                          },
+                          "required_field_count": {
+                            "description": "The required field count value.",
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "field_count",
+                          "id",
+                          "name",
+                          "required_field_count"
+                        ],
+                        "type": "object"
+                      },
                       "value": {
                         "description": "The value value.",
                         "type": "string"
@@ -49479,6 +49599,36 @@
                         "name": {
                           "description": "The name value.",
                           "type": "string"
+                        },
+                        "screen": {
+                          "additionalProperties": false,
+                          "description": "The screen value.",
+                          "nullable": true,
+                          "properties": {
+                            "field_count": {
+                              "description": "The field count value.",
+                              "type": "integer"
+                            },
+                            "id": {
+                              "description": "The id value.",
+                              "type": "integer"
+                            },
+                            "name": {
+                              "description": "The name value.",
+                              "type": "string"
+                            },
+                            "required_field_count": {
+                              "description": "The required field count value.",
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "field_count",
+                            "id",
+                            "name",
+                            "required_field_count"
+                          ],
+                          "type": "object"
                         },
                         "value": {
                           "description": "The value value.",
@@ -81093,12 +81243,20 @@
       "PostItemsItemIdTransitionPayload": {
         "additionalProperties": false,
         "properties": {
+          "fields": {
+            "additionalProperties": {
+              "description": "Arbitrary JSON extension value."
+            },
+            "description": "The fields value.",
+            "type": "object"
+          },
           "to_status_id": {
             "description": "The to status id value.",
             "type": "integer"
           }
         },
         "required": [
+          "fields",
           "to_status_id"
         ],
         "type": "object"
@@ -97392,6 +97550,150 @@
               "type": "object"
             },
             "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PutTransitionsTransitionIdScreenPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "screen_id": {
+            "description": "The screen id value.",
+            "nullable": true,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PutTransitionsTransitionIdScreenResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "approval_drivers": {
+                "description": "The approval drivers value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "approval_set_id": {
+                      "description": "The approval set id value.",
+                      "type": "integer"
+                    },
+                    "approval_set_name": {
+                      "description": "The approval set name value.",
+                      "type": "string"
+                    },
+                    "approval_set_status_id": {
+                      "description": "The approval set status id value.",
+                      "type": "integer"
+                    },
+                    "role": {
+                      "description": "The role value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "approval_set_id",
+                    "approval_set_name",
+                    "approval_set_status_id",
+                    "role"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "conditions": {
+                "description": "The conditions value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "condition_count": {
+                      "description": "The condition count value.",
+                      "type": "integer"
+                    },
+                    "condition_set_id": {
+                      "description": "The condition set id value.",
+                      "type": "integer"
+                    },
+                    "condition_set_name": {
+                      "description": "The condition set name value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "condition_count",
+                    "condition_set_id",
+                    "condition_set_name"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "from_status_id": {
+                "description": "The from status id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "from_status_name": {
+                "description": "The from status name value.",
+                "type": "string"
+              },
+              "screen": {
+                "additionalProperties": false,
+                "description": "The screen value.",
+                "nullable": true,
+                "properties": {
+                  "field_count": {
+                    "description": "The field count value.",
+                    "type": "integer"
+                  },
+                  "id": {
+                    "description": "The id value.",
+                    "type": "integer"
+                  },
+                  "name": {
+                    "description": "The name value.",
+                    "type": "string"
+                  },
+                  "required_field_count": {
+                    "description": "The required field count value.",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "field_count",
+                  "id",
+                  "name",
+                  "required_field_count"
+                ],
+                "type": "object"
+              },
+              "to_status_id": {
+                "description": "The to status id value.",
+                "type": "integer"
+              },
+              "to_status_name": {
+                "description": "The to status name value.",
+                "type": "string"
+              },
+              "transition_id": {
+                "description": "The transition id value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "approval_drivers",
+              "conditions",
+              "from_status_name",
+              "to_status_id",
+              "to_status_name",
+              "transition_id"
+            ],
+            "type": "object"
           }
         },
         "required": [
@@ -119885,6 +120187,82 @@
         ],
         "x-required-scopes": [
           "workflows:read"
+        ]
+      }
+    },
+    "/transitions/{transition_id}/screen": {
+      "put": {
+        "description": "Bind a transition screen. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "putTransitionsTransitionIdScreen",
+        "parameters": [
+          {
+            "description": "The transition identifier.",
+            "in": "path",
+            "name": "transition_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutTransitionsTransitionIdScreenPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PutTransitionsTransitionIdScreenResult"
+                }
+              }
+            },
+            "description": "Bind a transition screen response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Bind a transition screen",
+        "tags": [
+          "Governance"
+        ],
+        "x-required-scopes": [
+          "workflows:write"
         ]
       }
     },

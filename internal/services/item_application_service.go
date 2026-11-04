@@ -170,6 +170,19 @@ type ItemTransitionOption struct {
 	Name          string `json:"name"`
 	Value         string `json:"value"`
 	CategoryColor string `json:"category_color,omitempty"`
+	// Screen is the transition screen the client must open before calling the
+	// transition endpoint, or nil when the move has no screen (WI-1835).
+	Screen *ItemTransitionScreen `json:"screen,omitempty"`
+}
+
+// ItemTransitionScreen is the screen summary attached to an available
+// transition so the client can decide whether to open the screen modal before
+// calling the transition endpoint.
+type ItemTransitionScreen struct {
+	ID                 int    `json:"id"`
+	Name               string `json:"name"`
+	FieldCount         int    `json:"field_count"`
+	RequiredFieldCount int    `json:"required_field_count"`
 }
 
 type ItemTransitionSummary struct {
@@ -1104,8 +1117,8 @@ func (s *ItemApplicationService) UpdateRank(ctx context.Context, actor AuditActo
 	return s.Get(ctx, actor.UserID, itemID, false)
 }
 
-func (s *ItemApplicationService) Transition(ctx context.Context, actor AuditActor, itemID, statusID int) (*ItemTransitionResult, error) {
-	result, err := s.transitionItem(ctx, actor, itemID, statusID)
+func (s *ItemApplicationService) Transition(ctx context.Context, actor AuditActor, itemID, statusID int, fields map[string]any) (*ItemTransitionResult, error) {
+	result, err := s.transitionItem(ctx, actor, itemID, statusID, fields)
 	if err != nil {
 		return nil, err
 	}
@@ -1118,8 +1131,11 @@ func (s *ItemApplicationService) Transition(ctx context.Context, actor AuditActo
 }
 
 // transitionItem runs one workflow transition without enriching the returned
-// item, so bulk callers can reuse it without paying for N detail loads.
-func (s *ItemApplicationService) transitionItem(ctx context.Context, actor AuditActor, itemID, statusID int) (*ItemTransitionResult, error) {
+// item, so bulk callers can reuse it without paying for N detail loads. The
+// governing transition's screen is always enforced; callers that cannot
+// collect field values (bulk) pass nil fields and receive a screen_required
+// rejection per item.
+func (s *ItemApplicationService) transitionItem(ctx context.Context, actor AuditActor, itemID, statusID int, fields map[string]any) (*ItemTransitionResult, error) {
 	item, err := s.items.FindByID(itemID)
 	if err != nil {
 		return nil, err
@@ -1130,8 +1146,12 @@ func (s *ItemApplicationService) transitionItem(ctx context.Context, actor Audit
 	if s.activity != nil {
 		_ = s.activity.TrackItemActivity(actor.UserID, itemID, ActivityEdit)
 	}
+	applyFields := func(ctx context.Context, tx database.Tx, locked *models.Item) error {
+		return s.bulk.ApplyFieldsInTx(ctx, tx, locked.ID, screenUpdateData(fields), actor.UserID)
+	}
 	result, err := NewWorkflowService(s.db).PerformTransition(ctx, PerformTransitionRequest{
 		ItemID: itemID, ToStatusID: statusID, ActorUserID: actor.UserID, Modes: []string{"validator", "condition"},
+		Fields: fields, EnforceScreen: true, ApplyFields: applyFields,
 	}, s.items, s.conditions, s.approvals)
 	if err != nil {
 		return nil, err
@@ -1180,7 +1200,7 @@ func (s *ItemApplicationService) BulkTransition(ctx context.Context, actor Audit
 	}
 	result := ItemBulkTransitionResult{RequestedCount: len(ids), Failures: []ItemBulkTransitionFailure{}}
 	for _, id := range ids {
-		transition, err := s.transitionItem(ctx, actor, id, toStatusID)
+		transition, err := s.transitionItem(ctx, actor, id, toStatusID, nil)
 		if err != nil {
 			failure, expected := bulkTransitionFailure(id, err)
 			if !expected {
@@ -1356,9 +1376,21 @@ func (s *ItemApplicationService) AvailableTransitions(ctx context.Context, userI
 		}
 	}
 	seen := map[int]bool{*item.StatusID: true}
+	transitionIDs := make([]int, 0, len(options))
+	for _, option := range options {
+		transitionIDs = append(transitionIDs, option.TransitionID)
+	}
+	screens, err := repository.NewTransitionRepository(s.db).ScreensForTransitions(transitionIDs)
+	if err != nil {
+		return ItemTransitionSummary{}, err
+	}
 	for _, option := range options {
 		if !seen[option.StatusID] {
-			response.AvailableTransitions = append(response.AvailableTransitions, itemTransitionOption(option))
+			entry := itemTransitionOption(option)
+			if screen, ok := screens[option.TransitionID]; ok {
+				entry.Screen = &ItemTransitionScreen{ID: screen.ID, Name: screen.Name, FieldCount: screen.FieldCount, RequiredFieldCount: screen.RequiredFieldCount}
+			}
+			response.AvailableTransitions = append(response.AvailableTransitions, entry)
 			seen[option.StatusID] = true
 		}
 	}

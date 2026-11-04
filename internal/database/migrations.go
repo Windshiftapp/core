@@ -3179,6 +3179,23 @@ var Catalog = []Migration{
 			DROP INDEX IF EXISTS idx_time_worklogs_customer_id;
 		`,
 	},
+	{
+		Version:       "20261119_workflow_transition_screen",
+		Name:          "Attach a screen to a workflow transition",
+		CheckSQLite:   sqliteColumnCheck("workflow_transitions", "screen_id"),
+		CheckPostgres: pgColumnCheck("workflow_transitions", "screen_id"),
+		// A transition has at most one screen, so the binding is a nullable FK on
+		// the topology row. ON DELETE RESTRICT means an in-use screen cannot be
+		// deleted and silently drop a gate; the admin unbinds instead.
+		SQLite: `
+			ALTER TABLE workflow_transitions ADD COLUMN screen_id INTEGER REFERENCES screens(id) ON DELETE RESTRICT;
+			CREATE INDEX IF NOT EXISTS idx_workflow_transitions_screen_id ON workflow_transitions(screen_id);
+		`,
+		Postgres: `
+			ALTER TABLE workflow_transitions ADD COLUMN IF NOT EXISTS screen_id INTEGER REFERENCES screens(id) ON DELETE RESTRICT;
+			CREATE INDEX IF NOT EXISTS idx_workflow_transitions_screen_id ON workflow_transitions(screen_id);
+		`,
+	},
 }
 
 // dropTimeWorklogCustomerSQLite rebuilds time_worklogs without the customer_id
