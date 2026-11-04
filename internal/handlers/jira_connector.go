@@ -38,6 +38,8 @@ type JiraImportHandler struct {
 	cacheInvalidator *services.AuthorizationCacheInvalidator
 	// importMaxDuration caps a single import. Zero disables the overall limit.
 	importMaxDuration time.Duration
+	// importWatchers enables the per-issue watcher fetch and item-watch import.
+	importWatchers bool
 }
 
 func (h *JiraImportHandler) WithAuthorizationCacheInvalidator(invalidator *services.AuthorizationCacheInvalidator) *JiraImportHandler {
@@ -49,6 +51,13 @@ func (h *JiraImportHandler) WithAuthorizationCacheInvalidator(invalidator *servi
 // no wall-clock cap.
 func (h *JiraImportHandler) WithImportMaxDuration(maxDuration time.Duration) *JiraImportHandler {
 	h.importMaxDuration = maxDuration
+	return h
+}
+
+// WithImportWatchers enables mapping Jira watchers to Windshift item watches.
+// It is off by default because the identities cost one Jira request per issue.
+func (h *JiraImportHandler) WithImportWatchers(enabled bool) *JiraImportHandler {
+	h.importWatchers = enabled
 	return h
 }
 

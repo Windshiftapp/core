@@ -309,6 +309,10 @@ type JiraConfig struct {
 	// finish. When set, an import that hits the limit stops and reports a
 	// timed_out status instead of a misleading completed_with_errors.
 	ImportMaxDuration time.Duration
+	// ImportWatchers enables mapping Jira issue watchers to Windshift item
+	// watches. It is off by default: the identities require one extra Jira
+	// request per issue, which dominates large imports for a low-value mapping.
+	ImportWatchers bool
 }
 
 // LogbookSidecarConfig is the sibling of Config for the standalone logbook

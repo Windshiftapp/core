@@ -1191,9 +1191,11 @@ func (h *JiraImportHandler) collectJiraTrackingMetadata(issue *jira.JiraIssue, c
 	if issue.Fields.Watches != nil {
 		customFieldValues["_jira_watcher_count"] = issue.Fields.Watches.WatchCount
 	}
-	customFieldValues["_jira_watcher_identities_available"] = issue.Fields.WatcherIdentitiesAvailable
-	if issue.Fields.WatcherFetchError != "" {
-		customFieldValues["_jira_watcher_fetch_error"] = issue.Fields.WatcherFetchError
+	if h.importWatchers {
+		customFieldValues["_jira_watcher_identities_available"] = issue.Fields.WatcherIdentitiesAvailable
+		if issue.Fields.WatcherFetchError != "" {
+			customFieldValues["_jira_watcher_fetch_error"] = issue.Fields.WatcherFetchError
+		}
 	}
 }
 
@@ -1209,7 +1211,7 @@ func (h *JiraImportHandler) collectJiraIdentityMetadata(im *jiraImportContext, i
 	if assignee := jiraUserIdentityMetadata(issue.Fields.Assignee); len(assignee) > 0 {
 		customFieldValues["_jira_assignee"] = assignee
 	}
-	if len(issue.Fields.Watchers) > 0 {
+	if h.importWatchers && len(issue.Fields.Watchers) > 0 {
 		watchers := make([]map[string]any, 0, len(issue.Fields.Watchers))
 		for idx := range issue.Fields.Watchers {
 			if identity := jiraUserIdentityMetadata(&issue.Fields.Watchers[idx]); len(identity) > 0 {
@@ -1521,8 +1523,10 @@ func (h *JiraImportHandler) recordJiraIssueMapping(im *jiraImportContext, issue 
 // contractual order: watchers, labels, attachments, description media
 // re-render, comments, and worklogs.
 func (h *JiraImportHandler) importJiraIssueSubresources(ctx context.Context, im *jiraImportContext, issue *jira.JiraIssue, itemID int64, rawDescription any, description string, mentionResolver jira.MentionResolver, forked bool) error {
-	if err := h.importIssueWatchers(im.jobID, int(itemID), issue, im.userMap); err != nil {
-		return fmt.Errorf("import Jira issue watchers: %w", err)
+	if h.importWatchers {
+		if err := h.importIssueWatchers(im.jobID, int(itemID), issue, im.userMap); err != nil {
+			return fmt.Errorf("import Jira issue watchers: %w", err)
+		}
 	}
 
 	// Attach Jira labels (top-level Fields.Labels, distinct from labels-typed

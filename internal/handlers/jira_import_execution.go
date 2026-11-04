@@ -746,7 +746,9 @@ func (h *JiraImportHandler) completeJiraBatchSubresources(ctx context.Context, i
 				slog.String("issue", issues[idx].Key),
 				slog.Any("error", err))
 		}
-		h.completeIssueWatchers(ctx, &issues[idx], im.client)
+		if h.importWatchers {
+			h.completeIssueWatchers(ctx, &issues[idx], im.client)
+		}
 		if im.jsmImport != nil {
 			if err := h.annotateJiraServiceDeskCommentVisibility(ctx, &issues[idx], im.client); err != nil {
 				slog.Warn("Failed to load Jira Service Management comment visibility",
@@ -782,8 +784,10 @@ func (h *JiraImportHandler) collectJiraBatchUsers(im *jiraImportContext, project
 		addJiraUserSummaryFromUser(issue.Fields.Assignee, knownIdentityMap, &usersToProcess, usersSeen)
 		addJiraUserSummaryFromUser(issue.Fields.Reporter, knownIdentityMap, &usersToProcess, usersSeen)
 		addJiraUserSummaryFromUser(issue.Fields.Creator, knownIdentityMap, &usersToProcess, usersSeen)
-		for watcherIdx := range issue.Fields.Watchers {
-			addJiraUserSummaryFromUser(&issue.Fields.Watchers[watcherIdx], knownIdentityMap, &usersToProcess, usersSeen)
+		if h.importWatchers {
+			for watcherIdx := range issue.Fields.Watchers {
+				addJiraUserSummaryFromUser(&issue.Fields.Watchers[watcherIdx], knownIdentityMap, &usersToProcess, usersSeen)
+			}
 		}
 		if issue.Fields.Votes != nil {
 			for voterIdx := range issue.Fields.Votes.Voters {
