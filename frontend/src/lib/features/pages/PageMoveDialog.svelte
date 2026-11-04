@@ -3,8 +3,8 @@
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
+  import WorkspacePicker from '../../pickers/WorkspacePicker.svelte';
   import { pages } from '../../api/pages.js';
-  import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { isSelfOrDescendant } from './pageHierarchy.js';
 
@@ -19,13 +19,7 @@
 
   let candidates = $state([]);
   let sourceTree = $state([]);
-  let workspaces = $state([]);
-  // The directory cache holds a bounded first page, so a destination workspace
-  // beyond it is only reachable through a server-side search.
-  let searchedWorkspaces = $state(null);
-  let workspaceSearchToken = 0;
   let loading = $state(false);
-  let loadingWorkspaces = $state(false);
   let saving = $state(false);
   let error = $state('');
 
@@ -44,22 +38,11 @@
       pickedParentId = null;
       selectionMade = false;
       error = '';
-      searchedWorkspaces = null;
-      workspaceSearchToken += 1;
     }
   });
 
   async function loadDialogData() {
-    loadingWorkspaces = true;
-    const workspaceRequest = workspacesStore.load();
-    await Promise.all([loadCandidates(workspaceId, true), workspaceRequest.then((items) => {
-      workspaces = (items || []).filter((item) => item.active !== false);
-    }).catch((err) => {
-      error = err?.message || t('pages.errorLoadWorkspaces');
-      workspaces = [];
-    }).finally(() => {
-      loadingWorkspaces = false;
-    })]);
+    await loadCandidates(workspaceId, true);
   }
 
   async function loadCandidates(destinationWorkspaceId, rememberSource = false) {
@@ -83,18 +66,6 @@
     }
   }
 
-  async function onWorkspaceSearch(query) {
-    const trimmed = query.trim();
-    const token = ++workspaceSearchToken;
-    if (!trimmed) {
-      searchedWorkspaces = null;
-      return;
-    }
-    const result = await workspacesStore.searchWorkspaces(trimmed, { limit: 100 });
-    if (token !== workspaceSearchToken) return;
-    searchedWorkspaces = (result.workspaces || []).filter((item) => item.active !== false);
-  }
-
   async function onWorkspacePick(item) {
     if (!item) return;
     pickedWorkspaceId = item.id;
@@ -113,7 +84,6 @@
   // Show the "Workspace root" option only when moving there would
   // actually change something. If the page is already at the root it'd
   // be a confusing no-op.
-  const workspaceItems = $derived(searchedWorkspaces ?? workspaces);
   const crossWorkspace = $derived(
     pickedWorkspaceId != null && pickedWorkspaceId !== workspaceId
   );
@@ -151,18 +121,12 @@
       <div class="error" role="alert">{error}</div>
     {/if}
 
-    <BasePicker
+    <WorkspacePicker
       id="page-move-workspace-picker"
       bind:value={pickedWorkspaceId}
-      items={workspaceItems}
-      loading={loadingWorkspaces}
-      serverSearch={searchedWorkspaces !== null}
-      onSearchChange={onWorkspaceSearch}
+      multiple={false}
       label={t('pages.moveWorkspaceLabel')}
       placeholder={t('pages.moveWorkspacePlaceholder')}
-      searchFields={['name', 'key', 'description']}
-      getValue={(item) => item.id}
-      getLabel={(item) => item.name}
       optionTestid={(option) => `page-move-workspace-option-${option.value}`}
       onSelect={onWorkspacePick}
     />

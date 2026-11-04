@@ -11,10 +11,12 @@
     value = $bindable([]),
     placeholder = '',
     label = '',
+    id = undefined,
     disabled = false,
     multiple = true,
     allowClear = false,
     items = null,
+    optionTestid = null,
     class: className = '',
     onChange = () => {},
     onSelect = () => {},
@@ -107,6 +109,8 @@
   items={workspaces}
   {loading}
   {error}
+  {id}
+  {optionTestid}
   placeholder={resolvedPlaceholder}
   {label}
   {disabled}
