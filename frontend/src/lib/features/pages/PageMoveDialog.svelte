@@ -20,6 +20,10 @@
   let candidates = $state([]);
   let sourceTree = $state([]);
   let workspaces = $state([]);
+  // The directory cache holds a bounded first page, so a destination workspace
+  // beyond it is only reachable through a server-side search.
+  let searchedWorkspaces = $state(null);
+  let workspaceSearchToken = 0;
   let loading = $state(false);
   let loadingWorkspaces = $state(false);
   let saving = $state(false);
@@ -40,6 +44,8 @@
       pickedParentId = null;
       selectionMade = false;
       error = '';
+      searchedWorkspaces = null;
+      workspaceSearchToken += 1;
     }
   });
 
@@ -77,6 +83,18 @@
     }
   }
 
+  async function onWorkspaceSearch(query) {
+    const trimmed = query.trim();
+    const token = ++workspaceSearchToken;
+    if (!trimmed) {
+      searchedWorkspaces = null;
+      return;
+    }
+    const result = await workspacesStore.searchWorkspaces(trimmed, { limit: 100 });
+    if (token !== workspaceSearchToken) return;
+    searchedWorkspaces = (result.workspaces || []).filter((item) => item.active !== false);
+  }
+
   async function onWorkspacePick(item) {
     if (!item) return;
     pickedWorkspaceId = item.id;
@@ -95,6 +113,7 @@
   // Show the "Workspace root" option only when moving there would
   // actually change something. If the page is already at the root it'd
   // be a confusing no-op.
+  const workspaceItems = $derived(searchedWorkspaces ?? workspaces);
   const crossWorkspace = $derived(
     pickedWorkspaceId != null && pickedWorkspaceId !== workspaceId
   );
@@ -135,8 +154,10 @@
     <BasePicker
       id="page-move-workspace-picker"
       bind:value={pickedWorkspaceId}
-      items={workspaces}
+      items={workspaceItems}
       loading={loadingWorkspaces}
+      serverSearch={searchedWorkspaces !== null}
+      onSearchChange={onWorkspaceSearch}
       label={t('pages.moveWorkspaceLabel')}
       placeholder={t('pages.moveWorkspacePlaceholder')}
       searchFields={['name', 'key', 'description']}
