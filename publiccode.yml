@@ -1,0 +1,74 @@
+publiccodeYmlVersion: "0.8.0"
+
+name: Windshift
+url: "https://github.com/Windshiftapp/core.git"
+landingURL: "https://windshift.sh"
+logo: frontend/public/windshift-3.svg
+softwareVersion: "0.9.3"
+releaseDate: "2026-11-04"
+
+platforms:
+  - web
+  - linux
+  - mac
+  - windows
+
+categories:
+  - task-management
+  - project-management
+  - agile-project-management
+  - it-service-management
+  - test-management
+  - knowledge-management
+  - time-tracking
+
+developmentStatus: stable
+softwareType: "standalone/web"
+
+description:
+  en:
+    shortDescription: >-
+      Self-hosted, open-source work management platform and Jira alternative.
+    longDescription: >-
+      Windshift is a work management platform for teams that want Jira's depth
+      without Jira's weight. It covers projects, epics, stories, sub-tasks,
+      sprints and backlogs, boards, roadmaps, custom workflows, custom fields,
+      screens, permissions, automation, and dashboards, and filters with the
+      JQL-style Windshift Query Language. It also includes service management
+      with SLAs and a customer portal, a knowledge base, test management, time
+      tracking, and an asset/CMDB register. It ships as a single Go binary with
+      the Svelte frontend built in, using embedded SQLite by default or
+      PostgreSQL, and runs on your own infrastructure.
+    documentation: "https://windshift.sh/docs"
+    apiDocumentation: "https://github.com/Windshiftapp/core/blob/main/api/openapi-v2.json"
+    features:
+      - Boards, backlogs, sprints, epics and sub-tasks
+      - Configurable workflows, statuses, custom fields and screens
+      - JQL-style query language with saved collections
+      - SLAs, queues, approvals and a customer portal
+      - Automation rules, dashboards and reporting
+      - Test management, time tracking, knowledge base and asset register
+      - Jira importer and GitHub, GitLab, Gitea and Forgejo integrations
+    screenshots:
+      - .github/assets/screenshots/hero-board-framed.webp
+      - .github/assets/screenshots/hero-dashboard.webp
+
+legal:
+  license: AGPL-3.0-or-later
+  mainCopyrightOwner: Realigned Technologies Ltd
+
+maintenance:
+  type: internal
+  contacts:
+    - name: Stefan Ernst
+      email: info@realigned.io
+      affiliation: Realigned Technologies Ltd
+
+localisation:
+  localisationReady: true
+  availableLanguages:
+    - en
+
+organisation:
+  uri: "https://realigned.io"
+  name: Realigned Technologies Ltd
