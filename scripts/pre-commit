@@ -17,6 +17,7 @@ RUN_GO=0
 RUN_OPENAPI=0
 RUN_FRONTEND=0
 RUN_SCHEMA=0
+RUN_API_VERSION=0
 
 # A single file can matter to several buckets (e.g. a restapi handler needs
 # both linting and OpenAPI validation), so test each trigger set separately
@@ -30,6 +31,9 @@ while IFS= read -r path; do
     case "$path" in internal/restapi/*|internal/metrics/*|internal/health/*|api/*|scripts/openapi-*|scripts/check-frontend-v2-fields.mjs) RUN_OPENAPI=1 ;; esac
     case "$path" in frontend/*)  RUN_FRONTEND=1 ;; esac
     case "$path" in internal/database/*) RUN_SCHEMA=1 ;; esac
+    # The v1 API guard scans first-party source roots; it is cheap, so run it
+    # for any of them rather than only for Go changes.
+    case "$path" in internal/*|cmd/*|windshift-runner/*|frontend/*|scripts/*) RUN_API_VERSION=1 ;; esac
 done <<< "$STAGED"
 
 SKIPPED=()
@@ -88,6 +92,18 @@ if [[ "$RUN_GO" -eq 1 ]]; then
     fi
 else
     SKIPPED+=("Go lint/guards")
+fi
+
+# --- Deprecated v1 API ---
+# Blocks new integrations, clients, and tooling from being built on the frozen
+# v1 surface (see scripts/check-deprecated-v1-api.sh).
+if [[ "$RUN_API_VERSION" -eq 1 ]]; then
+    echo "  Running deprecated v1 API guard..."
+    if ! "$REPO_ROOT/scripts/check-deprecated-v1-api.sh"; then
+        FAILED=1
+    fi
+else
+    SKIPPED+=("deprecated v1 API guard")
 fi
 
 # --- OpenAPI spec freshness ---

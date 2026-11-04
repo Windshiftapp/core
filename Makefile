@@ -198,6 +198,7 @@ lint:
 	@node scripts/check-audit-literals.mjs
 	@bash scripts/check-layering.sh
 	@bash scripts/check-handler-db-access.sh
+	@bash scripts/check-deprecated-v1-api.sh
 
 # Install git hooks
 hooks:

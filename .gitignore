@@ -182,6 +182,7 @@ scripts/*
 !scripts/check-schema-migration-pairing.sh
 !scripts/check-sql-boolean-literals.mjs
 !scripts/check-audit-literals.mjs
+!scripts/check-deprecated-v1-api.sh
 !scripts/audit_coverage_inventory.py
 !scripts/.layering-baseline
 !scripts/.handler-db-access-allowlist
