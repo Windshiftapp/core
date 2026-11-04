@@ -1,4 +1,11 @@
-// Package v1 provides scoped bearer-token REST endpoints.
+// Package v1 provides the deprecated scoped bearer-token REST endpoints.
+//
+// Deprecated: the v1 API (/rest/api/v1) is superseded by v2. Bearer clients must
+// use /rest/api/v2 and session clients /api/v2; the v2 contract is served at
+// /rest/api/v2/openapi.json. Every v1 response carries `Deprecation: true` and a
+// `Link: </rest/api/v2/openapi.json>; rel="successor-version"` header. Do not add
+// routes here or build new integrations against v1 — extend v2 instead. v1 is
+// kept only so existing bearer tokens keep working.
 //
 // Only /rest/api/v1 accepts crw_* bearer tokens; /api uses session auth and
 // /api/internal uses the sidecar secret. Routes must enforce token scope and
