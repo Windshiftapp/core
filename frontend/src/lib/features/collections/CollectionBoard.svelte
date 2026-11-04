@@ -8,6 +8,7 @@
   import { labels as labelsApi } from '../../api/misc.js';
   import TransitionScreenModal from '../../dialogs/TransitionScreenModal.svelte';
   import { resolveTransitionScreen } from '../../utils/transitionScreens.js';
+  import { runBulkTransitionWithScreenRetry } from '../../utils/bulkActions.js';
   import { collections as collectionsApi } from '../../api/collections.js';
   import { workspaces as workspacesApi } from '../../api/workspaces.js';
   import { iterations as iterationsApi } from '../../api/milestones.js';
@@ -1579,7 +1580,13 @@
     const ids = bulkSelectionIds();
     bulkBusy = true;
     try {
-      const result = await itemsApi.bulkTransition(ids, targetStatusId);
+      const result = await runBulkTransitionWithScreenRetry(
+        itemsApi.bulkTransition,
+        ids,
+        targetStatusId
+      );
+      // The user declined the retry; nothing moved and the selection stays.
+      if (result === null) return;
       const failed = result?.failed_count ?? 0;
       if (failed > 0) {
         warningToast(t('collections.bulkStatusPartial', {

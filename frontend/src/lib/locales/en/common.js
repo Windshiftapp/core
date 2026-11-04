@@ -329,6 +329,14 @@ export default {
     configureFilter: 'Configure filter to see items',
     createToStart: 'Create {item} to get started',
   },
+  bulkActions: {
+    screenRequiredTitle: 'Some items need a form',
+    screenRequiredAll:
+      'Every selected item needs a form before it can move. Move them one at a time instead.',
+    screenRequiredMessage:
+      '{blocked} of {total} selected items need a form before they can move. Move the other {remaining}?',
+    screenRequiredConfirm: 'Move the rest',
+  },
   dueDate: {
     noDueDate: 'No due date',
     dueToday: 'Due today',

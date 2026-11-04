@@ -1127,6 +1127,12 @@ func itemError(err error) error {
 	if errors.Is(err, services.ErrItemMergeConflict) {
 		return newError(http.StatusConflict, "merge_conflict", err.Error())
 	}
+	var screenRequired *services.BulkTransitionScreenRequiredError
+	if errors.As(err, &screenRequired) {
+		apiErr := newError(http.StatusConflict, "screen_required", "Some items need a transition screen before they can move. Retry without the listed items.")
+		apiErr.Details = map[string]any{"items": screenRequired.Blocked}
+		return apiErr
+	}
 	if errors.Is(err, services.ErrBulkItemNotFound) {
 		return newError(http.StatusNotFound, "not_found", "Item not found")
 	}
