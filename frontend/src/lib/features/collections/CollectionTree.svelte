@@ -35,6 +35,7 @@
   import ListCellRenderer from './ListCellRenderer.svelte';
   import ColumnSelector from './ColumnSelector.svelte';
   import CollectionLevelFilter from './CollectionLevelFilter.svelte';
+  import CollectionHierarchyLoadMore from './CollectionHierarchyLoadMore.svelte';
   import ItemKey from '../../components/ItemKey.svelte';
   import { useListColumnConfig } from './listColumnConfig.svelte.js';
   import { useCollectionHierarchy } from '../../composables/useCollectionHierarchy.svelte.js';
@@ -60,6 +61,7 @@
   const hierarchy = useCollectionHierarchy({
     getWorkspaceId: () => workspaceId ?? null,
     getCollectionId: () => collectionId ?? null,
+    getView: () => 'tree',
     getMaxDepth: () => 0,
     getSubFilterQL: () => collectionStore.effectiveSubFilterQL,
   });
@@ -375,7 +377,13 @@
       ? 'title'
       : listColumns[0]?.field_identifier
   );
-  const treeGridOptions = { titleMinWidth: 24, keyWidth: 10 };
+  // The parent-reference chip needs a wider key track, but only when a row
+  // actually shows one; otherwise the default key width keeps the row compact.
+  let hasParentReferences = $derived(allItems.some((item) => parentReference(item) != null));
+  let treeGridOptions = $derived({
+    titleMinWidth: 24,
+    keyWidth: hasParentReferences ? 10 : undefined,
+  });
   let gridTemplateColumns = $derived(listGridTemplateColumns(listColumns, treeGridOptions));
   let gridMinWidth = $derived(listGridMinWidth(listColumns, treeGridOptions));
 </script>
@@ -666,6 +674,7 @@
         </div>
       </div>
 
+        <CollectionHierarchyLoadMore testid="tree-load-more" />
       {/if}
   </StaticViewBackground>
 {:else}

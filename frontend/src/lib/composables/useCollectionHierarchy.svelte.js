@@ -1,5 +1,7 @@
+import { untrack } from 'svelte';
 import { items as itemsApi } from '../api/items.js';
 import { collectionStore } from '../stores/collectionContext.js';
+import { collectionPreferences } from '../stores/collectionPreferences.svelte.js';
 
 const DEFAULT_PER_ROOT_LIMIT = 100;
 
@@ -40,6 +42,7 @@ function mergeById(existing, incoming) {
  * @param {object} options
  * @param {() => number|null} [options.getWorkspaceId]
  * @param {() => number|null} [options.getCollectionId]
+ * @param {() => string|null} [options.getView] View key used to persist expansion.
  * @param {() => number} [options.getMaxDepth] 0 = full matching descendants.
  * @param {() => number} [options.getPerRootLimit]
  * @param {() => string} [options.getSubFilterQL]
@@ -47,6 +50,7 @@ function mergeById(existing, incoming) {
 export function useCollectionHierarchy({
   getWorkspaceId = () => null,
   getCollectionId = () => null,
+  getView = () => null,
   getMaxDepth = () => 0,
   getPerRootLimit = () => DEFAULT_PER_ROOT_LIMIT,
   getSubFilterQL = () => '',
@@ -245,15 +249,45 @@ export function useCollectionHierarchy({
     void fetchRoots([itemId]);
   }
 
+  // The expanded ids are stored per scope and view so a reload restores the
+  // tree the user left. A stored key (even an empty list) is authoritative over
+  // the default "roots with children start expanded".
+  const EXPANDED_STATE_KEY = 'expanded_ids';
+
+  function readStoredExpanded() {
+    const view = getView();
+    if (!view) return null;
+    const stored = collectionPreferences.viewStateValue(
+      getWorkspaceId(),
+      getCollectionId(),
+      view,
+      EXPANDED_STATE_KEY
+    );
+    return Array.isArray(stored) ? new Set(stored) : null;
+  }
+
+  function persistExpanded() {
+    const view = getView();
+    if (!view) return;
+    const workspaceId = getWorkspaceId();
+    const collectionId = getCollectionId();
+    if (workspaceId == null && collectionId == null) return;
+    collectionPreferences.patchViewState(workspaceId, collectionId, view, {
+      [EXPANDED_STATE_KEY]: [...expanded],
+    });
+  }
+
   function expand(itemId) {
     expanded.add(itemId);
     expanded = new Set(expanded);
     ensureLoaded(itemId);
+    persistExpanded();
   }
 
   function collapse(itemId) {
     expanded.delete(itemId);
     expanded = new Set(expanded);
+    persistExpanded();
   }
 
   function toggleExpanded(itemId) {
@@ -263,6 +297,7 @@ export function useCollectionHierarchy({
 
   function collapseAll() {
     expanded = new Set();
+    persistExpanded();
   }
 
   function expandAll() {
@@ -275,6 +310,7 @@ export function useCollectionHierarchy({
     }
     expanded = next;
     if (toLoad.length > 0) void fetchRoots(toLoad);
+    persistExpanded();
   }
 
   // Reset the overlay when the base set is replaced (level or scope change) and
@@ -311,11 +347,14 @@ export function useCollectionHierarchy({
     const nextIds = new Set(baseItems.map((item) => item.id));
     const isAppend =
       previousBaseIds !== null && [...previousBaseIds].every((id) => nextIds.has(id));
+    // Read without subscribing: preferences are written by the actions below,
+    // and a tracked read would re-run this effect on every save.
+    const stored = untrack(readStoredExpanded);
     if (!isAppend) {
       overlayByRoot = {};
       loadedRoots = new Set();
       loadingRoots = new Set();
-      expanded = new Set();
+      expanded = stored ?? new Set();
     }
     baseSignature = signature;
     previousBaseIds = nextIds;
@@ -325,12 +364,16 @@ export function useCollectionHierarchy({
       .map((item) => item.id);
     if (toLoad.length > 0) void fetchRoots(toLoad);
 
-    // Base roots with children start expanded, matching the previous default.
-    const nextExpanded = new Set(expanded);
-    for (const item of baseItems) {
-      if (item.has_children) nextExpanded.add(item.id);
+    // Base roots with children start expanded until the view has a stored
+    // expansion, after which the user's choice is authoritative.
+    if (stored == null) {
+      const nextExpanded = new Set(expanded);
+      for (const item of baseItems) {
+        if (item.has_children) nextExpanded.add(item.id);
+      }
+      expanded = nextExpanded;
+      if (expanded.size > 0) persistExpanded();
     }
-    expanded = nextExpanded;
   });
 
   return {
