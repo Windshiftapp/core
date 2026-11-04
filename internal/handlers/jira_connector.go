@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"time"
 
 	"windshift/internal/blobstore"
 	"windshift/internal/database"
@@ -35,10 +36,19 @@ type JiraImportHandler struct {
 	// through every import helper.
 	jobTokens        map[string]string
 	cacheInvalidator *services.AuthorizationCacheInvalidator
+	// importMaxDuration caps a single import. Zero disables the overall limit.
+	importMaxDuration time.Duration
 }
 
 func (h *JiraImportHandler) WithAuthorizationCacheInvalidator(invalidator *services.AuthorizationCacheInvalidator) *JiraImportHandler {
 	h.cacheInvalidator = invalidator
+	return h
+}
+
+// WithImportMaxDuration sets the overall import limit. Zero (the default) means
+// no wall-clock cap.
+func (h *JiraImportHandler) WithImportMaxDuration(maxDuration time.Duration) *JiraImportHandler {
+	h.importMaxDuration = maxDuration
 	return h
 }
 

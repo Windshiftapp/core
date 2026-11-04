@@ -248,7 +248,7 @@ func (s *Service) PreviousImports(projectKeys []string) ([]PreviousImport, error
 		       (SELECT COUNT(*) FROM jira_import_id_mappings m WHERE m.job_id = j.id AND m.entity_type = 'workspace'),
 		       (SELECT COUNT(*) FROM jira_import_id_mappings m WHERE m.job_id = j.id AND m.entity_type = 'item')
 		FROM jira_import_jobs j
-		WHERE j.status IN ('completed', 'completed_with_errors')
+		WHERE j.status IN ('completed', 'completed_with_errors', 'timed_out')
 		ORDER BY j.completed_at DESC
 		LIMIT 10
 	`)
@@ -345,7 +345,7 @@ func (s *Service) UpdateStatus(jobID, token, status, phase string, progress *Pro
 	var result sql.Result
 	var err error
 	switch status {
-	case "completed", "completed_with_errors", "failed":
+	case "completed", "completed_with_errors", "failed", "timed_out":
 		result, err = s.db.ExecWrite(`
 			UPDATE jira_import_jobs
 			SET status = ?, phase = ?, progress_json = ?, error_message = ?,

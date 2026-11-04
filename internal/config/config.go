@@ -303,6 +303,12 @@ type JiraConfig struct {
 	// CapturePayloadsDir, when non-empty, makes the Jira import path write
 	// request/response payloads to this directory for debugging.
 	CapturePayloadsDir string
+	// ImportMaxDuration caps a single Jira import. Zero (the default) means no
+	// overall wall-clock limit: per-request HTTP timeouts and the worker lease
+	// already keep the import live, and a large project must be allowed to
+	// finish. When set, an import that hits the limit stops and reports a
+	// timed_out status instead of a misleading completed_with_errors.
+	ImportMaxDuration time.Duration
 }
 
 // LogbookSidecarConfig is the sibling of Config for the standalone logbook

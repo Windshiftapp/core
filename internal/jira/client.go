@@ -458,6 +458,13 @@ func doReadOnlyJiraRequest(
 		}
 
 		delay := jiraRetryDelay(resp.Header.Get("Retry-After"), attempt, time.Now())
+		// Make upstream throttling diagnosable: without this a slow import cannot
+		// be told apart from a rate-limited one.
+		slog.Warn("Jira request throttled; retrying",
+			slog.String("component", "jira"),
+			slog.Int("status", resp.StatusCode),
+			slog.Int("attempt", attempt+1),
+			slog.Duration("delay", delay))
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
 		_ = resp.Body.Close()
 		if err := retryWait(ctx, delay); err != nil {

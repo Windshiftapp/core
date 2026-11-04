@@ -738,7 +738,7 @@ export const jiraImport = {
           importState.result = status;
           markWizardStepComplete('import');
           return; // Stop polling
-        } else if (status.status === 'failed') {
+        } else if (status.status === 'failed' || status.status === 'timed_out') {
           importState.error = status.error_message || 'Import failed';
           return; // Stop polling
         }
