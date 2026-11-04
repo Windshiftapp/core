@@ -3144,6 +3144,7 @@ var Catalog = []Migration{
 		ApplyPostgres: applyItemSearchIndexPostgres,
 	},
 	{
+
 		Version: "20261117_time_project_customer_backfill",
 		Name:    "Backfill NULL time-project customers to the no-customer placeholder",
 		// Effect present when no project lacks a customer. Projects written before
@@ -3178,6 +3179,36 @@ var Catalog = []Migration{
 			ALTER TABLE time_worklogs DROP COLUMN IF EXISTS customer_id;
 			DROP INDEX IF EXISTS idx_time_worklogs_customer_id;
 		`,
+	},
+	{
+		Version:       "20261119_plane_import_mappings",
+		Name:          "External-id map for the Plane importer (idempotent re-runs, provenance)",
+		CheckSQLite:   `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='plane_import_mappings'`,
+		CheckPostgres: `SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='plane_import_mappings'`,
+		SQLite: `
+CREATE TABLE IF NOT EXISTS plane_import_mappings (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+	entity_type TEXT NOT NULL,
+	external_id TEXT NOT NULL,
+	windshift_id INTEGER NOT NULL,
+	metadata_json TEXT,
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	UNIQUE(workspace_id, entity_type, external_id)
+);
+CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_mappings(workspace_id, entity_type, windshift_id);`,
+		Postgres: `
+CREATE TABLE IF NOT EXISTS plane_import_mappings (
+	id SERIAL PRIMARY KEY,
+	workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+	entity_type TEXT NOT NULL,
+	external_id TEXT NOT NULL,
+	windshift_id INTEGER NOT NULL,
+	metadata_json TEXT,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	UNIQUE(workspace_id, entity_type, external_id)
+);
+CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_mappings(workspace_id, entity_type, windshift_id);`,
 	},
 }
 
