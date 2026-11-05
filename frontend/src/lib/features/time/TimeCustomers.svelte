@@ -196,6 +196,7 @@
   bind:formData
   {customerOrgFields}
   attachmentsEnabled={attachmentStatus.enabled}
+  entityId={editingCustomer?.id ?? 0}
   isEditing={!!editingCustomer}
   onsave={saveCustomer}
   oncancel={cancelForm}

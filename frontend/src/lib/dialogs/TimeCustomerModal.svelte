@@ -27,6 +27,7 @@
     }),
     customerOrgFields = [],
     attachmentsEnabled = false,
+    entityId = 0,
     isEditing = false,
     onsave = () => {},
     oncancel = () => {}
@@ -55,7 +56,7 @@
     try {
       const uploadFormData = new FormData();
       uploadFormData.append('file', file);
-      uploadFormData.append('item_id', '0');
+      uploadFormData.append('entity_id', String(entityId ?? 0));
       uploadFormData.append('category', 'customer_avatar');
 
       const uploadResult = await attachments.upload(uploadFormData);

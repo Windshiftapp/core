@@ -245,19 +245,24 @@ func (h *AttachmentHandler) authorizeUploadEntity(w http.ResponseWriter, r *http
 
 	case "customer_avatar":
 		// customer_organisations are global (no workspace_id); gate on the
-		// global customers.manage permission.
-		var exists bool
-		if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM customer_organisations WHERE id = ?)", entityID).Scan(&exists); err != nil {
-			respondInternalError(w, r, err)
-			return false
-		}
-		if !exists {
-			respondNotFound(w, r, "customer")
-			return false
-		}
+		// global customers.manage permission. The avatar is staged before the
+		// organisation exists when creating one, so entity_id 0 is allowed and
+		// the existence check only applies to a real id. The organisation binds
+		// the staged URL through its avatar_url column on save.
 		user, ok := RequireAuth(w, r)
 		if !ok {
 			return false
+		}
+		if entityID != 0 {
+			var exists bool
+			if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM customer_organisations WHERE id = ?)", entityID).Scan(&exists); err != nil {
+				respondInternalError(w, r, err)
+				return false
+			}
+			if !exists {
+				respondNotFound(w, r, "customer")
+				return false
+			}
 		}
 		hasPerm, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionCustomersManage)
 		if err != nil {
