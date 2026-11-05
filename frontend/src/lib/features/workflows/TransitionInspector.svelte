@@ -45,7 +45,7 @@
 
     const token = ++loadToken;
     loading = true;
-    const requests = [screensApi.getAll()];
+    const requests = [screensApi.getAllWithFields()];
     if (id) requests.push(transitionsApi.governance(id));
     Promise.all(requests)
       .then(([list, gov]) => {
@@ -70,6 +70,21 @@
     statuses.find((status) => status.id === transition?.to_status_id)?.name || '?'
   );
 
+  // The screens list has no counts, so derive them from the fields when the
+  // list was fetched with them. Keeps the staged summary honest for an edge
+  // that has no governance row yet.
+  function screenSummary(target) {
+    if (!target) return null;
+    const fields = target.fields ?? [];
+    return {
+      id: target.id,
+      name: target.name,
+      field_count: target.field_count ?? fields.length,
+      required_field_count:
+        target.required_field_count ?? fields.filter((field) => field.is_required).length,
+    };
+  }
+
   async function bindScreen(screenId) {
     if (saving) return;
 
@@ -77,8 +92,7 @@
     // once the graph save has assigned the transition a row id.
     if (pending) {
       const found = screenId == null ? null : screens.find((item) => item.id === screenId) || null;
-      const selected = found ? { field_count: 0, required_field_count: 0, ...found } : null;
-      onChanged?.({ edgeId: transition?.edgeId, screen: selected });
+      onChanged?.({ edgeId: transition?.edgeId, screen: screenSummary(found) });
       successToast(t('workflowInspector.screenStaged'));
       return;
     }
@@ -130,11 +144,15 @@
     try {
       const created = await screensApi.create({ name });
       newScreenName = '';
-      screens = [...screens, created];
+      // A new screen always carries the always-visible system fields, so fetch
+      // them to show accurate counts before the editor saves anything.
+      const createdFields = await screensApi.getFields(created.id);
+      const createdWithFields = { ...created, fields: createdFields ?? [] };
+      screens = [...screens, createdWithFields];
       await bindScreen(created.id);
-      // A brand-new screen is empty; open the layout editor so its fields are
-      // laid out without a detour to the Screens page.
-      openFieldEditor(created);
+      // Open the layout editor so a brand-new screen gets its fields without a
+      // detour to the Screens page.
+      openFieldEditor(createdWithFields);
     } catch (err) {
       errorToast(err?.message || t('workflowInspector.screenCreateFailed'));
     } finally {
@@ -190,7 +208,7 @@
         {#if screen}
           <div class="rounded border p-3 mb-2" style="border-color: var(--workflow-border);">
             <div class="text-sm font-medium" data-testid="transition-inspector-screen-name">{screen.name}</div>
-            <div class="text-xs mt-0.5" style="color: var(--workflow-text-subtle);">
+            <div class="text-xs mt-0.5" style="color: var(--workflow-text-subtle);" data-testid="transition-inspector-field-summary">
               {t('workflowInspector.fieldSummary', { fields: screen.field_count, required: screen.required_field_count })}
             </div>
             <button
