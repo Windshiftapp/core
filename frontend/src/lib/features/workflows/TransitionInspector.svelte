@@ -10,6 +10,10 @@
   import { screens as screensApi } from '../../api/configuration.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
+  import Modal from '../../dialogs/Modal.svelte';
+  import ModalHeader from '../../dialogs/ModalHeader.svelte';
+  import DialogFooter from '../../dialogs/DialogFooter.svelte';
+  import ScreenFieldLayoutEditor from '../../editors/ScreenFieldLayoutEditor.svelte';
 
   let { transition, statuses = [], onClose = null, onChanged = null } = $props();
 
@@ -19,6 +23,10 @@
   let saving = $state(false);
   let creating = $state(false);
   let newScreenName = $state('');
+  // The screen whose fields are open in the layout editor, and the editor
+  // instance so the modal footer can drive its save.
+  let fieldEditorScreen = $state(null);
+  let fieldEditorRef = $state(null);
 
   let loadToken = 0;
   // Identity of the transition the inspector last loaded, so a staged binding
@@ -68,7 +76,8 @@
     // Unsaved edges: stage the choice locally and let the designer apply it
     // once the graph save has assigned the transition a row id.
     if (pending) {
-      const selected = screenId == null ? null : screens.find((item) => item.id === screenId) || null;
+      const found = screenId == null ? null : screens.find((item) => item.id === screenId) || null;
+      const selected = found ? { field_count: 0, required_field_count: 0, ...found } : null;
       onChanged?.({ edgeId: transition?.edgeId, screen: selected });
       successToast(t('workflowInspector.screenStaged'));
       return;
@@ -87,6 +96,33 @@
     }
   }
 
+  function openFieldEditor(target) {
+    if (target?.id) fieldEditorScreen = { ...target };
+  }
+
+  function closeFieldEditor() {
+    fieldEditorScreen = null;
+  }
+
+  // Saving the layout refreshes the field counts shown next to the screen.
+  async function saveFieldEditor() {
+    const target = fieldEditorScreen;
+    try {
+      const summary = await fieldEditorRef?.save();
+      fieldEditorScreen = null;
+      if (!target?.id || !summary) return;
+      if (transition?.transitionId) {
+        governance = await transitionsApi.governance(transition.transitionId);
+        return;
+      }
+      if (screen?.id === target.id) {
+        onChanged?.({ edgeId: transition?.edgeId, screen: { ...screen, ...summary } });
+      }
+    } catch (err) {
+      errorToast(err?.message || t('workflowInspector.screenSaveFailed'));
+    }
+  }
+
   async function createAndBind() {
     const name = newScreenName.trim();
     if (!name || creating) return;
@@ -96,6 +132,9 @@
       newScreenName = '';
       screens = [...screens, created];
       await bindScreen(created.id);
+      // A brand-new screen is empty; open the layout editor so its fields are
+      // laid out without a detour to the Screens page.
+      openFieldEditor(created);
     } catch (err) {
       errorToast(err?.message || t('workflowInspector.screenCreateFailed'));
     } finally {
@@ -154,6 +193,15 @@
             <div class="text-xs mt-0.5" style="color: var(--workflow-text-subtle);">
               {t('workflowInspector.fieldSummary', { fields: screen.field_count, required: screen.required_field_count })}
             </div>
+            <button
+              type="button"
+              class="mt-2 text-xs underline cursor-pointer"
+              style="color: var(--workflow-accent);"
+              data-testid="transition-inspector-edit-fields"
+              onclick={() => openFieldEditor(screen)}
+            >
+              {t('workflowInspector.editFields')}
+            </button>
           </div>
           <div class="flex gap-2 min-w-0">
             <select
@@ -229,3 +277,27 @@
     {/if}
   </div>
 </aside>
+
+{#if fieldEditorScreen}
+  <Modal
+    isOpen={true}
+    onclose={closeFieldEditor}
+    maxWidth="max-w-5xl"
+    onSubmit={saveFieldEditor}
+    dataTestid="transition-screen-field-editor"
+  >
+    <ModalHeader
+      title={t('workflowInspector.editFieldsTitle', { name: fieldEditorScreen.name })}
+      showCloseButton={false}
+    />
+    <div class="px-6 py-4">
+      <ScreenFieldLayoutEditor bind:this={fieldEditorRef} screen={fieldEditorScreen} />
+    </div>
+    <DialogFooter
+      onCancel={closeFieldEditor}
+      onConfirm={saveFieldEditor}
+      confirmLabel={t('screensPage.saveFields')}
+      showKeyboardHint
+    />
+  </Modal>
+{/if}

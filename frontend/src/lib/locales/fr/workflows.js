@@ -389,7 +389,9 @@ export default {
     createAndBind: 'Créer et associer',
     createHeading: 'Créer un nouvel écran',
     createHint:
-      'Crée un écran vide et l’associe à cette transition. Ajoutez ses champs sur la page Écrans.',
+      'Crée un écran vide, l’associe à cette transition et ouvre l’éditeur de champs.',
+    editFields: 'Modifier les champs',
+    editFieldsTitle: 'Champs de l’écran — {name}',
     screenSaved: 'Écran de transition enregistré',
     screenStaged: 'L’écran sera associé à l’enregistrement du flux de travail',
     pendingHint: 'Cette transition n’est pas encore enregistrée. L’écran sera associé à l’enregistrement du flux de travail.',

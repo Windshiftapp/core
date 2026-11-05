@@ -389,7 +389,9 @@ export default {
     createAndBind: 'Create & bind',
     createHeading: 'Create a new screen',
     createHint:
-      'Creates an empty screen and binds it to this transition. Add its fields on the Screens page.',
+      'Creates an empty screen, binds it to this transition, and opens the field editor.',
+    editFields: 'Edit fields',
+    editFieldsTitle: 'Screen fields — {name}',
     screenSaved: 'Transition screen saved',
     screenStaged: 'Screen will be attached when you save the workflow',
     pendingHint: 'This transition is not saved yet. The screen is attached when you save the workflow.',
