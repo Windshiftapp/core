@@ -487,7 +487,7 @@ func (h *IntegrationOAuthHandler) GetUserConnections(w http.ResponseWriter, r *h
 	rows, err := h.db.Query(`
 		SELECT
 			uit.id, uit.user_id, uit.integration_provider_id,
-			uit.provider_metadata, uit.connected_at,
+			uit.provider_metadata, uit.invalidated_at, uit.connected_at,
 			uit.created_at, uit.updated_at,
 			ip.name AS provider_name, ip.provider_type, ip.slug AS provider_slug
 		FROM user_integration_tokens uit
@@ -505,9 +505,10 @@ func (h *IntegrationOAuthHandler) GetUserConnections(w http.ResponseWriter, r *h
 	for rows.Next() {
 		var conn models.UserIntegrationToken
 		var metadata sql.NullString
+		var invalidatedAt sql.NullTime
 		err := rows.Scan(
 			&conn.ID, &conn.UserID, &conn.IntegrationProviderID,
-			&metadata, &conn.ConnectedAt,
+			&metadata, &invalidatedAt, &conn.ConnectedAt,
 			&conn.CreatedAt, &conn.UpdatedAt,
 			&conn.ProviderName, &conn.ProviderType, &conn.ProviderSlug,
 		)
@@ -517,6 +518,9 @@ func (h *IntegrationOAuthHandler) GetUserConnections(w http.ResponseWriter, r *h
 		}
 		if metadata.Valid {
 			conn.ProviderMetadata = metadata.String
+		}
+		if invalidatedAt.Valid {
+			conn.InvalidatedAt = &invalidatedAt.Time
 		}
 		connections = append(connections, conn)
 	}

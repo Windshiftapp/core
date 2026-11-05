@@ -319,7 +319,15 @@
 								<h3 class="text-base font-medium" style="color: var(--ds-text);">
 									{provider.name}
 								</h3>
-								{#if connection}
+								{#if connection && connection.invalidated_at}
+									<span
+										class="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+										style="background-color: var(--ds-background-danger); color: var(--ds-text-danger);"
+									>
+										<XCircle class="w-3 h-3" />
+										Reconnect required
+									</span>
+								{:else if connection}
 									<span
 										class="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
 										style="background-color: var(--ds-background-success); color: var(--ds-text-success);"
@@ -364,7 +372,15 @@
 						</div>
 
 						<div class="flex items-center gap-2">
-							{#if connection}
+							{#if connection && connection.invalidated_at}
+								<Button
+									variant="primary"
+									size="small"
+									onclick={() => connectIntegration(provider)}
+								>
+									Reconnect
+								</Button>
+							{:else if connection}
 								<Button
 									variant="danger"
 									size="small"
