@@ -200,6 +200,14 @@ Then open `http://localhost:8080`. For a production setup, follow the [Docker de
 
 There is also a desktop app that connects to your server or runs locally. Get both from the [download page](https://windshift.sh/download). Windshift is designed to run comfortably on anything from a Raspberry Pi to a dedicated server.
 
+The `ws` command-line client is available through Homebrew:
+
+```sh
+brew install windshiftapp/tap/ws
+```
+
+See the [CLI installation guide](https://windshift.sh/self-hosting/04-cli/01-installation) for configuration.
+
 Want to build from source? See [BUILD.md](BUILD.md). For local development and contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing
