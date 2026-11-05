@@ -21,20 +21,29 @@
   let newScreenName = $state('');
 
   let loadToken = 0;
+  // Identity of the transition the inspector last loaded, so a staged binding
+  // that rewrites `transition.screen` does not refetch governance/screens.
+  let loadedKey = null;
+
+  // An edge drawn in this session has no transition id yet, so its binding is
+  // staged and applied when the workflow graph is saved.
+  const pending = $derived(!transition?.transitionId);
 
   $effect(() => {
     const id = transition?.transitionId;
-    if (!id) {
-      governance = null;
-      return;
-    }
+    const key = `${id ?? 'new'}:${transition?.edgeId ?? ''}`;
+    if (key === loadedKey) return;
+    loadedKey = key;
+
     const token = ++loadToken;
     loading = true;
-    Promise.all([transitionsApi.governance(id), screensApi.getAll()])
-      .then(([gov, list]) => {
+    const requests = [screensApi.getAll()];
+    if (id) requests.push(transitionsApi.governance(id));
+    Promise.all(requests)
+      .then(([list, gov]) => {
         if (token !== loadToken) return;
-        governance = gov;
         screens = list || [];
+        governance = id ? gov : null;
       })
       .catch(() => {
         if (token === loadToken) governance = null;
@@ -44,7 +53,7 @@
       });
   });
 
-  const screen = $derived(governance?.screen || null);
+  const screen = $derived(governance?.screen ?? transition?.screen ?? null);
 
   const fromName = $derived(
     statuses.find((status) => status.id === transition?.from_status_id)?.name || '?'
@@ -54,7 +63,18 @@
   );
 
   async function bindScreen(screenId) {
-    if (saving || !transition?.transitionId) return;
+    if (saving) return;
+
+    // Unsaved edges: stage the choice locally and let the designer apply it
+    // once the graph save has assigned the transition a row id.
+    if (pending) {
+      const selected = screenId == null ? null : screens.find((item) => item.id === screenId) || null;
+      onChanged?.({ edgeId: transition?.edgeId, screen: selected });
+      successToast(t('workflowInspector.screenStaged'));
+      return;
+    }
+
+    if (!transition?.transitionId) return;
     saving = true;
     try {
       governance = await transitionsApi.setScreen(transition.transitionId, screenId);
@@ -117,6 +137,16 @@
           <Monitor class="w-4 h-4" />
           <span class="text-sm font-medium">{t('workflowInspector.screen')}</span>
         </div>
+
+        {#if pending}
+          <div
+            class="text-xs rounded border px-2 py-1.5 mb-2"
+            style="border-color: var(--workflow-border); color: var(--workflow-text-subtle);"
+            data-testid="transition-inspector-pending"
+          >
+            {t('workflowInspector.pendingHint')}
+          </div>
+        {/if}
 
         {#if screen}
           <div class="rounded border p-3 mb-2" style="border-color: var(--workflow-border);">
