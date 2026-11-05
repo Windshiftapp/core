@@ -9,7 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/lib/pq"
 )
@@ -3196,6 +3199,217 @@ var Catalog = []Migration{
 			CREATE INDEX IF NOT EXISTS idx_workflow_transitions_screen_id ON workflow_transitions(screen_id);
 		`,
 	},
+	{
+		Version:         "20261120_customer_cfv_numeric_keys",
+		Name:            "Key portal customer/organisation custom field values by field id",
+		CheckSQLiteFn:   checkCustomerCFVNumericKeys,
+		CheckPostgresFn: checkCustomerCFVNumericKeys,
+		SQLite:          "applyCustomerCFVNumericKeys:v1",
+		Postgres:        "applyCustomerCFVNumericKeys:v1",
+		ApplySQLite:     applyCustomerCFVNumericKeys,
+		ApplyPostgres:   applyCustomerCFVNumericKeys,
+	},
+}
+
+// isNumericJSONKey reports whether a custom-field value key is a numeric field
+// id (the canonical form) rather than a legacy name key.
+func isNumericJSONKey(key string) bool {
+	_, err := strconv.Atoi(key)
+	return err == nil
+}
+
+// checkCustomerCFVNumericKeys reports whether every stored customer custom-field
+// value is already keyed by numeric field id (nothing left to migrate). Fresh
+// installs have no rows, so the migration is stamped without running.
+func checkCustomerCFVNumericKeys(db Database) (bool, error) {
+	for _, table := range []string{"portal_customers", "customer_organisations"} {
+		rows, err := db.Query(fmt.Sprintf(`SELECT custom_field_values FROM %s
+			WHERE custom_field_values IS NOT NULL
+			  AND CAST(custom_field_values AS TEXT) != ''`, table))
+		if err != nil {
+			return false, fmt.Errorf("check %s custom field values: %w", table, err)
+		}
+		for rows.Next() {
+			var raw sql.NullString
+			if err := rows.Scan(&raw); err != nil {
+				_ = rows.Close()
+				return false, fmt.Errorf("scan %s custom field values: %w", table, err)
+			}
+			if !raw.Valid || raw.String == "" {
+				continue
+			}
+			decoder := json.NewDecoder(strings.NewReader(raw.String))
+			decoder.UseNumber()
+			var cfv map[string]any
+			if err := decoder.Decode(&cfv); err != nil {
+				continue
+			}
+			for key := range cfv {
+				if !isNumericJSONKey(key) {
+					_ = rows.Close()
+					return false, nil
+				}
+			}
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return false, fmt.Errorf("iterate %s custom field values: %w", table, err)
+		}
+		_ = rows.Close()
+	}
+	return true, nil
+}
+
+// applyCustomerCFVNumericKeys rewrites portal_customers.custom_field_values and
+// customer_organisations.custom_field_values from name keys to numeric field-id
+// keys (WI-2025). The legacy name key is kept as a downgrade mirror for fields
+// whose name is unique in the scope; ambiguous and orphan names are left
+// untouched. Idempotent: a second pass finds only numeric keys and no-ops.
+func applyCustomerCFVNumericKeys(db Database) error {
+	indexByTable := map[string]map[string][]int{
+		"portal_customers":       {},
+		"customer_organisations": {},
+	}
+	nameByID := map[int]string{}
+
+	rows, err := db.Query(`SELECT id, name, applies_to_portal_customers, applies_to_customer_organisations FROM custom_field_definitions`)
+	if err != nil {
+		return fmt.Errorf("load custom fields: %w", err)
+	}
+	for rows.Next() {
+		var id int
+		var name string
+		var portal, org sql.NullBool
+		if err := rows.Scan(&id, &name, &portal, &org); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("scan custom field: %w", err)
+		}
+		nameByID[id] = name
+		lower := strings.ToLower(name)
+		if portal.Valid && portal.Bool {
+			indexByTable["portal_customers"][lower] = append(indexByTable["portal_customers"][lower], id)
+		}
+		if org.Valid && org.Bool {
+			indexByTable["customer_organisations"][lower] = append(indexByTable["customer_organisations"][lower], id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return fmt.Errorf("iterate custom fields: %w", err)
+	}
+	_ = rows.Close()
+
+	for _, table := range []string{"portal_customers", "customer_organisations"} {
+		if err := migrateCustomerCFVTable(db, table, indexByTable[table], nameByID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// migrateCustomerCFVTable migrates one JSON column in keyset-paginated batches.
+func migrateCustomerCFVTable(db Database, table string, index map[string][]int, nameByID map[int]string) error {
+	const batchSize = 500
+	lastID := 0
+	for {
+		rows, err := db.Query(fmt.Sprintf(`SELECT id, custom_field_values FROM %s
+			WHERE id > ? AND custom_field_values IS NOT NULL
+			  AND CAST(custom_field_values AS TEXT) != ''
+			ORDER BY id ASC LIMIT ?`, table), lastID, batchSize)
+		if err != nil {
+			return fmt.Errorf("read %s custom field values: %w", table, err)
+		}
+
+		type update struct {
+			id    int
+			value string
+		}
+		var updates []update
+		batch := 0
+		for rows.Next() {
+			var id int
+			var raw sql.NullString
+			if err := rows.Scan(&id, &raw); err != nil {
+				_ = rows.Close()
+				return fmt.Errorf("scan %s row: %w", table, err)
+			}
+			batch++
+			lastID = id
+			if !raw.Valid || raw.String == "" {
+				continue
+			}
+
+			decoder := json.NewDecoder(strings.NewReader(raw.String))
+			decoder.UseNumber()
+			var cfv map[string]any
+			if err := decoder.Decode(&cfv); err != nil {
+				// Malformed JSON is left for the read path to skip.
+				continue
+			}
+
+			changed := false
+			// 1. Legacy name keys become id keys; the name key stays as the mirror.
+			for key, value := range cfv {
+				if isNumericJSONKey(key) {
+					continue
+				}
+				ids := index[strings.ToLower(key)]
+				switch len(ids) {
+				case 0:
+					// Orphan (renamed/deleted field): leave alone.
+				case 1:
+					idKey := strconv.Itoa(ids[0])
+					if _, exists := cfv[idKey]; !exists {
+						cfv[idKey] = value
+						changed = true
+					}
+				default:
+					slog.Warn("customer cfv migration: ambiguous custom field name",
+						"table", table, "id", id, "name", key)
+				}
+			}
+			// 2. Refresh unique-name mirrors from the authoritative id keys.
+			for key, value := range cfv {
+				fieldID, err := strconv.Atoi(key)
+				if err != nil {
+					continue
+				}
+				name, ok := nameByID[fieldID]
+				if !ok || len(index[strings.ToLower(name)]) != 1 {
+					continue
+				}
+				if existing, exists := cfv[name]; !exists || !reflect.DeepEqual(existing, value) {
+					cfv[name] = value
+					changed = true
+				}
+			}
+
+			if !changed {
+				continue
+			}
+			encoded, err := json.Marshal(cfv)
+			if err != nil {
+				_ = rows.Close()
+				return fmt.Errorf("encode %s row %d: %w", table, id, err)
+			}
+			updates = append(updates, update{id: id, value: string(encoded)})
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("iterate %s rows: %w", table, err)
+		}
+		_ = rows.Close()
+
+		for _, u := range updates {
+			if _, err := db.Exec(fmt.Sprintf(`UPDATE %s SET custom_field_values = ? WHERE id = ?`, table), u.value, u.id); err != nil {
+				return fmt.Errorf("update %s row %d: %w", table, u.id, err)
+			}
+		}
+
+		if batch < batchSize {
+			return nil
+		}
+	}
 }
 
 // dropTimeWorklogCustomerSQLite rebuilds time_worklogs without the customer_id

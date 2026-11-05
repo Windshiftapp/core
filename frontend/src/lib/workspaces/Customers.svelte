@@ -23,6 +23,7 @@
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { realCustomers } from '../utils/customerLabel.js';
+  import { fieldValue } from '../utils/customFieldValues.js';
   import { permissionStore, isSystemAdmin } from '../stores/permissions.svelte.js';
   import AlertBox from '../components/AlertBox.svelte';
 
@@ -512,10 +513,10 @@
             {#each portalCustomerFields as field (field.id ?? field.name)}
               <CustomFieldRenderer
                 {field}
-                value={formData.custom_field_values[field.name] ?? ''}
+                value={fieldValue(formData.custom_field_values, field) ?? ''}
                 readonly={false}
                 onChange={(val) => {
-                  formData.custom_field_values[field.name] = val;
+                  formData.custom_field_values[String(field.id)] = val;
                 }}
               />
             {/each}

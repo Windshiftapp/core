@@ -4,11 +4,13 @@ import (
 	"errors"
 	"net/http"
 
+	"windshift/internal/customfields"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 	"windshift/internal/services"
+	"windshift/internal/validation"
 )
 
 type TimeCustomerHandler struct {
@@ -143,6 +145,11 @@ func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		sanitize.Pair{Target: &c.Description, Policy: sanitize.Comment, Label: "Description"},
 	)
 
+	index, ok := h.prepareCustomFieldValues(w, r, &c)
+	if !ok {
+		return
+	}
+
 	id, now, err := h.repo.Create(&c)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -152,6 +159,10 @@ func (h *TimeCustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 	c.ID = id
 	c.CreatedAt = now
 	c.UpdatedAt = now
+
+	if index != nil {
+		index.Resolve(c.CustomFieldValues)
+	}
 
 	if user != nil {
 		h.auditor.Log(r, user, logger.ActionTimeCustomerCreate, logger.ResourceTimeCustomer, &id, c.Name)
@@ -198,6 +209,11 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 		sanitize.Pair{Target: &c.Description, Policy: sanitize.Comment, Label: "Description"},
 	)
 
+	index, ok := h.prepareCustomFieldValues(w, r, &c)
+	if !ok {
+		return
+	}
+
 	now, err := h.repo.Update(id, &c)
 	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "customer")
@@ -210,6 +226,10 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	c.ID = id
 	c.UpdatedAt = now
+
+	if index != nil {
+		index.Resolve(c.CustomFieldValues)
+	}
 
 	if user != nil {
 		h.auditor.Log(r, user, logger.ActionTimeCustomerUpdate, logger.ResourceTimeCustomer, &id, c.Name)
@@ -270,6 +290,47 @@ func (h *TimeCustomerHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// prepareCustomFieldValues normalises legacy name keys to numeric field ids,
+// validates the values, and rebuilds the unique-name mirror for the downgrade
+// window (WI-2025). Writes the error response itself and returns ok=false on
+// failure. The returned index lets the caller strip the mirror from the
+// response without a second lookup.
+func (h *TimeCustomerHandler) prepareCustomFieldValues(w http.ResponseWriter, r *http.Request, c *models.CustomerOrganisation) (*customfields.CustomFieldNameIndex, bool) {
+	if len(c.CustomFieldValues) == 0 {
+		return nil, true
+	}
+	db := h.repo.DB()
+	index, err := customfields.LoadCustomFieldNameIndex(db, customfields.AppliesToCustomerOrganisations)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return nil, false
+	}
+	if err := index.Validate(c.CustomFieldValues); err != nil {
+		return nil, !respondCustomerFieldError(w, r, err)
+	}
+	if err := validation.ValidateAndNormalizeCustomFieldValues(db, c.CustomFieldValues); err != nil {
+		return nil, !respondCustomerFieldError(w, r, err)
+	}
+	index.RebuildMirrors(c.CustomFieldValues)
+	return index, true
+}
+
+// respondCustomerFieldError maps a custom-field validation error onto a 400.
+// Returns true when the error was handled.
+func respondCustomerFieldError(w http.ResponseWriter, r *http.Request, err error) bool {
+	var ve *validation.ValidationError
+	if errors.As(err, &ve) {
+		respondValidationError(w, r, ve.Error())
+		return true
+	}
+	var ae *customfields.AmbiguousNameError
+	if errors.As(err, &ae) {
+		respondValidationError(w, r, ae.Error())
+		return true
+	}
+	return false
 }
 
 // orgRequestSharingRequest is the body of PUT /customer-organisations/{id}/request-sharing.

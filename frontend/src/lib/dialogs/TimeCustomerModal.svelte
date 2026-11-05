@@ -10,6 +10,7 @@
   import { attachments } from '../api/misc.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, warningToast } from '../stores/toasts.svelte.js';
+  import { fieldValue } from '../utils/customFieldValues.js';
 	import TextField from '../components/TextField.svelte';
 	import TextareaField from '../components/TextareaField.svelte';
 
@@ -217,10 +218,10 @@
             {#each customerOrgFields as field}
               <CustomFieldRenderer
                 {field}
-                value={formData.custom_field_values[field.name] ?? ''}
+                value={fieldValue(formData.custom_field_values, field) ?? ''}
                 readonly={false}
                 onChange={(val) => {
-                  formData.custom_field_values[field.name] = val;
+                  formData.custom_field_values[String(field.id)] = val;
                 }}
               />
             {/each}

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -571,26 +572,31 @@ func (r *CustomFieldRepository) DriverName() string {
 // cheap LIKE prefilter; false positives there only waste IO.
 func (r *CustomFieldRepository) CountRowsUsingField(fieldID int) (int, error) {
 	fieldKey := strconv.Itoa(fieldID)
-	isPostgres := r.db.GetDriverName() == "postgres"
+	fieldName, err := r.fieldName(fieldID)
+	if err != nil {
+		return 0, err
+	}
 
 	total := 0
 	for _, table := range []string{"items", "assets"} {
-		var count int
-		var query string
-		if isPostgres {
-			query = fmt.Sprintf(`SELECT COUNT(*) FROM %s
-			  WHERE custom_field_values IS NOT NULL
-			    AND jsonb_exists(custom_field_values, ?)`, table)
-		} else {
-			query = fmt.Sprintf(`SELECT COUNT(*) FROM %s
-			  WHERE custom_field_values IS NOT NULL
-			    AND CAST(custom_field_values AS TEXT) != ''
-			    AND json_valid(CAST(custom_field_values AS TEXT))
-			    AND EXISTS (SELECT 1 FROM json_each(CAST(custom_field_values AS TEXT)) WHERE json_each.key = ?)`, table)
-		}
-		err := r.db.QueryRow(query, fieldKey).Scan(&count)
+		count, err := r.countRowsWithJSONKeys(table, []string{fieldKey})
 		if err != nil {
-			return 0, fmt.Errorf("count %s using custom field: %w", table, err)
+			return 0, err
+		}
+		total += count
+	}
+
+	// Portal customer/organisation values are keyed by numeric id with a
+	// unique-name mirror kept for the downgrade window (WI-2025), so count
+	// both forms.
+	for _, table := range []string{"portal_customers", "customer_organisations"} {
+		keys := []string{fieldKey}
+		if fieldName != "" {
+			keys = append(keys, fieldName)
+		}
+		count, err := r.countRowsWithJSONKeys(table, keys)
+		if err != nil {
+			return 0, err
 		}
 		total += count
 	}
@@ -608,6 +614,66 @@ func (r *CustomFieldRepository) CountRowsUsingField(fieldID int) (int, error) {
 	return total, nil
 }
 
+// fieldName resolves a custom field's stored name, or "" when the row is gone.
+func (r *CustomFieldRepository) fieldName(fieldID int) (string, error) {
+	var name string
+	err := r.db.QueryRow(`SELECT name FROM custom_field_definitions WHERE id = ?`, fieldID).Scan(&name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("resolve custom field name: %w", err)
+	}
+	return name, nil
+}
+
+// countRowsWithJSONKeys counts rows in table whose custom_field_values object
+// contains any of the given keys. table must be one of the trusted JSON-column
+// tables below.
+func (r *CustomFieldRepository) countRowsWithJSONKeys(table string, keys []string) (int, error) {
+	switch table {
+	case "items", "assets", "portal_customers", "customer_organisations":
+	default:
+		return 0, fmt.Errorf("invalid table for custom field values: %q", table)
+	}
+
+	isPostgres := r.db.GetDriverName() == "postgres"
+	args := make([]any, 0, len(keys))
+	predicates := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		args = append(args, key)
+		if isPostgres {
+			predicates = append(predicates, "jsonb_exists(custom_field_values, ?)")
+		} else {
+			predicates = append(predicates, "EXISTS (SELECT 1 FROM json_each(CAST(custom_field_values AS TEXT)) WHERE json_each.key = ?)")
+		}
+	}
+	if len(predicates) == 0 {
+		return 0, nil
+	}
+
+	var query string
+	if isPostgres {
+		query = fmt.Sprintf(`SELECT COUNT(*) FROM %s
+		  WHERE custom_field_values IS NOT NULL AND (%s)`, table, strings.Join(predicates, " OR "))
+	} else {
+		query = fmt.Sprintf(`SELECT COUNT(*) FROM %s
+		  WHERE custom_field_values IS NOT NULL
+		    AND CAST(custom_field_values AS TEXT) != ''
+		    AND json_valid(CAST(custom_field_values AS TEXT))
+		    AND (%s)`, table, strings.Join(predicates, " OR "))
+	}
+
+	var count int
+	if err := r.db.QueryRow(query, args...).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count %s using custom field: %w", table, err)
+	}
+	return count, nil
+}
+
 // --- items / assets custom_field_values cleanup ----------------------------
 
 // TableCFVRow is one (id, custom_field_values) pair from items or assets.
@@ -616,14 +682,23 @@ type TableCFVRow struct {
 	Value string
 }
 
+// isCFVTable reports whether tableName is a trusted table carrying a
+// custom_field_values JSON object keyed by field id.
+func isCFVTable(tableName string) bool {
+	switch tableName {
+	case "items", "assets", "portal_customers", "customer_organisations":
+		return true
+	}
+	return false
+}
+
 // ListRowsWithCustomFieldsPageByKey returns up to limit (id, custom_field_values)
-// pairs from items or assets after afterID whose custom_field_values mentions the
+// pairs from a trusted table after afterID whose custom_field_values mentions the
 // given field key, ordered by id. Keyset pagination (id > ?) keeps memory bounded
 // for the async option-removal cleanup, mirroring
-// ItemRepository.ListCustomFieldValuesPageByKey. tableName must be one of the
-// trusted names "items" or "assets".
+// ItemRepository.ListCustomFieldValuesPageByKey.
 func (r *CustomFieldRepository) ListRowsWithCustomFieldsPageByKey(tableName string, afterID int, fieldKey string, limit int) ([]TableCFVRow, error) {
-	if tableName != "items" && tableName != "assets" {
+	if !isCFVTable(tableName) {
 		return nil, fmt.Errorf("invalid table for custom field values: %q", tableName)
 	}
 	// CAST(... AS TEXT) so the LIKE key prefilter works on both SQLite (TEXT
@@ -656,9 +731,9 @@ func (r *CustomFieldRepository) ListRowsWithCustomFieldsPageByKey(tableName stri
 
 // CompareAndSwapRowCustomFields updates custom_field_values only when it still
 // matches oldVal. This prevents asynchronous cleanup from overwriting a newer
-// user edit. tableName must be one of the trusted names "items" or "assets".
+// user edit. tableName must be a trusted custom_field_values table.
 func (r *CustomFieldRepository) CompareAndSwapRowCustomFields(tableName string, id int, oldVal, newVal string) (bool, error) {
-	if tableName != "items" && tableName != "assets" {
+	if !isCFVTable(tableName) {
 		return false, fmt.Errorf("invalid table for custom field values: %q", tableName)
 	}
 	var (
@@ -688,7 +763,7 @@ func (r *CustomFieldRepository) CompareAndSwapRowCustomFields(tableName string, 
 
 // FindRowCustomFields returns the current custom_field_values value for a row.
 func (r *CustomFieldRepository) FindRowCustomFields(tableName string, id int) (currentValue string, found bool, err error) {
-	if tableName != "items" && tableName != "assets" {
+	if !isCFVTable(tableName) {
 		return "", false, fmt.Errorf("invalid table for custom field values: %q", tableName)
 	}
 	var value sql.NullString

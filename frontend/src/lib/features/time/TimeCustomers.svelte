@@ -16,6 +16,7 @@
   import Users from '@lucide/svelte/icons/users';
   import { t } from '../../stores/i18n.svelte.js';
   import { realCustomers } from '../../utils/customerLabel.js';
+  import { toIdKeyedCustomFieldValues } from '../../utils/customFieldValues.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import PageHeader from '../../layout/PageHeader.svelte';
@@ -75,7 +76,7 @@
       description: customer.description || '',
       active: customer.active,
       avatar_url: customer.avatar_url || null,
-      custom_field_values: customer.custom_field_values || {}
+      custom_field_values: toIdKeyedCustomFieldValues(customer.custom_field_values, customerOrgFields)
     };
     showModal = true;
   }

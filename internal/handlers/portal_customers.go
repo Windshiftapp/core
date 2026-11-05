@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"windshift/internal/customfields"
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
@@ -18,6 +19,7 @@ import (
 	"windshift/internal/sanitize"
 	"windshift/internal/services"
 	"windshift/internal/utils"
+	"windshift/internal/validation"
 )
 
 // PortalCustomersHandler handles portal customer management operations
@@ -145,6 +147,27 @@ func scanPortalCustomer(scanner interface{ Scan(...any) error }) (models.PortalC
 	return c, nil
 }
 
+// resolvePortalCustomerCustomFieldKeys rewrites legacy name keys to id keys on
+// a response map so the API contract stays id-keyed (WI-2025).
+func resolvePortalCustomerCustomFieldKeys(c *models.PortalCustomer, index *customfields.CustomFieldNameIndex) {
+	if index == nil || c == nil || len(c.CustomFieldValues) == 0 {
+		return
+	}
+	index.Resolve(c.CustomFieldValues)
+}
+
+// loadPortalCustomerFieldIndex loads the portal-customer name index. A lookup
+// failure is logged and treated as "no normalisation" so a read never fails on
+// it.
+func (h *PortalCustomersHandler) loadPortalCustomerFieldIndex() *customfields.CustomFieldNameIndex {
+	index, err := customfields.LoadCustomFieldNameIndex(h.db, customfields.AppliesToPortalCustomers)
+	if err != nil {
+		slog.Warn("failed to load custom field names for portal customers", slog.String("component", "portal"), slog.Any("error", err))
+		return nil
+	}
+	return index
+}
+
 // loadPortalCustomerWithRoles fetches a single portal customer by ID and loads its roles.
 func (h *PortalCustomersHandler) loadPortalCustomerWithRoles(id int64) (models.PortalCustomer, error) {
 	row := h.db.QueryRow(portalCustomerBaseQuery+" WHERE pc.id = ?", id)
@@ -161,6 +184,7 @@ func (h *PortalCustomersHandler) loadPortalCustomerWithRoles(id int64) (models.P
 		c.Roles = roles
 	}
 
+	resolvePortalCustomerCustomFieldKeys(&c, h.loadPortalCustomerFieldIndex())
 	return c, nil
 }
 
@@ -193,6 +217,11 @@ func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *ht
 	if err := rows.Err(); err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	fieldIndex := h.loadPortalCustomerFieldIndex()
+	for i := range customers {
+		resolvePortalCustomerCustomFieldKeys(&customers[i], fieldIndex)
 	}
 
 	// Batched role lookup avoids the previous N+1 per customer.
@@ -380,7 +409,7 @@ type portalCustomerInput struct {
 }
 
 // decodePortalCustomerInput decodes, validates, and serializes custom fields for portal customer create/update.
-func decodePortalCustomerInput(w http.ResponseWriter, r *http.Request) (portalCustomerInput, bool) {
+func (h *PortalCustomersHandler) decodePortalCustomerInput(w http.ResponseWriter, r *http.Request) (portalCustomerInput, bool) {
 	//nolint:misspell // API uses British spelling (customer_organisation_id)
 	var requestData struct {
 		Name                   string         `json:"name"`
@@ -411,6 +440,22 @@ func decodePortalCustomerInput(w http.ResponseWriter, r *http.Request) (portalCu
 
 	var customFieldValuesJSON *string
 	if len(requestData.CustomFieldValues) > 0 {
+		// Normalise legacy name keys to numeric field ids, then validate and
+		// re-add the unique-name mirror for the downgrade window (WI-2025).
+		index, err := customfields.LoadCustomFieldNameIndex(h.db, customfields.AppliesToPortalCustomers)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return portalCustomerInput{}, false
+		}
+		if err := index.Validate(requestData.CustomFieldValues); err != nil {
+			respondValidationError(w, r, err.Error())
+			return portalCustomerInput{}, false
+		}
+		if err := validation.ValidateAndNormalizeCustomFieldValues(h.db, requestData.CustomFieldValues); err != nil {
+			respondValidationError(w, r, err.Error())
+			return portalCustomerInput{}, false
+		}
+		index.RebuildMirrors(requestData.CustomFieldValues)
 		b, err := json.Marshal(requestData.CustomFieldValues)
 		if err != nil {
 			respondBadRequest(w, r, "Invalid custom field values")
@@ -433,7 +478,7 @@ func decodePortalCustomerInput(w http.ResponseWriter, r *http.Request) (portalCu
 
 // CreatePortalCustomer creates a new portal customer
 func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *http.Request) {
-	input, ok := decodePortalCustomerInput(w, r)
+	input, ok := h.decodePortalCustomerInput(w, r)
 	if !ok {
 		return
 	}
@@ -537,7 +582,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 		return
 	}
 
-	input, ok := decodePortalCustomerInput(w, r)
+	input, ok := h.decodePortalCustomerInput(w, r)
 	if !ok {
 		return
 	}
@@ -950,6 +995,11 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 	if err := rows.Err(); err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	fieldIndex := h.loadPortalCustomerFieldIndex()
+	for i := range contacts {
+		resolvePortalCustomerCustomFieldKeys(&contacts[i], fieldIndex)
 	}
 
 	rolesByContact, err := h.loadRolesForCustomers(contactIDs)

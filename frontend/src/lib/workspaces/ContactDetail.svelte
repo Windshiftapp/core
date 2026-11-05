@@ -23,6 +23,7 @@
   import BasePicker from '../pickers/BasePicker.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { fieldValue, toIdKeyedCustomFieldValues } from '../utils/customFieldValues.js';
   import DescriptionText from '../components/DescriptionText.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import { formatAuthenticatedDateTime } from '../utils/authenticatedDateFormatter.js';
@@ -128,7 +129,7 @@
       email: customer.email,
       phone: customer.phone || '',
       customer_organisation_id: customer.customer_organisation_id ?? null,
-      custom_field_values: customer.custom_field_values || {},
+      custom_field_values: toIdKeyedCustomFieldValues(customer.custom_field_values, portalCustomerFields),
       role_ids: (customer.roles || []).map((role) => role.id)
     };
     isEditing = true;
@@ -365,10 +366,10 @@
                   {#each portalCustomerFields as field}
                     <CustomFieldRenderer
                       {field}
-                      value={editFormData.custom_field_values[field.name] ?? ''}
+                      value={fieldValue(editFormData.custom_field_values, field) ?? ''}
                       readonly={false}
                       onChange={(val) => {
-                        editFormData.custom_field_values[field.name] = val;
+                        editFormData.custom_field_values[String(field.id)] = val;
                       }}
                     />
                   {/each}
@@ -418,7 +419,7 @@
 
             <!-- Custom Field Values (read-only) -->
             {#if portalCustomerFields.length > 0 && customer.custom_field_values}
-              {@const filledFields = portalCustomerFields.filter(f => hasCustomFieldValue(customer.custom_field_values[f.name]))}
+              {@const filledFields = portalCustomerFields.filter(f => hasCustomFieldValue(fieldValue(customer.custom_field_values, f)))}
               {#if filledFields.length > 0}
                 <div class="pt-4 border-t" style="border-color: var(--ds-border);">
                   <h3 class="text-sm font-medium mb-3" style="color: var(--ds-text);">{t('workspaces.customers.customFields')}</h3>
@@ -428,7 +429,7 @@
                         <div class="text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{field.label || field.name}</div>
                         <CustomFieldRenderer
                           {field}
-                          value={customer.custom_field_values[field.name]}
+                          value={fieldValue(customer.custom_field_values, field)}
                           readonly={true}
                           noPadding={true}
                           displayTestId={`customer-custom-field-${field.id}-value`}
