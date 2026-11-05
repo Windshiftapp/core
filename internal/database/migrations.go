@@ -3209,6 +3209,35 @@ var Catalog = []Migration{
 		ApplySQLite:     applyCustomerCFVNumericKeys,
 		ApplyPostgres:   applyCustomerCFVNumericKeys,
 	},
+	{
+		Version:       "20261120_integration_oauth_pkce_refresh",
+		Name:          "Add PKCE and refresh-token support to the integration OAuth framework",
+		CheckSQLite:   sqliteColumnCheck("integration_oauth_state", "code_verifier"),
+		CheckPostgres: pgColumnCheck("integration_oauth_state", "code_verifier"),
+		// Public-client providers (Docmost) need a PKCE verifier on the state row
+		// and refresh/expiry on the per-user token. Existing confidential-client
+		// providers (Notion, Todoist) leave the new token columns NULL.
+		SQLite: `
+			ALTER TABLE integration_oauth_state ADD COLUMN code_verifier TEXT;
+			ALTER TABLE user_integration_tokens ADD COLUMN encrypted_refresh_token TEXT;
+			ALTER TABLE user_integration_tokens ADD COLUMN expires_at DATETIME;
+			ALTER TABLE user_integration_tokens ADD COLUMN scopes TEXT;
+			ALTER TABLE user_integration_tokens ADD COLUMN refresh_lock_until DATETIME;
+			ALTER TABLE user_integration_tokens ADD COLUMN refresh_claim_owner TEXT;
+			ALTER TABLE user_integration_tokens ADD COLUMN auth_method TEXT NOT NULL DEFAULT 'oauth';
+			ALTER TABLE user_integration_tokens ADD COLUMN invalidated_at DATETIME;
+		`,
+		Postgres: `
+			ALTER TABLE integration_oauth_state ADD COLUMN IF NOT EXISTS code_verifier TEXT;
+			ALTER TABLE user_integration_tokens ADD COLUMN IF NOT EXISTS encrypted_refresh_token TEXT;
+			ALTER TABLE user_integration_tokens ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+			ALTER TABLE user_integration_tokens ADD COLUMN IF NOT EXISTS scopes TEXT;
+			ALTER TABLE user_integration_tokens ADD COLUMN IF NOT EXISTS refresh_lock_until TIMESTAMPTZ;
+			ALTER TABLE user_integration_tokens ADD COLUMN IF NOT EXISTS refresh_claim_owner TEXT;
+			ALTER TABLE user_integration_tokens ADD COLUMN IF NOT EXISTS auth_method TEXT NOT NULL DEFAULT 'oauth';
+			ALTER TABLE user_integration_tokens ADD COLUMN IF NOT EXISTS invalidated_at TIMESTAMPTZ;
+		`,
+	},
 }
 
 // isNumericJSONKey reports whether a custom-field value key is a numeric field

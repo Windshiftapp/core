@@ -107,6 +107,21 @@ func (r *IntegrationProviderRepository) GetByID(id string) (*IntegrationProvider
 	return &p, nil
 }
 
+// GetEnabledByType returns the first enabled provider of the given type, or
+// ErrNotFound. Provider services (e.g. Docmost) use it to resolve the admin
+// base connection without knowing the provider id.
+func (r *IntegrationProviderRepository) GetEnabledByType(providerType models.IntegrationProviderType) (*IntegrationProvider, error) {
+	row := r.db.QueryRow("SELECT "+integrationProviderColumns+" FROM integration_providers WHERE provider_type = ? AND enabled = true ORDER BY created_at LIMIT 1", string(providerType))
+	p, err := scanIntegrationProvider(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get integration_provider by type %s: %w", providerType, err)
+	}
+	return &p, nil
+}
+
 // Create inserts a new integration_provider. Returns ErrDuplicateEntry when
 // the slug collides with an existing row.
 func (r *IntegrationProviderRepository) Create(req IntegrationProviderInsert) error {

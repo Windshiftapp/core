@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS integration_oauth_state (
 	provider_id TEXT NOT NULL REFERENCES integration_providers(id) ON DELETE CASCADE,
 	state TEXT UNIQUE NOT NULL,
 	user_id TEXT NOT NULL,
+	code_verifier TEXT,
 	expires_at TIMESTAMPTZ NOT NULL,
 	created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -32,12 +33,22 @@ CREATE TABLE IF NOT EXISTS integration_oauth_state (
 CREATE INDEX IF NOT EXISTS idx_integration_oauth_state_state ON integration_oauth_state(state);
 CREATE INDEX IF NOT EXISTS idx_integration_oauth_state_expires ON integration_oauth_state(expires_at);
 
--- User Integration Tokens (per-user OAuth tokens for integration providers)
+-- User Integration Tokens (per-user OAuth tokens for integration providers).
+-- Long-lived providers (Notion, Todoist) leave the refresh/expiry columns NULL;
+-- public-client providers with rotating refresh tokens (Docmost) populate them
+-- and use refresh_lock_until / refresh_claim_owner to serialize rotation.
 CREATE TABLE IF NOT EXISTS user_integration_tokens (
 	id TEXT PRIMARY KEY,
 	user_id TEXT NOT NULL,
 	integration_provider_id TEXT NOT NULL REFERENCES integration_providers(id) ON DELETE CASCADE,
 	oauth_access_token_encrypted TEXT NOT NULL,
+	encrypted_refresh_token TEXT,
+	expires_at TIMESTAMPTZ,
+	scopes TEXT,
+	refresh_lock_until TIMESTAMPTZ,
+	refresh_claim_owner TEXT,
+	auth_method TEXT NOT NULL DEFAULT 'oauth',
+	invalidated_at TIMESTAMPTZ,
 	provider_metadata TEXT DEFAULT '{}',
 	connected_at TIMESTAMPTZ DEFAULT NOW(),
 	created_at TIMESTAMPTZ DEFAULT NOW(),

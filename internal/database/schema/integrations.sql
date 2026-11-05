@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS integration_oauth_state (
 	provider_id TEXT NOT NULL,
 	state TEXT UNIQUE NOT NULL,
 	user_id TEXT NOT NULL,
+	code_verifier TEXT,                           -- PKCE verifier for public clients (e.g. Docmost)
 	expires_at DATETIME NOT NULL,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (provider_id) REFERENCES integration_providers(id) ON DELETE CASCADE
@@ -42,12 +43,22 @@ BEGIN
 	AND (ABS(RANDOM()) % 100) = 0;
 END;
 
--- User Integration Tokens (per-user OAuth tokens for integration providers)
+-- User Integration Tokens (per-user OAuth tokens for integration providers).
+-- Long-lived providers (Notion, Todoist) leave the refresh/expiry columns NULL;
+-- public-client providers with rotating refresh tokens (Docmost) populate them
+-- and use refresh_lock_until / refresh_claim_owner to serialize rotation.
 CREATE TABLE IF NOT EXISTS user_integration_tokens (
 	id TEXT PRIMARY KEY,
 	user_id TEXT NOT NULL,
 	integration_provider_id TEXT NOT NULL,
 	oauth_access_token_encrypted TEXT NOT NULL,
+	encrypted_refresh_token TEXT,
+	expires_at DATETIME,
+	scopes TEXT,
+	refresh_lock_until DATETIME,
+	refresh_claim_owner TEXT,
+	auth_method TEXT NOT NULL DEFAULT 'oauth',
+	invalidated_at DATETIME,
 	provider_metadata TEXT DEFAULT '{}',          -- JSON: provider-specific data (e.g., workspace_id, workspace_name for Notion)
 	connected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

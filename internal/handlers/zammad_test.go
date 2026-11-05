@@ -379,7 +379,7 @@ func TestZammadConnectionReadyRequiresLocallyUsableDefaultGroup(t *testing.T) {
 
 func TestZammadOAuthCallbackRedirectsToIntegrationsAdminTab(t *testing.T) {
 	handler, db, _, _ := newZammadHandlerTest(t)
-	oauthHandler := NewIntegrationOAuthHandler(db, sso.NewSecretEncryption("synthetic-handler-test-secret"), "https://windshift.example.test")
+	oauthHandler := NewIntegrationOAuthHandler(db, sso.NewSecretEncryption("synthetic-handler-test-secret"), "https://windshift.example.test", nil)
 	oauthHandler.RegisterSystemOAuthFlow(models.IntegrationProviderZammad, handler.service, logger.NewAuditor(db))
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/integrations/oauth/system/zammad/callback?error=access_denied&state=missing", nil)
@@ -393,7 +393,7 @@ func TestZammadOAuthCallbackRedirectsToIntegrationsAdminTab(t *testing.T) {
 
 func TestUserOAuthSlugCannotCollideWithSystemCallback(t *testing.T) {
 	_, db, _, _ := newZammadHandlerTest(t)
-	oauthHandler := NewIntegrationOAuthHandler(db, sso.NewSecretEncryption("synthetic-handler-test-secret"), "https://windshift.example.test")
+	oauthHandler := NewIntegrationOAuthHandler(db, sso.NewSecretEncryption("synthetic-handler-test-secret"), "https://windshift.example.test", nil)
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/integrations/oauth/zammad/callback?error=access_denied", nil)
 	request.SetPathValue("slug", "zammad")
@@ -407,7 +407,7 @@ func TestZammadOAuthCallbackAuditsInitiatorSuccessAndFailureWithoutSecrets(t *te
 	handler, db, user, workspaceID := newZammadHandlerTest(t)
 	encryption := sso.NewSecretEncryption("synthetic-handler-test-secret")
 	handler.service.SetOAuthEncryption(encryption)
-	oauthHandler := NewIntegrationOAuthHandler(db, encryption, "https://windshift.example.test")
+	oauthHandler := NewIntegrationOAuthHandler(db, encryption, "https://windshift.example.test", nil)
 	oauthHandler.RegisterSystemOAuthFlow(models.IntegrationProviderZammad, handler.service, logger.NewAuditor(db))
 	handler.service.SetOAuthTransportForTesting(zammad.TransportFunc(func(_ context.Context, _ string, _ string, body []byte, _ map[string]string) (*zammad.Response, error) {
 		if strings.Contains(string(body), "failure-code") {

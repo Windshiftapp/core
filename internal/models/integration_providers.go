@@ -8,6 +8,7 @@ type IntegrationProviderType string
 const (
 	IntegrationProviderNotion  IntegrationProviderType = "notion"
 	IntegrationProviderTodoist IntegrationProviderType = "todoist"
+	IntegrationProviderDocmost IntegrationProviderType = "docmost"
 	// Future: IntegrationProviderConfluence, IntegrationProviderGoogleDocs
 )
 
