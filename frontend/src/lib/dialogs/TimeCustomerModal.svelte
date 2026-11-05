@@ -216,15 +216,18 @@
         <div class="mt-6 pt-6 border-t" style="border-color: var(--ds-border);">
           <h3 class="text-sm font-medium mb-4" style="color: var(--ds-text);">{t('organization.customFields')}</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {#each customerOrgFields as field}
-              <CustomFieldRenderer
-                {field}
-                value={fieldValue(formData.custom_field_values, field) ?? ''}
-                readonly={false}
-                onChange={(val) => {
-                  formData.custom_field_values[String(field.id)] = val;
-                }}
-              />
+            {#each customerOrgFields as field (field.id)}
+              <div>
+                <Label required={field.required} class="mb-2">{field.name}</Label>
+                <CustomFieldRenderer
+                  {field}
+                  value={fieldValue(formData.custom_field_values, field) ?? ''}
+                  readonly={false}
+                  onChange={(val) => {
+                    formData.custom_field_values[String(field.id)] = val;
+                  }}
+                />
+              </div>
             {/each}
           </div>
         </div>
