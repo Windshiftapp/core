@@ -3,6 +3,7 @@
   import Plus from '@lucide/svelte/icons/plus';
   import X from '@lucide/svelte/icons/x';
   import Button from '../../components/Button.svelte';
+  import { isFilterRowActive } from './filterOperators.js';
   import { t } from '../../stores/i18n.svelte.js';
 
   let {
@@ -15,9 +16,7 @@
   } = $props();
 
   let showFilters = $state(false);
-  const activeFilterCount = $derived(
-    filters.filter((filter) => filter.field && (filter.value || filter.values?.length)).length,
-  );
+  const activeFilterCount = $derived(filters.filter(isFilterRowActive).length);
 
   function addFilter() {
     filters = [...filters, { field: null, operator: '=', value: '', values: [] }];

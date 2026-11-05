@@ -5,6 +5,7 @@
   import Input from '../../components/Input.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import DynamicFieldFilter from '../items/DynamicFieldFilter.svelte';
+  import { isFilterRowActive } from '../shared/filterOperators.js';
   import { t } from '../../stores/i18n.svelte.js';
 
   // The one place the dynamic filter builder lives. It is opened from the
@@ -27,9 +28,7 @@
   let error = $state('');
   let busy = $state(false);
 
-  const hasRows = $derived(
-    draftRows.some((row) => row.field && (row.value || row.values?.length))
-  );
+  const hasRows = $derived(draftRows.some(isFilterRowActive));
 
   function blankRow() {
     return { field: null, operator: '=', value: '', values: [] };

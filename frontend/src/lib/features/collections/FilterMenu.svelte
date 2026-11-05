@@ -15,6 +15,7 @@
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import FilterBuilderModal from './FilterBuilderModal.svelte';
+  import { isFilterRowActive } from '../shared/filterOperators.js';
   import { queues } from '../../api/queues.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { successToast, warningToast } from '../../stores/toasts.svelte.js';
@@ -229,9 +230,7 @@
 
   // --- Applying and saving ------------------------------------------------
 
-  const hasActiveFilter = $derived(
-    applied || activeRows.some((row) => row.field && (row.value || row.values?.length))
-  );
+  const hasActiveFilter = $derived(applied || activeRows.some(isFilterRowActive));
 
   function parseRows(filterState) {
     if (!filterState) return [];
@@ -313,7 +312,7 @@
     <span>{t('common.filter')}</span>
     {#if hasActiveFilter}
       <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-semibold rounded-full" style="background-color: var(--ds-interactive-subtle, var(--ds-background-neutral)); color: var(--ds-text);">
-        {activeRows.filter((row) => row.field && (row.value || row.values?.length)).length || 1}
+        {activeRows.filter(isFilterRowActive).length || 1}
       </span>
     {/if}
   </button>
