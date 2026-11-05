@@ -4,6 +4,7 @@
   import FileInput from '../components/FileInput.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import Label from '../components/Label.svelte';
+  import Text from '../components/Text.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import Camera from '@lucide/svelte/icons/camera';
   import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -214,7 +215,7 @@
       <!-- Custom Fields -->
       {#if customerOrgFields.length > 0}
         <div class="mt-6 pt-6 border-t" style="border-color: var(--ds-border);">
-          <h3 class="text-sm font-medium mb-4" style="color: var(--ds-text);">{t('organization.customFields')}</h3>
+          <Text as="h3" variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider mb-4">{t('organization.customFields')}</Text>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             {#each customerOrgFields as field (field.id)}
               <div>
