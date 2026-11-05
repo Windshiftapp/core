@@ -105,7 +105,7 @@
 </script>
 
 <aside
-  class="w-96 flex-shrink-0 border-l overflow-y-auto"
+  class="w-96 flex-shrink-0 border-l overflow-y-auto min-w-0"
   style="border-color: var(--workflow-border); background-color: var(--workflow-panel); color: var(--workflow-text);"
   data-testid="transition-inspector"
 >
@@ -155,9 +155,9 @@
               {t('workflowInspector.fieldSummary', { fields: screen.field_count, required: screen.required_field_count })}
             </div>
           </div>
-          <div class="flex gap-2">
+          <div class="flex gap-2 min-w-0">
             <select
-              class="flex-1 text-sm rounded border px-2 py-1.5"
+              class="flex-1 min-w-0 text-sm rounded border px-2 py-1.5"
               style="border-color: var(--workflow-border); background-color: var(--workflow-surface); color: var(--workflow-text);"
               disabled={saving}
               data-testid="transition-inspector-screen-picker"
@@ -170,7 +170,7 @@
             </select>
             <button
               type="button"
-              class="px-2 py-1.5 text-sm rounded border cursor-pointer"
+              class="px-2 py-1.5 text-sm rounded border cursor-pointer flex-shrink-0"
               style="border-color: var(--workflow-border);"
               disabled={saving}
               data-testid="transition-inspector-unbind"
@@ -184,7 +184,7 @@
             {t('workflowInspector.noScreen')}
           </div>
           <select
-            class="w-full text-sm rounded border px-2 py-1.5 mb-2"
+            class="w-full text-sm rounded border px-2 py-1.5"
             style="border-color: var(--workflow-border); background-color: var(--workflow-surface); color: var(--workflow-text);"
             disabled={saving}
             data-testid="transition-inspector-screen-picker"
@@ -197,25 +197,33 @@
           </select>
         {/if}
 
-        <div class="flex gap-2 mt-2">
-          <input
-            class="flex-1 text-sm rounded border px-2 py-1.5"
-            style="border-color: var(--workflow-border); background-color: var(--workflow-surface); color: var(--workflow-text);"
-            placeholder={t('workflowInspector.newScreenPlaceholder')}
-            bind:value={newScreenName}
-            data-testid="transition-inspector-new-screen-name"
-          />
-          <button
-            type="button"
-            class="flex items-center gap-1 px-2 py-1.5 text-sm rounded border cursor-pointer disabled:opacity-50"
-            style="border-color: var(--workflow-border);"
-            disabled={creating || !newScreenName.trim()}
-            data-testid="transition-inspector-create-screen"
-            onclick={createAndBind}
-          >
-            <Plus class="w-3.5 h-3.5" />
-            {t('workflowInspector.createAndBind')}
-          </button>
+        <div class="mt-4 pt-3 border-t" style="border-color: var(--workflow-border);">
+          <div class="text-xs font-medium" style="color: var(--workflow-text);">
+            {t('workflowInspector.createHeading')}
+          </div>
+          <p class="text-xs mt-0.5 mb-2" style="color: var(--workflow-text-subtle);">
+            {t('workflowInspector.createHint')}
+          </p>
+          <div class="flex gap-2 min-w-0">
+            <input
+              class="flex-1 min-w-0 text-sm rounded border px-2 py-1.5"
+              style="border-color: var(--workflow-border); background-color: var(--workflow-surface); color: var(--workflow-text);"
+              placeholder={t('workflowInspector.newScreenPlaceholder')}
+              bind:value={newScreenName}
+              data-testid="transition-inspector-new-screen-name"
+            />
+            <button
+              type="button"
+              class="flex items-center gap-1 px-2 py-1.5 text-sm rounded border cursor-pointer flex-shrink-0 disabled:opacity-50"
+              style="border-color: var(--workflow-border);"
+              disabled={creating || !newScreenName.trim()}
+              data-testid="transition-inspector-create-screen"
+              onclick={createAndBind}
+            >
+              <Plus class="w-3.5 h-3.5" />
+              {t('workflowInspector.createAndBind')}
+            </button>
+          </div>
         </div>
       </section>
     {/if}

@@ -714,7 +714,7 @@
   </div>
 
   <!-- Svelte Flow Canvas -->
-  <div class="flex-1 relative" data-testid="workflow-canvas">
+  <div class="flex-1 min-w-0 relative" data-testid="workflow-canvas">
     <SvelteFlow
       bind:nodes
       bind:edges

@@ -207,6 +207,9 @@ export default {
     fieldSummary: '{fields} Feld(er), {required} erforderlich',
     newScreenPlaceholder: 'Name des neuen Bildschirms',
     createAndBind: 'Erstellen & binden',
+    createHeading: 'Neuen Bildschirm erstellen',
+    createHint:
+      'Erstellt einen leeren Bildschirm und bindet ihn an diesen Übergang. Felder werden auf der Seite „Bildschirme“ hinzugefügt.',
     screenSaved: 'Übergangsbildschirm gespeichert',
     screenStaged: 'Der Bildschirm wird beim Speichern des Workflows zugeordnet',
     pendingHint: 'Dieser Übergang ist noch nicht gespeichert. Der Bildschirm wird beim Speichern des Workflows zugeordnet.',

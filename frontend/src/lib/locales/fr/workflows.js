@@ -387,6 +387,9 @@ export default {
     fieldSummary: '{fields} champ(s), {required} obligatoire(s)',
     newScreenPlaceholder: 'Nom du nouvel écran',
     createAndBind: 'Créer et associer',
+    createHeading: 'Créer un nouvel écran',
+    createHint:
+      'Crée un écran vide et l’associe à cette transition. Ajoutez ses champs sur la page Écrans.',
     screenSaved: 'Écran de transition enregistré',
     screenStaged: 'L’écran sera associé à l’enregistrement du flux de travail',
     pendingHint: 'Cette transition n’est pas encore enregistrée. L’écran sera associé à l’enregistrement du flux de travail.',

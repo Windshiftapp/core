@@ -387,6 +387,9 @@ export default {
     fieldSummary: '{fields} field(s), {required} required',
     newScreenPlaceholder: 'New screen name',
     createAndBind: 'Create & bind',
+    createHeading: 'Create a new screen',
+    createHint:
+      'Creates an empty screen and binds it to this transition. Add its fields on the Screens page.',
     screenSaved: 'Transition screen saved',
     screenStaged: 'Screen will be attached when you save the workflow',
     pendingHint: 'This transition is not saved yet. The screen is attached when you save the workflow.',

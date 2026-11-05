@@ -196,6 +196,8 @@ export default {
     fieldSummary: '{fields} 个字段，{required} 个必填',
     newScreenPlaceholder: '新界面名称',
     createAndBind: '创建并绑定',
+    createHeading: '创建新界面',
+    createHint: '创建一个空界面并绑定到此转场。请在“界面”页面添加字段。',
     screenSaved: '转场界面已保存',
     screenStaged: '界面将在保存工作流时绑定',
     pendingHint: '此转场尚未保存。界面将在保存工作流时绑定。',
