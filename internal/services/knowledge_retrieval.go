@@ -1,19 +1,48 @@
 package services
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"html"
+	"regexp"
+	"strings"
 
 	"windshift/internal/database"
+	"windshift/internal/integrations/docmost"
 	"windshift/internal/repository"
 )
 
-// KnowledgeSource identifies where a search hit came from. Phase 1 only
-// emits "page"; logbook integration will register additional sources
-// without changing the public Result shape.
+// KnowledgeSource identifies where a search hit came from.
 const (
 	KnowledgeSourcePage    = "page"
 	KnowledgeSourceLogbook = "logbook"
+	KnowledgeSourceDocmost = "docmost"
 )
+
+// KnowledgeSourceState values reported per source.
+const (
+	KnowledgeSourceStateOK                = "ok"
+	KnowledgeSourceStateSkipped           = "skipped"
+	KnowledgeSourceStateNotConfigured     = "not_configured"
+	KnowledgeSourceStateNotConnected      = "not_connected"
+	KnowledgeSourceStateReconnectRequired = "reconnect_required"
+	KnowledgeSourceStateUnavailable       = "unavailable"
+)
+
+// KnowledgeSourceStatus reports whether a source contributed and, when it did
+// not, why. It is additive to the search response so a client can prompt a
+// reconnect without parsing logs.
+type KnowledgeSourceStatus struct {
+	Source string `json:"source"`
+	State  string `json:"state"`
+}
+
+// KnowledgeSearchResponse is the search result plus per-source states.
+type KnowledgeSearchResponse struct {
+	Results []KnowledgeResult       `json:"results"`
+	Sources []KnowledgeSourceStatus `json:"sources,omitempty"`
+}
 
 // KnowledgeResult is a single permission-filtered search hit.
 type KnowledgeResult struct {
@@ -28,14 +57,34 @@ type KnowledgeResult struct {
 	Score       float64 `json:"score"`
 }
 
+// DocmostKnowledgeSource resolves the acting user's Docmost credential. The
+// concrete implementation is *DocmostService; the interface keeps the
+// retrieval service testable and makes the fail-closed contract explicit.
+type DocmostKnowledgeSource interface {
+	Credential(ctx context.Context, userID int) (baseURL, token string, err error)
+	MarkInvalid(userID int)
+	MarkVerified(userID int)
+}
+
+// DocmostSearcher is the search subset of the Docmost client.
+type DocmostSearcher interface {
+	Search(ctx context.Context, baseURL, token, query string, limit int) ([]docmost.SearchResult, error)
+}
+
+// docmostHighlightTagRE strips the <b> markers Docmost wraps around matched
+// terms. The snippet is plain text in the JSON response, never HTML.
+var docmostHighlightTagRE = regexp.MustCompile(`<[^>]*>`)
+
 // KnowledgeRetrievalService is a thin facade over per-source repositories
 // that always runs the appropriate permission check before returning a
 // snippet. Adapters (HTTP search endpoint, AI tools) call into this
 // service rather than reaching into the page repository directly so the
 // re-check on read can never be skipped.
 type KnowledgeRetrievalService struct {
-	pages    *repository.PageRepository
-	pageAuth *PagePermissionService
+	pages         *repository.PageRepository
+	pageAuth      *PagePermissionService
+	docmost       DocmostKnowledgeSource
+	docmostClient DocmostSearcher
 }
 
 // NewKnowledgeRetrievalService wires the retrieval facade against the
@@ -47,8 +96,16 @@ func NewKnowledgeRetrievalService(db database.Database, pageAuth *PagePermission
 	}
 }
 
+// SetDocmost enables the authenticated Docmost source. Without it the source
+// stays skipped, so a deployment with no Docmost configured is unaffected.
+func (s *KnowledgeRetrievalService) SetDocmost(creds DocmostKnowledgeSource, client DocmostSearcher) {
+	s.docmost = creds
+	s.docmostClient = client
+}
+
 // SearchInput is the request shape for unified search.
 type SearchInput struct {
+	Ctx         context.Context
 	UserID      int
 	WorkspaceID int
 	Query       string
@@ -56,11 +113,23 @@ type SearchInput struct {
 	Sources     []string // optional whitelist; empty = "all enabled"
 }
 
-// Search runs full-text search over the requested sources, filters every
-// hit by the relevant per-source permission, and returns ranked results.
+// Search runs full-text search over the requested sources and returns ranked
+// results. It is the compatibility wrapper for callers that do not need the
+// per-source states.
 func (s *KnowledgeRetrievalService) Search(in SearchInput) ([]KnowledgeResult, error) {
+	response, err := s.SearchWithSources(in)
+	if err != nil {
+		return nil, err
+	}
+	return response.Results, nil
+}
+
+// SearchWithSources runs full-text search over the requested sources, filters
+// every hit by the relevant per-source permission, and reports each source's
+// state alongside the results.
+func (s *KnowledgeRetrievalService) SearchWithSources(in SearchInput) (KnowledgeSearchResponse, error) {
 	if in.Query == "" {
-		return nil, nil
+		return KnowledgeSearchResponse{Results: []KnowledgeResult{}}, nil
 	}
 	if in.Limit <= 0 || in.Limit > 100 {
 		in.Limit = 25
@@ -77,19 +146,86 @@ func (s *KnowledgeRetrievalService) Search(in SearchInput) ([]KnowledgeResult, e
 		return false
 	}
 
-	var out []KnowledgeResult
+	out := []KnowledgeResult{}
+	var sources []KnowledgeSourceStatus
 	if useSource(KnowledgeSourcePage) {
 		pageHits, err := s.searchPages(in)
 		if err != nil {
-			return nil, err
+			return KnowledgeSearchResponse{}, err
 		}
 		out = append(out, pageHits...)
+	}
+	if useSource(KnowledgeSourceDocmost) {
+		docmostHits, state := s.searchDocmost(in)
+		out = append(out, docmostHits...)
+		sources = append(sources, KnowledgeSourceStatus{Source: KnowledgeSourceDocmost, State: state})
 	}
 	// Logbook integration intentionally deferred — the bucket-access model
 	// lives outside PagePermissionService and is a separate slice. Until
 	// then the source whitelist still accepts "logbook" to keep clients
 	// forward-compatible; it just returns nothing.
-	return out, nil
+	if len(out) > in.Limit {
+		out = out[:in.Limit]
+	}
+	return KnowledgeSearchResponse{Results: out, Sources: sources}, nil
+}
+
+// searchDocmost queries the acting user's Docmost account. It fails closed: a
+// missing, unconfigured, or rejected credential yields no Docmost results (and
+// never falls back to the anonymous share path) while native pages keep
+// working. A token Docmost rejects is flagged so the client can prompt for
+// reconnect.
+func (s *KnowledgeRetrievalService) searchDocmost(in SearchInput) (results []KnowledgeResult, state string) {
+	if s.docmost == nil || s.docmostClient == nil {
+		return nil, KnowledgeSourceStateSkipped
+	}
+	ctx := in.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	baseURL, token, err := s.docmost.Credential(ctx, in.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, repository.ErrNotFound):
+			return nil, KnowledgeSourceStateNotConnected
+		case errors.Is(err, ErrDocmostNotConfigured):
+			return nil, KnowledgeSourceStateNotConfigured
+		case errors.Is(err, ErrDocmostReconnect):
+			return nil, KnowledgeSourceStateReconnectRequired
+		default:
+			return nil, KnowledgeSourceStateUnavailable
+		}
+	}
+
+	hits, err := s.docmostClient.Search(ctx, baseURL, token, in.Query, in.Limit)
+	if err != nil {
+		if errors.Is(err, docmost.ErrUnauthorized) {
+			s.docmost.MarkInvalid(in.UserID)
+			return nil, KnowledgeSourceStateReconnectRequired
+		}
+		return nil, KnowledgeSourceStateUnavailable
+	}
+	s.docmost.MarkVerified(in.UserID)
+
+	results = make([]KnowledgeResult, 0, len(hits))
+	for _, hit := range hits {
+		results = append(results, KnowledgeResult{
+			Source:      KnowledgeSourceDocmost,
+			WorkspaceID: in.WorkspaceID,
+			Title:       hit.Title,
+			URL:         docmost.PageURL(baseURL, hit.SpaceSlug, hit.SlugID),
+			Snippet:     stripHighlightTags(hit.Highlight),
+			Score:       hit.Rank,
+		})
+	}
+	return results, KnowledgeSourceStateOK
+}
+
+// stripHighlightTags turns a Docmost highlight into plain text: strip the
+// <b> markers first, then decode entities the page text may contain.
+func stripHighlightTags(highlight string) string {
+	return strings.TrimSpace(html.UnescapeString(docmostHighlightTagRE.ReplaceAllString(highlight, "")))
 }
 
 func (s *KnowledgeRetrievalService) searchPages(in SearchInput) ([]KnowledgeResult, error) {

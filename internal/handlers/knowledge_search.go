@@ -31,15 +31,19 @@ func (h *KnowledgeSearchHandler) Search(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 	query := r.URL.Query().Get("q")
-	results, err := h.retrieval.Search(services.SearchInput{
-		UserID: user.ID, WorkspaceID: workspaceID, Query: query, Limit: limit,
+	response, err := h.retrieval.SearchWithSources(services.SearchInput{
+		Ctx: r.Context(), UserID: user.ID, WorkspaceID: workspaceID, Query: query, Limit: limit,
 	})
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	if results == nil {
-		results = []services.KnowledgeResult{}
+	if response.Results == nil {
+		response.Results = []services.KnowledgeResult{}
 	}
-	respondJSONOK(w, map[string]any{"results": results, "query": query})
+	payload := map[string]any{"results": response.Results, "query": query}
+	if len(response.Sources) > 0 {
+		payload["sources"] = response.Sources
+	}
+	respondJSONOK(w, payload)
 }

@@ -797,6 +797,7 @@ func (s *Server) initialize() error {
 		docmostClient,
 	)
 	knowledgeRetrieval := services.NewKnowledgeRetrievalService(s.db, pagePermissionService)
+	knowledgeRetrieval.SetDocmost(docmostService, docmostClient)
 	knowledgeSearchHandler := handlers.NewKnowledgeSearchHandler(knowledgeRetrieval)
 	knowledgePublication := services.NewKnowledgePublicationService(s.db)
 	pageLabelService := services.NewPageLabelService(pageLabelRepo, logger.NewAuditor(s.db))
