@@ -110,13 +110,13 @@ func (h *PortalHandler) callerIsActiveApproverOnItem(ctx context.Context, itemID
 
 // GetMyRequests returns all requests submitted by the authenticated portal customer through this portal
 func (h *PortalHandler) GetMyRequests(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel, channel, _, ok := h.resolvePortalBySlug(w, r)
+	ctx, cancel, channel, config, ok := h.resolvePortalBySlug(w, r)
 	if !ok {
 		return
 	}
 	defer cancel()
 
-	requests, err := h.loadMyPortalRequests(ctx, r, channel.ID)
+	requests, err := h.loadMyPortalRequests(ctx, r, channel.ID, config)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -146,11 +146,12 @@ func (h *PortalHandler) GetRequestDetail(w http.ResponseWriter, r *http.Request)
 
 	// Page links in the description resolve to in-portal KB articles when the
 	// page is published through this portal; otherwise they lose the anchor so
-	// customers never see a dead or existence-leaking link. Both the raw
-	// markdown (rendered client-side through the shared read-only editor) and
-	// the sanitized HTML form are rewritten.
+	// customers never see a dead or existence-leaking link. Mention tokens also
+	// lose their embedded internal user id. Both the raw markdown (rendered
+	// client-side through the shared read-only editor) and the sanitized HTML
+	// form are rewritten.
 	resolver := h.portalKBPageLinkResolver(config)
-	detail.Description = markdown.RewritePageLinksInMarkdown(detail.Description, resolver)
+	detail.Description = h.portalRawMarkdown(detail.Description, config)
 	detail.DescriptionHTML = markdown.RewritePageLinks(detail.DescriptionHTML, resolver)
 
 	respondJSONOK(w, detail)
@@ -173,12 +174,12 @@ func (h *PortalHandler) GetRequestComments(w http.ResponseWriter, r *http.Reques
 
 	// Rewrite agent-inserted page links the same way as the description:
 	// published-through-this-portal pages become in-portal article links,
-	// anything else degrades to plain text. Both the raw markdown (rendered
-	// client-side through the shared read-only editor) and the sanitized HTML
-	// form are rewritten.
+	// anything else degrades to plain text. Mention tokens lose their embedded
+	// internal user id. Both the raw markdown (rendered client-side through the
+	// shared read-only editor) and the sanitized HTML form are rewritten.
 	resolver := h.portalKBPageLinkResolver(config)
 	for i := range comments {
-		comments[i].Content = markdown.RewritePageLinksInMarkdown(comments[i].Content, resolver)
+		comments[i].Content = h.portalRawMarkdown(comments[i].Content, config)
 		comments[i].ContentHTML = markdown.RewritePageLinks(comments[i].ContentHTML, resolver)
 	}
 
@@ -252,7 +253,13 @@ func (h *PortalHandler) GetRequestAttachments(w http.ResponseWriter, r *http.Req
 	}
 	defer cancel()
 
-	attachments, _, err := h.requestAttachmentService().ListPortalRequestAttachments(itemID, 200, 0)
+	svc := h.requestAttachmentService()
+	if svc == nil {
+		respondServiceUnavailable(w, r, "Attachments are not enabled on this server")
+		return
+	}
+
+	attachments, _, err := svc.ListPortalRequestAttachments(itemID, 200, 0)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -345,7 +352,13 @@ func (h *PortalHandler) DownloadRequestAttachment(w http.ResponseWriter, r *http
 		return
 	}
 
-	binary, err := h.requestAttachmentService().OpenPortalRequestAttachment(r.Context(), attachmentID, itemID)
+	svc := h.requestAttachmentService()
+	if svc == nil {
+		respondServiceUnavailable(w, r, "Attachments are not enabled on this server")
+		return
+	}
+
+	binary, err := svc.OpenPortalRequestAttachment(r.Context(), attachmentID, itemID)
 	if err != nil {
 		if errors.Is(err, services.ErrItemAttachmentDisabled) {
 			respondServiceUnavailable(w, r, "Attachments are not enabled on this server")

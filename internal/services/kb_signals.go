@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"windshift/internal/database"
+	"windshift/internal/repository"
 )
 
 // KB event types recorded in kb_events. They are the raw usage signals for
@@ -70,9 +71,10 @@ func (s *KBSignalService) RecordKBEvent(ctx context.Context, in KBEventInput) er
 }
 
 // PortalCustomerHasOpenRequests reports whether the customer has at least one
-// request on the channel that has not reached a completed status category.
+// request on the portal that has not reached a completed status category.
 // An "open" request means the customer may still be waiting on staff, so an
-// article view in that state is not treated as self-service deflection.
+// article view in that state is not treated as self-service deflection. The
+// request scope mirrors the portal: its own channel plus linked intakes.
 func (s *KBSignalService) PortalCustomerHasOpenRequests(ctx context.Context, channelID, portalCustomerID int) (bool, error) {
 	var count int
 	err := s.db.QueryRowContext(ctx,
@@ -80,9 +82,9 @@ func (s *KBSignalService) PortalCustomerHasOpenRequests(ctx context.Context, cha
 		 FROM items i
 		 JOIN statuses s ON s.id = i.status_id
 		 JOIN status_categories sc ON sc.id = s.category_id
-		 WHERE i.channel_id = ? AND i.creator_portal_customer_id = ?
+		 WHERE `+repository.PortalItemScopeSQL("i")+` AND i.creator_portal_customer_id = ?
 		   AND COALESCE(sc.is_completed, false) = false`,
-		channelID, portalCustomerID,
+		channelID, channelID, portalCustomerID,
 	).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("count open portal requests: %w", err)

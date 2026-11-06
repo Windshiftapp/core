@@ -18,6 +18,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/fileserve"
 	"windshift/internal/itemevents"
+	"windshift/internal/markdown"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -84,6 +85,18 @@ func (h *PortalHandler) portalKBPageLinkResolver(config models.ChannelConfig) fu
 		}
 		return fmt.Sprintf("/portal/%s/kb/%d?source=ticket", config.PortalSlug, pageID), true
 	}
+}
+
+// portalRawMarkdown prepares a raw markdown body for portal customers. Page
+// links resolve to published in-portal articles or degrade to plain text, and
+// mention tokens lose their embedded internal user id. The rendered HTML forms
+// already strip both; this covers the raw markdown the read-only editor
+// consumes.
+func (h *PortalHandler) portalRawMarkdown(content string, config models.ChannelConfig) string {
+	if content == "" {
+		return content
+	}
+	return markdown.StripMentionIDs(markdown.RewritePageLinksInMarkdown(content, h.portalKBPageLinkResolver(config)))
 }
 
 // SetApprovalService wires the approval service so portal customers can
@@ -705,6 +718,11 @@ func (h *PortalHandler) loadPortalRequestTypes(ctx context.Context, channelID in
 		}
 
 		if rt.IsVisibleTo(vc.userGroupIDs, vc.customerOrgID) {
+			// Visibility principals are internal routing data; the public portal
+			// contract exposes only what the form needs (mirrors
+			// PublicAssetReport, which drops the same IDs).
+			rt.VisibilityGroupIDs = nil
+			rt.VisibilityOrgIDs = nil
 			requestTypes = append(requestTypes, rt)
 		}
 	}

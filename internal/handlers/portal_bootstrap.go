@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"windshift/internal/auth"
+	"windshift/internal/markdown"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -114,7 +115,7 @@ func (h *PortalHandler) GetUserBootstrap(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ctx, cancel, channel, _, ok := h.resolvePortalBySlug(w, r)
+	ctx, cancel, channel, config, ok := h.resolvePortalBySlug(w, r)
 	if !ok {
 		return
 	}
@@ -130,7 +131,7 @@ func (h *PortalHandler) GetUserBootstrap(w http.ResponseWriter, r *http.Request)
 	wait.Add(2)
 	go func() {
 		defer wait.Done()
-		requests, err := h.loadMyPortalRequests(ctx, r, channel.ID)
+		requests, err := h.loadMyPortalRequests(ctx, r, channel.ID, config)
 		if err != nil {
 			slog.Warn("portal user bootstrap: requests unavailable", "channel_id", channel.ID, "error", err)
 			return
@@ -202,7 +203,7 @@ func (h *PortalHandler) portalAuthSnapshot(ctx context.Context, r *http.Request)
 	return response, nil
 }
 
-func (h *PortalHandler) loadMyPortalRequests(ctx context.Context, r *http.Request, channelID int) ([]services.PortalRequestSummary, error) {
+func (h *PortalHandler) loadMyPortalRequests(ctx context.Context, r *http.Request, channelID int, config models.ChannelConfig) ([]services.PortalRequestSummary, error) {
 	internalUserID, portalCustomerID := h.getAuthFromContext(r)
 	var (
 		requests []services.PortalRequestSummary
@@ -216,8 +217,21 @@ func (h *PortalHandler) loadMyPortalRequests(ctx context.Context, r *http.Reques
 	default:
 		return nil, errPortalApprovalActorUnauthorized
 	}
+	if err != nil {
+		return nil, err
+	}
+
+	// The list feeds the request detail when a customer opens a row, so its
+	// descriptions must carry the same page-link and mention rewriting as
+	// GetRequestDetail; otherwise an unpublished page anchor or an internal
+	// user id leaks through the list path.
+	resolver := h.portalKBPageLinkResolver(config)
+	for i := range requests {
+		requests[i].Description = h.portalRawMarkdown(requests[i].Description, config)
+		requests[i].DescriptionHTML = markdown.RewritePageLinks(requests[i].DescriptionHTML, resolver)
+	}
 	if requests == nil {
 		requests = []services.PortalRequestSummary{}
 	}
-	return requests, err
+	return requests, nil
 }

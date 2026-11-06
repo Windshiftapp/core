@@ -37,6 +37,17 @@ type ApproverInsert struct {
 	SubstitutedForUserID *int
 }
 
+// PortalItemScopeSQL returns the predicate matching an item visible through
+// one portal channel: the portal's own submissions plus items created by an
+// enabled intake linked to it. It mirrors PortalRequestVisibility so approval
+// reads never disagree with the request reads they gate. The caller supplies
+// the portal channel id twice, in placeholder order.
+func PortalItemScopeSQL(itemAlias string) string {
+	return fmt.Sprintf(`(%s.channel_id = ? OR %s.intake_id IN (
+		SELECT id FROM intakes WHERE portal_channel_id = ? AND status = 'enabled'
+	))`, itemAlias, itemAlias)
+}
+
 // ============================================================================
 // Read methods — outside transaction
 // ============================================================================
@@ -239,11 +250,13 @@ func (r *ApprovalRepository) findRequestIDsForActor(ctx context.Context, actorCo
 	if status == "" {
 		status = models.ApprovalRequestStatusPending
 	}
-	channelJoin := ""
+	scopeJoin := ""
+	scopeWhere := ""
 	args := []any{}
 	if channelID != nil {
-		channelJoin = "JOIN items i ON i.id = ar.item_id AND i.channel_id = ?"
-		args = append(args, *channelID)
+		scopeJoin = "JOIN items i ON i.id = ar.item_id"
+		scopeWhere = PortalItemScopeSQL("i") + " AND "
+		args = append(args, *channelID, *channelID)
 	}
 	args = append(args, status, actorID)
 	q := fmt.Sprintf(`
@@ -252,9 +265,9 @@ func (r *ApprovalRepository) findRequestIDsForActor(ctx context.Context, actorCo
 		JOIN approval_step_instances asi ON asi.approval_request_id = ar.id AND asi.status = 'pending'
 		JOIN approval_step_approvers asa ON asa.approval_step_instance_id = asi.id AND asa.is_active = true
 		%s
-		WHERE ar.status = ? AND asa.%s = ?
+		WHERE %sar.status = ? AND asa.%s = ?
 		ORDER BY ar.id DESC
-	`, channelJoin, actorColumn)
+	`, scopeJoin, scopeWhere, actorColumn)
 	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query for actor: %w", err)
@@ -274,11 +287,13 @@ func (r *ApprovalRepository) ActorHasActivePoolMembershipOnItem(ctx context.Cont
 	if actorColumn != "user_id" && actorColumn != "portal_customer_id" {
 		return false, fmt.Errorf("invalid actor column %q", actorColumn)
 	}
-	channelJoin := ""
+	scopeJoin := ""
+	scopeWhere := ""
 	args := []any{}
 	if channelID != nil {
-		channelJoin = "JOIN items i ON i.id = ar.item_id AND i.channel_id = ?"
-		args = append(args, *channelID)
+		scopeJoin = "JOIN items i ON i.id = ar.item_id"
+		scopeWhere = PortalItemScopeSQL("i") + " AND "
+		args = append(args, *channelID, *channelID)
 	}
 	args = append(args, itemID, actorID)
 	q := fmt.Sprintf(`
@@ -287,9 +302,9 @@ func (r *ApprovalRepository) ActorHasActivePoolMembershipOnItem(ctx context.Cont
 		JOIN approval_step_instances asi ON asi.approval_request_id = ar.id AND asi.status = 'pending'
 		JOIN approval_step_approvers asa ON asa.approval_step_instance_id = asi.id AND asa.is_active = true
 		%s
-		WHERE ar.item_id = ? AND ar.status = 'pending' AND asa.%s = ?
+		WHERE %sar.item_id = ? AND ar.status = 'pending' AND asa.%s = ?
 		LIMIT 1
-	`, channelJoin, actorColumn)
+	`, scopeJoin, scopeWhere, actorColumn)
 	var one int
 	err := r.db.QueryRowContext(ctx, q, args...).Scan(&one)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -459,9 +474,9 @@ func (r *ApprovalRepository) findRequestRowInChannel(ctx context.Context, reques
 			       ar.triggered_by_user_id, ar.status, ar.created_at, ar.completed_at
 			FROM approval_requests ar
 			JOIN items i ON i.id = ar.item_id
-			WHERE ar.id = ? AND i.channel_id = ?
+			WHERE ar.id = ? AND ` + PortalItemScopeSQL("i") + `
 		`
-		args = append(args, *channelID)
+		args = append(args, *channelID, *channelID)
 	}
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(
 		&req.ID, &req.ItemID, &req.WorkspaceID, &req.ApprovalSetStatusID, &req.StatusID,
@@ -510,9 +525,9 @@ func (r *ApprovalRepository) loadRequestByIDInChannelInTx(ctx context.Context, t
 			       ar.triggered_by_user_id, ar.status, ar.created_at, ar.completed_at
 			FROM approval_requests ar
 			JOIN items i ON i.id = ar.item_id
-			WHERE ar.id = ? AND i.channel_id = ?
+			WHERE ar.id = ? AND ` + PortalItemScopeSQL("i") + `
 		`
-		args = append(args, *channelID)
+		args = append(args, *channelID, *channelID)
 	}
 	err := tx.QueryRowContext(ctx, query, args...).Scan(
 		&req.ID, &req.ItemID, &req.WorkspaceID, &req.ApprovalSetStatusID, &req.StatusID,
