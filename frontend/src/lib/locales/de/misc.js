@@ -346,6 +346,8 @@ export default {
     assignee: 'Bearbeiter',
     role: 'Rolle',
     failedToDownload: 'Datei konnte nicht heruntergeladen werden',
+    hideFromCustomer: 'Vor Kunden verbergen',
+    showToCustomer: 'Für Kunden sichtbar machen',
     editDiagram: 'Diagramm bearbeiten',
     untitledDiagram: 'Unbenanntes Diagramm',
     diagram: 'Diagramm',

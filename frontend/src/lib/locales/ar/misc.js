@@ -449,6 +449,8 @@ export default {
 
     // Image preview
     failedToDownload: 'فشل تنزيل الملف',
+    hideFromCustomer: 'إخفاء عن العميل',
+    showToCustomer: 'إظهار للعميل',
     editDiagram: 'تعديل المخطط',
     untitledDiagram: 'مخطط بدون عنوان',
     diagram: 'مخطط',

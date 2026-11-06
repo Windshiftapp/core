@@ -518,6 +518,7 @@ type attachmentApplication interface {
 	GetItemAttachment(int, int) (*models.Attachment, error)
 	OpenItemAttachment(context.Context, int, int, bool) (*services.ItemAttachmentBinary, error)
 	UploadItemAttachment(context.Context, services.ItemAttachmentUploadInput) (models.AttachmentUploadResponse, error)
+	SetItemAttachmentInternal(int, int, bool) (*models.Attachment, error)
 	DeleteItemAttachment(context.Context, int, int) error
 }
 
@@ -542,6 +543,7 @@ type collectionApplication interface {
 	GetBoardConfiguration(int, services.BoardConfigurationScope) (*models.BoardConfiguration, error)
 	GetBoardConfigurationBootstrap(context.Context, int, services.BoardConfigurationScope, *int) (*services.BoardConfigurationBootstrap, error)
 	PutBoardConfiguration(services.AuditActor, services.BoardConfigurationScope, models.BoardConfigurationRequest) (*models.BoardConfiguration, error)
+	PatchBoardConfiguration(services.AuditActor, services.BoardConfigurationScope, services.BoardConfigurationPatch) (*models.BoardConfiguration, error)
 	DeleteBoardConfiguration(services.AuditActor, services.BoardConfigurationScope) error
 }
 
@@ -1247,6 +1249,16 @@ func applyParameterCorrections(route *Route) {
 		upsertParameter(route, ParameterMetadata{Name: "collection_id", In: "path", Required: true, Description: "Positive numeric collection ID or public_slug. Numeric keys resolve as IDs. Both forms enforce the same visibility checks and return 404 when inaccessible or missing.", Schema: map[string]any{"type": "string", "minLength": 1}})
 	case "GET /collections/{collection_id}/board-configuration/bootstrap":
 		upsertParameter(route, positiveIDQuery("workspace_id", "Workspace used for defaults when the collection has no saved board configuration."))
+	case "PATCH /collections/{collection_id}/board-configuration":
+		route.Tag = "Planning"
+		route.Summary = "Patch collection board configuration"
+		route.Description = semanticRouteDescription(route.Method, route.Summary)
+		upsertParameter(route, ParameterMetadata{Name: "collection_id", In: "path", Required: true, Description: "The collection identifier.", Schema: map[string]any{"type": "integer", "minimum": 1}})
+	case "PATCH /workspaces/{workspace_id}/board-configuration":
+		route.Tag = "Planning"
+		route.Summary = "Patch workspace board configuration"
+		route.Description = semanticRouteDescription(route.Method, route.Summary)
+		upsertParameter(route, ParameterMetadata{Name: "workspace_id", In: "path", Required: true, Description: "The workspace identifier.", Schema: map[string]any{"type": "integer", "minimum": 1}})
 	case "GET /condition-sets", "GET /approval-sets":
 		upsertParameter(route, positiveIDQuery("workflow_id", "Restricts results to one workflow."))
 	case "GET /workspaces/{workspace_id}/test-reports/summary":

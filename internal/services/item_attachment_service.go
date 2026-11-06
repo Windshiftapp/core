@@ -404,6 +404,33 @@ func (s *ItemAttachmentService) DeleteItemAttachment(ctx context.Context, attach
 	return nil
 }
 
+// SetItemAttachmentInternal hides or reveals an item attachment for portal
+// customers. Only item-scoped rows are reachable, and the caller must hold
+// item.edit in the attachment's workspace. Returns the updated attachment so
+// callers can echo the new visibility state.
+func (s *ItemAttachmentService) SetItemAttachmentInternal(attachmentID, actorID int, isInternal bool) (*models.Attachment, error) {
+	details, err := s.attachmentService.GetAttachmentDetails(attachmentID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrItemAttachmentNotFound
+		}
+		return nil, fmt.Errorf("get attachment details: %w", err)
+	}
+	if (details.EntityType != "item" && details.EntityType != "") || details.ItemID == nil {
+		return nil, ErrItemAttachmentNotFound
+	}
+	if err := s.authorizeItemEdit(actorID, *details.ItemID); err != nil {
+		return nil, err
+	}
+	if err := repository.NewAttachmentRepository(s.db).SetItemInternal(attachmentID, isInternal); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrItemAttachmentNotFound
+		}
+		return nil, fmt.Errorf("set item attachment visibility: %w", err)
+	}
+	return s.GetItemAttachment(actorID, attachmentID)
+}
+
 // authorizeItemEdit resolves the item and checks the caller holds item.edit in
 // its workspace, reusing the shared AttachmentService check (which also handles
 // portal customers). A missing item or insufficient permission collapses to

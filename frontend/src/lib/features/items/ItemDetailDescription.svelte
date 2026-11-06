@@ -16,6 +16,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { attachmentStatus } from '../../stores/attachmentStatus.svelte.js';
   import { aiStore } from '../../stores/aiStore.svelte.js';
+  import { isExternalRequest } from '../../utils/requestOrigin.js';
   import { onClickOutside } from 'runed';
 
   // Get shortcut configurations
@@ -48,6 +49,7 @@
     onattachmentUpload = undefined,
     onattachmentUploadFiles = undefined,
     onattachmentDelete = undefined,
+    onattachmentToggleVisibility = undefined,
     onnewDiagram = undefined,
     oneditDiagram = undefined,
     ondeleteDiagram = undefined,
@@ -58,6 +60,10 @@
   let milkdownEditor = $state(null);
   let showActionsMenu = $state(false);
   let actionsMenuRef = $state(null);
+
+  // Portal visibility only applies to customer requests, where the portal can
+  // read the item; direct agent-created items have no portal audience.
+  const canToggleAttachmentVisibility = $derived(canEdit && isExternalRequest(item));
 
   // Local state for editor content (initialized from prop when editing starts)
   let editorContent = $state('');
@@ -148,6 +154,10 @@
 
   function handleDeleteAttachment(attachment) {
     onattachmentDelete?.(attachment);
+  }
+
+  function handleToggleAttachmentVisibility(attachment) {
+    onattachmentToggleVisibility?.(attachment);
   }
 
   function handleNewDiagram() {
@@ -346,7 +356,9 @@
     <AttachmentDiagramList
       {attachments}
       {diagrams}
+      canToggleVisibility={canToggleAttachmentVisibility}
       ondelete={handleDeleteAttachment}
+      ontogglevisibility={handleToggleAttachmentVisibility}
       oneditdiagram={handleEditDiagram}
       ondeletediagram={handleDeleteDiagram}
     />

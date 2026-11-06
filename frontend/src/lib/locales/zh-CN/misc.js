@@ -449,6 +449,8 @@ export default {
     assignee: '经办人',
     role: '角色',
     failedToDownload: '下载文件失败',
+    hideFromCustomer: '对客户隐藏',
+    showToCustomer: '对客户显示',
     editDiagram: '编辑图表',
     untitledDiagram: '未命名图表',
     diagram: '图表',

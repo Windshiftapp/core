@@ -503,6 +503,8 @@ export default {
 
     // Image preview
     failedToDownload: 'Failed to download file',
+    hideFromCustomer: 'Hide from customer',
+    showToCustomer: 'Show to customer',
     editDiagram: 'Edit diagram',
     untitledDiagram: 'Untitled Diagram',
     diagram: 'diagram',

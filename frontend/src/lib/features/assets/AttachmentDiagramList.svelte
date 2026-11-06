@@ -4,6 +4,8 @@
   import IconTrash from '@tabler/icons-svelte-runes/icons/trash';
   import IconPhoto from '@tabler/icons-svelte-runes/icons/photo';
   import IconDownload from '@tabler/icons-svelte-runes/icons/download';
+  import IconEye from '@tabler/icons-svelte-runes/icons/eye';
+  import IconEyeOff from '@tabler/icons-svelte-runes/icons/eye-off';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import ModalBackdrop from '../../components/ModalBackdrop.svelte';
@@ -14,7 +16,9 @@
     attachments = [],
     diagrams = [],
     canDelete = true,
+    canToggleVisibility = false,
     ondelete,
+    ontogglevisibility,
     oneditdiagram,
     ondeletediagram
   } = $props();
@@ -93,6 +97,10 @@
     ondelete?.(attachment);
   }
 
+  function handleToggleVisibility(attachment) {
+    ontogglevisibility?.(attachment);
+  }
+
   function handleEditDiagram(diagram) {
     oneditdiagram?.(diagram);
   }
@@ -147,6 +155,22 @@
         <span class="text-xs" style="color: var(--ds-text-subtlest);">
           {formatFileSize(attachment.file_size)}
         </span>
+        {#if canToggleVisibility}
+          <button
+            class="p-1 rounded opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity hover:bg-[var(--ds-background-neutral-hovered)]"
+            style="color: var(--ds-text-subtle);"
+            onclick={() => handleToggleVisibility(attachment)}
+            title={attachment.is_internal ? t('assets.showToCustomer') : t('assets.hideFromCustomer')}
+            aria-label={attachment.is_internal ? t('assets.showToCustomer') : t('assets.hideFromCustomer')}
+            data-testid={`item-attachment-visibility-${attachment.id}`}
+          >
+            {#if attachment.is_internal}
+              <IconEyeOff class="w-3.5 h-3.5" />
+            {:else}
+              <IconEye class="w-3.5 h-3.5" />
+            {/if}
+          </button>
+        {/if}
         {#if canDelete}
           <button
             class="p-1 rounded opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity hover:bg-[var(--ds-background-danger-hovered)]"

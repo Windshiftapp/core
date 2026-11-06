@@ -103,6 +103,7 @@
     onattachmentUpload = null,
     onattachmentUploadFiles = null,
     onattachmentDelete = null,
+    onattachmentToggleVisibility = null,
     onattachmentPageChange = null,
     onattachmentPageSizeChange = null,
     ondiagramSaved = null,
@@ -394,6 +395,7 @@
             onattachmentUpload={(data) => onattachmentUpload?.(data)}
             onattachmentUploadFiles={(data) => onattachmentUploadFiles?.(data)}
             onattachmentDelete={(data) => onattachmentDelete?.(data)}
+            onattachmentToggleVisibility={(data) => onattachmentToggleVisibility?.(data)}
             onnewDiagram={handleNewDiagram}
             oneditDiagram={handleEditDiagram}
             ondeleteDiagram={handleDeleteDiagram}

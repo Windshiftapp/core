@@ -1496,6 +1496,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     onattachmentUpload={attachmentManager.handleUpload}
     onattachmentUploadFiles={attachmentManager.uploadFiles}
     onattachmentDelete={attachmentManager.handleDelete}
+    onattachmentToggleVisibility={attachmentManager.handleToggleVisibility}
     onattachmentPageChange={attachmentManager.handlePageChange}
     onattachmentPageSizeChange={attachmentManager.handlePageSizeChange}
     ondiagramSaved={handleDiagramSaved}

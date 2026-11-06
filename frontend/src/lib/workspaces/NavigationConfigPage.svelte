@@ -183,29 +183,14 @@
     // does not get marked as persisted.
     const sent = [...enabled];
     try {
-      // Round-trip the stored configuration fields: a PUT rewrites them, so
-      // an omitted columns array would wipe the board's saved columns.
-      const payload = {
-        columns: config?.columns || [],
-        backlog_status_ids: config?.backlog_status_ids || [],
-        list_columns: config?.list_columns || [],
-        roadmap_config: config?.roadmap_config || null,
-        card_fields: (config?.card_fields || []).map((f, i) => ({
-          field_identifier: f.field_identifier,
-          field_type: f.field_type,
-          display_order: f.display_order ?? i,
-          width: f.width ?? 0,
-        })),
-        show_rightmost_column_last_50: Boolean(config?.show_rightmost_column_last_50),
-        completed_item_retention_days: config?.completed_item_retention_days ?? null,
-        view_settings: { enabled_views: sent },
-      };
-      // The PUT response carries the saved config with its effective view
+      // This page owns only view_settings. A merge patch leaves the board's
+      // columns, card fields, and other settings untouched instead of
+      // round-tripping them back through the full-replace endpoint.
+      const payload = { view_settings: { enabled_views: sent } };
+      // The PATCH response carries the saved config with its effective view
       // settings; adopt it without touching the local toggle state so rows
       // do not re-render from a refetch.
-      config = config?.id
-        ? await collections.updateBoardConfiguration(collectionId, config.id, payload, workspaceId)
-        : await collections.createBoardConfiguration(collectionId, workspaceId, payload);
+      config = await collections.patchBoardConfiguration(collectionId, payload, workspaceId);
       persisted = sent;
       inherited = Boolean(config?.view_settings_inherited) || !config?.view_settings;
       // Reflect the saved set immediately: navigation reads this store, and
@@ -230,7 +215,7 @@
       try {
         saving = true;
         try {
-          await collections.updateBoardConfiguration(collectionId, config?.id, {
+          await collections.patchBoardConfiguration(collectionId, {
             view_settings: { enabled_views: null },
           }, workspaceId);
           applyEffectiveViews(

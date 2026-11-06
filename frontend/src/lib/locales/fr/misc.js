@@ -498,6 +498,8 @@ export default {
 
     // Image preview
     failedToDownload: 'Échec du téléchargement du fichier',
+    hideFromCustomer: 'Masquer au client',
+    showToCustomer: 'Afficher au client',
     editDiagram: 'Modifier le schéma',
     untitledDiagram: 'Schéma sans titre',
     diagram: 'schéma',

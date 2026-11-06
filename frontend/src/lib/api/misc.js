@@ -148,6 +148,15 @@ export const attachments = {
     fetchV2Data(`/attachments/${attachmentId}`, {
       method: 'DELETE',
     }),
+
+  // Hide or reveal an item attachment for portal customers. Only meaningful
+  // on customer requests; the server still enforces item.edit.
+  setInternal: (attachmentId, isInternal) =>
+    fetchV2Data(`/attachments/${attachmentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/merge-patch+json' },
+      body: JSON.stringify({ is_internal: isInternal }),
+    }),
 };
 
 // Attachment Settings (for admin)

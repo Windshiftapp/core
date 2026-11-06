@@ -112,6 +112,23 @@ export function useItemAttachments(getItemId, showError = console.error) {
   }
 
   /**
+   * Toggle whether an attachment is hidden from portal customers.
+   * @param {Object} attachment - The attachment to update
+   */
+  async function handleToggleVisibility(attachment) {
+    try {
+      const updated = await attachmentsApi.setInternal(attachment.id, !attachment.is_internal);
+      const index = attachments.findIndex((item) => item.id === attachment.id);
+      if (index !== -1 && updated) {
+        attachments[index] = { ...attachments[index], ...updated };
+      }
+    } catch (err) {
+      console.error('Failed to update attachment visibility:', err);
+      showError('Failed to update attachment visibility', err.message || String(err));
+    }
+  }
+
+  /**
    * Handle page change
    * @param {Object} detail - { page, itemsPerPage }
    */
@@ -200,6 +217,7 @@ export function useItemAttachments(getItemId, showError = console.error) {
     isEnabled,
     handleUpload,
     handleDelete,
+    handleToggleVisibility,
     handlePageChange,
     handlePageSizeChange,
     uploadFiles,

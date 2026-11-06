@@ -500,6 +500,8 @@ export default {
 
     // Image preview
     failedToDownload: 'Impossibile scaricare il file',
+    hideFromCustomer: 'Nascondi al cliente',
+    showToCustomer: 'Mostra al cliente',
     editDiagram: 'Modifica diagramma',
     untitledDiagram: 'Diagramma senza titolo',
     diagram: 'diagramma',
