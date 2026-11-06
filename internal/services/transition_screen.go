@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -28,6 +29,7 @@ var transitionScreenSystemFieldKeys = map[string][]string{
 	"estimate":         {"estimate_minutes"},
 	"estimate_minutes": {"estimate_minutes"},
 	"milestone":        {"milestone_ids"},
+	"labels":           {"label_ids"},
 }
 
 // resolveGoverningTransitionID returns the transition row that governs a move:
@@ -85,11 +87,13 @@ func (s *WorkflowService) transitionScreenFieldSatisfied(item *models.Item, fiel
 	if field.FieldType == "custom" {
 		return transitionCustomFieldValuePresent(item, field.FieldIdentifier, submitted), nil
 	}
-	// A submitted value always wins over the stored row.
+	// A submitted value is authoritative over the stored row: when the key is
+	// present it decides the result, so clearing a required field cannot be
+	// masked by the value still stored on the item.
 	if keys, ok := transitionScreenSystemFieldKeys[field.FieldIdentifier]; ok && submitted != nil {
 		for _, key := range keys {
-			if value, ok := submitted[key]; ok && !screenValueEmpty(value) {
-				return true, nil
+			if value, ok := submitted[key]; ok {
+				return !screenValueEmpty(value), nil
 			}
 		}
 	}
@@ -150,20 +154,60 @@ func overlayTransitionFields(ctx, fields map[string]any) {
 	ctx["custom_fields"] = merged
 }
 
-// screenUpdateData strips transition-only keys (comment) from the submitted
-// fields so the item update validator never sees a key it does not own.
+// screenUpdateData strips transition-only keys (comment, label_ids) from the
+// submitted fields so the item update validator never sees a key it does not
+// own.
 func screenUpdateData(fields map[string]any) map[string]any {
 	if len(fields) == 0 {
 		return nil
 	}
 	out := make(map[string]any, len(fields))
 	for key, value := range fields {
-		if key == "comment" {
+		if key == "comment" || key == "label_ids" {
 			continue
 		}
 		out[key] = value
 	}
 	return out
+}
+
+// transitionLabelIDs extracts the label id list from the submitted screen
+// fields. The second return reports whether the caller supplied label_ids at
+// all, so an absent key leaves the item's labels untouched while an empty list
+// clears them.
+func transitionLabelIDs(fields map[string]any) (ids []int, present bool, err error) {
+	raw, ok := fields["label_ids"]
+	if !ok {
+		return nil, false, nil
+	}
+	if raw == nil {
+		return nil, true, nil
+	}
+	if ints, ok := raw.([]int); ok {
+		return ints, true, nil
+	}
+	values, ok := raw.([]any)
+	if !ok {
+		return nil, true, fmt.Errorf("label_ids must be an array")
+	}
+	ids = make([]int, 0, len(values))
+	for _, value := range values {
+		switch typed := value.(type) {
+		case float64:
+			ids = append(ids, int(typed))
+		case int:
+			ids = append(ids, typed)
+		case json.Number:
+			n, intErr := typed.Int64()
+			if intErr != nil {
+				return nil, true, fmt.Errorf("label_ids must contain integers")
+			}
+			ids = append(ids, int(n))
+		default:
+			return nil, true, fmt.Errorf("label_ids must contain integers")
+		}
+	}
+	return ids, true, nil
 }
 
 func screenValueEmpty(value any) bool {
@@ -218,8 +262,10 @@ func screenItemFieldPresent(item *models.Item, identifier string) bool {
 func transitionCustomFieldValuePresent(item *models.Item, identifier string, submitted map[string]any) bool {
 	if submitted != nil {
 		if cfv, ok := submitted["custom_field_values"].(map[string]any); ok {
-			if value, ok := cfv[identifier]; ok && !screenValueEmpty(value) {
-				return true
+			// A present key is authoritative, so clearing a required custom
+			// field is not masked by the stored value.
+			if value, present := cfv[identifier]; present {
+				return !screenValueEmpty(value)
 			}
 		}
 	}

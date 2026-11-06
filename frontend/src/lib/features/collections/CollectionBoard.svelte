@@ -2779,6 +2779,7 @@
     screen={boardTransition.screen}
     targetStatusName={boardTransition.targetName}
     workspaceId={boardTransition.item?.workspace_id}
+    itemLabels={boardTransition.item?.labels || []}
     onconfirm={handleBoardTransitionConfirm}
     oncancel={() => (boardTransition = null)}
   />

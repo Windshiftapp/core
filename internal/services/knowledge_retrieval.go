@@ -156,9 +156,13 @@ func (s *KnowledgeRetrievalService) SearchWithSources(in SearchInput) (Knowledge
 		out = append(out, pageHits...)
 	}
 	if useSource(KnowledgeSourceDocmost) {
-		docmostHits, state := s.searchDocmost(in)
+		docmostHits, state, report := s.searchDocmost(in)
 		out = append(out, docmostHits...)
-		sources = append(sources, KnowledgeSourceStatus{Source: KnowledgeSourceDocmost, State: state})
+		// A deployment with no Docmost configured reports nothing for the source
+		// (skipped), so the response shape is unchanged for those deployments.
+		if report {
+			sources = append(sources, KnowledgeSourceStatus{Source: KnowledgeSourceDocmost, State: state})
+		}
 	}
 	// Logbook integration intentionally deferred — the bucket-access model
 	// lives outside PagePermissionService and is a separate slice. Until
@@ -175,9 +179,13 @@ func (s *KnowledgeRetrievalService) SearchWithSources(in SearchInput) (Knowledge
 // never falls back to the anonymous share path) while native pages keep
 // working. A token Docmost rejects is flagged so the client can prompt for
 // reconnect.
-func (s *KnowledgeRetrievalService) searchDocmost(in SearchInput) (results []KnowledgeResult, state string) {
+//
+// report is false when the source is not part of this deployment (no service
+// wired or no enabled provider), so callers omit it from the per-source status
+// instead of advertising a source the deployment does not have.
+func (s *KnowledgeRetrievalService) searchDocmost(in SearchInput) (results []KnowledgeResult, state string, report bool) {
 	if s.docmost == nil || s.docmostClient == nil {
-		return nil, KnowledgeSourceStateSkipped
+		return nil, KnowledgeSourceStateSkipped, false
 	}
 	ctx := in.Ctx
 	if ctx == nil {
@@ -188,13 +196,13 @@ func (s *KnowledgeRetrievalService) searchDocmost(in SearchInput) (results []Kno
 	if err != nil {
 		switch {
 		case errors.Is(err, repository.ErrNotFound):
-			return nil, KnowledgeSourceStateNotConnected
+			return nil, KnowledgeSourceStateNotConnected, true
 		case errors.Is(err, ErrDocmostNotConfigured):
-			return nil, KnowledgeSourceStateNotConfigured
+			return nil, KnowledgeSourceStateNotConfigured, false
 		case errors.Is(err, ErrDocmostReconnect):
-			return nil, KnowledgeSourceStateReconnectRequired
+			return nil, KnowledgeSourceStateReconnectRequired, true
 		default:
-			return nil, KnowledgeSourceStateUnavailable
+			return nil, KnowledgeSourceStateUnavailable, true
 		}
 	}
 
@@ -202,9 +210,9 @@ func (s *KnowledgeRetrievalService) searchDocmost(in SearchInput) (results []Kno
 	if err != nil {
 		if errors.Is(err, docmost.ErrUnauthorized) {
 			s.docmost.MarkInvalid(in.UserID)
-			return nil, KnowledgeSourceStateReconnectRequired
+			return nil, KnowledgeSourceStateReconnectRequired, true
 		}
-		return nil, KnowledgeSourceStateUnavailable
+		return nil, KnowledgeSourceStateUnavailable, true
 	}
 	s.docmost.MarkVerified(in.UserID)
 
@@ -219,7 +227,7 @@ func (s *KnowledgeRetrievalService) searchDocmost(in SearchInput) (results []Kno
 			Score:       hit.Rank,
 		})
 	}
-	return results, KnowledgeSourceStateOK
+	return results, KnowledgeSourceStateOK, true
 }
 
 // stripHighlightTags turns a Docmost highlight into plain text: strip the

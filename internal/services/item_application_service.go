@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strconv"
 	"strings"
@@ -77,6 +78,7 @@ type ItemApplicationService struct {
 	matrix     *TransitionMatrixService
 	bulk       *ItemUpdateService
 	mentions   *MentionService
+	comments   *CommentService
 	// clock is the SLA evaluation clock. Reporting must share it so an
 	// ongoing-breach snapshot matches the engine's "now"; nil means wall time.
 	clock sla.Clock
@@ -136,6 +138,13 @@ func (s *ItemApplicationService) WithWorkflow(conditions *ConditionService, even
 
 func (s *ItemApplicationService) WithMutationEffects(mentions *MentionService) *ItemApplicationService {
 	s.mentions = mentions
+	return s
+}
+
+// WithComments wires the comment service used to persist the optional comment
+// collected by a transition screen.
+func (s *ItemApplicationService) WithComments(comments *CommentService) *ItemApplicationService {
+	s.comments = comments
 	return s
 }
 
@@ -1147,7 +1156,10 @@ func (s *ItemApplicationService) transitionItem(ctx context.Context, actor Audit
 		_ = s.activity.TrackItemActivity(actor.UserID, itemID, ActivityEdit)
 	}
 	applyFields := func(ctx context.Context, tx database.Tx, locked *models.Item) error {
-		return s.bulk.ApplyFieldsInTx(ctx, tx, locked.ID, screenUpdateData(fields), actor.UserID)
+		if err := s.bulk.ApplyFieldsInTx(ctx, tx, locked.ID, screenUpdateData(fields), actor.UserID); err != nil {
+			return err
+		}
+		return s.applyTransitionLabels(ctx, tx, locked, actor, fields)
 	}
 	result, err := NewWorkflowService(s.db).PerformTransition(ctx, PerformTransitionRequest{
 		ItemID: itemID, ToStatusID: statusID, ActorUserID: actor.UserID, Modes: []string{"validator", "condition"},
@@ -1160,9 +1172,66 @@ func (s *ItemApplicationService) transitionItem(ctx context.Context, actor Audit
 		s.events.EmitStatusChanged(result.Item, result.OldStatusID, result.NewStatusID, actor.UserID, actor.Username)
 	}
 	s.syncStatus(ctx, result.Item.ID, result.NewStatusID, result.NoOp)
+	s.recordTransitionComment(itemID, actor.UserID, fields)
 	return &ItemTransitionResult{
 		Item: result.Item, OldStatusID: result.OldStatusID, NewStatusID: result.NewStatusID, NoOp: result.NoOp,
 	}, nil
+}
+
+// applyTransitionLabels replaces the item's label set inside the transition
+// transaction when the screen submitted label_ids. The label-change fact is
+// recorded in the same transaction so the swap and its history commit together.
+func (s *ItemApplicationService) applyTransitionLabels(ctx context.Context, tx database.Tx, item *models.Item, actor AuditActor, fields map[string]any) error {
+	labelIDs, present, err := transitionLabelIDs(fields)
+	if err != nil {
+		return err
+	}
+	if !present {
+		return nil
+	}
+	labels := repository.NewLabelRepository(s.db)
+	for _, labelID := range labelIDs {
+		if _, err := labels.GetByID(labelID); err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return NewServiceError(400, fmt.Sprintf("label %d was not found", labelID))
+			}
+			return err
+		}
+	}
+	before, err := labels.ListForItemTx(tx, item.ID)
+	if err != nil {
+		return err
+	}
+	if err := labels.ReplaceItemLabelsTx(ctx, tx, item.ID, labelIDs); err != nil {
+		return err
+	}
+	after, err := labels.ListForItemTx(tx, item.ID)
+	if err != nil {
+		return err
+	}
+	if !labelSetsDiffer(before, after) {
+		return nil
+	}
+	return recordLabelChangeFact(s.db, tx, item, before, after, actor)
+}
+
+// recordTransitionComment persists the optional comment collected by a
+// transition screen. The move already committed, so a comment failure is
+// logged rather than reported as a failed transition.
+func (s *ItemApplicationService) recordTransitionComment(itemID, authorID int, fields map[string]any) {
+	if s.comments == nil {
+		return
+	}
+	content, ok := fields["comment"].(string)
+	if !ok || strings.TrimSpace(content) == "" {
+		return
+	}
+	if _, err := s.comments.Create(CreateCommentParams{
+		ItemID: itemID, AuthorID: authorID, ActorUserID: authorID, Content: content,
+	}); err != nil {
+		slog.Error("failed to persist transition comment",
+			slog.String("component", "items"), slog.Int("item_id", itemID), slog.Any("error", err))
+	}
 }
 
 // ItemBulkTransitionFailure records one selected item a bulk transition could

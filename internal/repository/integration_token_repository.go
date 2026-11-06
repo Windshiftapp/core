@@ -125,6 +125,7 @@ func (r *IntegrationTokenRepository) UpsertOAuthToken(providerID string, userID 
 			auth_method = 'oauth',
 			refresh_lock_until = NULL,
 			refresh_claim_owner = NULL,
+			invalidated_at = NULL,
 			connected_at = CURRENT_TIMESTAMP,
 			updated_at = CURRENT_TIMESTAMP
 	`, uuid.New().String(), strconv.Itoa(userID), providerID, encryptedAccess, refresh, expiry, scopeArg)

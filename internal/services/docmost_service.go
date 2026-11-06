@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"windshift/internal/integrations/docmost"
@@ -49,6 +50,9 @@ type DocmostService struct {
 	tokens     *repository.IntegrationTokenRepository
 	encryption *sso.SecretEncryption
 	client     DocmostClientAPI
+	// registerMu serializes first-connect client registration so concurrent
+	// users do not register two public clients and race the stored client id.
+	registerMu sync.Mutex
 }
 
 // NewDocmostService wires the shared provider/token repositories, the
@@ -114,11 +118,8 @@ func (s *DocmostService) StartOAuth(ctx context.Context, providerID, state, redi
 
 	clientID := provider.OAuthClientID
 	if clientID == "" {
-		clientID, err = s.client.RegisterClient(ctx, baseURL, "Windshift", redirectURI)
+		clientID, err = s.ensureClientID(ctx, providerID, redirectURI)
 		if err != nil {
-			return "", "", err
-		}
-		if err := s.providers.Update(provider.ID, repository.IntegrationProviderUpdate{OAuthClientID: &clientID}); err != nil {
 			return "", "", err
 		}
 	}
@@ -140,6 +141,32 @@ func (s *DocmostService) StartOAuth(ctx context.Context, providerID, state, redi
 		"code_challenge_method": {"S256"},
 	}
 	return baseURL + "/oauth/consent?" + params.Encode(), codeVerifier, nil
+}
+
+// ensureClientID returns the provider's registered public client id, registering
+// one on first use. registerMu serializes the registration so concurrent users
+// do not create two clients and race the stored client id.
+func (s *DocmostService) ensureClientID(ctx context.Context, providerID, redirectURI string) (string, error) {
+	s.registerMu.Lock()
+	defer s.registerMu.Unlock()
+
+	// Re-read under the lock: another request may have registered the client
+	// between StartOAuth's first read and acquiring the lock.
+	provider, baseURL, err := s.providerByID(providerID)
+	if err != nil {
+		return "", err
+	}
+	if provider.OAuthClientID != "" {
+		return provider.OAuthClientID, nil
+	}
+	clientID, err := s.client.RegisterClient(ctx, baseURL, "Windshift", redirectURI)
+	if err != nil {
+		return "", err
+	}
+	if err := s.providers.Update(provider.ID, repository.IntegrationProviderUpdate{OAuthClientID: &clientID}); err != nil {
+		return "", err
+	}
+	return clientID, nil
 }
 
 // CompleteOAuth exchanges the authorization code and stores the encrypted

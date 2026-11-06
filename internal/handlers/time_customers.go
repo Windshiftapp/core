@@ -308,29 +308,32 @@ func (h *TimeCustomerHandler) prepareCustomFieldValues(w http.ResponseWriter, r 
 		return nil, false
 	}
 	if err := index.Validate(c.CustomFieldValues); err != nil {
-		return nil, !respondCustomerFieldError(w, r, err)
+		respondCustomerFieldError(w, r, err)
+		return nil, false
 	}
 	if err := validation.ValidateAndNormalizeCustomFieldValues(db, c.CustomFieldValues); err != nil {
-		return nil, !respondCustomerFieldError(w, r, err)
+		respondCustomerFieldError(w, r, err)
+		return nil, false
 	}
 	index.RebuildMirrors(c.CustomFieldValues)
 	return index, true
 }
 
-// respondCustomerFieldError maps a custom-field validation error onto a 400.
-// Returns true when the error was handled.
-func respondCustomerFieldError(w http.ResponseWriter, r *http.Request, err error) bool {
+// respondCustomerFieldError maps a custom-field validation error onto a 400,
+// falling back to a 500 for unexpected errors so a failure never lets an
+// unvalidated write proceed.
+func respondCustomerFieldError(w http.ResponseWriter, r *http.Request, err error) {
 	var ve *validation.ValidationError
 	if errors.As(err, &ve) {
 		respondValidationError(w, r, ve.Error())
-		return true
+		return
 	}
 	var ae *customfields.AmbiguousNameError
 	if errors.As(err, &ae) {
 		respondValidationError(w, r, ae.Error())
-		return true
+		return
 	}
-	return false
+	respondInternalError(w, r, err)
 }
 
 // orgRequestSharingRequest is the body of PUT /customer-organisations/{id}/request-sharing.

@@ -10,6 +10,7 @@
   import PriorityPicker from '../../pickers/PriorityPicker.svelte';
   import UserPicker from '../../pickers/UserPicker.svelte';
   import CustomFieldRenderer from './CustomFieldRenderer.svelte';
+  import WorkspaceLabelCombobox from '../../pickers/WorkspaceLabelCombobox.svelte';
   import { customFields as customFieldsApi } from '../../api/configuration.js';
   import { t } from '../../stores/i18n.svelte.js';
 
@@ -19,10 +20,14 @@
     workspaceId = null,
     milestones = [],
     iterations = [],
+    itemLabels = [],
     disabled = false,
   } = $props();
 
   let customFieldDefs = $state([]);
+  // Names shown by the label combobox. Null means the item's current labels;
+  // a selection (including a just-created label) replaces it.
+  let labelSelection = $state(null);
 
   onMount(async () => {
     try {
@@ -60,6 +65,20 @@
 
   function isRequired(field) {
     return field?.is_required === true;
+  }
+
+  // The combobox speaks label names. When the user has changed the set it is
+  // carried in labelSelection; otherwise the item's current labels show.
+  function labelNames() {
+    if (labelSelection !== null) return labelSelection;
+    return (itemLabels || []).map((label) => label.name);
+  }
+
+  function setLabels(result) {
+    const selected = result?.labels || [];
+    labelSelection = selected.map((label) => label?.name).filter(Boolean);
+    const ids = selected.map((label) => label?.id).filter((id) => Number.isFinite(id));
+    setValue('label_ids', ids);
   }
 </script>
 
@@ -106,6 +125,16 @@
       <div class="space-y-1">
         <Label color="default">{key === 'story_points' ? t('items.storyPoints') || 'Story points' : t('items.estimate') || 'Estimate'}{#if isRequired(field)}<span style="color: var(--ds-text-danger, #ef4444);"> *</span>{/if}</Label>
         <Input type="number" value={values[key] ?? ''} disabled={disabled} oninput={(e) => setValue(key, e.target.value === '' ? null : Number(e.target.value))} />
+      </div>
+    {:else if identifier === 'labels'}
+      <div class="space-y-1">
+        <Label color="default">{t('items.labels') || 'Labels'}{#if isRequired(field)}<span style="color: var(--ds-text-danger, #ef4444);"> *</span>{/if}</Label>
+        <WorkspaceLabelCombobox
+          {workspaceId}
+          value={labelNames()}
+          {disabled}
+          onSelect={setLabels}
+        />
       </div>
     {/if}
   {/each}

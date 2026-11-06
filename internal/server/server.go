@@ -2030,6 +2030,7 @@ func (s *Server) initialize() error {
 		WithCache(itemHandler.ItemCacheService()).
 		WithWorkflow(conditionService, eventCoordinator, issueSyncService).
 		WithMutationEffects(mentionService).
+		WithComments(commentService).
 		WithClock(slaClock)
 	itemDetailApplication := services.NewItemDetailApplicationService(s.db, itemApplication, itemLinkService, permService).
 		WithContextReaders(screenHandler, requestTypeHandler, actionApplication).

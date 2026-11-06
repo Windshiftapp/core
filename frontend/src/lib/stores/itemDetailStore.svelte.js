@@ -913,6 +913,7 @@ class ItemDetailStore {
         assigneeName,
         iterationName,
         teamName,
+        transitionFields,
       });
       return;
     }
@@ -1146,7 +1147,8 @@ class ItemDetailStore {
           pending.directValue,
           pending.assigneeName,
           pending.iterationName,
-          pending.teamName
+          pending.teamName,
+          pending.transitionFields ?? null
         );
       }
     } finally {

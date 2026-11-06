@@ -178,7 +178,11 @@
       statusSheetOpen = false;
       return;
     }
-    await performChangeStatus(statusId, null);
+    try {
+      await performChangeStatus(statusId, null);
+    } catch (err) {
+      errorToast(err?.message || t('mobile.item.saveFailed'));
+    }
   }
 
   async function performChangeStatus(statusId, fields) {
@@ -680,6 +684,7 @@
     screen={mobileTransition.screen}
     targetStatusName={mobileTransition.statusName}
     workspaceId={item?.workspace_id}
+    itemLabels={item?.labels || []}
     onconfirm={handleMobileTransitionConfirm}
     oncancel={() => (mobileTransition = null)}
   />

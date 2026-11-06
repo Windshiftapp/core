@@ -248,10 +248,6 @@
 				/>
 			</FormField>
 
-			<FormField label={t('integrations.oauthClientId')}>
-				<Input bind:value={formData.oauth_client_id} placeholder={t('integrations.oauthClientId')} />
-			</FormField>
-
 			{#if formData.provider_type === 'docmost'}
 				<FormField label="Base URL" required>
 					<Input bind:value={formData.docmost_base_url} placeholder="https://wiki.example.com" />
@@ -261,6 +257,9 @@
 					ID or secret is needed. Docmost must have an enterprise license and MCP enabled.
 				</p>
 			{:else}
+				<FormField label={t('integrations.oauthClientId')}>
+					<Input bind:value={formData.oauth_client_id} placeholder={t('integrations.oauthClientId')} />
+				</FormField>
 				<FormField label={t('integrations.oauthClientSecret')}>
 					<Input
 						bind:value={formData.oauth_client_secret}

@@ -18,6 +18,7 @@
     workspaceId = null,
     milestones = [],
     iterations = [],
+    itemLabels = [],
     onconfirm = null,
     oncancel = null,
   } = $props();
@@ -124,7 +125,7 @@
           {t('common.loading')}
         </div>
       {:else}
-        <ScreenFieldsForm bind:values {workspaceId} {milestones} {iterations} screenFields={fields} />
+        <ScreenFieldsForm bind:values {workspaceId} {milestones} {iterations} {itemLabels} screenFields={fields} />
 
         <div class="space-y-1">
           <Label color="default">{t('transitionScreen.comment')}</Label>
