@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { currentRoute, initRouter, isMobileRoute, navigate } from './lib/router.js';
   import { authStore } from './lib/stores/auth.svelte.js';
+  import { portalAuthStore } from './lib/stores/portalAuth.svelte.js';
   import { moduleSettings } from './lib/stores/moduleSettings.js';
   import { setup, themes } from './lib/api/admin.js';
   import { APP_NAME } from './lib/constants.js';
@@ -245,6 +246,18 @@
       const userLang = authStore.currentUser.language;
       if (SUPPORTED_LOCALES.some(l => l.code === userLang) && i18n.locale !== userLang) {
         i18n.setLocale(userLang);
+      }
+    }
+  });
+
+  // Sync i18n locale with the authenticated portal customer's saved language.
+  // Detection seeds the value on first contact; once set, this keeps the portal
+  // UI in the customer's language across devices.
+  $effect(() => {
+    const customerLang = $portalAuthStore.customer?.language;
+    if ($portalAuthStore.isAuthenticated && !$portalAuthStore.isInternal && customerLang) {
+      if (SUPPORTED_LOCALES.some(l => l.code === customerLang) && i18n.locale !== customerLang) {
+        i18n.setLocale(customerLang);
       }
     }
   });

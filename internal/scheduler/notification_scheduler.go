@@ -74,7 +74,7 @@ type NotificationScheduler struct {
 
 // SMTPSender interface for sending emails
 type SMTPSender interface {
-	SendBatchedNotificationsContext(ctx context.Context, userEmail, userName string, notifications []models.Notification) error
+	SendBatchedNotificationsContext(ctx context.Context, userEmail, userName, locale, timezone string, notifications []models.Notification) error
 	IsSMTPConfigured() bool
 }
 
@@ -438,5 +438,5 @@ func (ns *NotificationScheduler) sendNotificationBatch(ctx context.Context, batc
 		return nil
 	}
 
-	return ns.smtpSender.SendBatchedNotificationsContext(ctx, batch.UserEmail, batch.UserName, batch.Notifications)
+	return ns.smtpSender.SendBatchedNotificationsContext(ctx, batch.UserEmail, batch.UserName, batch.Locale, batch.Timezone, batch.Notifications)
 }

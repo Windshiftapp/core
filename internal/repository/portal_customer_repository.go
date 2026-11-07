@@ -160,6 +160,76 @@ func (r *PortalCustomerRepository) AssignOrganisationIfUnset(customerID, organis
 	return rows > 0, nil
 }
 
+// SetLanguageIfUnset stores the language only when the customer has never
+// chosen or had one detected. It reports whether the value was written, so the
+// caller can treat detection as a one-time event and never override a choice.
+func (r *PortalCustomerRepository) SetLanguageIfUnset(customerID int, language string) (bool, error) {
+	if language == "" {
+		return false, nil
+	}
+	result, err := r.db.ExecWrite(`
+		UPDATE portal_customers
+		SET language = ?, updated_at = ?
+		WHERE id = ? AND (language IS NULL OR language = '')
+	`, language, time.Now(), customerID)
+	if err != nil {
+		return false, fmt.Errorf("set portal customer language: %w", err)
+	}
+	rows, _ := result.RowsAffected()
+	return rows > 0, nil
+}
+
+// UpdateRegionalSettings stores the customer's chosen language and timezone.
+// Empty values clear the preference (NULL), which re-enables the instance
+// default. Callers validate the values before writing.
+func (r *PortalCustomerRepository) UpdateRegionalSettings(customerID int, language, timezone string) error {
+	result, err := r.db.ExecWrite(`
+		UPDATE portal_customers
+		SET language = NULLIF(?, ''), timezone = NULLIF(?, ''), updated_at = ?
+		WHERE id = ?
+	`, language, timezone, time.Now(), customerID)
+	if err != nil {
+		return fmt.Errorf("update portal customer regional settings: %w", err)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// Language returns the customer's stored language, or "" when unset.
+func (r *PortalCustomerRepository) Language(ctx context.Context, customerID int) (string, error) {
+	var language string
+	err := r.db.QueryRowContext(ctx,
+		"SELECT COALESCE(language, '') FROM portal_customers WHERE id = ?", customerID,
+	).Scan(&language)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("get portal customer %d language: %w", customerID, err)
+	}
+	return language, nil
+}
+
+// LanguageByEmail returns the language of the customer with the given email,
+// or "" when no customer row exists. The reply paths only know the recipient
+// address, so a missing row is not an error.
+func (r *PortalCustomerRepository) LanguageByEmail(ctx context.Context, email string) (string, error) {
+	var language string
+	err := r.db.QueryRowContext(ctx,
+		"SELECT COALESCE(language, '') FROM portal_customers WHERE LOWER(email) = LOWER(?)", strings.TrimSpace(email),
+	).Scan(&language)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("get portal customer language by email: %w", err)
+	}
+	return language, nil
+}
+
 func (r *PortalCustomerRepository) EnsureChannelAccess(customerID, channelID int) (bool, error) {
 	var existed bool
 	if err := r.db.QueryRow(`

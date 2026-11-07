@@ -5,6 +5,7 @@ import analytics from './analytics.js';
 import auth from './auth.js';
 import channels from './channels.js';
 import common from './common.js';
+import email from './email.js';
 import logbook from './logbook.js';
 import misc from './misc.js';
 import navigation from './navigation.js';
@@ -25,6 +26,7 @@ import backfill from './backfill.js';
 
 export default createLocale({
   common,
+  email,
   auth,
   workspace,
   admin,

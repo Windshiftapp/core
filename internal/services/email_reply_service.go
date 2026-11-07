@@ -16,6 +16,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/emailutil"
+	"windshift/internal/i18n"
 	"windshift/internal/itemevents"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -216,24 +217,6 @@ func (s *EmailReplyService) handleCommentCreated(params HandleCommentParams, del
 	// stays correct.
 	itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
 	portalURL := s.portalRequestURL(params.ItemID)
-	_, htmlBody, textBody, err := s.smtpSender.RenderEmail(emailutil.TemplatePortalReply, struct {
-		AuthorName      string
-		ItemKey         string
-		ItemTitle       string
-		Content         string
-		OriginalSubject string
-		PortalURL       string
-	}{
-		AuthorName:      authorName,
-		ItemKey:         itemKey,
-		ItemTitle:       item.Title,
-		Content:         params.Content,
-		OriginalSubject: subject,
-		PortalURL:       portalURL,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to render portal reply email: %w", err)
-	}
 
 	referencesJSON, err := json.Marshal(references)
 	if err != nil {
@@ -244,6 +227,25 @@ func (s *EmailReplyService) handleCommentCreated(params HandleCommentParams, del
 	replyToEmail, replyToName := s.resolveReplyToAddress(params.ItemID, *item.ChannelID)
 	outboxIDs := make([]int, 0, len(recipients))
 	for _, recipient := range recipients {
+		// Render per recipient so each gets the body in their own language.
+		_, htmlBody, textBody, err := s.smtpSender.RenderEmailLocale(s.portalCustomerLocale(recipient.Email), emailutil.TemplatePortalReply, struct {
+			AuthorName      string
+			ItemKey         string
+			ItemTitle       string
+			Content         string
+			OriginalSubject string
+			PortalURL       string
+		}{
+			AuthorName:      authorName,
+			ItemKey:         itemKey,
+			ItemTitle:       item.Title,
+			Content:         params.Content,
+			OriginalSubject: subject,
+			PortalURL:       portalURL,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to render portal reply email: %w", err)
+		}
 		messageID := recipientMessageID(params.CommentID, recipient.Email, smtpDomain)
 		var outboxID int
 		err = s.db.QueryRow(`
@@ -518,7 +520,7 @@ func (s *EmailReplyService) sendItemNotice(item *models.Item, toEmail, toName, s
 	}
 	itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
 	portalURL := s.portalRequestURL(item.ID)
-	_, htmlBody, textBody, err := s.smtpSender.RenderEmail(emailutil.TemplatePortalReply, struct {
+	_, htmlBody, textBody, err := s.smtpSender.RenderEmailLocale(s.portalCustomerLocale(toEmail), emailutil.TemplatePortalReply, struct {
 		AuthorName      string
 		ItemKey         string
 		ItemTitle       string
@@ -611,7 +613,7 @@ func (s *EmailReplyService) EnqueueIntakeConfirmation(itemID, customerID int) er
 	}
 	itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.WorkspaceItemNumber)
 	portalURL := s.portalRequestURL(itemID)
-	subject, htmlBody, textBody, err := s.smtpSender.RenderEmail(emailutil.TemplateIntakeConfirmation, struct {
+	subject, htmlBody, textBody, err := s.smtpSender.RenderEmailLocale(s.portalCustomerLocale(customerEmail), emailutil.TemplateIntakeConfirmation, struct {
 		FirstName string
 		ItemKey   string
 		ItemTitle string
@@ -690,6 +692,16 @@ func (s *EmailReplyService) portalSlug(channelID int) string {
 		return ""
 	}
 	return strings.TrimSpace(cfg.PortalSlug)
+}
+
+// portalCustomerLocale resolves the recipient portal customer's stored
+// language by email, falling back to the default when unset or unknown.
+func (s *EmailReplyService) portalCustomerLocale(email string) string {
+	language, err := repository.NewPortalCustomerRepository(s.db).LanguageByEmail(context.Background(), email)
+	if err != nil || language == "" {
+		return i18n.Default
+	}
+	return i18n.Normalize(language)
 }
 
 // ProcessPendingReplies retries a bounded batch from the durable reply outbox.
