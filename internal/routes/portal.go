@@ -20,6 +20,7 @@ func RegisterPortalRoutes(deps *Deps) {
 		api.HandleH("GET /portal/{slug}/auth/verify", deps.PortalAuthLimiter.Limit(http.HandlerFunc(deps.Portal.PortalAuth.VerifyMagicLink)))
 		api.HandleH("POST /portal/{slug}/auth/logout", deps.PortalAuthLimiter.Limit(http.HandlerFunc(deps.Portal.PortalAuth.Logout)))
 		api.HandleH("GET /portal/{slug}/auth/me", deps.PortalAuthLimiter.Limit(http.HandlerFunc(deps.Portal.PortalAuth.GetCurrentCustomer)))
+		api.HandleH("PUT /portal/{slug}/auth/me", deps.PortalAuthLimiter.Limit(http.HandlerFunc(deps.Portal.PortalAuth.UpdateCurrentCustomer)))
 	}
 
 	if deps.Portal.PortalWebAuthn != nil {

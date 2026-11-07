@@ -1404,7 +1404,7 @@ func (s *Server) initialize() error {
 	portalHandler.SetKnowledgePublicationService(knowledgePublication)
 	portalHandler.SetKBSignalService(services.NewKBSignalService(s.db))
 	portalHandler.SetCommentService(commentService)
-	portalAuthHandler := handlers.NewPortalAuthHandler(repository.NewPortalAuthRepository(s.db), portalSessionManager, sessionManager, magicLinkService, ipExtractor)
+	portalAuthHandler := handlers.NewPortalAuthHandler(repository.NewPortalAuthRepository(s.db), repository.NewPortalCustomerRepository(s.db), portalSessionManager, sessionManager, magicLinkService, ipExtractor)
 	var portalWebAuthnHandler *handlers.PortalWebAuthnHandler
 	if portalWebAuthnConfig != nil {
 		portalWebAuthnHandler = handlers.NewPortalWebAuthnHandler(

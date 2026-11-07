@@ -237,10 +237,14 @@ type PortalCustomer struct {
 	CustomerOrganisationID *int           `json:"customer_organisation_id,omitempty"` //nolint:misspell // matches API/database field name
 	IsPrimary              bool           `json:"is_primary"`                         // Primary contact for the organization
 	CustomFieldValues      map[string]any `json:"custom_field_values,omitempty"`
-	DeactivatedAt          *time.Time     `json:"deactivated_at,omitempty"` // Security deactivation (WI-1554); every portal auth path refuses deactivated customers
-	CreatedVia             string         `json:"created_via"`              // Creation provenance (WI-1553)
-	CreatedAt              time.Time      `json:"created_at"`
-	UpdatedAt              time.Time      `json:"updated_at"`
+	// Language and Timezone are the customer's own preferences. Empty means
+	// never chosen or detected; the instance default (en, UTC) applies.
+	Language      string     `json:"language,omitempty"`
+	Timezone      string     `json:"timezone,omitempty"`
+	DeactivatedAt *time.Time `json:"deactivated_at,omitempty"` // Security deactivation (WI-1554); every portal auth path refuses deactivated customers
+	CreatedVia    string     `json:"created_via"`              // Creation provenance (WI-1553)
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
 	// Joined fields for API responses
 	UserName                 string        `json:"user_name,omitempty"`
 	UserEmail                string        `json:"user_email,omitempty"`

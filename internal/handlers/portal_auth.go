@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"windshift/internal/auth"
+	"windshift/internal/i18n"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
@@ -19,15 +20,17 @@ import (
 // PortalAuthHandler handles portal customer authentication
 type PortalAuthHandler struct {
 	portalAuthRepo       *repository.PortalAuthRepository
+	customerRepo         *repository.PortalCustomerRepository
 	portalSessionManager *auth.PortalSessionManager
 	sessionManager       *auth.SessionManager // internal session manager
 	magicLinkService     *services.MagicLinkService
 	ipExtractor          *utils.IPExtractor
 }
 
-// NewPortalAuthHandler creates a new portal auth handler
+// NewPortalAuthHandler creates a new portal auth handler.
 func NewPortalAuthHandler(
 	portalAuthRepo *repository.PortalAuthRepository,
+	customerRepo *repository.PortalCustomerRepository,
 	portalSessionManager *auth.PortalSessionManager,
 	sessionManager *auth.SessionManager,
 	magicLinkService *services.MagicLinkService,
@@ -35,6 +38,7 @@ func NewPortalAuthHandler(
 ) *PortalAuthHandler {
 	return &PortalAuthHandler{
 		portalAuthRepo:       portalAuthRepo,
+		customerRepo:         customerRepo,
 		portalSessionManager: portalSessionManager,
 		sessionManager:       sessionManager,
 		magicLinkService:     magicLinkService,
@@ -93,6 +97,9 @@ func (h *PortalAuthHandler) RequestMagicLink(w http.ResponseWriter, r *http.Requ
 	var request struct {
 		Email string `json:"email" validate:"required,email,max=255"`
 		Next  string `json:"next"`
+		// Locale is the portal UI's current locale. It seeds the customer's
+		// preference on first contact; an unsupported value is ignored.
+		Locale string `json:"locale"`
 	}
 	if !decodeChannelRequest(w, r, &request, false) {
 		return
@@ -179,6 +186,26 @@ func (h *PortalAuthHandler) RequestMagicLink(w http.ResponseWriter, r *http.Requ
 	// Get customer name for email personalization (may be empty for new customers)
 	_, customerName, _ := h.magicLinkService.GetPortalCustomerByEmail(email)
 
+	// First contact: remember the browser's language once, before the email is
+	// rendered, so even the first magic link is localized. A stored value is
+	// never overwritten, and an unmatched header leaves the column NULL so the
+	// instance default applies.
+	detected := ""
+	if i18n.IsSupported(request.Locale) {
+		detected = i18n.Normalize(request.Locale)
+	} else if negotiated, ok := i18n.NegotiateAcceptLanguage(r.Header.Get("Accept-Language")); ok {
+		detected = negotiated
+	}
+	if detected != "" {
+		if _, err := h.customerRepo.SetLanguageIfUnset(customerID, detected); err != nil {
+			slog.Warn("failed to store detected portal customer language", slog.String("component", "portal_auth"), slog.Int("portal_customer_id", customerID), slog.Any("error", err))
+		}
+	}
+	locale := i18n.Default
+	if stored, err := h.customerRepo.Language(ctx, customerID); err == nil && stored != "" {
+		locale = i18n.Normalize(stored)
+	}
+
 	// Generate magic link
 	token, err := h.magicLinkService.GenerateMagicLink(customerID, &channel.ID)
 	if err != nil {
@@ -192,7 +219,7 @@ func (h *PortalAuthHandler) RequestMagicLink(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Send magic link email
-	err = h.magicLinkService.SendMagicLinkEmail(email, customerName, token, slug, next)
+	err = h.magicLinkService.SendMagicLinkEmail(email, customerName, token, slug, next, locale)
 	if err != nil {
 		slog.Error("failed to send magic link email", slog.String("component", "portal_auth"), slog.Any("error", err))
 		// Still return success to prevent enumeration
@@ -375,6 +402,8 @@ func (h *PortalAuthHandler) GetCurrentCustomer(w http.ResponseWriter, r *http.Re
 				"email":         session.Customer.Email,
 				"name":          session.Customer.Name,
 				"passkey_count": info.PasskeyCount,
+				"language":      info.Language,
+				"timezone":      info.Timezone,
 			}
 			if info.DismissedPasskeyPromptAt != nil {
 				customerPayload["dismissed_passkey_prompt_at"] = info.DismissedPasskeyPromptAt.Format(time.RFC3339)
@@ -419,5 +448,67 @@ func (h *PortalAuthHandler) GetCurrentCustomer(w http.ResponseWriter, r *http.Re
 	// No valid session found
 	respondJSON(w, http.StatusUnauthorized, map[string]any{
 		"authenticated": false,
+	})
+}
+
+// updatePortalRegionalSettingsRequest is the editable regional subset of a
+// portal customer profile.
+type updatePortalRegionalSettingsRequest struct {
+	Language string `json:"language"`
+	Timezone string `json:"timezone"`
+}
+
+// UpdateCurrentCustomer handles PUT /portal/{slug}/auth/me. It lets an
+// authenticated portal customer change their own language and timezone.
+// Internal-user sessions are rejected: this endpoint is not a back door to the
+// users table, and it only ever writes the session's own customer row.
+func (h *PortalAuthHandler) UpdateCurrentCustomer(w http.ResponseWriter, r *http.Request) {
+	_, cancel, channel, ok := h.resolvePortalChannel(w, r)
+	if !ok {
+		return
+	}
+	defer cancel()
+
+	token, err := h.portalSessionManager.GetPortalSessionFromRequest(r)
+	if err != nil {
+		respondJSON(w, http.StatusUnauthorized, map[string]any{"authenticated": false})
+		return
+	}
+	session, err := h.portalSessionManager.ValidatePortalSession(token, h.getClientIP(r))
+	if err != nil || session.ChannelID == nil || *session.ChannelID != channel.ID {
+		respondJSON(w, http.StatusUnauthorized, map[string]any{"authenticated": false})
+		return
+	}
+
+	req, ok := decodeJSON[updatePortalRegionalSettingsRequest](w, r)
+	if !ok {
+		return
+	}
+
+	language := strings.TrimSpace(req.Language)
+	if language != "" && !i18n.IsSupported(language) {
+		respondValidationError(w, r, "Unsupported language")
+		return
+	}
+	if language != "" {
+		language = i18n.Normalize(language)
+	}
+
+	timezone := strings.TrimSpace(req.Timezone)
+	if timezone != "" {
+		if _, err := time.LoadLocation(timezone); err != nil {
+			respondValidationError(w, r, "Invalid timezone")
+			return
+		}
+	}
+
+	if err := h.customerRepo.UpdateRegionalSettings(session.Customer.ID, language, timezone); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+
+	respondJSONOK(w, map[string]any{
+		"language": language,
+		"timezone": timezone,
 	})
 }

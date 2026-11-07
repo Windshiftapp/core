@@ -2521,6 +2521,20 @@ var Catalog = []Migration{
 		`,
 	},
 	{
+		Version:       "20261122_portal_customer_language",
+		Name:          "Store portal customer language and timezone preferences (WI-2034)",
+		CheckSQLite:   sqliteColumnCheck("portal_customers", "language"),
+		CheckPostgres: pgColumnCheck("portal_customers", "language"),
+		SQLite: `
+			ALTER TABLE portal_customers ADD COLUMN language TEXT;
+			ALTER TABLE portal_customers ADD COLUMN timezone TEXT;
+		`,
+		Postgres: `
+			ALTER TABLE portal_customers ADD COLUMN IF NOT EXISTS language TEXT;
+			ALTER TABLE portal_customers ADD COLUMN IF NOT EXISTS timezone TEXT;
+		`,
+	},
+	{
 		Version:       "20261015_request_types_kind",
 		Name:          "Add system intake kind to request types (WI-1644)",
 		CheckSQLite:   sqliteColumnCheck("request_types", "kind"),

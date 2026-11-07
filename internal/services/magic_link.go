@@ -120,27 +120,28 @@ func (s *MagicLinkService) generateMagicLink(portalCustomerID int, channelID *in
 	return token, nil
 }
 
-// SendMagicLinkEmail sends the magic link email to the portal customer.
-// The token is placed in the URL fragment (#) so it is not transmitted in
-// HTTP Referer headers, query-string logs, or any third-party request
-// initiated by the verify page. The token is already URL-safe
+// SendMagicLinkEmail sends the magic link email to the portal customer in the
+// supplied locale. The token is placed in the URL fragment (#) so it is not
+// transmitted in HTTP Referer headers, query-string logs, or any third-party
+// request initiated by the verify page. The token is already URL-safe
 // (base64.URLEncoding), so no further escaping is needed. An optional `next`
 // destination (a same-portal path already validated by the caller) rides
 // alongside the token so the customer resumes the page that sent them to
 // sign in instead of landing on the portal home.
-func (s *MagicLinkService) SendMagicLinkEmail(email, name, token, portalSlug, next string) error {
+func (s *MagicLinkService) SendMagicLinkEmail(email, name, token, portalSlug, next, locale string) error {
 	if name == "" {
 		name = "there"
 	}
+	locale = i18n.Normalize(locale)
 	magicURL := fmt.Sprintf("%s/portal/%s/verify#token=%s", s.baseURL, portalSlug, token)
 	if next != "" {
 		magicURL += "&next=" + escapeFragmentValue(next)
 	}
-	return s.smtpSender.SendTransactional(email, i18n.Default, emailutil.TemplateMagicLink, struct {
+	return s.smtpSender.SendTransactional(email, locale, emailutil.TemplateMagicLink, struct {
 		FirstName    string
 		MagicLinkURL string
 		ExpiresIn    string
-	}{name, magicURL, i18n.HumanizeDuration(i18n.Default, MagicLinkExpiry)})
+	}{name, magicURL, i18n.HumanizeDuration(locale, MagicLinkExpiry)})
 }
 
 // PortalNextPath validates an optional post-sign-in destination supplied with
@@ -182,14 +183,25 @@ func (s *MagicLinkService) SendApprovalRequestEmail(email, name, token, portalSl
 	if name == "" {
 		name = "there"
 	}
+	locale := s.customerLocale(email)
 	approvalURL := fmt.Sprintf("%s/portal/%s/verify#token=%s&next=/portal/%s/approvals/%d", s.baseURL, portalSlug, token, portalSlug, requestID)
-	return s.smtpSender.SendTransactional(email, i18n.Default, emailutil.TemplateApprovalRequested, struct {
+	return s.smtpSender.SendTransactional(email, locale, emailutil.TemplateApprovalRequested, struct {
 		FirstName   string
 		ItemKey     string
 		ItemTitle   string
 		ApprovalURL string
 		ExpiresIn   string
-	}{name, itemKey, itemTitle, approvalURL, i18n.HumanizeDuration(i18n.Default, ApprovalMagicLinkExpiry)})
+	}{name, itemKey, itemTitle, approvalURL, i18n.HumanizeDuration(locale, ApprovalMagicLinkExpiry)})
+}
+
+// customerLocale resolves the recipient portal customer's stored language,
+// falling back to the default when unset or when no customer row exists.
+func (s *MagicLinkService) customerLocale(email string) string {
+	language, err := repository.NewPortalCustomerRepository(s.db).LanguageByEmail(context.Background(), email)
+	if err != nil || language == "" {
+		return i18n.Default
+	}
+	return i18n.Normalize(language)
 }
 
 // ValidateMagicLink validates a magic link token presented at a specific
