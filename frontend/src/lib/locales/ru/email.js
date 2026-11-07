@@ -80,4 +80,28 @@ export default {
       note: 'Чтобы добавить информацию, просто ответьте на это письмо.',
     },
   },
+  notification: {
+    dueReminder: {
+        title: "Напоминание: срок {itemKey} скоро истекает",
+        message: "Срок {itemTitle} — {dueDate}",
+    },
+    mention: {
+        title: "Вас упомянули",
+        comment: "{actor} упомянул вас в комментарии к {itemTitle} ({itemKey})",
+        description: "{actor} упомянул вас в описании {itemTitle} ({itemKey})",
+        item: "{actor} упомянул вас в {itemTitle} ({itemKey})",
+    },
+    approvalStarted: {
+        title: "Требуется согласование",
+        message: "Требуется ваше согласование по {itemKey}: {itemTitle}",
+    },
+    approvalEscalated: {
+        title: "Согласование передано вам",
+        message: "Вам передано согласование по {itemKey}: {itemTitle}",
+    },
+    incident: {
+        title: "Инцидент: {itemTitle}",
+        message: "{itemKey} сработал и требует подтверждения",
+    },
+  },
 };

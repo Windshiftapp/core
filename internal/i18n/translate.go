@@ -21,6 +21,19 @@ func Translate(locale, key string, params map[string]any) string {
 	return interpolate(value, params)
 }
 
+// TranslateOK is Translate and reports whether a translation existed, so
+// callers can fall back to stored copy instead of showing a raw key.
+func TranslateOK(locale, key string, params map[string]any) (string, bool) {
+	value, ok := lookup(locale, key)
+	if !ok {
+		return "", false
+	}
+	if len(params) == 0 {
+		return value, true
+	}
+	return interpolate(value, params), true
+}
+
 func lookup(locale, key string) (string, bool) {
 	normalized := Normalize(locale)
 	if entries, ok := catalog[normalized]; ok {

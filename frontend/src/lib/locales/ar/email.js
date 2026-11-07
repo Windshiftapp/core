@@ -79,4 +79,28 @@ export default {
       note: 'لإضافة مزيد من المعلومات، ما عليك سوى الرد على هذا البريد.',
     },
   },
+  notification: {
+    dueReminder: {
+        title: "تذكير: {itemKey} يستحق قريبًا",
+        message: "{itemTitle} يستحق في {dueDate}",
+    },
+    mention: {
+        title: "تمت الإشارة إليك",
+        comment: "{actor} أشار إليك في تعليق على {itemTitle} ({itemKey})",
+        description: "{actor} أشار إليك في وصف {itemTitle} ({itemKey})",
+        item: "{actor} أشار إليك في {itemTitle} ({itemKey})",
+    },
+    approvalStarted: {
+        title: "مطلوب موافقة",
+        message: "مطلوب موافقتك على {itemKey}: {itemTitle}",
+    },
+    approvalEscalated: {
+        title: "تم تصعيد الموافقة إليك",
+        message: "تم تصعيد موافقة إليك على {itemKey}: {itemTitle}",
+    },
+    incident: {
+        title: "حادث: {itemTitle}",
+        message: "تم تفعيل {itemKey} ويحتاج إلى إقرار",
+    },
+  },
 };

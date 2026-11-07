@@ -86,4 +86,28 @@ export default {
       note: 'To add more information, simply reply to this email.',
     },
   },
+  notification: {
+    dueReminder: {
+        title: "Reminder: {itemKey} is due soon",
+        message: "{itemTitle} is due on {dueDate}",
+    },
+    mention: {
+        title: "You were mentioned",
+        comment: "{actor} mentioned you in a comment on {itemTitle} ({itemKey})",
+        description: "{actor} mentioned you in the description of {itemTitle} ({itemKey})",
+        item: "{actor} mentioned you in {itemTitle} ({itemKey})",
+    },
+    approvalStarted: {
+        title: "Approval Required",
+        message: "Your approval is required on {itemKey}: {itemTitle}",
+    },
+    approvalEscalated: {
+        title: "Approval Escalated to You",
+        message: "An approval has been escalated to you on {itemKey}: {itemTitle}",
+    },
+    incident: {
+        title: "Incident: {itemTitle}",
+        message: "{itemKey} is triggered and needs an acknowledgement",
+    },
+  },
 };

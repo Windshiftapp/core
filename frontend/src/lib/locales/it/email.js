@@ -80,4 +80,28 @@ export default {
       note: 'Per aggiungere altre informazioni, rispondi semplicemente a questa e-mail.',
     },
   },
+  notification: {
+    dueReminder: {
+        title: "Promemoria: {itemKey} scade presto",
+        message: "{itemTitle} scade il {dueDate}",
+    },
+    mention: {
+        title: "Sei stato menzionato",
+        comment: "{actor} ti ha menzionato in un commento su {itemTitle} ({itemKey})",
+        description: "{actor} ti ha menzionato nella descrizione di {itemTitle} ({itemKey})",
+        item: "{actor} ti ha menzionato in {itemTitle} ({itemKey})",
+    },
+    approvalStarted: {
+        title: "Approvazione richiesta",
+        message: "La tua approvazione è richiesta per {itemKey}: {itemTitle}",
+    },
+    approvalEscalated: {
+        title: "Approvazione escalata a te",
+        message: "Un'approvazione è stata escalata a te su {itemKey}: {itemTitle}",
+    },
+    incident: {
+        title: "Incidente: {itemTitle}",
+        message: "{itemKey} è stato attivato e richiede una conferma",
+    },
+  },
 };

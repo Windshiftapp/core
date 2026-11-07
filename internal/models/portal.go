@@ -1,6 +1,59 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"strings"
+	"time"
+)
+
+// NotificationI18n carries the translatable copy for a notification. It is
+// stored in the notifications.metadata JSON so the digest can re-render the
+// title and message in the recipient's locale instead of the stored English.
+type NotificationI18n struct {
+	TitleKey   string         `json:"title_key,omitempty"`
+	MessageKey string         `json:"message_key,omitempty"`
+	Params     map[string]any `json:"params,omitempty"`
+}
+
+// NotificationMetadata is the parsed shape of notifications.metadata. Unknown
+// fields are ignored so other writers can keep using the column.
+type NotificationMetadata struct {
+	I18n *NotificationI18n `json:"i18n,omitempty"`
+}
+
+// ParseNotificationI18n extracts translatable copy from a notification's
+// metadata JSON. ok is false when the row carries no usable i18n metadata.
+func ParseNotificationI18n(metadata string) (titleKey, messageKey string, params map[string]any, ok bool) {
+	if strings.TrimSpace(metadata) == "" {
+		return "", "", nil, false
+	}
+	var parsed NotificationMetadata
+	if err := json.Unmarshal([]byte(metadata), &parsed); err != nil || parsed.I18n == nil {
+		return "", "", nil, false
+	}
+	if parsed.I18n.TitleKey == "" && parsed.I18n.MessageKey == "" {
+		return "", "", nil, false
+	}
+	return parsed.I18n.TitleKey, parsed.I18n.MessageKey, parsed.I18n.Params, true
+}
+
+// NotificationMetadataJSON builds the metadata JSON for a notification that
+// carries translatable copy. Empty keys are omitted; a fully empty input
+// yields an empty string so callers can leave Metadata untouched.
+func NotificationMetadataJSON(titleKey, messageKey string, params map[string]any) string {
+	if titleKey == "" && messageKey == "" {
+		return ""
+	}
+	payload, err := json.Marshal(NotificationMetadata{I18n: &NotificationI18n{
+		TitleKey:   titleKey,
+		MessageKey: messageKey,
+		Params:     params,
+	}})
+	if err != nil {
+		return ""
+	}
+	return string(payload)
+}
 
 // Channel represents an integration channel (inbound/outbound)
 type Channel struct {

@@ -80,4 +80,28 @@ export default {
       note: 'Para añadir más información, responde a este correo.',
     },
   },
+  notification: {
+    dueReminder: {
+        title: "Recordatorio: {itemKey} vence pronto",
+        message: "{itemTitle} vence el {dueDate}",
+    },
+    mention: {
+        title: "Te han mencionado",
+        comment: "{actor} te ha mencionado en un comentario en {itemTitle} ({itemKey})",
+        description: "{actor} te ha mencionado en la descripción de {itemTitle} ({itemKey})",
+        item: "{actor} te ha mencionado en {itemTitle} ({itemKey})",
+    },
+    approvalStarted: {
+        title: "Aprobación requerida",
+        message: "Se requiere tu aprobación en {itemKey}: {itemTitle}",
+    },
+    approvalEscalated: {
+        title: "Aprobación escalada a ti",
+        message: "Se te ha escalado una aprobación en {itemKey}: {itemTitle}",
+    },
+    incident: {
+        title: "Incidente: {itemTitle}",
+        message: "{itemKey} se ha activado y necesita confirmación",
+    },
+  },
 };

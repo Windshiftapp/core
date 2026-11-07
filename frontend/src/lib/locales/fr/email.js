@@ -81,4 +81,28 @@ export default {
       note: 'Pour ajouter des informations, répondez simplement à cet e-mail.',
     },
   },
+  notification: {
+    dueReminder: {
+        title: "Rappel : {itemKey} arrive bientôt à échéance",
+        message: "{itemTitle} arrive à échéance le {dueDate}",
+    },
+    mention: {
+        title: "Vous avez été mentionné",
+        comment: "{actor} vous a mentionné dans un commentaire sur {itemTitle} ({itemKey})",
+        description: "{actor} vous a mentionné dans la description de {itemTitle} ({itemKey})",
+        item: "{actor} vous a mentionné dans {itemTitle} ({itemKey})",
+    },
+    approvalStarted: {
+        title: "Approbation requise",
+        message: "Votre approbation est requise pour {itemKey} : {itemTitle}",
+    },
+    approvalEscalated: {
+        title: "Approbation escaladée vers vous",
+        message: "Une approbation vous a été escaladée sur {itemKey} : {itemTitle}",
+    },
+    incident: {
+        title: "Incident : {itemTitle}",
+        message: "{itemKey} a été déclenché et nécessite un accusé de réception",
+    },
+  },
 };

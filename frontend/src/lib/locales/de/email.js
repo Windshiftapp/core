@@ -82,4 +82,28 @@ export default {
       note: 'Um weitere Informationen hinzuzufügen, antworten Sie einfach auf diese E-Mail.',
     },
   },
+  notification: {
+    dueReminder: {
+        title: "Erinnerung: {itemKey} ist bald fällig",
+        message: "{itemTitle} ist am {dueDate} fällig",
+    },
+    mention: {
+        title: "Sie wurden erwähnt",
+        comment: "{actor} hat Sie in einem Kommentar zu {itemTitle} ({itemKey}) erwähnt",
+        description: "{actor} hat Sie in der Beschreibung von {itemTitle} ({itemKey}) erwähnt",
+        item: "{actor} hat Sie in {itemTitle} ({itemKey}) erwähnt",
+    },
+    approvalStarted: {
+        title: "Genehmigung erforderlich",
+        message: "Ihre Genehmigung ist für {itemKey} erforderlich: {itemTitle}",
+    },
+    approvalEscalated: {
+        title: "Genehmigung an Sie eskaliert",
+        message: "Eine Genehmigung wurde an Sie eskaliert: {itemKey}: {itemTitle}",
+    },
+    incident: {
+        title: "Vorfall: {itemTitle}",
+        message: "{itemKey} wurde ausgelöst und muss bestätigt werden",
+    },
+  },
 };

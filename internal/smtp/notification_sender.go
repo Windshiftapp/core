@@ -461,9 +461,10 @@ func buildNotificationBatchData(baseURL, userName, locale, timezone string, noti
 		NotificationCount: len(notifications),
 	}
 	for _, n := range notifications {
+		title, message := localizedNotificationCopy(locale, n)
 		data.Notifications = append(data.Notifications, notificationBatchEntry{
-			Title:         n.Title,
-			Message:       n.Message,
+			Title:         title,
+			Message:       message,
 			Type:          n.Type,
 			AccentColor:   notificationAccentColor(n.Type),
 			FormattedTime: i18n.FormatDateTimeZ(locale, n.Timestamp, location),
@@ -471,6 +472,24 @@ func buildNotificationBatchData(baseURL, userName, locale, timezone string, noti
 		})
 	}
 	return data
+}
+
+// localizedNotificationCopy re-renders a notification's stored English copy in
+// the recipient's locale when the row carries i18n metadata, falling back to
+// the stored text for rule-based or user-authored notifications.
+func localizedNotificationCopy(locale string, n models.Notification) (title, message string) {
+	title, message = n.Title, n.Message
+	titleKey, messageKey, params, ok := models.ParseNotificationI18n(n.Metadata)
+	if !ok {
+		return title, message
+	}
+	if translated, found := i18n.TranslateOK(locale, titleKey, params); found {
+		title = translated
+	}
+	if translated, found := i18n.TranslateOK(locale, messageKey, params); found {
+		message = translated
+	}
+	return title, message
 }
 
 // absoluteActionURL turns a stored relative notification action path into a

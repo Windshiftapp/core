@@ -79,4 +79,28 @@ export default {
       note: '如需补充更多信息，直接回复此邮件即可。',
     },
   },
+  notification: {
+    dueReminder: {
+        title: "提醒：{itemKey} 即将到期",
+        message: "{itemTitle} 将于 {dueDate} 到期",
+    },
+    mention: {
+        title: "有人提到了您",
+        comment: "{actor} 在 {itemTitle}（{itemKey}）的评论中提到了您",
+        description: "{actor} 在 {itemTitle}（{itemKey}）的描述中提到了您",
+        item: "{actor} 在 {itemTitle}（{itemKey}）中提到了您",
+    },
+    approvalStarted: {
+        title: "需要审批",
+        message: "需要您审批 {itemKey}：{itemTitle}",
+    },
+    approvalEscalated: {
+        title: "审批已升级给您",
+        message: "有一项审批已升级给您：{itemKey}：{itemTitle}",
+    },
+    incident: {
+        title: "事件：{itemTitle}",
+        message: "{itemKey} 已触发，需要确认",
+    },
+  },
 };

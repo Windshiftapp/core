@@ -79,4 +79,28 @@ export default {
       note: '추가 정보를 보내려면 이 이메일에 답장하세요.',
     },
   },
+  notification: {
+    dueReminder: {
+        title: "알림: {itemKey}의 마감이 다가옵니다",
+        message: "{itemTitle}의 마감일은 {dueDate}입니다",
+    },
+    mention: {
+        title: "회원님이 언급되었습니다",
+        comment: "{actor}님이 {itemTitle}({itemKey})의 댓글에서 회원님을 언급했습니다",
+        description: "{actor}님이 {itemTitle}({itemKey})의 설명에서 회원님을 언급했습니다",
+        item: "{actor}님이 {itemTitle}({itemKey})에서 회원님을 언급했습니다",
+    },
+    approvalStarted: {
+        title: "승인 필요",
+        message: "{itemKey}에 대한 승인이 필요합니다: {itemTitle}",
+    },
+    approvalEscalated: {
+        title: "승인이 회원님에게 에스컬레이션되었습니다",
+        message: "{itemKey}에 대한 승인이 회원님에게 에스컬레이션되었습니다: {itemTitle}",
+    },
+    incident: {
+        title: "인시던트: {itemTitle}",
+        message: "{itemKey}이(가) 트리거되었으며 확인이 필요합니다",
+    },
+  },
 };
