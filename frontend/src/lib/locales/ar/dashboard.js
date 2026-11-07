@@ -65,7 +65,7 @@ export default {
       },
       supportOverview: {
         name: 'نظرة عامة على الدعم',
-        description: 'قائمة الانتظار وأول رد والحل والالتزام بـ SLA لتذاكر العملاء',
+        description: 'قائمة المهام المعلّقة وأول رد والحل والالتزام بـ SLA لتذاكر العملاء',
       },
     },
     customization: {
@@ -123,7 +123,7 @@ export default {
       supportOverviewSetupTitle: 'اختر مساحات العمل التي تريد تقريراً عنها',
       supportOverviewSetupSubtitle: 'تعرض هذه الأداة مقاييس مكتب المساعدة فقط لمساحات العمل التي تختارها.',
       supportSourcesUnavailable: '{count} من مساحات العمل المهيأة لم تعد متاحة',
-      supportBacklog: 'قائمة الانتظار',
+      supportBacklog: 'قائمة المهام المعلّقة',
       supportUnassigned: 'غير معيّن',
       supportCreated: 'تم الإنشاء',
       supportResolved: 'تم الحل',
