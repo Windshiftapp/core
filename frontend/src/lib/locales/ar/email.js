@@ -1,0 +1,82 @@
+export default {
+  email: {
+    footer: {
+      automated: 'هذا بريد إلكتروني آلي — يُرجى عدم الرد عليه.',
+      repliable: 'تصلك هذا البريد لأن لديك طلبًا مفتوحًا لدينا.',
+    },
+    common: {
+      greeting: 'مرحبًا {name}،',
+      openInWindshift: 'عرض في Windshift',
+      manualLinkHint: 'إذا لم يعمل الزر، فانسخ هذا الرابط والصقه في المتصفح:',
+    },
+    duration: {
+      minute: '{count} دقيقة',
+      minutes: '{count} دقيقة',
+      hour: '{count} ساعة',
+      hours: '{count} ساعة',
+      day: '{count} يوم',
+      days: '{count} أيام',
+    },
+    magicLink: {
+      subject: 'تسجيل الدخول إلى بوابتك',
+      heading: 'تسجيل الدخول إلى بوابتك',
+      body: 'انقر على الزر أدناه لتسجيل الدخول. الرابط صالح لمدة {expires}.',
+      button: 'تسجيل الدخول',
+      note: 'إذا لم تطلب هذا الرابط، يمكنك تجاهل هذا البريد بأمان — لا يمكن لأحد تسجيل الدخول بدونه.',
+    },
+    verification: {
+      subject: 'تأكيد بريدك الإلكتروني',
+      heading: 'تأكيد بريدك الإلكتروني',
+      body: 'يرجى تأكيد بريدك الإلكتروني لإكمال إعداد حسابك.',
+      button: 'تأكيد البريد',
+      note: 'تنتهي صلاحية هذا الرابط خلال {expires}. إذا لم تنشئ حساب Windshift، يمكنك تجاهل هذا البريد.',
+    },
+    invitation: {
+      subject: 'تمت دعوتك إلى Windshift',
+      heading: 'تمت دعوتك إلى Windshift',
+      body: 'عيّن كلمة مرور لتفعيل حسابك وبدء التعاون مع فريقك.',
+      button: 'تعيين كلمة المرور',
+      note: 'تنتهي صلاحية هذه الدعوة خلال {expires}. إذا لم تكن تتوقعها، يمكنك تجاهل هذا البريد بأمان.',
+    },
+    notificationBatch: {
+      subjectOne: 'Windshift — لديك إشعار جديد واحد',
+      subjectOther: 'Windshift — لديك {count} إشعارات جديدة',
+      headingOne: 'إشعار جديد واحد',
+      headingOther: '{count} إشعارات جديدة',
+      intro: 'مرحبًا {name}، إليك الجديد:',
+      manage: 'يمكنك إدارة وتيرة استلام هذه الرسائل من تفضيلات الإشعارات.',
+    },
+    mention: {
+      subject: '{actor} أشار إليك في {itemKey}',
+      body: '{actor} أشار إليك في {source} في {itemKey} · {itemTitle}',
+      source: {
+        comment: 'تعليق',
+        description: 'الوصف',
+        item: 'عنصر',
+      },
+    },
+    portalReply: {
+      subject: 'Re: {subject}',
+      body: '{author} ردّ على {itemKey} · {itemTitle}',
+      portalLink: 'عرض هذا الطلب في بوابتك',
+      note: 'لمتابعة المحادثة، ما عليك سوى الرد على هذا البريد.',
+    },
+    approval: {
+      subject: 'طلب موافقة: {itemKey} — {itemTitle}',
+      heading: 'طلب موافقة',
+      body: 'مطلوب موافقتك على {itemKey} · {itemTitle}.',
+      body2: 'انقر على الزر أدناه للمراجعة والبت. الرابط صالح لمدة {expires}.',
+      button: 'مراجعة الموافقة',
+      note: 'إذا لم تكن تتوقع هذا الطلب، يمكنك تجاهل هذا البريد بأمان.',
+    },
+    intake: {
+      subject: 'استلمنا طلبك ({itemKey})',
+      heading: 'استلمنا طلبك',
+      body: 'شكرًا لتواصلك معنا. سجّلنا طلبك باسم {itemKey} · {itemTitle}.',
+      body2: 'سيراجعه فريقنا ويعاود التواصل معك في أقرب وقت ممكن.',
+      body3: 'يمكنك متابعة التقدم وإضافة التفاصيل في بوابتك:',
+      button: 'عرض طلبك',
+      note: 'لإضافة مزيد من المعلومات، ما عليك سوى الرد على هذا البريد.',
+    },
+  },
+};

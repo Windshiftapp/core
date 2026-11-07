@@ -2507,6 +2507,20 @@ var Catalog = []Migration{
 		Postgres:        notificationDigestLinksMigration,
 	},
 	{
+		Version:       "20261121_notification_template_customized",
+		Name:          "Track admin-customized email templates so localized defaults apply (WI-2034)",
+		CheckSQLite:   sqliteColumnCheck("notification_templates", "is_customized"),
+		CheckPostgres: pgColumnCheck("notification_templates", "is_customized"),
+		SQLite: `
+			ALTER TABLE notification_templates ADD COLUMN is_customized BOOLEAN NOT NULL DEFAULT FALSE;
+			UPDATE notification_templates SET is_customized = TRUE WHERE updated_at > created_at;
+		`,
+		Postgres: `
+			ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS is_customized BOOLEAN NOT NULL DEFAULT false;
+			UPDATE notification_templates SET is_customized = true WHERE updated_at > created_at;
+		`,
+	},
+	{
 		Version:       "20261015_request_types_kind",
 		Name:          "Add system intake kind to request types (WI-1644)",
 		CheckSQLite:   sqliteColumnCheck("request_types", "kind"),

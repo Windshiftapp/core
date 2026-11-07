@@ -38,7 +38,7 @@ func NewEmailTemplateRepository(db database.Database) *EmailTemplateRepository {
 	}
 }
 
-const emailTemplateColumns = "id, name, COALESCE(subject, '') AS subject, COALESCE(content, '') AS content, COALESCE(text_body, '') AS text_body, COALESCE(description, '') AS description, COALESCE(is_active, true) AS is_active, COALESCE(is_system, false) AS is_system, created_at, updated_at"
+const emailTemplateColumns = "id, name, COALESCE(subject, '') AS subject, COALESCE(content, '') AS content, COALESCE(text_body, '') AS text_body, COALESCE(description, '') AS description, COALESCE(is_active, true) AS is_active, COALESCE(is_system, false) AS is_system, COALESCE(is_customized, false) AS is_customized, created_at, updated_at"
 
 // GetByName returns the active template with the given name. Returns
 // ErrNotFound if no row exists or the row is inactive — senders treat that
@@ -77,7 +77,7 @@ func (r *EmailTemplateRepository) fetchByName(name string) (*models.EmailTemplat
 		name,
 	)
 	var t models.EmailTemplate
-	if err := row.Scan(&t.ID, &t.Name, &t.Subject, &t.HTMLBody, &t.TextBody, &t.Description, &t.IsActive, &t.IsSystem, &t.CreatedAt, &t.UpdatedAt); err != nil {
+	if err := row.Scan(&t.ID, &t.Name, &t.Subject, &t.HTMLBody, &t.TextBody, &t.Description, &t.IsActive, &t.IsSystem, &t.IsCustomized, &t.CreatedAt, &t.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -97,7 +97,7 @@ func (r *EmailTemplateRepository) List() ([]models.EmailTemplate, error) {
 	var templates []models.EmailTemplate
 	for rows.Next() {
 		var t models.EmailTemplate
-		if err := rows.Scan(&t.ID, &t.Name, &t.Subject, &t.HTMLBody, &t.TextBody, &t.Description, &t.IsActive, &t.IsSystem, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.Subject, &t.HTMLBody, &t.TextBody, &t.Description, &t.IsActive, &t.IsSystem, &t.IsCustomized, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan email template: %w", err)
 		}
 		templates = append(templates, t)
@@ -112,7 +112,7 @@ func (r *EmailTemplateRepository) List() ([]models.EmailTemplate, error) {
 func (r *EmailTemplateRepository) GetByID(id int) (*models.EmailTemplate, error) {
 	row := r.db.QueryRow("SELECT "+emailTemplateColumns+" FROM notification_templates WHERE id = ?", id)
 	var t models.EmailTemplate
-	if err := row.Scan(&t.ID, &t.Name, &t.Subject, &t.HTMLBody, &t.TextBody, &t.Description, &t.IsActive, &t.IsSystem, &t.CreatedAt, &t.UpdatedAt); err != nil {
+	if err := row.Scan(&t.ID, &t.Name, &t.Subject, &t.HTMLBody, &t.TextBody, &t.Description, &t.IsActive, &t.IsSystem, &t.IsCustomized, &t.CreatedAt, &t.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -127,7 +127,7 @@ func (r *EmailTemplateRepository) Update(id int, subject, htmlBody, textBody, de
 	now := time.Now()
 	res, err := r.db.ExecWrite(
 		`UPDATE notification_templates
-		 SET subject = ?, content = ?, text_body = ?, description = ?, is_active = ?, updated_at = ?
+		 SET subject = ?, content = ?, text_body = ?, description = ?, is_active = ?, is_customized = true, updated_at = ?
 		 WHERE id = ?`,
 		subject, htmlBody, textBody, description, isActive, now, id,
 	)

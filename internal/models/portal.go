@@ -760,16 +760,19 @@ type NotificationCache struct {
 // "magic_link", "notification_batch"). Subject, HTMLBody, and TextBody are
 // all Go html/template / text/template sources.
 type EmailTemplate struct {
-	ID          int       `json:"id"`
-	Name        string    `json:"name"`
-	Subject     string    `json:"subject"`
-	HTMLBody    string    `json:"html_body"`
-	TextBody    string    `json:"text_body"`
-	Description string    `json:"description,omitempty"`
-	IsActive    bool      `json:"is_active"`
-	IsSystem    bool      `json:"is_system"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Subject     string `json:"subject"`
+	HTMLBody    string `json:"html_body"`
+	TextBody    string `json:"text_body"`
+	Description string `json:"description,omitempty"`
+	IsActive    bool   `json:"is_active"`
+	IsSystem    bool   `json:"is_system"`
+	// IsCustomized is set when an admin saves an edit. Unmodified seeds stay
+	// false so the localized built-in default is used instead.
+	IsCustomized bool      `json:"is_customized"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // NotificationSetting represents a notification configuration that can be assigned to configuration sets

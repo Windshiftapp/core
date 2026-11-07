@@ -385,6 +385,7 @@ CREATE TABLE IF NOT EXISTS notification_templates (
 	text_body TEXT, -- Plain-text body template
 	is_system BOOLEAN DEFAULT false,
 	is_active BOOLEAN DEFAULT true,
+	is_customized BOOLEAN NOT NULL DEFAULT false, -- true once an admin saves an edit; unmodified seeds fall back to the localized built-in default
 	template_type TEXT, -- legacy, unused
 	event_type TEXT, -- legacy, unused
 	template_subject TEXT, -- legacy, unused

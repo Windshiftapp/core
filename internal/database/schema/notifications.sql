@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS notification_templates (
 	description TEXT,
 	is_system BOOLEAN DEFAULT FALSE,
 	is_active BOOLEAN DEFAULT TRUE,
+	is_customized BOOLEAN NOT NULL DEFAULT FALSE, -- true once an admin saves an edit; unmodified seeds fall back to the localized built-in default
 	template_type TEXT, -- legacy, unused
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP

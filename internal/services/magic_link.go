@@ -14,6 +14,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/emailutil"
+	"windshift/internal/i18n"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 )
@@ -135,11 +136,11 @@ func (s *MagicLinkService) SendMagicLinkEmail(email, name, token, portalSlug, ne
 	if next != "" {
 		magicURL += "&next=" + escapeFragmentValue(next)
 	}
-	return s.smtpSender.SendTransactional(email, emailutil.TemplateMagicLink, struct {
+	return s.smtpSender.SendTransactional(email, i18n.Default, emailutil.TemplateMagicLink, struct {
 		FirstName    string
 		MagicLinkURL string
 		ExpiresIn    string
-	}{name, magicURL, emailutil.HumanizeDuration(MagicLinkExpiry)})
+	}{name, magicURL, i18n.HumanizeDuration(i18n.Default, MagicLinkExpiry)})
 }
 
 // PortalNextPath validates an optional post-sign-in destination supplied with
@@ -182,13 +183,13 @@ func (s *MagicLinkService) SendApprovalRequestEmail(email, name, token, portalSl
 		name = "there"
 	}
 	approvalURL := fmt.Sprintf("%s/portal/%s/verify#token=%s&next=/portal/%s/approvals/%d", s.baseURL, portalSlug, token, portalSlug, requestID)
-	return s.smtpSender.SendTransactional(email, emailutil.TemplateApprovalRequested, struct {
+	return s.smtpSender.SendTransactional(email, i18n.Default, emailutil.TemplateApprovalRequested, struct {
 		FirstName   string
 		ItemKey     string
 		ItemTitle   string
 		ApprovalURL string
 		ExpiresIn   string
-	}{name, itemKey, itemTitle, approvalURL, emailutil.HumanizeDuration(ApprovalMagicLinkExpiry)})
+	}{name, itemKey, itemTitle, approvalURL, i18n.HumanizeDuration(i18n.Default, ApprovalMagicLinkExpiry)})
 }
 
 // ValidateMagicLink validates a magic link token presented at a specific

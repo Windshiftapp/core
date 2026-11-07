@@ -5,14 +5,14 @@ package i18n
 // dateFormats holds the numeric date/time layout for each shipped locale.
 // Source: frontend/src/lib/locales/dateFormats.js
 var dateFormats = map[string]dateFormat{
-	"ar": {Date: "2/1/2006", DateTime: "2/1/2006, 15:04", Time: "15:04"},
-	"de": {Date: "02.01.2006", DateTime: "02.01.2006, 15:04", Time: "15:04"},
-	"en": {Date: "1/2/2006", DateTime: "1/2/2006, 3:04 PM", Time: "3:04 PM"},
-	"es": {Date: "2/1/2006", DateTime: "2/1/2006, 15:04", Time: "15:04"},
-	"fr": {Date: "02/01/2006", DateTime: "02/01/2006 15:04", Time: "15:04"},
-	"it": {Date: "02/01/2006", DateTime: "02/01/2006, 15:04", Time: "15:04"},
-	"ko": {Date: "2006. 1. 2.", DateTime: "2006. 1. 2. 15:04", Time: "15:04"},
+	"ar":    {Date: "2/1/2006", DateTime: "2/1/2006, 15:04", Time: "15:04"},
+	"de":    {Date: "02.01.2006", DateTime: "02.01.2006, 15:04", Time: "15:04"},
+	"en":    {Date: "1/2/2006", DateTime: "1/2/2006, 3:04 PM", Time: "3:04 PM"},
+	"es":    {Date: "2/1/2006", DateTime: "2/1/2006, 15:04", Time: "15:04"},
+	"fr":    {Date: "02/01/2006", DateTime: "02/01/2006 15:04", Time: "15:04"},
+	"it":    {Date: "02/01/2006", DateTime: "02/01/2006, 15:04", Time: "15:04"},
+	"ko":    {Date: "2006. 1. 2.", DateTime: "2006. 1. 2. 15:04", Time: "15:04"},
 	"pt-BR": {Date: "2/1/2006", DateTime: "2/1/2006, 15:04", Time: "15:04"},
-	"ru": {Date: "02.01.2006", DateTime: "02.01.2006, 15:04", Time: "15:04"},
+	"ru":    {Date: "02.01.2006", DateTime: "02.01.2006, 15:04", Time: "15:04"},
 	"zh-CN": {Date: "2006/1/2", DateTime: "2006/1/2 15:04", Time: "15:04"},
 }

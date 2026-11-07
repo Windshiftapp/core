@@ -258,15 +258,21 @@ func (s *NotificationSMTPSender) SetEncryption(enc Encryptor) {
 }
 
 // RenderEmail resolves the named email template (admin-edited DB row preferred,
-// embedded fallback otherwise) and renders subject/html/text against `data`.
-// The rendered Subject is also exposed to the HTML/text body templates as
-// `{{.Subject}}` (used by the shared shell's <title> tag), so each call site
-// only has to pass its native fields without remembering to mirror the
-// subject in the struct.
+// embedded fallback otherwise) and renders subject/html/text against `data` in
+// the default locale. The rendered Subject is also exposed to the HTML/text body
+// templates as `{{.Subject}}` (used by the shared shell's <title> tag), so each
+// call site only has to pass its native fields without remembering to mirror
+// the subject in the struct.
 func (s *NotificationSMTPSender) RenderEmail(templateName string, data any) (subject, htmlBody, textBody string, err error) {
+	return s.RenderEmailLocale(i18n.Default, templateName, data)
+}
+
+// RenderEmailLocale is RenderEmail with copy and date formatting bound to the
+// recipient's locale.
+func (s *NotificationSMTPSender) RenderEmailLocale(locale, templateName string, data any) (subject, htmlBody, textBody string, err error) {
 	subjectSrc, htmlSrc, textSrc, fromDB := s.resolveTemplate(templateName)
 
-	subject, htmlBody, textBody, err = renderEmailTemplates(subjectSrc, htmlSrc, textSrc, data)
+	subject, htmlBody, textBody, err = renderEmailTemplates(locale, subjectSrc, htmlSrc, textSrc, data)
 	if err == nil {
 		return subject, htmlBody, textBody, nil
 	}
@@ -285,18 +291,18 @@ func (s *NotificationSMTPSender) RenderEmail(templateName string, data any) (sub
 		slog.String("template", templateName),
 		slog.Any("error", err),
 	)
-	return renderEmailTemplates(def.Subject, def.HTMLBody, def.TextBody, data)
+	return renderEmailTemplates(locale, def.Subject, def.HTMLBody, def.TextBody, data)
 }
 
 // renderEmailTemplates renders subject then body, exposing the rendered subject
 // to the body as {{.Subject}} (used by the shared shell's <title> tag).
-func renderEmailTemplates(subjectSrc, htmlSrc, textSrc string, data any) (subject, htmlBody, textBody string, err error) {
-	_, subject, err = emailutil.RenderTemplates(subjectSrc, subjectSrc, data)
+func renderEmailTemplates(locale, subjectSrc, htmlSrc, textSrc string, data any) (subject, htmlBody, textBody string, err error) {
+	_, subject, err = emailutil.RenderTemplatesLocale(locale, subjectSrc, subjectSrc, data)
 	if err != nil {
 		return "", "", "", err
 	}
-	enriched := emailutil.EnrichWithSubject(data, subject)
-	htmlBody, textBody, err = emailutil.RenderTemplates(htmlSrc, textSrc, enriched)
+	enriched := emailutil.EnrichWithSubjectLocale(data, subject, locale)
+	htmlBody, textBody, err = emailutil.RenderTemplatesLocale(locale, htmlSrc, textSrc, enriched)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -314,21 +320,22 @@ func defaultTemplate(name string) (emailutil.DefaultTemplate, bool) {
 }
 
 // SendTransactional renders a named template against `data` and sends it via
-// SMTP to `toEmail`. Returns ErrSMTPNotConfigured if SMTP isn't set up. This
-// is the shared one-call surface used by the magic-link / verification /
-// invitation services so each one stays a thin URL-builder + caller.
-func (s *NotificationSMTPSender) SendTransactional(toEmail, templateName string, data any) error {
-	return s.SendTransactionalContext(context.Background(), toEmail, templateName, data)
+// SMTP to `toEmail` in the recipient's locale. Returns ErrSMTPNotConfigured if
+// SMTP isn't set up. This is the shared one-call surface used by the magic-link
+// / verification / invitation services so each one stays a thin URL-builder +
+// caller.
+func (s *NotificationSMTPSender) SendTransactional(toEmail, locale, templateName string, data any) error {
+	return s.SendTransactionalContext(context.Background(), toEmail, locale, templateName, data)
 }
 
 // SendTransactionalContext is SendTransactional with cancellation propagated
 // through SMTP dialing, handshake, commands, and DATA completion. The
 // mention-email outbox uses it so a scheduler shutdown cannot wedge a send.
-func (s *NotificationSMTPSender) SendTransactionalContext(ctx context.Context, toEmail, templateName string, data any) error {
+func (s *NotificationSMTPSender) SendTransactionalContext(ctx context.Context, toEmail, locale, templateName string, data any) error {
 	if !s.IsSMTPConfigured() {
 		return ErrSMTPNotConfigured
 	}
-	subject, htmlBody, textBody, err := s.RenderEmail(templateName, data)
+	subject, htmlBody, textBody, err := s.RenderEmailLocale(locale, templateName, data)
 	if err != nil {
 		return fmt.Errorf("render %s: %w", templateName, err)
 	}
@@ -347,10 +354,12 @@ func AbsoluteActionURL(baseURL, actionURL string) string {
 }
 
 // resolveTemplate returns the template sources and whether they came from the
-// admin-editable DB row (as opposed to the embedded default).
+// admin-editable DB row (as opposed to the embedded default). A seeded row is
+// authoritative only once an admin has saved an edit; an unmodified seed falls
+// through to the embedded default, which is localized at render time.
 func (s *NotificationSMTPSender) resolveTemplate(name string) (subject, html, text string, fromDB bool) {
 	if s.templates != nil {
-		if t, err := s.templates.GetByName(name); err == nil && t != nil {
+		if t, err := s.templates.GetByName(name); err == nil && t != nil && t.IsCustomized {
 			return t.Subject, t.HTMLBody, t.TextBody, true
 		}
 	}
@@ -421,7 +430,7 @@ func (s *NotificationSMTPSender) SendBatchedNotificationsContext(ctx context.Con
 		return fmt.Errorf("failed to get SMTP config: %w", err)
 	}
 
-	subject, htmlBody, textBody, err := s.RenderEmail(emailutil.TemplateNotificationBatch, buildNotificationBatchData(s.baseURL, userName, locale, timezone, notifications))
+	subject, htmlBody, textBody, err := s.RenderEmailLocale(locale, emailutil.TemplateNotificationBatch, buildNotificationBatchData(s.baseURL, userName, locale, timezone, notifications))
 	if err != nil {
 		return fmt.Errorf("failed to render notification email: %w", err)
 	}
