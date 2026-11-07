@@ -4,11 +4,13 @@ import { createCrudClient } from './createCrudClient.js';
 // Portal Auth API (magic link authentication for portal customers)
 export const portalAuth = {
   // Request a magic link email. `next` is an optional same-portal path the
-  // emailed verify link should return to after sign-in.
-  requestMagicLink: (slug, email, next) =>
+  // emailed verify link should return to after sign-in. `locale` is the portal
+  // UI's current locale; the server stores it once on first contact so the
+  // first email is already localized.
+  requestMagicLink: (slug, email, next, locale) =>
     fetchAPI(`/portal/${slug}/auth/request`, {
       method: 'POST',
-      body: JSON.stringify(next ? { email, next } : { email }),
+      body: JSON.stringify({ email, next, locale }),
     }),
 
   // Verify a magic link token (returns session on success)
@@ -17,6 +19,13 @@ export const portalAuth = {
 
   // Get current authenticated portal customer
   getCurrentCustomer: (slug) => fetchAPI(`/portal/${slug}/auth/me`),
+
+  // Update the authenticated customer's own language/timezone preferences.
+  updateCurrentCustomer: (slug, settings) =>
+    fetchAPI(`/portal/${slug}/auth/me`, {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    }),
 
   // Logout portal customer
   logout: (slug) =>

@@ -94,10 +94,14 @@ type queuedNotificationEvent struct {
 
 // UserNotificationBatch is a set of unread notifications destined for one
 // user's batched email, along with the contact fields needed to address it.
+// Locale and Timezone are the recipient's preferences; the digest renders
+// timestamps for them so a reader elsewhere is never shown an unlabeled time.
 type UserNotificationBatch struct {
 	UserID          int
 	UserEmail       string
 	UserName        string
+	Locale          string
+	Timezone        string
 	Notifications   []models.Notification
 	NotificationIDs []int
 }
@@ -216,13 +220,13 @@ func (ns *NotificationService) unreadEmailBatches(maxBatchSize int, now time.Tim
 	// Rows the recipient may not see are suppressed below; without that a
 	// recipient whose whole backlog is invisible would be re-selected forever.
 	rows, err := ns.db.Query(`
-		SELECT u.id, u.email, u.first_name, u.last_name
+		SELECT u.id, u.email, u.first_name, u.last_name, COALESCE(u.language, ''), COALESCE(u.timezone, '')
 		FROM notifications n
 		JOIN users u ON n.user_id = u.id
 		WHERE n.sent_at IS NULL AND n.read = false AND u.email != '' AND u.is_active = true
 		  AND n.email_delivery_state IN (?, ?)
 		  AND n.authorization_scope IN (?, ?, ?)
-		GROUP BY u.id, u.email, u.first_name, u.last_name
+		GROUP BY u.id, u.email, u.first_name, u.last_name, u.language, u.timezone
 		ORDER BY MIN(n.timestamp) ASC, u.id ASC
 		LIMIT ?
 	`, notificationEmailPending, notificationEmailFailed,
@@ -234,11 +238,12 @@ func (ns *NotificationService) unreadEmailBatches(maxBatchSize int, now time.Tim
 	type recipient struct {
 		id                 int
 		email, first, last string
+		language, timezone string
 	}
 	recipients := make([]recipient, 0)
 	for rows.Next() {
 		var candidate recipient
-		if err := rows.Scan(&candidate.id, &candidate.email, &candidate.first, &candidate.last); err != nil {
+		if err := rows.Scan(&candidate.id, &candidate.email, &candidate.first, &candidate.last, &candidate.language, &candidate.timezone); err != nil {
 			_ = rows.Close()
 			return nil, fmt.Errorf("scan notification email recipient: %w", err)
 		}
@@ -277,6 +282,8 @@ func (ns *NotificationService) unreadEmailBatches(maxBatchSize int, now time.Tim
 			UserID:          candidate.id,
 			UserEmail:       candidate.email,
 			UserName:        strings.TrimSpace(candidate.first + " " + candidate.last),
+			Locale:          candidate.language,
+			Timezone:        candidate.timezone,
 			Notifications:   notifications,
 			NotificationIDs: make([]int, len(notifications)),
 		}
@@ -735,6 +742,13 @@ type directNotificationSpec struct {
 	ItemID             *int
 	SourceType         string
 	SourceID           *int
+	// I18nTitleKey / I18nMessageKey name catalog entries for translatable copy;
+	// I18nParams supplies their placeholders. When set, the digest re-renders
+	// the entry in the recipient's locale and the stored Title/Message stay as
+	// the fallback.
+	I18nTitleKey   string
+	I18nMessageKey string
+	I18nParams     map[string]any
 	// DeliveryKey makes the insert idempotent when non-empty. A duplicate is
 	// silently skipped and not returned as stored. It must already include the
 	// recipient when the batch spans more than one user.
@@ -748,6 +762,21 @@ type directNotificationSpec struct {
 // email path needs the notification id to suppress the content-less digest
 // copy once the dedicated email carrying the message body has gone out.
 func (ns *NotificationService) NotifyUsersWithRecords(userIDs []int, workspaceID, itemID, actorUserID int, notifType, title, message string) ([]models.Notification, error) {
+	return ns.NotifyUsersWithRecordsI18n(userIDs, workspaceID, itemID, actorUserID, notifType, title, message, "", "", nil)
+}
+
+// NotifyUsersI18n is NotifyUsers with translatable copy (see
+// NotifyUsersWithRecordsI18n for the key/params contract).
+func (ns *NotificationService) NotifyUsersI18n(userIDs []int, workspaceID, itemID, actorUserID int, notifType, title, message, titleKey, messageKey string, params map[string]any) error {
+	_, err := ns.NotifyUsersWithRecordsI18n(userIDs, workspaceID, itemID, actorUserID, notifType, title, message, titleKey, messageKey, params)
+	return err
+}
+
+// NotifyUsersWithRecordsI18n is NotifyUsersWithRecords with translatable copy.
+// titleKey/messageKey name catalog entries and params supplies their
+// placeholders. The stored title/message stay the fallback when a translation
+// is missing, so non-localized callers are unaffected.
+func (ns *NotificationService) NotifyUsersWithRecordsI18n(userIDs []int, workspaceID, itemID, actorUserID int, notifType, title, message, titleKey, messageKey string, params map[string]any) ([]models.Notification, error) {
 	workspace, item := workspaceID, itemID
 	return ns.notifyUsersAtURL(userIDs, actorUserID, directNotificationSpec{
 		Type:               notifType,
@@ -759,6 +788,9 @@ func (ns *NotificationService) NotifyUsersWithRecords(userIDs []int, workspaceID
 		ItemID:             &item,
 		SourceType:         "item",
 		SourceID:           &item,
+		I18nTitleKey:       titleKey,
+		I18nMessageKey:     messageKey,
+		I18nParams:         params,
 	}, ns.workspaceViewAuthorizer(workspaceID))
 }
 
@@ -826,8 +858,15 @@ func (ns *NotificationService) NotifyDueDateReminder(reminder DueDateReminder, n
 		ItemID:             &itemID,
 		SourceType:         "item.due_reminder",
 		SourceID:           &itemID,
-		DeliveryKey:        fmt.Sprintf("due-reminder:%d:%s:%d", itemID, dueDate, reminder.RecipientID),
-		Timestamp:          now,
+		I18nTitleKey:       "notification.dueReminder.title",
+		I18nMessageKey:     "notification.dueReminder.message",
+		I18nParams: map[string]any{
+			"itemKey":   reminder.ItemKey,
+			"itemTitle": reminder.Title,
+			"dueDate":   dueDate,
+		},
+		DeliveryKey: fmt.Sprintf("due-reminder:%d:%s:%d", itemID, dueDate, reminder.RecipientID),
+		Timestamp:   now,
 	}, ns.workspaceViewAuthorizer(workspaceID))
 	return err
 }
@@ -885,6 +924,7 @@ func (ns *NotificationService) notifyUsersAtURL(
 			Timestamp:          now,
 			Read:               false,
 			ActionURL:          spec.ActionURL,
+			Metadata:           models.NotificationMetadataJSON(spec.I18nTitleKey, spec.I18nMessageKey, spec.I18nParams),
 			AuthorizationScope: spec.AuthorizationScope,
 			WorkspaceID:        spec.WorkspaceID,
 			ItemID:             spec.ItemID,

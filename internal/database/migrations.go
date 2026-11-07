@@ -2507,6 +2507,69 @@ var Catalog = []Migration{
 		Postgres:        notificationDigestLinksMigration,
 	},
 	{
+		Version:       "20261121_notification_template_customized",
+		Name:          "Track admin-customized email templates so localized defaults apply (WI-2034)",
+		CheckSQLite:   sqliteColumnCheck("notification_templates", "is_customized"),
+		CheckPostgres: pgColumnCheck("notification_templates", "is_customized"),
+		SQLite: `
+			ALTER TABLE notification_templates ADD COLUMN is_customized BOOLEAN NOT NULL DEFAULT FALSE;
+			UPDATE notification_templates SET is_customized = TRUE WHERE updated_at > created_at;
+		`,
+		Postgres: `
+			ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS is_customized BOOLEAN NOT NULL DEFAULT false;
+			UPDATE notification_templates SET is_customized = true WHERE updated_at > created_at;
+		`,
+	},
+	{
+		Version:       "20261122_portal_customer_language",
+		Name:          "Store portal customer language and timezone preferences (WI-2034)",
+		CheckSQLite:   sqliteColumnCheck("portal_customers", "language"),
+		CheckPostgres: pgColumnCheck("portal_customers", "language"),
+		SQLite: `
+			ALTER TABLE portal_customers ADD COLUMN language TEXT;
+			ALTER TABLE portal_customers ADD COLUMN timezone TEXT;
+		`,
+		Postgres: `
+			ALTER TABLE portal_customers ADD COLUMN IF NOT EXISTS language TEXT;
+			ALTER TABLE portal_customers ADD COLUMN IF NOT EXISTS timezone TEXT;
+		`,
+	},
+	{
+		Version:       "20261123_notification_template_translations",
+		Name:          "Store per-locale overrides for built-in email templates (WI-2034)",
+		CheckSQLite:   sqliteTableCheck("notification_template_translations"),
+		CheckPostgres: pgTableCheck("notification_template_translations"),
+		SQLite: `
+			CREATE TABLE notification_template_translations (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				template_id INTEGER NOT NULL,
+				locale TEXT NOT NULL,
+				subject TEXT,
+				content TEXT,
+				text_body TEXT,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(template_id, locale),
+				FOREIGN KEY (template_id) REFERENCES notification_templates(id) ON DELETE CASCADE
+			);
+			CREATE INDEX idx_notification_template_translations_template ON notification_template_translations(template_id);
+		`,
+		Postgres: `
+			CREATE TABLE IF NOT EXISTS notification_template_translations (
+				id SERIAL PRIMARY KEY,
+				template_id INTEGER NOT NULL,
+				locale TEXT NOT NULL,
+				subject TEXT,
+				content TEXT,
+				text_body TEXT,
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(template_id, locale),
+				FOREIGN KEY (template_id) REFERENCES notification_templates(id) ON DELETE CASCADE
+			);
+		`,
+	},
+	{
 		Version:       "20261015_request_types_kind",
 		Name:          "Add system intake kind to request types (WI-1644)",
 		CheckSQLite:   sqliteColumnCheck("request_types", "kind"),

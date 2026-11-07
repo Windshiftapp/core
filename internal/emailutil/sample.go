@@ -1,6 +1,10 @@
 package emailutil
 
-import "time"
+import (
+	"time"
+
+	"windshift/internal/i18n"
+)
 
 // SampleData returns canned template data matching the variable schema for a
 // given template name. Used by the admin preview endpoint so editors can see
@@ -106,6 +110,9 @@ func SampleData(name string) any {
 			FormattedTime string
 		}
 		now := time.Date(2026, 4, 28, 9, 30, 0, 0, time.UTC)
+		formatted := func(t time.Time) string {
+			return i18n.FormatDateTimeZ(i18n.Default, t, time.UTC)
+		}
 		return struct {
 			UserName          string
 			NotificationCount int
@@ -119,21 +126,21 @@ func SampleData(name string) any {
 					Message:       "Sam Patel assigned this item to you in the Platform workspace.",
 					Type:          "assignment",
 					AccentColor:   "#8b5cf6",
-					FormattedTime: now.Format("January 2, 2006 at 3:04 PM"),
+					FormattedTime: formatted(now),
 				},
 				{
 					Title:         "New comment on ITEM-17",
 					Message:       "Mira left a comment: \"Looks good — ready for review.\"",
 					Type:          "comment",
 					AccentColor:   "#06b6d4",
-					FormattedTime: now.Add(-15 * time.Minute).Format("January 2, 2006 at 3:04 PM"),
+					FormattedTime: formatted(now.Add(-15 * time.Minute)),
 				},
 				{
 					Title:         "Status changed on ITEM-08",
 					Message:       "ITEM-08 moved from In Progress to Done.",
 					Type:          "status_change",
 					AccentColor:   "#f97316",
-					FormattedTime: now.Add(-2 * time.Hour).Format("January 2, 2006 at 3:04 PM"),
+					FormattedTime: formatted(now.Add(-2 * time.Hour)),
 				},
 			},
 		}
