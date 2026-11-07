@@ -79,7 +79,7 @@ jobs:
         run: make install-govulncheck
 
       - name: Run govulncheck
-        run: govulncheck ./...
+        run: bash scripts/check-vulnerabilities.sh
 
   openapi:
     name: OpenAPI Spec Freshness
