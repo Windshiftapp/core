@@ -22,15 +22,15 @@ export default {
     "noUsersAvailable": "هیچ کاربری در دسترس نیست",
     "assignTo": "اختصاص به",
     "unassigned": "واگذار نشده است",
-    "assignee": "مأمور",
+    "assignee": "مسئول",
     "user": "کاربر",
     "group": "گروه",
     "searchUser": "جستجوی کاربر...",
     "searchGroup": "جستجوی گروه...",
-    "agentOnline": "نماینده آنلاین - یک دونده زنده آیتم های اختصاص داده شده را انتخاب می کند",
-    "agentOffline": "عامل آفلاین - استخر دونده آن رانر زنده ندارد. موارد اختصاص داده شده در صف قرار می گیرند",
-    "agentLocal": "Agent روی این سرور اجرا می شود",
-    "agentUnbound": "هیچ عاملی در این فضای کاری الزام آور نیست - اختصاص دادن اجرا را شروع نمی کند",
+    "agentOnline": "عامل آنلاین — یک رانر زنده موارد اختصاص داده شده را برمی‌دارد",
+    "agentOffline": "عامل آفلاین - استخر رانر آن رانر زنده ندارد. موارد اختصاص داده شده در صف قرار می گیرند",
+    "agentLocal": "عامل روی این سرور اجرا می‌شود",
+    "agentUnbound": "هیچ عاملی به این فضای کاری متصل نیست - اختصاص دادن، اجرا را شروع نمی‌کند",
     "selectGroup": "گروه را انتخاب کنید",
     "selectCategories": "دسته ها را انتخاب کنید",
     "removeCategory": "حذف دسته",
@@ -42,7 +42,7 @@ export default {
     "searchWorkspaces": "جستجو در فضاهای کاری...",
     "noWorkspacesFound": "هیچ فضای کاری یافت نشد",
     "selectConfigurationSet": "مجموعه تنظیمات را انتخاب کنید",
-    "searchConfigurationSets": "مجموعه های پیکربندی جستجو...",
+    "searchConfigurationSets": "جستجوی مجموعه‌های پیکربندی...",
     "configurationSets": "مجموعه های پیکربندی",
     "defaultConfiguration": "پیکربندی پیش فرض",
     "defaultConfigurationDescription": "از تنظیمات پیش فرض فضای کاری استفاده می کند",
@@ -50,10 +50,10 @@ export default {
     "entityAlreadyAssigned": "{label} قبلاً اختصاص داده شده است",
     "itemType": "نوع مورد",
     "priorities": "اولویت ها",
-    "itemTypes": "انواع آیتم ها",
+    "itemTypes": "انواع مورد",
     "level": "سطح {level}",
     "assigned": "اختصاص داده شده است",
-    "noEntitiesAssigned": "{entities} اختصاص داده نشده است",
+    "noEntitiesAssigned": "هیچ {entities} اختصاص داده نشده است",
     "available": "موجود است",
     "noEntitiesMatchSearch": "هیچ {entities} با جستجوی شما مطابقت ندارد",
     "allEntitiesAssigned": "همه {entities} اختصاص داده شده است",
@@ -84,7 +84,7 @@ export default {
       "identifier": "شناسه"
     },
     "fieldCategories": {
-      "basic": "زمینه های پایه",
+      "basic": "فیلدهای پایه",
       "dates": "فیلدهای تاریخ",
       "people": "مردم",
       "workflow": "گردش کار",
@@ -109,15 +109,15 @@ export default {
         "description": "سطح اولویت"
       },
       "type": {
-        "name": "تایپ کنید",
+        "name": "نوع",
         "description": "نوع مورد"
       },
       "assignee": {
-        "name": "مأمور",
+        "name": "مسئول",
         "description": "کاربر اختصاص داده شده"
       },
       "reporter": {
-        "name": "خبرنگار",
+        "name": "گزارش‌دهنده",
         "description": "چه کسی مورد را گزارش کرد"
       },
       "createdAt": {
@@ -137,20 +137,20 @@ export default {
         "description": "وقتی کار شروع می شود"
       },
       "estimate": {
-        "name": "تخمین بزنید",
+        "name": "تخمین",
         "description": "تلاش برآورد شده"
       },
       "openChildCount": {
-        "name": "باز کردن تعداد فرزندان",
-        "description": "کودکان را در وضعیت تکمیل نشده هدایت کنید"
+        "name": "تعداد فرزندان باز",
+        "description": "فرزندان مستقیم که در وضعیت تکمیل‌شده نیستند"
       },
       "openDescendantCount": {
-        "name": "باز کردن تعداد فرزندان",
-        "description": "فرزندان در هر عمقی که در وضعیت کامل نیستند"
+        "name": "تعداد فرزندان باز",
+        "description": "فرزندان در هر عمقی که در وضعیت تکمیل‌شده نیستند"
       },
       "labels": {
         "name": "برچسب ها",
-        "description": "برچسب های اقلام"
+        "description": "برچسب‌های موارد"
       },
       "sprint": {
         "name": "اسپرینت",
@@ -158,19 +158,19 @@ export default {
       },
       "iteration": {
         "name": "تکرار",
-        "description": "تکرار مرتبط (دوی سرعت، انتشار و غیره)"
+        "description": "تکرار مرتبط (اسپرینت، انتشار و غیره)"
       },
       "milestone": {
         "name": "نقطه عطف",
         "description": "نقطه عطف هدف"
       },
       "parent": {
-        "name": "پدر و مادر",
+        "name": "والد",
         "description": "مورد والد"
       },
       "children": {
-        "name": "بچه ها",
-        "description": "وسایل کودک"
+        "name": "فرزندان",
+        "description": "موارد فرزند"
       },
       "links": {
         "name": "پیوندها",
@@ -210,7 +210,7 @@ export default {
     "milestonesSelected_one": "{count} نقطه عطف انتخاب شد",
     "milestonesSelected_other": "{count} نقطه عطف انتخاب شد",
     "noMilestonesFound": "هیچ نقطه عطفی پیدا نشد",
-    "showCompletedMilestones": "نمایش کامل شد",
+    "showCompletedMilestones": "نمایش تکمیل‌شده‌ها",
     "selectIteration": "تکرار را انتخاب کنید",
     "noIteration": "بدون تکرار",
     "selectPriority": "اولویت را انتخاب کنید",
@@ -218,7 +218,7 @@ export default {
     "loadingPriorities": "در حال بارگیری اولویت ها...",
     "noPrioritiesConfigured": "هیچ اولویتی پیکربندی نشده است",
     "selectProject": "پروژه را انتخاب کنید",
-    "linkRepositories": "مخازن پیوند",
+    "linkRepositories": "پیوند مخازن",
     "selectRepositoriesFrom": "انتخاب مخازن از {provider}",
     "searchRepositories": "جستجو در مخازن...",
     "loadingRepositories": "در حال بارگیری مخازن...",
@@ -232,15 +232,15 @@ export default {
     "selectScreen": "صفحه نمایش را انتخاب کنید",
     "searchTestCases": "جستجوی موارد آزمایشی...",
     "selectWorkflow": "گردش کار را انتخاب کنید",
-    "selectConditionSet": "تنظیم شرط را انتخاب کنید",
+    "selectConditionSet": "مجموعه شرایط را انتخاب کنید",
     "selectApprovalSet": "مجموعه تایید را انتخاب کنید"
   },
   "editors": {
     "enterText": "متن را وارد کنید...",
     "selectDate": "انتخاب تاریخ...",
     "clickToChangeColor": "برای تغییر رنگ کلیک کنید",
-    "saveEnter": "ذخیره (ورود)",
-    "cancelEscape": "لغو (فرار)",
+    "saveEnter": "ذخیره (Enter)",
+    "cancelEscape": "لغو (Escape)",
     "availableFields": "فیلدهای موجود",
     "selectedFields": "فیلدهای انتخاب شده",
     "dragFieldsToAdd": "فیلدها را بکشید تا آنها را اضافه کنید",
@@ -251,10 +251,10 @@ export default {
     "allFieldsAdded": "تمام فیلدهای موجود اضافه شده است",
     "bold": "پررنگ (Ctrl+B)",
     "italic": "مورب (Ctrl+I)",
-    "strikethrough": "ضربه زدن",
+    "strikethrough": "خط‌خوردگی",
     "inlineCode": "کد درون خطی",
-    "bulletList": "لیست گلوله",
-    "numberedList": "لیست شماره گذاری شده",
+    "bulletList": "فهرست نقطه‌ای",
+    "numberedList": "فهرست شماره‌گذاری‌شده",
     "insertImage": "درج تصویر",
     "userNotFound": "کاربر پیدا نشد",
     "multipleUsersMatch": "چند کاربر مطابقت دارند",
@@ -271,9 +271,9 @@ export default {
     "diagramRenderError": "نمودار ارائه نشد",
     "diagramLoadError": "نمودار بارگیری نشد",
     "diagramSaveError": "نمودار ذخیره نشد",
-    "mermaidRendering": "نمودار رندرینگ",
-    "mermaidParseError": "خطای تجزیه پری دریایی",
-    "mermaidEmpty": "بلوک پری دریایی خالی",
+    "mermaidRendering": "در حال رندر نمودار Mermaid",
+    "mermaidParseError": "خطای تجزیه Mermaid",
+    "mermaidEmpty": "بلوک Mermaid خالی",
     "useProvider": "ویرایش با {label}",
     "useRichText": "از ویرایشگر متن غنی استفاده کنید",
     "providerActive": "{label} فعال است",
@@ -296,18 +296,18 @@ export default {
       "dismissAllNotifications": "آیا مطمئن هستید که می‌خواهید همه اعلان‌ها را رد کنید؟ این قابل واگرد نیست.",
       "removeAvatar": "آیا مطمئن هستید که می خواهید عکس نمایه خود را حذف کنید؟",
       "revokeCalendarFeed": "آیا مطمئنید که می‌خواهید فید تقویم URL خود را لغو کنید؟ هر تقویمی که از این URL استفاده کند همگام‌سازی متوقف می‌شود.",
-      "deleteTheme": "آیا مطمئن هستید که می خواهید این موضوع را حذف کنید؟ این قابل واگرد نیست.",
+      "deleteTheme": "آیا مطمئن هستید که می خواهید این پوسته را حذف کنید؟ این قابل واگرد نیست.",
       "resetBoardConfig": "آیا مطمئن هستید که می خواهید پیکربندی برد پیش فرض را بازنشانی کنید؟ با این کار پیکربندی سفارشی شما حذف می شود.",
       "deleteCustomField": "آیا مطمئن هستید که می خواهید فیلد سفارشی \"{name}\" را حذف کنید؟ این باعث حذف آن از تمام پروژه ها می شود.",
       "deleteLinkType": "آیا مطمئن هستید که می خواهید این نوع پیوند را حذف کنید؟ با این کار تمام پیوندهای این نوع نیز حذف می شود.",
       "deleteAsset": "آیا مطمئن هستید که می خواهید این دارایی را حذف کنید؟",
       "deleteAssetSet": "آیا مطمئن هستید که می خواهید این مجموعه دارایی را حذف کنید؟ با این کار تمام دارایی‌ها، انواع و دسته‌های موجود در آن حذف می‌شود.",
       "deleteAssetType": "آیا مطمئن هستید که می خواهید این نوع دارایی را حذف کنید؟ دارایی‌هایی که از این نوع استفاده می‌کنند، دیگر نوع خاصی ندارند.",
-      "deleteCategory": "آیا مطمئن هستید که می خواهید این دسته را حذف کنید؟ دسته های فرزند به والدین منتقل می شوند.",
+      "deleteCategory": "آیا مطمئن هستید که می خواهید این دسته را حذف کنید؟ دسته های فرزند به والد منتقل می شوند.",
       "revokeRole": "آیا مطمئنید که می خواهید این نقش را لغو کنید؟",
       "quitApplication": "آیا مطمئن هستید که می خواهید از برنامه خارج شوید؟ سرور خاموش خواهد شد.",
       "deleteConnection": "آیا مطمئن هستید که می خواهید این اتصال را حذف کنید؟ این عمل قابل لغو نیست.",
-      "deleteWidget": "این بخش حذف شود؟ تمام ویجت های این بخش حذف خواهند شد.",
+      "deleteWidget": "این ویجت حذف شود؟ این ویجت از این بخش حذف خواهد شد.",
       "deleteScreen": "آیا مطمئن هستید که می خواهید صفحه نمایش \"{name}\" را حذف کنید؟ این روی تمام فضاهای کاری که از این صفحه استفاده می کنند تأثیر می گذارد."
     },
     "alerts": {
@@ -319,7 +319,7 @@ export default {
       "startTimerFromItem": "لطفاً یک تایمر از داخل یک مورد کاری برای ارائه زمینه شروع کنید.",
       "cannotDeleteDefaultScreen": "نمی توان صفحه پیش فرض را حذف کرد. این صفحه برای فضاهای کاری بدون مجموعه پیکربندی لازم است.",
       "applicationShuttingDown": "برنامه در حال خاموش شدن است...",
-      "pdfExportComingSoon": "PDF صادرات به زودی برای نمای بلوک زمانی",
+      "pdfExportComingSoon": "PDF برون‌ریزی به زودی برای نمای بلوکی جدول زمانی",
       "configUpdatedSuccess": "مجموعه پیکربندی با موفقیت به روز شد. همه موارد کاری در حال حاضر از وضعیت‌های گردش کار جدید استفاده می‌کنند.",
       "failedToSave": "ذخیره نشد: {error}",
       "failedToDelete": "حذف نشد: {error}",
@@ -333,14 +333,14 @@ export default {
       "failedToApplyConfig": "تغییر پیکربندی اعمال نشد: {error}",
       "failedToAddManager": "مدیر اضافه نشد: {error}",
       "failedToRemoveManager": "مدیر حذف نشد: {error}",
-      "failedToSaveWorkspace": "پروژه ذخیره نشد. لطفا ورودی خود را بررسی کنید و دوباره امتحان کنید.",
+      "failedToSaveWorkspace": "فضای کاری ذخیره نشد. لطفاً ورودی خود را بررسی کنید و دوباره امتحان کنید.",
       "failedToResetConfig": "پیکربندی بازنشانی نشد: {error}",
       "failedToToggleStatus": "تغییر وضعیت نوع پیوند انجام نشد: {error}",
       "failedToAssignRole": "نقش تعیین نشد: {error}",
       "failedToRevokeRole": "نقش لغو نشد: {error}",
-      "failedToUpdateRole": "نقش همه افراد به‌روزرسانی نشد: {error}",
+      "failedToUpdateRole": "به‌روزرسانی نقش همه کاربران ناموفق بود: {error}",
       "failedToLoadFields": "فیلدها بارگیری نشد: {error}",
-      "failedToSaveFields": "تکالیف فیلد ذخیره نشد: {error}",
+      "failedToSaveFields": "تخصیص‌های فیلد ذخیره نشد: {error}",
       "errorAddingTestCase": "خطا در افزودن مورد آزمایشی: {error}",
       "failedToCreateLabel": "برچسب ایجاد نشد: {error}",
       "failedToSaveLayout": "تغییرات طرح بندی ذخیره نشد",
@@ -378,16 +378,16 @@ export default {
       "itemsPerPage": "موارد در هر صفحه:",
       "previousPage": "صفحه قبلی",
       "nextPage": "صفحه بعدی",
-      "goToPage": "Go به صفحه {page}",
+      "goToPage": "برو به صفحه {page}",
       "pageOf": "صفحه {current} از {total}"
     },
     "userAvatar": {
       "myWorkspace": "فضای کاری من",
       "myWorkspaceSubtitle": "فضای کاری شخصی برای کارها و یادداشت ها",
-      "profileSubtitle": "پروفایل و تنظیمات خود را مدیریت کنید",
+      "profileSubtitle": "نمایه و تنظیمات خود را مدیریت کنید",
       "security": "امنیت",
-      "securitySubtitle": "رمزهای عبور، نشانه‌های 2FA و API را مدیریت کنید",
-      "themeTitle": "موضوع: {mode}",
+      "securitySubtitle": "رمزهای عبور، توکن‌های 2FA و API را مدیریت کنید",
+      "themeTitle": "پوسته: {mode}",
       "themeLight": "نور",
       "themeDark": "تاریک",
       "themeSystem": "سیستم",
@@ -397,7 +397,7 @@ export default {
   },
   "aria": {
     "close": "بستن",
-    "dragToReorder": "برای سفارش مجدد بکشید",
+    "dragToReorder": "برای جابه‌جایی بکشید",
     "refresh": "تازه کردن",
     "removeField": "حذف فیلد",
     "removeFromSection": "حذف از بخش",
@@ -405,7 +405,7 @@ export default {
     "removeCurrentStep": "مرحله فعلی را حذف کنید",
     "dismissNotification": "رد اطلاعیه",
     "mainNavigation": "ناوبری اصلی",
-    "resizeNavigation": "تغییر اندازه نوار کناری پیمایش",
+    "resizeNavigation": "تغییر اندازه نوار کناری ناوبری",
     "sidebarResizeHint": "برای تغییر اندازه بکشید. برای بازنشانی دوبار کلیک کنید.",
     "mentionUsers": "کاربران را ذکر کنید",
     "notifications": "اطلاعیه ها",
@@ -425,7 +425,7 @@ export default {
   "widgets": {
     "stats": {
       "collections": "مجموعه ها",
-      "totalItems": "مجموع اقلام"
+      "totalItems": "مجموع موارد"
     },
     "removeWidget": "ویجت را حذف کنید",
     "defaultWidth": "پیش‌فرض: {width}/{columns} عرض",
@@ -443,7 +443,7 @@ export default {
     "rowCount5": "5 ردیف",
     "rowCount10": "10 ردیف",
     "rowCount15": "15 ردیف",
-    "rowCountAll": "همه ردیف ها",
+    "rowCountAll": "همه ردیف‌ها",
     "narrowWidth": "باریک (عرض 1/3)",
     "mediumWidth": "متوسط ​​(2/3 عرض)",
     "fullWidth": "عرض کامل",
@@ -454,11 +454,11 @@ export default {
     },
     "completionChart": {
       "title": "نمودار تکمیل",
-      "emptyMessage": "هیچ داده تکمیلی موجود نیست"
+      "emptyMessage": "داده تکمیل‌شده موجود نیست"
     },
     "createdChart": {
-      "title": "نمودار ایجاد شد",
-      "emptyMessage": "هیچ داده ایجاد موجود نیست"
+      "title": "نمودار ایجاد",
+      "emptyMessage": "داده ایجادشده موجود نیست"
     },
     "recentItems": {
       "loadingText": "در حال بارگیری موارد اخیر...",
@@ -499,11 +499,11 @@ export default {
     },
     "overdueItems": {
       "loadingStatus": "در حال بارگیری...",
-      "itemCount": "{count} موارد عقب افتاده",
+      "itemCount": "{count} مورد عقب‌افتاده",
       "refreshAriaLabel": "موارد عقب افتاده را تازه کنید",
-      "loadingText": "در حال بارگیری اقلام عقب افتاده...",
-      "emptyTitle": "بدون اقلام معوق",
-      "emptySubtitle": "همه موارد در مسیر هستند",
+      "loadingText": "در حال بارگیری موارد عقب‌افتاده...",
+      "emptyTitle": "مورد معوقی وجود ندارد",
+      "emptySubtitle": "همه موارد طبق برنامه پیش می‌روند",
       "loadError": "موارد عقب افتاده بارگیری نشد",
       "daysOverdue": "{days} روز عقب افتاده است"
     },
@@ -511,10 +511,10 @@ export default {
       "loadingStatus": "در حال بارگیری...",
       "itemCount": "{count} در راه است",
       "refreshAriaLabel": "مهلت های آینده را به روز کنید",
-      "loadingText": "بارگیری ضرب الاجل های آینده...",
-      "emptyTitle": "بدون ضرب الاجل آینده",
+      "loadingText": "در حال بارگیری مهلت‌های آینده...",
+      "emptyTitle": "مهلت آینده‌ای وجود ندارد",
       "emptySubtitle": "موارد دارای تاریخ سررسید در اینجا ظاهر می شوند",
-      "loadError": "مهلت های آتی بارگیری نشد"
+      "loadError": "مهلت‌های آینده بارگیری نشد"
     },
     "iterationTimeline": {
       "loadingStatus": "در حال بارگیری...",
@@ -534,20 +534,20 @@ export default {
       "emptyTitle": "هیچ الزامی پیکربندی نشده است",
       "emptyDescription": "برای مشاهده داده‌های پوشش، انواع نیازمندی‌ها را در گزارش‌های آزمایشی پیکربندی کنید.",
       "chartAria": "تجزیه پوشش تست",
-      "covered": "پوشیده شده است",
-      "notCovered": "پوشیده نشده است",
+      "covered": "پوشش داده شده",
+      "notCovered": "بدون پوشش",
       "requirementCount": "{covered} از {total} مورد نیاز",
       "requirements": "{count} مورد نیاز",
       "requirements_other": "{count} مورد نیاز",
       "requirements_one": "{count} مورد نیاز",
-      "linkedCases": "موارد آزمایشی را به هم مرتبط کرده اند"
+      "linkedCases": "موارد آزمایشی مرتبط"
     }
   },
   "recurrence": {
     "title": "عود",
     "description": "قوانین وظایف تکراری را مدیریت کنید",
     "frequency": "فرکانس",
-    "interval": "هر بار تکرار کنید",
+    "interval": "فاصله تکرار",
     "daily": "روزانه",
     "weekly": "هفتگی",
     "monthly": "ماهانه",
@@ -563,12 +563,12 @@ export default {
     "previewLoading": "در حال بارگیری پیش نمایش...",
     "previewError": "پیش نمایش بارگیری نشد",
     "copySettings": "کپی از قالب",
-    "copyAssignee": "واگذارنده را کپی کنید",
-    "copyPriority": "اولویت کپی",
+    "copyAssignee": "مسئول را کپی کنید",
+    "copyPriority": "کپی اولویت",
     "copyCustomFields": "فیلدهای سفارشی را کپی کنید",
     "copyDescription": "توضیحات را کپی کنید",
-    "leadTime": "تولید پیش رو (روزها)",
-    "statusOnCreate": "وضعیت در حال ایجاد",
+    "leadTime": "زمان پیشروی (روزها)",
+    "statusOnCreate": "وضعیت هنگام ایجاد",
     "active": "فعال",
     "inactive": "غیر فعال",
     "instances": "نمونه های تولید شده",
@@ -577,8 +577,8 @@ export default {
     "generating": "در حال تولید...",
     "generated": "{count} نمونه تولید شد",
     "addRecurrence": "تکرار اضافه کنید",
-    "noRule": "بدون تنظیم مجدد",
-    "setUp": "تنظیم مجدد",
+    "noRule": "بدون تنظیم",
+    "setUp": "تنظیم تکرار",
     "editRule": "ویرایش تکرار",
     "deleteRule": "حذف تکرار",
     "deleteConfirm": "آیا مطمئن هستید که می خواهید این قانون تکرار را حذف کنید؟ نمونه های تولید شده تحت تأثیر قرار نمی گیرند.",
@@ -610,13 +610,13 @@ export default {
     "wed": "چهارشنبه",
     "thu": "پنج شنبه",
     "fri": "جمعه",
-    "sat": "نشست",
-    "sun": "خورشید"
+    "sat": "شنبه",
+    "sun": "یکشنبه"
   },
   "footer": {
-    "platformName": "Windshift پلتفرم مدیریت کار",
+    "platformName": "پلتفرم مدیریت کار Windshift",
     "aboutWindshift": "درباره Windshift",
-    "apiReference": "API مرجع",
+    "apiReference": "مرجع API",
     "licenses": "مجوزها",
     "reportProblem": "یک مشکل را گزارش کنید"
   }

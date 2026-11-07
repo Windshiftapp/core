@@ -15,13 +15,13 @@ export default {
     "aiChat": "چت هوش مصنوعی",
     "terminal": "ترمینال",
     "admin": "مدیر",
-    "delegatedAdmin": "ادمین تفویض شده",
+    "delegatedAdmin": "مدیر تفویض‌شده",
     "delegatedAdminSubtitle": "مناطق اختصاص داده شده به شما را مدیریت کنید",
     "delegatedAdminUnauthorized": "شما به هیچ یک از مناطق مدیریت واگذار شده دسترسی ندارید.",
     "notifications": "اطلاعیه ها",
     "profile": "نمایه",
     "expand": "گسترش دهید",
-    "collapse": "فرو ریختن",
+    "collapse": "جمع کردن",
     "manageWorkspaces": "مدیریت فضاهای کاری",
     "manageWorkspacesSubtitle": "فضاهای کاری را ایجاد، ویرایش و سازماندهی کنید",
     "searchWorkspaces": "جستجو در فضاهای کاری...",
@@ -77,7 +77,7 @@ export default {
       },
       "collections": {
         "label": "مجموعه ها",
-        "description": "مجموعه‌ها و نماهای آیتم‌های کاری را مدیریت کنید"
+        "description": "مجموعه‌ها و نماهای مورد‌های کاری را مدیریت کنید"
       },
       "adminPanel": {
         "label": "پنل مدیریت",
@@ -136,7 +136,7 @@ export default {
         "description": "پروژه های ردیابی زمان را مدیریت کنید"
       },
       "logTime": {
-        "label": "زمان ثبت نام",
+        "label": "ثبت زمان",
         "description": "به سرعت یک ورودی زمان جدید اضافه کنید"
       },
       "startTimer": {
@@ -148,7 +148,7 @@ export default {
         "description": "ردیابی زمان فعلی را متوقف کنید"
       },
       "createWorkItem": {
-        "label": "ایجاد آیتم کاری",
+        "label": "ایجاد مورد کار",
         "description": "یک مورد یا کار جدید ایجاد کنید"
       },
       "createWorkspace": {
@@ -156,12 +156,12 @@ export default {
         "description": "یک فضای کاری پروژه جدید ایجاد کنید"
       },
       "createMilestone": {
-        "label": "Milestone ایجاد کنید",
+        "label": "افزودن نقطه عطف",
         "description": "یک نقطه عطف پروژه جدید ایجاد کنید"
       },
       "createCollection": {
         "label": "ایجاد مجموعه",
-        "description": "یک مجموعه آیتم کاری جدید ایجاد کنید"
+        "description": "یک مجموعه مورد کار جدید ایجاد کنید"
       },
       "adminCustomFields": {
         "label": "فیلدهای سفارشی",
@@ -173,11 +173,11 @@ export default {
       },
       "adminHierarchyLevels": {
         "label": "سطوح سلسله مراتبی",
-        "description": "سطوح سلسله مراتب آیتم کاری را پیکربندی کنید"
+        "description": "سطوح سلسله مراتب موارد کار را پیکربندی کنید"
       },
       "adminItemTypes": {
-        "label": "انواع آیتم ها",
-        "description": "انواع آیتم های کاری را با نمادها و رنگ ها مدیریت کنید"
+        "label": "انواع موارد",
+        "description": "انواع مورد کار را با نمادها و رنگ‌ها مدیریت کنید"
       },
       "adminPriorities": {
         "label": "اولویت ها",
@@ -189,7 +189,7 @@ export default {
       },
       "adminStatuses": {
         "label": "وضعیت ها",
-        "description": "وضعیت آیتم های کاری فردی را مدیریت کنید"
+        "description": "وضعیت موارد کار را مدیریت کنید"
       },
       "adminStatusCategories": {
         "label": "دسته بندی وضعیت",
@@ -208,8 +208,8 @@ export default {
         "description": "انواع پیوند بین موارد کاری را مدیریت کنید"
       },
       "adminScmProviders": {
-        "label": "SCM ارائه دهندگان",
-        "description": "پیکربندی GitHub، GitLab، Gitea، و Bitbucket ادغام"
+        "label": "ارائه‌دهندگان SCM",
+        "description": "پیکربندی ادغام GitHub، GitLab، Gitea و Bitbucket"
       },
       "adminAttachments": {
         "label": "پیوست ها",
@@ -220,8 +220,8 @@ export default {
         "description": "ماژول‌های ردیابی زمان و تست را فعال یا غیرفعال کنید"
       },
       "adminThemes": {
-        "label": "تنظیمات تم",
-        "description": "تم ها و ظاهر برنامه را مدیریت کنید"
+        "label": "تنظیمات پوسته",
+        "description": "پوسته‌ها و ظاهر برنامه را مدیریت کنید"
       },
       "adminUsers": {
         "label": "مدیریت کاربر",
@@ -252,7 +252,7 @@ export default {
         "description": "فیدهای تقویم و اجرای افزونه را پیکربندی کنید"
       },
       "adminSystemImport": {
-        "label": "واردات سیستم",
+        "label": "درون‌ریزی سیستم",
         "description": "داده ها را از سیستم های دیگر وارد کنید"
       },
       "adminAssets": {
@@ -260,7 +260,7 @@ export default {
         "description": "پیکربندی انواع و دسته‌های دارایی"
       },
       "adminWorkspaces": {
-        "label": "ادمین فضاهای کاری",
+        "label": "مدیر فضاهای کاری",
         "description": "فضاهای کاری و تنظیمات را مدیریت کنید"
       },
       "adminNotifications": {
@@ -284,8 +284,8 @@ export default {
         "description": "برنامه ریزی و ردیابی اسپرینت"
       },
       "createItem": {
-        "label": "ایجاد آیتم",
-        "description": "یک آیتم کاری جدید ایجاد کنید"
+        "label": "ایجاد مورد",
+        "description": "یک مورد کاری جدید ایجاد کنید"
       },
       "myProfile": {
         "label": "نمایه من",
@@ -308,11 +308,11 @@ export default {
         "description": "سازمان های مشتری را مدیریت کنید"
       },
       "goToWorkspace": {
-        "label": "Go به {name}",
+        "label": "برو به {name}",
         "description": "به فضای کاری {name} بروید"
       },
       "workspaceOverview": {
-        "label": "{name} نمای کلی",
+        "label": "نمای کلی {name}",
         "description": "مشاهده داشبورد فضای کاری با آمار و نمودار"
       }
     }
@@ -326,29 +326,29 @@ export default {
     "recentItems": "موارد اخیر",
     "myTasks": "وظایف من",
     "assignedToMe": "به من اختصاص داده شده است",
-    "openTasks": "Tasks را باز کنید",
+    "openTasks": "وظایف باز",
     "overdueItems": "اقلام عقب افتاده",
-    "upcomingDeadlines": "مهلت های آینده",
+    "upcomingDeadlines": "مهلت‌های آینده",
     "activeIterations": "تکرارهای فعال",
-    "inProgressMilestones": "نقاط عطف در حال پیشرفت",
+    "inProgressMilestones": "نقاط عطف در حال انجام",
     "noRecentActivity": "هیچ فعالیت اخیری وجود ندارد",
     "recentItemsHint": "مواردی که به‌روزرسانی می‌کنید در اینجا ظاهر می‌شوند",
     "noActiveIterations": "بدون تکرار فعال",
     "iterationTimelinesHint": "جدول زمانی تکرار در اینجا ظاهر می شود",
-    "noUpcomingDeadlines": "بدون ضرب الاجل آینده",
+    "noUpcomingDeadlines": "مهلت آینده‌ای وجود ندارد",
     "dueDatesHint": "موارد دارای تاریخ سررسید در اینجا ظاهر می شوند",
     "noOpenTasks": "هیچ کار باز به شما محول نشده است",
-    "allCaughtUp": "همه شما گرفتار شده اید!",
+    "allCaughtUp": "همه را خوانده‌اید!",
     "noOverdueItems": "بدون اقلام معوق",
     "loadingRecentItems": "در حال بارگیری موارد اخیر...",
     "loadingTasks": "در حال بارگیری وظایف شما...",
     "loadingOverdueItems": "در حال بارگیری اقلام عقب افتاده...",
     "workItemStatusOverview": "نمای کلی وضعیت مورد کار",
-    "statusOpen": "باز کنید",
+    "statusOpen": "باز",
     "statusInProgress": "در حال انجام است",
-    "statusClosed": "بسته شد",
+    "statusClosed": "بسته",
     "quickActions": "اقدامات سریع",
-    "createWorkItem": "ایجاد آیتم کاری",
+    "createWorkItem": "ایجاد مورد کار",
     "createWorkItemDesc": "ردیابی یک مورد کاری جدید را شروع کنید",
     "manageMilestones": "نقاط عطف را مدیریت کنید",
     "manageMilestonesDesc": "نقاط عطف را مشاهده و سازماندهی کنید",
@@ -365,27 +365,27 @@ export default {
     "noRecentlyEdited": "هیچ موردی اخیراً ویرایش نشده است",
     "noRecentlyCommented": "هیچ موردی که اخیراً نظر داده نشده است",
     "quickAccess": "دسترسی سریع",
-    "quickAccessHint": "{shortcut} را فشار دهید تا پالت فرمان باز شود",
+    "quickAccessHint": "{shortcut} را بزنید تا پالت فرمان باز شود",
     "upcomingMilestones": "نقاط عطف آینده",
-    "watching": "تماشا کردن",
+    "watching": "در حال تماشا",
     "recentWorkspaces": "فضاهای کاری اخیر",
     "noRecentWorkspaces": "فضای کاری اخیر وجود ندارد",
     "goodMorning": "صبح بخیر",
     "goodAfternoon": "ظهر بخیر",
     "goodEvening": "عصر بخیر",
     "goodNight": "شب بخیر",
-    "dueIn": "موعد مقرر در {days} روز است",
+    "dueIn": "سررسید تا {days} روز دیگر",
     "dueToday": "سررسید امروز",
     "overdue": "{days} روز عقب افتاده است",
     "done": "{done}/{total} انجام شد",
-    "there": "وجود دارد",
+    "there": "دوست عزیز",
     "doneEditing": "ویرایش انجام شد",
     "customize": "سفارشی کنید",
     "editModeHint": "حالت ویرایش: اضافه کردن، تغییر نام، ترتیب مجدد، یا حذف بخش ها و ویجت ها",
     "sections": {
       "yourDay": "روز شما",
       "yourDayDescription": "خواندن سریع در مورد آنچه نیاز به توجه شما دارد",
-      "work": "کار کنید",
+      "work": "کار",
       "workDescription": "لیست شخصی و مواردی که به شما اختصاص داده شده است",
       "workspaces": "فضاهای کاری",
       "workspacesDescription": "دوباره به داخل بپر",
@@ -396,15 +396,15 @@ export default {
       "rename": "تغییر نام بخش",
       "deleteMessage": "این بخش حذف شود؟ تمام ویجت های موجود در آن نیز حذف خواهند شد.",
       "noWidgets": "هنوز ویجتی در این بخش وجود ندارد",
-      "addWidgetsHint": "برای افزودن ویجت ها، Customize را انتخاب کنید",
+      "addWidgetsHint": "برای افزودن ویجت‌ها، سفارشی‌سازی را انتخاب کنید",
       "none": "هیچ بخش پیکربندی نشده است",
       "noneHint": "برای افزودن بخش داشبورد، ویرایش را انتخاب کنید"
     },
     "customization": {
-      "widgets": "ابزارک ها",
+      "widgets": "ویجت‌ها",
       "activity": "فعالیت",
       "activityDescription": "جلسات توجیهی، جریان‌های فعالیت، و اعلان‌ها",
-      "work": "کار کنید",
+      "work": "کار",
       "workDescription": "موارد، نقاط عطف و کارهایی که به شما محول شده است",
       "navigation": "ناوبری",
       "navigationDescription": "دسترسی سریع به فضاهای کاری",
@@ -438,7 +438,7 @@ export default {
       },
       "watchedItems": {
         "name": "موارد تماشا شده",
-        "description": "مواردی که دنبال می کنید"
+        "description": "مواردی که تماشا می‌کنید"
       },
       "upcomingMilestones": {
         "name": "نقاط عطف آینده",
@@ -463,9 +463,9 @@ export default {
       "personalEmpty": "لیست کارهای شخصی شما خالی است",
       "noWorkspaces": "هنوز فضای کاری وجود ندارد",
       "createWorkspace": "یکی ایجاد کنید",
-      "workspaceAvatar": "{name} آواتار",
+      "workspaceAvatar": "آواتار {name}",
       "visited": "بازدید شده {date}",
-      "watchedEmpty": "شما هیچ آیتمی را تماشا نمی کنید",
+      "watchedEmpty": "هیچ موردی را تماشا نمی‌کنید",
       "noUpcomingMilestones": "هیچ نقطه عطف آینده وجود ندارد",
       "milestoneDone": "{done} از {total} انجام شد",
       "daysOverdue": "{count} روز تاخیر",
@@ -505,14 +505,14 @@ export default {
     "widgets": {
       "stats": {
         "name": "بررسی اجمالی آمار",
-        "description": "مجموعه ها و تعداد آیتم ها بر اساس دسته وضعیت"
+        "description": "مجموعه ها و تعداد موارد بر اساس دسته وضعیت"
       },
       "completionChart": {
         "name": "نمودار تکمیل",
         "description": "موارد تکمیل شده در چهار هفته گذشته"
       },
       "createdChart": {
-        "name": "نمودار خلقت",
+        "name": "نمودار ایجاد",
         "description": "موارد ایجاد شده در هفت روز گذشته"
       },
       "milestoneProgress": {
@@ -520,8 +520,8 @@ export default {
         "description": "نقاط عطف فعال و پیشرفت آنها"
       },
       "storyPointsByAssignee": {
-        "name": "نکات داستانی توسط مامور",
-        "description": "باز کردن نقاط داستان اختصاص داده شده به هر عضو"
+        "name": "امتیاز داستان بر اساس مسئول",
+        "description": "باز کردن امتیاز داستان اختصاص داده شده به هر عضو"
       },
       "recentItems": {
         "name": "موارد اخیر",
@@ -553,26 +553,26 @@ export default {
       },
       "supportMetrics": {
         "name": "معیارهای پشتیبانی",
-        "description": "عقب ماندگی، اولین پاسخ، وضوح، و مطابقت SLA برای بلیط های مشتری"
+        "description": "عقب‌ماندگی، اولین پاسخ، زمان حل، و رعایت SLA برای بلیط‌های مشتری"
       },
       "zammadSupportOverview": {
-        "name": "Zammad نمای کلی پشتیبانی",
+        "name": "نمای کلی پشتیبانی Zammad",
         "description": "وضعیت بلیت پیوندی در سراسر فضای کاری و تغییرات مشاهده شده"
       }
     },
     "customization": {
-      "widgets": "ابزارک ها",
+      "widgets": "ویجت‌ها",
       "builtIn": "ویجت های داخلی",
       "builtInDescription": "معیارها و نمودارهای فضای کاری اصلی",
       "additional": "ویجت های اضافی",
-      "additionalDescription": "لیست ها، برنامه ها و ابزارک های آزمایشی",
+      "additionalDescription": "فهرست‌ها، برنامه‌ها و ویجت‌های آزمایشی",
       "defaultWidth": "عرض پیش‌فرض: {width} از 3",
       "tipTitle": "نکته",
       "tip": "یک ویجت را به هر بخش در صفحه اصلی فضای کاری بکشید."
     }
   },
   "search": {
-    "title": "جستجو کنید",
+    "title": "جستجو",
     "subtitle": "در تمام فضاهای کاری با گزینه های فیلتر پیشرفته جستجو کنید",
     "searchPlaceholder": "جستجو...",
     "searchItems": "جستجوی موارد...",
@@ -589,7 +589,7 @@ export default {
   },
   "about": {
     "title": "درباره Windshift",
-    "subtitle": "یک پلت فرم مدیریت کار جامع که برای تیم های مدرن طراحی شده است",
+    "subtitle": "یک پلتفرم مدیریت کار جامع که برای تیم های مدرن طراحی شده است",
     "whatIs": "Windshift چیست؟",
     "description": "Windshift یک برنامه مدیریت کار قدرتمند است که ردیابی پروژه، مدیریت آزمایش، ردیابی زمان و همکاری تیمی را در یک پلتفرم یکپارچه گرد هم می‌آورد. ساخته شده با فناوری های مدرن و طراحی شده برای انعطاف پذیری، با گردش کار منحصر به فرد تیم شما سازگار است.",
     "keyFeatures": "ویژگی های کلیدی",
@@ -600,8 +600,8 @@ export default {
     "timeTracking": "ردیابی زمان",
     "timeTrackingDesc": "ردیابی زمان صرف شده برای پروژه ها و وظایف با گزارش و تجزیه و تحلیل دقیق.",
     "builtWith": "کتابخانه های قابل توجه",
-    "libSvelte": "فریم ورک Frontend",
-    "libTailwind": "فریم ورک Utility-first CSS",
+    "libSvelte": "فریم‌ورک فرانت‌اند",
+    "libTailwind": "فریم‌ورک Utility-first CSS",
     "libMilkdown": "ویرایشگر متن غنی",
     "libExcalidraw": "نمودارها و ترسیم",
     "libMeltUI": "اجزای اولیه UI",
@@ -625,19 +625,19 @@ export default {
     "createWorkspaceBtn": "ایجاد فضای کاری",
     "createFirstWorkItem": "اولین مورد کاری خود را ایجاد کنید",
     "trackTasks": "وظایف، اشکالات، ویژگی‌ها و موارد دیگر را ردیابی کنید",
-    "createWorkItemBtn": "ایجاد آیتم کاری",
-    "dismissAssistant": "اخراج دستیار",
-    "dismissOnboarding": "رد کردن ورود",
+    "createWorkItemBtn": "ایجاد مورد کار",
+    "dismissAssistant": "بستن دستیار",
+    "dismissOnboarding": "رد کردن راهنمای شروع",
     "getStartedMember": "در اینجا فضاهای کاری در دسترس شما هستند",
     "selectWorkspace": "برای شروع یک فضای کاری انتخاب کنید",
-    "browseAllWorkspaces": "همه {count} فضاهای کاری را مرور کنید",
+    "browseAllWorkspaces": "مرور همه {count} فضای کاری",
     "noWorkspacesAvailable": "هنوز هیچ فضای کاری در دسترس نیست. لطفاً برای دسترسی به یک فضای کاری با سرپرست خود تماس بگیرید."
   },
   "navConfig": {
     "configureTitle": "پیکربندی ناوبری",
     "scopeWorkspace": "پیش‌فرض فضای کاری — {name}",
     "scopeCollection": "مجموعه — {name}",
-    "collectionScopeHelp": "این ضامن‌ها پیش‌فرض فضای کاری این مجموعه را لغو می‌کنند. ابزارها و تست ها از تنظیمات فضای کاری پیروی می کنند.",
+    "collectionScopeHelp": "این بازنویسی‌ها پیش‌فرض فضای کاری این مجموعه را لغو می‌کنند. ابزارها و تست‌ها از تنظیمات فضای کاری پیروی می‌کنند.",
     "inheritedBadge": "پیروی از پیش‌فرض فضای کاری - یک نمای را تغییر دهید تا آن را لغو کنید.",
     "resetToInherited": "بازنشانی به پیش فرض فضای کاری",
     "alwaysVisible": "همیشه قابل مشاهده است",

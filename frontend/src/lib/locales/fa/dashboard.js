@@ -10,7 +10,7 @@ export default {
         "subtitle": "خواندن سریع در مورد آنچه نیاز به توجه شما دارد"
       },
       "work": {
-        "title": "کار کنید",
+        "title": "کار",
         "subtitle": "لیست شخصی و مواردی که به شما اختصاص داده شده است"
       },
       "workspaces": {
@@ -53,7 +53,7 @@ export default {
       },
       "watchedItems": {
         "name": "موارد تماشا شده",
-        "description": "مواردی که دنبال می کنید"
+        "description": "مواردی که تماشا می‌کنید"
       },
       "upcomingMilestones": {
         "name": "نقاط عطف آینده",
@@ -69,21 +69,21 @@ export default {
       },
       "supportOverview": {
         "name": "نمای کلی پشتیبانی",
-        "description": "عقب ماندگی، اولین پاسخ، وضوح، و مطابقت SLA برای بلیط های مشتری"
+        "description": "بک‌لاگ، اولین پاسخ، زمان حل، و رعایت SLA برای بلیط های مشتری"
       }
     },
     "customization": {
-      "widgets": "ابزارک ها",
+      "widgets": "ویجت‌ها",
       "activity": {
         "name": "فعالیت",
         "description": "جلسات توجیهی، جریان‌های فعالیت، و اعلان‌ها"
       },
       "work": {
-        "name": "کار کنید",
+        "name": "کار",
         "description": "موارد، نقاط عطف، و چیزهایی که به شما اختصاص داده شده است"
       },
       "support": {
-        "name": "پشتیبانی کنید",
+        "name": "پشتیبانی",
         "description": "معیارهای Helpdesk برای صف های مشتریان شما"
       },
       "navigation": {
@@ -120,7 +120,7 @@ export default {
       "loading": "در حال بارگیری...",
       "aiUnavailable": "تولید هوش مصنوعی در دسترس نیست، بنابراین ویجت جدیدی نمی‌توان ایجاد کرد.",
       "aiUnavailableEditing": "تولید هوش مصنوعی در دسترس نیست. همچنان می‌توانید نام و درخواست‌ها را تغییر دهید.",
-      "generateFailed": "نسل شکست خورد",
+      "generateFailed": "تولید ناموفق بود",
       "saveFailed": "ذخیره نشد",
       "loadFailed": "این ویجت بارگیری نشد",
       "saving": "در حال ذخیره..."
@@ -133,7 +133,7 @@ export default {
       "notConfigured": "این ویجت هنوز راه اندازی نشده است",
       "noLinks": "هیچ پیوندی بین این موارد و دارایی ها وجود ندارد",
       "canvasUnavailable": "این نمودار به بوم نیاز دارد که در اینجا موجود نیست",
-      "renderedNodes": "ترسیم {shown} از {total} گره"
+      "renderedNodes": "نمایش {shown} از {total} گره"
     },
     "editor": {
       "newSection": "بخش جدید",
@@ -149,7 +149,7 @@ export default {
       "deleteSection": "حذف بخش",
       "unknownWidgetType": "نوع ویجت ناشناخته: {type}",
       "noWidgets": "هنوز ویجتی در این بخش وجود ندارد",
-      "addWidgetsHint": "برای افزودن ویجت، Customize را انتخاب کنید",
+      "addWidgetsHint": "برای افزودن ویجت، سفارشی‌سازی را انتخاب کنید",
       "noSections": "هیچ بخش پیکربندی نشده است",
       "addSectionsHint": "برای افزودن بخش ها به داشبورد خود، ویرایش را انتخاب کنید"
     },
@@ -158,36 +158,36 @@ export default {
       "assignedEmpty": "در حال حاضر چیزی به شما اختصاص داده نشده است",
       "createdLoadError": "مواردی که ایجاد کردید بارگیری نشد",
       "createdEmpty": "شما هیچ مورد باز ایجاد نکرده اید",
-      "storyPointsLoadError": "خلاصه نکات داستان بارگیری نشد",
-      "storyPointsEmpty": "هنوز هیچ نقطه داستان باز اختصاص داده نشده است",
+      "storyPointsLoadError": "خلاصه امتیاز داستان بارگیری نشد",
+      "storyPointsEmpty": "هنوز هیچ امتیاز داستان باز اختصاص داده نشده است",
       "personalTasksLoadError": "وظایف شخصی شما بارگیری نشد",
       "personalTasksEmpty": "لیست کارهای شخصی شما خالی است",
       "supportMetricsLoadError": "معیارهای پشتیبانی بارگیری نشد",
       "supportMetricsEmpty": "هنوز بلیط مشتری در این محدوده وجود ندارد",
       "supportOverviewSetupTitle": "فضاهای کاری را برای گزارش انتخاب کنید",
-      "supportOverviewSetupSubtitle": "این ویجت معیارهای مرکز راهنمایی را فقط برای فضاهای کاری که انتخاب می‌کنید نشان می‌دهد.",
+      "supportOverviewSetupSubtitle": "این ویجت معیارهای میز پشتیبانی را فقط برای فضاهای کاری که انتخاب می‌کنید نشان می‌دهد.",
       "supportSourcesUnavailable": "{count} از فضاهای کاری پیکربندی شده شما دیگر در دسترس نیستند",
-      "supportBacklog": "عقب ماندگی",
+      "supportBacklog": "بک‌لاگ",
       "supportUnassigned": "اختصاص داده نشده است",
       "supportCreated": "ایجاد شد",
       "supportResolved": "حل شد",
-      "supportSlaCompliance": "SLA ملاقات کرد",
+      "supportSlaCompliance": "رعایت SLA",
       "supportSlaNone": "—",
       "supportFirstResponseP50": "اولین پاسخ p50",
-      "supportExportCSV": "صادرات CSV",
+      "supportExportCSV": "برون‌ریزی CSV",
       "supportLiveDelayed": "به‌روزرسانی‌های زنده موقتاً متوقف شد",
       "dailyBriefingUnavailable": "خلاصه روزانه شما در حال حاضر در دسترس نیست. متکی به یک ادغام هوش مصنوعی است. اگر به تازگی یکی را راه اندازی کرده اید، کمی بعد دوباره بررسی کنید.",
       "updatedAt": "به روز شد {time}",
       "priorityLabel": "اولویت: {priority}",
       "noWorkspaces": "هنوز فضای کاری وجود ندارد",
       "createWorkspace": "یکی ایجاد کنید",
-      "workspaceAvatarAlt": "{name} آواتار",
+      "workspaceAvatarAlt": "آواتار {name}",
       "visited": "بازدید از {time}",
-      "noUpcomingMilestones": "هیچ نقطه عطف آینده وجود ندارد",
+      "noUpcomingMilestones": "نقطه عطف آینده‌ای وجود ندارد",
       "milestoneProgress": "{done} از {total} انجام شد",
       "daysOverdue": "{days} روز تاخیر",
       "daysLeft": "{days} روز باقی مانده است",
-      "watchedItemsEmpty": "شما هیچ آیتمی را تماشا نمی کنید",
+      "watchedItemsEmpty": "هیچ موردی را تماشا نمی‌کنید",
       "workspaceWithId": "فضای کاری {id}"
     }
   }

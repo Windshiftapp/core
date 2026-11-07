@@ -2,38 +2,38 @@ export default {
   "settings": {
     "title": "تنظیمات",
     "subtitle": "تنظیمات برنامه خود را پیکربندی کنید",
-    "general": "ژنرال",
+    "general": "عمومی",
     "appearance": "ظاهر",
     "privacy": "حریم خصوصی",
     "language": "زبان",
     "timezone": "منطقه زمانی",
     "dateFormat": "فرمت تاریخ",
     "timeFormat": "فرمت زمان",
-    "theme": "موضوع",
+    "theme": "پوسته",
     "lightMode": "حالت نور",
     "darkMode": "حالت تاریک",
     "systemDefault": "پیش فرض سیستم",
     "themeManager": {
       "background": "پس زمینه",
       "text": "متن",
-      "failedToLoad": "طرح زمینه ها بارگیری نشد.",
-      "failedToCreate": "طرح زمینه ایجاد نشد.",
-      "failedToUpdate": "تم به روز نشد.",
-      "failedToDelete": "تم حذف نشد.",
-      "failedToActivate": "طرح زمینه فعال نشد.",
+      "failedToLoad": "پوسته‌ها بارگیری نشد.",
+      "failedToCreate": "پوسته ایجاد نشد.",
+      "failedToUpdate": "پوسته به‌روزرسانی نشد.",
+      "failedToDelete": "پوسته حذف نشد.",
+      "failedToActivate": "پوسته فعال نشد.",
       "failedToUploadLogo": "لوگو بارگذاری نشد.",
       "defaults": {
         "default": {
           "name": "پیش فرض",
-          "description": "تم تمیز با رنگ های ناوبری استاندارد"
+          "description": "پوسته تمیز با رنگ‌های ناوبری استاندارد"
         },
         "ocean": {
           "name": "اقیانوس",
-          "description": "تم ناوبری با رنگ آبی حرفه ای"
+          "description": "پوسته ناوبری با رنگ آبی حرفه‌ای"
         },
         "forest": {
           "name": "جنگل",
-          "description": "تم ناوبری سبز الهام گرفته از طبیعت"
+          "description": "پوسته ناوبری سبز الهام‌گرفته از طبیعت"
         }
       }
     },
@@ -61,11 +61,11 @@ export default {
       },
       "hierarchyLevels": {
         "title": "سطوح سلسله مراتبی",
-        "description": "سطوح سلسله مراتب آیتم کاری را پیکربندی کنید"
+        "description": "سطوح سلسله مراتب مورد کاری را پیکربندی کنید"
       },
       "itemTypes": {
-        "title": "انواع آیتم ها",
-        "description": "انواع آیتم های کاری را با نمادها و رنگ ها مدیریت کنید"
+        "title": "انواع موارد",
+        "description": "انواع مواردی کاری را با نمادها و رنگ ها مدیریت کنید"
       },
       "priorities": {
         "title": "اولویت ها",
@@ -93,10 +93,10 @@ export default {
       },
       "approvalSets": {
         "title": "مجموعه های تایید",
-        "description": "تأییدیه‌های چند مرحله‌ای که دروازه را از وضعیت خارج می‌کند"
+        "description": "تأییدیه‌های چند مرحله‌ای که انتقال‌ها از یک وضعیت را کنترل می‌کنند"
       },
       "scmProviders": {
-        "title": "SCM ارائه دهندگان",
+        "title": "ارائه‌دهندگان SCM",
         "description": "پیکربندی GitHub، GitLab، Gitea، و Bitbucket ادغام"
       },
       "integrationProviders": {
@@ -104,7 +104,7 @@ export default {
         "description": "مدیریت یکپارچه‌سازی‌های خروجی Windshift به برنامه‌های ورودی و اتصال به برنامه‌هایی که از طریق OAuth مجوز می‌دهند."
       },
       "systemImport": {
-        "title": "واردات سیستم",
+        "title": "درون‌ریزی سیستم",
         "description": "وارد کردن داده ها از سیستم های خارجی"
       },
       "linkTypes": {
@@ -120,8 +120,8 @@ export default {
         "description": "ماژول های سیستم را فعال یا غیرفعال کنید"
       },
       "themes": {
-        "title": "تم ها",
-        "description": "تم ها و ظاهر برنامه را مدیریت کنید"
+        "title": "پوسته‌ها",
+        "description": "پوسته‌ها و ظاهر برنامه را مدیریت کنید"
       },
       "users": {
         "title": "کاربران",
@@ -181,11 +181,11 @@ export default {
       },
       "agentTemplates": {
         "title": "الگوهای عامل",
-        "description": "کاتالوگ ایجاد Agent Studio را لغو کنید: نام‌های الگو، انواع نمایه و دستورالعمل‌ها"
+        "description": "کاتالوگ ایجاد Agent Studio را بازنویسی کنید: نام‌های الگو، انواع نمایه و دستورالعمل‌ها"
       },
       "actionCapabilities": {
         "title": "قابلیت های اقدام",
-        "description": "مدیریت Docker محیط‌ها، HTTP کلاینت‌ها، و LLM اتصالات برای کنش‌ها"
+        "description": "مدیریت محیط‌های Docker، کلاینت‌های HTTP، و اتصالات LLM برای اقدام‌ها"
       },
       "diagnostics": {
         "title": "تشخیص",
@@ -206,7 +206,7 @@ export default {
       "content": "محتوا",
       "plugins": "پلاگین ها",
       "noContent": "فقط طرحواره",
-      "apply": "درخواست کنید",
+      "apply": "اعمال",
       "verify": "تأیید کنید",
       "cancel": "لغو کنید",
       "targetNew": "فضای کاری جدید",
@@ -219,14 +219,14 @@ export default {
       "stageSchema": "مجموعه پیکربندی",
       "stageContent": "محتوا",
       "stageConformance": "انطباق",
-      "stageOk": "باشه",
-      "stageSkipped": "پرش کرد",
+      "stageOk": "موفق",
+      "stageSkipped": "رد شد",
       "stageFailed": "شکست خورد",
       "conformant": "سازگار",
       "driftRows": "{count} ردیف دریفت",
       "verified": "بسته معتبر است و قابل اعمال است",
       "applied": "بسته به فضای کاری اعمال می شود",
-      "failed": "بسته تمیز اعمال نمی شود"
+      "failed": "بسته به‌درستی اعمال نمی‌شود"
     },
     "attachments": {
       "title": "تنظیمات پیوست",
@@ -255,11 +255,11 @@ export default {
       "text": "متن",
       "clearAll": "پاک کردن همه",
       "addMimeType": "نوع MIME را اضافه کنید",
-      "mimeTypePlaceholder": "به عنوان مثال، تصویر/jpeg",
+      "mimeTypePlaceholder": "به عنوان مثال، image/jpeg",
       "allowedMimeTypes": "انواع MIME مجاز",
       "allFileTypesAllowed": "همه انواع فایل مجاز است",
       "settingsSavedSuccess": "تنظیمات با موفقیت ذخیره شد",
-      "notAvailable": "عملکرد پیوست در دسترس نیست. یک فهرست پیوست را برای فعال کردن پیوست ها پیکربندی کنید.",
+      "notAvailable": "قابلیت پیوست در دسترس نیست. یک فهرست پیوست را برای فعال کردن پیوست ها پیکربندی کنید.",
       "failedToLoad": "تنظیمات پیوست بارگیری نشد",
       "failedToSave": "تنظیمات ذخیره نشد"
     },
@@ -315,8 +315,8 @@ export default {
       "editSetting": "ویرایش تنظیمات اعلان",
       "setting": "تنظیم",
       "eventRules": "قوانین رویداد",
-      "rulesConfigured": "{count} قوانین پیکربندی شد ({enabled} فعال)",
-      "noRules": "0 قانون پیکربندی شده است",
+      "rulesConfigured": "{count} قانون پیکربندی شد ({enabled} فعال)",
+      "noRules": "هیچ قانونی پیکربندی نشده است",
       "createdBy": "ایجاد شده توسط",
       "noSettingsFound": "هیچ تنظیمات اعلان پیدا نشد. برای شروع اولین تنظیمات اعلان خود را ایجاد کنید.",
       "name": "نام",
@@ -333,8 +333,8 @@ export default {
       "eventType": "نوع رویداد",
       "selectEventType": "انتخاب نوع رویداد...",
       "notifyRecipients": "به گیرندگان اطلاع دهید",
-      "assignee": "مأمور",
-      "creator": "خالق",
+      "assignee": "مسئول",
+      "creator": "ایجادکننده",
       "watchers": "ناظران",
       "workspaceAdmins": "مدیران فضای کاری",
       "customMessageTemplate": "الگوی پیام سفارشی (اختیاری)",
@@ -358,23 +358,23 @@ export default {
       "editConfigSet": "ویرایش مجموعه پیکربندی",
       "searchPlaceholder": "مجموعه های پیکربندی جستجو...",
       "loading": "در حال بارگیری مجموعه های پیکربندی...",
-      "noConfigSets": "هنوز پیکربندی تنظیم نشده است",
+      "noConfigSets": "هنوز مجموعه پیکربندی وجود ندارد",
       "previewUnavailable": "هیچ مجموعه پیکربندی در دسترس نیست",
-      "previewUnavailableDescription": "",
+      "previewUnavailableDescription": "برای پیکربندی این فضای کاری، یک مجموعه پیکربندی پیش‌فرض ایجاد کنید.",
       "assignerDescription": "مجموعه پیکربندی‌ای را انتخاب کنید که گردش کار و صفحه‌های ساخت، ویرایش و مشاهده موارد را در این فضای کاری تعریف می‌کند. فقط یک مجموعه را می‌توان اختصاص داد.",
-      "migrationRequiresSystemAdmin": "",
+      "migrationRequiresSystemAdmin": "تغییر به این مجموعه پیکربندی نیازمند مهاجرت داده است که فقط مدیر سیستم می‌تواند اجرا کند.",
       "select": "مجموعه تنظیمات را انتخاب کنید",
       "updating": "در حال به‌روزرسانی پیکربندی…",
       "configured": "پیکربندی شده است",
       "customScreenOverrides": "{count} سفارشی",
       "importSuccess": "پیکربندی با موفقیت وارد شد",
-      "import": "واردات",
-      "importing": "در حال واردات…",
-      "importWarning": "",
+      "import": "درون‌ریزی",
+      "importing": "در حال درون‌ریزی…",
+      "importWarning": "مجموعه پیکربندی با هشدارها درون‌ریزی شد.",
       "importFailed": "وارد کردن مجموعه پیکربندی انجام نشد.",
-      "unresolvedReferencesHeading": "",
-      "defaultConflictHeading": "",
-      "unresolvedImportTitle": "واردات: مراجع حل نشده",
+      "unresolvedReferencesHeading": "درون‌ریزی به موجودیت‌هایی اشاره می‌کند که در این نصب وجود ندارند.",
+      "defaultConflictHeading": "درون‌ریزی با یک موجودیت پیش‌فرض در این نصب تعارض دارد.",
+      "unresolvedImportTitle": "درون‌ریزی: مراجع حل نشده",
       "unresolvedImportDescription": "چیزی نوشته نشد. این مراجع را از بسته منبع حذف کنید یا موجودیت های گمشده را در اینجا ایجاد کنید، سپس دوباره امتحان کنید.",
       "referenceLocation": "در {path}",
       "unresolvedKinds": {
@@ -384,7 +384,7 @@ export default {
         "status_category": "دسته وضعیت «{name}»",
         "entity": "موجودیت \"{name}\""
       },
-      "export": "صادرات",
+      "export": "برون‌ریزی",
       "exportTitle": "این مجموعه پیکربندی را به عنوان یک الگوی قابل حمل JSON صادر کنید",
       "exportDefaultDisabled": "مجموعه تنظیمات پیش فرض را نمی توان صادر کرد. اگر به یک نسخه قابل حمل نیاز دارید ابتدا آن را کلون کنید.",
       "defaults": {
@@ -402,7 +402,7 @@ export default {
       "noWorkspacesAvailable": "هیچ فضای کاری در دسترس نیست",
       "workspaces": "فضاهای کاری",
       "noWorkspacesAssigned": "هیچ فضای کاری اختصاص داده نشده است",
-      "itemTypes": "انواع آیتم ها",
+      "itemTypes": "انواع موارد",
       "noItemTypesAssigned": "هیچ نوع موردی اختصاص داده نشده است",
       "workflow": "گردش کار",
       "noneAssigned": "هیچ کدام اختصاص داده نشده است",
@@ -414,7 +414,7 @@ export default {
       "none": "هیچ کدام",
       "created": "ایجاد شد",
       "newConfigSet": "مجموعه پیکربندی جدید",
-      "configureDesc": "پیکربندی گردش کار، صفحه نمایش، و تکالیف فضای کاری",
+      "configureDesc": "پیکربندی گردش کار، صفحه نمایش، و تخصیص‌های فضای کاری",
       "unsavedChanges": "تغییرات ذخیره نشده",
       "basicInfo": "اطلاعات پایه",
       "name": "نام",
@@ -444,7 +444,7 @@ export default {
       "addPermission": "اضافه کردن مجوز",
       "allWorkspaceUsers": "همه کاربران فضای کاری",
       "allGroups": "همه گروه ها",
-      "systemAdmin": "ادمین سیستم",
+      "systemAdmin": "مدیر سیستم",
       "user": "کاربر",
       "group": "گروه",
       "remove": "حذف کنید",
@@ -465,7 +465,7 @@ export default {
       "permissionGrantedToUser": "مجوز با موفقیت به کاربر داده شد",
       "permissionGrantedToGroup": "مجوز به گروه با موفقیت اعطا شد",
       "failedToGrantPermission": "اعطای مجوز ناموفق بود:",
-      "cannotRevokeLastAdmin": "نمی‌توان ادمین سیستم را از آخرین سرپرست لغو کرد",
+      "cannotRevokeLastAdmin": "نمی‌توان مدیر سیستم را از آخرین سرپرست لغو کرد",
       "permissionRevokedFromUser": "مجوز با موفقیت از کاربر لغو شد",
       "permissionRevokedFromGroup": "مجوز از گروه با موفقیت لغو شد",
       "failedToRevokePermission": "لغو مجوز ناموفق بود:",
@@ -489,9 +489,9 @@ export default {
       "loadingPermissionSet": "در حال بارگیری مجموعه مجوز...",
       "basicInfo": "اطلاعات پایه",
       "saveChanges": "ذخیره تغییرات",
-      "permissionAssignments": "تکالیف مجوز",
-      "addAssignment": "افزودن تکلیف",
-      "addAssignmentDesc": "یک نقش، گروه یا کاربر را در زیر انتخاب کنید تا آنها را به این مجوز اضافه کنید. تکلیف بلافاصله پس از انتخاب اضافه خواهد شد.",
+      "permissionAssignments": "تخصیص‌های مجوز",
+      "addAssignment": "افزودن تخصیص",
+      "addAssignmentDesc": "یک نقش، گروه یا کاربر را در زیر انتخاب کنید تا آن‌ها را به این مجوز اضافه کنید. تخصیص بلافاصله پس از انتخاب اضافه خواهد شد.",
       "addByRole": "اضافه کردن بر اساس نقش",
       "addByGroup": "افزودن بر اساس گروه",
       "addByUser": "افزودن توسط کاربر",
@@ -499,10 +499,10 @@ export default {
       "failedToDelete": "مجموعه مجوز حذف نشد:",
       "failedToLoad": "مجموعه مجوز بارگیری نشد:",
       "failedToUpdate": "به‌روزرسانی مجموعه مجوز ناموفق بود:",
-      "failedToAddAssignment": "تکلیف اضافه نشد:",
-      "failedToRemoveAssignment": "تکلیف حذف نشد:",
-      "removeAssignment": "حذف تکلیف",
-      "confirmRemoveAssignment": "آیا مطمئنید که می خواهید این تکلیف را حذف کنید؟",
+      "failedToAddAssignment": "تخصیص اضافه نشد:",
+      "failedToRemoveAssignment": "تخصیص حذف نشد:",
+      "removeAssignment": "حذف تخصیص",
+      "confirmRemoveAssignment": "آیا مطمئنید که می‌خواهید این تخصیص را حذف کنید؟",
       "role": "نقش",
       "group": "گروه",
       "user": "کاربر",
@@ -512,7 +512,7 @@ export default {
       "searchAndSelectUser": "جستجو و انتخاب کاربر..."
     },
     "scmProviders": {
-      "title": "SCM ارائه دهندگان",
+      "title": "ارائه‌دهندگان SCM",
       "subtitle": "ادغام‌های GitHub، GitLab و Gitea را برای پیوند مخزن پیکربندی کنید.",
       "addProvider": "ارائه دهنده را اضافه کنید",
       "connectionSuccessful": "اتصال با موفقیت انجام شد",
@@ -520,45 +520,45 @@ export default {
       "noProviders": "ارائه‌دهنده SCM وجود ندارد",
       "getStarted": "با افزودن یک ارائه دهنده GitHub، GitLab یا Gitea شروع کنید.",
       "enabled": "فعال شد",
-      "disabled": "از کار افتاده است",
+      "disabled": "غیرفعال",
       "default": "پیش فرض",
       "restricted": "محدود شده است",
       "patConfigured": "رمز دسترسی پیکربندی شد",
       "patNotConfigured": "رمز دسترسی پیکربندی نشده است",
       "addSCMProvider": "ارائه دهنده SCM را اضافه کنید",
-      "editSCMProvider": "ویرایش SCM ارائه دهنده",
+      "editSCMProvider": "ویرایش ارائه‌دهنده SCM",
       "failedToLoad": "ارائه دهندگان SCM بارگیری نشدند",
       "failedToSave": "ارائه دهنده ذخیره نشد",
       "failedToDelete": "ارائه دهنده حذف نشد",
-      "slug": "حلزون حرکت کردن",
-      "slugHelp": "URL-شناسه امن (حروف کوچک، خط تیره مجاز است)",
+      "slug": "اسلاگ",
+      "slugHelp": "شناسه امن URL (حروف کوچک و خط تیره مجاز است)",
       "name": "نام",
       "namePlaceholder": "GitHub - سازمان اصلی",
       "providerType": "نوع ارائه دهنده",
       "authMethod": "روش احراز هویت",
-      "baseUrl": "پایه URL",
+      "baseUrl": "URL پایه",
       "baseUrlPlaceholder": "نمونه GitLab خود میزبانی یا Gitea/Forgejo خود را وارد کنید URL",
       "baseUrlOptionalGitlab": "برای gitlab.com خالی بگذارید یا نمونه GitLab خود مدیریت شده URL را وارد کنید",
-      "callbackUrl": "پاسخ به تماس URL",
+      "callbackUrl": "URL کالبک",
       "copy": "کپی کنید",
       "copied": "کپی شده!",
-      "enterSlugForCallback": "برای ایجاد پاسخ تماس، یک اسلاگ در بالا وارد کنید URL",
+      "enterSlugForCallback": "برای ایجاد URL کالبک، یک اسلاگ در بالا وارد کنید",
       "useThisUrl": "هنگام پیکربندی برنامه OAuth خود از این URL استفاده کنید",
-      "oauthClientId": "OAuth مشتری ID",
-      "oauthClientSecret": "OAuth راز مشتری",
+      "oauthClientId": "شناسه مشتری OAuth",
+      "oauthClientSecret": "راز مشتری OAuth",
       "oauthCallbackError": "اتصال کنترل منبع ناموفق بود",
       "leaveEmptyToKeep": "خالی بگذارید تا راز موجود باقی بماند",
       "accessToken": "رمز دسترسی",
-      "accessTokenHelp": "از یک نشانه دسترسی با مجوزهای مورد نیاز برای ارائه دهنده انتخاب شده استفاده کنید.",
+      "accessTokenHelp": "از یک توکن دسترسی با مجوزهای مورد نیاز برای ارائه دهنده انتخاب شده استفاده کنید.",
       "gitlabAccessTokenHelp": "GitLab توکن‌های دسترسی شخصی، پروژه‌ای و گروهی را می‌پذیرد. برای ادغام ربات و سرور به سرور، توکن پروژه یا گروه را ترجیح دهید.",
-      "githubAppId": "GitHub برنامه ID",
+      "githubAppId": "شناسه برنامه GitHub",
       "privateKeyPem": "کلید خصوصی (PEM)",
       "orgInstallation": "نصب سازمان",
       "discoverInstallations": "محل نصب برنامه GitHub خود را کشف کنید",
       "discoverButton": "تاسیسات را کشف کنید",
       "orgInstallationId": "نصب سازمان (ID:",
       "scopes": "محدوده ها",
-      "scopesHelp": "فهرستی از OAuth محدوده جدا شده با فاصله",
+      "scopesHelp": "فهرستی از محدوده‌های OAuth جدا شده با فاصله",
       "workspaceAccess": "دسترسی به فضای کاری",
       "allWorkspaces": "همه فضاهای کاری می توانند از این ارائه دهنده استفاده کنند",
       "restrictToWorkspaces": "محدود به فضاهای کاری خاص",
@@ -569,14 +569,14 @@ export default {
       "title": "امنیت",
       "subtitle": "تنظیمات مربوط به امنیت و کنترل‌های ویژگی را مدیریت کنید",
       "calendarFeeds": "اشتراک های فید تقویم",
-      "calendarFeedsDesc": "به کاربران اجازه دهید ICS فید URLs را برای برنامه‌های تقویم خارجی تولید کنند",
-      "calendarFeedsWarning": "هشدار: در صورت غیرفعال شدن، فیدهای تقویم موجود فوراً کار نمی کنند. کاربران نمی توانند فید جدید URLs تولید کنند.",
-      "pluginExecution": "پلاگین CLI اجرای فرمان",
+      "calendarFeedsDesc": "به کاربران اجازه دهید URLهای فید ICS را برای برنامه‌های تقویم خارجی تولید کنند",
+      "calendarFeedsWarning": "هشدار: در صورت غیرفعال شدن، فیدهای تقویم موجود فوراً کار نمی‌کنند. کاربران نمی‌توانند URLهای فید جدید تولید کنند.",
+      "pluginExecution": "اجرای فرمان CLI افزونه",
       "pluginExecutionDesc": "به افزونه ها اجازه دهید دستورات پوسته را روی سرور اجرا کنند",
       "pluginExecutionWarning": "هشدار: فعال کردن این تنظیم به افزونه ها اجازه می دهد تا دستورات پوسته را اجرا کنند. دستورات برای امنیت به دایرکتوری خود هر افزونه محدود می شوند. فقط در صورتی فعال کنید که به همه افزونه های نصب شده اعتماد دارید.",
       "externalImages": "تصاویر Markdown خارجی",
       "externalImagesDesc": "به محتوای Markdown اجازه دهید تصاویر را از هر میزبان HTTP یا HTTPS بارگیری کند.",
-      "externalImagesRefresh": "وقتی کاربران بعدی صفحه را بارگیری یا بازخوانی می کنند، تغییرات اعمال می شود. میزبان‌ها، پیوست‌ها و تصاویر جاسازی‌شده Unsplash، Atlassian، پیکربندی شده Jira در صورت غیرفعال شدن در دسترس باقی می‌مانند.",
+      "externalImagesRefresh": "تغییرات با بارگیری یا بازخوانی صفحه بعدی اعمال می‌شوند. میزبان‌ها، پیوست‌ها و تصاویر جاسازی‌شده (Unsplash، Atlassian، Jira) در صورت غیرفعال شدن در دسترس باقی می‌مانند.",
       "externalImagesWarning": "تصاویر خارجی می‌توانند آدرس‌های IP بیننده و جزئیات مرورگر را نشان دهند و می‌توانند درخواست‌هایی را به سرویس‌های قابل دسترسی از شبکه بیننده ارسال کنند. فقط در صورتی فعال شود که به نویسندگان محتوا اعتماد دارید.",
       "failedToLoad": "تنظیمات امنیتی بارگیری نشد",
       "failedToSave": "تنظیمات ذخیره نشد"
@@ -591,48 +591,48 @@ export default {
       "deleteSsoProvider": "ارائه دهنده SSO را حذف کنید",
       "createProvider": "ایجاد ارائه دهنده",
       "deleteProvider": "حذف ارائه دهنده",
-      "noProviderConfigured": "ارائه دهنده SSO پیکربندی نشده است",
+      "noProviderConfigured": "هیچ ارائه‌دهنده SSO پیکربندی نشده است",
       "noProviderDescription": "برای فعال کردن Single Sign-On برای کاربران خود، یک ارائه دهنده هویت OIDC اضافه کنید. از Keycloak، Authentik، Pocket ID و سایر ارائه دهندگان سازگار با OIDC پشتیبانی می کند.",
-      "slug": "حلزون حرکت کردن",
+      "slug": "اسلاگ",
       "slugPlaceholder": "به عنوان مثال، معتبر",
       "slugHelp": "استفاده شده در ورود SSO URL",
-      "slugRequired": "Slug مورد نیاز است",
-      "slugInvalid": "Slug باید فقط شامل حروف کوچک، اعداد و خط فاصله باشد",
+      "slugRequired": "اسلاگ مورد نیاز است",
+      "slugInvalid": "اسلاگ باید فقط شامل حروف کوچک، اعداد و خط فاصله باشد",
       "name": "نام",
       "displayName": "نام نمایشی",
       "displayNamePlaceholder": "به عنوان مثال، Authentik، Keycloak",
       "nameRequired": "نام الزامی است",
       "providerType": "نوع ارائه دهنده",
-      "issuerUrl": "صادرکننده URL",
+      "issuerUrl": "URL صادرکننده",
       "issuerUrlPlaceholder": "https://auth.example.com/realms/myrealm",
-      "issuerUrlHelp": "صادرکننده OIDC URL. برای Keycloak: https://host/realms/realmname",
-      "issuerUrlRequired": "صادرکننده URL مورد نیاز است",
-      "issuerUrlInvalid": "صادرکننده URL باید با https:// یا http:// شروع شود",
-      "clientId": "مشتری ID",
-      "clientIdPlaceholder": "بادگیر",
-      "clientIdRequired": "مشتری ID مورد نیاز است",
+      "issuerUrlHelp": "URL صادرکننده OIDC. برای Keycloak: https://host/realms/realmname",
+      "issuerUrlRequired": "URL صادرکننده مورد نیاز است",
+      "issuerUrlInvalid": "URL صادرکننده باید با https:// یا http:// شروع شود",
+      "clientId": "شناسه مشتری",
+      "clientIdPlaceholder": "windshift",
+      "clientIdRequired": "شناسه مشتری مورد نیاز است",
       "clientSecret": "راز مشتری",
       "clientSecretRequired": "Client Secret مورد نیاز است",
       "enterClientSecret": "راز مشتری را وارد کنید",
       "leaveEmptyToKeepCurrent": "(برای حفظ جریان، خالی بگذارید)",
       "notConfigured": "پیکربندی نشده است",
-      "callbackUrl": "پاسخ به تماس URL",
-      "callbackUrlHelp": "این URL را به‌عنوان تغییر مسیر/بازخوانی URL در ارائه‌دهنده هویت خود پیکربندی کنید",
-      "baseUrlWarningTitle": "پایه سرور URL پیکربندی نشده است",
-      "baseUrlWarningBody": "Windshift برای پیوندها و OAuth تماس‌ها به {url} برمی‌گردد، بنابراین ورود به سیستم SSO آن آدرس را به ارائه‌دهنده هویت شما می‌فرستد. متغیر محیطی BASE_URL را تنظیم کنید و Windshift را قبل از ثبت پاسخ تماس URL راه اندازی مجدد کنید.",
+      "callbackUrl": "URL کالبک",
+      "callbackUrlHelp": "این URL را به‌عنوان URL تغییر مسیر/کالبک در ارائه‌دهنده هویت خود پیکربندی کنید",
+      "baseUrlWarningTitle": "URL پایه سرور پیکربندی نشده است",
+      "baseUrlWarningBody": "Windshift برای پیوندها و کالبک‌های OAuth به {url} برمی‌گردد، بنابراین ورود به سیستم SSO آن آدرس را به ارائه‌دهنده هویت شما می‌فرستد. متغیر محیطی BASE_URL را تنظیم کنید و Windshift را قبل از ثبت URL کالبک راه اندازی مجدد کنید.",
       "scopes": "محدوده ها",
-      "scopesHelp": "فهرستی از OIDC محدوده‌های جدا شده با فاصله",
-      "nameClaimsHelp": "برخی از ارائه دهندگان (به عنوان مثال Microsoft Entra ID) فقط نام نمایشی را به طور پیش فرض درج می کنند. name_name و family_name را به عنوان ادعاهای اختیاری اضافه کنید تا Windshift به جای تجزیه نام نمایشی، نام ساختاریافته را دریافت کند.",
+      "scopesHelp": "فهرستی از محدوده‌های OIDC جدا شده با فاصله",
+      "nameClaimsHelp": "برخی از ارائه دهندگان (به عنوان مثال Microsoft Entra ID) فقط نام نمایشی را به طور پیش فرض درج می کنند. given_name و family_name را به عنوان ادعاهای اختیاری اضافه کنید تا Windshift به جای تجزیه نام نمایشی، نام ساختاریافته را دریافت کند.",
       "attributeMapping": "نگاشت صفت",
-      "attributeMappingHelp": "اختیاری. وقتی ارائه‌دهنده شما از نام‌های ادعایی غیراستاندارد استفاده می‌کند، ادعا را نادیده بگیرید. برای استفاده از ادعای پیش‌فرض نشان داده شده در جای‌بان، یک فیلد خالی بگذارید.",
+      "attributeMappingHelp": "اختیاری. وقتی ارائه‌دهنده شما از نام‌های ادعایی غیراستاندارد استفاده می‌کند، ادعا را نادیده بگیرید. برای استفاده از ادعای پیش‌فرض نشان‌داده‌شده در راهنما، یک فیلد خالی بگذارید.",
       "attributeEmail": "ادعای ایمیل",
-      "attributeEmailVerified": "ایمیل ادعای تایید شده",
+      "attributeEmailVerified": "ادعای ایمیل تأییدشده",
       "attributeName": "ادعای نام کامل",
       "attributeGivenName": "ادعای نام",
       "attributeFamilyName": "ادعای نام خانوادگی",
       "attributeUsername": "ادعای نام کاربری",
       "enabled": "فعال شد",
-      "disabled": "از کار افتاده است",
+      "disabled": "غیرفعال",
       "default": "پیش فرض",
       "oidc": "OIDC",
       "enableThisProvider": "این ارائه دهنده را فعال کنید",
@@ -646,7 +646,7 @@ export default {
       "unsafeProvisioningWarningTitle": "پیوند تأیید نشده فعال شد",
       "unsafeProvisioningWarningBody": "هویت‌های این ارائه‌دهنده از طریق ایمیل به حساب‌های موجود مرتبط می‌شوند، حتی زمانی که ارائه‌دهنده آدرس را تأیید نشده گزارش می‌کند. این را فقط زمانی فعال کنید که ارائه دهنده آدرس ایمیل کاربران خود را کنترل کند.",
       "testConnection": "تست اتصال",
-      "testing": "تست کردن...",
+      "testing": "در حال تست...",
       "connectionSuccessful": "اتصال با موفقیت انجام شد",
       "connectionFailed": "اتصال ناموفق بود",
       "connectionTestFailed": "تست اتصال ناموفق بود",
@@ -665,7 +665,7 @@ export default {
       "systemChannelNote": "این یک کانال سیستمی است. فقط مدیران می توانند آن را مدیریت کنند.",
       "systemAdminsCanManage": "مدیران سیستم می توانند این کانال را مدیریت کنند",
       "noManagersAssigned": "هیچ مدیری تعیین نشده است",
-      "defaultChannelsManaged": "کانال های پیش فرض به طور خودکار توسط ادمین ها مدیریت می شوند",
+      "defaultChannelsManaged": "کانال های پیش فرض به طور خودکار توسط مدیران مدیریت می‌شوند",
       "addUsersOrGroups": "کاربران یا گروه هایی را برای مدیریت این کانال اضافه کنید",
       "user": "کاربر",
       "group": "گروه",
@@ -684,7 +684,7 @@ export default {
       "oauthFailedCallback": "اتصال ناموفق بود",
       "noProvidersTitle": "ارائه‌دهندگان SCM موجود نیستند",
       "noProvidersDesc": "سرپرست شما هیچ ارائه دهنده SCM را با OAuth پیکربندی نکرده است.",
-      "connectDesc": "حساب خود را وصل کنید تا شعبه ایجاد کنید و درخواست ها را بکشید",
+      "connectDesc": "حساب خود را وصل کنید تا شاخه ایجاد کنید و درخواست ها را بکشید",
       "connected": "متصل شد",
       "notConnected": "متصل نیست",
       "connectedOn": "متصل شد",
@@ -692,7 +692,7 @@ export default {
       "disconnecting": "در حال قطع شدن...",
       "connect": "اتصال",
       "account": "حساب",
-      "footerNote": "حساب‌های متصل برای ایجاد شعبه‌ها و درخواست‌ها به نام شما استفاده می‌شوند. هر کاربر باید حساب خود را برای انتساب مناسب متصل کند."
+      "footerNote": "حساب‌های متصل برای ایجاد شاخه‌ها و درخواست‌ها به نام شما استفاده می‌شوند. هر کاربر باید حساب خود را برای انتساب مناسب متصل کند."
     },
     "emailTemplates": {
       "title": "قالب های ایمیل",
@@ -709,12 +709,12 @@ export default {
       "editTitle": "ویرایش: {name}",
       "editFallbackTitle": "ویرایش قالب",
       "subject": "موضوع",
-      "htmlBody": "HTML بدن",
+      "htmlBody": "بدنه HTML",
       "textBody": "بدنه متن ساده",
       "adminNotes": "توضیحات (یادداشت های مدیریت)",
       "activeHint": "فعال (برای بازگشت به حالت پیش فرض داخلی علامت را بردارید)",
       "availableVariables": "متغیرهای موجود",
-      "syntaxHint": "الگوها از نحو html/template Go استفاده می کنند. از {open}. فیلد {close} برای مقادیر و {open} محدوده استفاده کنید. آیتم‌ها {close}…{open} پایان {close} برای تکرار.",
+      "syntaxHint": "الگوها از نحو html/template در Go استفاده می‌کنند. برای مقادیر از {open}.Field{close} و برای تکرار از {open}range .Items{close}…{open}end{close} استفاده کنید.",
       "preview": "پیش نمایش",
       "previewLoading": "در حال ارائه…",
       "previewTitle": "پیش نمایش",
@@ -760,11 +760,11 @@ export default {
       "defaults": {
         "tests": {
           "name": "تست ها",
-          "description": "مورد آزمایشی مورد آزمایشی"
+          "description": "مورد آزمایشی، مورد کار را تست می‌کند"
         },
         "implements": {
           "name": "اجرا می کند",
-          "description": "آیتم Work آیتم کاری دیگر را پیاده سازی می کند"
+          "description": "یک مورد کاری، مورد کاری دیگری را پیاده‌سازی می‌کند"
         },
         "dependsOn": {
           "name": "بستگی دارد",
@@ -825,15 +825,15 @@ export default {
       }
     },
     "itemTypes": {
-      "title": "انواع آیتم ها",
-      "subtitle": "انواع آیتم ها را مدیریت کنید و آنها را به سطوح سلسله مراتبی اختصاص دهید",
+      "title": "انواع موارد",
+      "subtitle": "انواع موارد را مدیریت کنید و آنها را به سطوح سلسله مراتبی اختصاص دهید",
       "addItemType": "نوع مورد را اضافه کنید",
       "name": "نام",
       "description": "توضیحات",
       "icon": "نماد",
       "color": "رنگ",
       "hierarchyLevel": "سطح سلسله مراتب",
-      "genericSubtaskLevel": "وظیفه فرعی عمومی (هر سطح والدین)",
+      "genericSubtaskLevel": "وظیفه فرعی عمومی (هر سطح والد)",
       "nameRequired": "نام الزامی است",
       "failedToLoad": "انواع مورد بارگیری نشد.",
       "failedToSave": "نوع مورد ذخیره نشد.",
@@ -843,7 +843,7 @@ export default {
       "noConfigurationSets": "بدون مجموعه پیکربندی",
       "defaultConfiguration": "پیکربندی پیش فرض",
       "namePlaceholder": "به عنوان مثال حماسه، داستان، وظیفه، اشکال",
-      "descriptionPlaceholder": "شرح مختصری از این نوع کالا",
+      "descriptionPlaceholder": "شرح مختصری از این نوع مورد",
       "levelLabel": "سطح {level} - {name}",
       "levelOnly": "سطح {level}",
       "levelOption": "{name} (سطح {level})",
@@ -856,7 +856,7 @@ export default {
         "subtask": "وظیفه فرعی"
       },
       "hierarchyChangeWarningTitle": "موارد موجود پیوندهای خود را حفظ خواهند کرد",
-      "hierarchyChangeWarningDescription": "تغییر از سطح {fromLevel} به سطح {toLevel} موارد موجود را جابه‌جا نمی‌کند. انتخاب های آینده والدین و فرزند از سطح {toLevel} محاسبه خواهد شد. کاربران ممکن است نیاز داشته باشند که یک نوع مورد سازگار را قبل از والد کردن مجدد موارد قدیمی انتخاب کنند."
+      "hierarchyChangeWarningDescription": "تغییر از سطح {fromLevel} به سطح {toLevel} موارد موجود را جابه‌جا نمی‌کند. انتخاب های آینده والد و فرزند از سطح {toLevel} محاسبه خواهد شد. کاربران ممکن است نیاز داشته باشند که یک نوع مورد سازگار را قبل از والد کردن مجدد موارد قدیمی انتخاب کنند."
     },
     "hierarchyLevels": {
       "title": "سطوح سلسله مراتبی",
@@ -886,7 +886,7 @@ export default {
         },
         "epic": {
           "name": "حماسه",
-          "description": "آیتم کاری بزرگ که می توان آن را به داستان ها تقسیم کرد"
+          "description": "مورد کاری بزرگ که می توان آن را به داستان ها تقسیم کرد"
         },
         "story": {
           "name": "داستان",
@@ -894,7 +894,7 @@ export default {
         },
         "task": {
           "name": "وظیفه",
-          "description": "آیتم کاری فردی یا کار فنی"
+          "description": "مورد کاری فردی یا کار فنی"
         },
         "activity": {
           "name": "فعالیت",
@@ -907,8 +907,8 @@ export default {
       "subtitle": "ماژول های سیستم را فعال یا غیرفعال کنید و افزونه ها را مدیریت کنید",
       "plugins": "پلاگین ها",
       "pluginsDisabledMessage": "سیستم افزونه از طریق پیکربندی راه اندازی سرور غیرفعال شده است.",
-      "instanceId": "نمونه ID",
-      "instanceIdDescription": "این ID را در پورتال Windshift جای‌گذاری کنید تا مجوزهای افزونه را به این نصب صادر کنید.",
+      "instanceId": "شناسه نمونه",
+      "instanceIdDescription": "این شناسه را در پورتال Windshift وارد کنید تا مجوزهای افزونه را به این نصب صادر کنید.",
       "chooseLicense": "فایل مجوز را انتخاب کنید",
       "changeLicense": "تغییر فایل مجوز",
       "licenseSelected": "مجوز انتخاب شده: {name}",
@@ -940,14 +940,14 @@ export default {
       "failedToReload": "بارگیری مجدد افزونه انجام نشد: {error}",
       "failedToDelete": "افزونه حذف نشد: {error}",
       "pleaseSelectPlugin": "لطفا یک فایل افزونه را انتخاب کنید",
-      "wasmNeedsManifest": "فایل های WASM به فایل manifest.json نیاز دارند. لطفاً یک manifest.json انتخاب کنید یا یک فایل zip. حاوی هر دو فایل را آپلود کنید.",
+      "wasmNeedsManifest": "فایل‌های WASM به فایل manifest.json نیاز دارند. لطفاً یک manifest.json انتخاب کنید یا یک فایل zip حاوی هر دو فایل را آپلود کنید.",
       "by": "توسط",
       "settingsSavedSuccess": "تنظیمات ماژول با موفقیت ذخیره شد!",
       "failedToSave": "تنظیمات ماژول ذخیره نشد. لطفا دوباره امتحان کنید."
     },
     "aiFeatures": {
       "title": "ویژگی های هوش مصنوعی",
-      "subtitle": "پیکربندی کنید کدام ویژگی‌های AI فعال هستند و اتصالات LLM خاصی را اختصاص دهید",
+      "subtitle": "پیکربندی کنید کدام ویژگی‌های هوش مصنوعی فعال هستند و اتصالات LLM خاصی را اختصاص دهید",
       "loading": "در حال بارگیری پیکربندی ویژگی هوش مصنوعی...",
       "saveSuccess": "پیکربندی ویژگی‌های هوش مصنوعی ذخیره شد",
       "saveFailed": "پیکربندی ویژگی‌های هوش مصنوعی ذخیره نشد",
@@ -955,7 +955,7 @@ export default {
       "noConnections": "هیچ اتصال LLM پیکربندی نشده است. ابتدا اتصالات را در اتصالات هوش مصنوعی اضافه کنید.",
       "modeDefault": "از پیش فرض استفاده کنید",
       "modeSpecific": "از اتصال خاص استفاده کنید",
-      "modeDisabled": "از کار افتاده است",
+      "modeDisabled": "غیرفعال",
       "selectConnection": "انتخاب اتصال...",
       "scheduleLabel": "فرکانس تولید",
       "scheduleDaily": "یک بار در روز",
@@ -970,11 +970,11 @@ export default {
           "description": "خلاصه های روزانه خودکار با فرکانس تولید قابل تنظیم"
         },
         "plan_my_day": {
-          "name": "برای روزم برنامه ریزی کن",
+          "name": "برنامه‌ریزی روز من",
           "description": "برنامه ریزی و اولویت بندی وظایف روزانه مبتنی بر هوش مصنوعی"
         },
         "catch_me_up": {
-          "name": "منو بگیر",
+          "name": "خلاصه فعالیت اخیر",
           "description": "خلاصه ای از فعالیت اخیر در مورد یک مورد کاری را دریافت کنید"
         },
         "find_similar": {
@@ -982,7 +982,7 @@ export default {
           "description": "موارد کار مشابه را با استفاده از تجزیه و تحلیل هوش مصنوعی بیابید"
         },
         "decompose": {
-          "name": "تجزیه کنند",
+          "name": "تجزیه",
           "description": "موارد کار را به وظایف فرعی کوچکتر تقسیم کنید"
         },
         "release_notes": {
@@ -994,13 +994,13 @@ export default {
           "description": "تجزیه و تحلیل و پیشنهاد وابستگی بین موارد"
         },
         "logbook_articles": {
-          "name": "مقالات دفترچه ثبت نام",
+          "name": "مقالات دفترچه گزارش",
           "description": "طبقه بندی اسناد مبتنی بر هوش مصنوعی، تمیز کردن، و تولید مقاله برای دفترچه گزارش"
         }
       }
     },
     "workItemStaleness": {
-      "title": "بیات بودن آیتم کار",
+      "title": "کهنگی موارد کار",
       "subtitle": "از یک آستانه فعالیت در جزئیات و تجزیه و تحلیل موارد کاری استفاده کنید",
       "thresholdTitle": "آستانه مورد کار دست نخورده",
       "thresholdDescription": "یک مورد کار ناتمام پس از این چند روز کامل بدون نظر، ویرایش یا سایر فعالیت‌های ثبت شده کهنه می‌شود.",
@@ -1015,7 +1015,7 @@ export default {
     },
     "actionCapabilities": {
       "title": "قابلیت های اقدام",
-      "subtitle": "قابلیت های تدارک دیده شده برای گره های اقدام اتوماسیون را مدیریت کنید",
+      "subtitle": "قابلیت‌های فراهم‌شده برای گره‌های اقدام خودکارسازی را مدیریت کنید",
       "addCapability": "قابلیت اضافه کردن",
       "editCapability": "قابلیت ویرایش",
       "deleteCapability": "قابلیت حذف",
@@ -1034,11 +1034,11 @@ export default {
       "deleteFailed": "قابلیت حذف نشد",
       "loadFailed": "قابلیت‌های اقدام بارگیری نشد",
       "confirmDelete": "آیا مطمئن هستید که می خواهید حذف کنید؟",
-      "typeDocker": "Docker محیط زیست",
-      "typeHTTP": "HTTP مشتری",
-      "typeLLM": "LLM اتصال",
+      "typeDocker": "محیط Docker",
+      "typeHTTP": "کلاینت HTTP",
+      "typeLLM": "اتصال LLM",
       "docker": {
-        "image": "Docker تصویر",
+        "image": "تصویر Docker",
         "imagePlaceholder": "به عنوان مثال، python: 3.12-slim",
         "memory": "محدودیت حافظه",
         "memoryPlaceholder": "به عنوان مثال، 512 متر",
@@ -1048,12 +1048,12 @@ export default {
         "envVars": "متغیرهای محیطی",
         "addEnvVar": "متغیر اضافه کنید",
         "key": "کلید",
-        "value": "ارزش",
+        "value": "مقدار",
         "healthCheck": "بررسی سلامت",
         "endpoint": "نقطه پایانی",
-        "endpointPlaceholder": "به عنوان مثال، / سلامت",
+        "endpointPlaceholder": "به عنوان مثال، /health",
         "intervalSecs": "فاصله (ها)",
-        "timeoutSecs": "تایم اوت (های)"
+        "timeoutSecs": "تایم اوت (ثانیه)"
       },
       "http": {
         "allowedPatterns": "الگوهای مجاز URL",
@@ -1062,12 +1062,12 @@ export default {
         "defaultHeaders": "سرصفحه های پیش فرض",
         "addHeader": "هدر را اضافه کنید",
         "key": "کلید",
-        "value": "ارزش",
+        "value": "مقدار",
         "timeout": "تایم اوت (ثانیه)",
         "timeoutPlaceholder": "به عنوان مثال، 30"
       },
       "llm": {
-        "connection": "LLM اتصال",
+        "connection": "اتصال LLM",
         "selectConnection": "انتخاب یک اتصال...",
         "noConnections": "هیچ اتصال LLM موجود نیست. ابتدا یکی را در اتصالات هوش مصنوعی پیکربندی کنید."
       }
@@ -1075,7 +1075,7 @@ export default {
     "localizedObjects": {
       "displayLabelFor": "نمایش برچسب برای {locale}",
       "primaryHelp": "این برچسبی است که مدیران و کاربران در محلی فعال می بینند.",
-      "localeOverrides": "محلی لغو می شود",
+      "localeOverrides": "لغوهای محلی",
       "canonicalFallback": "پیشرفته: بازگشت متعارف",
       "canonicalHelp": "مقدار متعارف فقط زمانی استفاده می‌شود که نمونه مشابه یا ترجمه ارسال‌شده اعمال نشود. IDs، کلیدهای داخلی، و رفتار اتوماسیون بدون تغییر هستند.",
       "baseName": "نام جایگزین متعارف",
@@ -1086,7 +1086,7 @@ export default {
       "canonicalWarning": "این ترجمه‌های محلی همچنان بر نسخه متعارف اصلی اولویت خواهند داشت. نحوه رسیدگی به موارد نادیده گرفته شده توسط سرپرست را به صراحت انتخاب کنید.",
       "canonicalChoiceRequired": "انتخاب کنید که تغییر متعارف چگونه باید بر لغو محلی تأثیر بگذارد.",
       "localizedNameRequired": "برچسب نمایش محلی فعال مورد نیاز است.",
-      "shippedFallback": "ارسال مجدد: {value}",
+      "shippedFallback": "پیش‌فرض: {value}",
       "permissionRequired": "فقط یک مدیر نمونه می تواند برچسب های محلی را مدیریت کند.",
       "loadFailed": "نادیده‌گیری‌های محلی بارگیری نشد."
     },
@@ -1107,30 +1107,30 @@ export default {
     "boardConfig": {
       "configureBoard": "پیکربندی برد",
       "columns": "ستون ها",
-      "backlog": "عقب ماندگی",
-      "dragToReorder": "برای سفارش مجدد بکشید",
+      "backlog": "بک‌لاگ",
+      "dragToReorder": "برای جابه‌جایی بکشید",
       "addColumn": "اضافه کردن ستون",
       "saveConfiguration": "ذخیره پیکربندی",
       "unsavedChanges": "تغییرات ذخیره نشده",
       "columnNameRequired": "نام ستون مورد نیاز است",
       "resetToDefault": "به حالت پیش فرض بازنشانی کنید",
-      "noStatusesMapped": "هیچ وضعیتی ترسیم نشده است",
+      "noStatusesMapped": "هیچ وضعیتی نگاشت نشده است",
       "wipLimit": "محدودیت WIP",
-      "mappedStatuses": "وضعیت های نقشه برداری شده",
+      "mappedStatuses": "وضعیت های نگاشت شده",
       "noStatusesSelected": "هیچ وضعیتی انتخاب نشده است",
-      "backlogStatuses": "وضعیت های معوقه",
+      "backlogStatuses": "وضعیت‌های بک‌لاگ",
       "backlogStatusesHelp": "اقلام با این وضعیت ها در بک لاگ ظاهر می شوند",
       "availableStatuses": "وضعیت های موجود",
       "dragStatusesToColumns": "وضعیت ها را به ستون ها بکشید تا آنها را اختصاص دهید",
       "dropStatusesHere": "وضعیت ها را اینجا رها کنید",
       "allStatusesAssigned": "تمام وضعیت ها به ستون ها اختصاص داده شده است",
       "noStatusesMatchSearch": "هیچ وضعیتی با جستجوی شما مطابقت ندارد",
-      "boardColumns": "ستون های تابلو",
+      "boardColumns": "ستون‌های برد",
       "searchStatuses": "جستجوی وضعیت ها...",
       "cardFields": "فیلدهای کارت",
       "cardFieldsTitle": "فیلدهای کارت",
       "cardFieldsDescription": "فیلدهایی را که روی کارت‌های برد نمایش داده می‌شوند، پیکربندی کنید.",
-      "views": "بازدیدها",
+      "views": "نماها",
       "viewsHelp": "انتخاب کنید کدام نماهای مجموعه در اینجا موجود است. نماهای غیرفعال از پیمایش ناپدید می شوند و پیوندهای مستقیم به نمای فعال باز می گردند.",
       "viewsInheritedHint": "این مجموعه از نماهای پیش فرض فضای کاری پیروی می کند.",
       "viewsOverrideHint": "این مجموعه نماهای پیش فرض فضای کاری را لغو می کند.",
@@ -1146,7 +1146,7 @@ export default {
       "displayOptionsHint": "نحوه نمایش کار تکمیل شده و سمت راست ترین ستون را کنترل کنید.",
       "columnColor": "رنگ ستون",
       "latestFiftyRightmost": "فقط آخرین 50 مورد را در سمت راست ترین ستون نشان دهید",
-      "latestFiftyRightmostHint": "مفید برای ستون های مشغول انجام شده بدون محدود کردن بقیه تخته.",
+      "latestFiftyRightmostHint": "مفید برای ستون های مشغول انجام شده بدون محدود کردن بقیه برد.",
       "hideCompletedByAge": "موارد تکمیل شده قدیمی را پنهان کنید",
       "hideCompletedByAgeHint": "کار ناتمام قابل مشاهده می ماند. کار تکمیل شده با فعالیت اخیر فیلتر می شود.",
       "recentActivityWindow": "پنجره فعالیت اخیر",
@@ -1155,12 +1155,12 @@ export default {
       "retentionRangeError": "یک عدد کامل از 1 تا 3650 وارد کنید.",
       "completedVisibility": "کار تمام شده",
       "completedVisibilityCustom": "سفارشی (از گزینه های زیر استفاده کنید)",
-      "completedVisibilityHint": "انتخاب کنید که این تخته چقدر کار تکمیل شده بارگیری می کند. برای هر بیننده ای اعمال می شود.",
+      "completedVisibilityHint": "انتخاب کنید که این برد چقدر کار تکمیل شده بارگیری می کند. برای هر بیننده ای اعمال می شود.",
       "completedLimit": "تعداد موارد تکمیل شده",
-      "completedLimitHint": "حداکثر این تعداد مورد تکمیل شده را روی تخته نشان دهید (1–{max}).",
-      "backlogSelected": "{count} وضعیت برای عقب ماندگی انتخاب شده است",
-      "backlogSelected_one": "وضعیت {count} برای عقب ماندگی انتخاب شده است",
-      "backlogSelected_other": "{count} وضعیت برای عقب ماندگی انتخاب شده است",
+      "completedLimitHint": "حداکثر این تعداد مورد تکمیل شده را روی برد نشان دهید (1–{max}).",
+      "backlogSelected": "{count} وضعیت برای بک‌لاگ انتخاب شده است",
+      "backlogSelected_one": "وضعیت {count} برای بک‌لاگ انتخاب شده است",
+      "backlogSelected_other": "{count} وضعیت برای بک‌لاگ انتخاب شده است",
       "systemFieldNames": {
         "status": "وضعیت",
         "priority": "اولویت",
@@ -1172,10 +1172,10 @@ export default {
         "labels": "برچسب ها",
         "created_at": "ایجاد شد",
         "project": "پروژه",
-        "parent": "پدر و مادر",
+        "parent": "والد",
         "time_in_status": "زمان در وضعیت",
-        "story_points": "نکات داستانی",
-        "estimate": "تخمین بزنید",
+        "story_points": "امتیاز داستان",
+        "estimate": "تخمین",
         "sla": "SLA"
       }
     }
@@ -1223,7 +1223,7 @@ export default {
     "grantPermission": "اعطای مجوز",
     "revokePermission": "لغو مجوز",
     "read": "بخوانید",
-    "write": "بنویسید",
+    "write": "نوشتن",
     "delete": "حذف کنید",
     "admin": "مدیر",
     "manage": "مدیریت کنید",

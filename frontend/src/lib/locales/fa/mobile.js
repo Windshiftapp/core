@@ -3,7 +3,7 @@ export default {
     "common": {
       "loadFailed": "بارگیری نشد.",
       "empty": "اینجا هنوز چیزی نیست",
-      "noMatches": "هیچ مسابقه ای وجود ندارد.",
+      "noMatches": "نتیجه‌ای یافت نشد.",
       "noOptions": "هیچ گزینه ای در دسترس نیست.",
       "unread": "خوانده نشده",
       "saving": "در حال ذخیره…",
@@ -23,11 +23,11 @@ export default {
     },
     "myWork": {
       "title": "کار من",
-      "watched": "تماشا کرد",
+      "watched": "تماشاشده",
       "recent": "اخیر",
       "loadFailed": "کار شما بارگیری نشد.",
       "noAssigned": "در حال حاضر چیزی به شما اختصاص داده نشده است.",
-      "noWatched": "شما هیچ آیتمی را تماشا نمی کنید.",
+      "noWatched": "هیچ موردی را تماشا نمی‌کنید.",
       "noRecent": "هیچ فعالیت اخیری وجود ندارد."
     },
     "personal": {
@@ -53,10 +53,10 @@ export default {
       "blocked": "اعلان ها مسدود شده است. آنها را برای Windshift در تنظیمات دستگاه خود فعال کنید.",
       "enabled": "اعلان ها روشن است",
       "enable": "اعلان ها را فعال کنید",
-      "caughtUp": "همه شما گرفتار شده اید"
+      "caughtUp": "همه را خوانده‌اید"
     },
     "timer": {
-      "running": "در حال دویدن",
+      "running": "در حال اجرا",
       "stop": "توقف کنید",
       "idle": "بدون تایمر",
       "startHelp": "یکی را از صفحه جزئیات یک مورد کاری شروع کنید.",
@@ -84,7 +84,7 @@ export default {
       "cancelEditing": "لغو ویرایش",
       "pageTitle": "عنوان صفحه",
       "contentLabel": "محتوای صفحه (Markdown)",
-      "ancestors": "صفحات اجدادی",
+      "ancestors": "صفحات والد",
       "empty": "این صفحه خالی است",
       "children": "صفحات فرعی"
     },
@@ -100,14 +100,14 @@ export default {
       "keepEditing": "به ویرایش ادامه دهید",
       "assigneesFailed": "مسئولین بارگیری نشدند.",
       "deleted": "این مورد حذف شد.",
-      "parents": "موارد والدین",
+      "parents": "موارد والد",
       "editTitleDescription": "عنوان و توضیحات را ویرایش کنید",
       "linkedCount": "{count} پیوند داده شد",
-      "watching": "تماشا کردن",
+      "watching": "در حال تماشا",
       "watch": "تماشا کنید",
       "children": "موارد فرعی",
       "addChild": "افزودن مورد فرعی",
-      "commitsPullRequests": "درخواست‌ها را متعهد می‌کند و می‌کشد",
+      "commitsPullRequests": "کامیت‌ها و درخواست‌های کشش",
       "codingAgent": "عامل کدنویسی",
       "noStatuses": "گزینه وضعیت وجود ندارد",
       "noAssignees": "کاربران قابل تخصیص وجود ندارد"
@@ -115,14 +115,14 @@ export default {
     "create": {
       "action": "مورد ایجاد کنید",
       "personal": "وظیفه شخصی جدید",
-      "child": "زیرمجموعه جدید",
+      "child": "زیرمورد جدید",
       "item": "مورد جدید",
       "requiredField": "{field} مورد نیاز است.",
-      "invalidStoryPoints": "نقاط داستان باید یک عدد معتبر باشد.",
+      "invalidStoryPoints": "امتیاز داستان باید یک عدد معتبر باشد.",
       "invalidEstimate": "تخمین باید یک مدت زمان معتبر باشد.",
       "customField": "فیلد سفارشی",
       "failed": "مورد ایجاد نشد.",
-      "loadingParent": "در حال بارگیری والدین…",
+      "loadingParent": "در حال بارگیری والد…",
       "parentFailed": "مورد والد بارگیری نشد.",
       "under": "زیر",
       "taskTitle": "عنوان وظیفه",
@@ -140,7 +140,7 @@ export default {
     "palette": {
       "title": "پالت فرمان",
       "close": "پالت فرمان را ببندید",
-      "placeholder": "دستورات جستجو، آیتم ها، صفحات…",
+      "placeholder": "جستجوی دستورات، موارد، صفحات…",
       "help": "برای جستجو تایپ کنید یا مقصدی را انتخاب کنید.",
       "item": "مورد",
       "tools": "ابزار",
