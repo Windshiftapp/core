@@ -2535,6 +2535,41 @@ var Catalog = []Migration{
 		`,
 	},
 	{
+		Version:       "20261123_notification_template_translations",
+		Name:          "Store per-locale overrides for built-in email templates (WI-2034)",
+		CheckSQLite:   sqliteTableCheck("notification_template_translations"),
+		CheckPostgres: pgTableCheck("notification_template_translations"),
+		SQLite: `
+			CREATE TABLE notification_template_translations (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				template_id INTEGER NOT NULL,
+				locale TEXT NOT NULL,
+				subject TEXT,
+				content TEXT,
+				text_body TEXT,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(template_id, locale),
+				FOREIGN KEY (template_id) REFERENCES notification_templates(id) ON DELETE CASCADE
+			);
+			CREATE INDEX idx_notification_template_translations_template ON notification_template_translations(template_id);
+		`,
+		Postgres: `
+			CREATE TABLE IF NOT EXISTS notification_template_translations (
+				id SERIAL PRIMARY KEY,
+				template_id INTEGER NOT NULL,
+				locale TEXT NOT NULL,
+				subject TEXT,
+				content TEXT,
+				text_body TEXT,
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(template_id, locale),
+				FOREIGN KEY (template_id) REFERENCES notification_templates(id) ON DELETE CASCADE
+			);
+		`,
+	},
+	{
 		Version:       "20261015_request_types_kind",
 		Name:          "Add system intake kind to request types (WI-1644)",
 		CheckSQLite:   sqliteColumnCheck("request_types", "kind"),

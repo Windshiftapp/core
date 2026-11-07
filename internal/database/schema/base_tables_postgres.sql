@@ -396,6 +396,22 @@ CREATE TABLE IF NOT EXISTS notification_templates (
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Per-locale overrides for built-in email templates. A row here replaces the
+-- template's subject/body for that locale; locales without a row fall back to
+-- the global template row and then the localized built-in default.
+CREATE TABLE IF NOT EXISTS notification_template_translations (
+	id SERIAL PRIMARY KEY,
+	template_id INTEGER NOT NULL,
+	locale TEXT NOT NULL,
+	subject TEXT,
+	content TEXT, -- HTML body template
+	text_body TEXT, -- Plain-text body template
+	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+	UNIQUE(template_id, locale),
+	FOREIGN KEY (template_id) REFERENCES notification_templates(id) ON DELETE CASCADE
+);
+
 -- From tests_postgres.sql (simplified for base tables - full definition with FKs in tests_postgres.sql)
 CREATE TABLE IF NOT EXISTS test_folders (
 	id SERIAL PRIMARY KEY,

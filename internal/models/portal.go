@@ -830,6 +830,24 @@ type EmailTemplate struct {
 	IsCustomized bool      `json:"is_customized"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+	// Translations holds per-locale overrides (admin UI). Loaded on list/get,
+	// not persisted on the base row.
+	Translations []EmailTemplateTranslation `json:"translations,omitempty"`
+}
+
+// EmailTemplateTranslation is an admin override of a built-in email template
+// for one shipped locale. A row replaces the base template's subject/body for
+// that locale; locales without a row fall back to the base row and then the
+// localized built-in default.
+type EmailTemplateTranslation struct {
+	ID         int       `json:"id"`
+	TemplateID int       `json:"template_id"`
+	Locale     string    `json:"locale"`
+	Subject    string    `json:"subject"`
+	HTMLBody   string    `json:"html_body"`
+	TextBody   string    `json:"text_body"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // NotificationSetting represents a notification configuration that can be assigned to configuration sets

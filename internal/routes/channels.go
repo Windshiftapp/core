@@ -97,6 +97,8 @@ func RegisterChannelRoutes(deps *Deps) {
 	api.HandleH("GET /email-templates", admin(http.HandlerFunc(deps.Channels.EmailTemplate.List)))
 	api.HandleH("GET /email-templates/{id}", admin(http.HandlerFunc(deps.Channels.EmailTemplate.Get)))
 	api.HandleH("PUT /email-templates/{id}", admin(http.HandlerFunc(deps.Channels.EmailTemplate.Update)))
+	api.HandleH("PUT /email-templates/{id}/translations/{locale}", admin(http.HandlerFunc(deps.Channels.EmailTemplate.UpdateTranslation)))
+	api.HandleH("DELETE /email-templates/{id}/translations/{locale}", admin(http.HandlerFunc(deps.Channels.EmailTemplate.DeleteTranslation)))
 	api.HandleH("POST /email-templates/preview", admin(http.HandlerFunc(deps.Channels.EmailTemplate.Preview)))
 
 	// Webhook manual trigger endpoints

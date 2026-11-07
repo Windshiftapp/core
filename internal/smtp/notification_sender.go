@@ -270,7 +270,7 @@ func (s *NotificationSMTPSender) RenderEmail(templateName string, data any) (sub
 // RenderEmailLocale is RenderEmail with copy and date formatting bound to the
 // recipient's locale.
 func (s *NotificationSMTPSender) RenderEmailLocale(locale, templateName string, data any) (subject, htmlBody, textBody string, err error) {
-	subjectSrc, htmlSrc, textSrc, fromDB := s.resolveTemplate(templateName)
+	subjectSrc, htmlSrc, textSrc, fromDB := s.resolveTemplate(locale, templateName)
 
 	subject, htmlBody, textBody, err = renderEmailTemplates(locale, subjectSrc, htmlSrc, textSrc, data)
 	if err == nil {
@@ -354,13 +354,14 @@ func AbsoluteActionURL(baseURL, actionURL string) string {
 }
 
 // resolveTemplate returns the template sources and whether they came from the
-// admin-editable DB row (as opposed to the embedded default). A seeded row is
-// authoritative only once an admin has saved an edit; an unmodified seed falls
-// through to the embedded default, which is localized at render time.
-func (s *NotificationSMTPSender) resolveTemplate(name string) (subject, html, text string, fromDB bool) {
+// admin-editable DB row (as opposed to the embedded default). It resolves the
+// recipient locale first: an exact-locale override wins, then a customized base
+// row; an unmodified seed falls through to the embedded default, which is
+// localized at render time.
+func (s *NotificationSMTPSender) resolveTemplate(locale, name string) (subject, html, text string, fromDB bool) {
 	if s.templates != nil {
-		if t, err := s.templates.GetByName(name); err == nil && t != nil && t.IsCustomized {
-			return t.Subject, t.HTMLBody, t.TextBody, true
+		if t, fromDB, err := s.templates.ResolveForLocale(name, locale); err == nil && t != nil {
+			return t.Subject, t.HTMLBody, t.TextBody, fromDB
 		}
 	}
 	if t, ok := defaultTemplate(name); ok {
