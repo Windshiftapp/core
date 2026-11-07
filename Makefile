@@ -196,6 +196,7 @@ lint:
 	@scripts/run-golangci-lint.sh run --timeout=5m
 	@node scripts/check-sql-boolean-literals.mjs
 	@node scripts/check-audit-literals.mjs
+	@node scripts/generate-i18n-catalog.mjs --check
 	@bash scripts/check-layering.sh
 	@bash scripts/check-handler-db-access.sh
 	@bash scripts/check-deprecated-v1-api.sh

@@ -27,6 +27,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/emailutil"
+	"windshift/internal/i18n"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/utils"
@@ -400,13 +401,14 @@ func (s *NotificationSMTPSender) getSMTPConfig() (*models.ChannelConfig, error) 
 }
 
 // SendBatchedNotifications sends a batch of notifications to a user via email
-func (s *NotificationSMTPSender) SendBatchedNotifications(userEmail, userName string, notifications []models.Notification) error {
-	return s.SendBatchedNotificationsContext(context.Background(), userEmail, userName, notifications)
+func (s *NotificationSMTPSender) SendBatchedNotifications(userEmail, userName, locale, timezone string, notifications []models.Notification) error {
+	return s.SendBatchedNotificationsContext(context.Background(), userEmail, userName, locale, timezone, notifications)
 }
 
 // SendBatchedNotificationsContext sends a batch with cancellation propagated
-// through SMTP dialing, handshake, commands, and DATA completion.
-func (s *NotificationSMTPSender) SendBatchedNotificationsContext(ctx context.Context, userEmail, userName string, notifications []models.Notification) error {
+// through SMTP dialing, handshake, commands, and DATA completion. locale and
+// timezone are the recipient's preferences and drive date rendering.
+func (s *NotificationSMTPSender) SendBatchedNotificationsContext(ctx context.Context, userEmail, userName, locale, timezone string, notifications []models.Notification) error {
 	if len(notifications) == 0 {
 		return nil
 	}
@@ -419,7 +421,7 @@ func (s *NotificationSMTPSender) SendBatchedNotificationsContext(ctx context.Con
 		return fmt.Errorf("failed to get SMTP config: %w", err)
 	}
 
-	subject, htmlBody, textBody, err := s.RenderEmail(emailutil.TemplateNotificationBatch, buildNotificationBatchData(s.baseURL, userName, notifications))
+	subject, htmlBody, textBody, err := s.RenderEmail(emailutil.TemplateNotificationBatch, buildNotificationBatchData(s.baseURL, userName, locale, timezone, notifications))
 	if err != nil {
 		return fmt.Errorf("failed to render notification email: %w", err)
 	}
@@ -439,7 +441,8 @@ type notificationBatchEntry struct {
 	ActionURL     string
 }
 
-func buildNotificationBatchData(baseURL, userName string, notifications []models.Notification) any {
+func buildNotificationBatchData(baseURL, userName, locale, timezone string, notifications []models.Notification) any {
+	location := i18n.Location(timezone)
 	data := struct {
 		UserName          string
 		NotificationCount int
@@ -454,7 +457,7 @@ func buildNotificationBatchData(baseURL, userName string, notifications []models
 			Message:       n.Message,
 			Type:          n.Type,
 			AccentColor:   notificationAccentColor(n.Type),
-			FormattedTime: n.Timestamp.Format("January 2, 2006 at 3:04 PM"),
+			FormattedTime: i18n.FormatDateTimeZ(locale, n.Timestamp, location),
 			ActionURL:     absoluteActionURL(baseURL, n.ActionURL),
 		})
 	}

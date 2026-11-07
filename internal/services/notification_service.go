@@ -94,10 +94,14 @@ type queuedNotificationEvent struct {
 
 // UserNotificationBatch is a set of unread notifications destined for one
 // user's batched email, along with the contact fields needed to address it.
+// Locale and Timezone are the recipient's preferences; the digest renders
+// timestamps for them so a reader elsewhere is never shown an unlabeled time.
 type UserNotificationBatch struct {
 	UserID          int
 	UserEmail       string
 	UserName        string
+	Locale          string
+	Timezone        string
 	Notifications   []models.Notification
 	NotificationIDs []int
 }
@@ -216,13 +220,13 @@ func (ns *NotificationService) unreadEmailBatches(maxBatchSize int, now time.Tim
 	// Rows the recipient may not see are suppressed below; without that a
 	// recipient whose whole backlog is invisible would be re-selected forever.
 	rows, err := ns.db.Query(`
-		SELECT u.id, u.email, u.first_name, u.last_name
+		SELECT u.id, u.email, u.first_name, u.last_name, COALESCE(u.language, ''), COALESCE(u.timezone, '')
 		FROM notifications n
 		JOIN users u ON n.user_id = u.id
 		WHERE n.sent_at IS NULL AND n.read = false AND u.email != '' AND u.is_active = true
 		  AND n.email_delivery_state IN (?, ?)
 		  AND n.authorization_scope IN (?, ?, ?)
-		GROUP BY u.id, u.email, u.first_name, u.last_name
+		GROUP BY u.id, u.email, u.first_name, u.last_name, u.language, u.timezone
 		ORDER BY MIN(n.timestamp) ASC, u.id ASC
 		LIMIT ?
 	`, notificationEmailPending, notificationEmailFailed,
@@ -234,11 +238,12 @@ func (ns *NotificationService) unreadEmailBatches(maxBatchSize int, now time.Tim
 	type recipient struct {
 		id                 int
 		email, first, last string
+		language, timezone string
 	}
 	recipients := make([]recipient, 0)
 	for rows.Next() {
 		var candidate recipient
-		if err := rows.Scan(&candidate.id, &candidate.email, &candidate.first, &candidate.last); err != nil {
+		if err := rows.Scan(&candidate.id, &candidate.email, &candidate.first, &candidate.last, &candidate.language, &candidate.timezone); err != nil {
 			_ = rows.Close()
 			return nil, fmt.Errorf("scan notification email recipient: %w", err)
 		}
@@ -277,6 +282,8 @@ func (ns *NotificationService) unreadEmailBatches(maxBatchSize int, now time.Tim
 			UserID:          candidate.id,
 			UserEmail:       candidate.email,
 			UserName:        strings.TrimSpace(candidate.first + " " + candidate.last),
+			Locale:          candidate.language,
+			Timezone:        candidate.timezone,
 			Notifications:   notifications,
 			NotificationIDs: make([]int, len(notifications)),
 		}
