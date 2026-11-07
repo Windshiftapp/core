@@ -1,7 +1,7 @@
 export default {
   actions: {
     title: '操作',
-    description: '使用基于规则的行动自动化工作流',
+    description: '使用基于规则的操作自动化工作流',
     create: '创建操作',
     createFirst: '创建您的第一个操作',
     noActions: '暂无操作',

@@ -41,7 +41,7 @@ export default {
       },
       savedSearch: {
         name: '已保存的搜索',
-        description: '显示已保存集合中的工作事项',
+        description: '显示已保存集合中的工作项',
       },
       assignedToMe: {
         name: '分配给我的',
