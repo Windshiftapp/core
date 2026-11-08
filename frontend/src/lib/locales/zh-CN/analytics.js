@@ -33,12 +33,12 @@ export default {
     },
     scope: {
       summary: '{items} 个当前项目 · {from}–{to}',
-      currentWorkspace: '当前工作区队列',
+      currentWorkspace: '当前工作区群组',
       currentWorkspaceNote:
         '日期范围适用于流量和交付图表；健康状况和工龄为当前快照。历史图表使用今天位于此工作区的项目，不包括已移动或已删除的项目。',
-      currentCollection: '当前集合队列',
+      currentCollection: '当前集合群组',
       currentCollectionNote:
-        '日期范围适用于流量和交付图表；健康状况和工龄为当前快照。历史图表使用今天符合此集合条件的项目。更改集合可能会改变分析队列。',
+        '日期范围适用于流量和交付图表；健康状况和停留时长为当前快照。历史图表使用今天符合此集合条件的工作项。更改集合可能会改变分析群组。',
     },
     health: {
       title: '需要关注',
@@ -53,7 +53,7 @@ export default {
       attentionItems: '待检查项目',
       item: '项目',
       status: '状态',
-      age: '已存在时间',
+      age: '停留时长',
       signals: '信号',
       flags: {
         overdue: '已逾期',
@@ -72,17 +72,17 @@ export default {
       net: '净变化',
       average: '平均每周完成',
       period: '周期',
-      definition: '完成是指项目首次转换到已完成状态。',
+      definition: '完成是指工作项首次转换到已完成状态。',
     },
     aging: {
-      title: '在制工作老化',
+      title: '进行中工作项停留时长',
       description: '当前未完成项目已经打开了多长时间。',
       total: '活动项目',
-      median: '中位时间',
+      median: '中位停留时长',
       p85: '第 85 百分位',
       ageBand: '时间范围',
       itemCount: '项目数',
-      byStatus: '按状态查看时间',
+      byStatus: '按状态统计停留时长',
       oldest: '最早的未完成项目',
       status: '状态',
       noActive: '此范围内没有未完成工作。',
@@ -108,7 +108,7 @@ export default {
       duration: '交付时间',
       missingHistory_one: '由于缺少完成历史，已排除 1 个当前已完成项目。',
       missingHistory_other: '由于缺少完成历史，已排除 {count} 个当前已完成项目。',
-      definition: '从项目创建到首次转换到已完成状态。之后重新打开不会更改此值。',
+      definition: '从工作项创建到首次转换到已完成状态的时间。之后重新打开不会更改此值。',
     },
     dataTable: {
       show: '查看数据表',

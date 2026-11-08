@@ -18,6 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { ENGLISH_FALLBACK_KEYS } from '../src/lib/locales/adminOperationsFallback.js';
 import { mergeInto } from '../src/lib/locales/createLocale.js';
+import { DATE_FORMAT_KEYS, DATE_FORMATS } from '../src/lib/locales/dateFormats.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LOCALES_DIR = join(__dirname, '..', 'src', 'lib', 'locales');
@@ -477,6 +478,43 @@ async function main() {
   }
   console.log('');
 
+  // --- Check 5: Date format coverage ---
+  // Backend-rendered email formats dates from this table (internal/i18n), so a
+  // locale without an entry would silently fall back to English date order.
+  console.log('  --- Date format coverage ---');
+  let dateFormatErrors = 0;
+  const knownLocaleDirs = new Set(localeDirs);
+
+  for (const locale of localeDirs) {
+    const entry = DATE_FORMATS[locale];
+    const missingKeys = DATE_FORMAT_KEYS.filter(
+      (key) => typeof entry?.[key] !== 'string' || entry[key].trim() === ''
+    );
+    if (!entry || missingKeys.length > 0) {
+      console.log(`  ✗ ${locale}: ${entry ? `missing ${missingKeys.join(', ')}` : 'no entry'}`);
+      dateFormatErrors += 1;
+    }
+  }
+
+  const unknownDateFormatLocales = Object.keys(DATE_FORMATS).filter(
+    (locale) => !knownLocaleDirs.has(locale)
+  );
+  if (unknownDateFormatLocales.length > 0) {
+    console.log(
+      `  ✗ date formats declared for unknown locale(s): ${unknownDateFormatLocales.join(', ')}`
+    );
+    dateFormatErrors += unknownDateFormatLocales.length;
+  }
+
+  if (dateFormatErrors === 0) {
+    console.log(
+      `  ✓ all ${localeDirs.length} locales define ${DATE_FORMAT_KEYS.join(', ')} formats`
+    );
+  } else {
+    exitCode = 1;
+  }
+  console.log('');
+
   // --- Summary ---
   if (requiredMissing > 0 || totalExtra > 0) {
     exitCode = 1;
@@ -493,6 +531,7 @@ async function main() {
     if (totalExtra > 0) issues.push(`${totalExtra} extra locale key(s)`);
     if (placeholderErrors > 0) issues.push(`${placeholderErrors} placeholder mismatch(es)`);
     if (carryoverTotal > 0) issues.push(`${carryoverTotal} suspected carryover(s)`);
+    if (dateFormatErrors > 0) issues.push(`${dateFormatErrors} date format coverage error(s)`);
     console.log(`  ${issues.join(', ')}`);
     console.log('');
     process.exit(1);

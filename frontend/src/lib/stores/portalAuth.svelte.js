@@ -5,6 +5,7 @@ import {
   prepareCredentialRequestOptions,
   processCredentialRequestResponse,
 } from '../utils/webauthn-utils.js';
+import { i18n } from './i18n.svelte.js';
 import { clearStores, getStoreValue } from './storeUtils.js';
 
 /**
@@ -239,6 +240,16 @@ function createPortalAuthStore() {
     },
 
     /**
+     * Merge fields into the cached customer without a /auth/me round-trip.
+     * Used after the profile updates the customer's own language/timezone.
+     */
+    patchCustomer(patch) {
+      const c = getStoreValue(customer);
+      if (!c) return;
+      customer.set({ ...c, ...patch });
+    },
+
+    /**
      * Request a magic link email
      * @param {string} slug - Portal slug
      * @param {string} email - Customer email
@@ -250,7 +261,7 @@ function createPortalAuthStore() {
       emailSent.set(false);
 
       try {
-        await portalAuth.requestMagicLink(slug, email, next);
+        await portalAuth.requestMagicLink(slug, email, next, i18n.locale);
         // Always show success (prevents email enumeration)
         emailSent.set(true);
         return { success: true };

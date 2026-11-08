@@ -452,7 +452,7 @@ run_go_vulnerability_check() {
     fi
 
     log_info "Running govulncheck..."
-    govulncheck ./...
+    bash scripts/check-vulnerabilities.sh
 }
 
 check_git_state() {

@@ -295,6 +295,12 @@ func (s *IncidentService) dispatchNotification(incident *models.Incident, rule m
 			AuthorizationScope: models.NotificationScopeSystem,
 			SourceType:         "incident",
 			SourceID:           &itemID,
+			I18nTitleKey:       "notification.incident.title",
+			I18nMessageKey:     "notification.incident.message",
+			I18nParams: map[string]any{
+				"itemTitle": incident.ItemTitle,
+				"itemKey":   incident.ItemKey,
+			},
 		}, nil,
 	)
 	return err

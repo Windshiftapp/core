@@ -234,7 +234,7 @@ export default {
       },
       adminSecurity: {
         label: 'إعدادات الأمان',
-        description: 'تكوين موجزات التقويم وتنفيذ الإضافات',
+        description: 'تكوين خلاصات التقويم وتنفيذ الإضافات',
       },
       adminSystemImport: {
         label: 'استيراد النظام',
@@ -266,7 +266,7 @@ export default {
       },
       iterations: {
         label: 'التكرارات',
-        description: 'تخطيط وتتبع السبرنت',
+        description: 'تخطيط التكرارات وتتبعها',
       },
       createItem: {
         label: 'إنشاء عنصر',
@@ -318,12 +318,12 @@ export default {
     openTasks: 'المهام المفتوحة',
     overdueItems: 'العناصر المتأخرة',
     upcomingDeadlines: 'المواعيد النهائية القادمة',
-    activeIterations: 'السبرنتات النشطة',
+    activeIterations: 'التكرارات النشطة',
     inProgressMilestones: 'المعالم قيد التقدم',
     noRecentActivity: 'لا يوجد نشاط حديث',
     recentItemsHint: 'ستظهر العناصر التي تحدثها هنا',
-    noActiveIterations: 'لا توجد سبرنتات نشطة',
-    iterationTimelinesHint: 'ستظهر جداول السبرنت هنا',
+    noActiveIterations: 'لا توجد تكرارات نشطة',
+    iterationTimelinesHint: 'ستظهر الجداول الزمنية للتكرارات هنا',
     noUpcomingDeadlines: 'لا توجد مواعيد نهائية قادمة',
     dueDatesHint: 'ستظهر العناصر ذات تواريخ الاستحقاق هنا',
     noOpenTasks: 'لا توجد مهام مفتوحة معينة لك',
@@ -432,7 +432,7 @@ export default {
 
   workspaceDashboard: {
     widgets: {
-      supportMetrics: { name: 'مقاييس الدعم', description: 'قائمة الانتظار وأول رد والحل والالتزام بـ SLA لتذاكر العملاء' },
+      supportMetrics: { name: 'مقاييس الدعم', description: 'قائمة المهام المعلّقة وأول رد والحل والالتزام بـ SLA لتذاكر العملاء' },
     },
   },
 };

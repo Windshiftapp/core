@@ -72,8 +72,8 @@ export default {
         "description": "الموافقات متعددة الخطوات التي تؤدي إلى انتقالات خارج الحالة"
       },
       "integrationProviders": {
-        "title": "عمليات التكامل",
-        "description": "إدارة عمليات التكامل الصادرة يتصل Windshift بالتطبيقات الواردة والتطبيقات الواردة التي تسمح عبر OAuth."
+        "title": "التكاملات",
+        "description": "إدارة التكاملات الصادرة التي يتصل بها Windshift والتطبيقات الواردة التي تُفوّض عبر OAuth."
       },
       "diagnostics": {
         "description": "صحة النظام: ساعة الخادم، وفشل الإجراءات، وإشارات التشغيل الأخرى"
@@ -107,7 +107,7 @@ export default {
       "addCustomTitle": "دور مخصص جديد",
       "labelOnlyNotice": "الأدوار المخصصة هي تسمية فقط اليوم. يمكن استخدامها لتوجيه الموافقات ولكن لا يمكن منح الأذونات بعد.",
       "cannotDeleteSystem": "لا يمكن حذف أدوار النظام.",
-      "deleteConfirm": "هل تريد حذف هذا الدور المخصص؟ سيفقد الأعضاء تعيين التصنيف هذا.",
+      "deleteConfirm": "هل تريد حذف هذا الدور المخصص؟ سيفقد الأعضاء تعيين التسمية هذا.",
       "nameRequired": "مطلوب اسم الدور.",
       "nameTaken": "يوجد دور بهذا الاسم بالفعل.",
       "namePlaceholder": "على سبيل المثال. مراجعو ضمان الجودة",
@@ -116,12 +116,12 @@ export default {
   },
   "analytics": {
     "deliveryTime": {
-      "missingHistory": "{count} تم استبعاد العناصر المكتملة حاليًا لأن سجل اكتمالها مفقود."
+      "missingHistory": "تم استبعاد {count} من العناصر المكتملة حاليًا لأن سجل اكتمالها مفقود."
     }
   },
   "channel": {
     "channelConfigCorrupted": "تكوين القناة تالف ولا يمكن تحريره بأمان. الرجاء الاتصال بالمسؤول.",
-    "portalSlugInvalid": "يجب أن يتكون العدد الثابت من 1 إلى 40 حرفًا صغيرًا أو أرقامًا أو واصلات، ولا يجوز أن يبدأ أو ينتهي بواصلة أو يحتوي على واصلات متتالية.",
+    "portalSlugInvalid": "يجب أن يتكون المُعرّف المختصر من 1 إلى 40 حرفًا صغيرًا أو أرقامًا أو واصلات، ولا يجوز أن يبدأ أو ينتهي بواصلة أو يحتوي على واصلات متتالية.",
     "portalAllowedDomainsInvalid": "واحد أو أكثر من النطاقات المسموح بها غير صالحة (مثل \"acme.com\").",
     "portalRegistration": "وصول العميل",
     "portalRegistrationMode": "وضع التسجيل",
@@ -139,14 +139,14 @@ export default {
     "smtpIsInactive": "SMTP معطل حاليًا",
     "failedToLoad": "فشل في تحميل القناة",
     "microsoftOrGoogle": "Microsoft 365 أو Google",
-    "workspaceFieldResolution": "دقة حقل مساحة العمل",
-    "formSlugRequired": "مطلوب رمز ثابت للنموذج",
-    "formSlugInvalid": "يجب أن يتكون الرمز الثابت من 1 إلى 40 حرفًا صغيرًا أو أرقامًا أو واصلات، ولا يجوز أن يبدأ أو ينتهي بواصلة أو يحتوي على واصلات متتالية.",
+    "workspaceFieldResolution": "تحديد حقل مساحة العمل",
+    "formSlugRequired": "مطلوب معرّف مختصر للنموذج",
+    "formSlugInvalid": "يجب أن يتكون المُعرّف المختصر من 1 إلى 40 حرفًا صغيرًا أو أرقامًا أو واصلات، ولا يجوز أن يبدأ أو ينتهي بواصلة أو يحتوي على واصلات متتالية.",
     "formBrandColorInvalid": "يجب أن يكون لون العلامة التجارية رمزًا سداسيًا مكونًا من 6 أرقام (على سبيل المثال #14b8a6).",
     "formLogoUrlInvalid": "يجب أن يكون عنوان URL للشعار عبارة عن عنوان URL صالح لـ http(s).",
     "formRedirectUrlInvalid": "يجب أن يكون عنوان URL لإعادة التوجيه عبارة عن عنوان URL صالح لـ http(s).",
     "formSuccessMessage": "رسالة النجاح الافتراضية",
-    "formSuccessMessagePlaceholder": "شكرًا لك على إرسالك!",
+    "formSuccessMessagePlaceholder": "شكرًا لك على الإرسال!",
     "formRedirectUrlHelp": "إعادة توجيه المستخدمين إلى عنوان URL هذا بعد الإرسال الناجح (اختياري)",
     "enableForm": "تمكين قناة النموذج",
     "formIsActive": "قناة النموذج نشطة وتقبل عمليات الإرسال",
@@ -157,7 +157,7 @@ export default {
   },
   "portal": {
     "selectWorkspace": "حدد مساحة العمل",
-    "workspaceFieldResolution": "مساحة العمل دقة الحقل",
+    "workspaceFieldResolution": "تحديد حقل مساحة العمل",
     "notFound": "لم يتم العثور على البوابة الإلكترونية",
     "createAssetReport": "إنشاء تقرير الأصول",
     "editAssetReport": "تحرير تقرير الأصول",
@@ -174,11 +174,11 @@ export default {
     "assetSetHint": "مجموعة الأصول تستعلم عن هذا التقرير.",
     "qlQuery": "استعلام QL",
     "qlQueryRequired": "استعلام QL مطلوب",
-    "qlQueryTokenRequired": "يجب أن تشير استعلامات QL في وضع النموذج إلى حقل نموذج واحد على الأقل باستخدام الرموز المميزة ${field_identifier}",
+    "qlQueryTokenRequired": "يجب أن تشير استعلامات QL في وضع النموذج إلى حقل نموذج واحد على الأقل باستخدام المتغيرات ${field_identifier}",
     "qlQueryPlaceholder": "status = \"Active\" AND category = \"Hardware\"",
-    "qlQueryHint": "تصفية الأصول باستخدام QL (Windshift لغة الاستعلام).",
+    "qlQueryHint": "تصفية الأصول باستخدام QL (لغة استعلام Windshift).",
     "qlQueryFormPlaceholder": "title = ${title} AND status = ${status}",
-    "qlQueryFormHint": "استخدم الرموز المميزة ${field_identifier} للإشارة إلى القيم المرسلة بواسطة النموذج.",
+    "qlQueryFormHint": "استخدم المتغيرات ${field_identifier} للإشارة إلى القيم المرسلة بواسطة النموذج.",
     "runMode": "وضع التشغيل",
     "runModeDirect": "الجدول المباشر",
     "runModeDirectHint": "عرض النتائج مضمنة كجدول كامل العرض في القسم.",
@@ -209,6 +209,10 @@ export default {
     "orSignInWithEmail": "أو قم بتسجيل الدخول باستخدام البريد الإلكتروني",
     "profileAndSecurity": "الملف الشخصي والأمان",
     "profileTitle": "الملف الشخصي",
+    languageTitle: "اللغة",
+    languageSubtitle: "اختر لغة هذه البوابة والرسائل التي تصلك.",
+    languageLabel: "اللغة",
+    languageSaved: "تم تحديث اللغة",
     "profileSubtitle": "إدارة كيفية تسجيل الدخول إلى هذه البوابة.",
     "profileSection": "الحساب",
     "passkeysTitle": "مفاتيح المرور",
@@ -242,8 +246,8 @@ export default {
       "backToFields": "العودة إلى الحقول"
     },
     "settings": {
-      "submitButton": "إرسال نص الزر",
-      "successMessagePlaceholder": "شكرًا لك على إرسالك!"
+      "submitButton": "نص زر الإرسال",
+      "successMessagePlaceholder": "شكرًا لك على الإرسال!"
     },
     "integration": {
       "openInNewTab": "فتح في علامة تبويب جديدة"
@@ -256,7 +260,7 @@ export default {
     "scheduling": "الجدولة",
     "submitting": "إرسال...",
     "deleted": "محذوف",
-    "dismiss": "استبعاد",
+    "dismiss": "تجاهل",
     "error": "خطأ",
     "notFound": "لم يتم العثور عليه",
     "workspace": "مساحة العمل"
@@ -292,9 +296,9 @@ export default {
     "template": "القالب"
   },
   "integrations": {
-    "title": "عمليات التكامل",
+    "title": "التكاملات",
     "linkPage": "صفحة الارتباط",
-    "searchPages": "صفحات البحث...",
+    "searchPages": "البحث في الصفحات...",
     "noLinksYet": "لا توجد صفحات مرتبطة حتى الآن",
     "connectAccount": "قم بتوصيل حسابك",
     "connectToLink": "اتصل بصفحات الارتباط",
@@ -319,7 +323,7 @@ export default {
     "callbackUrl": "عنوان URL لرد الاتصال",
     "callbackUrlHint": "نسخ عنوان URL هذا في إعدادات تطبيق التكامل الخاص بك",
     "providerConfig": "تكوين الموفر (JSON)",
-    "notion": "الفكرة",
+    "notion": "Notion",
     "noProviders": "لم يتم تكوين موفري التكامل",
     "selectProvider": "حدد الموفر",
     "page": "الصفحة",
@@ -355,12 +359,12 @@ export default {
     "notCovered": "غير مشمول",
     "selectPlanAndName": "حدد خطة اختبار وأدخل اسمًا",
     "totalRequirements": "إجمالي المتطلبات",
-    "labelsAssigned_one": "{count} تسمية معينة",
-    "labelsAssigned_other": "{count} تسميات معينة",
-    "testStepsConfigured_one": "{count} تم تكوين خطوة الاختبار",
-    "testStepsConfigured_other": "{count} خطوات الاختبار التي تم تكوينها",
-    "assignedTestCases_one": "{count} حالة الاختبار المخصصة",
-    "assignedTestCases_other": "{count} حالات الاختبار المعينة",
+    "labelsAssigned_one": "تم تعيين {count} تسمية",
+    "labelsAssigned_other": "تم تعيين {count} تسميات",
+    "testStepsConfigured_one": "تم تكوين {count} خطوة اختبار",
+    "testStepsConfigured_other": "تم تكوين {count} خطوات اختبار",
+    "assignedTestCases_one": "تم تعيين {count} حالة اختبار",
+    "assignedTestCases_other": "تم تعيين {count} حالات اختبار",
     "runsCount_one": "{count} تشغيل",
     "runsCount_other": "{count} تشغيل",
     "noDefinedSteps": "لم يتم تحديد خطوات لحالة الاختبار هذه",
@@ -368,15 +372,15 @@ export default {
     "executeToSeeResults": "قم بتنفيذ تشغيل الاختبار هذا لرؤية النتائج",
     "failedToLoadSummary": "فشل تحميل ملخص الاختبار",
     "noResultsForExport": "لا توجد نتائج متاحة للتصدير",
-    "stepsNotExecuted": "{count} لم يتم تنفيذ الخطوات بشكل فردي",
-    "stepsNotExecuted_one": "{count} لم يتم تنفيذ الخطوة بشكل فردي",
-    "stepsNotExecuted_other": "{count} لم يتم تنفيذ الخطوات بشكل فردي"
+    "stepsNotExecuted": "لم يتم تنفيذ {count} خطوة بشكل فردي",
+    "stepsNotExecuted_one": "لم يتم تنفيذ {count} خطوة بشكل فردي",
+    "stepsNotExecuted_other": "لم يتم تنفيذ {count} خطوات بشكل فردي"
   },
   "pickers": {
     "startTypingToSearch": "ابدأ الكتابة للبحث...",
-    "searchPages": "صفحات البحث...",
-    "agentOnline": "الوكيل عبر الإنترنت - سيختار عداء مباشر العناصر المخصصة",
-    "agentOffline": "الوكيل غير متصل - مجموعة المتسابقين الخاصة به لا تحتوي على متسابق مباشر؛ سيتم وضع العناصر المعينة في قائمة الانتظار",
+    "searchPages": "البحث في الصفحات...",
+    "agentOnline": "الوكيل متصل - سيختار مشغّل مباشر العناصر المخصصة",
+    "agentOffline": "الوكيل غير متصل - لا تحتوي مجموعة المشغّلات الخاصة به على مشغّل مباشر؛ ستُوضع العناصر المعينة في قائمة الانتظار",
     "agentLocal": "يتم تشغيل الوكيل على هذا الخادم",
     "agentUnbound": "لا يوجد وكيل ملزم في مساحة العمل هذه - لن يؤدي التعيين إلى بدء التشغيل",
     "labelCommaNotAllowed": "لا يمكن أن تحتوي أسماء التسميات على فاصلة",
@@ -386,7 +390,7 @@ export default {
   "editors": {
     "insertDiagram": "إدراج رسم تخطيطي",
     "diagramEdit": "تحرير الرسم التخطيطي",
-    "diagramOpen": "الرسم التخطيطي المفتوح",
+    "diagramOpen": "فتح الرسم التخطيطي",
     "diagramUntitled": "الرسم التخطيطي بدون عنوان",
     "diagramNamePlaceholder": "اسم الرسم التخطيطي",
     "diagramUnsaved": "التغييرات غير المحفوظة",
@@ -396,8 +400,8 @@ export default {
     "diagramLoadError": "تعذر تحميل الرسم التخطيطي",
     "diagramSaveError": "تعذر حفظ الرسم التخطيطي",
     "mermaidRendering": "عرض الرسم التخطيطي",
-    "mermaidParseError": "خطأ في تحليل حورية البحر",
-    "mermaidEmpty": "كتلة حورية البحر فارغة"
+    "mermaidParseError": "خطأ في تحليل Mermaid",
+    "mermaidEmpty": "كتلة Mermaid فارغة"
   },
   "dialogs": {
     "alerts": {
@@ -434,7 +438,7 @@ export default {
   "recurrence": {
     "title": "التكرار",
     "description": "إدارة قواعد المهام المتكررة",
-    "frequency": "التكرار",
+    "frequency": "معدل التكرار",
     "interval": "كرر كل",
     "daily": "يوميًا",
     "weekly": "أسبوعيًا",
@@ -445,14 +449,14 @@ export default {
     "endCondition": "ينتهي",
     "never": "أبدًا",
     "onDate": "في التاريخ",
-    "afterOccurrences": "بعد الأحداث",
-    "occurrences": "الأحداث",
+    "afterOccurrences": "بعد عدد من المرات",
+    "occurrences": "المرات",
     "preview": "الأحداث القادمة",
     "previewLoading": "جارٍ تحميل المعاينة...",
     "previewError": "فشل تحميل المعاينة",
     "copySettings": "نسخ من القالب",
     "copyAssignee": "نسخ المكلف",
-    "copyPriority": "أولوية النسخ",
+    "copyPriority": "نسخ الأولوية",
     "copyCustomFields": "انسخ الحقول المخصصة",
     "copyDescription": "انسخ الوصف",
     "leadTime": "أنشئ مسبقًا (أيام)",
@@ -460,10 +464,10 @@ export default {
     "active": "نشط",
     "inactive": "غير نشط",
     "instances": "المثيلات التي تم إنشاؤها",
-    "instanceCount": "{count} المثيلات",
+    "instanceCount": "{count} مثيل",
     "forceGenerate": "أنشئ الآن",
     "generating": "جارٍ الإنشاء...",
-    "generated": "{count} المثيلات التي تم إنشاؤها",
+    "generated": "تم إنشاء {count} مثيل",
     "addRecurrence": "إضافة تكرار",
     "noRule": "لم يتم تعيين أي تكرار",
     "setUp": "إعداد التكرار",
@@ -480,7 +484,7 @@ export default {
     "settingsTab": "الإعدادات",
     "instancesTab": "المثيلات",
     "searchPlaceholder": "قواعد تكرار البحث...",
-    "noMatchingResults": "لا قواعد التكرار تطابق بحثك",
+    "noMatchingResults": "لا توجد قواعد تكرار تطابق بحثك",
     "empty": "لا توجد قواعد تكرار",
     "emptyDesc": "ستظهر قواعد التكرار هنا عندما يتم تكوين جداول متكررة للعناصر.",
     "createFromItem": "لإنشاء قاعدة تكرار، افتح عنصرًا وقم بإعداد التكرار من الشريط الجانبي للتفاصيل.",
@@ -505,7 +509,7 @@ export default {
     "licenses": "التراخيص"
   },
   "screens": {
-    "screens": "{count} الشاشات"
+    "screens": "{count} شاشات"
   },
   "conditionSets": {
     "title": "مجموعات الشروط",
@@ -532,7 +536,7 @@ export default {
     "workflowRequired": "مطلوب سير العمل.",
     "nameRequired": "الاسم مطلوب.",
     "changeWorkflow": "تغيير سير العمل",
-    "changeWorkflowConfirm": "سيؤدي تغيير سير العمل إلى إزالة كافة شروط النقل الحالية. يكمل؟",
+    "changeWorkflowConfirm": "سيؤدي تغيير سير العمل إلى إزالة كافة شروط النقل الحالية. متابعة؟",
     "transitionConditions": "شروط النقل",
     "transitionConditionsDesc": "أضف شروطًا إلى انتقالات محددة لتقييد من يمكنه تنفيذها.",
     "unconditionedTransitions": "انتقالات بدون شروط",
@@ -612,7 +616,7 @@ export default {
     "stepModeSequential": "متسلسل",
     "stepModeParallel": "موازي",
     "stepModeSequentialDesc": "يتم تشغيل الخطوات واحدة تلو الأخرى. يتم فتح كل خطوة فقط عند الموافقة على الخطوة السابقة.",
-    "stepModeParallelDesc": "تفتح جميع الخطوات مرة واحدة. تتم الموافقة على الطلب فقط عند الموافقة على كل خطوة؛ يرفض في الرفض الأول.",
+    "stepModeParallelDesc": "تفتح جميع الخطوات مرة واحدة. تتم الموافقة على الطلب فقط عند الموافقة على كل خطوة؛ يُرفض عند أول رفض.",
     "steps": "الخطوات",
     "addStep": "إضافة خطوة",
     "removeStep": "إزالة الخطوة",
@@ -634,12 +638,12 @@ export default {
     "approverSourceAssignee": "المكلف الحالي",
     "approverSourceCurrentUser": "الشخص الذي قام بتفعيل الموافقة",
     "approverSourceUser": "مستخدم محدد",
-    "approverSourceRegularField": "الحقل العادي (المُعيَّن_معرف_المُنشئ،...)",
+    "approverSourceRegularField": "حقل عادي (assignee_id، creator_id، …)",
     "approverSourceCustomField": "الحقل المخصص (الذي كتبه المستخدم)",
     "approverSourceRole": "دور مساحة العمل",
     "approverSourceGroup": "المجموعة",
     "approverFieldIdentifier": "معرف الحقل",
-    "approverFieldIdentifierHelp": "الحقول المُدرجة في القائمة البيضاء: assignee_id، Creator_id، reporter_id.",
+    "approverFieldIdentifierHelp": "الحقول المُدرجة في القائمة البيضاء: assignee_id، creator_id، reporter_id.",
     "approverFieldId": "الحقل المخصص",
     "approverRole": "الدور",
     "approverGroup": "المجموعة",
@@ -647,18 +651,18 @@ export default {
     "allowSelfApproval": "السماح بالموافقة الذاتية — السماح لنفس المستخدم بنقل العنصر والموافقة عليه",
     "onLeave": "عند إجازة المعتمد",
     "onLeaveUseSubstitute": "استخدم البديل (افتراضي)",
-    "onLeaveUseSubstituteDesc": "تكريم المجموعة البديلة في الإجازة سجل. يعود إلى التصعيد إذا لم يتم تكوين بديل.",
+    "onLeaveUseSubstituteDesc": "يستخدم البديل المُعيَّن في سجل الإجازة. يعود إلى التصعيد إذا لم يتم تكوين بديل.",
     "onLeaveSkip": "تخطي المعتمد",
-    "onLeaveSkipDesc": "قم بإسقاط المستخدم الموجود على الإجازة من المجموعة. يتم التصعيد إذا أصبح المجمع فارغًا.",
+    "onLeaveSkipDesc": "يستبعد المستخدم الموجود في إجازة من التجمّع. يتم التصعيد إذا أصبح التجمّع فارغًا.",
     "onLeaveKeep": "احتفظ بالموافق",
-    "onLeaveKeepDesc": "واتركهم في حوض السباحة. يجب على الموافق الأصلي الرد بالرغم من غيابه.",
+    "onLeaveKeepDesc": "يبقيهم في التجمّع. يجب على الموافق الأصلي الرد رغم غيابه.",
     "fallbackTitle": "إذا لم يتمكن المعتمد من اتخاذ القرار",
     "fallbackDesc": "تشكل هاتان القاعدتان سلسلة احتياطية واحدة. يعالج الأول الموافقين على الإجازة المخططة؛ والثاني هو شبكة الأمان عند فشل التعامل مع الإجازة أو عدم وصول القرار في الوقت المناسب.",
     "fallbackConnector": "إذا كانت قاعدة الإجازة أعلاه تنتج تجمعًا فارغًا (لا يوجد بديل، أو تخطي يستنزف المجمع)، يتم تشغيل التصعيد على الفور بدلاً من انتظار المؤقت.",
     "escalation": "عندما لا يصل أي قرار في الوقت المناسب",
     "escalationDisabled": "لا يوجد تصعيد",
     "escalationDisabledDesc": "انتظر إلى أجل غير مسمى. لا يتم حل الخطوة تلقائيًا أبدًا؛ يجب على المشرف التدخل.",
-    "escalationActionReassignDesc": "قم بتسليم الخطوة إلى شخص أو دور أو مجموعة مختلفة. إعادة التسلح بعد كل مهلة متسلسلة تصل إلى الحد الأقصى من التصعيد.",
+    "escalationActionReassignDesc": "تسليم الخطوة إلى شخص أو دور أو مجموعة مختلفة. تُعاد الجدولة بعد كل مهلة متتالية حتى الحد الأقصى للتصعيد.",
     "escalationActionSkipStepDesc": "ضع علامة على الخطوة المعتمدة واترك الطلب يستمر أسفل السلسلة.",
     "escalationActionAutoRejectDesc": "ارفض الطلب وأطلق انتقال الرفض الذي تم تكوينه.",
     "escalationAfterHours": "التصعيد بعد (ساعات)",
@@ -667,8 +671,8 @@ export default {
     "escalationActionSkipStep": "تخطي الخطوة (المعاملة على أنها معتمدة)",
     "escalationActionAutoReject": "رفض الطلب تلقائيًا",
     "escalationTarget": "هدف التصعيد",
-    "maxEscalations": "الحد الأقصى التصعيد (فارغ = غير محدود)",
-    "chainedNote": "عند استخدام إعادة التعيين، يتم إعادة تسليح escalation_due_at بعد كل مهلة حتى هذا الحد الأقصى.",
+    "maxEscalations": "الحد الأقصى للتصعيد (فارغ = غير محدود)",
+    "chainedNote": "عند استخدام إعادة التعيين، يُعاد ضبط escalation_due_at بعد كل مهلة حتى هذا الحد الأقصى.",
     "overrideWarningTitle": "تنبيه: يتم أيضًا ربط هذا النقل بالشروط",
     "overrideWarningBody": "يتم تجاوز الشروط الخاصة بالانتقال المستند إلى الموافقة بصمت عندما يقوم محرك الموافقة بتشغيل النقل. لا تزال الشروط سارية لمحاولات المستخدم المباشرة (والتي ستحظرها الموافقة على أي حال). لتجنب المفاجآت، فكر في إزالة هذه الشروط أو نقلها إلى مرحلة انتقال الدخول.",
     "overrideWarningLearnMore": "راجع قواعد الشرط المتأثرة",
@@ -677,7 +681,7 @@ export default {
   },
   "workspaces": {
     "customers": {
-      "customerCount": "{count} العملاء",
+      "customerCount": "{count} عميل",
       "placeholders": {
         "phone": "+1 (555) 123-4567"
       }
@@ -689,22 +693,22 @@ export default {
     "agentLogTriggeredBy": "تم تشغيله بواسطة",
     "agentLogWaiting": "في انتظار الإخراج...",
     "agentRunSingular": "تشغيل",
-    "agentRunPlural": "يعمل",
-    "agentRerunLabel": "وكيل إعادة التشغيل",
+    "agentRunPlural": "عمليات التشغيل",
+    "agentRerunLabel": "إعادة تشغيل الوكيل",
     "agentRerunStarting": "جارٍ البدء...",
     "agentRerunBusy": "التشغيل قيد التقدم",
     "agentRerunTitle": "قم بتشغيل الوكيل مرة أخرى على هذا العنصر",
     "agentRerunFailed": "تعذر بدء تشغيل جديد",
     "agentReviewFlagTitle": "يحتاج إلى مراجعة بشرية",
-    "agentReviewFlagBody": "أساء الوكيل استخدام أداة ولم يستردها - قد لا يكون مخرجاته موثوقًا بها.",
+    "agentReviewFlagBody": "أساء الوكيل استخدام أداة ولم يتعافَ منها - قد لا تكون مخرجاته موثوقة.",
     "rollupItemCount": "متراكم عبر {count} عناصر",
     "linkToPage": "قم بربط هذا العنصر بصفحة المعرفة في نفس مساحة العمل.",
     "targetPage": "الصفحة المستهدفة",
     "page": "الصفحة",
     "linkedPages": "الصفحات",
-    "pagePickerPlaceholder": "صفحات البحث...",
-    "labels": "التصنيفات",
-    "addLabel": "+ إضافة تصنيف"
+    "pagePickerPlaceholder": "البحث في الصفحات...",
+    "labels": "التسميات",
+    "addLabel": "+ إضافة تسمية"
   },
   "comments": {
     "agentAuthored": "تأليف وكيل الذكاء الاصطناعي",
@@ -724,9 +728,9 @@ export default {
     "publicBoard": "اللوحة العامة",
     "transition_failed": "فشل نقل الحالة. تم تحديث اللوحة.",
     "manual_sort_unavailable_title": "الفرز اليدوي غير متاح",
-    "manual_sort_unavailable": "بدّل إلى وضع الترتيب لتنظيم البطاقات يدويًا.",
-    "blockersCount": "{count} أدوات الحظر",
-    "blockingCount": "{count} الحظر"
+    "manual_sort_unavailable": "انتقل إلى وضع الترتيب لتنظيم البطاقات يدويًا.",
+    "blockersCount": "{count} عنصر يحظر",
+    "blockingCount": "{count} عنصر محظور"
   },
   "workspaceSettings": {
     "tabs": {
@@ -736,9 +740,9 @@ export default {
     "headers": {
       "general": "تفاصيل مساحة العمل الأساسية والإعدادات الافتراضية",
       "categories": "تقييد فئات المشروع التي تنطبق",
-      "members": "إدارة من يمكنه الوصول إلى هذا مساحة العمل",
+      "members": "إدارة من يمكنه الوصول إلى مساحة العمل هذه",
       "configuration": "تعيين مجموعات التكوين لمساحة العمل هذه",
-      "sourceControl": "توصيل المستودعات والتحكم بالمصادر",
+      "sourceControl": "ربط المستودعات والتحكم في المصادر",
       "codingAgents": "تكوين وكلاء الترميز ومهاراتهم",
       "issueSync": "مزامنة المشكلات الخارجية في مساحة العمل هذه",
       "recurrence": "إدارة قواعد العناصر المتكررة",
@@ -748,6 +752,6 @@ export default {
     "workspaceKeyPlaceholder": "على سبيل المثال، DEV، TEST، PROD"
   },
   "issueSync": {
-    "workflowBypassWarning": "Synced GitHub تتجاوز الحالات قواعد سير العمل. يمكن أن تؤدي تغييرات الحالة التي يتم إجراؤها بواسطة مزامنة المشكلات إلى تخطي التحولات والشروط وأدوات التحقق من الصحة والموافقات."
+    "workflowBypassWarning": "تتجاوز حالات GitHub المُزامنة قواعد سير العمل. يمكن أن تؤدي تغييرات الحالة التي تُجريها مزامنة المشكلات إلى تخطي الانتقالات والشروط والمدققات والموافقات."
   }
 };

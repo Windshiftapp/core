@@ -1,0 +1,411 @@
+/**
+ * Arabic (ar) completion - remaining modules.
+ * Hand-written translations for previously missing keys.
+ */
+export default {
+  common: {
+    team: 'الفريق',
+  },
+
+  milestones: {
+    searchMilestones: 'البحث عن معالم...',
+    allWorkspaces: 'جميع مساحات العمل',
+    workspaceFilterCount: 'مساحات العمل: {count}',
+    allStatuses: 'جميع الحالات',
+    statusFilterCount: 'الحالات: {count}',
+    noMatchingMilestones: 'لا توجد معالم تطابق الفلاتر',
+    noMatchingMilestonesDescription: 'غيّر الفلاتر لرؤية مزيد من المعالم.',
+    clearFilters: 'مسح الفلاتر',
+    activity: {
+      tabOverview: 'نظرة عامة',
+      tabActivity: 'النشاط',
+      empty: 'لا يوجد نشاط بعد',
+      system: 'النظام',
+      someone: 'شخص ما',
+      none: 'لا شيء',
+      commentedOnMilestone: 'علّق على المعلم',
+      changedDescription: 'غيّر الوصف',
+      changedStatus: 'غيّر الحالة من {from} إلى {to}',
+      changedTargetDate: 'غيّر التاريخ المستهدف من {from} إلى {to}',
+      linkedPage: 'ربط الصفحة',
+      unlinkedPage: 'ألغى ربط الصفحة',
+      commentedOn: 'علّق على',
+      changedItemStatus: 'غيّر حالة',
+      fromTo: 'من {from} إلى {to}',
+      added: 'أضاف',
+      toMilestone: 'إلى المعلم',
+      removed: 'أزال',
+      fromMilestone: 'من المعلم',
+    },
+    columnStatus: 'الحالة',
+    columnMilestone: 'المعلم',
+    columnTargetDate: 'التاريخ المستهدف',
+    columnTimeline: 'الجدول الزمني',
+    columnTests: 'الاختبارات',
+    columnCreated: 'تاريخ الإنشاء',
+    columnUpdated: 'آخر تحديث',
+    visibleCount: '{count} معلم',
+    visibleCount_one: '{count} معلم',
+    visibleCount_other: '{count} معالم',
+    visibleInCategory: '{count} معلم في هذه الفئة',
+    visibleInCategory_one: '{count} معلم في هذه الفئة',
+    visibleInCategory_other: '{count} معالم في هذه الفئة',
+  },
+
+  actions: {
+    trigger: {
+      statusLoop: 'حلقة الحالة',
+      slaBreached: 'تجاوز SLA',
+      slaWarning: 'تحذير SLA',
+      commentCreated: 'تم إنشاء تعليق',
+      itemInactive: 'عنصر خامل',
+    },
+    nodes: {
+      notifyCustomer: 'إشعار العميل',
+      insertCannedResponse: 'إدراج رد جاهز',
+      adjustLabels: 'ضبط التسميات',
+    },
+    config: {
+      scopeThisItem: 'هذا العنصر',
+      scopeParentItem: 'العنصر الأب',
+      loopStatus: 'الحالة المتكررة',
+      enterMessage: 'أدخل رسالة...',
+      notifySubject: 'الموضوع',
+      notifySubjectPlaceholder: 'اتركه فارغًا لاستخدام موضوع التذكرة',
+      notifyCustomerPrivacyHint: 'يُتخطى تلقائيًا عندما يكون التعليق المُشغِّل خاصًا.',
+      commentAuthor: 'مؤلف التعليق',
+      commentAnyAuthor: 'أي مؤلف',
+      commentCustomer: 'ردود العملاء',
+      commentAgent: 'تعليقات الوكيل',
+      commentPrivacyHint: 'لا تُطلق التعليقات الخاصة أبدًا إجراءات مرئية للعميل.',
+      inactiveHours: 'ساعات الخمول',
+      inactiveHoursPlaceholder: 'مثال: 24',
+      inactiveHoursHint: 'يُشغّل عندما تبقى تذكرة مفتوحة بلا نشاط لهذا العدد من الساعات.',
+      cannedResponse: 'رد جاهز',
+      selectCannedResponse: 'اختيار رد جاهز...',
+      cannedResponseHint:
+        'تُنشر المقاطع الخاصة والإدراجات الناتجة عن تعليق خاص كملاحظات داخلية.',
+      addLabels: 'إضافة تسميات',
+      removeLabels: 'إزالة تسميات',
+      selectLabels: 'اختيار تسميات...',
+      noLabels: 'لا توجد تسميات في مساحة العمل بعد.',
+      adjustLabelsHint: 'تُدرج التسميات المفقودة في سجل التشغيل بدلًا من إفشال الإجراء.',
+    },
+    placeholders: {
+      trigger: {
+        actorUserId: 'المستخدم الذي شغّل الإجراء',
+        newField: 'القيمة الجديدة لحقل متغيّر، مثال: trigger.new_iteration_id',
+        fieldFallback: 'اختصار للقيمة الجديدة، مثال: trigger.iteration_id',
+        oldField: 'القيمة السابقة لحقل متغيّر، مثال: trigger.old_iteration_id',
+      },
+      parent: {
+        openChildCount: 'الأبناء المباشرون المفتوحون للعنصر الأب',
+        any: 'أي حقل من حقول العنصر الأب',
+      },
+    },
+  },
+
+  testing: {
+    caseFormat: 'تنسيق الحالة',
+    formatSteps: 'الخطوات',
+    formatBDD: 'BDD (Gherkin)',
+    formatImmutableNote: 'لا يمكن تغيير التنسيق بعد الإنشاء.',
+    titleFromScenarioNote: 'يأتي العنوان من اسم السيناريو.',
+    gherkinLabel: 'السيناريو (Gherkin)',
+    gherkinRequired: 'مصدر Gherkin مطلوب لحالة اختبار BDD.',
+    validateGherkin: 'التحقق',
+    gherkinValid: 'ملف ميزة صالح.',
+    gherkinValidScenario: 'صالح — السيناريو «{scenario}».',
+    gherkinInvalidCount: 'تم العثور على {count} مشكلة.',
+    gherkinChangedSinceValidation: 'تغيّر منذ آخر تحقق.',
+    gherkinErrorLocation: 'السطر {line}، العمود {column}',
+    gherkinValidationFailed: 'فشل طلب التحقق.',
+    failedToSaveCase: 'تعذّر حفظ حالة الاختبار.',
+    scenario: 'السيناريو',
+    feature: 'الميزة',
+    background: 'الخلفية',
+    examples: 'الأمثلة',
+    exampleN: 'مثال {n}',
+    examplesCount: '{count} مثال',
+    exampleResults: 'نتائج الأمثلة',
+    examplesNotExecuted: 'لم يتم تنفيذ الأمثلة.',
+    showRendered: 'عرض المعروض',
+    showSource: 'عرض المصدر',
+    copyFeatureFile: 'نسخ ملف الميزة',
+    featureCopied: 'تم نسخ ملف الميزة',
+    featureCopyFailed: 'تعذّر نسخ ملف الميزة',
+    bddSpecUnavailable: 'مواصفة السيناريو غير متاحة لهذه الحالة.',
+    bddSnapshotNote: 'تُسجَّل النتائج مقابل لقطة المواصفة المأخوذة عند دخول هذه الحالة إلى التشغيل.',
+    noExampleResults: 'لم يتم العثور على نتائج أمثلة لهذه الحالة في هذا التشغيل.',
+    failedToSaveExample: 'تعذّر حفظ نتيجة المثال.',
+    hideExampleSteps: 'إخفاء الخطوات',
+    showExampleSteps: 'عرض {count} خطوة',
+  },
+
+  zammad: {
+    groupCatalogNotVerified:
+      'تمنع أذونات حساب الخدمة المقيّدة التحقق التلقائي من المجموعات المكوّنة. تأكد من المجموعات المعاد تسميتها أو المحذوفة في Zammad قبل تغيير سياسة المجموعات.',
+    unverifiedGroup: 'مجموعة غير متحقَّق منها (المعرّف {id})',
+    ticketReloadAfterChangeFailed:
+      'نجح التغيير في Zammad، لكن تعذّر إعادة تحميل بيانات التذكرة الحالية.',
+    timeline: {
+      toggle: 'التغييرات الملاحَظة',
+      observedHint:
+        'التغييرات التي لاحظها Windshift أثناء المزامنة. هذا ليس سجل تدقيق كاملًا لـ Zammad.',
+      empty: 'لا توجد تغييرات ملاحَظة على التذكرة بعد.',
+      loadFailed: 'تعذّر تحميل تغييرات Zammad الملاحَظة',
+      initialValue: 'غير محدد',
+      valueIdFallback: 'المعرّف {id}',
+      change: '{field}: {from} → {to}',
+      field: {
+        status: 'الحالة',
+        group: 'المجموعة',
+        owner: 'المالك',
+        changed: 'حقل التذكرة',
+      },
+    },
+    overview: {
+      loading: 'جارٍ تحميل حالة دعم Zammad على مستوى مساحة العمل…',
+      loadFailed: 'تعذّر تحميل نظرة عامة على دعم Zammad',
+      emptyTitle: 'لا توجد تذاكر Zammad مرتبطة',
+      emptyDescription: 'لا توجد تذاكر Zammad مرتبطة بمساحة العمل هذه.',
+      observedHint: 'حالة التذاكر على مستوى مساحة العمل كما لاحظها Windshift أثناء المزامنة.',
+      refresh: 'تحديث',
+      byStatus: 'توزيع الحالات',
+      statusIdFallback: 'معرّف الحالة {id}',
+      statusWithConnection: '{connection} · {status}',
+      unknownStatusBucket: 'حالة غير معروفة',
+      recentChanges: 'التغييرات الملاحَظة الأخيرة',
+      noRecentChanges: 'لا توجد تغييرات ملاحَظة بعد.',
+      syncStateHint: 'بعض روابط التذاكر تحتاج إلى متابعة في Zammad أو في إعدادات اتصالها.',
+      metrics: {
+        total: 'الإجمالي',
+        active: 'نشطة',
+        closed: 'مغلقة',
+        unassigned: 'غير معيّن',
+        syncFailed: 'فشلت المزامنة',
+        creationUncertain: 'إنشاء غير مؤكد',
+        unknownStatus: 'حالة غير معروفة',
+      },
+    },
+  },
+
+  time: {
+    pomodoro: {
+      title: 'إعدادات بومودورو',
+      subtitle: 'كوّن سلوك مؤقت سطح المكتب والتسجيل التلقائي للوقت.',
+      loadingSettings: 'جارٍ تحميل الإعدادات...',
+      loadError: 'تعذّر تحميل الإعدادات: {error}',
+      settingsSaved: 'تم حفظ الإعدادات',
+      saveError: 'تعذّر حفظ الإعدادات: {error}',
+      timer: 'المؤقت',
+      workDuration: 'مدة العمل',
+      workDurationHelper: 'دقائق لكل جلسة تركيز',
+      shortBreak: 'راحة قصيرة',
+      shortBreakHelper: 'دقائق بين جلسات العمل',
+      longBreak: 'راحة طويلة',
+      longBreakHelper: 'دقائق بعد اكتمال دورة',
+      sessionsBeforeLongBreak: 'الجلسات قبل الراحة الطويلة',
+      sessionsBeforeLongBreakHelper: 'جلسات العمل المكتملة',
+      behavior: 'السلوك',
+      autoStartBreaks: 'بدء فترات الراحة تلقائيًا',
+      autoStartWork: 'بدء العمل تلقائيًا',
+      logging: 'التسجيل',
+      autoLogCompletedSessions: 'تسجيل جلسات العمل المكتملة تلقائيًا',
+      project: 'المشروع',
+      projectHelper: 'مشاريع الوقت النشطة من خادم مساحة العمل هذه',
+      selectProject: 'اختيار مشروع...',
+      loadingProjects: 'جارٍ تحميل المشاريع...',
+      description: 'الوصف',
+      descriptionHelper: 'يُستخدم لإدخالات سجل العمل الجديدة',
+      sessionPlaceholder: 'جلسة بومودورو',
+      cancel: 'إلغاء',
+      saveSettings: 'حفظ الإعدادات',
+    },
+  },
+
+  teams: {
+    tabs: {
+      serviceHours: 'ساعات الخدمة',
+    },
+    serviceHours: {
+      title: 'ساعات الخدمة',
+      subtitle: 'تقاويم ساعات العمل التي ينشرها هذا الفريق لمساحات العمل المرتبطة لأهداف SLA.',
+      createCalendar: 'تقويم جديد',
+      deleteCalendar: 'حذف التقويم',
+      deleteConfirm: 'حذف التقويم «{name}»؟ لا يمكن التراجع عن هذا.',
+      deleteBlocked: 'لا يزال هدف SLA يشير إلى هذا التقويم ولا يمكن حذفه.',
+      created: 'تم إنشاء التقويم',
+      updated: 'تم تحديث التقويم',
+      deleted: 'تم حذف التقويم',
+      loadFailed: 'تعذّر تحميل ساعات الخدمة',
+      timezone: 'المنطقة الزمنية',
+      noCalendars: 'لا توجد تقاويم ساعات خدمة بعد.',
+      previewImpact: 'معاينة التأثير',
+      impactTitle: 'تأثير تعديل «{name}»',
+      impactFailed: 'تعذّر تحميل معاينة التأثير',
+      impactCycles: '{count} دورة جارية تستخدم هذا التقويم',
+      noImpact: 'لا تشير أي مساحة عمل مرتبطة إلى هذا التقويم حاليًا.',
+    },
+  },
+
+  widgets: {
+    stats: {
+      collections: 'المجموعات',
+      totalItems: 'إجمالي العناصر',
+    },
+    milestoneProgress: {
+      chartAria: 'توزيع حالات المعالم',
+    },
+    testCoverage: {
+      chartAria: 'توزيع تغطية الاختبار',
+      covered: 'مغطى',
+      notCovered: 'غير مغطى',
+      emptyTitle: 'لم يتم تكوين متطلبات',
+      emptyDescription: 'كوّن أنواع المتطلبات في تقارير الاختبار لعرض بيانات التغطية.',
+      linkedCases: 'لها حالات اختبار مرتبطة',
+      loadError: 'تعذّر تحميل بيانات التغطية',
+      loading: 'جارٍ تحميل بيانات التغطية…',
+      requirementCount: '{covered} من {total} متطلب',
+      requirements: '{count} متطلب',
+      requirements_one: '{count} متطلب',
+      requirements_other: '{count} متطلبات',
+    },
+    iterationTimeline: {
+      planned: 'مخطط',
+      active: 'نشط',
+      completed: 'مكتمل',
+    },
+  },
+
+  workflowInspector: {
+    subtitle: 'إعدادات الانتقال',
+    screen: 'الشاشة',
+    noScreen: 'لا توجد شاشة مرتبطة بهذا الانتقال.',
+    chooseScreen: 'اختيار شاشة…',
+    changeScreen: 'تغيير الشاشة…',
+    unbind: 'إلغاء الربط',
+    fieldSummary: '{fields} حقل، منها {required} مطلوب',
+    newScreenPlaceholder: 'اسم الشاشة الجديدة',
+    createAndBind: 'إنشاء وربط',
+    createHeading: 'إنشاء شاشة جديدة',
+    createHint: 'ينشئ شاشة فارغة، ويربطها بهذا الانتقال، ويفتح محرر الحقول.',
+    editFields: 'تعديل الحقول',
+    editFieldsTitle: 'حقول الشاشة — {name}',
+    screenSaved: 'تم حفظ شاشة الانتقال',
+    screenStaged: 'ستُرفق الشاشة عند حفظ سير العمل',
+    pendingHint: 'لم يتم حفظ هذا الانتقال بعد. تُرفق الشاشة عند حفظ سير العمل.',
+    screenSaveFailed: 'تعذّر حفظ شاشة الانتقال',
+    screenCreateFailed: 'تعذّر إنشاء الشاشة',
+  },
+
+  contactLevels: {
+    title: 'مستويات الاتصال',
+    subtitle: 'إدارة مستويات اتصال البوابة المستخدمة لمشاركة طلبات المؤسسات',
+    createLevel: 'إنشاء مستوى',
+    editLevel: 'تعديل المستوى',
+    noLevels: 'لا توجد مستويات اتصال بعد',
+    namePlaceholder: 'مثال: مدير، فواتير، مشاهد',
+    nameRequired: 'اسم مستوى الاتصال مطلوب.',
+    failedToLoad: 'تعذّر تحميل مستويات الاتصال.',
+    failedToSave: 'تعذّر حفظ مستوى الاتصال.',
+    deleteFailed: 'تعذّر حذف مستوى الاتصال.',
+    confirmDelete: 'حذف «{name}»؟ سيفقد جهات الاتصال التي تحمل هذا المستوى إياه.',
+    system: 'النظام',
+  },
+
+  editors: {
+    insertPageLink: 'إدراج رابط صفحة معرفة',
+    searchPagesToLink: 'البحث في الصفحات…',
+    useProvider: 'التحرير باستخدام {label}',
+    useRichText: 'استخدام محرر النص الغني',
+    providerActive: '{label} نشط',
+    discardProviderChanges: 'تجاهل التغييرات غير المحفوظة؟',
+    discardProviderChangesMessage:
+      'لم تُحفظ تعديلاتك في {label}. التبديل إلى محرر آخر سيتجاهلها.',
+    discardChanges: 'تجاهل',
+    providerError: 'أبلغت إضافة المحرر عن خطأ: {message}',
+  },
+
+  transitionScreen: {
+    title: 'شاشة الانتقال',
+    moveTo: 'النقل إلى {status}',
+    comment: 'تعليق',
+    commentPlaceholder: 'إضافة تعليق (اختياري)',
+    confirm: 'نقل',
+    failed: 'تعذّر إكمال الانتقال.',
+    missingFields: 'املأ الحقول المطلوبة للمتابعة:',
+  },
+
+  pickers: {
+    selectStatus: 'اختيار حالة',
+    selectTeam: 'اختيار فريق',
+    fieldCategories: {
+      automation: 'الأتمتة',
+    },
+    fields: {
+      openChildCount: {
+        name: 'عدد الأبناء المفتوحين',
+        description: 'الأبناء المباشرون غير الموجودين في حالة مكتملة',
+      },
+      openDescendantCount: {
+        name: 'عدد الأحفاد المفتوحين',
+        description: 'الأحفاد على أي عمق غير الموجودين في حالة مكتملة',
+      },
+    },
+  },
+
+  createModal: {
+    team: 'الفريق',
+    workspacePackTemplate: 'حزمة مضمنة',
+    workspacePackMeta: 'الإصدار {version} · مجموعة تكوين + محتوى',
+    workspacePackError: 'تعذّر تحميل الحزم المضمنة',
+    createdPartialError:
+      'أُنشئ العنصر، لكن تعذّر إنهاؤه: {error}. اضغط «إنشاء» مرة أخرى لإعادة المحاولة.',
+  },
+
+  bulkActions: {
+    screenRequiredTitle: 'بعض العناصر تحتاج إلى نموذج',
+    screenRequiredAll:
+      'كل عنصر محدد يحتاج إلى نموذج قبل أن يُنقل. انقلها واحدًا واحدًا بدلًا من ذلك.',
+    screenRequiredMessage:
+      '{blocked} من {total} عنصر محدد يحتاج إلى نموذج قبل أن يُنقل. هل تريد نقل العناصر الأخرى ({remaining})؟',
+    screenRequiredConfirm: 'نقل الباقي',
+  },
+
+  scm: {
+    createMergeRequest: 'إنشاء طلب دمج',
+    mergeRequests: 'طلبات الدمج',
+    mrCreatedSuccess: 'تم إنشاء طلب الدمج !{prNumber} بنجاح',
+  },
+
+  jiraImport: {
+    mapping: {
+      createNewWorkspace: 'إنشاء مساحة عمل جديدة',
+      createNewItemType: 'إنشاء نوع عنصر جديد',
+      createNewStatus: 'إنشاء حالة جديدة',
+    },
+  },
+
+  pages: {
+    publiclyViewableBanner:
+      'قابلة للعرض العام — نُشرت هذه الصفحة عبر قاعدة معرفة البوابة ويمكن لمستخدمي البوابة قراءتها.',
+    publiclyViewableBannerWithPortals:
+      'قابلة للعرض العام — نُشرت هذه الصفحة عبر قاعدة معرفة {portals} ويمكن لمستخدمي البوابة قراءتها.',
+  },
+
+  assets: {
+    availableOnPortals: 'متاح على البوابات',
+    availableOnPortalsDesc:
+      'السماح لزوار البوابة بقراءة الأصول في هذه المجموعة عبر تقرير بوابة يشير إليها.',
+  },
+
+  aria: {
+    resizeNavigation: 'تغيير حجم الشريط الجانبي للتنقل',
+    sidebarResizeHint: 'اسحب لتغيير الحجم. انقر نقرًا مزدوجًا لإعادة التعيين.',
+  },
+
+  workflows: {
+    failedToSaveScreen: 'تعذّر حفظ شاشة انتقال',
+  },
+};

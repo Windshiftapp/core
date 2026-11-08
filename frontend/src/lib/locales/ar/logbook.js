@@ -87,7 +87,7 @@ export default {
     createdAt: 'تاريخ الإنشاء',
     updatedAt: 'تاريخ التحديث',
     reviewedAt: 'تاريخ المراجعة',
-    health: 'الحالة',
+    health: 'الصحة',
     author: 'المؤلف',
     processingMessage: 'جارٍ معالجة المستند...',
     runAction: 'تشغيل الإجراء',

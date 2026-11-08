@@ -2,9 +2,10 @@
   import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
   import { emailTemplates } from '../api/email-templates.js';
-  import { t } from '../stores/i18n.svelte.js';
+  import { SUPPORTED_LOCALES, t } from '../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
   import Button from '../components/Button.svelte';
+  import BasePicker from '../pickers/BasePicker.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
@@ -68,6 +69,9 @@
   let showEditor = $state(false);
   let editing = $state(null);
   let formData = $state({ subject: '', html_body: '', text_body: '', description: '', is_active: true });
+  // Empty locale edits the base (global) template; a shipped locale edits its
+  // override. Translations are stored per template + locale.
+  let selectedLocale = $state('');
 
   let showPreview = $state(false);
   let previewSubject = $state('');
@@ -91,26 +95,94 @@
 
   function openEditor(tmpl) {
     editing = tmpl;
-    formData = {
-      subject: tmpl.subject || '',
-      html_body: tmpl.html_body || '',
-      text_body: tmpl.text_body || '',
-      description: tmpl.description || '',
-      is_active: tmpl.is_active,
-    };
+    selectedLocale = '';
+    applyLocaleForm('');
     showEditor = true;
   }
+
+  const localeOptions = $derived([
+    { value: '', label: t('settings.emailTemplates.defaultLocale') },
+    ...SUPPORTED_LOCALES.map((locale) => ({ value: locale.code, label: locale.name })),
+  ]);
+
+  let selectedTranslation = $derived(
+    selectedLocale
+      ? ((editing?.translations ?? []).find((tr) => tr.locale === selectedLocale) ?? null)
+      : null
+  );
+
+  function applyLocaleForm(locale) {
+    if (!editing) return;
+    if (!locale) {
+      formData = {
+        subject: editing.subject || '',
+        html_body: editing.html_body || '',
+        text_body: editing.text_body || '',
+        description: editing.description || '',
+        is_active: editing.is_active,
+      };
+      return;
+    }
+    const translation = (editing.translations ?? []).find((tr) => tr.locale === locale);
+    formData = {
+      subject: translation?.subject ?? editing.subject ?? '',
+      html_body: translation?.html_body ?? editing.html_body ?? '',
+      text_body: translation?.text_body ?? editing.text_body ?? '',
+      description: '',
+      is_active: true,
+    };
+  }
+
+  function changeLocale(value) {
+    selectedLocale = value;
+    applyLocaleForm(value);
+  }
+
+  // Re-hydrate the form whenever the template or locale selection changes.
+  // formData is written here but never read, so this does not loop.
+  $effect(() => {
+    applyLocaleForm(selectedLocale);
+  });
 
   async function save() {
     if (!editing) return;
     try {
-      await emailTemplates.update(editing.id, formData);
-      successToast(t('settings.emailTemplates.saved'));
+      if (selectedLocale) {
+        await emailTemplates.updateTranslation(editing.id, selectedLocale, {
+          subject: formData.subject,
+          html_body: formData.html_body,
+          text_body: formData.text_body,
+        });
+        successToast(t('settings.emailTemplates.translationSaved'));
+      } else {
+        await emailTemplates.update(editing.id, formData);
+        successToast(t('settings.emailTemplates.saved'));
+      }
       showEditor = false;
       editing = null;
       await loadTemplates();
     } catch (err) {
-      errorToast(t('settings.emailTemplates.saveFailed', { error: err.message }));
+      errorToast(
+        t(
+          selectedLocale
+            ? 'settings.emailTemplates.translationSaveFailed'
+            : 'settings.emailTemplates.saveFailed',
+          { error: err.message }
+        )
+      );
+    }
+  }
+
+  async function deleteTranslation() {
+    if (!editing || !selectedLocale) return;
+    try {
+      await emailTemplates.deleteTranslation(editing.id, selectedLocale);
+      successToast(t('settings.emailTemplates.translationDeleted'));
+      showEditor = false;
+      editing = null;
+      await loadTemplates();
+    } catch (err) {
+      errorToast(t('settings.emailTemplates.translationDeleteFailed', { error: err.message }));
     }
   }
 
@@ -123,6 +195,7 @@
         subject: formData.subject,
         html_body: formData.html_body,
         text_body: formData.text_body,
+        locale: selectedLocale || undefined,
       });
       previewSubject = result.subject;
       previewHTML = result.html_body;
@@ -210,6 +283,22 @@
   <div class="px-6 py-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="lg:col-span-2 flex flex-col gap-4">
       <div>
+        <Label color="default" class="mb-2">{t('settings.emailTemplates.localeLabel')}</Label>
+        <BasePicker
+          bind:value={selectedLocale}
+          items={localeOptions}
+          placeholder={t('settings.emailTemplates.defaultLocale')}
+          getValue={(item) => item.value}
+          getLabel={(item) => item.label}
+        />
+        {#if selectedLocale}
+          <p class="text-xs mt-2" style="color: var(--ds-text-subtle);">
+            {t('settings.emailTemplates.translationHint')}
+          </p>
+        {/if}
+      </div>
+
+      <div>
         <TextField
           label={t('settings.emailTemplates.subject')}
           labelColor="default"
@@ -237,18 +326,20 @@
         />
       </div>
 
-      <div>
-        <TextareaField
-          label={t('settings.emailTemplates.adminNotes')}
-          labelColor="default"
-          rows={2}
-          bind:value={formData.description}
-        />
-      </div>
+      {#if !selectedLocale}
+        <div>
+          <TextareaField
+            label={t('settings.emailTemplates.adminNotes')}
+            labelColor="default"
+            rows={2}
+            bind:value={formData.description}
+          />
+        </div>
 
-      <div>
-        <Checkbox bind:checked={formData.is_active} label={t('settings.emailTemplates.activeHint')} size="small" />
-      </div>
+        <div>
+          <Checkbox bind:checked={formData.is_active} label={t('settings.emailTemplates.activeHint')} size="small" />
+        </div>
+      {/if}
     </div>
 
     <aside
@@ -276,7 +367,14 @@
     </aside>
   </div>
 
-  <div class="px-6 pb-2 flex justify-end">
+  <div class="px-6 pb-2 flex items-center justify-between gap-4">
+    <div>
+      {#if selectedTranslation}
+        <Button variant="danger-ghost" onclick={deleteTranslation}>
+          {t('settings.emailTemplates.translationDelete')}
+        </Button>
+      {/if}
+    </div>
     <Button variant="secondary" onclick={preview} icon={Eye} disabled={previewLoading}>
       {previewLoading ? t('settings.emailTemplates.previewLoading') : t('settings.emailTemplates.preview')}
     </Button>

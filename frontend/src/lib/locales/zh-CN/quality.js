@@ -34,20 +34,20 @@ export default {
   "pickers": {
     "noItemsFound": "未找到工作项",
     "noItemsAvailable": "无可用工作项",
-    "agentOffline": "代理离线 — 其跑步者池中没有实时跑步者；分配的工作项将排队"
+    "agentOffline": "代理离线 — 其运行器池中没有在线运行器；分配的工作项将排队"
   },
   "widgets": {
     "recentItems": {
       "loadingText": "正在加载最近的工作项...",
       "emptyTitle": "没有最近的工作项",
-      "emptySubtitle": "将显示最近查看的工作项此处",
+      "emptySubtitle": "最近查看的工作项将显示在此处",
       "loadError": "无法加载最近的工作项"
     }
   },
   "commandPalette": {
     "commands": {
       "assets": {
-        "description": "管理资产集和工作项"
+        "description": "管理资产集和资产"
       }
     },
     "recentlyViewed": {
@@ -73,7 +73,7 @@ export default {
     "scope": {
       "summary": "{items} 当前工作项 · {from}–{to}",
       "currentWorkspaceNote": "日期范围适用于流量和交付图表；健康状况和工龄为当前快照。历史图表使用今天位于此工作区的工作项，不包括已移动或已删除的工作项。",
-      "currentCollectionNote": "日期范围适用于流量和交付图表；健康状况和工龄为当前快照。历史图表使用今天符合此集合条件的工作项。更改集合可能会改变分析队列。"
+      "currentCollectionNote": "日期范围适用于流量和交付图表；健康状况和停留时长为当前快照。历史图表使用今天符合此集合条件的工作项。更改集合可能会改变分析群组。"
     },
     "health": {
       "attentionItems": "待检查工作项",
@@ -93,7 +93,7 @@ export default {
       "analyzed": "已完成工作项",
       "missingHistory_one": "由于缺少完成历史，已排除 1 个当前已完成工作项。",
       "missingHistory_other": "由于缺少完成历史，已排除 {count} 个当前已完成工作项。",
-      "definition": "从工作项创建到首次转换到已完成状态。之后重新打开不会更改此值。",
+      "definition": "从工作项创建到首次转换到已完成状态的时间。之后重新打开不会更改此值。",
       "missingHistory": "{count} 当前完成的工作项已被排除，因为缺少完成历史记录。"
     },
     "insufficientData": {
@@ -104,7 +104,7 @@ export default {
   "pages": {
     "workItemsButton": "工作项",
     "workItemsAria": "显示链接的工作项",
-    "workItemsEmpty": "无工作项链接还在这里"
+    "workItemsEmpty": "尚无工作项链接到此"
   },
   "recurrence": {
     "emptyDesc": "当工作项配置了重复计划时，重复规则将显示在此处。",

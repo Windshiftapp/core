@@ -71,12 +71,31 @@ CREATE TABLE IF NOT EXISTS notification_templates (
 	description TEXT,
 	is_system BOOLEAN DEFAULT FALSE,
 	is_active BOOLEAN DEFAULT TRUE,
+	is_customized BOOLEAN NOT NULL DEFAULT FALSE, -- true once an admin saves an edit; unmodified seeds fall back to the localized built-in default
 	template_type TEXT, -- legacy, unused
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_notification_templates_active ON notification_templates(is_active);
+
+-- Per-locale overrides for built-in email templates. A row here replaces the
+-- template's subject/body for that locale; locales without a row fall back to
+-- the global template row and then the localized built-in default.
+CREATE TABLE IF NOT EXISTS notification_template_translations (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	template_id INTEGER NOT NULL,
+	locale TEXT NOT NULL,
+	subject TEXT,
+	content TEXT, -- HTML body template
+	text_body TEXT, -- Plain-text body template
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	UNIQUE(template_id, locale),
+	FOREIGN KEY (template_id) REFERENCES notification_templates(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_notification_template_translations_template ON notification_template_translations(template_id);
 
 -- Notification settings system for configuration sets
 CREATE TABLE IF NOT EXISTS notification_settings (

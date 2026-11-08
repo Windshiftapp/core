@@ -135,7 +135,7 @@ export default {
       discardTitle: 'تجاهل هذا العنصر؟',
       discardMessage: 'ستفقد ما كتبته.',
       noPriorities: 'لا توجد أولويات',
-      noMilestones: 'لا توجد مراحل',
+      noMilestones: 'لا توجد معالم',
     },
     palette: {
       title: 'لوحة الأوامر',

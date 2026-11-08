@@ -388,8 +388,10 @@ func (ec *EventCoordinator) EmitApprovalStepStarted(req *models.ApprovalRequest,
 	message := fmt.Sprintf("Your approval is required on %s: %s", itemKey, item.Title)
 
 	if ec.notificationService != nil && len(approverUserIDs) > 0 {
-		_ = ec.notificationService.NotifyUsers(approverUserIDs, item.WorkspaceID, item.ID, actorUserID,
-			models.EventApprovalStepStarted, title, message)
+		_ = ec.notificationService.NotifyUsersI18n(approverUserIDs, item.WorkspaceID, item.ID, actorUserID,
+			models.EventApprovalStepStarted, title, message,
+			"notification.approvalStarted.title", "notification.approvalStarted.message",
+			map[string]any{"itemKey": itemKey, "itemTitle": item.Title})
 		// Also fire a rule-based broadcast for watchers/dashboards.
 		ec.notificationService.EmitEvent(&NotificationEvent{
 			EventType:   models.EventApprovalStepStarted,
@@ -594,10 +596,12 @@ func (ec *EventCoordinator) EmitApprovalEscalated(req *models.ApprovalRequest, s
 
 	if ec.notificationService != nil {
 		if len(newApproverIDs) > 0 {
-			_ = ec.notificationService.NotifyUsers(newApproverIDs, item.WorkspaceID, item.ID, actorUserID,
+			_ = ec.notificationService.NotifyUsersI18n(newApproverIDs, item.WorkspaceID, item.ID, actorUserID,
 				models.EventApprovalEscalated,
 				"Approval Escalated to You",
-				fmt.Sprintf("An approval has been escalated to you on %s: %s", itemKey, item.Title))
+				fmt.Sprintf("An approval has been escalated to you on %s: %s", itemKey, item.Title),
+				"notification.approvalEscalated.title", "notification.approvalEscalated.message",
+				map[string]any{"itemKey": itemKey, "itemTitle": item.Title})
 		}
 		ec.notificationService.EmitEvent(&NotificationEvent{
 			EventType:   models.EventApprovalEscalated,

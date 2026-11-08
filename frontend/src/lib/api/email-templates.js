@@ -14,6 +14,19 @@ export const emailTemplates = {
       body: JSON.stringify(data),
     }),
 
+  // Per-locale override for one template. The base row and the localized
+  // built-in default remain the fallback for other locales.
+  updateTranslation: (id, locale, data) =>
+    fetchAPI(`/email-templates/${id}/translations/${encodeURIComponent(locale)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteTranslation: (id, locale) =>
+    fetchAPI(`/email-templates/${id}/translations/${encodeURIComponent(locale)}`, {
+      method: 'DELETE',
+    }),
+
   preview: (data) =>
     fetchAPI('/email-templates/preview', {
       method: 'POST',
