@@ -288,13 +288,17 @@ class ItemDetailStore {
     this.#diagramsLoadedItemId = null;
     this.error = null;
     this.notFound = false;
+    // Only the first load flashes placeholders. A background reconcile of the
+    // item already on screen keeps its loaded sections in place; flipping
+    // these flags replaces the linked/child lists with a loading message and
+    // makes every field save flicker.
     if (!isSwitch) {
       this.loading = true;
       this.loadingLinks = true;
+      this.loadingStatusTransitions = true;
+      this.loadingWatchStatus = true;
+      this.loadingChildItems = true;
     }
-    this.loadingStatusTransitions = true;
-    this.loadingWatchStatus = true;
-    this.loadingChildItems = true;
 
     try {
       // Do not activate a different scope (e.g. a global board) just because
@@ -392,7 +396,13 @@ class ItemDetailStore {
       this.watcherCount = summary.watcher_count || 0;
       this.watchers = null;
       this.mergedIntoItemId = summary.merged_into_item_id || null;
-      this.childItems = summary.children || [];
+      const nextChildItems = summary.children || [];
+      // Replacing the array on every reconcile re-runs the child list's
+      // drag-and-drop setup; keep the reference when nothing display-relevant
+      // changed.
+      if (!childItemListsMatch(this.childItems, nextChildItems)) {
+        this.childItems = nextChildItems;
+      }
       this.currentItemType = summary.current_item_type || null;
       this.currentHierarchyLevel = summary.current_hierarchy_level || null;
       this.availableSubIssueTypes = summary.available_sub_issue_types || [];

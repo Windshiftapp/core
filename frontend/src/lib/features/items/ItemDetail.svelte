@@ -112,14 +112,11 @@ import NativeSelect from '../../components/NativeSelect.svelte';
       return Promise.resolve();
     }
     reconcilePending = false;
-    itemDetailStore.transitioning = true;
-    return loadData()
-      .then((loaded) => {
-        if (loaded) populateDropdownItems();
-      })
-      .finally(() => {
-        itemDetailStore.transitioning = false;
-      });
+    // A background reconcile of the item already on screen is not a view
+    // transition. Dimming the content here made every field save flicker.
+    return loadData().then((loaded) => {
+      if (loaded) populateDropdownItems();
+    });
   }
 
   $effect(() => {
