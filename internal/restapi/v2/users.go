@@ -13,19 +13,20 @@ type userReader interface {
 }
 
 type userDTO struct {
-	ID            int     `json:"id"`
-	Email         string  `json:"email"`
-	Username      string  `json:"username"`
-	FirstName     string  `json:"first_name"`
-	LastName      string  `json:"last_name"`
-	FullName      string  `json:"full_name"`
-	IsActive      bool    `json:"is_active"`
-	IsAgent       bool    `json:"is_agent"`
-	AgentPresence string  `json:"agent_presence"`
-	AvatarURL     *string `json:"avatar_url"`
-	Timezone      string  `json:"timezone"`
-	Language      string  `json:"language"`
-	CreatedAt     string  `json:"created_at"`
+	ID                    int     `json:"id"`
+	Email                 string  `json:"email"`
+	Username              string  `json:"username"`
+	FirstName             string  `json:"first_name"`
+	LastName              string  `json:"last_name"`
+	FullName              string  `json:"full_name"`
+	IsActive              bool    `json:"is_active"`
+	IsAgent               bool    `json:"is_agent"`
+	AgentPresence         string  `json:"agent_presence"`
+	AvatarURL             *string `json:"avatar_url"`
+	Timezone              string  `json:"timezone"`
+	Language              string  `json:"language"`
+	RequiresPasswordReset bool    `json:"requires_password_reset"`
+	CreatedAt             string  `json:"created_at"`
 }
 
 func getCurrentUser(users userReader) readOperation[userDTO] {
@@ -49,18 +50,19 @@ func mapUser(user *models.User) userDTO {
 		avatarURL = &value
 	}
 	return userDTO{
-		ID:            user.ID,
-		Email:         user.Email,
-		Username:      user.Username,
-		FirstName:     user.FirstName,
-		LastName:      user.LastName,
-		FullName:      user.FullName,
-		IsActive:      user.IsActive,
-		IsAgent:       user.IsAgent,
-		AgentPresence: user.AgentPresence,
-		AvatarURL:     avatarURL,
-		Timezone:      user.Timezone,
-		Language:      user.Language,
-		CreatedAt:     user.CreatedAt.UTC().Format(time.RFC3339),
+		ID:                    user.ID,
+		Email:                 user.Email,
+		Username:              user.Username,
+		FirstName:             user.FirstName,
+		LastName:              user.LastName,
+		FullName:              user.FullName,
+		IsActive:              user.IsActive,
+		IsAgent:               user.IsAgent,
+		AgentPresence:         user.AgentPresence,
+		AvatarURL:             avatarURL,
+		Timezone:              user.Timezone,
+		Language:              user.Language,
+		RequiresPasswordReset: user.RequiresPasswordReset,
+		CreatedAt:             user.CreatedAt.UTC().Format(time.RFC3339),
 	}
 }

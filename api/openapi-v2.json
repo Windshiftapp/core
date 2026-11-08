@@ -31606,6 +31606,10 @@
                 "description": "The last name value.",
                 "type": "string"
               },
+              "requires_password_reset": {
+                "description": "The requires password reset value.",
+                "type": "boolean"
+              },
               "timezone": {
                 "description": "The timezone value.",
                 "type": "string"
@@ -31626,6 +31630,7 @@
               "is_agent",
               "language",
               "last_name",
+              "requires_password_reset",
               "timezone",
               "username"
             ],

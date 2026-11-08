@@ -6,6 +6,9 @@ export const getAdminUsers = () => fetchAllV2Pages('/admin/users');
 export const getAssignableUsers = (workspaceId, requestOptions = {}) =>
   fetchV2Data(`/workspaces/${workspaceId}/assignable-users`, requestOptions);
 export const getUser = (id, requestOptions = {}) => fetchV2Data(`/users/${id}`, requestOptions);
+// The authenticated user's own record. Unlike the directory summary returned by
+// getUser, this includes private profile fields (email, timezone, language).
+export const getMyProfile = (requestOptions = {}) => fetchV2Data('/users/me', requestOptions);
 export const getUserDisplayBatch = (ids, requestOptions = {}) =>
   fetchV2Data('/users/display-batch', {
     ...requestOptions,
