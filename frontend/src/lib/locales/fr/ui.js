@@ -212,6 +212,14 @@ export default {
 
     // Sélecteur de jeu d'approbations
     selectApprovalSet: 'Sélectionner un ensemble d’approbations',
+
+    // Sélecteur de date
+    datePicker: {
+      previousMonth: 'Mois précédent',
+      nextMonth: 'Mois suivant',
+      openCalendar: 'Ouvrir le calendrier',
+      selectDate: 'Sélectionner une date...',
+    },
   },
 
   editors: {

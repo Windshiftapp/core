@@ -168,6 +168,14 @@ export default {
     selectWorkflow: 'Выберите рабочий процесс',
     selectConditionSet: 'Выберите набор условий',
     selectApprovalSet: 'Выберите набор согласований',
+
+    // Выбор даты
+    datePicker: {
+      previousMonth: 'Предыдущий месяц',
+      nextMonth: 'Следующий месяц',
+      openCalendar: 'Открыть календарь',
+      selectDate: 'Выберите дату…',
+    },
   },
 
   editors: {

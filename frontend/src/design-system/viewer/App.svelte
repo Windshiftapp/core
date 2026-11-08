@@ -38,6 +38,7 @@
   import LayoutDashboard from '@lucide/svelte/icons/layout-dashboard';
   import ClipboardPenLine from '@lucide/svelte/icons/clipboard-pen-line';
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+  import Calendar from '@lucide/svelte/icons/calendar';
 
   // Composition Examples
   import BoardExample from './pages/BoardExample.svelte'
@@ -102,6 +103,7 @@
   import CategoryMultiSelectPage from './pages/CategoryMultiSelectPage.svelte'
   import FieldSelectorPage from './pages/FieldSelectorPage.svelte'
   import MentionPickerPage from './pages/MentionPickerPage.svelte'
+  import DatePickerPage from './pages/DatePickerPage.svelte'
 
   let currentPage = $state(window.location.hash.slice(1) || 'board-example')
   let colorMode = $state('light')
@@ -212,6 +214,7 @@
         { id: 'categorymultiselect', label: 'CategoryMultiSelect', icon: Tag },
         { id: 'fieldselector', label: 'FieldSelector', icon: List },
         { id: 'mentionpicker', label: 'MentionPicker', icon: AtSign },
+        { id: 'datepicker', label: 'DatePicker', icon: Calendar },
       ]
     },
   ]
@@ -363,6 +366,8 @@
       <FieldSelectorPage />
     {:else if currentPage === 'mentionpicker'}
       <MentionPickerPage />
+    {:else if currentPage === 'datepicker'}
+      <DatePickerPage />
     {/if}
   </main>
 </div>

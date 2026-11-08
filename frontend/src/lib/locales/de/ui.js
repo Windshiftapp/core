@@ -218,6 +218,14 @@ export default {
     showingOfTotal: 'Zeige {shown} von {total} — tippen zum Suchen',
     selectIteration: 'Iteration auswählen',
     noIteration: 'Keine Iteration',
+
+    // Date Picker
+    datePicker: {
+      previousMonth: 'Vorheriger Monat',
+      nextMonth: 'Nächster Monat',
+      openCalendar: 'Kalender öffnen',
+      selectDate: 'Datum auswählen...',
+    },
   },
   editors: {
     enterText: 'Text eingeben...',

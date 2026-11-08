@@ -216,6 +216,14 @@ export default {
 
     // Approval Set Picker
     selectApprovalSet: 'Select approval set',
+
+    // Date Picker
+    datePicker: {
+      previousMonth: 'Previous month',
+      nextMonth: 'Next month',
+      openCalendar: 'Open calendar',
+      selectDate: 'Select date...',
+    },
   },
 
   editors: {

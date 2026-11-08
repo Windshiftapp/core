@@ -148,6 +148,14 @@ export default {
     selectScreen: '选择屏幕',
     searchTestCases: '搜索测试用例...',
     selectWorkflow: '选择工作流',
+
+    // 日期选择器
+    datePicker: {
+      previousMonth: '上个月',
+      nextMonth: '下个月',
+      openCalendar: '打开日历',
+      selectDate: '选择日期...',
+    },
   },
 
   editors: {

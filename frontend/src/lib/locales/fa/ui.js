@@ -233,7 +233,13 @@ export default {
     "searchTestCases": "جستجوی موارد آزمایشی...",
     "selectWorkflow": "گردش کار را انتخاب کنید",
     "selectConditionSet": "مجموعه شرایط را انتخاب کنید",
-    "selectApprovalSet": "مجموعه تایید را انتخاب کنید"
+    "selectApprovalSet": "مجموعه تایید را انتخاب کنید",
+    "datePicker": {
+      "previousMonth": "ماه قبل",
+      "nextMonth": "ماه بعد",
+      "openCalendar": "باز کردن تقویم",
+      "selectDate": "انتخاب تاریخ..."
+    }
   },
   "editors": {
     "enterText": "متن را وارد کنید...",
