@@ -26,6 +26,7 @@
    *   minlength?: number,
    *   maxlength?: number,
    *   list?: string,
+   *   dir?: 'ltr' | 'rtl' | 'auto',
    *   class?: string,
    *   style?: string,
    *   dataTestid?: string,
@@ -64,6 +65,7 @@
     minlength = undefined,
     maxlength = undefined,
     list = undefined,
+    dir = 'auto',
     class: className = '',
     style = '',
     dataTestid = undefined,
@@ -156,6 +158,7 @@
   {min}
   {max}
   {step}
+  {dir}
   class={allClasses}
   style="{variantStyle} {style}"
   {oninput}

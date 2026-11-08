@@ -93,7 +93,8 @@
         <button
           onclick={startEditingTitle}
           data-testid="item-title-edit"
-          class="text-xl font-semibold transition-colors text-left cursor-pointer title-geometry break-words"
+          dir="auto"
+          class="text-xl font-semibold transition-colors text-start cursor-pointer title-geometry break-words"
           style="color: var(--ds-text); word-wrap: break-word; overflow-wrap: break-word;"
           title={t('items.clickToEditTitle')}
         >
@@ -103,7 +104,8 @@
         <!-- Read-only title for users without item.edit (server enforces the
              PATCH; the UI simply must not offer the affordance). -->
         <h1
-          class="text-xl font-semibold text-left title-geometry break-words"
+          class="text-xl font-semibold text-start title-geometry break-words"
+          dir="auto"
           style="color: var(--ds-text); word-wrap: break-word; overflow-wrap: break-word;"
           data-testid="item-title-readonly"
         >

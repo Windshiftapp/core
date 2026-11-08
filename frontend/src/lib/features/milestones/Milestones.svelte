@@ -825,6 +825,7 @@
             <a
               href="/milestones/{item.id}{workspaceId ? `?workspaceId=${workspaceId}` : ''}"
               class="font-medium hover:underline cursor-pointer"
+              dir="auto"
               style="color: var(--ds-text);"
               title={markdownExcerpt(item.description) || undefined}
             >

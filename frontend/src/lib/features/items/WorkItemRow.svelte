@@ -171,11 +171,11 @@
       {/if}
 
       <!-- Title -->
-      <h4 class="text-sm flex-1 min-w-0 truncate" style="color: var(--ds-text);">{item.title}</h4>
+      <h4 class="text-sm flex-1 min-w-0 truncate" dir="auto" style="color: var(--ds-text);">{item.title}</h4>
 
       <!-- Optional Workspace Name -->
       {#if showWorkspace && item.workspace_name}
-        <span class="text-xs min-w-0 truncate" style="color: var(--ds-text-subtle);">{item.workspace_name}</span>
+        <span class="text-xs min-w-0 truncate" dir="auto" style="color: var(--ds-text-subtle);">{item.workspace_name}</span>
       {/if}
 
       <!-- Optional Timestamp -->

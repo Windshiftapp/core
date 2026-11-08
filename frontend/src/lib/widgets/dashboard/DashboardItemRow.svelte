@@ -55,6 +55,7 @@
     {/if}
     <span
       class="text-sm truncate"
+      dir="auto"
       style={unread ? 'color: var(--ds-text); font-weight: 500;' : 'color: var(--ds-text);'}
       >{title}</span
     >

@@ -658,7 +658,7 @@
 							</div>
 						{:else}
 							<!-- Read Mode -->
-							<div class="comment-content text-sm" style="color: var(--ds-text);">
+							<div class="comment-content text-sm" dir="auto" style="color: var(--ds-text);">
 								<MilkdownEditor content={comment.content} readonly={true} showToolbar={false} compact={true} {workspaceId} />
 							</div>
 							{#if comment.source !== 'approval'}

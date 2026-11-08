@@ -381,6 +381,7 @@
             type="button"
             onclick={() => { editingTitle = true; }}
             class="flex-1 text-lg font-semibold cursor-pointer hover:opacity-70 truncate text-left {isTaskCompleted() ? 'line-through opacity-60' : ''}"
+            dir="auto"
             style="color: var(--ds-text); background: none; border: none; padding: 0;"
           >
             {item.title}

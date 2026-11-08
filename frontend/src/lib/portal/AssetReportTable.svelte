@@ -254,7 +254,7 @@ import EmptyState from '../components/EmptyState.svelte';
         <IconComponent size={20} color="white" />
       </div>
       <div>
-        <h3 class="font-medium flex items-center gap-2" style="color: var(--ds-text);">
+        <h3 class="font-medium flex items-center gap-2" dir="auto" style="color: var(--ds-text);">
           {report.name}
           {#if report.is_active === false}
             <span

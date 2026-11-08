@@ -661,7 +661,7 @@
     {:else if field.field_type === 'number'}
       <span class="tabular-nums" style="color: var(--ds-text);">{renderDisplayValue()}</span>
     {:else}
-      <span class={valueTruncate ? 'block min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
+      <span class={valueTruncate ? 'block min-w-0 truncate' : ''} dir="auto" style="color: var(--ds-text);">{renderDisplayValue()}</span>
     {/if}
   {:else if interactive}
     {#if field.field_type === 'user'}

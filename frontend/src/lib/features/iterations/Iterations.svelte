@@ -320,7 +320,7 @@
         {:else}
           <IconBuilding class="w-4 h-4" style="color: var(--ds-text-subtle); min-width: 16px;" />
         {/if}
-        <span class="font-medium hover:underline cursor-pointer" style="color: var(--ds-text);">{item.name}</span>
+        <span class="font-medium hover:underline cursor-pointer" dir="auto" style="color: var(--ds-text);">{item.name}</span>
       {/snippet}
 
       {#snippet typeCell(item)}

@@ -164,7 +164,7 @@
             onupdateError={(detail) => onupdateError?.(detail)}
           />
         {:else}
-          <span class="text-sm line-clamp-2" style="color: var(--ds-text);">{item.title}</span>
+          <span class="text-sm line-clamp-2" dir="auto" style="color: var(--ds-text);">{item.title}</span>
         {/if}
       </div>
     </div>

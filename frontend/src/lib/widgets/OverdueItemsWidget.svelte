@@ -140,7 +140,7 @@
           >
             <div class="flex items-center gap-3 flex-1 min-w-0">
               <div class="min-w-0">
-                <p class="text-sm truncate" style="color: var(--ds-text);">{item.title}</p>
+                <p class="text-sm truncate" dir="auto" style="color: var(--ds-text);">{item.title}</p>
                 <div class="flex flex-wrap items-center gap-3 text-xs mt-1" style="color: var(--ds-text-subtle);">
                   <ItemKey itemKey={getItemKey(item)} />
                   <span class="font-medium" style="color: var(--ds-text-danger);">{formatDueDate(item.due_date)}</span>

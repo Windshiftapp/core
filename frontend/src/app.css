@@ -416,6 +416,21 @@ a.link:hover {
   text-align: right;
 }
 
+/* Text whose direction follows its own content. `dir="auto"` resolves the
+   direction from the first strong character, so a Persian title stays
+   right-aligned in an English interface and an English title stays
+   left-aligned in an Arabic one. This rule is unlayered, so it wins over the
+   text-align utilities and an explicit text-left cannot override it. */
+[dir="auto"] {
+  text-align: start;
+}
+
+/* Inline runs of mixed-direction text (keys, URLs, code) stay isolated from
+   the surrounding sentence instead of reordering it. */
+.bidi-isolate {
+  unicode-bidi: isolate;
+}
+
 /* RTL-aware margin utilities using logical properties */
 .ms-auto {
   margin-inline-start: auto;

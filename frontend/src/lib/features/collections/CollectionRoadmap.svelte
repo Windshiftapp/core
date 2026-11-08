@@ -1397,7 +1397,7 @@
                       {/if}
 
                       <!-- Title -->
-                      <span class="text-sm truncate flex-1 group-hover/tree-row:underline" style="color: var(--ds-text);">{item.title}</span>
+                      <span class="text-sm truncate flex-1 group-hover/tree-row:underline" dir="auto" style="color: var(--ds-text);">{item.title}</span>
 
                       <!-- Scheduled indicator -->
                       {#if scheduled}

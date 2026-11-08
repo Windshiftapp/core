@@ -19,9 +19,9 @@
       <Icon class="w-6 h-6" style="color: var(--ds-interactive);" />
     {/if}
     <div>
-      <h3 class="text-lg font-semibold" style="color: var(--ds-text);">{title}</h3>
+      <h3 class="text-lg font-semibold" dir="auto" style="color: var(--ds-text);">{title}</h3>
       {#if subtitle}
-        <p class="text-sm mt-0.5" style="color: var(--ds-text-subtle);">{subtitle}</p>
+        <p class="text-sm mt-0.5" dir="auto" style="color: var(--ds-text-subtle);">{subtitle}</p>
       {/if}
     </div>
   </div>

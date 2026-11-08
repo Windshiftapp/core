@@ -453,7 +453,7 @@
     {/if}
 
     <div class="title-row">
-      <h1 class="title" data-testid="detail-title">{item.title}</h1>
+      <h1 class="title" dir="auto" data-testid="detail-title">{item.title}</h1>
       <button
         class="edit-btn"
         onclick={() => navigate(`/m/items/${item.id}/edit`)}

@@ -134,9 +134,9 @@
             </span>
             <Badge size="xs" variant={statusVariant(itemCtx.status)}>{itemCtx.status}</Badge>
           </div>
-          <h3 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">{itemCtx.title}</h3>
+          <h3 class="text-lg font-semibold mb-2" dir="auto" style="color: var(--ds-text);">{itemCtx.title}</h3>
           {#if itemCtx.description}
-            <div class="text-sm whitespace-pre-wrap" style="color: var(--ds-text-subtle);">
+            <div class="text-sm whitespace-pre-wrap" dir="auto" style="color: var(--ds-text-subtle);">
               {itemCtx.description}
             </div>
           {/if}

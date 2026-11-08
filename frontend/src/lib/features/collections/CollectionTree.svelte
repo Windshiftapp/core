@@ -443,6 +443,7 @@
       href="#view-test-case"
       onClick={(e) => handleTestCaseClick(e, item.id, item.testCaseData?.workspaceId)}
       class="block text-left w-full text-sm transition-colors truncate cursor-pointer text-ds-text-accent-green hover:opacity-80"
+      dir="auto"
     >
       {item.title}
     </LinkComponent>

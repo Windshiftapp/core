@@ -216,7 +216,8 @@
         onkeydown={handleDescriptionKeydown}
         role="button"
         tabindex="0"
-        class="description-hover text-left rounded cursor-pointer transition-colors duration-150"
+        class="description-hover text-start rounded cursor-pointer transition-colors duration-150"
+        dir="auto"
         style="color: var(--ds-text);"
         title={t('items.clickToEditDescription')}
         data-testid="item-description-display"
@@ -225,7 +226,8 @@
       </div>
     {:else}
       <div
-        class="text-left rounded"
+        class="text-start rounded"
+        dir="auto"
         style="color: var(--ds-text);"
         data-testid="item-description-display"
       >
@@ -236,7 +238,7 @@
     <button
       data-testid="item-description-empty"
       onclick={startEditingDescription}
-      class="description-empty text-left text-[0.875rem] transition-colors cursor-pointer"
+      class="description-empty text-start text-[0.875rem] transition-colors cursor-pointer"
       title={t('items.clickToAddDescription')}
     >
       {t('items.noDescriptionProvided')}
@@ -244,7 +246,7 @@
   {:else}
     <p
       data-testid="item-description-empty"
-      class="text-left w-full py-2 text-[0.875rem]"
+      class="text-start w-full py-2 text-[0.875rem]"
       style="color: var(--ds-text-subtle);"
     >
       {t('items.noDescriptionProvided')}
