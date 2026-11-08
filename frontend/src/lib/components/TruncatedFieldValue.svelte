@@ -50,7 +50,7 @@
       style="color: var(--ds-link, var(--ds-text)); outline-color: var(--ds-border-focused);"
       data-testid={testId}
     >
-      <span use:trackOverflow={value} class="min-w-0 truncate">{value}</span>
+      <span use:trackOverflow={value} class="min-w-0 truncate" dir="auto" style="text-align: end;">{value}</span>
       <ExternalLink class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
     </a>
   {:else if onactivate}
@@ -60,7 +60,8 @@
       {disabled}
       use:trackOverflow={value}
       class="block w-full min-w-0 truncate rounded-sm text-right focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-default"
-      style="color: {subtle ? 'var(--ds-text-subtle)' : 'var(--ds-text)'}; outline-color: var(--ds-border-focused);"
+      dir="auto"
+      style="text-align: end; color: {subtle ? 'var(--ds-text-subtle)' : 'var(--ds-text)'}; outline-color: var(--ds-border-focused);"
       data-testid={testId}
     >
       {value}
@@ -69,7 +70,8 @@
     <span
       use:trackOverflow={value}
       class="block min-w-0 truncate text-right"
-      style="color: {subtle ? 'var(--ds-text-subtle)' : 'var(--ds-text)'};"
+      dir="auto"
+      style="text-align: end; color: {subtle ? 'var(--ds-text-subtle)' : 'var(--ds-text)'};"
       data-testid={testId}
     >
       {value}

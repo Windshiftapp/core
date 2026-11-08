@@ -45,6 +45,7 @@
 <span
   class={cn('inline-flex items-center gap-1 rounded-full font-medium', sizeClasses, className)}
   style={variantStyles}
+  dir="auto"
   {...rest}
 >
   {#if Icon}

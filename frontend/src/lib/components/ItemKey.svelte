@@ -99,7 +99,7 @@
 </script>
 
 {#if linkHref}
-  <LinkComponent href={linkHref} onClick={handleClick} class={classes} style={resolvedStyle} data-testid={dataTestid} {title}>
+  <LinkComponent href={linkHref} onClick={handleClick} class={classes} style={resolvedStyle} dir="ltr" data-testid={dataTestid} {title}>
     {displayKey}
   </LinkComponent>
 {:else if interactive}
@@ -107,7 +107,7 @@
     {displayKey}
   </button>
 {:else}
-  <span class={classes} style={resolvedStyle} data-testid={dataTestid} {title}>
+  <span class={classes} style={resolvedStyle} dir="ltr" data-testid={dataTestid} {title}>
     {displayKey}
   </span>
 {/if}

@@ -28,8 +28,8 @@
     />
 
     <div class="flex-1 min-w-0">
-      <div class="font-medium text-sm truncate">{result.title}</div>
-      <div class="text-xs" style="color: var(--ds-text-subtle);">
+      <div class="font-medium text-sm truncate" dir="auto">{result.title}</div>
+      <div class="text-xs" dir="auto" style="color: var(--ds-text-subtle);">
         {#if result.type === 'test_case'}
           {result.description || `Test Case #${result.id}`}
         {:else}
