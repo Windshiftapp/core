@@ -1,20 +1,25 @@
 <script>
   /**
-   * Calendar-aware date picker: a popover trigger plus `CalendarGrid`.
+   * Calendar-aware date field.
    *
    * The bound `value` is always a Gregorian `YYYY-MM-DD` string, matching
-   * `<input type="date">` and the timestamp APIs, so it is a drop-in
-   * replacement. The displayed calendar follows the UI locale by default
-   * (Persian for `fa`) and can be overridden with the `calendar` prop.
+   * `<input type="date">` and the timestamp APIs.
+   *
+   * Two rendering modes, chosen from the resolved calendar:
+   * - Gregorian locales keep a native `<input type="date">`, which has the best
+   *   keyboard and OS-picker behaviour.
+   * - Non-Gregorian locales (Persian for `fa`) load `CalendarDateField` lazily,
+   *   so the Jalali calendar and `@internationalized/date` never reach locales
+   *   that keep the native picker.
+   *
+   * `inline` renders the control directly instead of inside its own popover,
+   * for use inside an existing popover (e.g. the create-modal date chips).
    */
-  import { createPopover, melt } from '@melt-ui/svelte';
-  import { DateFormatter, parseDate, today } from '@internationalized/date';
   import Calendar from '@lucide/svelte/icons/calendar';
-  import X from '@lucide/svelte/icons/x';
-  import { i18n, t } from '../stores/i18n.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
+  import { getAppLocale } from '../stores/appLocale.svelte.js';
   import { cn } from '../utils/cn.js';
   import { controlSizeClasses } from '../utils/controlSizes.js';
-  import CalendarGrid from './CalendarGrid.svelte';
 
   let {
     value = $bindable(''),
@@ -24,7 +29,10 @@
     max = undefined,
     disabled = false,
     readonly = false,
+    required = false,
     clearable = true,
+    inline = false,
+    autoOpen = false,
     placeholder = undefined,
     label = '',
     ariaLabel = undefined,
@@ -33,222 +41,144 @@
     size = 'medium',
     class: className = '',
     dataTestid = undefined,
-    onchange = undefined
+    inputRef = $bindable(null),
+    onchange = undefined,
+    onkeydown = undefined,
+    onblur = undefined,
+    onfocus = undefined
   } = $props();
 
   const PERSIAN_LOCALES = new Set(['fa']);
 
-  const resolvedLocale = $derived(locale || i18n.locale || 'en');
+  const resolvedLocale = $derived(locale || getAppLocale());
   const calendarId = $derived(
     calendar || (PERSIAN_LOCALES.has(resolvedLocale) ? 'persian' : 'gregory')
   );
+  const isNative = $derived(calendarId === 'gregory');
+  const resolvedAriaLabel = $derived(ariaLabel ?? (label || undefined));
 
-  const displayFormatter = $derived(
-    new DateFormatter(resolvedLocale, {
-      calendar: calendarId,
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    })
-  );
-
-  const displayText = $derived.by(() => {
-    if (!value) return placeholder ?? t('pickers.datePicker.selectDate');
-    try {
-      return displayFormatter.format(parseDate(value.slice(0, 10)).toDate('UTC'));
-    } catch {
-      return value;
-    }
-  });
-
-  const {
-    elements: { trigger, content },
-    states: { open }
-  } = createPopover({
-    positioning: { placement: 'bottom-start', gutter: 4 },
-    portal: 'body',
-    forceVisible: true
-  });
-
-  const triggerClass = $derived(
+  const controlClass = $derived(
     cn(
-      'inline-flex items-center justify-between gap-2 rounded border transition-colors text-left',
+      'rounded border transition-colors',
       controlSizeClasses(size),
+      inline ? 'w-full' : 'inline-flex items-center justify-between gap-2 text-left',
       className
     )
   );
 
-  function commit(nextValue) {
-    value = nextValue;
-    onchange?.(nextValue);
-    $open = false;
+  // Load the non-Gregorian field only when the locale needs it.
+  let CalendarDateField = $state(null);
+  $effect(() => {
+    if (isNative || CalendarDateField) return;
+    let cancelled = false;
+    import('./CalendarDateField.svelte').then((module) => {
+      if (!cancelled) CalendarDateField = module.default;
+    });
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  function handleNativeInput(event) {
+    value = event.currentTarget.value;
+    onchange?.(value);
   }
 
-  function handleClear(event) {
-    event?.stopPropagation();
-    commit('');
+  // Open the OS picker as soon as the input mounts, so a chip click still sets
+  // a date in one interaction.
+  function autoOpenPicker(node) {
+    if (!autoOpen) return;
+    node.focus();
+    try {
+      node.showPicker?.();
+    } catch {
+      // Keep the focused input available for manual entry.
+    }
   }
 </script>
 
-<div class="date-picker" data-testid={dataTestid ? `${dataTestid}-root` : undefined}>
+{#if isNative}
   {#if label}
     <span class="date-picker-label" style="color: var(--ds-text);">{label}</span>
   {/if}
-  <div class="date-picker-control">
-    <button
-      use:melt={$trigger}
-      type="button"
-      {id}
-      {disabled}
-      aria-label={ariaLabel ?? (label || t('pickers.datePicker.openCalendar'))}
-      class={triggerClass}
-      style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: {value
-        ? 'var(--ds-text)'
-        : 'var(--ds-text-subtle)'};"
-      data-testid={dataTestid}
-    >
-      <span class="date-picker-icon">
-        <Calendar size={15} />
-      </span>
-      <span class="date-picker-text">{displayText}</span>
-    </button>
-    {#if clearable && value && !disabled && !readonly}
-      <button
-        type="button"
-        class="date-picker-clear"
-        onclick={handleClear}
-        aria-label={t('common.clear')}
-        data-testid={dataTestid ? `${dataTestid}-clear` : undefined}
-      >
-        <X size={14} />
-      </button>
-    {/if}
-  </div>
-
-  {#if $open}
-    <div
-      use:melt={$content}
-      class="date-picker-popover"
-      data-testid={dataTestid ? `${dataTestid}-popover` : undefined}
-      style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
-    >
-      {#key calendarId}
-        <CalendarGrid
-          {calendarId}
-          locale={resolvedLocale}
-          {value}
-          {min}
-          {max}
-          onselect={commit}
-          dataTestid={dataTestid ? `${dataTestid}-calendar` : undefined}
-        />
-      {/key}
-      <div class="date-picker-footer" style="border-top: 1px solid var(--ds-border);">
-        <button
-          type="button"
-          class="date-picker-footer-button"
-          onclick={() => commit(today('UTC').toString())}
-          data-testid={dataTestid ? `${dataTestid}-today` : undefined}
-        >
-          {t('common.today')}
-        </button>
-        {#if clearable && value}
-          <button
-            type="button"
-            class="date-picker-footer-button"
-            onclick={handleClear}
-            data-testid={dataTestid ? `${dataTestid}-footer-clear` : undefined}
-          >
-            {t('common.clear')}
-          </button>
-        {/if}
-      </div>
-    </div>
-  {/if}
-
-  {#if name}
-    <input type="hidden" {name} value={value} />
-  {/if}
-</div>
+  <input
+    type="date"
+    {id}
+    {name}
+    {min}
+    {max}
+    {disabled}
+    {required}
+    readonly={readonly}
+    aria-label={resolvedAriaLabel}
+    {placeholder}
+    class={controlClass}
+    style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
+    data-testid={dataTestid}
+    value={value}
+    bind:this={inputRef}
+    oninput={handleNativeInput}
+    onchange={handleNativeInput}
+    {onkeydown}
+    {onblur}
+    {onfocus}
+    use:autoOpenPicker
+  />
+{:else if CalendarDateField}
+  <CalendarDateField
+    value={value}
+    {calendarId}
+    locale={resolvedLocale}
+    {min}
+    {max}
+    {disabled}
+    {readonly}
+    {clearable}
+    {inline}
+    {placeholder}
+    {label}
+    {ariaLabel}
+    {id}
+    {size}
+    class={className}
+    {dataTestid}
+    onchange={(next) => {
+      value = next;
+      onchange?.(next);
+    }}
+  />
+{:else}
+  <button
+    type="button"
+    class={controlClass}
+    style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text-subtle);"
+    {disabled}
+    data-testid={dataTestid ? `${dataTestid}-loading` : undefined}
+  >
+    <span class="date-picker-icon"><Calendar size={15} /></span>
+    <span class="date-picker-text">{placeholder ?? t('pickers.datePicker.selectDate')}</span>
+  </button>
+{/if}
 
 <style>
-  .date-picker {
-    display: inline-flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
   .date-picker-label {
+    display: block;
     font-size: 0.8125rem;
     font-weight: 500;
+    margin-bottom: 0.25rem;
   }
 
-  .date-picker-control {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    width: 100%;
-  }
-
-  .date-picker-control :global(.date-picker-icon) {
+  :global(.date-picker-icon) {
     display: inline-flex;
     align-items: center;
     color: var(--ds-text-subtle);
     flex-shrink: 0;
   }
 
-  .date-picker-control :global(.date-picker-text) {
+  :global(.date-picker-text) {
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .date-picker-clear {
-    position: absolute;
-    inset-inline-end: 0.5rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.25rem;
-    height: 1.25rem;
-    border-radius: 9999px;
-    border: none;
-    background: transparent;
-    color: var(--ds-text-subtle);
-    cursor: pointer;
-  }
-
-  .date-picker-clear:hover {
-    background-color: var(--ds-surface-hovered);
-    color: var(--ds-text);
-  }
-
-  .date-picker-popover {
-    z-index: 70;
-    border-radius: 0.5rem;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  }
-
-  .date-picker-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.5rem;
-  }
-
-  .date-picker-footer-button {
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.375rem;
-    border: none;
-    background: transparent;
-    font-size: 0.8125rem;
-    color: var(--ds-interactive);
-    cursor: pointer;
-  }
-
-  .date-picker-footer-button:hover {
-    background-color: var(--ds-surface-hovered);
   }
 </style>

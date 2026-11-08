@@ -20,7 +20,7 @@
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import { untrack } from 'svelte';
-  import { i18n, t } from '../stores/i18n.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
 
   let {
     calendarId = 'gregory',
@@ -28,11 +28,12 @@
     value = '',
     min = undefined,
     max = undefined,
+    readonly = false,
     dataTestid = undefined,
     onselect = undefined
   } = $props();
 
-  const isRTL = $derived(i18n.isRTL);
+  const isRTL = $derived(/^(fa|ar|he|ur)(-|$)/i.test(locale));
 
   // The calendar is instantiated once per mount; the parent remounts this
   // component when the calendar changes, so these props are read as initial
@@ -74,6 +75,7 @@
       minValue,
       maxValue,
       weekdayFormat: 'short',
+      readonly,
       calendarLabel: t('pickers.datePicker.selectDate'),
       onValueChange: ({ next }) => {
         if (next) onselect?.(next.toString());

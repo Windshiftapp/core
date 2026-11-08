@@ -18,6 +18,7 @@
   import { formatDateOnly, formatDueDate } from '../utils/dateFormatter.js';
   import MilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
   import ChipPicker from '../pickers/ChipPicker.svelte';
+  import DatePicker from '../pickers/DatePicker.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import PriorityPicker from '../pickers/PriorityPicker.svelte';
   import MilestoneCombobox from '../pickers/MilestoneCombobox.svelte';
@@ -83,18 +84,9 @@
     forceVisible: true
   });
 
-  // Optional dates are presented as chips. Open the browser's native calendar
-  // as soon as the chip mounts its input so setting a date remains a one-click
-  // interaction. The focused, visible input is the fallback when showPicker is
-  // unavailable or the browser declines the programmatic picker request.
-  function focusAndShowDatePicker(node) {
-    node.focus();
-    try {
-      node.showPicker?.();
-    } catch {
-      // Keep the focused input available for manual entry.
-    }
-  }
+  // Optional dates are presented as chips that open a popover holding the
+  // calendar-aware date field. Native locales open the OS picker on mount so
+  // setting a date stays a one-click interaction.
 
   // Reactive effects for data loading based on form state
 
@@ -390,14 +382,12 @@
           class="z-[70] rounded-lg shadow-lg p-3"
           style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
         >
-          <input
-            type="date"
-            data-testid="create-due-date-input"
+          <DatePicker
+            inline
+            autoOpen
             bind:value={store.formData.due_date}
-            use:focusAndShowDatePicker
-            aria-label={t('createModal.dueDate')}
-            class="w-full px-3 py-2 rounded border text-sm"
-            style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
+            dataTestid="create-due-date-input"
+            ariaLabel={t('createModal.dueDate')}
           />
         </div>
       {/if}
@@ -422,14 +412,12 @@
           class="z-[70] rounded-lg shadow-lg p-3"
           style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
         >
-          <input
-            type="date"
-            data-testid="create-start-date-input"
+          <DatePicker
+            inline
+            autoOpen
             bind:value={store.formData.start_date}
-            use:focusAndShowDatePicker
-            aria-label={t('common.startDate')}
-            class="w-full px-3 py-2 rounded border text-sm"
-            style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
+            dataTestid="create-start-date-input"
+            ariaLabel={t('common.startDate')}
           />
         </div>
       {/if}
@@ -454,14 +442,12 @@
           class="z-[70] rounded-lg shadow-lg p-3"
           style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
         >
-          <input
-            type="date"
-            data-testid="create-end-date-input"
+          <DatePicker
+            inline
+            autoOpen
             bind:value={store.formData.end_date}
-            use:focusAndShowDatePicker
-            aria-label={t('common.endDate')}
-            class="w-full px-3 py-2 rounded border text-sm"
-            style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
+            dataTestid="create-end-date-input"
+            ariaLabel={t('common.endDate')}
           />
         </div>
       {/if}

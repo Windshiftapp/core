@@ -1,6 +1,7 @@
 <script>
   import { cn } from '../utils/cn.js';
   import { controlSizeClasses } from '../utils/controlSizes.js';
+  import DatePicker from '../pickers/DatePicker.svelte';
 
   /**
    * @type {{
@@ -104,6 +105,32 @@
 </script>
 
 <!-- svelte-ignore a11y_autofocus -->
+{#if type === 'date'}
+  <DatePicker
+    bind:value
+    bind:inputRef
+    {id}
+    {name}
+    {min}
+    {max}
+    {disabled}
+    {required}
+    readonly={readonly}
+    {placeholder}
+    {size}
+    class={className}
+    {dataTestid}
+    {ariaLabel}
+    {onkeydown}
+    {onblur}
+    {onfocus}
+    onchange={(next) => {
+      const synthetic = { target: { value: next } };
+      oninput?.(synthetic);
+      onchange?.(synthetic);
+    }}
+  />
+{:else}
 <input
   {type}
   {id}
@@ -139,3 +166,4 @@
   {onkeydown}
   {onkeyup}
 />
+{/if}

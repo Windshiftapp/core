@@ -1,6 +1,7 @@
 /** Reactive i18n store with lazy locales, RTL, interpolation, pluralization,
  * backend-error translation, and persisted selection. */
 
+import { setAppLocale } from './appLocale.svelte.js';
 import { getPluralCategory, negotiateLocale } from './i18n-utils.js';
 
 const STORAGE_KEY = 'windshift-locale';
@@ -144,6 +145,7 @@ async function loadTranslations(localeCode) {
       fallbackTranslations = module.default;
     }
     locale = localeCode;
+    setAppLocale(localeCode);
 
     // Persist to localStorage
     if (typeof localStorage !== 'undefined') {

@@ -12,6 +12,7 @@
   import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import FileText from '@lucide/svelte/icons/file-text';
   import NativeSelect from '../components/NativeSelect.svelte';
+  import DatePicker from '../pickers/DatePicker.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import { loadMobileItemDetailSummary } from './mobileItemDetailData.js';
   import MobileEditorPage from './MobileEditorPage.svelte';
@@ -1024,15 +1025,15 @@
       </div>
     {:else if field.field_identifier === 'due_date'}
       <label class="chip chip-control">
-        <input class="chip-input" type="date" bind:value={dueDate} aria-label={t('common.dueDate')} />
+        <DatePicker inline bind:value={dueDate} class="chip-input" ariaLabel={t('common.dueDate')} dataTestid="mobile-due-date" />
       </label>
     {:else if field.field_identifier === 'start_date'}
       <label class="chip chip-control">
-        <input class="chip-input" type="date" bind:value={startDate} aria-label={t('common.startDate')} />
+        <DatePicker inline bind:value={startDate} class="chip-input" ariaLabel={t('common.startDate')} dataTestid="mobile-start-date" />
       </label>
     {:else if field.field_identifier === 'end_date'}
       <label class="chip chip-control">
-        <input class="chip-input" type="date" bind:value={endDate} aria-label={t('common.endDate')} />
+        <DatePicker inline bind:value={endDate} class="chip-input" ariaLabel={t('common.endDate')} dataTestid="mobile-end-date" />
       </label>
     {:else if field.field_identifier === 'story_points'}
       <label class="chip chip-control">

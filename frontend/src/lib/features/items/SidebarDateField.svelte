@@ -1,6 +1,7 @@
 <script>
   import Calendar from '@lucide/svelte/icons/calendar';
   import Text from '../../components/Text.svelte';
+  import DatePicker from '../../pickers/DatePicker.svelte';
   import { clickOutside } from '../../actions/clickOutside.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { formatDateOnly } from '../../utils/dateFormatter.js';
@@ -16,31 +17,18 @@
     onCancel = () => {},
   } = $props();
 
-  function focusAndShowPicker(node) {
-    node.focus();
-    setTimeout(() => {
-      try {
-        node.showPicker();
-      } catch {
-        // The browser may not support programmatic picker opening.
-      }
-    }, 0);
-  }
-
   let testId = $derived(`sidebar-date-${fieldKey.replaceAll('_', '-')}`);
 </script>
 
 <div class="mb-1">
   {#if editing}
     <div class="w-full py-1.5" use:clickOutside onclickOutside={onCancel}>
-      <input
-        data-testid={`${testId}-input`}
-        type="date"
+      <DatePicker
+        inline
+        autoOpen
         value={value ? value.split('T')[0] : ''}
-        onchange={(event) => onSave(event.currentTarget.value || null)}
-        class="w-full px-2 py-1 rounded-md text-sm focus:outline-none focus:ring-0"
-        style="background-color: transparent; color: var(--ds-text);"
-        use:focusAndShowPicker
+        onchange={(next) => onSave(next || null)}
+        dataTestid={`${testId}-input`}
       />
     </div>
   {:else}
