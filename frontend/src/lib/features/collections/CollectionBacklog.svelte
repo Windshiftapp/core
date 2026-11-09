@@ -14,8 +14,8 @@
   import Plus from '@lucide/svelte/icons/plus';
   import EmptyState from '../../components/EmptyState.svelte';
   import Toggle from '../../components/Toggle.svelte';
-  import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-  import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
+  import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+  import { registerReorderable } from '../../composables/reorderableDrag.js';
   import ViewHeader from '../../layout/ViewHeader.svelte';
   import StaticViewBackground from '../../layout/StaticViewBackground.svelte';
   import SubFilterBar from './SubFilterBar.svelte';
@@ -497,75 +497,54 @@
   function registerBacklogItem(element, itemId) {
     dragState.set(itemId, { isDragging: false, closestEdge: null });
 
-    const draggableCleanup = draggable({
+    const cleanup = registerReorderable({
       element,
-      getInitialData: () => {
+      getDragData: () => {
         const item = backlogItemsById.get(itemId);
         return { item, type: 'work-item', sectionId: item?.iteration_id || 'unassigned' };
       },
-      onDragStart: () => {
-        element.style.opacity = '0.5';
-        document.body.classList.add('is-dragging');
-        const state = dragState.get(itemId) || {};
-        const next = new Map(dragState);
-        next.set(itemId, { ...state, isDragging: true });
-        dragState = next;
-      },
-      onDrop: () => {
-        element.style.opacity = '';
-        document.body.classList.remove('is-dragging');
-        dragState = new Map([...dragState].map(([id]) => [id, { isDragging: false, closestEdge: null }]));
-        sectionDropHighlight = new Map();
-      }
-    });
-
-    const dropTargetCleanup = dropTargetForElements({
-      element,
+      getDropData: () => ({ sectionId: element.dataset.sectionId || 'unassigned' }),
       canDrop: ({ source }) => {
         const data = /** @type {any} */ (source.data);
         return data.type === 'work-item' && data.item?.id !== itemId &&
           !isSectionClosed(element.dataset.sectionId || 'unassigned');
       },
-      getData: ({ input, element: targetElement }) => attachClosestEdge(
-        { sectionId: element.dataset.sectionId || 'unassigned' },
-        { input, element: targetElement, allowedEdges: ['top', 'bottom'] }
-      ),
-      onDragEnter: ({ self, source }) => {
+      onDragStart: () => {
+        document.body.classList.add('is-dragging');
+        dragState.set(itemId, { ...(dragState.get(itemId) || {}), isDragging: true });
+        dragState = new Map(dragState);
+      },
+      onDragEnd: () => {
+        document.body.classList.remove('is-dragging');
+        dragState = new Map([...dragState].map(([id]) => [id, { isDragging: false, closestEdge: null }]));
+        sectionDropHighlight = new Map();
+      },
+      onEnter: (closestEdge, source) => {
         const data = /** @type {any} */ (source.data);
         if (data.type !== 'work-item' || data.item?.id === itemId) return;
-        const next = new Map(dragState);
-        next.set(itemId, {
-          ...(dragState.get(itemId) || {}),
-          closestEdge: extractClosestEdge(self.data),
-        });
-        dragState = next;
+        dragState.set(itemId, { ...(dragState.get(itemId) || {}), closestEdge });
+        dragState = new Map(dragState);
       },
-      onDragLeave: () => {
-        const next = new Map(dragState);
-        next.set(itemId, { ...(dragState.get(itemId) || {}), closestEdge: null });
-        dragState = next;
+      onLeave: () => {
+        dragState.set(itemId, { ...(dragState.get(itemId) || {}), closestEdge: null });
+        dragState = new Map(dragState);
       },
-      onDrop: ({ self, source }) => {
+      onDrop: ({ source, closestEdge }) => {
         const data = /** @type {any} */ (source.data);
         const item = backlogItemsById.get(itemId);
-        const closestEdge = extractClosestEdge(self.data);
         if (item && data.type === 'work-item' && closestEdge) {
           handleEdgeBasedDrop(data.item, item, closestEdge, {
             sectionId: element.dataset.sectionId || 'unassigned',
           });
         }
-      }
+      },
+      onCleanup: () => {
+        document.body.classList.remove('is-dragging');
+        dragState.delete(itemId);
+      },
     });
 
-    return {
-      destroy() {
-        element.style.opacity = '';
-        document.body.classList.remove('is-dragging');
-        draggableCleanup();
-        dropTargetCleanup();
-        dragState.delete(itemId);
-      }
-    };
+    return { destroy: cleanup };
   }
 
   function registerBacklogSection(element, iterationId) {

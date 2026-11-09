@@ -3,13 +3,13 @@
   import ColorDot from '../components/ColorDot.svelte';
   import TabStrip from '../components/TabStrip.svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-  import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
   import { navigate } from '../router.js';
   import { collections } from '../api/collections.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { CARD_SELECTABLE_FIELDS } from '../stores/fieldConfig.js';
   import { confirm } from '../composables/useConfirm.js';
+  import { registerReorderable } from '../composables/reorderableDrag.js';
   import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import { collectionStore } from '../stores/collectionContext.svelte.js';
   import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
@@ -281,61 +281,43 @@
       const statusId = columns[colIndex]?.status_ids?.[statusIndex];
       if (statusId == null) return;
 
-      statusDragState.set(`${colIndex}-${statusId}`, { closestEdge: null });
+      const key = `${colIndex}-${statusId}`;
+      const clearEdge = () => {
+        statusDragState.set(key, { closestEdge: null });
+        statusDragState = new Map(statusDragState);
+      };
+      statusDragState.set(key, { closestEdge: null });
 
-      const dragHandle = element.querySelector('.cursor-grab');
-      const draggableCleanup = draggable({
+      setupCleanups.push(registerReorderable({
         element,
-        dragHandle: dragHandle || element,
-        getInitialData: () => ({ statusId, colIndex, statusIndex, type: 'column-status' }),
-        onDragStart: () => { element.style.opacity = '0.5'; },
-        onDrop: () => {
-          element.style.opacity = '';
-          statusDragState.forEach((_, key) => {
-            statusDragState.set(key, { closestEdge: null });
-          });
-          statusDragState = new Map(statusDragState);
-        }
-      });
-
-      const dropTargetCleanup = dropTargetForElements({
-        element,
+        dragHandle: element.querySelector('.cursor-grab'),
+        getDragData: () => ({ statusId, colIndex, statusIndex, type: 'column-status' }),
         canDrop: ({ source }) => {
           const data = source.data;
           if (data.type === 'column-status' && data.colIndex === colIndex && data.statusIndex === statusIndex) return false;
           return data.type === 'available-status' || data.type === 'column-status';
         },
-        getData: ({ input, element }) => {
-          return attachClosestEdge({}, { input, element, allowedEdges: ['top', 'bottom'] });
-        },
-        onDragEnter: ({ self }) => {
-          const closestEdge = extractClosestEdge(self.data);
-          statusDragState.set(`${colIndex}-${statusId}`, { closestEdge });
+        onDragEnd: () => {
+          statusDragState.forEach((_, stateKey) => {
+            statusDragState.set(stateKey, { closestEdge: null });
+          });
           statusDragState = new Map(statusDragState);
         },
-        onDragLeave: () => {
-          statusDragState.set(`${colIndex}-${statusId}`, { closestEdge: null });
+        onEnter: (closestEdge) => {
+          statusDragState.set(key, { closestEdge });
           statusDragState = new Map(statusDragState);
         },
-        onDrop: ({ self, source }) => {
-          const closestEdge = extractClosestEdge(self.data);
+        onLeave: clearEdge,
+        onDrop: ({ source, closestEdge }) => {
           const data = source.data;
-
           if (data.type === 'available-status') {
             addStatusToColumnAtPosition(data.status, colIndex, statusIndex, closestEdge);
           } else if (data.type === 'column-status') {
             moveStatusBetweenColumns(data.statusId, data.colIndex, colIndex, statusIndex, closestEdge);
           }
-
-          statusDragState.set(`${colIndex}-${statusId}`, { closestEdge: null });
-          statusDragState = new Map(statusDragState);
-        }
-      });
-
-      setupCleanups.push(() => {
-        draggableCleanup();
-        dropTargetCleanup();
-      });
+          clearEdge();
+        },
+      }));
     });
 
     // --- Column drop zones (empty area at bottom of each column) ---
@@ -368,57 +350,40 @@
     // --- Column headers (for column reordering) ---
     /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-board-column]')).forEach(element => {
       const colIndex = parseInt(element.dataset.boardColumn);
-
+      const clearEdge = () => {
+        columnDragState.set(colIndex, { closestEdge: null });
+        columnDragState = new Map(columnDragState);
+      };
       columnDragState.set(colIndex, { closestEdge: null });
 
-      const dragHandle = element.querySelector('[data-column-drag-handle]');
-      const draggableCleanup = draggable({
+      setupCleanups.push(registerReorderable({
         element,
-        dragHandle: dragHandle || element,
-        getInitialData: () => ({ colIndex, type: 'board-column' }),
-        onDragStart: () => { element.style.opacity = '0.5'; },
-        onDrop: () => {
-          element.style.opacity = '';
-          columnDragState.forEach((_, key) => {
-            columnDragState.set(key, { closestEdge: null });
-          });
-          columnDragState = new Map(columnDragState);
-        }
-      });
-
-      const dropTargetCleanup = dropTargetForElements({
-        element,
+        dragHandle: element.querySelector('[data-column-drag-handle]'),
+        getDragData: () => ({ colIndex, type: 'board-column' }),
         canDrop: ({ source }) => {
           const data = source.data;
           if (data.type === 'board-column' && data.colIndex === colIndex) return false;
           return data.type === 'board-column';
         },
-        getData: ({ input, element }) => {
-          return attachClosestEdge({}, { input, element, allowedEdges: ['left', 'right'] });
+        allowedEdges: ['left', 'right'],
+        onDragEnd: () => {
+          columnDragState.forEach((_, key) => {
+            columnDragState.set(key, { closestEdge: null });
+          });
+          columnDragState = new Map(columnDragState);
         },
-        onDragEnter: ({ self }) => {
-          const closestEdge = extractClosestEdge(self.data);
+        onEnter: (closestEdge) => {
           columnDragState.set(colIndex, { closestEdge });
           columnDragState = new Map(columnDragState);
         },
-        onDragLeave: () => {
-          columnDragState.set(colIndex, { closestEdge: null });
-          columnDragState = new Map(columnDragState);
-        },
-        onDrop: ({ self, source }) => {
-          const closestEdge = extractClosestEdge(self.data);
+        onLeave: clearEdge,
+        onDrop: ({ source, closestEdge }) => {
           if (source.data.type === 'board-column') {
             reorderColumn(source.data.colIndex, colIndex, closestEdge);
           }
-          columnDragState.set(colIndex, { closestEdge: null });
-          columnDragState = new Map(columnDragState);
-        }
-      });
-
-      setupCleanups.push(() => {
-        draggableCleanup();
-        dropTargetCleanup();
-      });
+          clearEdge();
+        },
+      }));
     });
 
     // --- Card fields (for card-field reordering) ---
@@ -429,54 +394,39 @@
       const fieldIdentifier = element.dataset.cardFieldIdentifier;
       if (!fieldIdentifier || Number.isNaN(fieldIndex)) return;
 
+      const clearEdge = () => {
+        cardFieldDragState.set(fieldIdentifier, { closestEdge: null });
+        cardFieldDragState = new Map(cardFieldDragState);
+      };
       cardFieldDragState.set(fieldIdentifier, { closestEdge: null });
 
-      const dragHandle = element.querySelector('[data-card-field-drag-handle]');
-      const draggableCleanup = draggable({
+      setupCleanups.push(registerReorderable({
         element,
-        dragHandle: dragHandle || element,
-        getInitialData: () => ({ fieldIndex, fieldIdentifier, type: 'card-field' }),
-        onDragStart: () => { element.style.opacity = '0.5'; },
-        onDrop: () => {
-          element.style.opacity = '';
-          cardFieldDragState.forEach((_, key) => {
-            cardFieldDragState.set(key, { closestEdge: null });
-          });
-          cardFieldDragState = new Map(cardFieldDragState);
-        }
-      });
-
-      const dropTargetCleanup = dropTargetForElements({
-        element,
+        dragHandle: element.querySelector('[data-card-field-drag-handle]'),
+        getDragData: () => ({ fieldIndex, fieldIdentifier, type: 'card-field' }),
         canDrop: ({ source }) => {
           const data = source.data;
           if (data.type === 'card-field' && data.fieldIndex === fieldIndex) return false;
           return data.type === 'card-field';
         },
-        getData: ({ input, element }) => {
-          return attachClosestEdge({}, { input, element, allowedEdges: ['top', 'bottom'] });
-        },
-        onDragEnter: ({ self }) => {
-          cardFieldDragState.set(fieldIdentifier, { closestEdge: extractClosestEdge(self.data) });
+        onDragEnd: () => {
+          cardFieldDragState.forEach((_, key) => {
+            cardFieldDragState.set(key, { closestEdge: null });
+          });
           cardFieldDragState = new Map(cardFieldDragState);
         },
-        onDragLeave: () => {
-          cardFieldDragState.set(fieldIdentifier, { closestEdge: null });
+        onEnter: (closestEdge) => {
+          cardFieldDragState.set(fieldIdentifier, { closestEdge });
           cardFieldDragState = new Map(cardFieldDragState);
         },
-        onDrop: ({ self, source }) => {
+        onLeave: clearEdge,
+        onDrop: ({ source, closestEdge }) => {
           if (source.data.type === 'card-field') {
-            reorderCardFields(source.data.fieldIndex, fieldIndex, extractClosestEdge(self.data));
+            reorderCardFields(source.data.fieldIndex, fieldIndex, closestEdge);
           }
-          cardFieldDragState.set(fieldIdentifier, { closestEdge: null });
-          cardFieldDragState = new Map(cardFieldDragState);
-        }
-      });
-
-      setupCleanups.push(() => {
-        draggableCleanup();
-        dropTargetCleanup();
-      });
+          clearEdge();
+        },
+      }));
     });
   }
 
