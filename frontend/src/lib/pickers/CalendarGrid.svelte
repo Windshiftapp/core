@@ -37,6 +37,27 @@
 
   const isRTL = $derived(/^(fa|ar|he|ur)(-|$)/i.test(locale));
 
+  // Calendar-aware heading: Melt's `headingValue` strips the calendar (it converts the
+  // `CalendarDate` to a plain JS Date via `toDate()` and formats with `Intl` but no
+  // `calendar` option). Render the heading using the resolved calendar and interface
+  // locale so the month name follows the interface language regardless of the chosen
+  // calendar. This keeps the component general so any calendar supported by
+  // `@internationalized/date` can be added to `CALENDARS` without touching this file.
+  const calendarHeading = $derived.by(() => {
+    if (!$months?.length) return '';
+    const first = $months[0].value;
+    if (!first || typeof first.toDate !== 'function') return '';
+    try {
+      return new Intl.DateTimeFormat(locale, {
+        calendar: calendarId,
+        month: 'long',
+        year: 'numeric',
+      }).format(first.toDate('UTC'));
+    } catch {
+      return '';
+    }
+  });
+
   // The calendar is instantiated once per mount; the parent remounts this
   // component when the calendar changes, so these props are read as initial
   // values on purpose.
@@ -134,7 +155,7 @@
         <ChevronLeft size={16} />
       {/if}
     </button>
-    <div use:melt={$heading} class="calendar-heading">{$headingValue}</div>
+    <div use:melt={$heading} class="calendar-heading">{calendarHeading}</div>
     <button
       use:melt={$nextButton}
       bind:this={nextButtonEl}
