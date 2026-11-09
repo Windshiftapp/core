@@ -88,7 +88,7 @@ export const catalogs = {
 };
 
 export const customFields = {
-  ...createCrudClient('/custom-fields', { adminBasePath: '/admin/custom-fields', readV2: true }),
+  ...createCrudClient('/custom-fields', { v2: true }),
   getOverview: async (requestOptions = {}) => {
     const document = await fetchAPIV2('/custom-fields', requestOptions);
     return {
@@ -97,7 +97,7 @@ export const customFields = {
     };
   },
   updateSettings: (data) =>
-    fetchAPI('/admin/custom-fields/settings', {
+    fetchV2Data('/custom-fields/settings', {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
