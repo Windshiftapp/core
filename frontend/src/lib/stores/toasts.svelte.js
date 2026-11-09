@@ -1,7 +1,7 @@
 // Toast store for managing multiple stacked toasts
 // Uses Svelte 5 runes for reactivity
 
-import { t } from './i18n.svelte.js';
+import { t, translateError } from './i18n.svelte.js';
 
 let toastId = 0;
 
@@ -76,6 +76,29 @@ export function removeToast(id) {
       console.error('toast onDismiss callback threw:', err);
     }
   }
+}
+
+/**
+ * Surface a caught failure to the user while keeping the console diagnostic.
+ * Prefer this over a bare `console.error` so a failure cannot disappear into
+ * the console. Pass `silent: true` only for work the user did not initiate and
+ * that has another visible outcome (background sync, optional persistence).
+ *
+ * @param {unknown} error - The caught error, or a message string.
+ * @param {Object} [options]
+ * @param {string} [options.title] - Toast title; defaults to the error title.
+ * @param {string} [options.message] - Override the translated error message.
+ * @param {string} [options.context] - Label for the console diagnostic.
+ * @param {'error'|'warning'} [options.level] - Toast severity. Default `error`.
+ * @param {boolean} [options.silent] - Log without a toast.
+ */
+export function surfaceError(error, options = {}) {
+  const { title, message, context, level = 'error', silent = false } = options;
+  console.error(context ? `[${context}]` : '[windshift]', error);
+  if (silent) return;
+  const text = message ?? (typeof error === 'string' ? error : translateError(error));
+  if (level === 'warning') warningToast(text, title);
+  else errorToast(text, title);
 }
 
 /**

@@ -17,7 +17,7 @@
   import { agentRuns as agentRunBus } from '../stores/agentRuns.svelte.js';
   import { navigate } from '../router.js';
   import { notificationActions } from '../stores/notifications.js';
-  import { errorToast, infoToast } from '../stores/toasts.svelte.js';
+  import { errorToast, infoToast, surfaceError } from '../stores/toasts.svelte.js';
   import { timerStore } from '../stores/timerStore.svelte.js';
   import { useItemEventStream } from '../composables/useItemEventStream.svelte.js';
   import { usePullToRefresh } from '../composables/usePullToRefresh.svelte.js';
@@ -81,8 +81,7 @@
     try {
       assigneeOptions = (await getAssignableUsers(item.workspace_id)) ?? [];
     } catch (err) {
-      console.error('Failed to load assignable users:', err);
-      errorToast(t('mobile.item.assigneesFailed'));
+      surfaceError(err, { context: 'loadAssignableUsers', message: t('mobile.item.assigneesFailed') });
       assigneeOptions = [];
     } finally {
       assigneeLoading = false;
@@ -165,7 +164,7 @@
       const res = await items.getAvailableStatusTransitions(id);
       if (token === loadToken) transitions = res?.available_transitions ?? [];
     } catch (err) {
-      console.error('Failed to load transitions:', err);
+      surfaceError(err, { context: 'refreshTransitionState' });
     }
   }
 
@@ -223,7 +222,7 @@
       const updated = await items.transition(itemId, target);
       item = { ...item, ...updated };
     } catch (err) {
-      console.error('Failed to toggle personal task:', err);
+      surfaceError(err, { context: 'togglePersonalDone' });
     } finally {
       transitioning = false;
     }
@@ -239,7 +238,7 @@
         : null;
       item = { ...item, ...updated, assignee_id: assigneeId, assignee_name: name, assignee_avatar: user?.avatar_url ?? null };
     } catch (err) {
-      console.error('Failed to update assignee:', err);
+      surfaceError(err, { context: 'updateAssignee' });
     }
   }
 
@@ -253,7 +252,7 @@
       isWatching = status?.watching ?? !isWatching;
       watcherCount = status?.watcher_count ?? watcherCount;
     } catch (err) {
-      console.error('Failed to toggle watch:', err);
+      surfaceError(err, { context: 'toggleWatch' });
     } finally {
       watchBusy = false;
     }
@@ -271,7 +270,7 @@
       });
       navigate('/m/timer');
     } catch (err) {
-      console.error('Failed to start timer:', err);
+      surfaceError(err, { context: 'startTimer' });
     } finally {
       startingTimer = false;
     }

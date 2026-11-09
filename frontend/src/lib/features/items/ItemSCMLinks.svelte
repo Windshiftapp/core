@@ -17,6 +17,7 @@
   import Text from '../../components/Text.svelte';
   import LinkSectionHeader from './LinkSectionHeader.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { surfaceError } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { safeHref } from '../../utils/sanitize';
 
@@ -81,7 +82,7 @@
       connectionStatus = await itemSCMLinks.getConnectionStatus(itemId, { signal });
     } catch (err) {
       if (signal?.aborted || err?.name === 'AbortError' || err?.status === 404) return;
-      console.error('Failed to check SCM connection status:', err);
+      surfaceError(err, { context: 'checkScmConnection' });
       // If we can't check connection status, assume no repos configured
       connectionStatus = { has_repositories: false };
     } finally {
@@ -101,8 +102,8 @@
         window.location.href = result.auth_url;
       }
     }).catch(err => {
-      console.error('Failed to start OAuth:', err);
       error = t('scm.failedToStartConnection');
+      surfaceError(err, { context: 'startScmOAuth' });
     });
   }
 
@@ -126,9 +127,9 @@
       }
     } catch (err) {
       if (signal?.aborted || err?.name === 'AbortError' || err?.status === 404) return;
-      console.error('Failed to load SCM links:', err);
       error = t('scm.failedToLoadLinks');
       links = [];
+      surfaceError(err, { context: 'loadScmLinks' });
     } finally {
       loading = false;
     }
@@ -141,7 +142,7 @@
       // Update the link in our list
       links = links.map(l => l.id === linkId ? updatedLink : l);
     } catch (err) {
-      console.error('Failed to refresh link:', err);
+      surfaceError(err, { context: 'refreshScmLink' });
     } finally {
       refreshing = false;
     }
@@ -161,7 +162,7 @@
       await itemSCMLinks.delete(linkId);
       links = links.filter(l => l.id !== linkId);
     } catch (err) {
-      console.error('Failed to delete link:', err);
+      surfaceError(err, { context: 'deleteScmLink' });
     }
   }
 

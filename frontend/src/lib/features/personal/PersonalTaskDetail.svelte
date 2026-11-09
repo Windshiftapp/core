@@ -20,7 +20,7 @@
   import ItemDetailBreadcrumbs from '../items/ItemDetailBreadcrumbs.svelte';
   import { useItemEventStream } from '../../composables/useItemEventStream.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { errorToast } from '../../stores/toasts.svelte.js';
+  import { errorToast, surfaceError } from '../../stores/toasts.svelte.js';
   import { runWithConcurrency } from '../../utils/concurrency.js';
 
   let {
@@ -167,8 +167,8 @@
       item = { ...item, status_id: targetStatusId };
       onupdate?.();
     } catch (err) {
-      console.error('Failed to toggle done status:', err);
       error = err.message;
+      surfaceError(err, { context: 'togglePersonalTask' });
     } finally {
       saving = false;
     }
@@ -188,8 +188,8 @@
       editingTitle = false;
       onupdate?.();
     } catch (err) {
-      console.error('Failed to save title:', err);
       error = err.message;
+      surfaceError(err, { context: 'saveTitle' });
     } finally {
       saving = false;
     }
@@ -203,8 +203,8 @@
       editingDescription = false;
       onupdate?.();
     } catch (err) {
-      console.error('Failed to save description:', err);
       error = err.message;
+      surfaceError(err, { context: 'saveDescription' });
     } finally {
       saving = false;
     }
@@ -219,8 +219,8 @@
       editingDueDate = false;
       onupdate?.();
     } catch (err) {
-      console.error('Failed to save due date:', err);
       error = err.message;
+      surfaceError(err, { context: 'saveDueDate' });
     } finally {
       saving = false;
     }
@@ -280,8 +280,8 @@
       await attachmentsApi.delete(attachment.id);
       attachments = attachments.filter(a => a.id !== attachment.id);
     } catch (err) {
-      console.error('Failed to delete attachment:', err);
       error = 'Failed to delete attachment';
+      surfaceError(err, { context: 'deleteAttachment' });
     }
   }
 

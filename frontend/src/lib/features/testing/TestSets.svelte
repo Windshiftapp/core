@@ -26,7 +26,7 @@
   import { getStatusLabel, getTestStatusColor } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
-  import { errorToast } from '../../stores/toasts.svelte.js';
+  import { surfaceError } from '../../stores/toasts.svelte.js';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
   import TestManagementHeader from './TestManagementHeader.svelte';
@@ -78,7 +78,7 @@
       testSets.set(sets || []);
       milestones.set(milestonesData || []);
     } catch (error) {
-      console.error('Failed to load data:', error);
+      surfaceError(error, { context: 'loadTestPlans' });
     }
   }
 
@@ -120,7 +120,7 @@
       await loadData();
       showForm = false;
     } catch (error) {
-      console.error('Failed to save test plan:', error);
+      surfaceError(error, { context: 'saveTestPlan' });
     }
   }
 
@@ -140,7 +140,7 @@
       // Navigate to the execution page
       navigate(testPath(`/runs/${newRun.id}/execute`));
     } catch (error) {
-      console.error('Failed to start test run:', error);
+      surfaceError(error, { context: 'startTestRun' });
     }
   }
 
@@ -156,7 +156,7 @@
       await tests.testPlans.delete(workspaceId, id);
       await loadData();
     } catch (error) {
-      console.error('Failed to delete test plan:', error);
+      surfaceError(error, { context: 'deleteTestPlan' });
     }
   }
 
@@ -171,7 +171,7 @@
       const cases = await tests.testPlans.getTestCases(workspaceId, setId);
       setTestCases = cases || [];
     } catch (error) {
-      console.error('Failed to load set test cases:', error);
+      surfaceError(error, { context: 'loadSetTestCases' });
     }
   }
 
@@ -182,8 +182,10 @@
       await tests.testPlans.addTestCase(workspaceId, $selectedSet.id, testCase.id);
       await loadSetTestCases($selectedSet.id);
     } catch (error) {
-      console.error('Failed to add test case to set:', error);
-      errorToast(t('dialogs.alerts.errorAddingTestCase', { error: error.message }));
+      surfaceError(error, {
+        context: 'addTestCaseToSet',
+        message: t('dialogs.alerts.errorAddingTestCase', { error: error.message }),
+      });
     }
   }
 
@@ -192,7 +194,7 @@
       await tests.testPlans.removeTestCase(workspaceId, $selectedSet.id, testCaseId);
       await loadSetTestCases($selectedSet.id);
     } catch (error) {
-      console.error('Failed to remove test case from set:', error);
+      surfaceError(error, { context: 'removeTestCaseFromSet' });
     }
   }
 

@@ -16,7 +16,7 @@
   import PersonalTaskDetail from '../personal/PersonalTaskDetail.svelte';
   import { authStore } from '../../stores/auth.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { errorToast } from '../../stores/toasts.svelte.js';
+  import { surfaceError } from '../../stores/toasts.svelte.js';
   import Checkbox from '../../components/Checkbox.svelte';
   import Input from '../../components/Input.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -165,7 +165,7 @@
     try {
       statuses = await workspaces.getStatuses(workspaceId);
     } catch (error) {
-      console.error('Failed to load statuses:', error);
+      surfaceError(error, { context: 'loadStatuses' });
       statuses = [];
     }
   }
@@ -174,7 +174,7 @@
     try {
       statusCategories = await statusCategoriesApi.getAll();
     } catch (error) {
-      console.error('Failed to load status categories:', error);
+      surfaceError(error, { context: 'loadStatusCategories' });
       statusCategories = [];
     }
   }
@@ -189,7 +189,7 @@
       const response = await items.getAll(filters);
       personalTodos = response?.data ?? [];
     } catch (error) {
-      console.error('Failed to load personal todos:', error);
+      surfaceError(error, { context: 'loadPersonalTodos' });
       personalTodos = [];
     }
   }
@@ -211,7 +211,7 @@
       let allAssigned = response?.data ?? [];
       assignedWork = allAssigned.filter(item => item.workspace_id !== parseInt(workspaceId));
     } catch (error) {
-      console.error('Failed to load assigned work:', error);
+      surfaceError(error, { context: 'loadAssignedWork' });
       assignedWork = [];
     }
   }
@@ -243,8 +243,10 @@
       await loadPersonalTodos();
       cancelAddingTodo();
     } catch (error) {
-      console.error('Failed to create todo:', error);
-      errorToast(t('todo.failedToCreate') + ': ' + (error.message || error));
+      surfaceError(error, {
+        context: 'createTodo',
+        message: t('todo.failedToCreate') + ': ' + (error.message || error),
+      });
     }
   }
 
@@ -258,7 +260,7 @@
         await loadAssignedWork();
       }
     } catch (error) {
-      console.error('Failed to update item status:', error);
+      surfaceError(error, { context: 'updateItemStatus' });
     }
   }
 
@@ -287,7 +289,7 @@
         await changeItemStatus(todo, targetStatusId, true);
       }
     } catch (error) {
-      console.error('Failed to toggle personal task:', error);
+      surfaceError(error, { context: 'togglePersonalTask' });
     }
   }
 
@@ -344,7 +346,7 @@
   }
 
   function handleDeleteError(error) {
-    console.error('Failed to delete todo:', error);
+    surfaceError(error, { context: 'deleteTodo' });
   }
 
   function handleKeydown(event) {

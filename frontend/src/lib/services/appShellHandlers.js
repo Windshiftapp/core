@@ -8,11 +8,44 @@ import { configureServiceWorkerNotifications } from '../mobile/serviceWorkerClie
 import { navigate } from '../router.js';
 import { authStore } from '../stores/auth.svelte.js';
 import { t } from '../stores/i18n.svelte.js';
-import { addToast } from '../stores/toasts.svelte.js';
+import { addToast, surfaceError } from '../stores/toasts.svelte.js';
 import { initCrossTabSync } from '../utils/crossTabSync.js';
+
+// `installAppShellHandlers` is idempotent; track installed targets so a
+// re-mount (or a test reusing a fake window) cannot stack duplicate handlers.
+const globalErrorHandlerTargets = new WeakSet();
+
+/**
+ * Surface failures that no component caught. Without this they only exist in
+ * the console, which is how silent errors reach the user as "nothing happened".
+ * Exported with an injectable target so the wiring can be tested directly.
+ * @param {Window | EventTarget | null} [target]
+ */
+export function installGlobalErrorHandlers(target = typeof window !== 'undefined' ? window : null) {
+  if (!target || globalErrorHandlerTargets.has(target)) return;
+  globalErrorHandlerTargets.add(target);
+
+  // A promise rejection nobody handled. Aborting is navigation/cancellation
+  // control flow, not a failure the user should see.
+  target.addEventListener('unhandledrejection', (event) => {
+    const reason = /** @type {PromiseRejectionEvent} */ (event).reason;
+    if (reason?.name === 'AbortError') return;
+    surfaceError(reason, { context: 'unhandledrejection' });
+  });
+
+  // Synchronous errors outside Svelte's render tree. Resource load failures
+  // (a missing image or a 404 chunk) carry no `error` and are not surfaced.
+  target.addEventListener('error', (event) => {
+    const { error } = /** @type {ErrorEvent} */ (event);
+    if (!error) return;
+    surfaceError(error, { context: 'window.onerror' });
+  });
+}
 
 /** Install the injected handlers. Safe to call more than once. */
 export function installAppShellHandlers() {
+  installGlobalErrorHandlers();
+
   configureAPIEventHandlers({
     onAuthExpired: () => authStore.clearAuth(),
     onClockDrift: notifyAdminOfClockDrift,

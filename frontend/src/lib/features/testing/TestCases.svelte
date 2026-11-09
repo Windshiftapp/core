@@ -37,6 +37,7 @@
   import { toHotkeyString, getShortcutDisplay, matchesShortcut, isTypingInField } from '../../utils/keyboardShortcuts.js';
   import { currentRoute, navigate } from '../../router.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { surfaceError } from '../../stores/toasts.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import SearchInput from '../../components/SearchInput.svelte';
@@ -191,7 +192,7 @@
       const countResult = await tests.testCases.count(workspaceId);
       allCount = countResult?.count || 0;
     } catch (error) {
-      console.error('Failed to load test folders:', error);
+      surfaceError(error, { context: 'loadFolders' });
     }
   }
 
@@ -221,7 +222,7 @@
       hasMoreTestCases = nextCases.length === TEST_CASE_BATCH_SIZE;
       if (!append) renderedTestCaseLimit = RENDER_WINDOW_STEP;
     } catch (error) {
-      console.error('Failed to load test cases:', error);
+      surfaceError(error, { context: 'loadTestCases' });
     } finally {
       if (requestId === testCaseLoadRequest) loadingMoreTestCases = false;
     }
@@ -237,7 +238,7 @@
       const labels = await tests.testLabels.getAll(workspaceId);
       testLabels.set(labels || []);
     } catch (error) {
-      console.error('Failed to load test labels:', error);
+      surfaceError(error, { context: 'loadLabels' });
     }
   }
 
@@ -324,7 +325,7 @@
         const detail = await tests.testCases.get(workspaceId, testCase.id);
         bdd = detail?.bdd || null;
       } catch (err) {
-        console.error('Failed to load BDD content:', err);
+        surfaceError(err, { context: 'loadBddContent' });
       }
     }
     const { hours, minutes } = secondsToHoursMinutes(testCase.estimated_duration || 0);
@@ -365,7 +366,7 @@
       await loadFolders();
       showFolderForm = false;
     } catch (error) {
-      console.error('Failed to save folder:', error);
+      surfaceError(error, { context: 'saveFolder' });
     }
   }
 
@@ -413,8 +414,8 @@
       await loadFolders();
       showCaseForm = false;
     } catch (error) {
-      console.error('Failed to save test case:', error);
       caseFormError = error?.message || t('testing.failedToSaveCase');
+      surfaceError(error, { context: 'saveTestCase' });
     }
   }
 
@@ -435,7 +436,7 @@
         await loadTestCases();
       }
     } catch (error) {
-      console.error('Failed to delete folder:', error);
+      surfaceError(error, { context: 'deleteFolder' });
     }
   }
 
@@ -453,7 +454,7 @@
       await loadTestCases(selectedFolder);
       await loadFolders();
     } catch (error) {
-      console.error('Failed to delete test case:', error);
+      surfaceError(error, { context: 'deleteTestCase' });
     }
   }
 
@@ -478,7 +479,7 @@
       selectedTestCaseLabels = labels || [];
       showLabelsModal = true;
     } catch (error) {
-      console.error('Failed to load test case labels:', error);
+      surfaceError(error, { context: 'loadTestCaseLabels' });
       selectedTestCaseLabels = [];
       showLabelsModal = true;
     }
@@ -499,7 +500,7 @@
       // Reload test cases to update display
       await loadTestCases(selectedFolder);
     } catch (error) {
-      console.error('Failed to add label to test case:', error);
+      surfaceError(error, { context: 'addLabelToTestCase' });
     }
   }
 
@@ -512,7 +513,7 @@
       // Reload test cases to update display
       await loadTestCases(selectedFolder);
     } catch (error) {
-      console.error('Failed to remove label from test case:', error);
+      surfaceError(error, { context: 'removeLabelFromTestCase' });
     }
   }
 
@@ -542,7 +543,7 @@
         description: ''
       };
     } catch (error) {
-      console.error('Failed to create label:', error);
+      surfaceError(error, { context: 'createLabel' });
     }
   }
 
@@ -809,7 +810,7 @@
       await loadTestCases(selectedFolder);
       await loadFolders();
     } catch (error) {
-      console.error('Failed to move test case:', error);
+      surfaceError(error, { context: 'moveTestCase' });
     }
   }
 
