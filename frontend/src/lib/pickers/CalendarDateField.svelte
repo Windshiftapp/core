@@ -127,7 +127,7 @@
     <span id="{descriptionId}-required" class="sr-only">{t('validation.required')}</span>
   {/if}
   {#if validationMessage}
-    <span id="{descriptionId}-error" role="alert" class="text-xs" style="color: var(--ds-text-danger);">{validationMessage}</span>
+    <span id="{descriptionId}-error" role="alert" class="text-xs text-ds-text-danger">{validationMessage}</span>
   {/if}
   <div class="date-picker-control">
     {#if inline}

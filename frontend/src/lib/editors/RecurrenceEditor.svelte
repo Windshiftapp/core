@@ -245,7 +245,7 @@
   </div>
 
   {#if resolveCalendar(getAppLocale()) !== 'gregory' && (frequency === 'MONTHLY' || frequency === 'YEARLY')}
-    <p class="text-sm" style="color: var(--ds-text-subtle);">{t('recurrence.gregorianRuleHint')}</p>
+    <p class="text-sm text-ds-text-subtle">{t('recurrence.gregorianRuleHint')}</p>
   {/if}
 
   {#if frequency === 'WEEKLY'}
