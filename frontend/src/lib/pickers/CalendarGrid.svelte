@@ -14,13 +14,14 @@
     getDayOfWeek,
     parseDate,
     startOfWeek,
-    today,
     toCalendar
   } from '@internationalized/date';
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import { untrack } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { formatDate } from '../utils/dateFormatter.js';
+  import { serverNow } from '../utils/serverClock.js';
 
   let {
     calendarId = 'gregory',
@@ -29,6 +30,7 @@
     min = undefined,
     max = undefined,
     readonly = false,
+    disabled = false,
     dataTestid = undefined,
     onselect = undefined
   } = $props();
@@ -49,7 +51,7 @@
           return undefined;
         }
       };
-      const todayValue = toCalendar(today('UTC'), intlCalendar);
+      const todayValue = toCalendar(parseDate(formatDate(serverNow())), intlCalendar);
       return {
         intlCalendar,
         todayValue,
@@ -63,9 +65,11 @@
     }
   );
 
+  let syncing = false;
   const {
     elements: { calendar, heading, grid, cell, prevButton, nextButton },
-    states: { months, weekdays, headingValue }
+    states: { months, weekdays, headingValue, value: selectedValue },
+    options: { minValue: minStore, maxValue: maxStore, readonly: readonlyStore, disabled: disabledStore }
   } = untrack(() =>
     createCalendar({
       locale,
@@ -76,14 +80,29 @@
       maxValue,
       weekdayFormat: 'short',
       readonly,
+      disabled,
       calendarLabel: t('pickers.datePicker.selectDate'),
       onValueChange: ({ next }) => {
-        if (next) onselect?.(next.toString());
+        if (next && !syncing) onselect?.(next.toString());
         return next;
       }
     })
   );
 
+  $effect(() => {
+    syncing = true;
+    try { $selectedValue = value ? toCalendar(parseDate(value.slice(0, 10)), intlCalendar) : undefined; }
+    catch { $selectedValue = undefined; }
+    syncing = false;
+  });
+  $effect(() => {
+    try { $minStore = min ? toCalendar(parseDate(min.slice(0, 10)), intlCalendar) : undefined; }
+    catch { $minStore = undefined; }
+    try { $maxStore = max ? toCalendar(parseDate(max.slice(0, 10)), intlCalendar) : undefined; }
+    catch { $maxStore = undefined; }
+    $readonlyStore = readonly;
+    $disabledStore = disabled;
+  });
   let prevButtonEl = $state(null);
   let nextButtonEl = $state(null);
 

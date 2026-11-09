@@ -18,8 +18,10 @@
   import Calendar from '@lucide/svelte/icons/calendar';
   import { t } from '../stores/i18n.svelte.js';
   import { getAppLocale } from '../stores/appLocale.svelte.js';
+  import { resolveCalendar } from '../stores/calendar.svelte.js';
   import { cn } from '../utils/cn.js';
   import { controlSizeClasses } from '../utils/controlSizes.js';
+  import { LazyComponentLoader } from '../utils/lazyComponentLoader.svelte.js';
 
   let {
     value = $bindable(''),
@@ -27,9 +29,14 @@
     locale = undefined,
     min = undefined,
     max = undefined,
+    step = undefined,
     disabled = false,
     readonly = false,
     required = false,
+    autofocus = false,
+    style = '',
+    title = undefined,
+    ariaDescribedby = undefined,
     clearable = true,
     inline = false,
     autoOpen = false,
@@ -45,14 +52,14 @@
     onchange = undefined,
     onkeydown = undefined,
     onblur = undefined,
-    onfocus = undefined
+    onfocus = undefined,
+    onclick = undefined,
+    onkeyup = undefined
   } = $props();
-
-  const PERSIAN_LOCALES = new Set(['fa']);
 
   const resolvedLocale = $derived(locale || getAppLocale());
   const calendarId = $derived(
-    calendar || (PERSIAN_LOCALES.has(resolvedLocale) ? 'persian' : 'gregory')
+    resolveCalendar(resolvedLocale, calendar)
   );
   const isNative = $derived(calendarId === 'gregory');
   const resolvedAriaLabel = $derived(ariaLabel ?? (label || undefined));
@@ -67,21 +74,17 @@
   );
 
   // Load the non-Gregorian field only when the locale needs it.
-  let CalendarDateField = $state(null);
+  const calendarLoader = new LazyComponentLoader({ calendar: () => import('./CalendarDateField.svelte') });
+  let CalendarDateField = $derived(calendarLoader.getComponent('calendar'));
   $effect(() => {
-    if (isNative || CalendarDateField) return;
-    let cancelled = false;
-    import('./CalendarDateField.svelte').then((module) => {
-      if (!cancelled) CalendarDateField = module.default;
-    });
-    return () => {
-      cancelled = true;
-    };
+    if (!isNative) void calendarLoader.load('calendar');
   });
 
   function handleNativeInput(event) {
-    value = event.currentTarget.value;
-    onchange?.(value);
+    const next = event.currentTarget.value;
+    if (next === value) return;
+    value = next;
+    onchange?.(value, event);
   }
 
   // Open the OS picker as soon as the input mounts, so a chip click still sets
@@ -101,18 +104,24 @@
   {#if label}
     <span class="date-picker-label text-ds-text">{label}</span>
   {/if}
+  <!-- svelte-ignore a11y_autofocus -->
   <input
     type="date"
     {id}
     {name}
     {min}
     {max}
+    {step}
     {disabled}
     {required}
+    {autofocus}
+    {title}
+    aria-describedby={ariaDescribedby}
     readonly={readonly}
     aria-label={resolvedAriaLabel}
     {placeholder}
     class="bg-ds-background-input border-ds-border text-ds-text {controlClass}"
+    style="{style}"
     data-testid={dataTestid}
     value={value}
     bind:this={inputRef}
@@ -121,17 +130,33 @@
     {onkeydown}
     {onblur}
     {onfocus}
+    {onclick}
+    {onkeyup}
     use:autoOpenPicker
   />
 {:else if CalendarDateField}
+  {#key `${calendarId}:${resolvedLocale}`}
   <CalendarDateField
     value={value}
     {calendarId}
     locale={resolvedLocale}
     {min}
     {max}
+    {step}
     {disabled}
     {readonly}
+    {required}
+    {autofocus}
+    {title}
+    {ariaDescribedby}
+    {style}
+    {onclick}
+    {onkeyup}
+    {name}
+    bind:inputRef
+    {onblur}
+    {onfocus}
+    {onkeydown}
     {clearable}
     {inline}
     {placeholder}
@@ -146,6 +171,11 @@
       onchange?.(next);
     }}
   />
+  {/key}
+{:else if calendarLoader.getError('calendar')}
+  <button type="button" class={controlClass} onclick={() => calendarLoader.retry('calendar')}>
+    {t('errors.failedToLoad')} · {t('common.retry')}
+  </button>
 {:else}
   <button
     type="button"

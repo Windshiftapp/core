@@ -7,11 +7,13 @@
    * Emits Gregorian `YYYY-MM-DD` strings.
    */
   import { createPopover, melt } from '@melt-ui/svelte';
-  import { DateFormatter, parseDate, today } from '@internationalized/date';
+  import { DateFormatter, parseDate } from '@internationalized/date';
   import Calendar from '@lucide/svelte/icons/calendar';
   import X from '@lucide/svelte/icons/x';
   import { untrack } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { formatDate } from '../utils/dateFormatter.js';
+  import { serverNow } from '../utils/serverClock.js';
   import { cn } from '../utils/cn.js';
   import { controlSizeClasses } from '../utils/controlSizes.js';
   import CalendarGrid from './CalendarGrid.svelte';
@@ -22,8 +24,21 @@
     locale = 'fa',
     min = undefined,
     max = undefined,
+    step = undefined,
     disabled = false,
     readonly = false,
+    required = false,
+    autofocus = false,
+    style = '',
+    title = undefined,
+    ariaDescribedby = undefined,
+    name = undefined,
+    inputRef = $bindable(null),
+    onblur = undefined,
+    onfocus = undefined,
+    onkeydown = undefined,
+    onclick = undefined,
+    onkeyup = undefined,
     clearable = true,
     inline = false,
     placeholder = undefined,
@@ -36,10 +51,13 @@
     onchange = undefined
   } = $props();
 
+  const descriptionId = $props.id();
+
   const displayFormatter = untrack(
     () =>
       new DateFormatter(locale, {
         calendar: calendarId,
+        timeZone: 'UTC',
         day: 'numeric',
         month: 'long',
         year: 'numeric'
@@ -73,7 +91,20 @@
     )
   );
 
+  function canCommit(nextValue) {
+    if (disabled || readonly || (nextValue && ((min && nextValue < min) || (max && nextValue > max)))) return false;
+    const dayStep = Number(step);
+    return !(nextValue && dayStep > 0 && (Date.parse(nextValue) - Date.parse(min || '1970-01-01')) / 86400000 % dayStep !== 0);
+  }
+
+  let validationMessage = $state('');
+  $effect(() => {
+    void [value, readonly, disabled, min, max, step, required];
+    validationMessage = '';
+  });
   function commit(nextValue) {
+    if (!canCommit(nextValue)) return;
+    validationMessage = '';
     value = nextValue;
     onchange?.(nextValue);
     $open = false;
@@ -89,6 +120,15 @@
   {#if label}
     <span class="date-picker-label text-ds-text">{label}</span>
   {/if}
+  {#if name || required}
+    <input type="date" {name} {required} {min} {max} {step} {disabled} {readonly} value={value} tabindex="-1" aria-hidden="true" style="position:absolute; width:1px; height:1px; opacity:0;" oninvalid={(event) => { event.preventDefault(); validationMessage = event.currentTarget.validationMessage; inputRef?.focus(); }} />
+  {/if}
+  {#if required}
+    <span id="{descriptionId}-required" class="sr-only">{t('validation.required')}</span>
+  {/if}
+  {#if validationMessage}
+    <span id="{descriptionId}-error" role="alert" class="text-xs" style="color: var(--ds-text-danger);">{validationMessage}</span>
+  {/if}
   <div class="date-picker-control">
     {#if inline}
       <div
@@ -101,18 +141,33 @@
           {min}
           {max}
           {readonly}
+          {disabled}
           onselect={commit}
           dataTestid={dataTestid ? `${dataTestid}-calendar` : undefined}
         />
       </div>
     {:else}
+      <!-- svelte-ignore a11y_autofocus -->
       <button
         use:melt={$trigger}
         type="button"
         {id}
         {disabled}
+        {autofocus}
+        {title}
+        aria-describedby={[ariaDescribedby, required ? `${descriptionId}-required` : '', validationMessage ? `${descriptionId}-error` : ''].filter(Boolean).join(' ') || undefined}
+        bind:this={inputRef}
+        {onfocus}
+        onkeydown={(event) => {
+          if ($open && (event.key === 'Enter' || event.key === 'Escape')) return;
+          onkeydown?.(event);
+        }}
+        {onclick}
+        {onkeyup}
+        onblur={(event) => setTimeout(() => { if (!$open) onblur?.(event); }, 0)}
         aria-label={ariaLabel ?? t('pickers.datePicker.openCalendar')}
         class="bg-ds-background-input border-ds-border {value ? 'text-ds-text' : 'text-ds-text-subtle'} {controlClass}"
+        style="{style}"
         data-testid={dataTestid}
       >
         <span class="date-picker-icon">
@@ -147,6 +202,7 @@
         {min}
         {max}
         {readonly}
+        {disabled}
         onselect={commit}
         dataTestid={dataTestid ? `${dataTestid}-calendar` : undefined}
       />
@@ -154,12 +210,13 @@
         <button
           type="button"
           class="date-picker-footer-button"
-          onclick={() => commit(today('UTC').toString())}
+          disabled={!canCommit(formatDate(serverNow()))}
+          onclick={() => commit(parseDate(formatDate(serverNow())).toString())}
           data-testid={dataTestid ? `${dataTestid}-today` : undefined}
         >
           {t('common.today')}
         </button>
-        {#if clearable && value}
+        {#if clearable && value && !readonly && !disabled}
           <button
             type="button"
             class="date-picker-footer-button"
