@@ -406,7 +406,7 @@ export default {
     }
   },
   "recurrence": {
-    gregorianRuleHint: 'Monatliche und jährliche Wiederholungen verwenden den gregorianischen Kalender.',
+    "gregorianRuleHint": "Monatliche und jährliche Wiederholungen verwenden den gregorianischen Kalender.",
     "title": "Wiederholung",
     "description": "Regeln für wiederkehrende Aufgaben verwalten",
     "frequency": "Häufigkeit",

@@ -575,6 +575,7 @@ export default {
   },
 
   recurrence: {
+    gregorianRuleHint: 'Miesięczne i roczne reguły powtarzania korzystają z kalendarza gregoriańskiego.',
     title: 'Powtarzanie',
     description: 'Zarządzaj regułami powtarzających się zadań',
     frequency: 'Częstotliwość',
