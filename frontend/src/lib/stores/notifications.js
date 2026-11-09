@@ -106,9 +106,18 @@ export const notificationActions = {
     }
   },
 
-  // Dismiss notification (remove from list - local only for now)
-  dismiss: (id) => {
-    notifications.update((items) => items.filter((item) => item.id !== id));
+  // Dismiss a notification. Removes it from the server-backed inbox so it does
+  // not reappear on the next reconcile or still trigger the email digest.
+  dismiss: async (id) => {
+    try {
+      await notificationsApi.dismiss(id);
+      // An older inbox request may have started before the delete. Let it
+      // settle first so its response cannot restore the dismissed notification.
+      if (loadPromise) await loadPromise;
+      notifications.update((items) => items.filter((item) => item.id !== id));
+    } catch (error) {
+      console.error('Failed to dismiss notification:', error);
+    }
   },
 
   // Delete every notification from the server-backed inbox.

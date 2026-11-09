@@ -38,7 +38,10 @@ func DefaultDueDateReminderSchedulerConfig() DueDateReminderSchedulerConfig {
 // notification path, which re-checks recipient eligibility and workspace
 // permission and dedupes on the delivery key; a per-(item, user, due date)
 // ledger that outlives the notification row keeps a dismissed reminder from
-// being recreated. Email rides the existing notification email batching.
+// being recreated. A recipient filtered out (inactive, agent, no workspace
+// access) is recorded as not delivered and retried after a backoff, so a
+// temporary condition does not lose the reminder or starve later candidates.
+// Email rides the existing notification email batching.
 type DueDateReminderScheduler struct {
 	items         *repository.ItemRepository
 	notifications *services.NotificationService
@@ -115,11 +118,16 @@ func (s *DueDateReminderScheduler) RunOnce(ctx context.Context, now time.Time) {
 		return
 	}
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	// The query applies each recipient's own lead time and skips items already
-	// reminded, so every returned row is a candidate and the batch advances.
-	horizon := today.AddDate(0, 0, services.MaxReminderDays)
+	// The horizon is the start of the day after the largest supported lead, so
+	// the whole final day is included even when a due date carries a time
+	// component. The per-recipient lead predicate is still the real window cap.
+	horizon := today.AddDate(0, 0, services.MaxReminderDays+1)
+	retryBefore := now.Add(-repository.DueReminderRetryInterval)
 
-	items, err := s.items.ListDueSoonItemsForReminderUsers(today, horizon, s.config.BatchSize)
+	// The query applies each recipient's own lead time, skips items already
+	// reminded, and holds skipped candidates back until retryBefore, so every
+	// returned row is a candidate and the batch advances.
+	items, err := s.items.ListDueSoonItemsForReminderUsers(today, horizon, retryBefore, s.config.BatchSize)
 	if err != nil {
 		slog.Warn("due-date reminders: failed to list due items",
 			slog.String("component", "reminders"), slog.Any("error", err))
@@ -140,19 +148,21 @@ func (s *DueDateReminderScheduler) RunOnce(ctx context.Context, now time.Time) {
 }
 
 func (s *DueDateReminderScheduler) notify(item repository.DueSoonItem, now time.Time) error {
-	if err := s.notifications.NotifyDueDateReminder(services.DueDateReminder{
+	delivered, err := s.notifications.NotifyDueDateReminder(services.DueDateReminder{
 		RecipientID: item.RecipientID,
 		WorkspaceID: item.WorkspaceID,
 		ItemID:      item.ItemID,
 		ItemKey:     fmt.Sprintf("%s-%d", item.WorkspaceKey, item.ItemNumber),
 		Title:       item.Title,
 		DueDate:     item.DueDate,
-	}, now); err != nil {
+	}, now)
+	if err != nil {
 		return err
 	}
 	// Record the ledger even when the recipient was filtered out (inactive,
-	// agent, or no workspace access) so the candidate cannot consume a batch
-	// slot on every sweep. A failed insert returns before this point, so the
-	// reminder is retried; the delivery key keeps the retry from duplicating it.
-	return s.items.RecordDueDateReminder(item.ItemID, item.RecipientID, item.DueDate.Format("2006-01-02"))
+	// agent, or no workspace access), but as not-delivered so the candidate is
+	// retried after the backoff. A failed insert returns before this point, so
+	// the reminder is retried; the delivery key keeps the retry from
+	// duplicating it.
+	return s.items.RecordDueDateReminder(item.ItemID, item.RecipientID, item.DueDate.Format("2006-01-02"), delivered, now)
 }
