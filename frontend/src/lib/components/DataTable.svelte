@@ -231,7 +231,7 @@
                       <!-- Render function output as text (safe by default) -->
                       <span dir="auto">{getCellValue(item, column) || '—'}</span>
                     {:else}
-                      <span dir="auto" style="color: {column.textColor || (column.key === 'actions' ? 'var(--ds-text)' : 'var(--ds-text)')};">
+                      <span dir="auto" style="color: {column.textColor || 'var(--ds-text)'};">
                         {getCellValue(item, column) || '—'}
                       </span>
                     {/if}

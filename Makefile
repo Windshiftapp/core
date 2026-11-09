@@ -127,6 +127,7 @@ ci-frontend: ci-tools-check
 	cd $(FRONTEND_DIR) && npm ci
 	cd $(FRONTEND_DIR) && npm audit signatures --min-release-age=0
 	cd $(FRONTEND_DIR) && npm run check
+	cd $(FRONTEND_DIR) && npm run check:inline-styles
 	cd $(FRONTEND_DIR) && npm run typecheck
 	cd $(FRONTEND_DIR) && npm run build
 

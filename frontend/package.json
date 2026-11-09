@@ -23,6 +23,7 @@
     "check": "biome check . && node scripts/check-shortcuts.js && node scripts/check-i18n.js && node scripts/check-hardcoded-i18n.js && node scripts/check-silent-errors.js && node scripts/check-design-tokens.js && node scripts/check-hmr-boundaries.js && node scripts/check-openui-components.mjs",
     "check:entry-assets": "node scripts/check-entry-assets.js",
     "check:fix": "biome check --write .",
+    "check:inline-styles": "node scripts/check-inline-styles.js",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",

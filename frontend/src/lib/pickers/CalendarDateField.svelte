@@ -87,13 +87,12 @@
 
 <div class="date-picker" data-testid={dataTestid ? `${dataTestid}-root` : undefined}>
   {#if label}
-    <span class="date-picker-label" style="color: var(--ds-text);">{label}</span>
+    <span class="date-picker-label text-ds-text">{label}</span>
   {/if}
   <div class="date-picker-control">
     {#if inline}
       <div
-        class="date-picker-inline"
-        style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
+        class="date-picker-inline bg-ds-surface-raised border border-ds-border"
       >
         <CalendarGrid
           {calendarId}
@@ -113,10 +112,7 @@
         {id}
         {disabled}
         aria-label={ariaLabel ?? t('pickers.datePicker.openCalendar')}
-        class={controlClass}
-        style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: {value
-          ? 'var(--ds-text)'
-          : 'var(--ds-text-subtle)'};"
+        class="bg-ds-background-input border-ds-border {value ? 'text-ds-text' : 'text-ds-text-subtle'} {controlClass}"
         data-testid={dataTestid}
       >
         <span class="date-picker-icon">
@@ -141,9 +137,8 @@
   {#if !inline && $open}
     <div
       use:melt={$content}
-      class="date-picker-popover"
+      class="date-picker-popover bg-ds-surface-raised border border-ds-border"
       data-testid={dataTestid ? `${dataTestid}-popover` : undefined}
-      style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
     >
       <CalendarGrid
         {calendarId}
@@ -155,7 +150,7 @@
         onselect={commit}
         dataTestid={dataTestid ? `${dataTestid}-calendar` : undefined}
       />
-      <div class="date-picker-footer" style="border-top: 1px solid var(--ds-border);">
+      <div class="date-picker-footer border-t border-ds-border">
         <button
           type="button"
           class="date-picker-footer-button"
