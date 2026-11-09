@@ -5,6 +5,14 @@ import (
 	"time"
 )
 
+// DueReminderRetryInterval is how long a skipped reminder candidate is held
+// back before it is re-evaluated. A candidate whose recipient was ineligible
+// (inactive, agent, or without workspace access) is recorded as not delivered
+// and retried after this interval, so a temporary ineligibility does not lose
+// the reminder while still letting the sweep advance past it instead of
+// re-selecting the same row every tick.
+const DueReminderRetryInterval = 24 * time.Hour
+
 // DueSoonItem is the projection the due-date reminder sweep needs: the
 // opted-in recipient to notify and enough item identity to build a deep link
 // and delivery key.
@@ -18,15 +26,20 @@ type DueSoonItem struct {
 	RecipientID  int
 }
 
-// RecordDueDateReminder records that a due-date reminder was sent for the
-// (item, user, due date) triple. It is idempotent, and the ledger outlives the
-// notification row so dismissing the notification cannot resurrect it.
-func (r *ItemRepository) RecordDueDateReminder(itemID, userID int, dueDate string) error {
+// RecordDueDateReminder records the outcome of one due-date reminder attempt
+// for the (item, user, due date) triple. It is idempotent, and a delivered row
+// is never downgraded by a later skipped attempt. attemptedAt is the sweep
+// clock, so the retry backoff and the query use the same clock. The ledger
+// outlives the notification row so dismissing the notification cannot
+// resurrect it.
+func (r *ItemRepository) RecordDueDateReminder(itemID, userID int, dueDate string, delivered bool, attemptedAt time.Time) error {
 	if _, err := r.db.ExecWrite(`
-		INSERT INTO item_due_reminders (item_id, user_id, due_date)
-		VALUES (?, ?, ?)
-		ON CONFLICT(item_id, user_id, due_date) DO NOTHING
-	`, itemID, userID, dueDate); err != nil {
+		INSERT INTO item_due_reminders (item_id, user_id, due_date, delivered, sent_at)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(item_id, user_id, due_date) DO UPDATE SET
+		    delivered = item_due_reminders.delivered OR excluded.delivered,
+		    sent_at = excluded.sent_at
+	`, itemID, userID, dueDate, delivered, attemptedAt); err != nil {
 		return fmt.Errorf("record due-date reminder: %w", err)
 	}
 	return nil
@@ -36,10 +49,12 @@ func (r *ItemRepository) RecordDueDateReminder(itemID, userID int, dueDate strin
 // are due within their recipient's configured lead time and have not already
 // been reminded. The recipient is the assignee for regular items and the
 // workspace owner for personal-workspace items without an assignee. The
-// lead-time window and the sent-reminder exclusion both run in SQL, so every
-// returned row is a candidate and a full batch always makes progress instead
-// of re-selecting rows that can never be claimed.
-func (r *ItemRepository) ListDueSoonItemsForReminderUsers(from, to time.Time, limit int) ([]DueSoonItem, error) {
+// lead-time window, merged/deactivated exclusions, and the sent-reminder
+// exclusion all run in SQL, so every returned row is a candidate and a full
+// batch always makes progress instead of re-selecting rows that can never be
+// claimed. A skipped candidate is held back until retryBefore so a temporary
+// ineligibility does not consume a batch slot on every sweep.
+func (r *ItemRepository) ListDueSoonItemsForReminderUsers(from, to, retryBefore time.Time, limit int) ([]DueSoonItem, error) {
 	if limit <= 0 {
 		limit = 500
 	}
@@ -67,16 +82,19 @@ func (r *ItemRepository) ListDueSoonItemsForReminderUsers(from, to time.Time, li
 		  AND i.due_date <= ?
 		  AND `+leadPredicate+`
 		  AND COALESCE(sc.is_completed, FALSE) = FALSE
+		  AND i.merged_into_item_id IS NULL
+		  AND w.active = TRUE
 		  AND (i.assignee_id IS NOT NULL OR w.is_personal = TRUE)
 		  AND NOT EXISTS (
 		      SELECT 1 FROM item_due_reminders r
 		      WHERE r.item_id = i.id
 		        AND r.user_id = COALESCE(i.assignee_id, w.owner_id)
 		        AND r.due_date = `+ledgerDate+`
+		        AND (r.delivered = TRUE OR r.sent_at > ?)
 		  )
 		ORDER BY i.due_date ASC, i.id ASC
 		LIMIT ?
-	`, from, to, from, limit)
+	`, from, to, from, retryBefore, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list due-soon items for reminder users: %w", err)
 	}

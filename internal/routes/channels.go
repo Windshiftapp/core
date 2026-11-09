@@ -87,6 +87,7 @@ func RegisterChannelRoutes(deps *Deps) {
 	api.HandleH("GET /notifications/events", auth(http.HandlerFunc(deps.Channels.Notification.NotificationEvents)))
 	api.HandleH("POST /notifications", auth(http.HandlerFunc(deps.Channels.Notification.CreateNotification)))
 	api.HandleH("DELETE /notifications", auth(http.HandlerFunc(deps.Channels.Notification.ClearNotifications)))
+	api.HandleH("DELETE /notifications/{id}", auth(http.HandlerFunc(deps.Channels.Notification.DeleteNotification)))
 	api.HandleH("PATCH /notifications/read-all", auth(http.HandlerFunc(deps.Channels.Notification.MarkAllNotificationsAsRead)))
 	api.HandleH("PATCH /notifications/{id}/read", auth(http.HandlerFunc(deps.Channels.Notification.MarkNotificationAsRead)))
 	api.HandleH("PATCH /notifications/seen-all", auth(http.HandlerFunc(deps.Channels.Notification.MarkAllNotificationsAsSeen)))

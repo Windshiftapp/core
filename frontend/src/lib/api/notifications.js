@@ -15,6 +15,10 @@ export const notifications = {
     fetchAPI('/notifications', {
       method: 'DELETE',
     }),
+  dismiss: (id) =>
+    fetchAPI(`/notifications/${id}`, {
+      method: 'DELETE',
+    }),
   markAsRead: (id) =>
     fetchAPI(`/notifications/${id}/read`, {
       method: 'PATCH',

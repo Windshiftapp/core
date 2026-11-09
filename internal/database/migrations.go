@@ -3301,6 +3301,21 @@ var Catalog = []Migration{
 			ALTER TABLE user_integration_tokens ADD COLUMN IF NOT EXISTS invalidated_at TIMESTAMPTZ;
 		`,
 	},
+	{
+		Version:       "20261121_item_due_reminders_delivered",
+		Name:          "Track whether a due-date reminder was delivered so skipped candidates can be retried",
+		CheckSQLite:   sqliteColumnCheck("item_due_reminders", "delivered"),
+		CheckPostgres: pgColumnCheck("item_due_reminders", "delivered"),
+		// Existing rows predate the distinction and are treated as delivered so
+		// the sweep keeps its previous behavior. New skipped rows carry
+		// delivered=false and are retried after the retry backoff.
+		SQLite: `
+			ALTER TABLE item_due_reminders ADD COLUMN delivered BOOLEAN NOT NULL DEFAULT TRUE;
+		`,
+		Postgres: `
+			ALTER TABLE item_due_reminders ADD COLUMN IF NOT EXISTS delivered BOOLEAN NOT NULL DEFAULT TRUE;
+		`,
+	},
 }
 
 // isNumericJSONKey reports whether a custom-field value key is a numeric field

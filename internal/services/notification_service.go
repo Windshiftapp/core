@@ -139,12 +139,20 @@ type NotificationEmailClaim struct {
 	ExpiresAt time.Time
 }
 
+// notificationAuthorizer is the authorization surface the notification service
+// needs to resolve recipients and re-check notification visibility. It is an
+// interface so tests can inject failures without a real permission service.
+type notificationAuthorizer interface {
+	Snapshot(userID int) (*NotificationAuthorizationSnapshot, error)
+	snapshotForRecipient(userID int, active bool, permissions *models.UserPermissionCache) *NotificationAuthorizationSnapshot
+}
+
 // NotificationService handles asynchronous notification creation
 type NotificationService struct {
 	db                  database.Database
 	notificationManager NotificationManager
 	permService         *PermissionService
-	notificationAuth    *NotificationAuthorizer
+	notificationAuth    notificationAuthorizer
 	config              NotificationServiceConfig
 
 	// Rule cache
@@ -259,6 +267,7 @@ func (ns *NotificationService) unreadEmailBatches(maxBatchSize int, now time.Tim
 
 	batches := make(map[string]*UserNotificationBatch, maxNotificationEmailRecipients)
 	var suppressed []int
+	skippedRecipients := 0
 	for _, candidate := range recipients {
 		if len(batches) >= maxNotificationEmailRecipients {
 			break
@@ -268,11 +277,23 @@ func (ns *NotificationService) unreadEmailBatches(maxBatchSize int, now time.Tim
 		}
 		snapshot, err := ns.notificationAuth.Snapshot(candidate.id)
 		if err != nil {
-			return nil, fmt.Errorf("resolve notification scope for user %d: %w", candidate.id, err)
+			// One recipient's authorization lookup must not wedge the whole
+			// digest tick. Their rows stay pending and are retried next tick.
+			skippedRecipients++
+			slog.Warn("notification digest: skipping recipient after scope resolution failed",
+				slog.String("component", "notifications"),
+				slog.Int("user_id", candidate.id),
+				slog.Any("error", err))
+			continue
 		}
 		notifications, invisible, err := ns.unreadEmailNotificationsForUser(candidate.id, snapshot, maxBatchSize, now)
 		if err != nil {
-			return nil, err
+			skippedRecipients++
+			slog.Warn("notification digest: skipping recipient after notification scan failed",
+				slog.String("component", "notifications"),
+				slog.Int("user_id", candidate.id),
+				slog.Any("error", err))
+			continue
 		}
 		suppressed = append(suppressed, invisible...)
 		if len(notifications) == 0 {
@@ -294,6 +315,11 @@ func (ns *NotificationService) unreadEmailBatches(maxBatchSize int, now time.Tim
 	}
 	if err := ns.suppressNotificationEmails(suppressed, now); err != nil {
 		return nil, err
+	}
+	// If every candidate failed, the fault is systemic rather than one bad
+	// recipient; surface it so the tick is recorded as failed and retried.
+	if len(batches) == 0 && skippedRecipients > 0 {
+		return nil, fmt.Errorf("notification digest: all %d candidate recipients failed", skippedRecipients)
 	}
 	return batches, nil
 }
@@ -367,7 +393,14 @@ func (ns *NotificationService) unreadEmailNotificationsForUser(userID int, snaps
 			seen[notification.ID] = true
 			visible, err := snapshot.Visible(notification)
 			if err != nil {
-				return nil, nil, err
+				// A per-row authorization error is not a permanent denial: skip
+				// the row without suppressing it so a later tick can retry.
+				slog.Warn("notification digest: skipping row after visibility check failed",
+					slog.String("component", "notifications"),
+					slog.Int("user_id", userID),
+					slog.Int("notification_id", notification.ID),
+					slog.Any("error", err))
+				continue
 			}
 			if visible {
 				notifications = append(notifications, notification)
@@ -778,7 +811,7 @@ func (ns *NotificationService) NotifyUsersI18n(userIDs []int, workspaceID, itemI
 // is missing, so non-localized callers are unaffected.
 func (ns *NotificationService) NotifyUsersWithRecordsI18n(userIDs []int, workspaceID, itemID, actorUserID int, notifType, title, message, titleKey, messageKey string, params map[string]any) ([]models.Notification, error) {
 	workspace, item := workspaceID, itemID
-	return ns.notifyUsersAtURL(userIDs, actorUserID, directNotificationSpec{
+	notifications, _, err := ns.notifyUsersAtURL(userIDs, actorUserID, directNotificationSpec{
 		Type:               notifType,
 		Title:              title,
 		Message:            message,
@@ -792,6 +825,7 @@ func (ns *NotificationService) NotifyUsersWithRecordsI18n(userIDs []int, workspa
 		I18nMessageKey:     messageKey,
 		I18nParams:         params,
 	}, ns.workspaceViewAuthorizer(workspaceID))
+	return notifications, err
 }
 
 // NotifyUsersForAsset creates direct notifications for users who currently
@@ -810,7 +844,7 @@ func (ns *NotificationService) NotifyUsersForAsset(userIDs []int, setID, assetID
 		return checker.HasAssetSetPermission(userID, setID, AssetPermissionKeyView)
 	}
 	asset := assetID
-	notifications, err := ns.notifyUsersAtURL(userIDs, actorUserID, directNotificationSpec{
+	notifications, _, err := ns.notifyUsersAtURL(userIDs, actorUserID, directNotificationSpec{
 		Type:               notifType,
 		Title:              title,
 		Message:            message,
@@ -842,13 +876,13 @@ type DueDateReminder struct {
 // NotifyDueDateReminder delivers one due-date reminder through the shared
 // direct-notification path: agents, inactive users, and users without current
 // workspace view permission are dropped, and the delivery key makes the insert
-// idempotent. A nil error means the candidate was handled, whether or not a row
-// was inserted, so the caller can record the sent-reminder ledger and keep an
-// ineligible recipient from being re-selected on every sweep.
-func (ns *NotificationService) NotifyDueDateReminder(reminder DueDateReminder, now time.Time) error {
+// idempotent. The returned bool reports whether the recipient was eligible and
+// the notification is present, so the caller can record the sent-reminder
+// ledger with the right delivered/skipped state.
+func (ns *NotificationService) NotifyDueDateReminder(reminder DueDateReminder, now time.Time) (bool, error) {
 	dueDate := reminder.DueDate.Format("2006-01-02")
 	workspaceID, itemID := reminder.WorkspaceID, reminder.ItemID
-	_, err := ns.notifyUsersAtURL([]int{reminder.RecipientID}, 0, directNotificationSpec{
+	_, eligible, err := ns.notifyUsersAtURL([]int{reminder.RecipientID}, 0, directNotificationSpec{
 		Type:               "reminder",
 		Title:              fmt.Sprintf("Reminder: %s is due soon", reminder.ItemKey),
 		Message:            fmt.Sprintf("%s is due on %s", reminder.Title, dueDate),
@@ -868,7 +902,10 @@ func (ns *NotificationService) NotifyDueDateReminder(reminder DueDateReminder, n
 		DeliveryKey: fmt.Sprintf("due-reminder:%d:%s:%d", itemID, dueDate, reminder.RecipientID),
 		Timestamp:   now,
 	}, ns.workspaceViewAuthorizer(workspaceID))
-	return err
+	if err != nil {
+		return false, err
+	}
+	return eligible > 0, nil
 }
 
 // workspaceViewAuthorizer re-checks the recipient's current item.view
@@ -888,9 +925,9 @@ func (ns *NotificationService) notifyUsersAtURL(
 	actorUserID int,
 	spec directNotificationSpec,
 	authorize func(int) (bool, error),
-) ([]models.Notification, error) {
+) ([]models.Notification, int, error) {
 	if ns.notificationManager == nil {
-		return nil, fmt.Errorf("notification manager not configured")
+		return nil, 0, fmt.Errorf("notification manager not configured")
 	}
 	skipAsAgent := map[int]bool{}
 	if ns.db != nil {
@@ -910,7 +947,7 @@ func (ns *NotificationService) notifyUsersAtURL(
 		if authorize != nil {
 			allowed, err := authorize(uid)
 			if err != nil {
-				return nil, fmt.Errorf("authorize notification recipient %d: %w", uid, err)
+				return nil, 0, fmt.Errorf("authorize notification recipient %d: %w", uid, err)
 			}
 			if !allowed {
 				continue
@@ -934,13 +971,13 @@ func (ns *NotificationService) notifyUsersAtURL(
 		})
 	}
 	if len(notifications) == 0 {
-		return []models.Notification{}, nil
+		return []models.Notification{}, 0, nil
 	}
 	stored, err := ns.notificationManager.AddNotifications(notifications)
 	if err != nil {
-		return nil, fmt.Errorf("add notifications for %d users: %w", len(notifications), err)
+		return nil, 0, fmt.Errorf("add notifications for %d users: %w", len(notifications), err)
 	}
-	return stored, nil
+	return stored, len(notifications), nil
 }
 
 // CreateNotification stores a single notification through the notification
@@ -1188,7 +1225,7 @@ func (ns *NotificationService) refreshRuleCache() error {
 	// workspace with no config set assigned, mirroring how an unassigned
 	// workflow falls back to workflows.is_default (workflow_service.go).
 	// A missing default row leaves this 0, which resolves to "no rules" (skip).
-	if err := ns.db.QueryRow(`SELECT id FROM configuration_sets WHERE is_default = true LIMIT 1`).Scan(&newCache.DefaultConfigSetID); err != nil {
+	if err := ns.db.QueryRow(`SELECT id FROM configuration_sets WHERE is_default = true ORDER BY id LIMIT 1`).Scan(&newCache.DefaultConfigSetID); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			slog.Warn("failed to load default configuration set for notifications", slog.String("component", "notifications"), slog.Any("error", err))
 		}
