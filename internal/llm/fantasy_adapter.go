@@ -15,6 +15,8 @@ import (
 	"charm.land/fantasy/providers/anthropic"
 	"charm.land/fantasy/providers/openai"
 	sdkoption "github.com/openai/openai-go/v3/option"
+
+	"windshift/internal/toolschema"
 )
 
 type dynamicFantasyClient struct {
@@ -434,6 +436,10 @@ func toFantasyTools(tools []ToolDefinition, enablePromptCache bool) []fantasy.To
 	for i, tool := range tools {
 		var schema map[string]any
 		_ = json.Unmarshal(tool.Function.Parameters, &schema)
+		// Externally supplied tools (the coding-agent runner broker decodes its
+		// own CompletionRequest) bypass the aitools registry, so canonicalize
+		// here too: every provider request sees the same portable shape.
+		toolschema.EnsureProperties(schema)
 		mapped := fantasy.FunctionTool{
 			Name:        tool.Function.Name,
 			Description: tool.Function.Description,

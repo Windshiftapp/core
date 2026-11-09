@@ -9,6 +9,7 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 
 	"windshift/internal/agentstudio"
+	"windshift/internal/toolschema"
 )
 
 // CapabilityGroup is the stable Agent Studio grouping for Standard-agent
@@ -142,6 +143,10 @@ func Register[Args any](r *Registry, t Tool[Args]) {
 	schemaJSON, err := json.Marshal(schema)
 	if err != nil {
 		panic(fmt.Sprintf("aitools: marshal schema for %s: %v", t.Name, err))
+	}
+	schemaJSON, err = toolschema.NormalizeParameters(schemaJSON)
+	if err != nil {
+		panic(fmt.Sprintf("aitools: normalize schema for %s: %v", t.Name, err))
 	}
 
 	entry := Entry{
