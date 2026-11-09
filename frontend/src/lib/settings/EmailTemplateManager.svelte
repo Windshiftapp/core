@@ -304,6 +304,8 @@
           labelColor="default"
           type="text"
           size="small"
+          id="email-template-subject"
+          dataTestid="email-template-subject"
           bind:value={formData.subject}
         />
       </div>
