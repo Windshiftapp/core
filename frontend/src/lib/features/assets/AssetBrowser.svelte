@@ -802,14 +802,14 @@
       {:else if assetSets.length === 0}
         <EmptyState
           icon={IconPackage}
-          title={t('common.noItems')}
-          description={t('common.noItems')}
+          title={t('assets.noAssetSets')}
+          description={t('assets.noAssetSetsDesc')}
         />
       {:else if assets.length === 0}
         <EmptyState
           icon={IconBox}
-          title={t('common.noItems')}
-          description={t('common.noItems')}
+          title={activeQuery || selectedCategoryId ? t('common.noResults') : t('common.noItems')}
+          description={activeQuery || selectedCategoryId ? t('emptyStates.noItemsMatch') : undefined}
           action={selectedSetId && canEdit && !activeQuery && !selectedCategoryId ? createAssetAction : null}
         />
       {:else}

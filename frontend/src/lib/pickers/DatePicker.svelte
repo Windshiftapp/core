@@ -99,7 +99,7 @@
 
 {#if isNative}
   {#if label}
-    <span class="date-picker-label" style="color: var(--ds-text);">{label}</span>
+    <span class="date-picker-label text-ds-text">{label}</span>
   {/if}
   <input
     type="date"
@@ -112,8 +112,7 @@
     readonly={readonly}
     aria-label={resolvedAriaLabel}
     {placeholder}
-    class={controlClass}
-    style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
+    class="bg-ds-background-input border-ds-border text-ds-text {controlClass}"
     data-testid={dataTestid}
     value={value}
     bind:this={inputRef}
@@ -150,8 +149,7 @@
 {:else}
   <button
     type="button"
-    class={controlClass}
-    style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text-subtle);"
+    class="bg-ds-background-input border-ds-border text-ds-text-subtle {controlClass}"
     {disabled}
     data-testid={dataTestid ? `${dataTestid}-loading` : undefined}
   >
