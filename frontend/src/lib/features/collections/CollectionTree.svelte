@@ -478,7 +478,7 @@
       <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-4">
           <SubFilterBar {workspaceId} {collectionId} />
-          <CollectionLevelFilter {workspaceId} {collectionId} view="tree" />
+          <CollectionLevelFilter {workspaceId} {collectionId} />
         </div>
         <div class="flex items-center gap-2">
           <ColumnSelector

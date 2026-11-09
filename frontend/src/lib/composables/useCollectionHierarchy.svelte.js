@@ -61,6 +61,10 @@ export function useCollectionHierarchy({
   let loadedRoots = $state(new Set());
   let loadingRoots = $state(new Set());
   let expanded = $state(new Set());
+  // Bumped whenever the base set is replaced. A subtree response whose
+  // generation no longer matches is dropped instead of merged, so a fetch for
+  // a previous view, level, or filter cannot change the current hierarchy.
+  let fetchGeneration = 0;
 
   let baseSignature = null;
   let previousBaseIds = null;
@@ -127,7 +131,10 @@ export function useCollectionHierarchy({
         roots.push(item);
       }
     }
-    roots.sort(compareItems);
+    // Base items arrive in the API's rank order, so the root list keeps that
+    // order. Only child buckets need a sort: flattening can merge descendants
+    // from different depths into one parent, and the subtree read is
+    // breadth-first.
     for (const children of childrenByParent.values()) children.sort(compareItems);
     return { roots, childrenByParent };
   });
@@ -169,6 +176,7 @@ export function useCollectionHierarchy({
       (id) => !loadingRoots.has(id) && (force || offsetByRoot[id] != null || !loadedRoots.has(id))
     );
     if (ids.length === 0) return;
+    const generation = fetchGeneration;
     loadingRoots = new Set([...loadingRoots, ...ids]);
     try {
       const groups = await itemsApi.getHierarchy({
@@ -180,6 +188,7 @@ export function useCollectionHierarchy({
         perRootLimit: getPerRootLimit(),
         perRootOffset: 0,
       });
+      if (generation !== fetchGeneration) return;
       const next = { ...overlayByRoot };
       const nextLoaded = new Set(loadedRoots);
       for (const group of groups) {
@@ -202,9 +211,11 @@ export function useCollectionHierarchy({
     } catch (error) {
       console.error('[useCollectionHierarchy] failed to load descendants:', error);
     } finally {
-      const pending = new Set(loadingRoots);
-      for (const id of ids) pending.delete(id);
-      loadingRoots = pending;
+      if (generation === fetchGeneration) {
+        const pending = new Set(loadingRoots);
+        for (const id of ids) pending.delete(id);
+        loadingRoots = pending;
+      }
     }
   }
 
@@ -212,6 +223,7 @@ export function useCollectionHierarchy({
   async function loadMore(itemId) {
     const group = overlayByRoot[itemId];
     if (!group?.hasMore || loadingRoots.has(itemId)) return;
+    const generation = fetchGeneration;
     loadingRoots = new Set([...loadingRoots, itemId]);
     try {
       const groups = await itemsApi.getHierarchy({
@@ -223,6 +235,7 @@ export function useCollectionHierarchy({
         perRootLimit: getPerRootLimit(),
         perRootOffset: group.items.length,
       });
+      if (generation !== fetchGeneration) return;
       const next = groups.find((entry) => entry.root_id === itemId);
       if (!next) return;
       overlayByRoot = {
@@ -236,9 +249,11 @@ export function useCollectionHierarchy({
     } catch (error) {
       console.error('[useCollectionHierarchy] failed to load more descendants:', error);
     } finally {
-      const pending = new Set(loadingRoots);
-      pending.delete(itemId);
-      loadingRoots = pending;
+      if (generation === fetchGeneration) {
+        const pending = new Set(loadingRoots);
+        pending.delete(itemId);
+        loadingRoots = pending;
+      }
     }
   }
 
@@ -355,6 +370,7 @@ export function useCollectionHierarchy({
       loadedRoots = new Set();
       loadingRoots = new Set();
       expanded = stored ?? new Set();
+      fetchGeneration += 1;
     }
     baseSignature = signature;
     previousBaseIds = nextIds;

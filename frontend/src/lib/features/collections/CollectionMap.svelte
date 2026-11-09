@@ -736,7 +736,7 @@
       <!-- Controls Bar -->
       <div class="flex items-center gap-4 mt-4">
         <SubFilterBar {workspaceId} {collectionId} />
-        <CollectionLevelFilter {workspaceId} {collectionId} view="map" />
+        <CollectionLevelFilter {workspaceId} {collectionId} />
       </div>
 
       <!-- Hierarchy Breadcrumbs -->

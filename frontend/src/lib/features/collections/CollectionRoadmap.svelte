@@ -1222,7 +1222,7 @@
       <div class="relative z-40 flex items-center mb-4">
       <div class="flex items-center gap-4">
         <SubFilterBar {workspaceId} {collectionId} />
-        <CollectionLevelFilter {workspaceId} {collectionId} view="roadmap" />
+        <CollectionLevelFilter {workspaceId} {collectionId} />
       </div>
       </div>
 
