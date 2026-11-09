@@ -241,8 +241,19 @@ func (h *SSEHub) Subscribe(itemID int) *SSESubscriber[ItemSSEEvent] {
 	return h.items.subscribe([]int{itemID})
 }
 
+// SubscribeItems registers one subscriber against every item topic in itemIDs,
+// so a multiplexed connection can watch several open item details at once.
+func (h *SSEHub) SubscribeItems(itemIDs []int) *SSESubscriber[ItemSSEEvent] {
+	return h.items.subscribe(itemIDs)
+}
+
 // Unsubscribe removes an item subscriber.
 func (h *SSEHub) Unsubscribe(sub *SSESubscriber[ItemSSEEvent]) {
+	h.items.unsubscribe(sub)
+}
+
+// UnsubscribeItems removes an item subscriber from every topic.
+func (h *SSEHub) UnsubscribeItems(sub *SSESubscriber[ItemSSEEvent]) {
 	h.items.unsubscribe(sub)
 }
 

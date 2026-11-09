@@ -11,6 +11,10 @@ func RegisterItemRoutes(deps *Deps) {
 	// Session-only item endpoints. Canonical item CRUD and related operations
 	// are mounted at /api/v2 by the shared v2 router.
 	api.HandleH("GET /items/cache-stats", auth(http.HandlerFunc(deps.Items.Item.GetCacheStats)))
+	// Multiplexed live-update stream (WI-1656): one connection per tab carrying
+	// notification, workspace/collection and open-item invalidations. The
+	// per-topic streams below stay mounted for clients that have not migrated.
+	api.HandleH("GET /events", auth(http.HandlerFunc(deps.Items.Item.UserEvents)))
 	// Item live-update stream (WI-484). Item-view gated (404 on no view); the
 	// path ends in /events so it is exempt from per-user concurrency slots.
 	api.HandleH("GET /items/{id}/events", auth(http.HandlerFunc(deps.Items.Item.Events)))

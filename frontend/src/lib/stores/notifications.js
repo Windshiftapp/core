@@ -1,7 +1,7 @@
 import { get, writable } from 'svelte/store';
 import { notifications as notificationsApi } from '../api/notifications.js';
+import { subscribeEventStream } from '../composables/eventStream.svelte.js';
 import { navigate } from '../router.js';
-import { toExternal } from '../runtime/contextPath.js';
 import { itemIdFromActionUrl } from '../utils/actionUrl.js';
 import {
   canRunBackgroundSync,
@@ -26,12 +26,6 @@ const NOTIFICATION_PAGE_SIZE = 100;
 // Load notifications from API
 let loadPromise = null;
 let pollerGeneration = 0;
-// The poller opens the stream before requesting the first snapshot, so that
-// snapshot already covers everything up to the subscription. Track that
-// ordering so the first healthy connection does not reconcile a second time.
-let streamOpened = false;
-let initialLoadIssuedAfterStreamOpen = false;
-let streamEverConnected = false;
 
 async function loadNotificationPages(generation) {
   const allNotifications = [];
@@ -297,8 +291,8 @@ function _dispatchNew(items) {
 let _pollerStarted = false;
 let _stopReconnectListener = null;
 
-// --- User-scoped invalidation stream (WI-1625) ---
-let _eventSource = null;
+// --- User-scoped invalidation stream (WI-1625, multiplexed by WI-1656) ---
+let _unsubscribeStream = null;
 let _streamReconcileTimer = null;
 
 function _scheduleStreamReconcile() {
@@ -328,21 +322,12 @@ function _scheduleStreamReconcile() {
 }
 
 function _startNotificationStream() {
-  if (typeof EventSource === 'undefined' || _eventSource) return;
-  const source = new EventSource(toExternal('/api/notifications/events'));
-  _eventSource = source;
-  streamOpened = true;
-  const markConnected = () => {
-    const firstConnection = !streamEverConnected;
-    streamEverConnected = true;
-    // The first snapshot was requested after this stream opened, so it already
-    // reflects every invalidation the stream would replay. Reconcile only on a
-    // reconnect (or when the snapshot predates the stream).
-    if (firstConnection && initialLoadIssuedAfterStreamOpen) return;
-    _scheduleStreamReconcile();
-  };
-  source.addEventListener('connected', markConnected);
-  source.addEventListener('changed', _scheduleStreamReconcile);
+  if (typeof EventSource === 'undefined' || _unsubscribeStream) return;
+  // The shared multiplexed connection opens before the first snapshot, so the
+  // first healthy connection needs no reconcile; only a reconnect does.
+  _unsubscribeStream = subscribeEventStream('notifications', {
+    onReconcile: _scheduleStreamReconcile,
+  });
 }
 
 function _stopNotificationStream() {
@@ -350,14 +335,13 @@ function _stopNotificationStream() {
     clearTimeout(_streamReconcileTimer);
     _streamReconcileTimer = null;
   }
-  if (_eventSource) {
-    _eventSource.close();
-    _eventSource = null;
+  if (_unsubscribeStream) {
+    _unsubscribeStream();
+    _unsubscribeStream = null;
   }
 }
 
 function _loadInitialNotifications(generation) {
-  initialLoadIssuedAfterStreamOpen = streamOpened;
   loadNotifications().then(() => {
     if (!_pollerStarted || generation !== pollerGeneration) return;
     if (!_seeded) {
@@ -406,9 +390,6 @@ export function stopNotificationPoller() {
   _stopReconnectListener?.();
   _stopReconnectListener = null;
   loadPromise = null;
-  streamOpened = false;
-  initialLoadIssuedAfterStreamOpen = false;
-  streamEverConnected = false;
   _seeded = false;
   _seenIds.clear();
   notifications.set([]);
