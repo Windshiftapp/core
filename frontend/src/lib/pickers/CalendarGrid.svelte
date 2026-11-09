@@ -12,15 +12,17 @@
   import {
     createCalendar as createIntlCalendar,
     getDayOfWeek,
+    getLocalTimeZone,
     parseDate,
     startOfWeek,
-    today,
     toCalendar
   } from '@internationalized/date';
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import { untrack } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { formatDate } from '../utils/dateFormatter.js';
+  import { serverNow } from '../utils/serverClock.js';
 
   let {
     calendarId = 'gregory',
@@ -29,11 +31,33 @@
     min = undefined,
     max = undefined,
     readonly = false,
+    disabled = false,
     dataTestid = undefined,
     onselect = undefined
   } = $props();
 
   const isRTL = $derived(/^(fa|ar|he|ur)(-|$)/i.test(locale));
+
+  // Calendar-aware heading: Melt's `headingValue` strips the calendar (it converts the
+  // `CalendarDate` to a plain JS Date via `toDate()` and formats with `Intl` but no
+  // `calendar` option). Render the heading using the resolved calendar and interface
+  // locale so the month name follows the interface language regardless of the chosen
+  // calendar. This keeps the component general so any calendar supported by
+  // `@internationalized/date` can be added to `CALENDARS` without touching this file.
+  const calendarHeading = $derived.by(() => {
+    if (!$months?.length) return '';
+    const first = $months[0].value;
+    if (!first || typeof first.toDate !== 'function') return '';
+    try {
+      return new Intl.DateTimeFormat(locale, {
+        calendar: calendarId,
+        month: 'long',
+        year: 'numeric',
+      }).format(first.toDate(getLocalTimeZone()));
+    } catch {
+      return '';
+    }
+  });
 
   // The calendar is instantiated once per mount; the parent remounts this
   // component when the calendar changes, so these props are read as initial
@@ -49,7 +73,7 @@
           return undefined;
         }
       };
-      const todayValue = toCalendar(today('UTC'), intlCalendar);
+      const todayValue = toCalendar(parseDate(formatDate(serverNow())), intlCalendar);
       return {
         intlCalendar,
         todayValue,
@@ -63,9 +87,11 @@
     }
   );
 
+  let syncing = false;
   const {
     elements: { calendar, heading, grid, cell, prevButton, nextButton },
-    states: { months, weekdays, headingValue }
+    states: { months, weekdays, headingValue, value: selectedValue },
+    options: { minValue: minStore, maxValue: maxStore, readonly: readonlyStore, disabled: disabledStore }
   } = untrack(() =>
     createCalendar({
       locale,
@@ -76,14 +102,29 @@
       maxValue,
       weekdayFormat: 'short',
       readonly,
+      disabled,
       calendarLabel: t('pickers.datePicker.selectDate'),
       onValueChange: ({ next }) => {
-        if (next) onselect?.(next.toString());
+        if (next && !syncing) onselect?.(next.toString());
         return next;
       }
     })
   );
 
+  $effect(() => {
+    syncing = true;
+    try { $selectedValue = value ? toCalendar(parseDate(value.slice(0, 10)), intlCalendar) : undefined; }
+    catch { $selectedValue = undefined; }
+    syncing = false;
+  });
+  $effect(() => {
+    try { $minStore = min ? toCalendar(parseDate(min.slice(0, 10)), intlCalendar) : undefined; }
+    catch { $minStore = undefined; }
+    try { $maxStore = max ? toCalendar(parseDate(max.slice(0, 10)), intlCalendar) : undefined; }
+    catch { $maxStore = undefined; }
+    $readonlyStore = readonly;
+    $disabledStore = disabled;
+  });
   let prevButtonEl = $state(null);
   let nextButtonEl = $state(null);
 
@@ -115,7 +156,7 @@
         <ChevronLeft size={16} />
       {/if}
     </button>
-    <div use:melt={$heading} class="calendar-heading">{$headingValue}</div>
+    <div use:melt={$heading} class="calendar-heading">{calendarHeading}</div>
     <button
       use:melt={$nextButton}
       bind:this={nextButtonEl}

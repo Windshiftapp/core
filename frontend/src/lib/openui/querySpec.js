@@ -5,6 +5,8 @@
 // internal/customwidgets: a slot carries only a CQL string, a sort, a limit,
 // and (for assets) a set ID. Scope is never part of the spec.
 
+import { formatDateSimple } from '../utils/dateFormatter.js';
+
 export const DEFAULT_LIMIT = 100;
 export const MAX_LIMIT = 1000;
 
@@ -115,10 +117,10 @@ export function fieldValue(row, path) {
 /** Format a value for display in a table cell. */
 export function formatValue(value) {
   if (value === null || value === undefined) return '—';
-  if (value instanceof Date) return value.toLocaleDateString();
+  if (value instanceof Date) return formatDateSimple(value);
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
     const date = new Date(value);
-    if (!Number.isNaN(date.getTime())) return date.toLocaleDateString();
+    if (!Number.isNaN(date.getTime())) return formatDateSimple(date);
   }
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   return String(value);

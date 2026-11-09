@@ -3,10 +3,14 @@
  * Centralized date formatting functions to avoid duplication across components
  */
 
+import { resolveCalendar } from '../stores/calendar.svelte.js';
 import { i18n, t } from '../stores/i18n.svelte.js';
 import { serverNow } from './serverClock.js';
 
 export const DEFAULT_TIMEZONE = 'UTC';
+function getCalendarOption() {
+  return resolveCalendar(i18n.locale);
+}
 
 /**
  * Get the app's current locale for date formatting.
@@ -55,6 +59,7 @@ export function formatInstant(value, timezone = DEFAULT_TIMEZONE, options = {}) 
     return new Intl.DateTimeFormat(getAppLocale(), {
       ...options,
       timeZone: resolveTimezone(timezone),
+      calendar: getCalendarOption(),
     }).format(date);
   } catch (_error) {
     return '';
@@ -93,6 +98,7 @@ export function formatDateOnly(value, options = {}) {
     return new Intl.DateTimeFormat(getAppLocale(), {
       ...displayOptions,
       timeZone: DEFAULT_TIMEZONE,
+      calendar: getCalendarOption(),
     }).format(date);
   } catch (_error) {
     return '';
@@ -204,7 +210,10 @@ function formatDateLocale(dateString, options = {}) {
       day: 'numeric',
       ...options,
     };
-    return date.toLocaleDateString(getAppLocale(), defaultOptions);
+    return date.toLocaleDateString(getAppLocale(), {
+      ...defaultOptions,
+      calendar: getCalendarOption(),
+    });
   } catch (error) {
     console.error('Error formatting date with locale:', error);
     return '';
@@ -301,6 +310,7 @@ export function formatHistoryTimestamp(dateString, timezone = DEFAULT_TIMEZONE) 
       month: 'short',
       day: 'numeric',
       timeZone: resolvedTimezone,
+      calendar: getCalendarOption(),
     };
     const timeOptions = {
       hour: 'numeric',
@@ -357,7 +367,11 @@ export function formatRelativeCompact(date) {
   if (hours < 24) return `${hours}h ago`;
   if (days === 1) return 'Yesterday';
   if (days < 7) return `${days}d ago`;
-  return d.toLocaleDateString(getAppLocale(), { month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(getAppLocale(), {
+    month: 'short',
+    day: 'numeric',
+    calendar: getCalendarOption(),
+  });
 }
 
 /**
@@ -468,7 +482,7 @@ export function formatDateSimple(dateString) {
   if (!dateString) return '';
   try {
     const date = dateString instanceof Date ? dateString : new Date(dateString);
-    return date.toLocaleDateString(getAppLocale());
+    return date.toLocaleDateString(getAppLocale(), { calendar: getCalendarOption() });
   } catch (error) {
     console.error('Error formatting date:', error);
     return '';
@@ -486,7 +500,7 @@ export function formatDateWithOptions(dateString, options = {}) {
   if (!dateString) return '';
   try {
     const date = dateString instanceof Date ? dateString : new Date(dateString);
-    return date.toLocaleDateString(getAppLocale(), options);
+    return date.toLocaleDateString(getAppLocale(), { ...options, calendar: getCalendarOption() });
   } catch (error) {
     console.error('Error formatting date with options:', error);
     return '';

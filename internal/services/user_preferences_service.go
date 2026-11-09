@@ -13,6 +13,7 @@ import (
 
 // ErrInvalidColorMode is returned when a preference update contains an unsupported color mode.
 var ErrInvalidColorMode = errors.New("invalid color mode")
+var ErrInvalidCalendar = errors.New("calendar must be auto, gregory, or persian")
 
 // ErrPreferencesTooLarge is returned when a preferences update would store more
 // than the bounded per-user JSON blob.
@@ -44,6 +45,7 @@ const (
 const maxPreferencesBytes = 1 << 20 // 1 MiB
 
 type UserPreferencesSnapshot struct {
+	Calendar     string
 	ColorMode    string
 	ThemeID      *int
 	Theme        *models.Theme
@@ -60,6 +62,8 @@ type UserPreferencesSnapshot struct {
 }
 
 type UserPreferencesPatch struct {
+	CalendarSet        bool
+	Calendar           string
 	ColorModeSet       bool
 	ColorMode          string
 	ThemeIDSet         bool
@@ -123,15 +127,46 @@ func (s *UserPreferencesService) loadData(userID int) (models.UserPreferencesDat
 	return prefs, nil
 }
 
-func (s *UserPreferencesService) saveData(userID int, prefs models.UserPreferencesData) error {
-	prefsBytes, err := json.Marshal(prefs)
-	if err != nil {
-		return err
+func (s *UserPreferencesService) updateData(userID int, update func(*models.UserPreferencesData) error) error {
+	for attempt := 0; attempt < 3; attempt++ {
+		raw, err := s.prefsRepo.GetJSON(userID)
+		var old *string
+		if err == nil {
+			old = &raw
+		} else if !errors.Is(err, repository.ErrNotFound) {
+			return err
+		}
+		var prefs models.UserPreferencesData
+		if raw != "" {
+			if err := json.Unmarshal([]byte(raw), &prefs); err != nil {
+				return err
+			}
+		}
+		if err := update(&prefs); err != nil {
+			return err
+		}
+		data, err := json.Marshal(prefs)
+		if err != nil {
+			return err
+		}
+		if len(data) > maxPreferencesBytes {
+			return ErrPreferencesTooLarge
+		}
+		saved, err := s.prefsRepo.CompareAndSwapJSON(userID, old, string(data), time.Now())
+		if err != nil {
+			return err
+		}
+		if saved {
+			return nil
+		}
 	}
-	if len(prefsBytes) > maxPreferencesBytes {
-		return ErrPreferencesTooLarge
+	return repository.ErrConcurrentUpdate
+}
+func normalizeCalendar(value string) string {
+	if value == "gregory" || value == "persian" {
+		return value
 	}
-	return s.prefsRepo.UpsertJSON(userID, string(prefsBytes), time.Now())
+	return "auto"
 }
 
 func (s *UserPreferencesService) GetSnapshot(userID int) (UserPreferencesSnapshot, error) {
@@ -160,7 +195,7 @@ func (s *UserPreferencesService) GetSnapshot(userID int) (UserPreferencesSnapsho
 		return UserPreferencesSnapshot{}, err
 	}
 	return UserPreferencesSnapshot{
-		ColorMode: colorMode, ThemeID: prefs.ThemeID,
+		Calendar: normalizeCalendar(prefs.Calendar), ColorMode: colorMode, ThemeID: prefs.ThemeID,
 		Theme: theme, TUI: tui,
 		ViewState:               prefs.ViewState,
 		SavedFilters:            prefs.SavedFilters,
@@ -178,59 +213,64 @@ func normalizeCommentSortOrder(order string) string {
 }
 
 func (s *UserPreferencesService) UpdateSnapshot(userID int, patch UserPreferencesPatch) (UserPreferencesSnapshot, error) {
-	prefs, err := s.loadData(userID)
-	if err != nil {
-		return UserPreferencesSnapshot{}, err
+	if patch.CalendarSet && patch.Calendar != "auto" && patch.Calendar != "gregory" && patch.Calendar != "persian" {
+		return UserPreferencesSnapshot{}, ErrInvalidCalendar
 	}
-	if patch.DueDateReminderDaysSet && (patch.DueDateReminderDays < MinReminderDays || patch.DueDateReminderDays > MaxReminderDays) {
-		return UserPreferencesSnapshot{}, ErrInvalidReminderDays
-	}
-	if patch.CommentSortOrderSet && patch.CommentSortOrder != CommentSortOldest && patch.CommentSortOrder != CommentSortNewest {
-		return UserPreferencesSnapshot{}, ErrInvalidCommentSortOrder
-	}
-	if patch.CommentSortOrderSet {
-		prefs.CommentSortOrder = patch.CommentSortOrder
-	}
-	if patch.ColorModeSet {
-		if patch.ColorMode != "light" && patch.ColorMode != "dark" && patch.ColorMode != "system" {
-			return UserPreferencesSnapshot{}, ErrInvalidColorMode
+	err := s.updateData(userID, func(prefs *models.UserPreferencesData) error {
+		if patch.CalendarSet {
+			prefs.Calendar = patch.Calendar
 		}
-		prefs.ColorMode = patch.ColorMode
-	}
-	if patch.ThemeIDSet {
-		if patch.ThemeID != nil {
-			if _, err := s.themeRepo.GetByID(*patch.ThemeID); err != nil {
-				return UserPreferencesSnapshot{}, err
+		if patch.DueDateReminderDaysSet && (patch.DueDateReminderDays < MinReminderDays || patch.DueDateReminderDays > MaxReminderDays) {
+			return ErrInvalidReminderDays
+		}
+		if patch.CommentSortOrderSet && patch.CommentSortOrder != CommentSortOldest && patch.CommentSortOrder != CommentSortNewest {
+			return ErrInvalidCommentSortOrder
+		}
+		if patch.CommentSortOrderSet {
+			prefs.CommentSortOrder = patch.CommentSortOrder
+		}
+		if patch.ColorModeSet {
+			if patch.ColorMode != "light" && patch.ColorMode != "dark" && patch.ColorMode != "system" {
+				return ErrInvalidColorMode
 			}
+			prefs.ColorMode = patch.ColorMode
 		}
-		prefs.ThemeID = patch.ThemeID
-	}
-	if patch.TUIThemeSet || patch.TUISplitRatioSet || patch.LastWorkspaceIDSet {
-		tui := models.UserTUIPreferences{}
+		if patch.ThemeIDSet {
+			if patch.ThemeID != nil {
+				if _, err := s.themeRepo.GetByID(*patch.ThemeID); err != nil {
+					return err
+				}
+			}
+			prefs.ThemeID = patch.ThemeID
+		}
+		if patch.TUIThemeSet || patch.TUISplitRatioSet || patch.LastWorkspaceIDSet {
+			tui := models.UserTUIPreferences{}
+			if prefs.TUI != nil {
+				tui = *prefs.TUI
+			}
+			if patch.TUIThemeSet {
+				tui.Theme = patch.TUITheme
+			}
+			if patch.TUISplitRatioSet {
+				tui.SplitRatio = patch.TUISplitRatio
+			}
+			if patch.LastWorkspaceIDSet {
+				tui.LastWorkspaceID = patch.LastWorkspaceID
+			}
+			prefs.TUI = &tui
+		}
 		if prefs.TUI != nil {
-			tui = *prefs.TUI
+			normalizeTUIPreferences(userID, s.permissionService, prefs.TUI)
 		}
-		if patch.TUIThemeSet {
-			tui.Theme = patch.TUITheme
+		if patch.ViewStateSet {
+			prefs.ViewState = mergeViewState(prefs.ViewState, patch.ViewState)
 		}
-		if patch.TUISplitRatioSet {
-			tui.SplitRatio = patch.TUISplitRatio
+		if patch.SavedFiltersSet {
+			prefs.SavedFilters = mergeSavedFilters(prefs.SavedFilters, patch.SavedFilters)
 		}
-		if patch.LastWorkspaceIDSet {
-			tui.LastWorkspaceID = patch.LastWorkspaceID
-		}
-		prefs.TUI = &tui
-	}
-	if prefs.TUI != nil {
-		normalizeTUIPreferences(userID, s.permissionService, prefs.TUI)
-	}
-	if patch.ViewStateSet {
-		prefs.ViewState = mergeViewState(prefs.ViewState, patch.ViewState)
-	}
-	if patch.SavedFiltersSet {
-		prefs.SavedFilters = mergeSavedFilters(prefs.SavedFilters, patch.SavedFilters)
-	}
-	if err := s.saveData(userID, prefs); err != nil {
+		return nil
+	})
+	if err != nil {
 		return UserPreferencesSnapshot{}, err
 	}
 	if patch.DueDateRemindersEnabledSet || patch.DueDateReminderDaysSet {
@@ -359,15 +399,9 @@ func (s *UserPreferencesService) GetDashboardLayoutSnapshot(userID int) (models.
 
 // UpdateDashboardLayout stores the user's dashboard layout without clobbering other preferences.
 func (s *UserPreferencesService) UpdateDashboardLayout(userID int, layout models.UserDashboardLayout) error {
-	prefs, err := s.loadData(userID)
-	if err != nil {
-		return err
-	}
-	prefs.DashboardLayout = &layout
-	return s.saveData(userID, prefs)
+	return s.updateData(userID, func(prefs *models.UserPreferencesData) error { prefs.DashboardLayout = &layout; return nil })
 }
 
-// GetTUI returns the user's SSH TUI preferences (zero value when unset).
 func (s *UserPreferencesService) GetTUI(userID int) (models.UserTUIPreferences, error) {
 	prefs, err := s.loadData(userID)
 	if err != nil {
@@ -391,13 +425,7 @@ func (s *UserPreferencesService) GetTUI(userID int) (models.UserTUIPreferences, 
 // or odd preference should never break the TUI.
 func (s *UserPreferencesService) UpdateTUI(userID int, tui models.UserTUIPreferences) error {
 	normalizeTUIPreferences(userID, s.permissionService, &tui)
-
-	prefs, err := s.loadData(userID)
-	if err != nil {
-		return err
-	}
-	prefs.TUI = &tui
-	return s.saveData(userID, prefs)
+	return s.updateData(userID, func(prefs *models.UserPreferencesData) error { prefs.TUI = &tui; return nil })
 }
 
 func normalizeTUIPreferences(userID int, permissions *PermissionService, tui *models.UserTUIPreferences) {

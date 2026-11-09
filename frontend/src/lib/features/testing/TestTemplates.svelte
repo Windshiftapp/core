@@ -8,6 +8,7 @@
   import { errorToast } from '../../stores/toasts.svelte.js';
   import IconFiles from '@tabler/icons-svelte-runes/icons/files';
   import { escapeHtml } from '../../utils/sanitize.ts';
+  import { formatAuthenticatedDateTime } from '../../utils/authenticatedDateFormatter.js';
   import Button from '../../components/Button.svelte';
   import Input from '../../components/Input.svelte';
   import Select from '../../components/Select.svelte';
@@ -65,7 +66,7 @@
     {
       key: 'created_at',
       label: t('common.created'),
-      render: (template) => template.created_at ? new Date(template.created_at).toLocaleString() : '-'
+      render: (template) => template.created_at ? formatAuthenticatedDateTime(template.created_at) : '-'
     },
     { key: 'actions', label: t('common.actions'), width: 'w-20', align: 'text-right' }
   ]);

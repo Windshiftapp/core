@@ -32,6 +32,9 @@ cx
 *.spec.ts
 
 # Public regression coverage for the locale runtime ships with the implementation.
+!frontend/src/lib/stores/calendar.spec.js
+!internal/services/calendar_preferences_test.go
+!internal/restapi/v2/calendar_preferences_test.go
 !frontend/src/lib/stores/i18n-utils.spec.js
 !frontend/src/lib/mobile/mobile-i18n.spec.js
 !frontend/scripts/hardcoded-i18n-ast.spec.js

@@ -550,6 +550,7 @@ export default {
     }
   },
   "recurrence": {
+    "gregorianRuleHint": "تکرار ماهانه و سالانه بر اساس تقویم میلادی است.",
     "title": "عود",
     "description": "قوانین وظایف تکراری را مدیریت کنید",
     "frequency": "فرکانس",

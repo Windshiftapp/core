@@ -6,6 +6,7 @@
   import Button from '../../components/Button.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import Text from '../../components/Text.svelte';
+  import { formatAuthenticatedDateTime } from '../../utils/authenticatedDateFormatter.js';
   import { itemIncidents } from '../../api/incidents.js';
   import { errorToast, successToast } from '../../stores/toasts.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -89,7 +90,7 @@
   function formatTimestamp(value) {
     if (!value) return '';
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? '' : date.toLocaleString();
+    return Number.isNaN(date.getTime()) ? '' : formatAuthenticatedDateTime(value);
   }
 </script>
 

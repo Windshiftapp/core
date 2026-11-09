@@ -115,21 +115,26 @@
     {name}
     {min}
     {max}
+    {step}
     {disabled}
     {required}
+    {autofocus}
     readonly={readonly}
     {placeholder}
     {size}
     class={className}
     {dataTestid}
     {ariaLabel}
+    {ariaDescribedby}
+    {style}
+    {title}
+    {onclick}
+    {onkeyup}
     {onkeydown}
     {onblur}
     {onfocus}
-    onchange={(next) => {
-      // Mirror the native input shape: consumers read either target.value or
-      // currentTarget.value.
-      const synthetic = { target: { value: next }, currentTarget: { value: next } };
+    onchange={(next, event) => {
+      const synthetic = event || { target: { value: next }, currentTarget: { value: next } };
       oninput?.(synthetic);
       onchange?.(synthetic);
     }}

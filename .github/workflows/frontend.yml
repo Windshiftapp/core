@@ -60,6 +60,9 @@ jobs:
       - name: Run Svelte typecheck
         run: npm run typecheck
 
+      - name: Run frontend tests
+        run: npm run test:run
+
   build:
     name: Build
     runs-on: ubuntu-latest

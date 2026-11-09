@@ -97,5 +97,6 @@ func NegotiateAcceptLanguage(header string) (string, bool) {
 
 // IsRTL reports whether the locale reads right to left.
 func IsRTL(locale string) bool {
-	return Normalize(locale) == "ar"
+	normalized := Normalize(locale)
+	return normalized == "ar" || normalized == "fa"
 }

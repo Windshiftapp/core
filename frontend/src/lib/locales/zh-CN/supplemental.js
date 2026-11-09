@@ -432,6 +432,7 @@ export default {
     }
   },
   "recurrence": {
+    "gregorianRuleHint": "每月和每年的重复规则使用公历。",
     "title": "重复",
     "description": "管理重复任务规则",
     "frequency": "频率",
