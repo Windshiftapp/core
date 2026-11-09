@@ -153,7 +153,7 @@
     onblurcapture={handleFocusOut}
     onkeydown={handleKeydown}
   >
-    {@render editor({ draft, setDraft: (next) => (draft = next), commit, cancel: cancelEditing, saving, error })}
+    {@render editor({ draft, setDraft: (next) => (draft = next), commit, cancel: cancelEditing, saving, error, markAction: handleAction })}
     {#if showActions}
       <div class="absolute -right-1 -top-1">
         <InlineEditorActions

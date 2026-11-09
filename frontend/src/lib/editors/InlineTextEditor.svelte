@@ -1,8 +1,9 @@
 <script>
-  import { tick } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
-  import BaseInlineEditor from './BaseInlineEditor.svelte';
+  import EditableField from './EditableField.svelte';
   import Input from '../components/Input.svelte';
+  import InlineEditorActions from './InlineEditorActions.svelte';
+  import InlineEditorError from './InlineEditorError.svelte';
 
   let {
     value = '', placeholder = '', disabled = false, required = false,
@@ -14,70 +15,24 @@
 
   const effectivePlaceholder = $derived(placeholder || t('editors.enterText'));
 
-  let baseEditor;
-  let editValue = $state('');
-  let inputElement = $state(null);
-
-  function handleStartEdit() {
-    editValue = value || '';
-    tick().then(() => {
-      inputElement?.focus();
-      inputElement?.select();
-    });
-  }
-
-  function handleSave() {
-    const trimmedValue = editValue.trim();
-    if (required && !trimmedValue) {
-      baseEditor.setError(t('validation.required'));
-      return;
-    }
-    if (trimmedValue.length > maxLength) {
-      baseEditor.setError(t('validation.maxLength', { max: maxLength }));
-      return;
-    }
-    if (trimmedValue === (value || '')) {
-      baseEditor.cancelEditing();
-      return;
-    }
-    baseEditor.setSaving(true);
-    onsave?.({ value: trimmedValue });
-  }
-
-  export function confirmSave(newValue) {
-    value = newValue;
-    editValue = '';
-    baseEditor.confirmSave();
-  }
-
-  export function rejectSave(errorMessage) {
-    baseEditor.rejectSave(errorMessage);
+  function handleCommit(draft) {
+    const trimmed = String(draft ?? '').trim();
+    if (required && !trimmed) throw new Error(t('validation.required'));
+    if (trimmed.length > maxLength) throw new Error(t('validation.maxLength', { max: maxLength }));
+    if (trimmed === (value || '')) return;
+    return onsave?.({ value: trimmed });
   }
 </script>
 
-<BaseInlineEditor
-  bind:this={baseEditor}
-  {disabled}
+<EditableField
+  {value}
+  editable={!disabled}
+  oncommit={handleCommit}
   {enableSingleClick}
   {enableDoubleClick}
   onclick={onclickProp}
-  onsave={handleSave}
-  onstartedit={handleStartEdit}
 >
-  {#snippet editingInput({ saving, error, onkeydown, onblur })}
-    <Input
-      bind:inputRef={inputElement}
-      bind:value={editValue}
-      placeholder={effectivePlaceholder}
-      maxlength={maxLength}
-      class="w-full px-2 py-1 text-sm border rounded {editingClass} {className} {error ? 'border-ds-border-danger' : ''}"
-      disabled={saving}
-      {onkeydown}
-      {onblur}
-      style="background-color: var(--ds-surface); color: var(--ds-text); border-color: var(--ds-border-focused);"
-    />
-  {/snippet}
-  {#snippet displayContent()}
+  {#snippet display()}
     <span
       class="block text-left w-full px-2 py-1 text-sm rounded transition-colors {displayClass} {className}"
       class:placeholder-text={!value}
@@ -86,18 +41,39 @@
       {value || effectivePlaceholder}
     </span>
   {/snippet}
-</BaseInlineEditor>
+  {#snippet editor({ draft, setDraft, error, saving, commit, cancel, markAction })}
+    <div class="inline-flex items-center gap-1 w-full">
+      <div class="flex-1 relative">
+        <Input
+          value={draft ?? ''}
+          placeholder={effectivePlaceholder}
+          maxlength={maxLength}
+          class="w-full px-2 py-1 text-sm border rounded {editingClass} {className} {error ? 'border-ds-border-danger' : ''}"
+          style="background-color: var(--ds-surface); color: var(--ds-text); border-color: var(--ds-border-focused);"
+          oninput={(e) => setDraft(e.currentTarget.value)}
+          autofocus
+        />
+        <InlineEditorError {error} />
+      </div>
+      <div class="flex items-center gap-1">
+        <InlineEditorActions
+          {saving}
+          onsave={() => markAction(commit)}
+          oncancel={() => markAction(cancel)}
+        />
+      </div>
+    </div>
+  {/snippet}
+</EditableField>
 
 <style>
   .display-text:hover {
     background-color: var(--ds-background-neutral-hovered);
   }
-
   .editing-input {
     border-color: var(--ds-border-focused);
     box-shadow: 0 0 0 1px var(--ds-border-focused);
   }
-
   .placeholder-text {
     color: var(--ds-text-subtlest) !important;
   }

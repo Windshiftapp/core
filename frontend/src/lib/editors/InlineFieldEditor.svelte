@@ -15,9 +15,6 @@
     onitemUpdated = null, onupdateError = null, onclick: onclickProp = null
   } = $props();
 
-  let editorComponent = $state(null);
-  let saving = false;
-
   // Get current field value
   const fieldValue = $derived(getFieldValue(item, field));
 
@@ -32,14 +29,13 @@
     return item[field] ?? null;
   }
 
+  // Returns the promise so the editor's commit can await it and surface a
+  // failure inline instead of via the imperative confirm/reject dance.
   // Keep simple field/custom-value updates here; field-specific orchestration
   // belongs to itemDetailStore and ListCellRenderer.
   async function handleSave(detail) {
     const { value } = detail;
-    if (saving) return;
-
     try {
-      saving = true;
       let updatedItem;
       if (field.startsWith('custom_field_')) {
         const fieldId = field.replace('custom_field_', '');
@@ -50,14 +46,11 @@
         updatedItem = await items.update(item.id, { [field]: value });
       }
       const merged = { ...item, ...updatedItem };
-      editorComponent?.confirmSave?.(value);
       onitemUpdated?.({ item: merged, field, value });
+      return merged;
     } catch (error) {
-      const errorMessage = error?.message || 'Failed to save changes';
-      editorComponent?.rejectSave?.(errorMessage);
-      onupdateError?.({ error: errorMessage, field, value });
-    } finally {
-      saving = false;
+      onupdateError?.({ error: error?.message || 'Failed to save changes', field, value });
+      throw error;
     }
   }
 
@@ -70,7 +63,6 @@
 
 {#if fieldType === 'select'}
   <InlineSelectEditor
-    bind:this={editorComponent}
     value={fieldValue}
     {options}
     {placeholder}
@@ -81,7 +73,6 @@
   />
 {:else if fieldType === 'date'}
   <InlineDateEditor
-    bind:this={editorComponent}
     value={fieldValue}
     {placeholder}
     {required}
@@ -94,7 +85,6 @@
   />
 {:else if fieldType === 'number'}
   <InlineNumberEditor
-    bind:this={editorComponent}
     value={fieldValue}
     {placeholder}
     {required}
@@ -107,7 +97,6 @@
   />
 {:else if fieldType === 'duration'}
   <InlineDurationEditor
-    bind:this={editorComponent}
     value={fieldValue}
     {placeholder}
     {required}
@@ -120,7 +109,6 @@
   />
 {:else}
   <InlineTextEditor
-    bind:this={editorComponent}
     value={fieldValue}
     {placeholder}
     {required}

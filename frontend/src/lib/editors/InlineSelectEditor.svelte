@@ -2,6 +2,7 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { t } from '../stores/i18n.svelte.js';
   import Select from '../components/Select.svelte';
+  import EditableField from './EditableField.svelte';
   import InlineEditorActions from './InlineEditorActions.svelte';
   import InlineEditorError from './InlineEditorError.svelte';
 
@@ -23,135 +24,60 @@
     return opts;
   });
 
-  let editing = $state(false);
-  let saving = $state(false);
-  let error = $state('');
-  // Local edit buffer; resets to the prop value each time editing starts.
-  // svelte-ignore state_referenced_locally
-  let selectedValue = $state(value);
-
-  function startEditing() {
-    if (disabled) return;
-
-    editing = true;
-    selectedValue = value;
-    error = '';
-  }
-
-  function cancelEditing() {
-    editing = false;
-    selectedValue = value;
-    error = '';
-  }
-
-  async function saveValue() {
-    if (saving) return;
-
-    // Validation
-    if (required && (selectedValue === null || selectedValue === undefined || selectedValue === '')) {
-      error = t('validation.required');
-      return;
-    }
-
-    // Check if value actually changed
-    if (selectedValue === value) {
-      cancelEditing();
-      return;
-    }
-
-    try {
-      saving = true;
-      error = '';
-
-      // Call save callback
-      onsave?.({ value: selectedValue });
-
-      // Wait for parent to confirm save
-
-    } catch (err) {
-      error = err.message || 'Failed to save';
-      saving = false;
-    }
-  }
-
-  // External methods that parent can call
-  export function confirmSave(newValue) {
-    value = newValue;
-    selectedValue = newValue;
-    editing = false;
-    saving = false;
-    error = '';
-  }
-
-  export function rejectSave(errorMessage) {
-    error = errorMessage || 'Failed to save';
-    saving = false;
-  }
-
-  function handleKeydown(event) {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      saveValue();
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      cancelEditing();
-    }
-  }
-
-  function handleSelectChange(val) {
-    selectedValue = val;
-    // Auto-save on change for dropdowns
-    saveValue();
-  }
-
-  // Get display info for current value
-  const currentOption = $derived(options.find(opt => opt.value === value));
+  const currentOption = $derived(options.find((opt) => opt.value === value));
   const displayText = $derived(currentOption?.label || effectivePlaceholder);
   const displayColor = $derived(currentOption?.color);
+
+  function handleCommit(draft) {
+    if (required && (draft === null || draft === undefined || draft === '')) {
+      throw new Error(t('validation.required'));
+    }
+    if (draft === value) return;
+    return onsave?.({ value: draft });
+  }
 </script>
 
-{#if editing}
-  <div class="inline-flex items-center gap-1 w-full">
-    <div class="flex-1 relative">
-      <Select
-        value={selectedValue}
-        options={selectOptions}
-        disabled={saving}
-        size="small"
-        onchange={handleSelectChange}
-        class={className}
-      />
-
-      <InlineEditorError {error} />
-    </div>
-
-    <div class="flex items-center gap-1">
-      <InlineEditorActions {saving} onsave={saveValue} oncancel={cancelEditing} />
-    </div>
-  </div>
-{:else}
-  <button
-    type="button"
-    onclick={startEditing}
-    class="inline-flex items-center gap-2 px-2 py-1 text-sm rounded transition-colors {displayClass} {className}"
-    style={!currentOption ? 'color: var(--ds-text-subtle);' : ''}
-    {disabled}
-  >
+<EditableField {value} editable={!disabled} oncommit={handleCommit}>
+  {#snippet display()}
     <span
-      class="flex items-center gap-2"
+      class="inline-flex items-center gap-2 px-2 py-1 text-sm rounded transition-colors {displayClass} {className}"
       style={!currentOption ? 'color: var(--ds-text-subtle);' : ''}
     >
-      {#if currentOption && displayColor}
-        <span
-          class="w-2 h-2 rounded-full"
-          style="background-color: {displayColor};"
-        ></span>
-      {/if}
-      {displayText}
+      <span class="flex items-center gap-2">
+        {#if currentOption && displayColor}
+          <span class="w-2 h-2 rounded-full" style="background-color: {displayColor};"></span>
+        {/if}
+        {displayText}
+      </span>
+      <ChevronDown class="w-3 h-3" style="color: var(--ds-text-subtle);" />
     </span>
-    <ChevronDown class="w-3 h-3" style="color: var(--ds-text-subtle);" />
-  </button>
-{/if}
+  {/snippet}
+  {#snippet editor({ draft, setDraft, error, saving, commit, cancel, markAction })}
+    <div class="inline-flex items-center gap-1 w-full">
+      <div class="flex-1 relative">
+        <Select
+          value={draft}
+          options={selectOptions}
+          {disabled}
+          size="small"
+          onchange={(val) => {
+            setDraft(val);
+            commit();
+          }}
+          class={className}
+        />
+        <InlineEditorError {error} />
+      </div>
+      <div class="flex items-center gap-1">
+        <InlineEditorActions
+          {saving}
+          onsave={() => markAction(commit)}
+          oncancel={() => markAction(cancel)}
+        />
+      </div>
+    </div>
+  {/snippet}
+</EditableField>
 
 <style>
   .hover-bg:hover {
