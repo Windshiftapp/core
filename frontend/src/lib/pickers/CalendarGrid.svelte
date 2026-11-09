@@ -12,6 +12,7 @@
   import {
     createCalendar as createIntlCalendar,
     getDayOfWeek,
+    getLocalTimeZone,
     parseDate,
     startOfWeek,
     toCalendar
@@ -52,7 +53,7 @@
         calendar: calendarId,
         month: 'long',
         year: 'numeric',
-      }).format(first.toDate('UTC'));
+      }).format(first.toDate(getLocalTimeZone()));
     } catch {
       return '';
     }
