@@ -158,8 +158,11 @@ type SSEHub struct {
 // DefaultMaxUserStreams caps concurrent SSE connections per authenticated user.
 // Without a cap, one client can retain handlers, sockets, and subscriptions
 // indefinitely because stream routes are exempt from the request concurrency
-// limiter and write deadlines are lifted for the connection lifetime.
-const DefaultMaxUserStreams = 8
+// limiter and write deadlines are lifted for the connection lifetime. A tab
+// holds one stream per topic family (notifications, workspace/collection, item
+// detail) and reconnects briefly overlap, so the cap has to accommodate several
+// tabs; the server overrides this with MAX_USER_STREAMS when configured.
+const DefaultMaxUserStreams = 64
 
 // NewSSEHub creates an empty hub.
 func NewSSEHub() *SSEHub {

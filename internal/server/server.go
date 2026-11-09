@@ -1164,6 +1164,11 @@ func (s *Server) initialize() error {
 	// process-wide item-change publisher (WI-483 installed a no-op default), and
 	// give the item handler the hub so GET /items/{id}/events can subscribe.
 	sseHub := services.NewSSEHub()
+	// Each tab holds one stream per topic family (notifications, workspace/
+	// collection, item detail) and reconnects briefly overlap, so the old
+	// default of 8 tripped on ordinary multi-tab use. Bound the count, but
+	// leave room for several tabs per user.
+	sseHub.SetMaxUserStreams(cfg.MaxUserStreams)
 	if os.Getenv("WINDSHIFT_E2E_TEST_HOOKS") == "1" {
 		// Parallel e2e workers share the admin user; rapid reloads briefly
 		// overlap streams and would trip the production per-user cap, turning a

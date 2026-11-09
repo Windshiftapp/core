@@ -65,6 +65,7 @@ type Config struct {
 	EnableAdminFallback  bool
 	DisableIPRateLimit   bool
 	MaxUserConcurrency   int
+	MaxUserStreams       int
 	MaxTemplateSeedItems int
 	MCPEnabled           bool
 	RecoverUser          string
