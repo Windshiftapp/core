@@ -59,6 +59,7 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 		tlsKeyPath            = flag.String("tls-key", "", "TLS key file path")
 		disablePlugins        = flag.Bool("disable-plugins", false, "Disable the plugin system")
 		disableIPRateLimit    = flag.Bool("disable-ip-rate-limit", false, "Disable IP-based rate limiting")
+		h2c                   = flag.Bool("h2c", false, "Accept unencrypted HTTP/2 (h2c) on the plain listener, for a fronting proxy that speaks h2c")
 		enableAdminFallback   = flag.Bool("enable-fallback", false, "Enable admin password fallback")
 		enableCodingAgent     = flag.Bool("enable-coding-agent", false, "Enable the coding-agent harness")
 		llmProvidersFile      = flag.String("llm-providers", "", "Path to custom LLM providers JSON file")
@@ -311,6 +312,7 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 		AttachmentPath:       attachPath,
 		EnableAdminFallback:  adminFallbackEnabled,
 		DisableIPRateLimit:   ipRateLimitDisabled,
+		H2CEnabled:           *h2c || parseBoolEnv("H2C_ENABLED"),
 		MaxUserConcurrency:   parseIntEnv("MAX_USER_CONCURRENCY", *maxUserConcurrency),
 		MaxUserStreams:       parseIntEnv("MAX_USER_STREAMS", *maxUserStreams),
 		MaxTemplateSeedItems: parseIntEnv("MAX_TEMPLATE_SEED_ITEMS", *maxTemplateSeedItems),

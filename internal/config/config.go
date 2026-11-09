@@ -25,6 +25,12 @@ type Config struct {
 	TLSKeyPath        string
 	DisableCSRF       bool
 
+	// H2CEnabled accepts unencrypted HTTP/2 (h2c) on the plain HTTP listener, so
+	// a fronting proxy can multiplex streams onto one upstream connection. A TLS
+	// listener already negotiates h2 via ALPN and ignores this. h2c is cleartext
+	// and browsers do not use it, so it stays opt-in.
+	H2CEnabled bool
+
 	// AllowInsecureHTTP permits credentialed browser access from plain-http
 	// origins other than localhost (e.g. http://lanhost:8080). Without it,
 	// such a BASE_URL fails CORS middleware construction, because credentialed

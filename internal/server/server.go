@@ -2389,6 +2389,21 @@ func (s *Server) recoverUser(username string) {
 	slog.Warn("RECOVER_USER: re-enabled disabled user", "username", username, "email", userEmail, "id", id)
 }
 
+// configureServerProtocols selects the protocols the HTTP server accepts. A TLS
+// listener negotiates h2 through ALPN with no configuration, so it is left
+// alone. A plain listener is HTTP/1.1 unless h2c is explicitly enabled; h2c is
+// cleartext and browsers do not use it, so it exists for a fronting proxy that
+// multiplexes streams onto one upstream connection.
+func configureServerProtocols(server *http.Server, enableHTTPS, h2cEnabled bool) {
+	if enableHTTPS || !h2cEnabled {
+		return
+	}
+	protocols := new(http.Protocols)
+	protocols.SetHTTP1(true)
+	protocols.SetUnencryptedHTTP2(true)
+	server.Protocols = protocols
+}
+
 // Start begins listening for HTTP requests.
 // This method is non-blocking; the server runs in a goroutine.
 // Use Shutdown to stop the server gracefully.
@@ -2411,6 +2426,7 @@ func (s *Server) Start() error {
 	s.actualPort = tcpAddr.Port
 
 	enableHTTPS := s.config.TLSCertPath != "" && s.config.TLSKeyPath != ""
+	configureServerProtocols(s.httpServer, enableHTTPS, s.config.H2CEnabled)
 
 	if enableHTTPS {
 		slog.Info("HTTPS server starting", "port", s.actualPort)
