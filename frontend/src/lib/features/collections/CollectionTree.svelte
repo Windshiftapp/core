@@ -502,6 +502,7 @@
         <div class="flex justify-between items-center mb-4">
           <div class="flex items-center gap-2">
             <button
+              data-testid="tree-expand-toggle"
               class="flex items-center gap-2 px-3 py-2 text-sm border rounded-md transition-colors"
               style="{styles.glassStyle(12)} {styles.glassTextStyle}"
               onclick={toggleExpandCollapse}
@@ -518,6 +519,8 @@
             <!-- Test Case Toggle Button (only show if module enabled) -->
             {#if $moduleSettings.test_management_enabled}
               <button
+                data-testid="tree-show-tests"
+                aria-pressed={showTestCases}
                 class="flex items-center gap-2 px-3 py-2 text-sm border rounded-md transition-colors"
                 style="{styles.glassStyle(12)} {showTestCases ? 'color: var(--ds-accent-green);' : styles.glassTextStyle}"
                 onclick={toggleShowTestCases}

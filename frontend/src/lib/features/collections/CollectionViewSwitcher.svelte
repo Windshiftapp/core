@@ -99,6 +99,7 @@
         class={segment}
         data-active={activeView === 'configure'}
         aria-current={activeView === 'configure' ? 'page' : undefined}
+        data-testid="switcher-view-configure"
         onclick={activeView !== 'configure' ? goToConfigure : undefined}
       >
         <Settings class="w-4 h-4" />
