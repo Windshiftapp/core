@@ -374,6 +374,7 @@
       successToast(t('iterations.iterationStarted', { name: iteration.name }));
     } catch (error) {
       console.error('Failed to start iteration:', error);
+      errorToast(error?.message || t('iterations.failedToSaveIteration'));
     }
   }
 
@@ -404,6 +405,7 @@
       reloadCollection();
     } catch (error) {
       console.error('Failed to complete iteration:', error);
+      errorToast(error?.message || t('iterations.failedToSaveIteration'));
     }
   }
 
@@ -636,6 +638,7 @@
       reloadCollection();
     } catch (error) {
       console.error('Failed to handle section drop:', error);
+      errorToast(error?.message || t('common.error'));
     } finally {
       setTimeout(() => pendingDrops.delete(dropId), 500);
     }

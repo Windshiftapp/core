@@ -739,6 +739,7 @@
       }
     } catch (e) {
       console.error('Failed to save roadmap config:', e);
+      errorToast(t('dialogs.alerts.failedToSave', { error: e?.message || e }));
     }
   }
 
