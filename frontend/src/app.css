@@ -651,3 +651,19 @@ a.link:hover {
 .themed-nav .nav-button.nav-button-selected:hover {
   background-color: color-mix(in srgb, var(--ds-interactive) 14%, transparent);
 }
+
+/* Shared navigation-sidebar link styling. Each nav sidebar used to carry its
+   own copy of this block. */
+.nav-link {
+  color: var(--ds-text-subtle);
+}
+
+.nav-link:hover:not(.active) {
+  background: var(--ds-background-neutral-hovered);
+  color: var(--ds-text);
+}
+
+.nav-link.active {
+  background: var(--ds-surface-selected);
+  color: var(--ds-text);
+}
