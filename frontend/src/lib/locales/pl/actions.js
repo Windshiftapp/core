@@ -1,0 +1,347 @@
+/**
+ * Tłumaczenia automatyzacji akcji (polski)
+ */
+export default {
+  actions: {
+    title: 'Akcje',
+    description: 'Automatyzuj przepływy pracy za pomocą akcji opartych na regułach',
+    create: 'Utwórz akcję',
+    createFirst: 'Utwórz pierwszą akcję',
+    noActions: 'Brak akcji',
+    noActionsDescription: 'Utwórz akcje, aby automatyzować przepływy pracy na podstawie zdarzeń elementów',
+    enabled: 'Włączone',
+    disabled: 'Wyłączone',
+    enable: 'Włącz',
+    disable: 'Wyłącz',
+    viewLogs: 'Zobacz dzienniki',
+    confirmDelete: 'Czy na pewno chcesz usunąć akcję „{name}”?',
+    failedToSave: 'Nie udało się zapisać akcji',
+    newAction: 'Nowa akcja',
+
+    // Szablony akcji (gotowe schematy automatyzacji)
+    templates: {
+      pickTitle: 'Wybierz szablon akcji',
+      fromTemplate: 'Z szablonu',
+      empty: 'Brak dostępnych szablonów.',
+      help: 'Zastosuj gotowy schemat automatyzacji w tej przestrzeni roboczej. Każde zastosowanie tworzy nową akcję, którą możesz później edytować.',
+      apply: 'Zastosuj',
+    },
+
+    // Typy wyzwalaczy
+    trigger: {
+      statusTransition: 'Zmiana statusu',
+      statusLoop: 'Pętla statusu',
+      itemCreated: 'Utworzenie elementu',
+      itemUpdated: 'Aktualizacja elementu',
+      itemLinked: 'Powiązanie elementu',
+      slaBreached: 'Naruszenie SLA',
+      slaWarning: 'Ostrzeżenie SLA',
+      commentCreated: 'Utworzenie komentarza',
+      itemInactive: 'Element bezczynny',
+      manual: 'Ręcznie',
+      respondToCascades: 'Reaguj na zmiany wywołane przez akcje',
+      respondToCascadesHint:
+        'Po włączeniu ta akcja uruchomi się również wtedy, gdy zostanie wywołana przez inne akcje, a nie tylko przez zmiany użytkownika.',
+    },
+
+    manualAccess: {
+      label: 'Kto może uruchomić tę ręczną akcję?',
+      allEditors: 'Wszyscy edytujący w przestrzeni roboczej',
+      unrestrictedHint:
+        'Bez ograniczeń ról. Każdy z dostępem do edycji może zobaczyć i uruchomić tę akcję.',
+      restrictedHint:
+        'Tylko członkowie z co najmniej jedną wybraną rolą mogą zobaczyć i uruchomić tę akcję. Administratorzy przestrzeni roboczej zawsze zachowują dostęp.',
+    },
+
+    // Typy węzłów
+    nodes: {
+      trigger: 'Wyzwalacz',
+      setField: 'Ustaw pole',
+      setStatus: 'Ustaw status',
+      addComment: 'Dodaj komentarz',
+      notifyUser: 'Powiadom użytkownika',
+      condition: 'Warunek',
+      updateAsset: 'Zaktualizuj zasób',
+      createAsset: 'Utwórz zasób',
+      httpRequest: 'Żądanie HTTP',
+      containerRun: 'Uruchom kontener',
+      aiExtract: 'Ekstrakcja AI',
+      aiAgent: 'Agent AI',
+      relatedItems: 'Dla każdego powiązanego elementu',
+      transitionItem: 'Przejście elementu',
+      roundRobinAssign: 'Przypisanie rotacyjne',
+      createMilestone: 'Utwórz kamień milowy',
+      notifyCustomer: 'Powiadom klienta',
+      insertCannedResponse: 'Wstaw gotową odpowiedź',
+      adjustLabels: 'Dostosuj etykiety',
+    },
+
+    // Powiadomienie wyświetlane, gdy czat AI aktualizuje otwartą akcję przez update_action.
+    aiUpdated: 'Akcja zaktualizowana przez AI',
+
+    // Nadpisanie wykonawcy (uruchom jako)
+    runAs: 'Uruchom jako',
+    runAsTriggerUser: 'Uruchom jako użytkownik wyzwalający',
+    runAsHint:
+      'Akcja wykonuje się z uprawnieniami tego użytkownika. Pozostaw puste, aby uruchomić jako osoba, która ją wyzwoliła.',
+    runAsReadonlyHint: 'Zmiana wymaga uprawnienia Ustawianie wykonawcy akcji.',
+
+    // Paleta węzłów i wskazówki
+    addNodes: 'Dodaj węzły',
+    tips: 'Wskazówki',
+    tipDragToConnect: 'Przeciągnij od uchwytów, aby połączyć węzły',
+    tipClickToEdit: 'Kliknij węzeł, aby go skonfigurować',
+    tipConditionBranches: 'Warunki mają gałęzie prawda/fałsz',
+
+    // Panel konfiguracji
+    nodeConfig: 'Konfiguracja węzła',
+    config: {
+      from: 'Od',
+      to: 'Do',
+      selectField: 'Wybierz pole...',
+      selectStatus: 'Wybierz status...',
+      config: 'Konfiguracja',
+      configure: 'Konfiguruj',
+      selectConfig: 'Wybierz konfigurację',
+      enterComment: 'Wprowadź komentarz...',
+      selectRecipient: 'Wybierz odbiorcę...',
+      setCondition: 'Ustaw warunek...',
+      targetStatus: 'Docelowy status',
+      fieldName: 'Nazwa pola',
+      value: 'Wartość',
+      commentContent: 'Treść komentarza',
+      commentPlaceholder: 'Wprowadź treść komentarza. Użyj {{item.title}} dla zmiennych.',
+      privateComment: 'Komentarz prywatny (tylko wewnętrzny)',
+      fieldToCheck: 'Pole do sprawdzenia',
+      scopeThisItem: 'Ten element',
+      scopeParentItem: 'Element nadrzędny',
+      operator: 'Operator',
+      compareValue: 'Wartość porównawcza',
+      private: 'Prywatny',
+      triggerType: 'Typ wyzwalacza',
+      fromStatus: 'Ze statusu',
+      toStatus: 'Na status',
+      loopStatus: 'Status pętli',
+      anyStatus: 'Dowolny status',
+      triggerField: 'Zmienione pole',
+      anyField: 'Dowolne pole (wszystkie zmiany)',
+      recipientType: 'Odbiorca',
+      notifyMessage: 'Wiadomość',
+      notifyPlaceholder: 'Wprowadź wiadomość. Użyj {{item.title}} dla zmiennych.',
+      enterMessage: 'Wprowadź wiadomość...',
+      notifySubject: 'Temat',
+      notifySubjectPlaceholder: 'Pozostaw puste, aby użyć tematu zgłoszenia',
+      notifyCustomerPrivacyHint: 'Pomijane automatycznie, gdy wyzwalający komentarz jest prywatny.',
+      commentAuthor: 'Autor komentarza',
+      commentAnyAuthor: 'Dowolny autor',
+      commentCustomer: 'Odpowiedzi klientów',
+      commentAgent: 'Komentarze agentów',
+      commentPrivacyHint: 'Prywatne komentarze nigdy nie wyzwalają akcji widocznych dla klienta.',
+      inactiveHours: 'Godziny bezczynności',
+      inactiveHoursPlaceholder: 'np. 24',
+      inactiveHoursHint: 'Uruchamia się, gdy otwarte zgłoszenie nie ma aktywności przez tę liczbę godzin.',
+      cannedResponse: 'Gotowa odpowiedź',
+      selectCannedResponse: 'Wybierz gotową odpowiedź...',
+      cannedResponseHint: 'Prywatne fragmenty oraz wstawienia wywołane prywatnym komentarzem są publikowane jako notatki wewnętrzne.',
+      addLabels: 'Dodaj etykiety',
+      removeLabels: 'Usuń etykiety',
+      selectLabels: 'Wybierz etykiety...',
+      noLabels: 'Brak etykiet w przestrzeni roboczej.',
+      adjustLabelsHint: 'Brakujące etykiety są zgłaszane w dzienniku uruchomień, zamiast powodować błąd akcji.',
+      includeLink: 'Dołącz link do elementu',
+      // Konfiguracja aktualizacji zasobu
+      sourceAssetField: 'Pole zasobu w elemencie',
+      selectAssetField: 'Wybierz pole zasobu...',
+      sourceAssetFieldHint: 'Wybierz pole elementu, które zawiera powiązany zasób',
+      targetAssetType: 'Docelowy typ zasobu',
+      selectAssetType: 'Wybierz typ zasobu...',
+      fieldMappingsLabel: 'Mapowania pól',
+      fieldMappings: '{count} mapowań pól',
+      fieldMappings_one: '{count} mapowanie pola',
+      fieldMappings_few: '{count} mapowania pól',
+      fieldMappings_many: '{count} mapowań pól',
+      fieldMappings_other: '{count} mapowania pola',
+      configureAssetUpdate: 'Skonfiguruj aktualizację zasobu...',
+      fromField: 'Z pola',
+      sourceTypeVariable: 'Zmienna/szablon',
+      sourceTypeItemField: 'Pole elementu',
+      sourceTypeLiteral: 'Wartość dosłowna',
+      selectTargetField: 'Wybierz pole docelowe...',
+      addMapping: 'Dodaj mapowanie',
+      milestonePickerHint: 'Przechowuje identyfikatory kamieni milowych dla akcji; nazwy są pokazywane tylko podczas edycji.',
+      userPickerHint: 'Wybierz konkretnego użytkownika lub wpisz identyfikator użytkownika/szablon poniżej.',
+      // Konfiguracja tworzenia zasobu
+      assetSet: 'Zbiór zasobów',
+      selectAssetSet: 'Wybierz zbiór zasobów...',
+      assetTitle: 'Tytuł zasobu',
+      assetTitleHint: 'Użyj {{item.title}} lub innych zmiennych',
+      assetDescription: 'Opis',
+      assetTagLabel: 'Tag zasobu',
+      assetCategory: 'Kategoria',
+      selectCategory: 'Wybierz kategorię (opcjonalnie)...',
+      assetStatus: 'Status',
+      selectStatusOptional: 'Wybierz status (opcjonalnie)...',
+      requiredField: 'Wymagane',
+      configureAssetCreation: 'Skonfiguruj tworzenie zasobu...',
+      // Wybór możliwości (węzły HTTP, Docker, LLM)
+      capability: 'Możliwość',
+      selectCapability: 'Wybierz możliwość...',
+      noCapabilitiesForWorkspace:
+        'W tej przestrzeni roboczej nie ma dostępnych możliwości. Poproś administratora o ich udostępnienie.',
+      configureRequest: 'Skonfiguruj żądanie HTTP...',
+      configureExtract: 'Skonfiguruj ekstrakcję AI...',
+      selectModelAndTools: 'Wybierz model i narzędzia...',
+      // Węzeł żądania HTTP
+      httpCapability: 'Możliwość klienta HTTP',
+      httpMethod: 'Metoda',
+      urlTemplate: 'Szablon adresu URL',
+      requestBody: 'Treść żądania',
+      requestBodyPlaceholder: 'Opcjonalne. Treść JSON, może używać {{variables}}.',
+      httpHeaders: 'Nagłówki',
+      addHeader: 'Dodaj nagłówek',
+      headerName: 'Nazwa nagłówka',
+      headerValue: 'Wartość',
+      // Węzeł uruchomienia kontenera
+      dockerCapability: 'Środowisko Docker',
+      timeoutSecs: 'Limit czasu (sekundy)',
+      // Węzły AI
+      llmCapability: 'Połączenie LLM',
+      model: 'Model',
+      tools: 'Narzędzia',
+      aiPrompt: 'Podpowiedź',
+      aiExtractPromptPlaceholder:
+        'Wyodrębnij ustrukturyzowane dane z danych wejściowych. Określ dokładnie, co wyodrębnić.',
+      systemPrompt: 'Podpowiedź systemowa',
+      systemPromptPlaceholder: 'Jesteś pomocnym asystentem. Użyj narzędzi, aby ...',
+      inputField: 'Pole wejściowe',
+      inputFieldPlaceholder: 'nazwa zmiennej, z której odczytać dane wejściowe',
+      inputFields: 'Pola wejściowe',
+      inputFieldsPlaceholder: 'nazwy zmiennych oddzielone przecinkami',
+      outputField: 'Pole wyjściowe',
+      outputFieldPlaceholder: 'nazwa zmiennej, do której zapisać dane wyjściowe',
+      outputSchema: 'Schemat JSON wyjścia',
+      agentTools: 'Narzędzia',
+      agentToolsHint:
+        'Możliwości klienta HTTP, które agent może wywołać. Wymienione są tylko możliwości przypisane do tej przestrzeni roboczej.',
+      noToolsAvailable: 'Brak dostępnych możliwości klienta HTTP dla tej przestrzeni roboczej.',
+      maxSteps: 'Maksymalna liczba iteracji',
+    },
+
+    // Odbiorcy
+    recipients: {
+      assignee: 'Osoba przypisana',
+      creator: 'Twórca',
+      specific: 'Konkretni użytkownicy',
+    },
+
+    // Warunek
+    condition: {
+      true: 'Tak',
+      false: 'Nie',
+    },
+
+    // Operatory
+    operators: {
+      equals: 'Równa się',
+      notEquals: 'Nie równa się',
+      contains: 'Zawiera',
+      greaterThan: 'Większe niż',
+      lessThan: 'Mniejsze niż',
+      isEmpty: 'Jest puste',
+      isNotEmpty: 'Nie jest puste',
+    },
+
+    // Dzienniki wykonania
+    logs: {
+      title: 'Dzienniki wykonania',
+      noLogs: 'Brak dzienników wykonania',
+      status: 'Status',
+      running: 'W toku',
+      completed: 'Zakończone',
+      failed: 'Niepowodzenie',
+      skipped: 'Pominięte',
+      startedAt: 'Rozpoczęto',
+      completedAt: 'Zakończono',
+      error: 'Błąd',
+      details: 'Szczegóły',
+      viewDetails: 'Zobacz szczegóły',
+    },
+
+    // Ślad wykonania
+    trace: {
+      title: 'Szczegóły wykonania',
+      noSteps: 'Nie zarejestrowano kroków wykonania',
+      setStatus: 'Zmieniono status z „{from}” na „{to}”',
+      setField: 'Ustawiono {field} z „{from}” na „{to}”',
+      addComment: 'Dodano {prefix}komentarz: „{content}”',
+      notifyUser: 'Wysłano powiadomienie do {count} użytkowników',
+      notifyUser_one: 'Wysłano powiadomienie do {count} użytkownika',
+      notifyUser_few: 'Wysłano powiadomienie do {count} użytkowników',
+      notifyUser_many: 'Wysłano powiadomienie do {count} użytkowników',
+      notifyUser_other: 'Wysłano powiadomienie do {count} użytkownika',
+      notifySkipped: 'Powiadomienie pominięte: {reason}',
+      conditionResult: 'Warunek oceniono na {result}',
+      updateAsset: 'Zaktualizowano zasób #{asset_id}',
+      updateAssetSkipped: 'Aktualizacja zasobu pominięta: {reason}',
+      createAsset: 'Utworzono zasób #{asset_id}: {title}',
+      createAssetFailed: 'Tworzenie zasobu nie powiodło się: {reason}',
+    },
+
+    // Testowe/ręczne wykonanie
+    test: {
+      title: 'Testuj akcję',
+      description:
+        'Wybierz element, na którym ma zostać uruchomiona ta akcja. Spowoduje to natychmiastowe wykonanie akcji z pominięciem normalnego wyzwalacza.',
+      selectItem: 'Wybierz element',
+      itemPlaceholder: 'Szukaj elementu...',
+      execute: 'Uruchom akcję',
+      run: 'Uruchom test',
+      executionFailed: 'Nie udało się wykonać akcji',
+      executionQueued: 'Akcja zakolejkowana do wykonania',
+    },
+
+    // Dokumentacja symboli zastępczych
+    placeholders: {
+      title: 'Dostępne symbole zastępcze',
+      description:
+        'Użyj tych symboli zastępczych w szablonie. Zostaną zastąpione rzeczywistymi wartościami podczas uruchomienia akcji.',
+      showReference: 'Pokaż dokumentację symboli zastępczych',
+      categories: {
+        item: 'Pola elementu',
+        user: 'Bieżący użytkownik',
+        old: 'Poprzednie wartości',
+        trigger: 'Kontekst wyzwalacza',
+      },
+      item: {
+        title: 'Tytuł elementu',
+        id: 'ID elementu',
+        statusId: 'ID statusu',
+        assigneeId: 'ID użytkownika przypisanego',
+        any: 'Dowolne pole elementu',
+      },
+      user: {
+        name: 'Pełne imię i nazwisko użytkownika',
+        email: 'E-mail użytkownika',
+        id: 'ID użytkownika',
+      },
+      old: {
+        description: 'Poprzednia wartość przed zmianą',
+        example: 'Poprzednia wartość dowolnego pola',
+      },
+      trigger: {
+        itemId: 'ID elementu wyzwalającego',
+        workspaceId: 'ID przestrzeni roboczej',
+        actorUserId: 'Użytkownik, który wyzwolił akcję',
+        newField: 'Nowa wartość zmienionego pola, np. trigger.new_iteration_id',
+        fieldFallback: 'Skrót do nowej wartości, np. trigger.iteration_id',
+        oldField: 'Poprzednia wartość zmienionego pola, np. trigger.old_iteration_id',
+      },
+      parent: {
+        openChildCount: 'Otwarte bezpośrednie elementy podrzędne elementu nadrzędnego',
+        any: 'Dowolne pole elementu nadrzędnego',
+      },
+    },
+    switchToVertical: 'Przełącz na układ pionowy',
+    switchToHorizontal: 'Przełącz na układ poziomy',
+  },
+};

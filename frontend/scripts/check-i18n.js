@@ -25,11 +25,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const LOCALES_DIR = join(__dirname, '..', 'src', 'lib', 'locales');
 const SRC_DIR = join(__dirname, '..', 'src');
 const REFERENCE_LOCALE = 'en';
-// Russian, German, French, Simplified Chinese, and Persian are shipped with full
-// key coverage and must never silently fall back to English. Older locales may
-// remain partially translated while still using the application's documented
-// English runtime fallback.
-const REQUIRED_FULL_COVERAGE_LOCALES = new Set(['ru', 'de', 'fr', 'zh-CN', 'fa']);
+// Russian, German, French, Simplified Chinese, Persian, and Polish are shipped
+// with full key coverage and must never silently fall back to English. Older
+// locales may remain partially translated while still using the application's
+// documented English runtime fallback.
+const REQUIRED_FULL_COVERAGE_LOCALES = new Set(['ru', 'de', 'fr', 'zh-CN', 'fa', 'pl']);
 const PLURAL_SUFFIX_PATTERN = /_(zero|one|two|few|many|other)$/;
 
 // These values intentionally retain product names, code syntax, URLs, or sample identifiers.

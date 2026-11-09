@@ -13,6 +13,7 @@ var dateFormats = map[string]dateFormat{
 	"fr":    {Date: "02/01/2006", DateTime: "02/01/2006 15:04", Time: "15:04"},
 	"it":    {Date: "02/01/2006", DateTime: "02/01/2006, 15:04", Time: "15:04"},
 	"ko":    {Date: "2006. 1. 2.", DateTime: "2006. 1. 2. 15:04", Time: "15:04"},
+	"pl":    {Date: "02.01.2006", DateTime: "02.01.2006, 15:04", Time: "15:04"},
 	"pt-BR": {Date: "2/1/2006", DateTime: "2/1/2006, 15:04", Time: "15:04"},
 	"ru":    {Date: "02.01.2006", DateTime: "02.01.2006, 15:04", Time: "15:04"},
 	"zh-CN": {Date: "2006/1/2", DateTime: "2006/1/2 15:04", Time: "15:04"},
