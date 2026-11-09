@@ -1,0 +1,60 @@
+/** Agenci przestrzeni roboczej i Agent Studio. */
+
+export default {
+  workspaceAgents: {
+    availability: {
+      ready: 'Gotowy',
+      offline: 'Offline · kolejkuje pracę',
+      needsSetup: 'Wymaga konfiguracji',
+      draft: 'Szkic',
+      paused: 'Wstrzymany',
+      invalid: 'Nieprawidłowy',
+      archived: 'Zarchiwizowany',
+      unavailable: 'Niedostępny',
+    },
+    types: {
+      standard: 'Standardowy',
+      coding: 'Programistyczny',
+      legacy: 'Przestarzały',
+    },
+    runtimes: {
+      windshift: 'Wbudowane środowisko uruchomieniowe Windshift',
+      authorizedRunner: 'Autoryzowany runner programistyczny',
+      legacyLocal: 'Lokalne środowisko uruchomieniowe (starsze)',
+    },
+    identities: {
+      workspaceManaged: 'Zarządzana przez przestrzeń roboczą',
+      centralizedService: 'Tożsamość usługi centralnej',
+      userOwned: 'Tożsamość użytkownika',
+    },
+    runStatuses: {
+      queued: 'w kolejce',
+      running: 'w toku',
+      succeeded: 'zakończone',
+      completed: 'zakończone',
+      failed: 'niepowodzenie',
+      cancelled: 'anulowane',
+    },
+    catalog: {
+      title: 'Agenci',
+      subtitle: 'Specjaliści dostępni w tej przestrzeni roboczej',
+      createAgent: 'Utwórz agenta',
+      searchPlaceholder: 'Szukaj agentów',
+      loading: 'Ładowanie agentów przestrzeni roboczej…',
+      loadErrorTitle: 'Nie udało się załadować agentów',
+      loadErrorMessage: 'Nie udało się załadować agentów.',
+      emptyTitle: 'Brak agentów',
+      emptyAdminDescription: 'Utwórz specjalistę standardowego lub programistycznego dla tej przestrzeni roboczej.',
+      emptyMemberDescription: 'Administrator przestrzeni roboczej może dodać tutaj specjalistów.',
+      noMatchesTitle: 'Brak pasujących agentów',
+      noMatchesDescription: 'Spróbuj innej nazwy, identyfikatora, celu lub typu profilu.',
+      defaultPurpose: 'Specjalista przestrzeni roboczej skonfigurowany przez administratorów.',
+      ownedBy: 'Właściciel: {name}',
+      modelUnavailable: 'Model niedostępny',
+      standardInteraction: 'Przypisania, wzmianki i czat w przestrzeni roboczej',
+      codingInteraction: 'Bezpośrednie przypisania i wzmianki',
+      lastRun: 'Ostatnie uruchomienie: {status}',
+      viewProfileVersion: 'Zobacz profil · wersja {version}',
+    },
+  },
+};

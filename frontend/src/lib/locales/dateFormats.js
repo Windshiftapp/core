@@ -28,6 +28,7 @@ export const DATE_FORMATS = {
   ko: { date: '2006. 1. 2.', dateTime: '2006. 1. 2. 15:04', time: '15:04' },
   it: { date: '02/01/2006', dateTime: '02/01/2006, 15:04', time: '15:04' },
   fa: { date: '2006/1/2', dateTime: '2006/1/2، 15:04', time: '15:04' },
+  pl: { date: '02.01.2006', dateTime: '02.01.2006, 15:04', time: '15:04' },
 };
 
 /** Keys every locale entry must define. */
