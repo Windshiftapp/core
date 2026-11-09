@@ -18,6 +18,7 @@ RUN_OPENAPI=0
 RUN_FRONTEND=0
 RUN_SCHEMA=0
 RUN_API_VERSION=0
+RUN_SVELTE=0
 
 # A single file can matter to several buckets (e.g. a restapi handler needs
 # both linting and OpenAPI validation), so test each trigger set separately
@@ -30,6 +31,7 @@ while IFS= read -r path; do
     # Go changes elsewhere are caught by CI instead of every local commit.
     case "$path" in internal/restapi/*|internal/metrics/*|internal/health/*|api/*|scripts/openapi-*|scripts/check-frontend-v2-fields.mjs) RUN_OPENAPI=1 ;; esac
     case "$path" in frontend/*)  RUN_FRONTEND=1 ;; esac
+    case "$path" in frontend/*.svelte) RUN_SVELTE=1 ;; esac
     case "$path" in internal/database/*) RUN_SCHEMA=1 ;; esac
     # The v1 API guard scans first-party source roots; it is cheap, so run it
     # for any of them rather than only for Go changes.
@@ -136,6 +138,17 @@ if [[ "$RUN_FRONTEND" -eq 1 ]]; then
         if ! node "$REPO_ROOT/scripts/check-frontend-v2-fields.mjs"; then
             echo "FAIL: frontend sends fields missing from the v2 OpenAPI spec."
             FAILED=1
+        fi
+        # Inline color styles are baselined and CPU-heavy, so only scan when a
+        # Svelte file is part of the commit.
+        if [[ "$RUN_SVELTE" -eq 1 ]]; then
+            echo "  Running inline-style guard..."
+            if ! (cd "$REPO_ROOT/frontend" && npm run check:inline-styles); then
+                echo "FAIL: new inline color styles; use the design-token utilities."
+                FAILED=1
+            fi
+        else
+            SKIPPED+=("inline-style guard (no svelte changes)")
         fi
     else
         echo "  WARNING: frontend/ directory not found, skipping frontend checks"
