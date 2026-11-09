@@ -452,10 +452,11 @@ func (h *PortalAuthHandler) GetCurrentCustomer(w http.ResponseWriter, r *http.Re
 }
 
 // updatePortalRegionalSettingsRequest is the editable regional subset of a
-// portal customer profile.
+// portal customer profile. The pointers let an omitted field keep its stored
+// value; an explicit empty string clears it.
 type updatePortalRegionalSettingsRequest struct {
-	Language string `json:"language"`
-	Timezone string `json:"timezone"`
+	Language *string `json:"language"`
+	Timezone *string `json:"timezone"`
 }
 
 // UpdateCurrentCustomer handles PUT /portal/{slug}/auth/me. It lets an
@@ -485,20 +486,32 @@ func (h *PortalAuthHandler) UpdateCurrentCustomer(w http.ResponseWriter, r *http
 		return
 	}
 
-	language := strings.TrimSpace(req.Language)
-	if language != "" && !i18n.IsSupported(language) {
-		respondValidationError(w, r, "Unsupported language")
+	// Start from the stored values so an omitted field is left unchanged rather
+	// than rewritten to NULL.
+	language, timezone, err := h.customerRepo.RegionalSettings(r.Context(), session.Customer.ID)
+	if err != nil {
+		respondInternalError(w, r, err)
 		return
 	}
-	if language != "" {
-		language = i18n.Normalize(language)
+
+	if req.Language != nil {
+		language = strings.TrimSpace(*req.Language)
+		if language != "" && !i18n.IsSupported(language) {
+			respondValidationError(w, r, "Unsupported language")
+			return
+		}
+		if language != "" {
+			language = i18n.Normalize(language)
+		}
 	}
 
-	timezone := strings.TrimSpace(req.Timezone)
-	if timezone != "" {
-		if _, err := time.LoadLocation(timezone); err != nil {
-			respondValidationError(w, r, "Invalid timezone")
-			return
+	if req.Timezone != nil {
+		timezone = strings.TrimSpace(*req.Timezone)
+		if timezone != "" {
+			if _, err := time.LoadLocation(timezone); err != nil {
+				respondValidationError(w, r, "Invalid timezone")
+				return
+			}
 		}
 	}
 

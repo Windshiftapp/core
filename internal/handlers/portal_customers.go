@@ -403,7 +403,7 @@ type portalCustomerInput struct {
 	Email                  string
 	Phone                  string
 	CustomerOrganisationID *int
-	IsPrimary              bool
+	IsPrimary              *bool
 	RoleIDs                []int
 	CustomFieldValuesJSON  *string
 }
@@ -416,7 +416,7 @@ func (h *PortalCustomersHandler) decodePortalCustomerInput(w http.ResponseWriter
 		Email                  string         `json:"email"`
 		Phone                  string         `json:"phone"`
 		CustomerOrganisationID *int           `json:"customer_organisation_id"`
-		IsPrimary              bool           `json:"is_primary"`
+		IsPrimary              *bool          `json:"is_primary"`
 		RoleIDs                []int          `json:"role_ids"`
 		CustomFieldValues      map[string]any `json:"custom_field_values"`
 	}
@@ -491,7 +491,7 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 		err := tx.QueryRow(`
 			INSERT INTO portal_customers (name, email, phone, customer_organisation_id, is_primary, custom_field_values, created_via, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
-		`, input.Name, input.Email, input.Phone, input.CustomerOrganisationID, input.IsPrimary, input.CustomFieldValuesJSON, models.CustomerCreatedViaAgent).Scan(&customerID)
+		`, input.Name, input.Email, input.Phone, input.CustomerOrganisationID, boolValue(input.IsPrimary), input.CustomFieldValuesJSON, models.CustomerCreatedViaAgent).Scan(&customerID)
 		if err != nil {
 			return err
 		}
@@ -590,10 +590,13 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 	// Wrap update + role assignment in a transaction so partial failures
 	// don't leave the customer in a half-updated state.
 	txErr := database.WithTx(h.db, func(tx database.Tx) error {
+		// is_primary is preserved when the request omits it; an explicit value
+		// wins. The detail edit form does not carry the flag, so a metadata save
+		// must not demote the primary contact.
 		//nolint:misspell // customer_organisation_id is a database column name
 		query := `
 			UPDATE portal_customers
-			SET name = ?, email = ?, phone = ?, customer_organisation_id = ?, is_primary = ?, custom_field_values = ?, updated_at = CURRENT_TIMESTAMP
+			SET name = ?, email = ?, phone = ?, customer_organisation_id = ?, is_primary = COALESCE(?, is_primary), custom_field_values = ?, updated_at = CURRENT_TIMESTAMP
 			WHERE id = ? AND erased_at IS NULL
 		`
 		result, err := tx.Exec(query, input.Name, input.Email, input.Phone, input.CustomerOrganisationID, input.IsPrimary, input.CustomFieldValuesJSON, customerID)

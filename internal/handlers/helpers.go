@@ -292,3 +292,9 @@ func parseOffsetPagination(r *http.Request, defaultLimit, maxLimit int) (limit, 
 	}
 	return limit, offset
 }
+
+// boolValue reports an optional boolean, defaulting to false when the field
+// was omitted.
+func boolValue(v *bool) bool {
+	return v != nil && *v
+}

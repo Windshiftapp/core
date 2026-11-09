@@ -213,6 +213,21 @@ func (r *PortalCustomerRepository) Language(ctx context.Context, customerID int)
 	return language, nil
 }
 
+// RegionalSettings returns the customer's stored language and timezone, or ""
+// when either is unset. Callers use it to keep an omitted field unchanged.
+func (r *PortalCustomerRepository) RegionalSettings(ctx context.Context, customerID int) (language, timezone string, err error) {
+	err = r.db.QueryRowContext(ctx,
+		"SELECT COALESCE(language, ''), COALESCE(timezone, '') FROM portal_customers WHERE id = ?", customerID,
+	).Scan(&language, &timezone)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", ErrNotFound
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("get portal customer %d regional settings: %w", customerID, err)
+	}
+	return language, timezone, nil
+}
+
 // LanguageByEmail returns the language of the customer with the given email,
 // or "" when no customer row exists. The reply paths only know the recipient
 // address, so a missing row is not an error.

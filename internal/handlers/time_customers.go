@@ -204,6 +204,16 @@ func (h *TimeCustomerHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A metadata-only update must not clear structured columns the form does
+	// not carry. An omitted blob keeps its stored value; an explicit empty
+	// object still clears it.
+	if c.Settings == nil {
+		c.Settings = existing.Settings
+	}
+	if c.CustomFieldValues == nil {
+		c.CustomFieldValues = existing.CustomFieldValues
+	}
+
 	warnings := sanitize.ApplyAllWithWarnings(
 		sanitize.Pair{Target: &c.Name, Policy: sanitize.PlainTextField, Label: "Name"},
 		sanitize.Pair{Target: &c.Description, Policy: sanitize.Comment, Label: "Description"},
