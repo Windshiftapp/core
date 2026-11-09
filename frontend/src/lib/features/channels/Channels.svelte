@@ -582,7 +582,7 @@
         data={filteredChannels()}
         keyField="id"
         emptyMessage={t('channels.noChannels')}
-        emptyDescription={channelSearch ? t('channels.noChannels') : t('channels.noChannels')}
+        emptyDescription={t('channels.noChannels')}
         emptyIcon={IconLifebuoy}
         actionItems={getChannelActionItems}
         actionTriggerTestid={(channel) => `channel-actions-${channel.id}`}

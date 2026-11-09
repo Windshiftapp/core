@@ -809,7 +809,7 @@
         <EmptyState
           icon={IconBox}
           title={t('common.noItems')}
-          description={activeQuery || selectedCategoryId ? t('common.noItems') : t('common.noItems')}
+          description={t('common.noItems')}
           action={selectedSetId && canEdit && !activeQuery && !selectedCategoryId ? createAssetAction : null}
         />
       {:else}
