@@ -4,6 +4,7 @@
 // stays a hot update instead of reloading the page.
 
 import { configureAPIEventHandlers } from '../api/core.js';
+import { RUNED_CANCEL_SENTINEL } from '../composables/useDebouncedAction.svelte.js';
 import { configureServiceWorkerNotifications } from '../mobile/serviceWorkerClient.js';
 import { navigate } from '../router.js';
 import { authStore } from '../stores/auth.svelte.js';
@@ -26,10 +27,14 @@ export function installGlobalErrorHandlers(target = typeof window !== 'undefined
   globalErrorHandlerTargets.add(target);
 
   // A promise rejection nobody handled. Aborting is navigation/cancellation
-  // control flow, not a failure the user should see.
+  // control flow, not a failure the user should see. runed's own primitives
+  // also cancel an internal debounce during cleanup and discard its promise
+  // (`onClickOutside` does this on every pointerdown), so the cancel sentinel
+  // escapes `useDebouncedAction` and lands here.
   target.addEventListener('unhandledrejection', (event) => {
     const reason = /** @type {PromiseRejectionEvent} */ (event).reason;
     if (reason?.name === 'AbortError') return;
+    if (reason === RUNED_CANCEL_SENTINEL) return;
     surfaceError(reason, { context: 'unhandledrejection' });
   });
 
