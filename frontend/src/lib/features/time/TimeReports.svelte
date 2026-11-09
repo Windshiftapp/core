@@ -21,6 +21,7 @@
   import { formatDurationMinutes } from '../../utils/timeUtils.js';
   import Chart from '../../widgets/Chart.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { surfaceError } from '../../stores/toasts.svelte.js';
   import { customerDisplayName, customerOrganisationName } from '../../utils/customerLabel.js';
   import { formatDateOnly, getUserTimezone } from '../../utils/dateFormatter.js';
   import { formatAuthenticatedInstant } from '../../utils/authenticatedDateFormatter.js';
@@ -416,7 +417,7 @@
         exportPersonalPDF();
       }
     } catch (error) {
-      console.error('PDF export failed:', error);
+      surfaceError(error, { context: 'exportTimeReportPdf' });
     } finally {
       exportLoading = false;
     }
