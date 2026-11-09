@@ -734,7 +734,7 @@
                     <div>{link.connection_name}</div>
                     <div>{t('zammad.group')}: {link.group_name || t('zammad.unknown')}</div>
                     <div>{t('zammad.owner')}: {link.owner_name || t('zammad.unassignedOwner')}</div>
-                    <div>{link.last_synced_at ? t('zammad.lastSynced', { time: new Date(link.last_synced_at).toLocaleString() }) : t('zammad.notSynced')}</div>
+                    <div>{link.last_synced_at ? t('zammad.lastSynced', { time: formatDateTimeLocale(link.last_synced_at, timezone) }) : t('zammad.notSynced')}</div>
                   </div>
                 </div>
                 <Lozenge appearance={ticketStatusAppearance(link)} text={ticketStatusLabel(link)} />

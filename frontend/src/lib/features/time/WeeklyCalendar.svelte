@@ -31,7 +31,7 @@
   // Get current date and week
   let currentDate = $state(new Date());
   let currentWeekStart = $state(new Date());
-  let weekDays = $state([]);
+  let weekDays = $derived(generateWeekDays(currentWeekStart));
   let workItems = $state({}); // Store scheduled work items for each day
   let showTasksSidebar = $state(false);
   let assignedWorkItems = $state([]); // Real work items assigned to user
@@ -304,9 +304,9 @@
       days.push({
         date: new Date(date),
         dayName: formatDateWithOptions(date, { weekday: 'short' }),
-        dayNumber: date.getDate(),
+        dayNumber: formatDateWithOptions(date, { day: 'numeric' }),
         isToday: isToday(date),
-        isCurrentMonth: date.getMonth() === currentDate.getMonth(),
+        isCurrentMonth: formatDateWithOptions(date, { year: 'numeric', month: 'numeric' }) === formatDateWithOptions(currentDate, { year: 'numeric', month: 'numeric' }),
         dateKey: formatDateKey(date)
       });
     }
@@ -343,7 +343,6 @@
     const newWeekStart = new Date(currentWeekStart);
     newWeekStart.setDate(currentWeekStart.getDate() + (direction * 7));
     currentWeekStart = newWeekStart;
-    weekDays = generateWeekDays(currentWeekStart);
     loadScheduledItems();
   }
 

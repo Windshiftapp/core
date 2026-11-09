@@ -10,6 +10,7 @@
   import { agentRuns } from '../../api/agentRuns.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { formatDateSimple } from '../../utils/dateFormatter.js';
   import PageHeader from '../../layout/PageHeader.svelte';
   import Avatar from '../../components/Avatar.svelte';
   import Badge from '../../components/Badge.svelte';
@@ -270,7 +271,7 @@
                     {t('workspaceAgents.catalog.lastRun', {
                       status: runStatusLabel(latestRun.status),
                     })} ·
-                    {new Date(latestRun.updated_at || latestRun.created_at).toLocaleDateString()}
+                    {formatDateSimple(new Date(latestRun.updated_at || latestRun.created_at))}
                   </span>
                 </div>
               {/if}

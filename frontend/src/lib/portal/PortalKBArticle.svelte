@@ -5,6 +5,7 @@
   import { portal } from '../api/portal.js';
   import { navigate } from '../router.js';
   import { portalCustomizationStore as portalStore } from '../stores/portal.svelte.js';
+  import { formatDateWithOptions } from '../utils/dateFormatter.js';
   import StateDisplay from '../components/StateDisplay.svelte';
   import LazyMilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
 
@@ -87,7 +88,7 @@
       {#if page.updated_at}
         <p class="kb-article__updated">
           Last updated
-          {new Date(page.updated_at).toLocaleDateString(undefined, {
+          {formatDateWithOptions(new Date(page.updated_at), {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
