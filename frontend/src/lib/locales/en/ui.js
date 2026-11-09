@@ -567,6 +567,7 @@ export default {
   },
 
   recurrence: {
+    gregorianRuleHint: 'Monthly and yearly recurrence rules use the Gregorian calendar.',
     title: 'Recurrence',
     description: 'Manage recurring task rules',
     frequency: 'Frequency',

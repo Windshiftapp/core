@@ -559,6 +559,7 @@ export default {
   },
 
   recurrence: {
+    gregorianRuleHint: 'Les répétitions mensuelles et annuelles utilisent le calendrier grégorien.',
     title: 'Récurrence',
     description: 'Gérer les règles de tâches récurrentes',
     frequency: 'Fréquence',
