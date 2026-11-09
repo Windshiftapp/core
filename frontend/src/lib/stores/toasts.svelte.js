@@ -79,6 +79,24 @@ export function removeToast(id) {
 }
 
 /**
+ * Cancellation is control flow, not a failure the user should see. The API
+ * layer reports a client-canceled request as an AbortError, and the server
+ * reports it as REQUEST_CANCELED; both mean the work was intentionally
+ * abandoned (navigation, closed modal, superseded request).
+ *
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+function isCancellation(error) {
+  if (!error || typeof error !== 'object') return false;
+  if (/** @type {any} */ (error).name === 'AbortError') return true;
+  const code = String(
+    /** @type {any} */ (error).code ?? /** @type {any} */ (error).errorCode ?? ''
+  ).toLowerCase();
+  return code === 'request_canceled';
+}
+
+/**
  * Surface a caught failure to the user while keeping the console diagnostic.
  * Prefer this over a bare `console.error` so a failure cannot disappear into
  * the console. Pass `silent: true` only for work the user did not initiate and
@@ -94,6 +112,7 @@ export function removeToast(id) {
  */
 export function surfaceError(error, options = {}) {
   const { title, message, context, level = 'error', silent = false } = options;
+  if (isCancellation(error)) return;
   console.error(context ? `[${context}]` : '[windshift]', error);
   if (silent) return;
   const text = message ?? (typeof error === 'string' ? error : translateError(error));

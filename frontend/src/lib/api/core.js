@@ -129,6 +129,15 @@ export function clearAPIRequestSessionKey() {
   setAPIRequestSessionKey(null);
 }
 
+// The server answers 408 with REQUEST_CANCELED when the request context was
+// canceled by the client (navigation, modal teardown, superseded work). The
+// backend treats that as expected control flow, so present it to callers as an
+// AbortError instead of a failure they should report.
+function isCanceledRequest(error) {
+  const code = String(error?.code ?? error?.errorCode ?? '').toLowerCase();
+  return code === 'request_canceled';
+}
+
 /**
  * Create an enhanced error object from an API response
  * @param {Response} response - Fetch Response object
@@ -289,6 +298,9 @@ async function performFetchAPI(base, endpoint, options = {}) {
         // If we can't read the error body, use the status text
       }
       const apiError = createApiError(response, errorData);
+      if (isCanceledRequest(apiError)) {
+        throw new DOMException('The request was canceled', 'AbortError');
+      }
       if (
         response.status === 401 &&
         /** @type {any} */ (apiError).code !== 'AUTHENTICATION_PENDING'
