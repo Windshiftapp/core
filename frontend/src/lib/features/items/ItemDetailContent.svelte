@@ -48,9 +48,6 @@
     timeProjects = [],
     activeTimer = null,
     editingStatus = false,
-    editingDueDate = false,
-    editingStartDate = false,
-    editingEndDate = false,
     editingCustomFields = {},
     editCustomFieldValues = {},
     editingPriority = false,
@@ -86,9 +83,6 @@
     onstartEditingMilestone = null,
     onstartEditingIteration = null,
     onstartEditingPriority = null,
-    onstartEditingDueDate = null,
-    onstartEditingStartDate = null,
-    onstartEditingEndDate = null,
     onstartEditingStatus = null,
     onstartEditingProject = null,
     onstartEditingDescription = null,
@@ -187,18 +181,6 @@
 
   function handleStartEditingIteration() {
     onstartEditingIteration?.();
-  }
-
-  function handleStartEditingDueDate() {
-    onstartEditingDueDate?.();
-  }
-
-  function handleStartEditingStartDate() {
-    onstartEditingStartDate?.();
-  }
-
-  function handleStartEditingEndDate() {
-    onstartEditingEndDate?.();
   }
 
   function handleStartEditingPriority() {
@@ -462,9 +444,6 @@
             {pendingApproval}
             {onapprovalsChanged}
             {editingStatus}
-            {editingDueDate}
-            {editingStartDate}
-            {editingEndDate}
             {editingCustomFields}
             {editCustomFieldValues}
             {editingPriority}
@@ -490,9 +469,6 @@
             onstartEditingAssignee={onstartEditingAssignee}
             onstartEditingMilestone={onstartEditingMilestone}
             onstartEditingIteration={onstartEditingIteration}
-            onstartEditingDueDate={onstartEditingDueDate}
-            onstartEditingStartDate={onstartEditingStartDate}
-            onstartEditingEndDate={onstartEditingEndDate}
             onstartEditingPriority={onstartEditingPriority}
             onstartEditingStatus={onstartEditingStatus}
             onstartEditingProject={onstartEditingProject}

@@ -564,22 +564,6 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     itemDetailStore.startEditing('priority');
   }
 
-  function handleStartEditingDueDate() {
-    // Cancel all custom field editing when starting to edit due date
-    itemDetailStore.editing.customFields.active = {};
-    itemDetailStore.startEditing('dueDate');
-  }
-
-  function handleStartEditingStartDate() {
-    itemDetailStore.editing.customFields.active = {};
-    itemDetailStore.startEditing('startDate');
-  }
-
-  function handleStartEditingEndDate() {
-    itemDetailStore.editing.customFields.active = {};
-    itemDetailStore.startEditing('endDate');
-  }
-
   function handleStartEditingStatus() {
     // Cancel all custom field editing when starting to edit status
     itemDetailStore.editing.customFields.active = {};
@@ -1435,9 +1419,6 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     activeTimer={timerStore.activeTimer}
     editingStatus={itemDetailStore.editing.status.active}
     editingPriority={itemDetailStore.editing.priority.active}
-    editingDueDate={itemDetailStore.editing.dueDate.active}
-    editingStartDate={itemDetailStore.editing.startDate.active}
-    editingEndDate={itemDetailStore.editing.endDate.active}
     editingProject={itemDetailStore.editing.project.active}
     editingAssignee={itemDetailStore.editing.assignee.active}
     editingMilestone={itemDetailStore.editing.milestone.active}
@@ -1474,9 +1455,6 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     onstartEditingMilestone={handleStartEditingMilestone}
     onstartEditingIteration={handleStartEditingIteration}
     onstartEditingPriority={handleStartEditingPriority}
-    onstartEditingDueDate={handleStartEditingDueDate}
-    onstartEditingStartDate={handleStartEditingStartDate}
-    onstartEditingEndDate={handleStartEditingEndDate}
     onstartEditingStatus={handleStartEditingStatus}
     onstartEditingProject={handleStartEditingProject}
     onstartEditingDescription={handleStartEditingDescription}

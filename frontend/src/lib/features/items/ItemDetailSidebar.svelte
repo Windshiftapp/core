@@ -116,9 +116,6 @@
     pendingApproval = null,
     onapprovalsChanged = null,
     editingStatus = false,
-    editingDueDate = false,
-    editingStartDate = false,
-    editingEndDate = false,
     editingPriority = false,
     editingProject = false,
     editingAssignee = false,
@@ -145,9 +142,6 @@
     onstartEditingAssignee = null,
     onstartEditingMilestone = null,
     onstartEditingPriority = null,
-    onstartEditingDueDate = null,
-    onstartEditingStartDate = null,
-    onstartEditingEndDate = null,
     onstartEditingStatus = null,
     onstartEditingProject = null,
     onstartEditingIteration = null,
@@ -407,24 +401,6 @@
       ? priorities.find(p => p.id === item.priority_id)
       : null
   );
-
-  // Due Date helpers
-  function startEditingDueDate() {
-    if (!canEdit || !isSystemFieldEditable('due_date')) return;
-    onstartEditingDueDate?.();
-  }
-
-  // Start Date helpers
-  function startEditingStartDate() {
-    if (!canEdit || !isSystemFieldEditable('start_date')) return;
-    onstartEditingStartDate?.();
-  }
-
-  // End Date helpers
-  function startEditingEndDate() {
-    if (!canEdit || !isSystemFieldEditable('end_date')) return;
-    onstartEditingEndDate?.();
-  }
 
   // Helper to check if a system field should be shown. Keep the legacy
   // "show all" fallback only when no field configuration at all was resolved.
@@ -1199,7 +1175,6 @@
           label={t('common.dueDate')}
           value={item?.due_date}
           editable={canEdit && isSystemFieldEditable('due_date')}
-          onStartEdit={startEditingDueDate}
           onCancel={() => oncancelEdit?.({ field: 'due_date' })}
           onSave={(value) => onsaveField?.({ field: 'due_date', value })}
         />
@@ -1211,7 +1186,6 @@
           label={t('common.startDate')}
           value={item?.start_date}
           editable={canEdit && isSystemFieldEditable('start_date')}
-          onStartEdit={startEditingStartDate}
           onCancel={() => oncancelEdit?.({ field: 'start_date' })}
           onSave={(value) => onsaveField?.({ field: 'start_date', value })}
         />
@@ -1223,7 +1197,6 @@
           label={t('common.endDate')}
           value={item?.end_date}
           editable={canEdit && isSystemFieldEditable('end_date')}
-          onStartEdit={startEditingEndDate}
           onCancel={() => oncancelEdit?.({ field: 'end_date' })}
           onSave={(value) => onsaveField?.({ field: 'end_date', value })}
         />

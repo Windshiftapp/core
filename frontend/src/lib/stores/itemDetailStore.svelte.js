@@ -11,13 +11,9 @@ import { workspaceDataStore } from './workspaceDataStore.svelte.js';
 import { workspacesStore } from './workspaces.svelte.js';
 
 const FIELD_MAP = {
-  title: 'title',
   description: 'description',
   status: 'status_id',
   priority: 'priority_id',
-  dueDate: 'due_date',
-  startDate: 'start_date',
-  endDate: 'end_date',
   milestone: 'milestones',
   iteration: 'iteration_id',
   assignee: 'assignee_id',
@@ -82,13 +78,9 @@ const RELATED_ITEM_FIELDS = {
 };
 
 const DEFAULT_EDITING_STATE = {
-  title: { active: false, value: '' },
   description: { active: false, value: '' },
   status: { active: false, value: null },
   priority: { active: false, value: null },
-  dueDate: { active: false, value: null },
-  startDate: { active: false, value: null },
-  endDate: { active: false, value: null },
   milestone: { active: false, value: [] },
   iteration: { active: false, value: null },
   project: { active: false, value: null },
@@ -933,11 +925,8 @@ class ItemDetailStore {
       let updateData = {};
 
       if (field === 'title') {
-        const newTitle = directValue || this.editing.title.value.trim();
-        if (newTitle === this.item.title) {
-          this.cancelEditing('title');
-          return;
-        }
+        const newTitle = directValue;
+        if (newTitle === this.item.title) return;
         updateData.title = newTitle;
       } else if (field === 'description') {
         const newDescription = directValue !== null ? directValue : this.editing.description.value;
@@ -970,26 +959,17 @@ class ItemDetailStore {
         this.item = { ...this.item, priority_id: newPriorityId };
       } else if (field === 'due_date') {
         const newDueDate = directValue !== null ? directValue : null;
-        if (newDueDate === this.item.due_date) {
-          this.cancelEditing('dueDate');
-          return;
-        }
+        if (newDueDate === this.item.due_date) return;
         updateData.due_date = newDueDate;
         this.item = { ...this.item, due_date: newDueDate };
       } else if (field === 'start_date') {
         const newStartDate = directValue !== null ? directValue : null;
-        if (newStartDate === this.item.start_date) {
-          this.cancelEditing('startDate');
-          return;
-        }
+        if (newStartDate === this.item.start_date) return;
         updateData.start_date = newStartDate;
         this.item = { ...this.item, start_date: newStartDate };
       } else if (field === 'end_date') {
         const newEndDate = directValue !== null ? directValue : null;
-        if (newEndDate === this.item.end_date) {
-          this.cancelEditing('endDate');
-          return;
-        }
+        if (newEndDate === this.item.end_date) return;
         updateData.end_date = newEndDate;
         this.item = { ...this.item, end_date: newEndDate };
       } else if (field === 'milestone') {
