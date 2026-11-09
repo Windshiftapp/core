@@ -157,6 +157,8 @@
       return {
         id: `recent-item-${it.item_id}`,
         label: `${key}: ${it.title}`,
+        labelKey: key,
+        labelTitle: it.title,
         description: it.status || '',
         bucket: BUCKET.RECENT,
         keywords: [key.toLowerCase(), it.title?.toLowerCase()].filter(Boolean),
@@ -397,7 +399,14 @@
                   class="block w-full text-left px-4 py-2.5 transition-colors cursor-pointer no-underline command-option"
                 >
                   <div class="flex items-center gap-2">
-                    <div class="font-medium" style="color: var(--ds-text);">{command.label}</div>
+                    <div class="font-medium" style="color: var(--ds-text);">
+                      {#if command.labelTitle}
+                        <span dir="ltr">{command.labelKey}:</span>
+                        <span dir="auto">{command.labelTitle}</span>
+                      {:else}
+                        {command.label}
+                      {/if}
+                    </div>
                     {#if command._isContextCommand}
                       <span class="px-1.5 py-0.5 text-xs rounded font-medium" style="background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue);">
                         {t('commandPalette.context')}
@@ -405,7 +414,7 @@
                     {/if}
                   </div>
                   {#if command.description}
-                    <div class="text-sm mt-0.5" style="color: var(--ds-text-subtle);">{command.description}</div>
+                    <div class="text-sm mt-0.5" dir="auto" style="color: var(--ds-text-subtle);">{command.description}</div>
                   {/if}
                 </svelte:element>
               {/each}

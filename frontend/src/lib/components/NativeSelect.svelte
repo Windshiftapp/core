@@ -41,6 +41,7 @@
     {disabled}
     {required}
     multiple
+    dir="auto"
     data-testid={dataTestid}
     aria-label={ariaLabel}
     class={classes}
@@ -57,6 +58,7 @@
     bind:value
     {disabled}
     {required}
+    dir="auto"
     data-testid={dataTestid}
     aria-label={ariaLabel}
     class={classes}

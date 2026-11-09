@@ -977,6 +977,7 @@
     bind:this={editorElement}
     data-testid={testId}
     data-ready={editor ? 'true' : 'false'}
+    dir="auto"
     class="milkdown-editor"
     class:readonly
     class:compact

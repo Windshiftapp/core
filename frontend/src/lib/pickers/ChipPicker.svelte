@@ -192,7 +192,7 @@
   {#if colorDot}
     <div class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {getVisibleColor(colorDot)};"></div>
   {/if}
-  <span class="truncate max-w-[120px]">
+  <span class="truncate max-w-[120px]" dir="auto">
     {displayValue || placeholder}
   </span>
   <ChevronDown size={12} style="color: var(--ds-text-subtle); flex-shrink: 0;" />
@@ -263,7 +263,7 @@
               {#if itemSnippet}
                 {@render itemSnippet({ item, isSelected })}
               {:else}
-                <span class="truncate">{getLabel(item)}</span>
+                <span class="truncate" dir="auto">{getLabel(item)}</span>
               {/if}
             </div>
             {#if isSelected}
