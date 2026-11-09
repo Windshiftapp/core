@@ -169,7 +169,6 @@ windshift.dsl
 endpoints.txt
 RELEASE_NOTES.md
 .dev-windshift-pg
-releases/v0.3.2.md
 .crush
 .jscpd-frontend-report
 .jscpd-report
