@@ -24,6 +24,8 @@
   import { objectDisplayValue } from '../utils/systemLabels.js';
   import LocalizedObjectFields from './LocalizedObjectFields.svelte';
   import LogoUploader from '../components/LogoUploader.svelte';
+  import ThemeBrandFields from './ThemeBrandFields.svelte';
+  import { brandStore } from '../stores/brand.svelte.js';
 	import TextField from '../components/TextField.svelte';
 
   // State management
@@ -48,7 +50,10 @@
     nav_background_color_dark: '#1f2937',
     nav_text_color_dark: '#f3f4f6',
     logo_url: '',
-    logo_url_dark: ''
+    logo_url_dark: '',
+    logo_full_url: '',
+    logo_full_url_dark: '',
+    brand_layout: 'mark_text'
   });
   let uploadingLogo = $state(false);
 
@@ -94,7 +99,10 @@
         nav_background_color_dark: '#1f2937',
         nav_text_color_dark: '#f3f4f6',
         logo_url: '',
-        logo_url_dark: ''
+        logo_url_dark: '',
+        logo_full_url: '',
+        logo_full_url_dark: '',
+        brand_layout: 'mark_text'
       };
       showCreateForm = false;
     } catch (err) {
@@ -200,7 +208,14 @@
   }
 
   function startEdit(theme) {
-    editingTheme = { ...theme };
+    // The API omits empty logo fields, so normalize before binding them into
+    // the form; brand_layout always has a value but guard it too.
+    editingTheme = {
+      ...theme,
+      logo_full_url: theme.logo_full_url || '',
+      logo_full_url_dark: theme.logo_full_url_dark || '',
+      brand_layout: theme.brand_layout || 'mark_text'
+    };
   }
 
   function cancelEdit() {
@@ -224,6 +239,9 @@
       nav_text_color_dark: editingTheme.nav_text_color_dark,
       logo_url: editingTheme.logo_url || '',
       logo_url_dark: editingTheme.logo_url_dark || '',
+      logo_full_url: editingTheme.logo_full_url || '',
+      logo_full_url_dark: editingTheme.logo_full_url_dark || '',
+      brand_layout: editingTheme.brand_layout || 'mark_text',
       is_active: editingTheme.is_active
     });
     await translationEditor?.save();
@@ -324,6 +342,17 @@
         />
       </div>
 
+      <div class="mb-4">
+        <ThemeBrandFields
+          idPrefix="theme-create"
+          bind:brandLayout={newTheme.brand_layout}
+          bind:logoFullUrl={newTheme.logo_full_url}
+          bind:logoFullUrlDark={newTheme.logo_full_url_dark}
+          uploading={uploadingLogo}
+          onUpload={(files, field) => uploadThemeLogo(files, newTheme, field)}
+        />
+      </div>
+
       <!-- Light Mode Colors -->
       <div class="mb-4">
         <h4 class="text-sm font-semibold mb-3 flex items-center gap-2" style="color: var(--ds-text);">
@@ -385,26 +414,34 @@
               class="h-14 flex-1 flex items-center px-4"
               style="background-color: {theme.nav_background_color_light}; color: {theme.nav_text_color_light};"
             >
-              <div class="flex items-center space-x-2">
-                {#if theme.logo_url}
+              <div class="flex items-center gap-2 min-w-0">
+                {#if theme.brand_layout === 'full_logo' && theme.logo_full_url}
+                  <img src={theme.logo_full_url} alt="" class="max-h-6 max-w-full object-contain flex-shrink-0" />
+                {:else if theme.logo_url}
                   <img src={theme.logo_url} alt="" class="w-6 h-6 object-contain flex-shrink-0" />
                 {:else}
                   <Palette class="w-4 h-4" />
                 {/if}
-                <span class="font-medium text-sm">{t('settings.lightMode')}</span>
+                {#if theme.brand_layout !== 'full_logo' && theme.brand_layout !== 'mark_only'}
+                  <span class="font-medium text-sm truncate">{brandStore.siteTitle}</span>
+                {/if}
               </div>
             </div>
             <div
               class="h-14 flex-1 flex items-center px-4"
               style="background-color: {theme.nav_background_color_dark}; color: {theme.nav_text_color_dark};"
             >
-              <div class="flex items-center space-x-2">
-                {#if theme.logo_url_dark || theme.logo_url}
+              <div class="flex items-center gap-2 min-w-0">
+                {#if theme.brand_layout === 'full_logo' && (theme.logo_full_url_dark || theme.logo_full_url)}
+                  <img src={theme.logo_full_url_dark || theme.logo_full_url} alt="" class="max-h-6 max-w-full object-contain flex-shrink-0" />
+                {:else if theme.logo_url_dark || theme.logo_url}
                   <img src={theme.logo_url_dark || theme.logo_url} alt="" class="w-6 h-6 object-contain flex-shrink-0" />
                 {:else}
                   <Palette class="w-4 h-4" />
                 {/if}
-                <span class="font-medium text-sm">{t('settings.darkMode')}</span>
+                {#if theme.brand_layout !== 'full_logo' && theme.brand_layout !== 'mark_only'}
+                  <span class="font-medium text-sm truncate">{brandStore.siteTitle}</span>
+                {/if}
               </div>
             </div>
           </div>
@@ -447,6 +484,17 @@
                     maxHeight="40px"
                     label={t('lookAndFeel.darkLogo', 'Dark Mode Logo')}
                     helpText={t('lookAndFeel.darkLogoFallback', 'Shown in dark mode. Falls back to the light mode logo when left empty.')}
+                  />
+                </div>
+
+                <div class="mb-3">
+                  <ThemeBrandFields
+                    idPrefix={`theme-edit-${editingTheme.id}`}
+                    bind:brandLayout={editingTheme.brand_layout}
+                    bind:logoFullUrl={editingTheme.logo_full_url}
+                    bind:logoFullUrlDark={editingTheme.logo_full_url_dark}
+                    uploading={uploadingLogo}
+                    onUpload={(files, field) => uploadThemeLogo(files, editingTheme, field)}
                   />
                 </div>
 

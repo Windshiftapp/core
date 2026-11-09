@@ -21,6 +21,11 @@ export default {
     systemDefault: 'Paramètre système par défaut',
     themeManager: {
       background: 'Arrière-plan', text: 'Texte',
+      brandLayout: 'Marque de la barre latérale',
+      brandLayoutMarkText: 'Symbole + texte',
+      brandLayoutMarkOnly: 'Symbole seul',
+      brandLayoutFullLogo: 'Logo complet',
+      brandLayoutHelp: 'Contrôle la barre latérale développée. La barre latérale réduite affiche toujours le symbole.',
       failedToLoad: 'Échec du chargement des thèmes.', failedToCreate: 'Échec de la création du thème.',
       failedToUpdate: 'Échec de la mise à jour du thème.', failedToDelete: 'Échec de la suppression du thème.',
       failedToActivate: 'Échec de l\'activation du thème.',
@@ -31,6 +36,17 @@ export default {
       },
     },
 
+    generalSettings: {
+      title: 'Général',
+      subtitle: "Configuration à l'échelle de l'instance",
+      siteIdentity: 'Identité du site',
+      siteIdentityDescription:
+        "Le nom du produit affiché dans l'onglet du navigateur, la barre latérale et les écrans de connexion et de configuration.",
+      siteTitle: 'Titre du site',
+      preview: 'Aperçu',
+      saved: 'Paramètres généraux enregistrés',
+    },
+
     // Admin settings
     admin: 'Administration',
     systemSettings: 'Paramètres système',
@@ -39,6 +55,7 @@ export default {
 
     // Admin panel group labels (for Admin.svelte)
     adminGroups: {
+      general: 'Général',
       contentStructure: 'Contenu et structure',
       workflowProcess: 'Flux de travail et processus',
       integrationLinks: 'Intégrations et liens',
@@ -50,6 +67,10 @@ export default {
 
     // Admin panel item labels and descriptions (for Admin.svelte)
     adminItems: {
+      general: {
+        title: 'Général',
+        description: "Configuration à l'échelle de l'instance, comme le titre du site",
+      },
       customFields: { title: 'Champs personnalisés', description: 'Gérer les définitions des champs personnalisés' },
       screens: { title: 'Écrans', description: 'Configurer les écrans de formulaires et les dispositions' },
       hierarchyLevels: {

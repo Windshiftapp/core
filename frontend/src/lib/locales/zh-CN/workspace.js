@@ -724,6 +724,9 @@ export default {
     logoRecommendation: '建议：透明背景的 PNG 或 SVG。页眉中最大高度：40-50px。',
     lightLogo: '浅色模式标志',
     darkLogo: '深色模式标志',
+    fullLogoLight: '完整徽标（浅色模式）',
+    fullLogoDark: '完整徽标（深色模式）',
+    fullLogoHelp: '当布局为“完整徽标”时，用于展开侧边栏的宽版或文字徽标。',
     darkLogoFallback: '在深色模式下显示。留空时使用浅色模式标志。',
   },
 

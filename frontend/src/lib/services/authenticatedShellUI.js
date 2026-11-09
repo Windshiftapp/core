@@ -2,6 +2,7 @@ import { get } from 'svelte/store';
 import { shellBootstrap, themes } from '../api/admin.js';
 import { aiStore } from '../stores/aiStore.svelte.js';
 import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
+import { brandStore } from '../stores/brand.svelte.js';
 import { capabilitiesStore } from '../stores/capabilities.svelte.js';
 import { collectionPreferences } from '../stores/collectionPreferences.svelte.js';
 import { logbookStore } from '../stores/logbook.svelte.js';
@@ -135,9 +136,10 @@ export async function hydrateCurrentWorkspaceFromSharedData(workspaceId) {
  */
 export async function refreshAuthenticatedShellUI() {
   const generation = ++refreshGeneration;
-  const [shellResult, themeResult] = await Promise.allSettled([
+  const [shellResult, themeResult, brandResult] = await Promise.allSettled([
     shellBootstrap.get(),
     themes.getActive(),
+    brandStore.reload(),
     workspacesStore.reload(),
     workspaceDataStore.refresh(),
   ]);
@@ -157,6 +159,10 @@ export async function refreshAuthenticatedShellUI() {
     themeStore.setActiveTheme(themeResult.value);
   } else {
     console.warn('Failed to refresh the active theme after an admin change:', themeResult.reason);
+  }
+
+  if (brandResult.status === 'rejected') {
+    console.warn('Failed to refresh instance branding after an admin change:', brandResult.reason);
   }
 
   return shellResult.status === 'fulfilled';

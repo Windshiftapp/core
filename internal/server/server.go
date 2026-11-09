@@ -892,6 +892,7 @@ func (s *Server) initialize() error {
 	invitationHandler := handlers.NewInvitationHandler(invitationService)
 
 	themeHandler := handlers.NewThemeHandler(services.NewThemeService(repository.NewThemeRepository(s.db)), logger.NewAuditor(s.db)).WithObjectTranslations(objectTranslationService)
+	generalSettingsHandler := handlers.NewGeneralSettingsHandler(repository.NewSystemSettingRepository(s.db), repository.NewThemeRepository(s.db), logger.NewAuditor(s.db))
 	objectTranslationHandler := handlers.NewObjectTranslationHandler(objectTranslationService, logger.NewAuditor(s.db))
 	userPreferencesService := services.NewUserPreferencesService(repository.NewUserPreferencesRepository(s.db), repository.NewThemeRepository(s.db), permService)
 	userPreferencesHandler := handlers.NewUserPreferencesHandler(userPreferencesService)
@@ -1782,6 +1783,7 @@ func (s *Server) initialize() error {
 		},
 		Admin: routes.AdminHandlers{
 			SecuritySettings: securitySettingsHandler,
+			GeneralSettings:  generalSettingsHandler,
 			AuthPolicy:       authPolicyHandler,
 			Theme:            themeHandler,
 			UserPreferences:  userPreferencesHandler,

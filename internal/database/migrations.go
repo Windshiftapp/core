@@ -3316,6 +3316,22 @@ var Catalog = []Migration{
 			ALTER TABLE item_due_reminders ADD COLUMN IF NOT EXISTS delivered BOOLEAN NOT NULL DEFAULT TRUE;
 		`,
 	},
+	{
+		Version:       "20261121_theme_branding",
+		Name:          "Add full-logo and brand layout columns to themes",
+		CheckSQLite:   sqliteColumnCheck("themes", "brand_layout"),
+		CheckPostgres: pgColumnCheck("themes", "brand_layout"),
+		SQLite: `
+			ALTER TABLE themes ADD COLUMN logo_full_url TEXT;
+			ALTER TABLE themes ADD COLUMN logo_full_url_dark TEXT;
+			ALTER TABLE themes ADD COLUMN brand_layout TEXT NOT NULL DEFAULT 'mark_text';
+		`,
+		Postgres: `
+			ALTER TABLE themes ADD COLUMN IF NOT EXISTS logo_full_url TEXT;
+			ALTER TABLE themes ADD COLUMN IF NOT EXISTS logo_full_url_dark TEXT;
+			ALTER TABLE themes ADD COLUMN IF NOT EXISTS brand_layout TEXT NOT NULL DEFAULT 'mark_text';
+		`,
+	},
 }
 
 // isNumericJSONKey reports whether a custom-field value key is a numeric field

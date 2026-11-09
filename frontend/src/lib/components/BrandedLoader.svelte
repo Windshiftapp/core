@@ -1,5 +1,5 @@
 <script>
-  import { APP_NAME } from '../constants.js';
+  import { brandStore } from '../stores/brand.svelte.js';
   let { label = '', detail = '', fullViewport = true } = $props();
   // This component is also rendered while locale bundles are still loading.
   // Keep its fallback independent from i18n so a translation key never flashes.
@@ -15,7 +15,7 @@
   <div class="text-center">
     <img
       src="windshift-3.svg"
-      alt={APP_NAME}
+      alt={brandStore.siteTitle}
       class="mx-auto mb-4 h-16 w-16 motion-safe:animate-pulse"
       width="64"
       height="64"

@@ -116,6 +116,7 @@ var defaultSystemSettings = []defaultSystemSetting{
 	{"ai_feature_config", "{}", "json", "Per-feature AI LLM configuration", "ai"},
 	{"setup_completed", "false", "boolean", "Whether initial setup has been completed", "setup"},
 	{"admin_user_created", "false", "boolean", "Whether admin user has been created", "setup"},
+	{"site_title", "Windshift", "string", "Instance site title", "branding"},
 	{"calendar_feed_enabled", "true", "boolean", "Allow users to generate ICS calendar feed URLs", "security"},
 	{"plugin_cli_exec_enabled", "false", "boolean", "Allow plugins to execute CLI commands", "security"},
 	{"max_custom_field_indexes_per_table", "20", "integer", "Maximum number of custom field indexes per table", "performance"},

@@ -141,6 +141,7 @@ type UserHandlers struct {
 // AdminHandlers groups admin-related handlers.
 type AdminHandlers struct {
 	SecuritySettings     *handlers.SecuritySettingsHandler
+	GeneralSettings      *handlers.GeneralSettingsHandler
 	AuthPolicy           *handlers.AuthPolicyHandler
 	Theme                *handlers.ThemeHandler
 	UserPreferences      *handlers.UserPreferencesHandler

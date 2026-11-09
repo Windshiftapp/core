@@ -23,6 +23,12 @@ func RegisterAdminRoutes(deps *Deps) {
 	api.HandleH("GET /admin/security-settings", admin(http.HandlerFunc(deps.Admin.SecuritySettings.GetSecuritySettings)))
 	api.HandleH("PUT /admin/security-settings", admin(http.HandlerFunc(deps.Admin.SecuritySettings.UpdateSecuritySettings)))
 
+	// Instance-wide general configuration (site title and future fields)
+	if deps.Admin.GeneralSettings != nil {
+		api.HandleH("GET /admin/general-settings", admin(http.HandlerFunc(deps.Admin.GeneralSettings.GetSettings)))
+		api.HandleH("PUT /admin/general-settings", admin(http.HandlerFunc(deps.Admin.GeneralSettings.UpdateSettings)))
+	}
+
 	// Coding-agent acting-identity gate (WI-87). Master flag + allowlist
 	// for which service users a workspace admin may bind a run to.
 	if deps.Admin.AgentSecurity != nil {

@@ -170,6 +170,12 @@ export const attachmentSettings = {
   getStatus: () => fetchAPI('/attachment-settings/status'),
 };
 
+// Public instance branding (site title + active theme logos). No auth required;
+// used by the boot, login, and authenticated shell surfaces.
+export const branding = {
+  get: (options) => fetchAPI('/branding', options),
+};
+
 // Reviews API (daily/weekly review feature)
 export const reviews = {
   ...createCrudClient('/reviews'),

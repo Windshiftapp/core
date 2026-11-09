@@ -31418,6 +31418,10 @@
                 "description": "The theme value.",
                 "nullable": true,
                 "properties": {
+                  "brand_layout": {
+                    "description": "The brand layout value.",
+                    "type": "string"
+                  },
                   "builtin_key": {
                     "description": "The builtin key value.",
                     "type": "string"
@@ -31450,6 +31454,14 @@
                   "is_default": {
                     "description": "The is default value.",
                     "type": "boolean"
+                  },
+                  "logo_full_url": {
+                    "description": "The logo full url value.",
+                    "type": "string"
+                  },
+                  "logo_full_url_dark": {
+                    "description": "The logo full url dark value.",
+                    "type": "string"
                   },
                   "logo_url": {
                     "description": "The logo url value.",
@@ -31486,6 +31498,7 @@
                   }
                 },
                 "required": [
+                  "brand_layout",
                   "created_at",
                   "description",
                   "display_name",
@@ -59786,6 +59799,10 @@
                 "description": "The theme value.",
                 "nullable": true,
                 "properties": {
+                  "brand_layout": {
+                    "description": "The brand layout value.",
+                    "type": "string"
+                  },
                   "builtin_key": {
                     "description": "The builtin key value.",
                     "type": "string"
@@ -59818,6 +59835,14 @@
                   "is_default": {
                     "description": "The is default value.",
                     "type": "boolean"
+                  },
+                  "logo_full_url": {
+                    "description": "The logo full url value.",
+                    "type": "string"
+                  },
+                  "logo_full_url_dark": {
+                    "description": "The logo full url dark value.",
+                    "type": "string"
                   },
                   "logo_url": {
                     "description": "The logo url value.",
@@ -59854,6 +59879,7 @@
                   }
                 },
                 "required": [
+                  "brand_layout",
                   "created_at",
                   "description",
                   "display_name",

@@ -236,6 +236,23 @@ type TeamGroupMembershipResponse struct {
 	Groups []TeamGroup `json:"groups"`
 }
 
+// Brand layout values for Theme.BrandLayout: how the sidebar lockup renders.
+const (
+	BrandLayoutMarkText = "mark_text"
+	BrandLayoutMarkOnly = "mark_only"
+	BrandLayoutFullLogo = "full_logo"
+)
+
+// IsValidBrandLayout reports whether layout is a supported brand layout.
+func IsValidBrandLayout(layout string) bool {
+	switch layout {
+	case BrandLayoutMarkText, BrandLayoutMarkOnly, BrandLayoutFullLogo:
+		return true
+	default:
+		return false
+	}
+}
+
 // Theme represents the application's visual theme settings
 type Theme struct {
 	ID                 int    `json:"id"`
@@ -254,8 +271,16 @@ type Theme struct {
 	NavTextColorDark       string `json:"nav_text_color_dark"`       // CSS color value (hex, rgb, etc.)
 	// Optional company logo shown instead of the product mark. LogoURL is the
 	// default/light logo; LogoURLDark overrides it in dark mode when set.
-	LogoURL     string    `json:"logo_url,omitempty"`
-	LogoURLDark string    `json:"logo_url_dark,omitempty"`
+	LogoURL     string `json:"logo_url,omitempty"`
+	LogoURLDark string `json:"logo_url_dark,omitempty"`
+	// Optional full/wordmark logo for the expanded sidebar, with the same
+	// light/dark fallback as the mark.
+	LogoFullURL     string `json:"logo_full_url,omitempty"`
+	LogoFullURLDark string `json:"logo_full_url_dark,omitempty"`
+	// BrandLayout selects what the expanded sidebar lockup renders:
+	// mark_text (mark + site title), mark_only, or full_logo. The collapsed
+	// sidebar always renders the mark.
+	BrandLayout string    `json:"brand_layout"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -270,6 +295,9 @@ type ThemeCreateRequest struct {
 	NavTextColorDark        string `json:"nav_text_color_dark"`
 	LogoURL                 string `json:"logo_url"`
 	LogoURLDark             string `json:"logo_url_dark"`
+	LogoFullURL             string `json:"logo_full_url"`
+	LogoFullURLDark         string `json:"logo_full_url_dark"`
+	BrandLayout             string `json:"brand_layout"`
 }
 
 // ThemeUpdateRequest represents the payload for updating a theme
@@ -282,5 +310,8 @@ type ThemeUpdateRequest struct {
 	NavTextColorDark        string `json:"nav_text_color_dark"`
 	LogoURL                 string `json:"logo_url"`
 	LogoURLDark             string `json:"logo_url_dark"`
+	LogoFullURL             string `json:"logo_full_url"`
+	LogoFullURLDark         string `json:"logo_full_url_dark"`
+	BrandLayout             string `json:"brand_layout"`
 	IsActive                bool   `json:"is_active"`
 }

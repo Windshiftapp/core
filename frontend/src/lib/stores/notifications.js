@@ -11,7 +11,7 @@ import {
 import { formatDateSimple } from '../utils/dateFormatter.js';
 import { isTauri } from '../utils/isTauri.js';
 import { serverNow } from '../utils/serverClock.js';
-import { addToast } from './toasts.svelte.js';
+import { addToast, surfaceError } from './toasts.svelte.js';
 
 // Notification store
 export const notifications = writable([]);
@@ -116,7 +116,7 @@ export const notificationActions = {
       if (loadPromise) await loadPromise;
       notifications.update((items) => items.filter((item) => item.id !== id));
     } catch (error) {
-      console.error('Failed to dismiss notification:', error);
+      surfaceError(error, { context: 'dismiss notification' });
     }
   },
 

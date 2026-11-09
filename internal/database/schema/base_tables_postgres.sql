@@ -322,6 +322,9 @@ CREATE TABLE IF NOT EXISTS themes (
 	nav_text_color_dark TEXT NOT NULL DEFAULT '#f3f4f6',
 	logo_url TEXT,
 	logo_url_dark TEXT,
+	logo_full_url TEXT,
+	logo_full_url_dark TEXT,
+	brand_layout TEXT NOT NULL DEFAULT 'mark_text',
 	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
