@@ -62,6 +62,9 @@ jobs:
       - name: Run Go lint and architecture guards
         run: make lint
 
+      - name: Run preference and calendar tests
+        run: go test ./internal/services ./internal/repository ./internal/restapi/v2 ./internal/i18n
+
   govulncheck:
     name: Go Vulnerability Check
     runs-on: ubuntu-latest
