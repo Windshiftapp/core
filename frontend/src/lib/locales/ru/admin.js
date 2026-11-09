@@ -20,6 +20,11 @@ export default {
     systemDefault: 'Системная тема',
     themeManager: {
       background: 'Фон', text: 'Текст',
+      brandLayout: 'Бренд в боковой панели',
+      brandLayoutMarkText: 'Знак + текст',
+      brandLayoutMarkOnly: 'Только знак',
+      brandLayoutFullLogo: 'Полный логотип',
+      brandLayoutHelp: 'Управляет развёрнутой боковой панелью. В свёрнутой панели всегда отображается знак.',
       failedToLoad: 'Не удалось загрузить темы.', failedToCreate: 'Не удалось создать тему.',
       failedToUpdate: 'Не удалось обновить тему.', failedToDelete: 'Не удалось удалить тему.',
       failedToActivate: 'Не удалось включить тему.', failedToUploadLogo: 'Не удалось загрузить логотип.',
@@ -30,12 +35,24 @@ export default {
       },
     },
 
+    generalSettings: {
+      title: 'Общие',
+      subtitle: 'Общесистемные настройки',
+      siteIdentity: 'Идентичность сайта',
+      siteIdentityDescription:
+        'Название продукта, отображаемое на вкладке браузера, в боковой панели, а также на экранах входа и настройки.',
+      siteTitle: 'Название сайта',
+      preview: 'Предпросмотр',
+      saved: 'Общие настройки сохранены',
+    },
+
     admin: 'Администрирование',
     systemSettings: 'Системные настройки',
     organizationSettings: 'Настройки организации',
     workspaceSettings: 'Настройки рабочего пространства',
 
     adminGroups: {
+      general: 'Общие',
       contentStructure: 'Содержимое и структура',
       workflowProcess: 'Рабочие процессы',
       integrationLinks: 'Интеграции и связи',
@@ -46,6 +63,10 @@ export default {
     },
 
     adminItems: {
+      general: {
+        title: 'Общие',
+        description: 'Общесистемные настройки, например название сайта',
+      },
       customFields: {
         title: 'Настраиваемые поля',
         description: 'Создание и настройка дополнительных полей',

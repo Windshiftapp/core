@@ -16,6 +16,11 @@ export default {
     "themeManager": {
       "background": "پس زمینه",
       "text": "متن",
+      "brandLayout": "برند نوار کناری",
+      "brandLayoutMarkText": "نشان + متن",
+      "brandLayoutMarkOnly": "فقط نشان",
+      "brandLayoutFullLogo": "لوگوی کامل",
+      "brandLayoutHelp": "نوار کناری بازشده را کنترل می‌کند. نوار کناری جمع‌شده همیشه نشان را نمایش می‌دهد.",
       "failedToLoad": "پوسته‌ها بارگیری نشد.",
       "failedToCreate": "پوسته ایجاد نشد.",
       "failedToUpdate": "پوسته به‌روزرسانی نشد.",
@@ -37,11 +42,21 @@ export default {
         }
       }
     },
+    "generalSettings": {
+      "title": "عمومی",
+      "subtitle": "پیکربندی سطح نمونه",
+      "siteIdentity": "هویت سایت",
+      "siteIdentityDescription": "نام محصولی که در زبانه مرورگر، نوار کناری و صفحه‌های ورود و راه‌اندازی نمایش داده می‌شود.",
+      "siteTitle": "عنوان سایت",
+      "preview": "پیش‌نمایش",
+      "saved": "تنظیمات عمومی ذخیره شد"
+    },
     "admin": "اداره",
     "systemSettings": "تنظیمات سیستم",
     "organizationSettings": "تنظیمات سازمان",
     "workspaceSettings": "تنظیمات فضای کاری",
     "adminGroups": {
+      "general": "عمومی",
       "contentStructure": "محتوا و ساختار",
       "workflowProcess": "گردش کار و فرآیند",
       "integrationLinks": "ادغام و پیوندها",
@@ -51,6 +66,10 @@ export default {
       "system": "سیستم"
     },
     "adminItems": {
+      "general": {
+        "title": "عمومی",
+        "description": "پیکربندی سطح نمونه، مانند عنوان سایت"
+      },
       "customFields": {
         "title": "فیلدهای سفارشی",
         "description": "تعاریف فیلد سفارشی را مدیریت کنید"

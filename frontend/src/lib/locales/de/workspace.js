@@ -738,6 +738,10 @@ export default {
     logoRecommendation: 'Empfohlen: PNG oder SVG mit transparentem Hintergrund. Maximale Höhe im Header: 40-50px.',
     lightLogo: 'Logo für hellen Modus',
     darkLogo: 'Logo für dunklen Modus',
+    fullLogoLight: 'Vollständiges Logo (Hellmodus)',
+    fullLogoDark: 'Vollständiges Logo (Dunkelmodus)',
+    fullLogoHelp:
+      'Breites Logo oder Wortmarke für die erweiterte Seitenleiste, wenn das Layout „Vollständiges Logo“ ist.',
     darkLogoFallback: 'Wird im dunklen Modus angezeigt. Fällt auf das Logo des hellen Modus zurück, wenn leer.',
   },
   issueSync: {

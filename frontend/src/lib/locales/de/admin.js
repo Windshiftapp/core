@@ -19,6 +19,11 @@ export default {
     systemDefault: 'Systemstandard',
     themeManager: {
       background: 'Hintergrund', text: 'Text',
+      brandLayout: 'Marke in der Seitenleiste',
+      brandLayoutMarkText: 'Symbol + Text',
+      brandLayoutMarkOnly: 'Nur Symbol',
+      brandLayoutFullLogo: 'Vollständiges Logo',
+      brandLayoutHelp: 'Steuert die erweiterte Seitenleiste. Die eingeklappte Seitenleiste zeigt immer das Symbol.',
       failedToLoad: 'Themes konnten nicht geladen werden.', failedToCreate: 'Theme konnte nicht erstellt werden.',
       failedToUpdate: 'Theme konnte nicht aktualisiert werden.', failedToDelete: 'Theme konnte nicht gelöscht werden.',
       failedToActivate: 'Theme konnte nicht aktiviert werden.',
@@ -28,11 +33,21 @@ export default {
         forest: { name: 'Wald', description: 'Von der Natur inspiriertes grünes Navigationstheme' },
       },
     },
+    generalSettings: {
+      title: 'Allgemein',
+      subtitle: 'Instanzweite Konfiguration',
+      siteIdentity: 'Seitenidentität',
+      siteIdentityDescription: 'Der Produktname, der im Browser-Tab, in der Seitenleiste sowie auf der Anmelde- und Einrichtungsseite angezeigt wird.',
+      siteTitle: 'Seitentitel',
+      preview: 'Vorschau',
+      saved: 'Allgemeine Einstellungen gespeichert',
+    },
     admin: 'Administration',
     systemSettings: 'Systemeinstellungen',
     organizationSettings: 'Organisationseinstellungen',
     workspaceSettings: 'Arbeitsbereich-Einstellungen',
     adminGroups: {
+      general: 'Allgemein',
       contentStructure: 'Inhalt & Struktur',
       workflowProcess: 'Workflow & Prozess',
       integrationLinks: 'Integration & Verknüpfungen',
@@ -42,6 +57,10 @@ export default {
       system: 'System',
     },
     adminItems: {
+      general: {
+        title: 'Allgemein',
+        description: 'Instanzweite Konfiguration wie der Seitentitel',
+      },
       customFields: {
         title: 'Benutzerdefinierte Felder',
         description: 'Benutzerdefinierte Felddefinitionen verwalten',

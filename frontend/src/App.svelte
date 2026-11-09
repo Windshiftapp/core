@@ -5,8 +5,8 @@
   import { portalAuthStore } from './lib/stores/portalAuth.svelte.js';
   import { moduleSettings } from './lib/stores/moduleSettings.js';
   import { setup, themes } from './lib/api/admin.js';
-  import { APP_NAME } from './lib/constants.js';
   import { themeStore } from './lib/stores/theme.svelte.js';
+  import { brandStore } from './lib/stores/brand.svelte.js';
   import { i18n, SUPPORTED_LOCALES, t } from './lib/stores/i18n.svelte.js';
   import { safeLoginReturnPath } from './lib/utils/loginReturnPath.js';
   import { consumeOAuthReturnURL } from './lib/utils/oauthReturn.js';
@@ -99,9 +99,17 @@
     }, SLOW_START_MS);
 
     try {
-      // Initialize i18n (loads user's preferred locale)
-      await withBootstrapDeadline(i18n.init());
+      // Initialize i18n (loads user's preferred locale) and instance branding
+      // (public, no auth). Branding drives the browser tab title and the
+      // sidebar text on every surface, including pre-auth.
+      await Promise.all([
+        withBootstrapDeadline(i18n.init()),
+        brandStore.load({ timeout: BOOTSTRAP_TIMEOUT_MS }),
+      ]);
       i18nReady = true;
+      if (typeof document !== 'undefined') {
+        document.title = brandStore.siteTitle;
+      }
 
       // Check setup status first
       await checkSetupStatus();
@@ -416,9 +424,9 @@
   {#if startupError}
     <div class="min-h-screen flex items-center justify-center w-full px-6" data-testid="startup-error">
       <div class="text-center max-w-sm">
-        <img src="windshift-3.svg" alt={APP_NAME} width="64" height="64" class="w-16 h-16 mx-auto mb-4 opacity-75" />
+        <img src="windshift-3.svg" alt={brandStore.siteTitle} width="64" height="64" class="w-16 h-16 mx-auto mb-4 opacity-75" />
         <h1 class="text-xl font-semibold mb-2">
-          {getStartupCopy('errors.failedToLoad', i18nReady, t)} Windshift
+          {getStartupCopy('errors.failedToLoad', i18nReady, t)} {brandStore.siteTitle}
         </h1>
         <p class="text-ds-text-subtle mb-5">{getStartupCopy(startupError, i18nReady, t)}</p>
         <Button variant="primary" size="large" class="min-h-11" onclick={() => initializeApp()} dataTestid="startup-retry">
@@ -519,8 +527,8 @@
       {:else if showLoginDialog}
         <!-- Login dialog will show, but we can show a minimal background -->
         <div class="text-center">
-          <img src="windshift-3.svg" alt="Windshift" width="64" height="64" class="w-16 h-16 mx-auto mb-4 opacity-50" />
-          <h1 class="text-2xl font-bold text-ds-text-subtlest mb-2">Windshift</h1>
+          <img src="windshift-3.svg" alt={brandStore.siteTitle} width="64" height="64" class="w-16 h-16 mx-auto mb-4 opacity-50" />
+          <h1 class="text-2xl font-bold text-ds-text-subtlest mb-2">{brandStore.siteTitle}</h1>
           <p class="text-ds-text-subtle">{t('footer.platformName')}</p>
         </div>
       {/if}

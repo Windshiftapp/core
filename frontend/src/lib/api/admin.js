@@ -20,6 +20,16 @@ export const shellBootstrap = {
   get: (options) => fetchAPI('/shell-bootstrap', options),
 };
 
+// Instance-wide general configuration (admin)
+export const generalSettings = {
+  get: () => fetchAPI('/admin/general-settings'),
+  update: (data) =>
+    fetchAPI('/admin/general-settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+};
+
 export const system = {
   shutdown: () =>
     fetchAPI('/shutdown', {

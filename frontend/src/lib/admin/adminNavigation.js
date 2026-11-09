@@ -55,6 +55,19 @@ import IconUsers from '@tabler/icons-svelte-runes/icons/users';
 /** @type {AdminGroup[]} */
 export const adminGroups = [
   {
+    id: 'general',
+    labelKey: 'settings.adminGroups.general',
+    icon: IconSettings,
+    items: [
+      {
+        id: 'general',
+        labelKey: 'settings.adminItems.general.title',
+        icon: IconSettings,
+        descriptionKey: 'settings.adminItems.general.description',
+      },
+    ],
+  },
+  {
     id: 'content-structure',
     labelKey: 'settings.adminGroups.contentStructure',
     icon: IconStack2,

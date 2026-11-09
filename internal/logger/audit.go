@@ -755,6 +755,7 @@ const (
 	ActionAuthPolicyUpdate       = "auth_policy.update"
 	ActionAIFeaturesConfigUpdate = "ai_features_config.update"
 	ActionHubConfigUpdate        = "hub_config.update"
+	ActionGeneralSettingsUpdate  = "general_settings.update"
 
 	// Configuration-set migration execution
 	ActionConfigSetMigrationExecute              = "config_set.migration_execute"
@@ -1150,6 +1151,7 @@ const (
 	ResourceItemType             = "item_type"
 	ResourceScreen               = "screen"
 	ResourceTheme                = "theme"
+	ResourceGeneralSettings      = "general_settings"
 	ResourceModule               = "module"
 	ResourceAPIToken             = "api_token"
 	ResourceOAuthClient          = "oauth_client"
