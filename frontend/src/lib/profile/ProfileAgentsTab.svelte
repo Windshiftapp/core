@@ -17,6 +17,7 @@
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { surfaceError } from '../stores/toasts.svelte.js';
   import { copyToClipboard } from '../utils/clipboard.js';
   import { formatAuthenticatedInstant } from '../utils/authenticatedDateFormatter.js';
 
@@ -58,7 +59,7 @@
       if (version === loadVersion) agents = result || [];
     } catch (err) {
       if (version === loadVersion) agents = [];
-      console.error('Failed to load agents:', err);
+      surfaceError(err, { context: 'loadAgents' });
     } finally {
       if (version === loadVersion) loading = false;
     }
@@ -75,7 +76,7 @@
       tokensByAgent[agentId] = await getApiTokens(agentId);
     } catch (err) {
       tokensByAgent[agentId] = [];
-      console.error('Failed to load agent tokens:', err);
+      surfaceError(err, { context: 'loadAgentTokens' });
     }
   }
 
@@ -118,7 +119,7 @@
       await revokeApiToken(tokenId);
       tokensByAgent[agentId] = await getApiTokens(agentId);
     } catch (err) {
-      console.error('Failed to revoke token:', err);
+      surfaceError(err, { context: 'revokeAgentToken' });
     }
   }
 
@@ -159,7 +160,7 @@
       await deleteMyAgent(agentId);
       agents = agents.filter((agent) => agent.id !== agentId);
     } catch (err) {
-      console.error('Failed to delete agent:', err);
+      surfaceError(err, { context: 'deleteAgent' });
     }
   }
 

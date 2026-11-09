@@ -12,6 +12,7 @@
 	import { formatHistoryTimestamp, formatRelativeTime, getUserTimezone } from '../../utils/dateFormatter.js';
 	import { getShortcut, matchesShortcut, getDisplayString } from '../../utils/keyboardShortcuts.js';
 	import { t } from '../../stores/i18n.svelte.js';
+	import { surfaceError } from '../../stores/toasts.svelte.js';
 	import { confirm } from '../../composables/useConfirm.js';
 	import Badge from '../../components/Badge.svelte';
 	import AlertBox from '../../components/AlertBox.svelte';
@@ -401,8 +402,8 @@
 			// Update comment count
 			onCommentsLoaded?.({ count: totalCount });
 		} catch (err) {
-			console.error('Failed to create comment:', err);
 			error = t('comments.failedToCreate');
+			surfaceError(err, { context: 'createComment' });
 		} finally {
 			isSubmitting = false;
 		}
@@ -435,8 +436,8 @@
 			// Update comment count
 			onCommentsLoaded?.({ count: totalCount });
 		} catch (err) {
-			console.error('Failed to delete comment:', err);
 			error = t('comments.failedToDelete');
+			surfaceError(err, { context: 'deleteComment' });
 		}
 	}
 
@@ -473,8 +474,8 @@
 			editingCommentId = null;
 			editingContent = '';
 		} catch (err) {
-			console.error('Failed to update comment:', err);
 			error = t('comments.failedToUpdate');
+			surfaceError(err, { context: 'updateComment' });
 		} finally {
 			isSavingEdit = false;
 		}

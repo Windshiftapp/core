@@ -13,7 +13,7 @@
   import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { channelCategoriesStore } from '../stores/channelCategories.js';
   import { t } from '../stores/i18n.svelte.js';
-  import { errorToast, successToast } from '../stores/toasts.svelte.js';
+  import { errorToast, successToast, surfaceError } from '../stores/toasts.svelte.js';
   import { isSystemAdmin } from '../stores/permissions.svelte.js';
   import Modal from './Modal.svelte';
   import Button from '../components/Button.svelte';
@@ -303,7 +303,7 @@
     try {
       workspaces = ((await workspacesStore.load()) || []).filter(w => !w.is_personal);
     } catch (error) {
-      console.error('Failed to load workspaces:', error);
+      surfaceError(error, { context: 'loadChannelWorkspaces' });
     }
   }
 
@@ -317,7 +317,7 @@
       // this prop, so coerce to an array before handing it to the child.
       portalOptions = Array.isArray(portals) ? portals : [];
     } catch (error) {
-      console.error('Failed to load portal channels:', error);
+      surfaceError(error, { context: 'loadConnectedPortalOptions' });
       portalOptions = [];
     }
   }
@@ -327,7 +327,7 @@
     try {
       connectedMailboxes = await loadPortalConnectedMailboxes(channel.id);
     } catch (error) {
-      console.error('Failed to load connected mailboxes:', error);
+      surfaceError(error, { context: 'loadConnectedMailboxes' });
       connectedMailboxes = [];
     }
   }
@@ -361,7 +361,7 @@
           const restored = await channels.toggle(channel.id);
           persistedStatus = restored?.status || 'enabled';
         } catch (rollbackError) {
-          console.error('Failed to restore email channel status:', rollbackError);
+          surfaceError(rollbackError, { context: 'restoreEmailChannelStatus' });
         }
       }
       throw error;
@@ -488,7 +488,7 @@
             const restored = await channels.toggle(channel.id);
             persistedStatus = restored?.status || 'enabled';
           } catch (rollbackError) {
-            console.error('Failed to restore channel status:', rollbackError);
+            surfaceError(rollbackError, { context: 'restoreChannelStatus' });
           }
         }
         throw error;
@@ -502,8 +502,10 @@
       successToast(t('channel.channelSavedSuccess'));
       onSave();
     } catch (error) {
-      console.error('Failed to save channel:', error);
-      errorToast(t('channel.failedToSave') + ': ' + (error.message || error));
+      surfaceError(error, {
+        context: 'saveChannel',
+        message: t('channel.failedToSave') + ': ' + (error.message || error),
+      });
     } finally {
       loading = false;
     }

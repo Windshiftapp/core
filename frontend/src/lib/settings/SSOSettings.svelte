@@ -35,6 +35,7 @@
   import Label from '../components/Label.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { surfaceError } from '../stores/toasts.svelte.js';
   import PageHeader from '../layout/PageHeader.svelte';
   import { safeHref } from '../utils/sanitize';
   import DescriptionText from '../components/DescriptionText.svelte';
@@ -141,8 +142,8 @@
         providers = state.adminProviders || [];
       })();
     } catch (err) {
-      console.error('Failed to load SSO providers:', err);
       error = t('settings.sso.failedToLoad');
+      surfaceError(err, { context: 'loadSsoProviders' });
     } finally {
       loading = false;
     }
@@ -241,11 +242,11 @@
       closeModals();
       await loadProviders();
     } catch (err) {
-      console.error('Failed to create SSO provider:', err);
       formErrors = {
         ...formErrors,
         submit: err.message || t('settings.sso.failedToCreate')
       };
+      surfaceError(err, { context: 'createSsoProvider' });
     } finally {
       saving = false;
     }
@@ -261,11 +262,11 @@
       closeModals();
       await loadProviders();
     } catch (err) {
-      console.error('Failed to update SSO provider:', err);
       formErrors = {
         ...formErrors,
         submit: err.message || t('settings.sso.failedToUpdate')
       };
+      surfaceError(err, { context: 'updateSsoProvider' });
     } finally {
       saving = false;
     }
@@ -286,8 +287,8 @@
       await ssoStore.deleteProvider(provider.id);
       await loadProviders();
     } catch (err) {
-      console.error('Failed to delete SSO provider:', err);
       error = err.message || t('settings.sso.failedToDelete');
+      surfaceError(err, { context: 'deleteSsoProvider' });
     } finally {
       saving = false;
     }
@@ -302,8 +303,8 @@
       const result = await ssoStore.testProvider(editingProvider.id);
       testResult = result;
     } catch (err) {
-      console.error('Failed to test SSO provider:', err);
       testResult = { success: false, error: err.message || t('settings.sso.connectionTestFailed') };
+      surfaceError(err, { context: 'testSsoProvider' });
     } finally {
       testLoading = false;
     }

@@ -31,6 +31,7 @@
   import Textarea from '../../components/Textarea.svelte';
   import { getStatusLabel, getTestStatusColor } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { surfaceError } from '../../stores/toasts.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import { loadTestRunDetail } from './testRunDetailData.js';
@@ -378,7 +379,7 @@ import { parseScenarioSpec, flattenExamples } from './bddSpec.js';
         item_id: resultData.item_id ?? null
       });
     } catch (error) {
-      console.error('Failed to save step result:', error);
+      surfaceError(error, { context: 'saveStepStatus' });
     }
 
     // Auto-advance to next step on pass/skip (but not fail/blocked so user can create defects)
@@ -404,7 +405,7 @@ import { parseScenarioSpec, flattenExamples } from './bddSpec.js';
         item_id: resultData.item_id ?? null
       });
     } catch (error) {
-      console.error('Failed to save step result:', error);
+      surfaceError(error, { context: 'saveStepResult' });
     }
   }
 
@@ -502,7 +503,7 @@ import { parseScenarioSpec, flattenExamples } from './bddSpec.js';
         item_id: item.id
       });
     } catch (error) {
-      console.error('Failed to link item:', error);
+      surfaceError(error, { context: 'linkItemToStep' });
     }
   }
 </script>

@@ -19,6 +19,7 @@
   import IconSelector from '../pickers/IconSelector.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { surfaceError } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { objectDisplayValue } from '../utils/systemLabels.js';
   import LocalizedObjectFields from './LocalizedObjectFields.svelte';
@@ -64,7 +65,7 @@
       themes = await themesApi.getAll();
     } catch (err) {
       error = t('settings.themeManager.failedToLoad');
-      console.error('Error loading themes:', err);
+      surfaceError(err, { context: 'loadThemes' });
     } finally {
       loading = false;
     }
@@ -74,7 +75,7 @@
     try {
       activeTheme = await themesApi.getActive();
     } catch (err) {
-      console.error('Error loading active theme:', err);
+      surfaceError(err, { context: 'loadActiveTheme' });
     }
   }
 
@@ -98,7 +99,7 @@
       showCreateForm = false;
     } catch (err) {
       error = t('settings.themeManager.failedToCreate');
-      console.error('Error creating theme:', err);
+      surfaceError(err, { context: 'createTheme' });
     }
   }
 
@@ -123,7 +124,7 @@
       }
     } catch (err) {
       error = t('settings.themeManager.failedToUploadLogo');
-      console.error('Error uploading theme logo:', err);
+      surfaceError(err, { context: 'uploadThemeLogo' });
     } finally {
       uploadingLogo = false;
     }
@@ -161,7 +162,7 @@
       themes = themes.filter(t => t.id !== id);
     } catch (err) {
       error = t('settings.themeManager.failedToDelete');
-      console.error('Error deleting theme:', err);
+      surfaceError(err, { context: 'deleteTheme' });
     }
   }
 
@@ -178,7 +179,7 @@
       applyTheme(activeTheme);
     } catch (err) {
       error = t('settings.themeManager.failedToActivate');
-      console.error('Error activating theme:', err);
+      surfaceError(err, { context: 'activateTheme' });
     }
   }
 
