@@ -19,6 +19,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { ENGLISH_FALLBACK_KEYS } from '../src/lib/locales/adminOperationsFallback.js';
 import { mergeInto } from '../src/lib/locales/createLocale.js';
 import { DATE_FORMAT_KEYS, DATE_FORMATS } from '../src/lib/locales/dateFormats.js';
+import { findMixedKeyQuoting } from './locale-key-quoting.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LOCALES_DIR = join(__dirname, '..', 'src', 'lib', 'locales');
@@ -515,6 +516,36 @@ async function main() {
   }
   console.log('');
 
+  // --- Check 6: Locale key quoting ---
+  console.log('  --- Locale key quoting ---');
+  const localeSourceFiles = [];
+  for (const locale of localeDirs) {
+    const localeDir = join(LOCALES_DIR, locale);
+    const files = (await readdir(localeDir)).filter((f) => f.endsWith('.js') && f !== 'index.js');
+    for (const file of files) {
+      localeSourceFiles.push({
+        file: `src/lib/locales/${locale}/${file}`,
+        content: await readFile(join(localeDir, file), 'utf-8'),
+      });
+    }
+  }
+
+  const quotingProblems = findMixedKeyQuoting(localeSourceFiles);
+  let quotingErrors = 0;
+  if (quotingProblems.length > 0) {
+    for (const { file, unquoted } of quotingProblems) {
+      console.log(`  ✗ ${file}: unquoted key(s) in a quoted-key file`);
+      for (const { line, key } of unquoted) {
+        console.log(`      line ${line}: ${key}`);
+      }
+      quotingErrors += unquoted.length;
+    }
+    exitCode = 1;
+  } else {
+    console.log('  ✓ No mixed key quoting in locale files');
+  }
+  console.log('');
+
   // --- Summary ---
   if (requiredMissing > 0 || totalExtra > 0) {
     exitCode = 1;
@@ -532,13 +563,17 @@ async function main() {
     if (placeholderErrors > 0) issues.push(`${placeholderErrors} placeholder mismatch(es)`);
     if (carryoverTotal > 0) issues.push(`${carryoverTotal} suspected carryover(s)`);
     if (dateFormatErrors > 0) issues.push(`${dateFormatErrors} date format coverage error(s)`);
+    if (quotingErrors > 0)
+      issues.push(`${quotingErrors} unquoted key(s) in quoted-key locale file(s)`);
     console.log(`  ${issues.join(', ')}`);
     console.log('');
     process.exit(1);
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
