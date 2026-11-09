@@ -127,7 +127,9 @@
     {onblur}
     {onfocus}
     onchange={(next) => {
-      const synthetic = { target: { value: next } };
+      // Mirror the native input shape: consumers read either target.value or
+      // currentTarget.value.
+      const synthetic = { target: { value: next }, currentTarget: { value: next } };
       oninput?.(synthetic);
       onchange?.(synthetic);
     }}

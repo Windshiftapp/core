@@ -1469,6 +1469,17 @@ func (s *Server) initialize() error {
 		var pluginOpts []plugins.Option
 		pluginOpts = append(pluginOpts, plugins.WithDatabase(s.db), plugins.WithSCMService(scmSyncService), plugins.WithCommentService(commentService), plugins.WithAllowPublicRoutes(cfg.Plugins.AllowPublicRoutes))
 
+		// The instance identity is a stable install id, independent of license
+		// enforcement: the admin module settings page reads it to issue a
+		// license. Generate it whenever plugins are enabled so the endpoint
+		// works before a license key is configured.
+		instanceService = services.NewInstanceService(repository.NewSystemSettingRepository(s.db))
+		instanceID, instanceErr := instanceService.GetOrCreate()
+		if instanceErr != nil {
+			slog.Error("failed to load instance id", "error", instanceErr)
+			instanceService = nil
+		}
+
 		// License enforcement: when a license public key is configured, a
 		// plugin only contributes capabilities if its license verifies against
 		// this install's instance ID.
@@ -1476,17 +1487,10 @@ func (s *Server) initialize() error {
 			licensePubKey, err := base64.StdEncoding.DecodeString(cfg.Plugins.LicensePubKey)
 			if err != nil || len(licensePubKey) != ed25519.PublicKeySize {
 				slog.Error("invalid PLUGIN_LICENSE_PUBKEY; license enforcement disabled", "error", err)
-			} else {
-				instanceService = services.NewInstanceService(repository.NewSystemSettingRepository(s.db))
-				instanceID, err := instanceService.GetOrCreate()
-				if err != nil {
-					slog.Error("failed to load instance id; license enforcement disabled", "error", err)
-					instanceService = nil
-				} else {
-					pluginLicenseVerifier = licensing.MakeVerifier(ed25519.PublicKey(licensePubKey), instanceID)
-					pluginOpts = append(pluginOpts, plugins.WithLicenseVerifier(pluginLicenseVerifier))
-					slog.Info("plugin license enforcement enabled", "instance_id", instanceID)
-				}
+			} else if instanceService != nil {
+				pluginLicenseVerifier = licensing.MakeVerifier(ed25519.PublicKey(licensePubKey), instanceID)
+				pluginOpts = append(pluginOpts, plugins.WithLicenseVerifier(pluginLicenseVerifier))
+				slog.Info("plugin license enforcement enabled", "instance_id", instanceID)
 			}
 		}
 
