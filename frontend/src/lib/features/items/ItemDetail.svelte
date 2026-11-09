@@ -1413,8 +1413,6 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     currentItemType={itemDetailStore.currentItemType}
     currentHierarchyLevel={itemDetailStore.currentHierarchyLevel}
     {workspaceId}
-    editingTitle={itemDetailStore.editing.title.active}
-    editTitle={itemDetailStore.editing.title.value}
     saving={itemDetailStore.saving}
     dropdownItems={itemDetailStore.dropdownItems}
     statusOptions={itemDetailStore.statusOptions}

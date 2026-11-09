@@ -23,8 +23,6 @@
     currentItemType = null,
     currentHierarchyLevel = null,
     workspaceId = null,
-    editingTitle = $bindable(false),
-    editTitle = $bindable(''),
     saving = false,
     canEdit = false,
     dropdownItems = [],
@@ -367,12 +365,9 @@
           <ItemDetailHeader
             {item}
             {workspace}
-            bind:editingTitle
-            bind:editTitle
             {saving}
             {canEdit}
             onsavefield={handleSaveField}
-            oncanceledit={handleCancelEdit}
           />
           <ItemDetailDescription
             bind:this={descriptionComponent}

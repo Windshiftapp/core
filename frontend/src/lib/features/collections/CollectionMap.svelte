@@ -24,6 +24,7 @@
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Textarea from '../../components/Textarea.svelte';
+  import EditableField from '../../editors/EditableField.svelte';
   import { draggable, dropTargetForElements, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element';
   import Tooltip from '../../components/Tooltip.svelte';
@@ -79,8 +80,7 @@
   let quickAddState = $state({}); // { [parentId]: { show: boolean, workspace: null, itemType: null, title: '', error: null } }
 
   // Inline editing state
-  let editingItemId = $state(null);
-  let editingTitle = $state('');
+  let titleEditors = $state({});
 
   let mapScrollElement = $state(null);
 
@@ -651,50 +651,25 @@
   function startEditingItem(item, event) {
     event.stopPropagation();
     event.preventDefault(); // Prevent default double-click behavior
-
-    editingItemId = item.id;
-    editingTitle = item.title;
-
-    // Focus the textarea after it's rendered
-    setTimeout(() => {
-      const textarea = /** @type {HTMLTextAreaElement | null} */ (document.querySelector(`textarea[data-item-id="${item.id}"]`));
-      if (textarea) {
-        textarea.focus();
-        textarea.select();
-      }
-    }, 0);
+    titleEditors[item.id]?.startEditing();
   }
 
-  function cancelEditingItem() {
-    editingItemId = null;
-    editingTitle = '';
-  }
-
-  async function saveEditingItem(item) {
-    if (!editingTitle.trim()) {
-      cancelEditingItem();
-      return;
-    }
-
-    if (editingTitle === item.title) {
-      cancelEditingItem();
-      return;
-    }
+  async function saveEditingItem(item, draft) {
+    const title = String(draft ?? '').trim();
+    if (!title || title === item.title) return;
 
     try {
-      await items.update(item.id, { title: editingTitle.trim() });
+      await items.update(item.id, { title });
 
       // Update the local item
-      item.title = editingTitle.trim();
+      item.title = title;
 
       // Force reactivity
       backboneItems = [...backboneItems];
       childItemsByParent = { ...childItemsByParent };
-
-      cancelEditingItem();
     } catch (error) {
       console.error('Failed to update item title:', error);
-      cancelEditingItem();
+      throw error;
     }
   }
 
@@ -898,30 +873,32 @@
             ondblclick={(e) => startEditingItem(childItem, e)}
           >
             <!-- Title -->
-            {#if editingItemId === childItem.id}
-              <Textarea
-                bind:value={editingTitle}
-                data-item-id={childItem.id}
-                class="text-sm mb-2 leading-snug w-full resize-none overflow-hidden bg-transparent border-none outline-none p-0 m-0"
-                style="color: var(--ds-text); caret-color: var(--ds-text);"
-                rows={2}
-                onblur={() => saveEditingItem(childItem)}
-                onkeydown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    saveEditingItem(childItem);
-                  } else if (e.key === 'Escape') {
-                    e.preventDefault();
-                    cancelEditingItem();
-                  }
-                }}
-                onclick={(e) => e.stopPropagation()}
-              />
-            {:else}
-              <h4 class="text-sm mb-2 leading-snug line-clamp-2" style="{styles.glassTextStyle}">
-                {childItem.title}
-              </h4>
-            {/if}
+            <EditableField
+              bind:this={titleEditors[childItem.id]}
+              headless
+              multiline
+              value={childItem.title}
+              editable={true}
+              oncommit={(draft) => saveEditingItem(childItem, draft)}
+            >
+              {#snippet display()}
+                <h4 class="text-sm mb-2 leading-snug line-clamp-2" style="{styles.glassTextStyle}">
+                  {childItem.title}
+                </h4>
+              {/snippet}
+              {#snippet editor({ draft, setDraft })}
+                <Textarea
+                  data-item-id={childItem.id}
+                  value={draft ?? ''}
+                  class="text-sm mb-2 leading-snug w-full resize-none overflow-hidden bg-transparent border-none outline-none p-0 m-0"
+                  style="color: var(--ds-text); caret-color: var(--ds-text);"
+                  rows={2}
+                  oninput={(e) => setDraft(e.currentTarget.value)}
+                  onclick={(e) => e.stopPropagation()}
+                  autofocus
+                />
+              {/snippet}
+            </EditableField>
 
             <!-- Bottom row: Key, Icon, Status -->
             <div class="flex items-center justify-between">

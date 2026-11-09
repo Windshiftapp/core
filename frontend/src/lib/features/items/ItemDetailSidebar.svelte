@@ -16,6 +16,7 @@
   import Avatar from '../../components/Avatar.svelte';
   import Input from '../../components/Input.svelte';
   import Text from '../../components/Text.svelte';
+  import EditableField from '../../editors/EditableField.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import UserPicker from '../../pickers/UserPicker.svelte';
@@ -299,9 +300,6 @@
   }
 
   // Estimate inline editing (duration string parsed to minutes)
-  let editingEstimate = $state(false);
-  let estimateEditValue = $state('');
-  let estimateError = $state(false);
 
   // Workspace labels inline editing
   let editingLabels = $state(false);
@@ -328,11 +326,9 @@
   // the parent's own points stay manually editable.
   const childStoryPointRollup = $derived(storyPointsRollup);
 
-  function saveEstimate() {
-    const raw = (estimateEditValue ?? '').trim();
+  function commitEstimate(draft) {
+    const raw = String(draft ?? '').trim();
     if (raw === '') {
-      editingEstimate = false;
-      estimateError = false;
       if ((item?.estimate_minutes ?? null) !== null) {
         onsaveField?.({ field: 'estimate_minutes', value: null });
       }
@@ -340,14 +336,15 @@
     }
     const minutes = parseDuration(raw);
     if (!Number.isFinite(minutes) || minutes <= 0) {
-      estimateError = true;
-      return;
+      throw new Error(t('validation.pattern'));
     }
-    editingEstimate = false;
-    estimateError = false;
     const rounded = Math.round(minutes);
     if (rounded === (item?.estimate_minutes ?? null)) return;
     onsaveField?.({ field: 'estimate_minutes', value: rounded });
+  }
+
+  function estimateToDraft(stored) {
+    return stored != null ? durationToString(stored, { withDays: true }) : '';
   }
 
   // Computed item key for SCM operations
@@ -427,16 +424,6 @@
   function startEditingEndDate() {
     if (!canEdit || !isSystemFieldEditable('end_date')) return;
     onstartEditingEndDate?.();
-  }
-
-  // Estimate helpers
-  function startEditingEstimate() {
-    if (!canEdit || !isSystemFieldEditable('estimate')) return;
-    estimateEditValue = item?.estimate_minutes != null
-      ? durationToString(item.estimate_minutes, { withDays: true })
-      : '';
-    estimateError = false;
-    editingEstimate = true;
   }
 
   // Helper to check if a system field should be shown. Keep the legacy
@@ -1100,43 +1087,42 @@
 
     {#snippet estimateField()}
       <div class="mb-1" data-testid="item-estimate-field">
-        {#if editingEstimate}
-          <div class="w-full flex items-center justify-between px-2 py-1.5 text-sm">
-            <Text variant="subtle" size="sm">{t('items.estimate') || 'Estimate'}</Text>
-            <Input
-              type="text"
-              placeholder="3d 4h"
-              variant="ghost"
-              class="w-24 text-right text-sm px-1.5 py-0.5"
-              style="color: {estimateError ? 'var(--ds-text-danger, #cc3344)' : 'var(--ds-text)'};"
-              value={estimateEditValue ?? ''}
-              onfocus={(e) => e.currentTarget.select()}
-              oninput={(e) => { estimateEditValue = e.currentTarget.value; estimateError = false; }}
-              onblur={() => saveEstimate()}
-              onkeydown={(e) => {
-                if (e.key === 'Enter') { e.currentTarget.blur(); }
-                if (e.key === 'Escape') { editingEstimate = false; estimateError = false; }
-              }}
-              autofocus
-              size="small"
-            />
-          </div>
-        {:else}
-          <button
-            onclick={startEditingEstimate}
-            class="hover-bg w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
-            disabled={!canEdit || !isSystemFieldEditable('estimate')}
-          >
-            <Text variant="subtle" size="sm">{t('items.estimate') || 'Estimate'}</Text>
-            <div class="flex items-center gap-2">
-              {#if item?.estimate_minutes != null && item?.estimate_minutes > 0}
-                <span style="color: var(--ds-text);">{durationToString(item.estimate_minutes, { withDays: true })}</span>
-              {:else}
-                <Text variant="subtle" size="sm">{t('common.none')}</Text>
-              {/if}
+        <EditableField
+          value={item?.estimate_minutes ?? null}
+          editable={canEdit && isSystemFieldEditable('estimate')}
+          oncommit={commitEstimate}
+          toDraft={estimateToDraft}
+        >
+          {#snippet display()}
+            <div class="hover-bg w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group">
+              <Text variant="subtle" size="sm">{t('items.estimate') || 'Estimate'}</Text>
+              <div class="flex items-center gap-2">
+                {#if item?.estimate_minutes != null && item?.estimate_minutes > 0}
+                  <span style="color: var(--ds-text);">{durationToString(item.estimate_minutes, { withDays: true })}</span>
+                {:else}
+                  <Text variant="subtle" size="sm">{t('common.none')}</Text>
+                {/if}
+              </div>
             </div>
-          </button>
-        {/if}
+          {/snippet}
+          {#snippet editor({ draft, setDraft, error })}
+            <div class="w-full flex items-center justify-between px-2 py-1.5 text-sm">
+              <Text variant="subtle" size="sm">{t('items.estimate') || 'Estimate'}</Text>
+              <Input
+                type="text"
+                placeholder="3d 4h"
+                variant="ghost"
+                class="w-24 text-right text-sm px-1.5 py-0.5"
+                style="color: {error ? 'var(--ds-text-danger, #cc3344)' : 'var(--ds-text)'};"
+                value={draft ?? ''}
+                onfocus={(e) => e.currentTarget.select()}
+                oninput={(e) => setDraft(e.currentTarget.value)}
+                autofocus
+                size="small"
+              />
+            </div>
+          {/snippet}
+        </EditableField>
       </div>
     {/snippet}
 
@@ -1212,7 +1198,6 @@
           fieldKey="due_date"
           label={t('common.dueDate')}
           value={item?.due_date}
-          editing={editingDueDate}
           editable={canEdit && isSystemFieldEditable('due_date')}
           onStartEdit={startEditingDueDate}
           onCancel={() => oncancelEdit?.({ field: 'due_date' })}
@@ -1225,7 +1210,6 @@
           fieldKey="start_date"
           label={t('common.startDate')}
           value={item?.start_date}
-          editing={editingStartDate}
           editable={canEdit && isSystemFieldEditable('start_date')}
           onStartEdit={startEditingStartDate}
           onCancel={() => oncancelEdit?.({ field: 'start_date' })}
@@ -1238,7 +1222,6 @@
           fieldKey="end_date"
           label={t('common.endDate')}
           value={item?.end_date}
-          editing={editingEndDate}
           editable={canEdit && isSystemFieldEditable('end_date')}
           onStartEdit={startEditingEndDate}
           onCancel={() => oncancelEdit?.({ field: 'end_date' })}
