@@ -42,7 +42,7 @@
   import CollectionLevelFilter from './CollectionLevelFilter.svelte';
   import CollectionHierarchyLoadMore from './CollectionHierarchyLoadMore.svelte';
   import QuickAddForm from './QuickAddForm.svelte';
-  import { childItemTypesForParent } from '../../utils/hierarchy.js';
+  import { childItemTypesForLevel } from '../../utils/hierarchy.js';
   import { showCreatedItemOutsideViewToast } from '../../utils/createdItemToast.js';
   import { useCollectionHierarchy } from '../../composables/useCollectionHierarchy.svelte.js';
   import {
@@ -480,22 +480,25 @@
   }
 
   // Quick-add functions
-  function canAddChildren(parentId) {
-    // Get parent item to determine hierarchy level
+  // Child types the workspace offers below a backbone item. A backbone item's
+  // own type is normally workspace-bound, but a level-0 item can carry a type
+  // the configuration set excludes (imports, API). Its level then comes from
+  // the selected hierarchy level so the add card stays usable.
+  function availableChildTypes(parentId) {
     const parentItem = backboneItems.find(item => item.id === parentId);
-
-    if (!parentItem || !parentItem.item_type_id) {
-      return true; // Allow adding children if we can't determine parent type
-    }
+    if (!parentItem) return [];
 
     const parentType = getItemTypeInfo(parentItem.item_type_id);
-    if (!parentType) {
-      return true;
-    }
+    const parentLevel = parentType
+      ? Number(parentType.hierarchy_level)
+      : collectionStore.hierarchyLevel;
 
-    const childTypes = childItemTypesForParent(itemTypes, parentType);
+    return childItemTypesForLevel(itemTypes, parentLevel)
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  }
 
-    return childTypes.length > 0;
+  function canAddChildren(parentId) {
+    return availableChildTypes(parentId).length > 0;
   }
 
   function quickAddKey(parentId, laneKey) {
@@ -504,25 +507,10 @@
 
   function initQuickAdd(parentId, laneKey = null) {
     const stateKey = quickAddKey(parentId, laneKey);
-    // Check if this parent can have children
-    if (!canAddChildren(parentId)) {
-      return; // Don't initialize quick-add for items at lowest hierarchy level
-    }
+    const availableTypes = availableChildTypes(parentId);
 
-    // Get parent item to determine hierarchy level
-    const parentItem = backboneItems.find(item => item.id === parentId);
-
-    // Get available item types for children (next hierarchy level)
-    let availableTypes = [];
-    if (parentItem && parentItem.item_type_id) {
-      const parentType = getItemTypeInfo(parentItem.item_type_id);
-      if (parentType) {
-        availableTypes = childItemTypesForParent(itemTypes, parentType)
-          .sort((a, b) => a.sort_order - b.sort_order);
-      }
-    }
-
-    // If still no types found after all checks, don't proceed
+    // No child types means there is nothing to offer; the add card is hidden
+    // in that case, so this is only a guard against a stale render.
     if (availableTypes.length === 0) {
       return;
     }
