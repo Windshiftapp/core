@@ -31390,6 +31390,10 @@
           "data": {
             "additionalProperties": false,
             "properties": {
+              "calendar": {
+                "description": "The calendar value.",
+                "type": "string"
+              },
               "color_mode": {
                 "description": "The color mode value.",
                 "type": "string"
@@ -31552,6 +31556,7 @@
               }
             },
             "required": [
+              "calendar",
               "color_mode",
               "comment_sort_order",
               "due_date_reminder_days",
@@ -59695,6 +59700,11 @@
       "PatchUsersMePreferencesPayload": {
         "additionalProperties": false,
         "properties": {
+          "calendar": {
+            "description": "The calendar value.",
+            "nullable": true,
+            "type": "string"
+          },
           "color_mode": {
             "description": "The color mode value.",
             "nullable": true,
@@ -59771,6 +59781,10 @@
           "data": {
             "additionalProperties": false,
             "properties": {
+              "calendar": {
+                "description": "The calendar value.",
+                "type": "string"
+              },
               "color_mode": {
                 "description": "The color mode value.",
                 "type": "string"
@@ -59933,6 +59947,7 @@
               }
             },
             "required": [
+              "calendar",
               "color_mode",
               "comment_sort_order",
               "due_date_reminder_days",

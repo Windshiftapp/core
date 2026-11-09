@@ -72,25 +72,18 @@ func (r *UserPreferencesRepository) GetJSON(userID int) (string, error) {
 	return prefs, nil
 }
 
-// UpsertJSON creates or updates the raw preferences JSON for a user.
-func (r *UserPreferencesRepository) UpsertJSON(userID int, prefs string, now time.Time) error {
-	res, err := r.db.ExecWrite(
-		"UPDATE user_preferences SET preferences = ?, updated_at = ? WHERE user_id = ?",
-		prefs, now, userID,
-	)
+// CompareAndSwapJSON updates a preference document if it has not changed.
+func (r *UserPreferencesRepository) CompareAndSwapJSON(userID int, old *string, next string, now time.Time) (bool, error) {
+	var result sql.Result
+	var err error
+	if old == nil {
+		result, err = r.db.ExecWrite("INSERT INTO user_preferences (user_id, preferences, created_at, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(user_id) DO NOTHING", userID, next, now, now)
+	} else {
+		result, err = r.db.ExecWrite("UPDATE user_preferences SET preferences = ?, updated_at = ? WHERE user_id = ? AND preferences = ?", next, now, userID, *old)
+	}
 	if err != nil {
-		return fmt.Errorf("update user preferences %d: %w", userID, err)
+		return false, err
 	}
-	if affected, _ := res.RowsAffected(); affected > 0 {
-		return nil
-	}
-
-	_, err = r.db.ExecWrite(
-		"INSERT INTO user_preferences (user_id, preferences, created_at, updated_at) VALUES (?, ?, ?, ?)",
-		userID, prefs, now, now,
-	)
-	if err != nil {
-		return fmt.Errorf("insert user preferences %d: %w", userID, err)
-	}
-	return nil
+	count, err := result.RowsAffected()
+	return count > 0, err
 }
