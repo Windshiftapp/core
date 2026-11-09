@@ -1,7 +1,7 @@
 <script>
   import { untrack } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
-  import { useDebounce } from 'runed';
+  import { useDebouncedAction } from '../composables/useDebouncedAction.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { channels } from '../api/channels.js';
   import { formatDateSimple } from '../utils/dateFormatter.js';
@@ -44,7 +44,7 @@
   let bulkDiscarding = $state(false);
   let outboxNotice = $state(null);
 
-  const debouncedSearch = useDebounce(() => {
+  const debouncedSearch = useDebouncedAction(() => {
     page = 1;
     loadLog();
   }, 300);

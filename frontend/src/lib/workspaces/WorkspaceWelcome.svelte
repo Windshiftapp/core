@@ -1,7 +1,7 @@
 <script>
   import { onDestroy } from 'svelte';
   import { get } from 'svelte/store';
-  import { useDebounce } from 'runed';
+  import { useDebouncedAction } from '../composables/useDebouncedAction.svelte.js';
   import { workspaces } from '../api/workspaces.js';
   import { statusCategories as statusCategoriesApi, statuses } from '../api/workflows.js';
   import { items as itemsApi } from '../api/items.js';
@@ -425,7 +425,7 @@
     }
   }
 
-  const debouncedSave = useDebounce(() => saveHomepageLayout(), 1000);
+  const debouncedSave = useDebouncedAction(() => saveHomepageLayout(), 1000);
 
   // Section editing. The workspace dashboard keeps its own local state and
   // debounced save, so persistence is injected.

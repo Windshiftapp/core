@@ -82,18 +82,13 @@ export function removeToast(id) {
  * Cancellation is control flow, not a failure the user should see. The API
  * layer reports a client-canceled request as an AbortError, and the server
  * reports it as REQUEST_CANCELED; both mean the work was intentionally
- * abandoned (navigation, closed modal, superseded request). runed's
- * useDebounce.cancel() rejects its pending promise with the bare string
- * "Cancelled", which the global unhandledrejection handler would otherwise
- * surface as a toast.
+ * abandoned (navigation, closed modal, superseded request).
  *
  * @param {unknown} error
  * @returns {boolean}
  */
 function isCancellation(error) {
-  if (!error) return false;
-  if (typeof error === 'string') return error === 'Cancelled';
-  if (typeof error !== 'object') return false;
+  if (!error || typeof error !== 'object') return false;
   if (/** @type {any} */ (error).name === 'AbortError') return true;
   const code = String(
     /** @type {any} */ (error).code ?? /** @type {any} */ (error).errorCode ?? ''
