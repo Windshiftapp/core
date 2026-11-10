@@ -65,31 +65,33 @@
     </p>
   </div>
 
-  <LogoUploader
-    currentLogoUrl={logoFullUrl || null}
-    accept="image/png,image/jpeg,image/svg+xml,image/gif,image/webp"
-    onUpload={(files) => onUpload(files, 'logo_full_url')}
-    onRemove={() => (logoFullUrl = '')}
-    {uploading}
-    maxHeight="40px"
-    label={t('lookAndFeel.fullLogoLight', 'Full Logo (Light Mode)')}
-    helpText={t(
-      'lookAndFeel.fullLogoHelp',
-      'Wide or wordmark logo used in the expanded sidebar when the layout is "Full logo".'
-    )}
-  />
+  {#if brandLayout === 'full_logo'}
+    <LogoUploader
+      currentLogoUrl={logoFullUrl || null}
+      accept="image/png,image/jpeg,image/svg+xml,image/gif,image/webp"
+      onUpload={(files) => onUpload(files, 'logo_full_url')}
+      onRemove={() => (logoFullUrl = '')}
+      {uploading}
+      maxHeight="40px"
+      label={t('lookAndFeel.fullLogoLight', 'Full Logo (Light Mode)')}
+      helpText={t(
+        'lookAndFeel.fullLogoHelp',
+        'Wide or wordmark logo used in the expanded sidebar when the layout is "Full logo".'
+      )}
+    />
 
-  <LogoUploader
-    currentLogoUrl={logoFullUrlDark || null}
-    accept="image/png,image/jpeg,image/svg+xml,image/gif,image/webp"
-    onUpload={(files) => onUpload(files, 'logo_full_url_dark')}
-    onRemove={() => (logoFullUrlDark = '')}
-    {uploading}
-    maxHeight="40px"
-    label={t('lookAndFeel.fullLogoDark', 'Full Logo (Dark Mode)')}
-    helpText={t(
-      'lookAndFeel.darkLogoFallback',
-      'Shown in dark mode. Falls back to the light mode logo when left empty.'
-    )}
-  />
+    <LogoUploader
+      currentLogoUrl={logoFullUrlDark || null}
+      accept="image/png,image/jpeg,image/svg+xml,image/gif,image/webp"
+      onUpload={(files) => onUpload(files, 'logo_full_url_dark')}
+      onRemove={() => (logoFullUrlDark = '')}
+      {uploading}
+      maxHeight="40px"
+      label={t('lookAndFeel.fullLogoDark', 'Full Logo (Dark Mode)')}
+      helpText={t(
+        'lookAndFeel.darkLogoFallback',
+        'Shown in dark mode. Falls back to the light mode logo when left empty.'
+      )}
+    />
+  {/if}
 </div>

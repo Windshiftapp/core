@@ -25,6 +25,7 @@
   import LocalizedObjectFields from './LocalizedObjectFields.svelte';
   import LogoUploader from '../components/LogoUploader.svelte';
   import ThemeBrandFields from './ThemeBrandFields.svelte';
+  import ThemeLockupPreview from './ThemeLockupPreview.svelte';
   import { brandStore } from '../stores/brand.svelte.js';
 	import TextField from '../components/TextField.svelte';
 
@@ -250,7 +251,7 @@
   }
 </script>
 
-<div class="theme-manager">
+<div>
   <PageHeader
     icon={Palette}
     title={t('settings.theme')}
@@ -352,6 +353,21 @@
           bind:logoFullUrlDark={newTheme.logo_full_url_dark}
           uploading={uploadingLogo}
           onUpload={(files, field) => uploadThemeLogo(files, newTheme, field)}
+        />
+      </div>
+
+      <div class="mb-4">
+        <ThemeLockupPreview
+          siteTitle={brandStore.siteTitle}
+          brandLayout={newTheme.brand_layout}
+          logoUrl={newTheme.logo_url}
+          logoUrlDark={newTheme.logo_url_dark}
+          logoFullUrl={newTheme.logo_full_url}
+          logoFullUrlDark={newTheme.logo_full_url_dark}
+          lightBackground={newTheme.nav_background_color_light}
+          lightText={newTheme.nav_text_color_light}
+          darkBackground={newTheme.nav_background_color_dark}
+          darkText={newTheme.nav_text_color_dark}
         />
       </div>
 
@@ -502,6 +518,21 @@
                   />
                 </div>
 
+                <div class="mb-3">
+                  <ThemeLockupPreview
+                    siteTitle={brandStore.siteTitle}
+                    brandLayout={editingTheme.brand_layout}
+                    logoUrl={editingTheme.logo_url}
+                    logoUrlDark={editingTheme.logo_url_dark}
+                    logoFullUrl={editingTheme.logo_full_url}
+                    logoFullUrlDark={editingTheme.logo_full_url_dark}
+                    lightBackground={editingTheme.nav_background_color_light}
+                    lightText={editingTheme.nav_text_color_light}
+                    darkBackground={editingTheme.nav_background_color_dark}
+                    darkText={editingTheme.nav_text_color_dark}
+                  />
+                </div>
+
                 <!-- Light Mode Colors -->
                 <div class="mb-3">
                   <h5 class="text-xs font-semibold mb-2 flex items-center gap-1" style="color: var(--ds-text-subtle);">
@@ -538,24 +569,25 @@
                   </div>
                 </div>
 
-                <div class="flex justify-end space-x-2 mt-4">
-                  <button
-                    type="button"
+                <div class="flex justify-end items-center gap-2 mt-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={X}
                     onclick={cancelEdit}
-                    class="flex items-center space-x-1 px-3 py-1 text-sm rounded transition-colors"
-                    style="color: var(--ds-text-subtle); background-color: var(--ds-surface-secondary);"
+                    dataTestid={`theme-cancel-${editingTheme.id}`}
                   >
-                    <X class="w-3 h-3" />
-                    <span>{t('common.cancel')}</span>
-                  </button>
-                  <button
+                    {t('common.cancel')}
+                  </Button>
+                  <Button
                     type="submit"
-                    class="flex items-center space-x-1 px-3 py-1 text-sm text-white rounded transition-colors"
-                    style="background-color: var(--ds-background-brand); color: white;"
+                    variant="primary"
+                    size="sm"
+                    icon={Check}
+                    dataTestid={`theme-save-${editingTheme.id}`}
                   >
-                    <Check class="w-3 h-3" />
-                    <span>{t('common.save')}</span>
-                  </button>
+                    {t('common.save')}
+                  </Button>
                 </div>
               </form>
             {:else}
@@ -565,10 +597,10 @@
                   <h3 class="text-lg font-semibold flex items-center space-x-2" style="color: var(--ds-text);">
                     <span>{getThemeDisplayValue(theme, 'name')}</span>
                     {#if theme.is_default}
-                      <span class="px-2 py-1 text-xs rounded" style="background-color: var(--ds-surface-secondary); color: var(--ds-text-subtle);">{t('common.default')}</span>
+                      <span class="px-2 py-1 text-xs rounded" style="background-color: var(--ds-background-neutral); color: var(--ds-text-subtle);">{t('common.default')}</span>
                     {/if}
                     {#if theme.is_active}
-                      <span class="px-2 py-1 text-xs rounded" style="background-color: var(--ds-surface-success); color: var(--ds-text-success);">{t('common.active')}</span>
+                      <span class="px-2 py-1 text-xs rounded" style="background-color: var(--ds-success-subtle); color: var(--ds-text-success);">{t('common.active')}</span>
                     {/if}
                   </h3>
                   {#if getThemeDisplayValue(theme, 'description')}
@@ -629,28 +661,28 @@
                   {/if}
 
                   {#if !theme.is_default}
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={Edit}
                       onclick={() => startEdit(theme)}
-                      class="flex items-center space-x-1 px-3 py-1 text-sm rounded transition-colors hover-edit-btn"
-                      style="color: var(--ds-text-subtle); background-color: var(--ds-surface-secondary);"
-                      data-testid={`theme-edit-${theme.id}`}
+                      dataTestid={`theme-edit-${theme.id}`}
                     >
-                      <Edit class="w-3 h-3" />
-                      <span>{t('common.edit')}</span>
-                    </button>
+                      {t('common.edit')}
+                    </Button>
                   {/if}
                 </div>
 
                 {#if !theme.is_default}
-                  <button
+                  <Button
+                    variant="danger-ghost"
+                    size="sm"
+                    icon={Trash2}
                     onclick={() => deleteTheme(theme.id)}
-                    class="flex items-center space-x-1 px-3 py-1 text-sm rounded transition-colors"
-                    style="color: var(--ds-text-danger); background-color: var(--ds-danger-subtle);"
-                    data-testid={`theme-delete-${theme.id}`}
+                    dataTestid={`theme-delete-${theme.id}`}
                   >
-                    <Trash2 class="w-3 h-3" />
-                    <span>{t('common.delete')}</span>
-                  </button>
+                    {t('common.delete')}
+                  </Button>
                 {/if}
               </div>
             {/if}
@@ -671,14 +703,3 @@
     {/if}
   {/if}
 </div>
-
-<style>
-  .theme-manager {
-    max-width: 100%;
-    padding: 0;
-  }
-
-  .hover-edit-btn:hover {
-    background-color: var(--ds-surface-tertiary) !important;
-  }
-</style>
