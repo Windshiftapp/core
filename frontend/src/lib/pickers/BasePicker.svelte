@@ -376,6 +376,11 @@
 
   // Handle keyboard navigation
   async function handleKeydown(event) {
+    // A closed picker owns no keys. Consuming Escape here (preventDefault)
+    // would make Modal.svelte's defaultPrevented guard swallow it, so an
+    // enclosing dialog could never close while a picker had focus.
+    if (!$open) return;
+
     if (event.key === 'Escape') {
       event.preventDefault();
       // Return focus to the in-modal trigger so the next Tab continues inside
@@ -390,7 +395,6 @@
     // rather than tabbing out. Focus is kept inside the modal by restoring it to
     // the trigger on select/Escape (see restoreFocusToTrigger), not by
     // intercepting Tab.
-    if (!$open) return;
 
     const totalItems = visibleOptions.length;
 

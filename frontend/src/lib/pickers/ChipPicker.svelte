@@ -125,6 +125,11 @@
   }
 
   function handleKeyDown(e) {
+    // A closed picker owns no keys. Consuming Escape here (preventDefault +
+    // stopPropagation) would trap an enclosing dialog that only closes on an
+    // unprevented Escape.
+    if (!$open) return;
+
     const total = visibleItems.length;
 
     // Tab is intentionally left to native handling: when closed it moves to the
@@ -138,7 +143,7 @@
       return;
     }
 
-    if (!$open || total === 0) return;
+    if (total === 0) return;
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
