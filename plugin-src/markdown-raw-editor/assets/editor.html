@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Raw Markdown</title>
+    <!-- Same-origin assets: the iframe document is served from
+         /api/plugins/markdown-raw-editor/assets/editor.html. No inline script,
+         so the host CSP (script-src 'self' 'nonce-...') still applies. -->
+    <link rel="stylesheet" href="./editor.css" />
+  </head>
+  <body>
+    <div id="editor-root">
+      <textarea
+        id="markdown-input"
+        data-testid="raw-markdown-textarea"
+        aria-label="Markdown source"
+        spellcheck="false"
+        autocapitalize="off"
+        autocomplete="off"
+        placeholder="Write Markdown…"
+      ></textarea>
+      <div class="status">
+        <span id="status" data-testid="raw-markdown-status" role="status"></span>
+        <span class="status-spacer"></span>
+        <span
+          class="byte-count"
+          id="byte-count"
+          data-testid="raw-markdown-count"
+          aria-live="polite"
+        ></span>
+      </div>
+    </div>
+    <script src="./editor.js"></script>
+  </body>
+</html>
