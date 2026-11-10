@@ -450,6 +450,10 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     } catch (err) {
       console.error('Failed to update item:', err);
       showError('Failed to update item', err.message || String(err));
+      // Inline editors keep their draft open by rejecting their commit. The
+      // toast above is the user-facing message, so fire-and-forget callers
+      // attach their own catch instead of relying on this one.
+      throw err;
     }
   }
 

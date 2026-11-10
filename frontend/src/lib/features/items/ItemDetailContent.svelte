@@ -144,7 +144,14 @@
   }
 
   function handleSaveField(data) {
-    onsaveField?.(data);
+    return onsaveField?.(data);
+  }
+
+  // Description and sidebar edits are fire-and-forget: the store surfaces the
+  // failure toast, so swallow the rejection here instead of letting it reach
+  // the global unhandledrejection handler and add a second toast.
+  function handleBackgroundSaveField(data) {
+    return handleSaveField(data)?.catch?.(() => {});
   }
 
   function handleCancelEdit(data) {
@@ -363,7 +370,7 @@
             {manualActions}
             {canCreate}
             {canEdit}
-            onsavefield={handleSaveField}
+            onsavefield={handleBackgroundSaveField}
             oncanceledit={handleCancelEdit}
             onstartEditingDescription={() => onstartEditingDescription?.()}
             onshowAddLink={handleShowLinkModal}
@@ -463,7 +470,7 @@
             {timeProjects}
             {moduleSettings}
             {dropdownItems}
-            onsaveField={onsaveField}
+            onsaveField={handleBackgroundSaveField}
             oncancelEdit={oncancelEdit}
             {storyPointsRollup}
             onstartEditingAssignee={onstartEditingAssignee}
