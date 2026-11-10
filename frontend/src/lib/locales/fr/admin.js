@@ -317,6 +317,10 @@ export default {
       importing: 'Importation en cours…',
       importWarning: 'L\'ensemble de configuration a été importé avec des avertissements.',
       importFailed: 'Échec de l\'importation de l\'ensemble de configuration.',
+      importNameTitle: 'Nommer l\'ensemble importé',
+      importNameDescription:
+        'L\'importation crée une copie. Choisissez un nom pour l\'ensemble importé.',
+      importInvalidFile: 'Ce fichier n\'est pas un modèle d\'ensemble de configuration.',
       unresolvedReferencesHeading: 'L\'importation fait référence à des entités qui n\'existent pas sur cette instance.',
       defaultConflictHeading: 'L\'importation entre en conflit avec une entité par défaut sur cette instance.',
       unresolvedImportTitle: 'Importation : références non résolues',

@@ -341,6 +341,10 @@ export default {
       importing: 'Wird importiert…',
       importWarning: 'Das Konfigurationsset wurde mit Warnungen importiert.',
       importFailed: 'Das Konfigurationsset konnte nicht importiert werden.',
+      importNameTitle: 'Importierten Satz benennen',
+      importNameDescription:
+        'Der Import erstellt eine Kopie. Wählen Sie einen Namen für den importierten Satz.',
+      importInvalidFile: 'Diese Datei ist keine Vorlage für ein Konfigurationsset.',
       unresolvedReferencesHeading: 'Der Import verweist auf Entitäten, die auf dieser Instanz nicht vorhanden sind.',
       defaultConflictHeading: 'Der Import steht in Konflikt mit einer Standardentität dieser Instanz.',
       unresolvedImportTitle: 'Import: nicht aufgelöste Verweise',

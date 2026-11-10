@@ -359,6 +359,10 @@ export default {
       importing: 'Importing…',
       importWarning: 'The configuration set was imported with warnings.',
       importFailed: 'Failed to import the configuration set.',
+      importNameTitle: 'Name the imported set',
+      importNameDescription:
+        'Importing creates a copy. Choose a name for the imported set.',
+      importInvalidFile: 'That file is not a configuration set template.',
       unresolvedReferencesHeading: 'The import references entities that do not exist on this instance.',
       defaultConflictHeading: 'The import conflicts with a default entity on this instance.',
       unresolvedImportTitle: 'Import: unresolved references',

@@ -359,6 +359,10 @@ export default {
       importing: 'Importowanie…',
       importWarning: 'Zestaw konfiguracji zaimportowano z ostrzeżeniami.',
       importFailed: 'Nie udało się zaimportować zestawu konfiguracji.',
+      importNameTitle: 'Nazwij importowany zestaw',
+      importNameDescription:
+        'Import tworzy kopię. Wybierz nazwę dla importowanego zestawu.',
+      importInvalidFile: 'Ten plik nie jest szablonem zestawu konfiguracji.',
       unresolvedReferencesHeading: 'Import odwołuje się do encji, które nie istnieją w tej instancji.',
       defaultConflictHeading: 'Import jest sprzeczny z domyślną encją w tej instancji.',
       unresolvedImportTitle: 'Import: nierozwiązane odwołania',
