@@ -20,6 +20,8 @@
     ariaLabelledBy = undefined,
     /** CSS selector for the element that should receive focus first. */
     initialFocus = '[data-autofocus], [autofocus]',
+    /** Called first for every keydown that reaches the backdrop. */
+    onKeydown = undefined,
     onclose = undefined,
     children = undefined,
   } = $props();
@@ -115,6 +117,8 @@
   }
 
   function handleKeydown(event) {
+    onKeydown?.(event);
+
     if (closeOnEscape && event.key === 'Escape') {
       close();
       return;

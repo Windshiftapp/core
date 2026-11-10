@@ -10,7 +10,7 @@
   import ScreenFieldsForm from '../features/items/ScreenFieldsForm.svelte';
   import { screens } from '../api/configuration.js';
   import { t } from '../stores/i18n.svelte.js';
-  import { getShortcut, matchesShortcut } from '../utils/keyboardShortcuts.js';
+  import { getShortcut, getShortcutDisplay, matchesShortcut } from '../utils/keyboardShortcuts.js';
 
   let {
     show = $bindable(false),
@@ -126,13 +126,25 @@
     show = false;
   }
 
+  // Mirror Modal.svelte: once the screen has focus it owns the keyboard, so
+  // background shortcuts do not also fire.
   function handleKeydown(event) {
     if (!show) return;
+    event.stopPropagation();
     if (matchesShortcut(event, getShortcut('modal', 'submit'))) {
+      event.preventDefault();
+      submit();
+      return;
+    }
+    if (event.key === 'Enter' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+      const target = /** @type {HTMLElement} */ (event.target);
+      if (target?.tagName === 'TEXTAREA' || target?.isContentEditable) return;
       event.preventDefault();
       submit();
     }
   }
+
+  const submitHint = $derived(getShortcutDisplay('modal', 'submit'));
 
   const missingLabel = $derived(
     missingFields
@@ -142,9 +154,14 @@
   );
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
-<ModalBackdrop bind:show onclose={cancel} ariaLabelledBy="transition-screen-title" zIndex={60} portal={true}>
+<ModalBackdrop
+  bind:show
+  onclose={cancel}
+  onKeydown={handleKeydown}
+  ariaLabelledBy="transition-screen-title"
+  zIndex={60}
+  portal={true}
+>
   <div
     class="w-full max-w-lg rounded-lg shadow-xl"
     style="background-color: var(--ds-surface-overlay, var(--ds-surface)); color: var(--ds-text);"
@@ -195,6 +212,8 @@
       loading={submitting}
       disabled={loading}
       confirmLabel={t('transitionScreen.confirm')}
+      showKeyboardHint={true}
+      confirmKeyboardHint={submitHint}
     />
   </div>
 </ModalBackdrop>
