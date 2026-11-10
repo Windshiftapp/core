@@ -31,8 +31,8 @@
 
 <style>
   /* Active segments use the flat selected surface from the design system;
-     hover is the shared neutral so it reads the same on plain and glass
-     surfaces. No per-segment rounding or shadow. */
+     hover uses the context hover surface, which lightens glass backgrounds
+     instead of replacing them with a dark neutral. */
   .ws-button-group :global([data-active='true']),
   .ws-button-group :global([aria-pressed='true']) {
     background-color: var(--ds-surface-selected);
@@ -41,6 +41,6 @@
 
   .ws-button-group :global(button:not([data-active='true']):not([aria-pressed='true']):hover),
   .ws-button-group :global(a:not([data-active='true']):hover) {
-    background-color: var(--ds-background-neutral-hovered);
+    background-color: var(--ctx-hover-bg, var(--ds-surface-hovered));
   }
 </style>

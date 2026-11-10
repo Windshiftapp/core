@@ -477,9 +477,10 @@
 <style>
   /* The trigger owns its open state. It must not override an active segment's
      selected surface, so the open tint only applies when the trigger is not
-     marked active (ButtonGroup active segments set --ds-surface-selected). */
+     marked active (ButtonGroup active segments set --ds-surface-selected).
+     --ctx-hover-bg lightens glass surfaces and darkens plain ones. */
   .menu-trigger[data-open='true']:not([data-active='true']) {
-    background-color: var(--ds-background-neutral-hovered);
+    background-color: var(--ctx-hover-bg, var(--ds-surface-hovered));
   }
 
   .menu-item:hover {
