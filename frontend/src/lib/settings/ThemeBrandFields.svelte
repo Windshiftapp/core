@@ -67,6 +67,7 @@
 
   <LogoUploader
     currentLogoUrl={logoFullUrl || null}
+    accept="image/png,image/jpeg,image/svg+xml,image/gif,image/webp"
     onUpload={(files) => onUpload(files, 'logo_full_url')}
     onRemove={() => (logoFullUrl = '')}
     {uploading}
@@ -80,6 +81,7 @@
 
   <LogoUploader
     currentLogoUrl={logoFullUrlDark || null}
+    accept="image/png,image/jpeg,image/svg+xml,image/gif,image/webp"
     onUpload={(files) => onUpload(files, 'logo_full_url_dark')}
     onRemove={() => (logoFullUrlDark = '')}
     {uploading}

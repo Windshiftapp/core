@@ -322,6 +322,7 @@
       <div class="mb-4">
         <LogoUploader
           currentLogoUrl={newTheme.logo_url || null}
+          accept="image/png,image/jpeg,image/svg+xml,image/gif,image/webp"
           onUpload={(files) => uploadThemeLogo(files, newTheme, 'logo_url')}
           onRemove={() => (newTheme.logo_url = '')}
           uploading={uploadingLogo}
@@ -333,6 +334,7 @@
       <div class="mb-4">
         <LogoUploader
           currentLogoUrl={newTheme.logo_url_dark || null}
+          accept="image/png,image/jpeg,image/svg+xml,image/gif,image/webp"
           onUpload={(files) => uploadThemeLogo(files, newTheme, 'logo_url_dark')}
           onRemove={() => (newTheme.logo_url_dark = '')}
           uploading={uploadingLogo}
@@ -467,6 +469,7 @@
                 <div class="mb-3">
                   <LogoUploader
                     currentLogoUrl={editingTheme.logo_url || null}
+                    accept="image/png,image/jpeg,image/svg+xml,image/gif,image/webp"
                     onUpload={(files) => uploadThemeLogo(files, editingTheme, 'logo_url')}
                     onRemove={() => (editingTheme.logo_url = '')}
                     uploading={uploadingLogo}
@@ -478,6 +481,7 @@
                 <div class="mb-3">
                   <LogoUploader
                     currentLogoUrl={editingTheme.logo_url_dark || null}
+                    accept="image/png,image/jpeg,image/svg+xml,image/gif,image/webp"
                     onUpload={(files) => uploadThemeLogo(files, editingTheme, 'logo_url_dark')}
                     onRemove={() => (editingTheme.logo_url_dark = '')}
                     uploading={uploadingLogo}

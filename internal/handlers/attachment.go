@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -354,11 +355,15 @@ func (h *AttachmentHandler) authorizeUploadEntity(w http.ResponseWriter, r *http
 // Upload: collection path, entity-id requirement, image-only policy, public
 // asset URL, and response shape.
 type attachmentKind struct {
-	entityType       string
-	collection       string
-	scopedByEntity   bool
-	domain           bool
-	imageOnly        bool
+	entityType     string
+	collection     string
+	scopedByEntity bool
+	domain         bool
+	imageOnly      bool
+	// allowSVG admits image/svg+xml on an image-only target. SVG is
+	// script-capable, so it is opt-in per entity type rather than part of the
+	// shared image allowlist.
+	allowSVG         bool
 	requiresEntityID bool
 	publicAsset      bool
 	urlKey           string
@@ -405,7 +410,7 @@ func classifyAttachment(entityType, category string) (attachmentKind, error) {
 	case "hub_logo":
 		return attachmentKind{entityType: "hub_logo", collection: "hub_logos", imageOnly: true, publicAsset: true, urlKey: "logo_url", message: "Hub logo uploaded successfully"}, nil
 	case "theme_logo":
-		return attachmentKind{entityType: "theme_logo", collection: "theme_logos", imageOnly: true, publicAsset: true, urlKey: "logo_url", message: "Theme logo uploaded successfully"}, nil
+		return attachmentKind{entityType: "theme_logo", collection: "theme_logos", imageOnly: true, allowSVG: true, publicAsset: true, urlKey: "logo_url", message: "Theme logo uploaded successfully"}, nil
 	default:
 		return attachmentKind{}, fmt.Errorf("%w: %q", errUnknownAttachmentType, entityType)
 	}
@@ -521,7 +526,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Validate both the filename and detected content before writing anything.
 	slog.Debug("validating file extension", slog.String("component", "attachments"))
-	if err = h.validateFileExtension(fileHeader.Filename); err != nil {
+	if err = h.validateFileExtension(fileHeader.Filename, kind.allowSVG); err != nil {
 		slog.Warn("extension validation failed", slog.String("component", "attachments"), slog.Any("error", err))
 		respondValidationError(w, r, err.Error())
 		return
@@ -536,7 +541,7 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Debug("content verified", slog.String("component", "attachments"), slog.String("mime_type", detectedMimeType))
 
-	if kind.imageOnly && !isAllowedImageExtension(fileHeader.Filename) {
+	if kind.imageOnly && !isAllowedImageExtension(fileHeader.Filename, kind.allowSVG) {
 		respondValidationError(w, r, fmt.Sprintf(
 			"File extension %s is not allowed for %s uploads. Only image files are accepted",
 			strings.ToLower(filepath.Ext(fileHeader.Filename)), entityType))
@@ -613,7 +618,9 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	hasThumbnail := false
 	var thumbnailPath string
-	if strings.HasPrefix(mimeType, "image/") {
+	// SVG is a vector document, so the raster thumbnailer cannot decode it;
+	// skip the guaranteed-failing attempt.
+	if strings.HasPrefix(mimeType, "image/") && mimeType != "image/svg+xml" {
 		// Shared with the item/page upload services so local and S3 share one
 		// implementation; the uploaded bytes are already in memory.
 		thumbnail, thumbErr := services.GenerateAttachmentThumbnailJPEG(fileData)
@@ -1172,6 +1179,18 @@ func (h *AttachmentHandler) verifyFileContentFromBytes(fileData []byte, filename
 	detectedType := http.DetectContentType(fileData[:detectSize])
 
 	ext := filepath.Ext(filename)
+
+	// SVG is XML, not a raster format, so http.DetectContentType reports it as
+	// text/xml or text/plain and the extension/content comparison below would
+	// reject it. Confirm the bytes are an SVG document and return the canonical
+	// image type instead.
+	if strings.EqualFold(ext, ".svg") {
+		if !looksLikeSVG(fileData) {
+			return "", fmt.Errorf("file content is not a valid SVG document")
+		}
+		return "image/svg+xml", nil
+	}
+
 	expectedType := mime.TypeByExtension(ext)
 
 	if expectedType != "" {
@@ -1229,11 +1248,11 @@ func looksLikeJSON(data []byte) bool {
 }
 
 // validateFileExtension checks if the file extension is allowed (not in dangerous list)
-func (h *AttachmentHandler) validateFileExtension(filename string) error {
+func (h *AttachmentHandler) validateFileExtension(filename string, allowSVG bool) error {
 	dangerousExtensions := []string{
 		".exe", ".bat", ".cmd", ".com", ".pif", ".scr", ".msi", // Windows executables
 		".js", ".jsx", ".ts", ".tsx", // JavaScript/TypeScript (XSS risk)
-		".html", ".htm", ".svg", // HTML/SVG (XSS risk)
+		".html", ".htm", // HTML (XSS risk)
 		".sh", ".bash", ".zsh", ".fish", // Shell scripts
 		".py", ".rb", ".pl", ".php", ".asp", ".aspx", ".jsp", // Server-side scripts
 		".jar", ".class", ".dex", // Java/Android executables
@@ -1243,6 +1262,13 @@ func (h *AttachmentHandler) validateFileExtension(filename string) error {
 	}
 
 	ext := strings.ToLower(filepath.Ext(filename))
+
+	// SVG is script-capable and stays blocked unless the target opts in. Its
+	// public serving path carries a sandboxing CSP, which is what makes the
+	// exception safe for logo surfaces.
+	if ext == ".svg" && !allowSVG {
+		return fmt.Errorf("file extension %s is not allowed for security reasons", ext)
+	}
 
 	for _, dangerous := range dangerousExtensions {
 		if ext == dangerous {
@@ -1260,12 +1286,38 @@ func (h *AttachmentHandler) validateFileExtension(filename string) error {
 
 // isAllowedImageExtension checks if the file extension is a known image format.
 // Used for image-only entity types (avatars, backgrounds, logos) as defense-in-depth.
-func isAllowedImageExtension(filename string) bool {
+// SVG is admitted only when the caller's target opted in.
+func isAllowedImageExtension(filename string, allowSVG bool) bool {
 	allowed := map[string]bool{
 		".jpg": true, ".jpeg": true, ".png": true, ".gif": true,
 		".webp": true, ".bmp": true, ".ico": true, ".tiff": true, ".tif": true,
 	}
+	if allowSVG {
+		allowed[".svg"] = true
+	}
 	return allowed[strings.ToLower(filepath.Ext(filename))]
+}
+
+// looksLikeSVG reports whether data parses as XML whose root element is <svg>.
+// Only the root element is inspected; the public serving path applies a
+// sandboxing CSP, so this check establishes the content type rather than acting
+// as the security boundary.
+func looksLikeSVG(data []byte) bool {
+	decoder := xml.NewDecoder(bytes.NewReader(data))
+	for {
+		token, err := decoder.Token()
+		if err != nil {
+			return false
+		}
+		start, ok := token.(xml.StartElement)
+		if !ok {
+			continue
+		}
+		if start.Name.Local != "svg" {
+			return false
+		}
+		return start.Name.Space == "" || start.Name.Space == "http://www.w3.org/2000/svg"
+	}
 }
 
 // generateUniqueFilename creates a unique filename while preserving the extension
