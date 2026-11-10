@@ -2,7 +2,6 @@
   import { onDestroy } from 'svelte';
   import { ensureExtensionsLoaded, extensions, getEditorProviders } from '../stores/extensions.svelte.js';
   import { createPluginBridge } from '../services/PluginBridge.js';
-  import { confirm } from '../composables/useConfirm.js';
   import { t } from '../stores/i18n.svelte.js';
   import { themeStore } from '../stores/theme.svelte.js';
   import Spinner from '../components/Spinner.svelte';
@@ -31,7 +30,6 @@
   let nativeEditor = $state(null);
   let pluginReady = $state(false);
   let pluginError = $state(null);
-  let dirty = $state(false);
 
   // Imperative surface mirrors MilkdownEditor. Commands the plugin protocol
   // cannot express yet (insertImage/insertMarkdown) no-op with a warning in
@@ -97,30 +95,16 @@
     sessionId = null;
     pluginReady = false;
     pluginError = null;
-    dirty = false;
   }
 
-  async function confirmDiscard() {
-    if (!dirty) return true;
-    return confirm({
-      title: t('editors.discardProviderChanges'),
-      message: t('editors.discardProviderChangesMessage', { label: activeProvider?.label || '' }),
-      confirmText: t('editors.discardChanges'),
-      variant: 'danger',
-    });
-  }
-
-  async function openProvider(provider) {
-    if (!(await confirmDiscard())) return;
+  function openProvider(provider) {
     sessionId = crypto.randomUUID();
     activeProvider = provider;
     pluginReady = false;
     pluginError = null;
-    dirty = false;
   }
 
-  async function returnToNative() {
-    if (!(await confirmDiscard())) return;
+  function returnToNative() {
     closeProvider();
   }
 
@@ -130,6 +114,12 @@
     bridge = createPluginBridge(iframe, {
       pluginName: activeProvider.pluginName,
       sessionId,
+      onResize: (height) => {
+        if (!iframe || typeof height !== 'number') return;
+        // Clamp so a runaway height cannot push the page around; the iframe
+        // scrolls internally beyond the cap.
+        iframe.style.height = `${Math.min(Math.max(Math.round(height), 240), 900)}px`;
+      },
       onEditorReady: () => {
         pluginReady = true;
         // The host owns the content: it sends the current Markdown and persists
@@ -146,7 +136,12 @@
         });
       },
       onEditorChange: (message) => {
-        dirty = message?.dirty ?? true;
+        // Providers stream edits as they happen. Mirror them into the bound
+        // content so the surface's own Save/Cancel buttons govern persistence,
+        // exactly like the native editor. There is no separate plugin save.
+        if (typeof message?.markdown !== 'string') return;
+        content = message.markdown;
+        onContentChange?.(message.markdown);
       },
       onEditorSave: (message) => {
         if (typeof message?.markdown !== 'string') return;
@@ -215,7 +210,10 @@
       </div>
     {/if}
     {#if !pluginReady}
-      <div class="plugin-editor-loading">
+      <div
+        class="plugin-editor-loading"
+        data-testid={testId ? `${testId}-provider-loading` : 'plugin-editor-loading'}
+      >
         <Spinner />
       </div>
     {/if}

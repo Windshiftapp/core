@@ -42,8 +42,10 @@ export const MESSAGE_TYPES = {
   EDITOR_DISPOSE: 'host:editorDispose',
 };
 
+// Editor messages that must echo the sessionId from host:editorInit. READY is
+// deliberately excluded: it is the pre-session handshake, and the plugin only
+// learns the sessionId from the host's reply to it.
 const EDITOR_MESSAGE_TYPES = new Set([
-  MESSAGE_TYPES.EDITOR_READY,
   MESSAGE_TYPES.EDITOR_CHANGE,
   MESSAGE_TYPES.EDITOR_SAVE,
   MESSAGE_TYPES.EDITOR_CANCEL,
@@ -105,14 +107,19 @@ export function createPluginBridge(iframe, options = {}) {
 
     if (!message?.type) return;
 
+    // The plugin cannot echo a sessionId it has not received yet, so the ready
+    // handshake is accepted without one. The source/origin checks above still
+    // pin it to this bridge's iframe. Every later editor message is gated.
+    if (message.type === MESSAGE_TYPES.EDITOR_READY) {
+      onEditorReady(message);
+      return;
+    }
+
     if (EDITOR_MESSAGE_TYPES.has(message.type)) {
       if (sessionId == null || message.sessionId !== sessionId) {
         return;
       }
       switch (message.type) {
-        case MESSAGE_TYPES.EDITOR_READY:
-          onEditorReady(message);
-          break;
         case MESSAGE_TYPES.EDITOR_CHANGE:
           onEditorChange(message);
           break;
