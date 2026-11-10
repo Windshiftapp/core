@@ -136,13 +136,16 @@
         // containment check above cannot see them.
         const active = document.activeElement;
         if (active && active !== document.body && active.closest?.('[data-escapee]')) return;
-        backdropElement.focus();
+        // Focus without scrolling: the timer can fire after the user (or a
+        // test) has scrolled a tall modal, and a plain focus() would yank the
+        // backdrop back to the first field.
+        backdropElement.focus({ preventScroll: true });
         if (autoFocus) {
           const focusable = modalContentElement.querySelector(
             'input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled])'
           );
           if (focusable) {
-            focusable.focus();
+            focusable.focus({ preventScroll: true });
           }
         }
       }, 100);
