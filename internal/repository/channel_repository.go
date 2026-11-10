@@ -748,7 +748,7 @@ func (r *ChannelRepository) scanChannel(rows *sql.Rows) (*models.Channel, error)
 	}
 
 	// Scrub sensitive data from config
-	channel.Config = ScrubChannelConfig(channel.Config)
+	ScrubChannelForResponse(&channel)
 
 	return &channel, nil
 }
@@ -776,7 +776,7 @@ func (r *ChannelRepository) scanChannelRow(row *sql.Row) (*models.Channel, error
 	}
 
 	// Scrub sensitive data from config
-	channel.Config = ScrubChannelConfig(channel.Config)
+	ScrubChannelForResponse(&channel)
 
 	return &channel, nil
 }
@@ -1671,6 +1671,28 @@ func (r *ChannelRepository) ConsumeOAuthState(ctx context.Context, state string,
 		return 0, 0, 0, false, err
 	}
 	return row.ProviderID, row.ChannelID, row.UserID, row.RestoreChannelEnabled, nil
+}
+
+// ScrubChannelForResponse strips stored credentials from a channel's config
+// and records which ones existed, so read responses can advertise a saved
+// secret without ever revealing it.
+func ScrubChannelForResponse(channel *models.Channel) {
+	channel.HasEmailOAuthClientSecret = channelConfigHasSecret(channel.Config, "email_oauth_client_secret")
+	channel.Config = ScrubChannelConfig(channel.Config)
+}
+
+// channelConfigHasSecret reports whether a stored config holds a non-empty
+// string under key.
+func channelConfigHasSecret(configJSON, key string) bool {
+	if configJSON == "" {
+		return false
+	}
+	var config map[string]any
+	if err := json.Unmarshal([]byte(configJSON), &config); err != nil || config == nil {
+		return false
+	}
+	secret, _ := config[key].(string)
+	return secret != ""
 }
 
 // ScrubChannelConfig removes sensitive fields from the configuration JSON

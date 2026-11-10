@@ -197,6 +197,7 @@ export default {
     clientIdRequired: 'Identyfikator klienta OAuth jest wymagany',
     clientSecret: 'Tajny klucz klienta',
     clientSecretRequired: 'Tajny klucz klienta OAuth jest wymagany',
+    secretSaved: 'Tajny klucz klienta został zapisany. Pozostaw pole puste, aby go zachować.',
     leaveBlankToKeep: 'Pozostaw puste, aby zachować istniejący',
     tenantId: 'Identyfikator dzierżawcy',
     tenantIdHelp: 'Użyj „common”, aby zezwolić na dowolne konto Microsoft, lub wprowadź konkretny identyfikator dzierżawcy',

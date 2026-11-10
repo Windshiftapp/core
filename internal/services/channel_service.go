@@ -266,7 +266,7 @@ func (s *ChannelService) Create(ctx context.Context, req ChannelCreateRequest) (
 		}
 	}
 	// Scrub sensitive data before returning
-	channel.Config = repository.ScrubChannelConfig(channel.Config)
+	repository.ScrubChannelForResponse(channel)
 	return channel, nil
 }
 

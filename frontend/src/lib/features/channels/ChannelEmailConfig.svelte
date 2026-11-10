@@ -20,6 +20,9 @@
       oauth_provider_type: 'microsoft',
       oauth_client_id: '',
       oauth_client_secret: '',
+      oauth_client_secret_stored: false,
+      stored_oauth_provider_type: '',
+      stored_oauth_client_id: '',
       oauth_tenant_id: 'common',
       oauth_connected: false,
       oauth_email: '',
@@ -66,6 +69,17 @@
     )
   );
   let oauthIsConnected = $derived(formData.oauth_connected && !oauthIdentityChanged);
+  // The client identity the stored secret belongs to. The backend discards a
+  // stored secret when the provider or client ID changes without a new one, so
+  // the form must require re-entry in that case.
+  let oauthStoredIdentityChanged = $derived(
+    formData.oauth_provider_type !== formData.stored_oauth_provider_type ||
+    formData.oauth_client_id.trim() !== formData.stored_oauth_client_id.trim()
+  );
+  let oauthSecretAvailable = $derived(
+    !!formData.oauth_client_secret?.trim() ||
+    (formData.oauth_client_secret_stored && !oauthStoredIdentityChanged)
+  );
 
   async function startOAuthFlow() {
     if (!$isSystemAdmin || !channelId) return;
@@ -118,7 +132,7 @@
       if (!formData.oauth_mailbox?.trim()) {
         return { valid: false, message: t('channel.oauthMailboxRequired') };
       }
-      if (!oauthIsConnected && !formData.oauth_client_secret?.trim()) {
+      if (!oauthIsConnected && !oauthSecretAvailable) {
         return { valid: false, message: t('channel.clientSecretRequired') };
       }
     }
@@ -157,6 +171,18 @@
   }
 
   export function clearSecrets() {
+    const identityChanged =
+      formData.oauth_provider_type !== formData.stored_oauth_provider_type ||
+      formData.oauth_client_id.trim() !== formData.stored_oauth_client_id.trim();
+    if (formData.oauth_client_secret) {
+      // A typed secret was just persisted and belongs to the current identity.
+      formData.oauth_client_secret_stored = true;
+    } else if (identityChanged) {
+      // The backend drops a stored secret when the client identity changes.
+      formData.oauth_client_secret_stored = false;
+    }
+    formData.stored_oauth_provider_type = formData.oauth_provider_type;
+    formData.stored_oauth_client_id = formData.oauth_client_id.trim();
     formData.oauth_client_secret = '';
     formData.imap_password = '';
   }
@@ -248,9 +274,12 @@
               required
               labelColor="default"
               type="password"
-              placeholder={oauthIsConnected ? t('channel.leaveBlankToKeep') : 'Client secret value'}
+              placeholder={oauthIsConnected || oauthSecretAvailable ? t('channel.leaveBlankToKeep') : 'Client secret value'}
               bind:value={formData.oauth_client_secret}
             />
+            {#if formData.oauth_client_secret_stored && !oauthStoredIdentityChanged && !oauthIsConnected}
+              <DescriptionText>{t('channel.secretSaved')}</DescriptionText>
+            {/if}
           </div>
         </div>
 

@@ -193,6 +193,7 @@ export default {
     clientIdRequired: 'OAuth client ID is required',
     clientSecret: 'Client Secret',
     clientSecretRequired: 'OAuth client secret is required',
+    secretSaved: 'A client secret is saved. Leave the field blank to keep it.',
     leaveBlankToKeep: 'Leave blank to keep existing',
     tenantId: 'Tenant ID',
     tenantIdHelp: 'Use "common" to allow any Microsoft account, or enter a specific tenant ID',

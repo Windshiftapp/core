@@ -78,6 +78,9 @@ type Channel struct {
 	// Intakes is populated on demand by GET /channels?include_intakes=true so
 	// callers can resolve portal linkage without one request per channel.
 	Intakes []Intake `json:"intakes,omitempty"`
+	// HasEmailOAuthClientSecret reports that a scrubbed email OAuth client
+	// secret is stored, so the UI can show it as saved without receiving it.
+	HasEmailOAuthClientSecret bool `json:"has_email_oauth_client_secret,omitempty"`
 }
 
 // ChannelCategory represents a grouping for channels

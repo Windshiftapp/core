@@ -193,6 +193,7 @@ export default {
     clientIdRequired: 'L’ID client OAuth est requis',
     clientSecret: 'Secret client',
     clientSecretRequired: 'Le secret client OAuth est requis',
+    secretSaved: 'Un secret client est enregistré. Laissez le champ vide pour le conserver.',
     leaveBlankToKeep: 'Laissez vide pour conserver l’existant',
     tenantId: 'ID de locataire (Tenant ID)',
     tenantIdHelp: 'Utilisez « common » pour autoriser tout compte Microsoft, ou saisissez un ID de locataire spécifique',

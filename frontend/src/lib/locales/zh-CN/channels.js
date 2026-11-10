@@ -164,6 +164,7 @@ export default {
     clientIdRequired: 'OAuth 客户端 ID 为必填项',
     clientSecret: '客户端密钥',
     clientSecretRequired: 'OAuth 客户端密钥为必填项',
+    secretSaved: '客户端密钥已保存。留空以保留该密钥。',
     leaveBlankToKeep: '留空保留现有',
     tenantId: '租户 ID',
     tenantIdHelp: '使用 "common" 允许任何 Microsoft 账户，或输入特定的租户 ID',

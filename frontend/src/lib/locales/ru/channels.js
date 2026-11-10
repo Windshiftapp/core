@@ -190,6 +190,7 @@ export default {
     clientIdRequired: 'Укажите ID клиента OAuth',
     clientSecret: 'Секрет клиента',
     clientSecretRequired: 'Укажите секрет клиента OAuth',
+    secretSaved: 'Секрет клиента сохранён. Оставьте поле пустым, чтобы сохранить его.',
     leaveBlankToKeep: 'Оставьте пустым, чтобы сохранить текущее значение',
     tenantId: 'ID тенанта Microsoft',
     tenantIdHelp:

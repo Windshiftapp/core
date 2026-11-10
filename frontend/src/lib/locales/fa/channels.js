@@ -180,6 +180,7 @@ export default {
     "clientIdRequired": "شناسه مشتری OAuth مورد نیاز است",
     "clientSecret": "راز مشتری",
     "clientSecretRequired": "راز مشتری OAuth مورد نیاز است",
+    "secretSaved": "راز مشتری ذخیره شده است. برای حفظ آن، فیلد را خالی بگذارید.",
     "leaveBlankToKeep": "برای حفظ موجود، خالی بگذارید",
     "tenantId": "شناسه tenant",
     "tenantIdHelp": "برای اجازه دادن به هر حساب Microsoft از «common» استفاده کنید، یا یک شناسه tenant خاص وارد کنید",
