@@ -5,8 +5,8 @@
   // modal; the create form keeps its own store (WI-1835).
   import { onMount } from 'svelte';
   import Input from '../../components/Input.svelte';
-  import Textarea from '../../components/Textarea.svelte';
   import Label from '../../components/Label.svelte';
+  import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import PriorityPicker from '../../pickers/PriorityPicker.svelte';
   import UserPicker from '../../pickers/UserPicker.svelte';
   import CustomFieldRenderer from './CustomFieldRenderer.svelte';
@@ -93,7 +93,16 @@
     {:else if identifier === 'description'}
       <div class="space-y-1">
         <Label color="default">{t('common.description') || 'Description'}{#if isRequired(field)}<span style="color: var(--ds-text-danger, #ef4444);"> *</span>{/if}</Label>
-        <Textarea value={values.description ?? ''} disabled={disabled} oninput={(e) => setValue('description', e.target.value)} data-testid="transition-field-description" />
+        <MilkdownEditor
+          bind:content={values.description}
+          placeholder={t('createModal.addDescription')}
+          readonly={disabled}
+          showToolbar={false}
+          compact={true}
+          itemId={null}
+          allowImageUpload={false}
+          testId="transition-field-description"
+        />
       </div>
     {:else if identifier === 'priority'}
       <div class="space-y-1">
