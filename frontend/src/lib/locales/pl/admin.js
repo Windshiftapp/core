@@ -1002,11 +1002,6 @@ export default {
           name: 'Analiza zależności',
           description: 'Analizuj i sugeruj zależności między elementami',
         },
-        logbook_articles: {
-          name: 'Artykuły dziennika',
-          description:
-            'Wspomagana przez AI klasyfikacja dokumentów, czyszczenie i generowanie artykułów dla dziennika',
-        },
       },
     },
 

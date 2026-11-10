@@ -978,10 +978,6 @@ export default {
           name: 'Abhängigkeitsanalyse',
           description: 'Abhängigkeiten zwischen Vorgängen analysieren und vorschlagen',
         },
-        logbook_articles: {
-          name: 'Logbuch-Artikel',
-          description: 'KI-gestützte Dokumentklassifizierung, -bereinigung und Artikelgenerierung für das Logbuch',
-        },
       },
     },
     workItemStaleness: {

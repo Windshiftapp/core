@@ -1,4 +1,4 @@
-// Condition operator options shared by the asset and logbook action flow
+// Condition operator options shared by the asset and workspace action flow
 // editors. Keeping them in one place stops the two editors from drifting.
 export const conditionOperators = [
   { value: 'eq', label: 'Equals' },

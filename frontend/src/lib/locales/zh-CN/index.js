@@ -6,7 +6,6 @@ import auth from './auth.js';
 import channels from './channels.js';
 import common from './common.js';
 import email from './email.js';
-import logbook from './logbook.js';
 import misc from './misc.js';
 import navigation from './navigation.js';
 import testing from './testing.js';
@@ -38,7 +37,6 @@ export default createLocale({
   navigation,
   misc,
   actions,
-  logbook,
   analytics,
   pages,
   teams,

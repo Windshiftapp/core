@@ -1567,7 +1567,7 @@ func (s *Server) initialize() error {
 	s.ldapHandler = handlers.NewLDAPHandler(s.db, ldapSyncService, ssoHandler.GetEncryption())
 	ldapHandler := s.ldapHandler
 
-	featuresHandler := handlers.NewFeaturesHandler(s.pluginManager, cfg.SSH.Enabled, cfg.Logbook.Endpoint != "")
+	featuresHandler := handlers.NewFeaturesHandler(s.pluginManager, cfg.SSH.Enabled)
 
 	shutdownChan := cfg.ShutdownChan
 	if shutdownChan == nil {
@@ -1613,51 +1613,6 @@ func (s *Server) initialize() error {
 
 	s.briefingScheduler = scheduler.NewBriefingScheduler(s.db, llmManager, permService, timePermissionService, services.NewUserReadService(s.db), promptStore)
 	s.briefingScheduler.Start()
-
-	if cfg.Logbook.Endpoint != "" {
-		proxyCfg := LogbookProxyConfig{
-			Endpoint:          cfg.Logbook.Endpoint,
-			AuthMiddleware:    authMiddleware,
-			PermissionService: permService,
-			UploadLimiter:     s.uploadLimiter,
-			SharedSecret:      cfg.Auth.SessionSecret,
-		}
-		logbookProxy := NewLogbookProxy(proxyCfg)
-
-		// Rate-limited upload routes (registered before the catch-all so they take priority)
-		logbookUploadProxy := NewLogbookUploadProxy(proxyCfg)
-		mux.Handle("POST /api/logbook/buckets/{bucketID}/documents/upload", logbookUploadProxy)
-		mux.Handle("POST /api/logbook/documents/{documentID}/attachments", logbookUploadProxy)
-
-		// All logbook routes (including actions) are proxied to the sidecar
-		mux.Handle("GET /api/logbook/", logbookProxy)
-		mux.Handle("POST /api/logbook/", logbookProxy)
-		mux.Handle("PUT /api/logbook/", logbookProxy)
-		mux.Handle("PATCH /api/logbook/", logbookProxy)
-		mux.Handle("DELETE /api/logbook/", logbookProxy)
-		slog.Info("logbook proxy enabled", "endpoint", cfg.Logbook.Endpoint)
-
-		// Internal endpoints for sidecar → main server communication.
-		// cfg.Auth.SessionSecret is already validated non-empty by config.Load,
-		// so the guard is cosmetic — kept for defense-in-depth.
-		if ssoSecret := cfg.Auth.SessionSecret; ssoSecret != "" {
-			// LLM proxy for logbook article generation
-			llmProxy := NewInternalLLMProxy(llmManager, ssoSecret)
-			mux.Handle("POST /api/internal/llm/v1/chat/completions", llmProxy)
-			mux.Handle("GET /api/internal/llm/health", NewInternalLLMHealthCheck(llmManager, ssoSecret))
-			slog.Info("internal LLM proxy enabled for logbook article generation")
-
-			// Node execution endpoint for logbook actions (create_item, create_asset on SQLite)
-			nodeExecHandler := handlers.NewLogbookNodeExecutionHandler(
-				ssoSecret,
-				permService,
-				assetHandler,
-				itemHandler.ItemCreationService(),
-			)
-			mux.Handle("POST /api/internal/logbook/execute-node", http.HandlerFunc(nodeExecHandler.HandleNodeExecution))
-			slog.Info("internal logbook node execution endpoint enabled")
-		}
-	}
 
 	// Build API middleware chain
 	corsMiddleware := createCORSMiddleware(cfg.AllowedHosts, effectivePort, corsScheme, cfg.DisableCSRF, cfg.UseProxy, cfg.AllowInsecureHTTP)

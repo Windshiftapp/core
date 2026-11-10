@@ -14,8 +14,8 @@
   import SetStatusNode from '../actions/nodes/SetStatusNode.svelte';
   import ConditionNode from '../actions/nodes/ConditionNode.svelte';
   import NotifyUserNode from '../actions/nodes/NotifyUserNode.svelte';
-  import CreateItemNode from '../logbook-actions/nodes/CreateItemNode.svelte';
-  import CreateItemConfigPanel from '../logbook-actions/CreateItemConfigPanel.svelte';
+  import CreateItemNode from '../actions/nodes/CreateItemNode.svelte';
+  import CreateItemConfigPanel from '../actions/CreateItemConfigPanel.svelte';
   import BaseActionFlowEditor from '../actions/shared/BaseActionFlowEditor.svelte';
   import ConditionConfigPanel from '../actions/shared/ConditionConfigPanel.svelte';
   import { assetActionFlowStore } from '../../stores/assetActionFlowStore.svelte.js';

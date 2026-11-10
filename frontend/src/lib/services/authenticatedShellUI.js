@@ -5,7 +5,6 @@ import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
 import { brandStore } from '../stores/brand.svelte.js';
 import { capabilitiesStore } from '../stores/capabilities.svelte.js';
 import { collectionPreferences } from '../stores/collectionPreferences.svelte.js';
-import { logbookStore } from '../stores/logbook.svelte.js';
 import { moduleSettings } from '../stores/moduleSettings.js';
 import { permissionStore } from '../stores/permissions.svelte.js';
 import { themeStore } from '../stores/theme.svelte.js';
@@ -31,9 +30,7 @@ export function hydrateAuthenticatedShellUI(bootstrap) {
   attachmentStatus.hydrate(bootstrap.attachment_status);
   aiStore.hydrate(bootstrap.ai);
   capabilitiesStore.hydrate(bootstrap.features);
-  logbookStore.hydrateAvailability(bootstrap.features?.logbook_available);
   workItemStalenessSettings.hydrate(bootstrap.work_item_staleness);
-  permissionStore.setLogbookAvailable(bootstrap.features?.logbook_available === true);
   permissionStore.setHasAssetSets(bootstrap.has_asset_sets === true);
   permissionStore.setHasPortals(bootstrap.has_portals === true);
   permissionStore.setHasActivePortals(bootstrap.has_active_portals === true);

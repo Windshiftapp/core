@@ -794,7 +794,6 @@ export default {
         decompose: { name: '分解任务', description: '将工作项分解为更小的子任务' },
         release_notes: { name: '发布说明', description: '从里程碑进度生成发布说明' },
         dependency_analysis: { name: '依赖分析', description: '分析和建议事项之间的依赖关系' },
-        logbook_articles: { name: '日志文章', description: 'AI 驱动的文档分类、清理和日志文章生成' },
       },
     },
     workItemStaleness: {

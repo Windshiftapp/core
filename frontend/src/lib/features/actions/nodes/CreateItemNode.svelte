@@ -1,7 +1,7 @@
 <script>
   import FileText from '@lucide/svelte/icons/file-text';
-  import { logbookActionFlowStore } from '../../../stores/logbookActionFlowStore.svelte.js';
-  import BaseActionNode from '../../actions/shared/BaseActionNode.svelte';
+  import { actionFlowStore } from '../../../stores/actionFlowStore.svelte.js';
+  import BaseActionNode from '../shared/BaseActionNode.svelte';
 
   let { data = {}, selected = false } = $props();
 
@@ -12,7 +12,7 @@
   };
 </script>
 
-<BaseActionNode {data} {selected} flowStore={data.flowStore || logbookActionFlowStore} icon={FileText} title="Create Item" {colorVars}>
+<BaseActionNode {data} {selected} flowStore={data.flowStore || actionFlowStore} icon={FileText} title="Create Item" {colorVars}>
   {#snippet body()}
     {#if data.config?.title}
       <div class="config-line">{data.config.title}</div>

@@ -931,10 +931,6 @@ export default {
           "name": "의존 관계 분석",
           "description": "작업 간 의존 관계 분석 및 제안"
         },
-        "logbook_articles": {
-          "name": "로그북 문서",
-          "description": "로그북을 위한 AI 문서 분류, 정리 및 문서 생성"
-        }
       }
     },
     "workItemStaleness": {

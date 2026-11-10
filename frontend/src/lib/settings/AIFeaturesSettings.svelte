@@ -6,7 +6,6 @@
   import { aiFeatures } from '../api/ai.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
-  import { logbookStore } from '../stores/logbook.svelte.js';
   import Select from '../components/Select.svelte';
   import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
   import IconSun from '@tabler/icons-svelte-runes/icons/sun';
@@ -16,7 +15,6 @@
   import IconPuzzle from '@tabler/icons-svelte-runes/icons/puzzle';
   import IconFileDescription from '@tabler/icons-svelte-runes/icons/file-description';
   import IconArrowsShuffle from '@tabler/icons-svelte-runes/icons/arrows-shuffle';
-  import IconNotebook from '@tabler/icons-svelte-runes/icons/notebook';
 
   const FEATURE_ICONS = {
     ai_chat: IconMessageChatbot,
@@ -27,7 +25,6 @@
     decompose: IconPuzzle,
     release_notes: IconFileDescription,
     dependency_analysis: IconArrowsShuffle,
-    logbook_articles: IconNotebook,
   };
 
   const BASE_FEATURE_KEYS = [
@@ -41,11 +38,7 @@
     'dependency_analysis',
   ];
 
-  let featureKeys = $derived(
-    logbookStore.available
-      ? [...BASE_FEATURE_KEYS, 'logbook_articles']
-      : BASE_FEATURE_KEYS
-  );
+  const featureKeys = BASE_FEATURE_KEYS;
 
   let loading = $state(true);
   let saving = $state(false);

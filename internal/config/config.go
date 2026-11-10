@@ -56,7 +56,6 @@ type Config struct {
 	Plugins      PluginsConfig
 	LLM          LLMConfig
 	CodingAgent  CodingAgentConfig
-	Logbook      LogbookConfig
 	Notification NotificationConfig
 	Reminders    ReminderConfig
 	Email        EmailConfig
@@ -234,11 +233,6 @@ type CodingAgentConfig struct {
 	WSAPIURL string // URL the runner reaches this Windshift API on; defaults to BASE_URL
 }
 
-// LogbookConfig holds the URL of the logbook sidecar (if any).
-type LogbookConfig struct {
-	Endpoint string
-}
-
 // ReminderConfig holds the due-date reminder scheduler knobs.
 type ReminderConfig struct {
 	// Interval is how often the scheduler scans for due-soon items
@@ -323,20 +317,4 @@ type JiraConfig struct {
 	// ImportConcurrency overrides how many independent Jira requests an import
 	// keeps in flight. Zero uses the built-in default.
 	ImportConcurrency int
-}
-
-// LogbookSidecarConfig is the sibling of Config for the standalone logbook
-// sidecar binary (cmd/logbook/main.go). The sidecar never parses CLI flags
-// and has a narrower set of concerns than the main server.
-type LogbookSidecarConfig struct {
-	PostgresConn     string
-	Port             string
-	StoragePath      string
-	LLMEndpoint      string
-	ArticleEndpoint  string
-	MainServerURL    string
-	MainServerSecret string
-	BaseURL          string
-	Logging          LoggingConfig
-	OutboundTLS      OutboundTLSConfig
 }

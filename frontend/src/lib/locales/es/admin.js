@@ -875,10 +875,6 @@ export default {
           name: 'Análisis de dependencias',
           description: 'Analizar y sugerir dependencias entre elementos',
         },
-        logbook_articles: {
-          name: 'Artículos del registro',
-          description: 'Clasificación, limpieza y generación de artículos con IA para el registro',
-        },
       },
     },
     workspaceRoles: {

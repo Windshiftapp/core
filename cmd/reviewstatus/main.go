@@ -28,7 +28,6 @@ var (
 		"data":         {},
 		"deploy":       {},
 		"ethereal":     {},
-		"logbook":      {},
 		"docs":         {},
 		"plugins":      {},
 		"plugin-src":   {},

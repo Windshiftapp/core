@@ -272,9 +272,6 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 			Enabled:  codingAgentEnabled,
 			WSAPIURL: os.Getenv("CODING_AGENT_WS_API_URL"),
 		},
-		Logbook: LogbookConfig{
-			Endpoint: os.Getenv("LOGBOOK_ENDPOINT"),
-		},
 		Notification: NotificationConfig{
 			FlushInterval:   parseDurationEnv("NOTIFICATION_FLUSH_INTERVAL", 0),
 			BatchSize:       parseIntEnv("NOTIFICATION_BATCH_SIZE", 0),

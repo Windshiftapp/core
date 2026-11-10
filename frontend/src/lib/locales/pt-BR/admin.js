@@ -922,10 +922,6 @@ export default {
           name: 'Análise de dependências',
           description: 'Analisar e sugerir dependências entre itens',
         },
-        logbook_articles: {
-          name: 'Artigos do diário',
-          description: 'Classificação, limpeza e geração de artigos com IA para o diário',
-        },
       },
     },
     workItemStaleness: {

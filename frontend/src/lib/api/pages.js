@@ -2,9 +2,8 @@ import { fetchAPI, fetchV2Data } from './core.js';
 import { buildQueryString } from './utils.js';
 
 /**
- * Workspace knowledge-pages API client. Mirrors logbook.js style: every
- * method returns a Promise from fetchAPI; auth is automatic via cookies
- * (core.js sets credentials: 'same-origin').
+ * Workspace knowledge-pages API client. Each method returns a Promise from
+ * fetchAPI; auth is automatic via cookies (core.js sets credentials: 'same-origin').
  */
 export const pages = {
   /** Fetch every visible page as an ordered, flat metadata list. */

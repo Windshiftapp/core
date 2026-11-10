@@ -16,7 +16,6 @@ import (
 // KnowledgeSource identifies where a search hit came from.
 const (
 	KnowledgeSourcePage    = "page"
-	KnowledgeSourceLogbook = "logbook"
 	KnowledgeSourceDocmost = "docmost"
 )
 
@@ -164,10 +163,6 @@ func (s *KnowledgeRetrievalService) SearchWithSources(in SearchInput) (Knowledge
 			sources = append(sources, KnowledgeSourceStatus{Source: KnowledgeSourceDocmost, State: state})
 		}
 	}
-	// Logbook integration intentionally deferred — the bucket-access model
-	// lives outside PagePermissionService and is a separate slice. Until
-	// then the source whitelist still accepts "logbook" to keep clients
-	// forward-compatible; it just returns nothing.
 	if len(out) > in.Limit {
 		out = out[:in.Limit]
 	}

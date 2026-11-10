@@ -1,13 +1,13 @@
 <script>
   import { onMount } from 'svelte';
   import { itemTypes as itemTypesApi } from '../../api/configuration.js';
-  import { logbookActionFlowStore } from '../../stores/logbookActionFlowStore.svelte.js';
+  import { actionFlowStore } from '../../stores/actionFlowStore.svelte.js';
   import WorkspacePicker from '../../pickers/WorkspacePicker.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
   import Input from '../../components/Input.svelte';
   import Textarea from '../../components/Textarea.svelte';
 
-  let { selectedNode, flowStore = logbookActionFlowStore } = $props();
+  let { selectedNode, flowStore = actionFlowStore } = $props();
 
   let itemTypes = $state([]);
   let loading = $state(true);
@@ -100,7 +100,7 @@
     <Textarea
       id="create-item-description"
       rows={3}
-      placeholder={"Document from logbook: {{doc.title}}\nLink: {{doc.link}}"}
+      placeholder={"Asset: {{asset.tag}}"}
       value={selectedNode.data?.config?.description || ''}
       oninput={handleDescriptionChange}
       style="background-color: var(--ds-surface);"

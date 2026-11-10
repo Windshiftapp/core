@@ -83,8 +83,6 @@ export const MAIN_APP_COMPONENT_LOADERS = {
   'configuration-set-detail': () => import('../settings/ConfigurationSetDetail.svelte'),
   'workspace-look-and-feel': () => import('../workspaces/WorkspaceLookAndFeel.svelte'),
   'personal-plan': () => import('../features/personal/PlanMyDay.svelte'),
-  logbook: () => import('../features/logbook/Logbook.svelte'),
-  'logbook-document': () => import('../features/logbook/DocumentDetail.svelte'),
   'chat-panel': () => import('../features/chat/ChatPanel.svelte'),
   'terminal-panel': () => import('../features/terminal/TerminalPanel.svelte'),
 };
@@ -464,13 +462,6 @@ export const MAIN_APP_ROUTE_CONFIG = {
   'personal-plan': route('Loading Plan My Day...', 'Failed to load Plan My Day', {
     wrapper: 'surface-full',
   }),
-  logbook: route('Loading Knowledge Base...', 'Failed to load Knowledge Base', {
-    wrapper: 'surface-full',
-  }),
-  'logbook-document': route('Loading Document...', 'Failed to load Document', {
-    wrapper: 'surface-full',
-    getProps: (currentRoute) => ({ documentId: currentRoute.params.documentId }),
-  }),
 };
 
 export const MAIN_APP_TEST_VIEWS = new Set([
@@ -518,7 +509,6 @@ export const MAIN_APP_FOOTER_VIEWS = new Set([
   'workspace-nav-config',
   'collection-nav-config',
   'asset-settings',
-  'logbook-document',
 ]);
 
 export const WORKSPACE_SETTINGS_TABS = {

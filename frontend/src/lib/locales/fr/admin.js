@@ -946,11 +946,6 @@ export default {
           name: 'Analyse des dépendances',
           description: 'Analyser et suggérer des dépendances entre éléments',
         },
-        logbook_articles: {
-          name: 'Articles de journal de bord',
-          description:
-            'Classification, nettoyage et génération d\'articles automatisés pour le journal de bord',
-        },
       },
     },
 

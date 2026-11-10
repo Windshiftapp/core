@@ -6,7 +6,6 @@
 class CapabilitiesStore {
   /** @type {Set<string>} */
   capabilities = $state(new Set());
-  logbookAvailable = $state(false);
   sshAvailable = $state(false);
   loaded = $state(false);
   #loadPromise = null;
@@ -16,7 +15,6 @@ class CapabilitiesStore {
   hydrate(data) {
     if (!data) return;
     this.capabilities = new Set(data.capabilities || []);
-    this.logbookAvailable = data.logbook_available === true;
     this.sshAvailable = data.ssh_available === true;
     this.loaded = true;
     this.#finishHydration(true);
@@ -76,7 +74,6 @@ class CapabilitiesStore {
 
   reset() {
     this.capabilities = new Set();
-    this.logbookAvailable = false;
     this.sshAvailable = false;
     this.loaded = false;
     this.#loadPromise = null;

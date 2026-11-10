@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "total": 7839,
+  "total": 7786,
   "files": [
     {
       "file": "src/App.svelte",
@@ -967,35 +967,7 @@
       "count": 15
     },
     {
-      "file": "src/lib/features/logbook-actions/CreateItemConfigPanel.svelte",
-      "count": 1
-    },
-    {
-      "file": "src/lib/features/logbook-actions/LogbookActionsSettings.svelte",
-      "count": 1
-    },
-    {
-      "file": "src/lib/features/logbook/BucketNavigation.svelte",
-      "count": 2
-    },
-    {
-      "file": "src/lib/features/logbook/DocumentDetail.svelte",
-      "count": 24
-    },
-    {
-      "file": "src/lib/features/logbook/DocumentList.svelte",
-      "count": 15
-    },
-    {
-      "file": "src/lib/features/logbook/DocumentUpload.svelte",
-      "count": 9
-    },
-    {
-      "file": "src/lib/features/logbook/Logbook.svelte",
-      "count": 1
-    },
-    {
-      "file": "src/lib/features/logbook/RunActionMenu.svelte",
+      "file": "src/lib/features/actions/CreateItemConfigPanel.svelte",
       "count": 1
     },
     {

@@ -1053,7 +1053,7 @@ type ActionEvent struct {
 	TriggeredByAction bool   `json:"triggered_by_action,omitempty"` // True if this event was emitted by an action
 	ExecutionChainID  string `json:"execution_chain_id,omitempty"`  // UUID to look up cached chain state for cycle detection
 	CascadeDepth      int    `json:"cascade_depth,omitempty"`       // Depth level of this event (0 = user-triggered)
-	SourceApplication string `json:"source_application,omitempty"`  // "workspace", "logbook", or "asset"
+	SourceApplication string `json:"source_application,omitempty"`  // "workspace" or "asset"
 	// TriggerCommentIsPrivate carries the privacy of a comment_created
 	// trigger across cascades. Customer-visible nodes must not emit
 	// outward-facing output when it is set.
@@ -1278,6 +1278,14 @@ type AssetFieldMapping struct {
 	SourceType    string `json:"source_type"`     // "item_field", "literal", or "variable"
 	SourceValue   string `json:"source_value"`    // Field name, literal value, or template
 	TargetFieldID string `json:"target_field_id"` // Asset field to update
+}
+
+// CreateItemNodeConfig configures a create_item node
+type CreateItemNodeConfig struct {
+	WorkspaceID int    `json:"workspace_id"`
+	ItemTypeID  int    `json:"item_type_id"`
+	Title       string `json:"title"`       // Title template (supports {{variables}})
+	Description string `json:"description"` // Description template (optional)
 }
 
 // CreateAssetNodeConfig configures a create_asset node

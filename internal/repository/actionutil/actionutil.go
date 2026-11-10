@@ -1,7 +1,7 @@
 // Package actionutil provides shared helpers for scanning and saving
 // action flow nodes and edges. These helpers deduplicate the identical
-// transaction logic that exists across action, asset-action, and
-// logbook-action repositories.
+// transaction logic that exists across the action and asset-action
+// repositories.
 package actionutil
 
 import (
@@ -13,7 +13,7 @@ import (
 )
 
 // FlowNode is a database-level representation of an action flow node.
-// Each domain (action, asset-action, logbook-action) has its own Go type,
+// Each domain (action, asset-action) has its own Go type,
 // but the database columns are identical, so we scan/insert through this
 // common struct and let callers convert to their domain type.
 type FlowNode struct {

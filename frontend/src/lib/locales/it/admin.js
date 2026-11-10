@@ -974,11 +974,6 @@ export default {
           name: 'Analisi delle dipendenze',
           description: 'Analizza e suggerisce dipendenze tra elementi',
         },
-        logbook_articles: {
-          name: 'Articoli del logbook',
-          description:
-            'Classificazione dei documenti, pulizia e generazione di articoli per il logbook con l’IA',
-        },
       },
     },
 

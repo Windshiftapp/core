@@ -402,7 +402,7 @@ func (s *MentionService) ProcessMentions(params ProcessMentionsParams) error {
 
 // canUserReceiveMention reports whether userID has enough access to the
 // workspace that we can legitimately notify them they were mentioned. If the
-// permission service isn't wired (tests, logbook sidecar), fail open to stay
+// permission service isn't wired (tests), fail open to stay
 // compatible — production always configures one.
 func (s *MentionService) canUserReceiveMention(userID, workspaceID int) bool {
 	if s.permissionService == nil {

@@ -34,7 +34,7 @@ make dev-tools
 # Install git hooks
 make hooks
 
-# Start PostgreSQL + dev server (SQLite for main app, PostgreSQL for logbook)
+# Start the dev server (SQLite)
 ./dev.sh
 ```
 

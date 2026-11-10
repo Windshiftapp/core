@@ -1002,11 +1002,6 @@ export default {
           name: 'Dependency Analysis',
           description: 'Analyze and suggest dependencies between items',
         },
-        logbook_articles: {
-          name: 'Logbook Articles',
-          description:
-            'AI-powered document classification, cleaning, and article generation for logbook',
-        },
       },
     },
 
