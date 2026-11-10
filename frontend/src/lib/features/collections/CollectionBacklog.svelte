@@ -26,6 +26,7 @@
   import { backlogStore } from '../../stores/backlogStore.svelte.js';
   import { onWorkItemRefresh } from '../../stores/workItemRefresh.js';
   import { workspaceDataStore } from '../../stores/workspaceDataStore.svelte.js';
+  import { invalidateIterationReferences } from '../iterations/iterationReferences.js';
   import { collectionPreferences } from '../../stores/collectionPreferences.svelte.js';
   import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
   import { useCollectionEventStream } from '../../composables/useCollectionEventStream.svelte.js';
@@ -368,6 +369,7 @@
         is_global: iteration.is_global,
         workspace_id: iteration.workspace_id,
       });
+      await invalidateIterationReferences({ ...iteration, status: 'active' });
       allIterations = allIterations.map(i =>
         i.id === iteration.id ? { ...i, status: 'active' } : i
       );
@@ -398,6 +400,7 @@
     try {
       const targetIterationId = moveTarget.type === 'iteration' ? moveTarget.iterationId : null;
       await iterations.complete(iteration.id, targetIterationId);
+      await invalidateIterationReferences({ ...iteration, status: 'completed' });
       allIterations = allIterations.map(i =>
         i.id === iteration.id ? { ...i, status: 'completed' } : i
       );

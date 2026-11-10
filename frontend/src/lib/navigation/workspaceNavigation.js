@@ -119,6 +119,7 @@ export const workspaceOnlyViews = [
     labelKey: 'commandPalette.commands.iterations.label',
     tooltipKey: 'commandPalette.commands.iterations.description',
     icon: Calendar,
+    testId: 'workspace-nav-iterations',
   },
   {
     id: 'milestones',

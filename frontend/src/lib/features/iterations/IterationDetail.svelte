@@ -11,6 +11,7 @@
   import IconCircleCheck from '@tabler/icons-svelte-runes/icons/circle-check';
   import IterationBurndown from './IterationBurndown.svelte';
   import { iterations } from '../../api/milestones.js';
+  import { invalidateIterationReferences } from './iterationReferences.js';
   import { navigate } from '../../router.js';
   import Button from '../../components/Button.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
@@ -115,7 +116,8 @@
 
   async function saveIteration() {
     try {
-      await iterations.update(iterationId, formData);
+      const saved = await iterations.update(iterationId, formData);
+      await invalidateIterationReferences(saved ?? formData);
       showEditModal = false;
       await detail.loadProgress();
     } catch (err) {
@@ -135,6 +137,7 @@
     if (confirmed) {
       try {
         await iterations.delete(iterationId);
+        await invalidateIterationReferences(detail.entity);
         goBack();
       } catch (err) {
         console.error('Failed to delete iteration:', err);
@@ -164,6 +167,7 @@
     try {
       const targetIterationId = moveTarget.type === 'iteration' ? moveTarget.iterationId : null;
       await iterations.complete(iterationId, targetIterationId);
+      await invalidateIterationReferences({ ...detail.entity, status: 'completed' });
       successToast(t('iterations.iterationCompleted', { name: detail.entity.name }));
       await detail.loadProgress();
     } catch (err) {

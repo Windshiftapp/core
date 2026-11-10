@@ -657,7 +657,12 @@ class WorkspaceDataStore {
         workspaceId === 'global'
           ? milestones.getAll()
           : milestones.getAll({ workspace_id: workspaceId, include_global: true }),
-      iterations: () => iterations.getAll(),
+      // Mirror the bootstrap scope: a workspace store holds its own iterations
+      // plus the global ones, never iterations from other workspaces.
+      iterations: () =>
+        workspaceId === 'global'
+          ? iterations.getAll()
+          : iterations.getAll({ workspace_id: workspaceId, include_global: true }),
       priorities: () => priorities.getAll(),
       projects: () =>
         workspaces.getProjects ? workspaces.getProjects(workspaceId) : Promise.resolve([]),
