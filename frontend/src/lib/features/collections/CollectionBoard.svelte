@@ -48,7 +48,7 @@
   } from './swimlanes.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { resolveBoardWorkspaces } from './boardWorkspaces.js';
-  import { infoToast, successToast, warningToast } from '../../stores/toasts.svelte.js';
+  import { infoToast, successToast, warningToast, surfaceError } from '../../stores/toasts.svelte.js';
   import Plus from '@lucide/svelte/icons/plus';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -1859,11 +1859,25 @@
       });
   }
 
+  // Board rows are summaries (fields=summary), so load the full item before
+  // opening the screen; its stored values seed the displayed fields.
+  async function openBoardTransition(item, targetStatusId, targetName, laneTarget, screen) {
+    let sourceItem = item;
+    try {
+      const full = await itemsApi.get(item.id);
+      if (full) sourceItem = full;
+    } catch (err) {
+      // The board row still opens the screen; only the seed values are lost.
+      surfaceError(err, { context: 'loadBoardTransitionItem', silent: true });
+    }
+    boardTransition = { item: sourceItem, targetStatusId, targetName, laneTarget, screen };
+    showBoardTransition = true;
+  }
+
   async function moveItemToStatus(item, targetStatusId, targetName) {
     const screen = await resolveTransitionScreen(item.id, targetStatusId);
     if (screen) {
-      boardTransition = { item, targetStatusId, targetName, screen };
-      showBoardTransition = true;
+      await openBoardTransition(item, targetStatusId, targetName, null, screen);
       return;
     }
     await performMoveItemToStatus(item, targetStatusId, targetName, null);
@@ -1871,17 +1885,21 @@
 
   async function handleBoardTransitionConfirm(fields) {
     if (!boardTransition) return;
-    const { item, targetStatusId, targetName } = boardTransition;
+    const { item, targetStatusId, targetName, laneTarget } = boardTransition;
     boardTransition = null;
-    await performMoveItemToStatus(item, targetStatusId, targetName, fields);
+    await performMoveItemToStatus(item, targetStatusId, targetName, fields, laneTarget);
   }
 
-  async function performMoveItemToStatus(item, targetStatusId, targetName, fields) {
+  async function performMoveItemToStatus(item, targetStatusId, targetName, fields, laneTarget = null) {
     const previousStatusId = item.status_id;
     updateLocalItemStatus(item.id, targetStatusId);
     try {
-      const transitionedItem = await itemsApi.transition(item.id, targetStatusId, fields);
+      let transitionedItem = await itemsApi.transition(item.id, targetStatusId, fields);
       mergeLocalItem(item.id, transitionedItem);
+      if (laneTarget) {
+        transitionedItem = await applyLaneTarget(transitionedItem, laneTarget);
+        mergeLocalItem(item.id, transitionedItem);
+      }
       boardAnnouncement = `Moved ${item.title} to ${targetName}`;
       successToast(boardAnnouncement);
       reloadCollection();
@@ -2045,7 +2063,23 @@
         if (!(await confirmMilestoneLaneDrop(data.item, laneTarget))) return;
 
         const previousStatusId = data.item.status_id;
-        if (!isSameStatus) updateLocalItemStatus(data.item.id, transitionStatusId);
+        if (!isSameStatus) {
+          // A screen-bearing move pauses on the modal; the confirm handler runs
+          // the transition with the collected fields and lane target.
+          const screen = await resolveTransitionScreen(data.item.id, transitionStatusId);
+          if (screen) {
+            const targetStatus = statuses.find((status) => status.id === transitionStatusId);
+            await openBoardTransition(
+              data.item,
+              transitionStatusId,
+              targetStatus?.name || '',
+              laneTarget,
+              screen
+            );
+            return;
+          }
+          updateLocalItemStatus(data.item.id, transitionStatusId);
+        }
         try {
           let droppedItem = data.item;
           if (!isSameStatus) {
@@ -2154,13 +2188,13 @@
         const screen = await resolveTransitionScreen(preparedItem.id, targetStatusId);
         if (screen) {
           const targetStatus = statuses.find((status) => status.id === targetStatusId);
-          boardTransition = {
-            item: preparedItem,
+          await openBoardTransition(
+            preparedItem,
             targetStatusId,
-            targetName: targetStatus?.name || '',
-            screen,
-          };
-          showBoardTransition = true;
+            targetStatus?.name || '',
+            laneTarget,
+            screen
+          );
           return null;
         }
         updateLocalItemStatus(preparedItem.id, targetStatusId);
@@ -2795,6 +2829,7 @@
     targetStatusName={boardTransition.targetName}
     workspaceId={boardTransition.item?.workspace_id}
     itemLabels={boardTransition.item?.labels || []}
+    item={boardTransition.item}
     onconfirm={handleBoardTransitionConfirm}
     oncancel={() => (boardTransition = null)}
   />

@@ -689,6 +689,7 @@
         items={statusOptions}
         config={statusConfig}
         placeholder={t('pickers.selectStatus')}
+        optionTestid={(option) => `item-detail-status-option-${option.value}`}
         showUnassigned={false}
         autoOpen={editingStatus}
         disabled={!canEdit || !isSystemFieldEditable('status')}

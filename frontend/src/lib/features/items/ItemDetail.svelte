@@ -1772,6 +1772,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     milestones={itemDetailStore.milestones}
     iterations={itemDetailStore.iterations}
     itemLabels={itemDetailStore.item?.labels || []}
+    item={itemDetailStore.item}
     onconfirm={handleTransitionConfirm}
     oncancel={() => (transitionScreen = null)}
   />

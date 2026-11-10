@@ -684,6 +684,7 @@
     targetStatusName={mobileTransition.statusName}
     workspaceId={item?.workspace_id}
     itemLabels={item?.labels || []}
+    item={item}
     onconfirm={handleMobileTransitionConfirm}
     oncancel={() => (mobileTransition = null)}
   />

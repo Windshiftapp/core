@@ -87,8 +87,8 @@
     {@const identifier = field.field_identifier}
     {#if identifier === 'title'}
       <div class="space-y-1">
-        <Label color="default">{t('items.title') || 'Title'}{#if isRequired(field)}<span style="color: var(--ds-text-danger, #ef4444);"> *</span>{/if}</Label>
-        <Input value={values.title ?? ''} disabled={disabled} oninput={(e) => setValue('title', e.target.value)} />
+        <Label color="default">{t('common.title') || 'Title'}{#if isRequired(field)}<span style="color: var(--ds-text-danger, #ef4444);"> *</span>{/if}</Label>
+        <Input value={values.title ?? ''} disabled={disabled} oninput={(e) => setValue('title', e.target.value)} dataTestid="transition-field-title" />
       </div>
     {:else if identifier === 'description'}
       <div class="space-y-1">
