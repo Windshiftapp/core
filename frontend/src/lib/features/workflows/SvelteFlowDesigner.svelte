@@ -563,7 +563,6 @@
       lastCreatedStatusId = created.id;
       showStatusModal = false;
       statusFilter = '';
-      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to create status:', error);
       errorToast(t('dialogs.alerts.failedToCreate', { error: error.message || error }));

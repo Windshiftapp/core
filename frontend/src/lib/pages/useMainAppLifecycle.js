@@ -12,8 +12,8 @@ import { authStore } from '../stores/auth.svelte.js';
 import { capabilitiesStore } from '../stores/capabilities.svelte.js';
 import { homepageStore } from '../stores/homepageStore.svelte.js';
 import { startNotificationPoller, stopNotificationPoller } from '../stores/notifications.js';
+import { registerReferenceDataInvalidation } from '../stores/referenceDataInvalidation.js';
 import { onWorkItemRefresh } from '../stores/workItemRefresh.js';
-import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
 import { workspacesStore } from '../stores/workspaces.svelte.js';
 import { initDesktopFocusRefresh } from '../utils/desktopFocusRefresh.svelte.js';
 import { buildAuthenticatedShellTasks } from './authenticatedShellTasks.js';
@@ -124,7 +124,8 @@ export function useMainAppLifecycle({
       }
       void workspacesStore.reload();
     };
-    const handleRefreshWorkspaceData = () => void workspaceDataStore.refresh();
+    // Successful reference-data mutations drop the caches they invalidated.
+    const unregisterReferenceDataInvalidation = registerReferenceDataInvalidation();
     // The homepage only marks its snapshot stale here; the mounted Homepage
     // component refreshes it. One coordinator owns the event so this is not a
     // second independent listener.
@@ -133,13 +134,12 @@ export function useMainAppLifecycle({
     window.addEventListener('show-create-modal', handleShowCreateModal);
     window.addEventListener(ADMIN_UI_MUTATION_EVENT, scheduleAdminUIRefresh);
     window.addEventListener('refresh-workspaces', handleRefreshWorkspaces);
-    window.addEventListener('refresh-workspace-data', handleRefreshWorkspaceData);
 
     return () => {
       window.removeEventListener('show-create-modal', handleShowCreateModal);
       window.removeEventListener(ADMIN_UI_MUTATION_EVENT, scheduleAdminUIRefresh);
       window.removeEventListener('refresh-workspaces', handleRefreshWorkspaces);
-      window.removeEventListener('refresh-workspace-data', handleRefreshWorkspaceData);
+      unregisterReferenceDataInvalidation();
       unsubscribeRefreshWorkItems();
       if (adminUIRefreshTimer) clearTimeout(adminUIRefreshTimer);
     };

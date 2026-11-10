@@ -4,7 +4,6 @@
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { milestonesStore } from '../stores/milestones.js';
-  import { collectionEditorOptions } from '../stores/collectionEditorOptions.svelte.js';
   import { permissionStore, isSystemAdmin } from '../stores/permissions.svelte.js';
   import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import MilestoneFormDialog from '../features/milestones/MilestoneFormDialog.svelte';
@@ -199,13 +198,6 @@
       const created = await milestonesStore.add(data);
       createdMilestones = [...createdMilestones, created];
       onCreated?.(created);
-      // A successful planning mutation invalidates the selectable family so a
-      // later open reloads the directory. Global creations touch every scope.
-      if (data.is_global) {
-        collectionEditorOptions.invalidateFamily('milestones');
-      } else if (data.workspace_id) {
-        collectionEditorOptions.invalidate(data.workspace_id, 'milestones');
-      }
 
       if (multiple) {
         const nextIds = [

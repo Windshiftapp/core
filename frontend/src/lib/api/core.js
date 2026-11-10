@@ -18,6 +18,9 @@ const RETRY_JITTER_MS = 250;
 export const API_BASE = '/api';
 export const API_V2_BASE = '/api/v2';
 export const ADMIN_UI_MUTATION_EVENT = 'windshift:admin-ui-mutation';
+// Fires after every successful mutating request. The app shell listens to drop
+// stale reference caches; the API layer stays store-free.
+export const API_MUTATION_EVENT = 'windshift:api-mutation';
 
 // Ensure the clock-drift warning toast fires at most once per session
 let driftWarningShown = false;
@@ -108,13 +111,13 @@ function isAdminUIPath() {
   return pathname === '/admin' || pathname.startsWith('/admin/');
 }
 
-function notifyAdminUIMutation(endpoint, method) {
-  if (!isAdminUIPath()) return;
-  window.dispatchEvent(
-    new CustomEvent(ADMIN_UI_MUTATION_EVENT, {
-      detail: { endpoint, method },
-    })
-  );
+function notifyAPIMutation(endpoint, method) {
+  if (typeof window === 'undefined') return;
+  const detail = { endpoint, method };
+  window.dispatchEvent(new CustomEvent(API_MUTATION_EVENT, { detail }));
+  if (isAdminUIPath()) {
+    window.dispatchEvent(new CustomEvent(ADMIN_UI_MUTATION_EVENT, { detail }));
+  }
 }
 
 /** Replace the in-flight ownership scope after authentication changes. */
@@ -322,7 +325,7 @@ async function performFetchAPI(base, endpoint, options = {}) {
 
     const method = String(fetchOptions.method || 'GET').toUpperCase();
     if (!SAFE_METHODS.includes(method)) {
-      notifyAdminUIMutation(endpoint, method);
+      notifyAPIMutation(endpoint, method);
     }
 
     return result;

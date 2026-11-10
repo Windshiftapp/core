@@ -230,8 +230,18 @@
   // Backlog functionality
   let backlogItems = $derived(collectionStore.backlogItems);
 
-  // Iteration filter state
-  let allIterations = $state([]);
+  // Iteration filter state. When bootstrap delivered the complete directory
+  // the list mirrors the shared store, so a reference refresh reaches a mounted
+  // board; otherwise it holds the locally fetched page.
+  let fetchedIterations = $state([]);
+  const workspaceIsPersonal = $derived(workspaceDataStore.workspace?.is_personal === true);
+  let allIterations = $derived(
+    workspaceDataStore.planningCompleteness?.iterations === true
+      ? (workspaceDataStore.iterations || []).filter(
+          (iteration) => !workspaceIsPersonal || !iteration.is_global
+        )
+      : fetchedIterations
+  );
   let iterationFilterId = $state(null);
 
   // Board grouping: null, item-type lanes, or milestone lanes.
@@ -535,21 +545,15 @@
     if (requestedView !== viewSignature) return;
 
     try {
-      const isPersonal = workspaceDataStore.workspace?.is_personal === true;
-      let iters;
-      if (workspaceDataStore.planningCompleteness?.iterations === true) {
-        // Complete bootstrap data avoids a second full iteration fetch.
-        iters = (workspaceDataStore.iterations || []).filter(
-          (iteration) => !isPersonal || !iteration.is_global
-        );
-      } else {
-        iters = await iterationsApi.getAll({
+      // Complete bootstrap data drives the derived list; a truncated directory
+      // still needs its own fetch.
+      if (workspaceDataStore.planningCompleteness?.iterations !== true) {
+        fetchedIterations = (await iterationsApi.getAll({
           workspace_id: requestedWorkspaceId,
-          include_global: !isPersonal,
-        });
+          include_global: !workspaceIsPersonal,
+        })) || [];
       }
       if (requestedView !== viewSignature) return;
-      allIterations = iters || [];
 
       const storedIteration = collectionPreferences.viewStateValue(
         workspaceId,
@@ -590,6 +594,15 @@
     }
   });
 
+  // A reference refresh can remove the filtered iteration (or the last one), so
+  // drop the stale filter instead of keeping a lane that no longer exists.
+  $effect(() => {
+    if (iterationFilterId == null) return;
+    if (!allIterations.some((iteration) => iteration.id === iterationFilterId)) {
+      setIterationFilter(null);
+    }
+  });
+
   // Keep backlog count in sync
   $effect(() => {
     backlogStore.setCount(workspaceId, collectionStore.backlogPagination?.total_items ?? collectionStore.backlogItems.length);
@@ -608,7 +621,7 @@
     setupViewSignature = view;
     dependencyLoader.reset();
     visibleBoardItemIds = new Set();
-    allIterations = [];
+    fetchedIterations = [];
     iterationFilterId = null;
     boardGroupBy = null;
     excludeRightmostSwimlaneParents = false;
@@ -1689,9 +1702,6 @@
     } finally {
       bulkBusy = false;
       clearSelection();
-      // Keep the shared label directory in sync so newly created labels appear
-      // on cards and in other pickers.
-      void workspaceDataStore.invalidate('labels');
       reloadCollection();
     }
   }

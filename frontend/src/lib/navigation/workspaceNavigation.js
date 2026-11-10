@@ -126,6 +126,7 @@ export const workspaceOnlyViews = [
     labelKey: 'commandPalette.commands.milestones.label',
     tooltipKey: 'commandPalette.commands.milestones.description',
     icon: Milestone,
+    testId: 'workspace-nav-milestones',
   },
   {
     id: 'analytics',

@@ -19,7 +19,6 @@
   import IterationNavigation from './IterationNavigation.svelte';
   import { formatDateShort } from '../../utils/dateFormatter.js';
   import { iterationTypes as iterationTypesApi, iterations as iterationsApi } from '../../api/milestones.js';
-  import { invalidateIterationReferences } from './iterationReferences.js';
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { currentRoute, navigate } from '../../router.js';
@@ -126,18 +125,14 @@
 
   async function handleSave(data) {
     try {
-      let saved;
       if (editingIteration) {
-        saved = await iterationsApi.update(
+        await iterationsApi.update(
           editingIteration.id,
           preservePlanningScope(data, editingIteration)
         );
       } else {
-        saved = await iterationsApi.create(data);
+        await iterationsApi.create(data);
       }
-      // Boards, backlogs, and pickers read the shared workspace store, so a
-      // mutation here must drop the cached directory they were primed from.
-      await invalidateIterationReferences(saved ?? data);
       await loadData();
       showModal = false;
       editingIteration = null;
@@ -163,7 +158,6 @@
     if (confirmed) {
       try {
         await iterationsApi.delete(iteration.id);
-        await invalidateIterationReferences(iteration);
         await loadData();
       } catch (error) {
         console.error('Failed to delete iteration:', error);
