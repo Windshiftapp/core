@@ -1159,21 +1159,34 @@ func (r *ItemRepository) scanItemList(rows *sql.Rows) ([]models.Item, error) {
 }
 
 // GetBacklogStatusIDs returns status IDs for backlog items.
-// It first checks board_configurations for the workspace, then falls back to non-completed statuses.
-func (r *ItemRepository) GetBacklogStatusIDs(workspaceID int) ([]int, error) {
-	return r.GetBacklogStatusIDsContext(context.Background(), workspaceID)
+// It first checks board_configurations for the collection or workspace, then
+// falls back to the global non-completed statuses.
+func (r *ItemRepository) GetBacklogStatusIDs(workspaceID, collectionID int) ([]int, error) {
+	return r.GetBacklogStatusIDsContext(context.Background(), workspaceID, collectionID)
 }
 
 // GetBacklogStatusIDsContext is the request-aware form of GetBacklogStatusIDs.
-func (r *ItemRepository) GetBacklogStatusIDsContext(ctx context.Context, workspaceID int) ([]int, error) {
-	// First, check if there's a board configuration with backlog_status_ids
-	if workspaceID > 0 {
+// A collection-scoped board configuration owns that collection's backlog
+// statuses; a request without a collection uses the workspace default. When
+// neither is configured, the global non-completed, non-default statuses apply.
+func (r *ItemRepository) GetBacklogStatusIDsContext(ctx context.Context, workspaceID, collectionID int) ([]int, error) {
+	scopeColumn, scopeID := "", 0
+	if collectionID > 0 {
+		scopeColumn, scopeID = "collection_id", collectionID
+	} else if workspaceID > 0 {
+		scopeColumn, scopeID = "workspace_id", workspaceID
+	}
+	if scopeID > 0 {
 		var backlogStatusIDsJSON sql.NullString
 		err := r.db.QueryRowContext(ctx, `
 			SELECT backlog_status_ids
 			FROM board_configurations
-			WHERE workspace_id = ?`, workspaceID).Scan(&backlogStatusIDsJSON)
-
+			WHERE `+scopeColumn+` = ?
+			ORDER BY id
+			LIMIT 1`, scopeID).Scan(&backlogStatusIDsJSON)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("failed to load backlog configuration: %w", err)
+		}
 		if err == nil && backlogStatusIDsJSON.Valid && backlogStatusIDsJSON.String != "" {
 			var statusIDs []int
 			if err := json.Unmarshal([]byte(backlogStatusIDsJSON.String), &statusIDs); err != nil {

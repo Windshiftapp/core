@@ -620,7 +620,8 @@ type BacklogParams struct {
 	OmitDescriptions bool
 }
 
-// GetBacklogItems retrieves items with non-completed statuses for a workspace/collection
+// GetBacklogItems retrieves items whose status is configured for the backlog
+// of the requested collection or workspace.
 func (s *ItemCRUDService) GetBacklogItems(params BacklogParams) ([]models.Item, int, error) {
 	return s.GetBacklogItemsContext(context.Background(), params)
 }
@@ -632,7 +633,7 @@ func (s *ItemCRUDService) GetBacklogItemsContext(ctx context.Context, params Bac
 	}
 
 	// Resolve backlog status IDs
-	backlogStatusIDs, err := s.repo.GetBacklogStatusIDsContext(ctx, params.WorkspaceID)
+	backlogStatusIDs, err := s.repo.GetBacklogStatusIDsContext(ctx, params.WorkspaceID, params.CollectionID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get backlog statuses: %w", err)
 	}
