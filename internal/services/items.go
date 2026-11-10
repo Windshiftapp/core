@@ -55,29 +55,29 @@ func mapTextStatusToID(status string) *int {
 	}
 }
 
-// mapTextPriorityToID maps legacy text priority values to priority IDs
-// Returns nil if the priority cannot be mapped
-// Default priority IDs from database setup:
-// 1: "Low", 2: "Medium", 3: "High", 4: "Critical"
-func mapTextPriorityToID(priority string) *int {
-	normalized := strings.ToLower(strings.TrimSpace(priority))
+// priorityNameAliases maps legacy text priority values onto the canonical
+// priority names used by the default catalog.
+var priorityNameAliases = map[string]string{
+	"urgent": "Critical",
+}
 
-	switch normalized {
-	case "low":
-		id := 1
-		return &id
-	case "medium":
-		id := 2
-		return &id
-	case "high":
-		id := 3
-		return &id
-	case "critical", "urgent":
-		id := 4
-		return &id
-	default:
-		return nil
+// resolvePriorityIDByName maps a legacy text priority onto a catalog priority
+// ID by name. Priorities are configurable, so the seeded IDs cannot be assumed;
+// an unknown name returns nil so the caller can fall back to the default.
+func resolvePriorityIDByName(db database.Database, priority string) (*int, error) {
+	name := strings.TrimSpace(priority)
+	if alias, ok := priorityNameAliases[strings.ToLower(name)]; ok {
+		name = alias
 	}
+	var id int
+	err := db.QueryRow(`SELECT id FROM priorities WHERE LOWER(name) = LOWER(?) ORDER BY id LIMIT 1`, name).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("resolve priority %q: %w", priority, err)
+	}
+	return &id, nil
 }
 
 // ItemCreationParams contains all parameters for creating an item

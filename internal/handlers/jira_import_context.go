@@ -28,6 +28,7 @@ type jiraImportContext struct {
 
 	statusMap           map[string]int
 	itemTypeMap         map[string]int
+	priorityMap         map[string]int
 	customFieldIDMap    map[string]int
 	choiceOptionIDs     map[string]map[string]int
 	customFieldMappings []CustomFieldMapping
@@ -76,7 +77,7 @@ type jiraIssueReferences struct {
 	channelID               *int
 	requestTypeID           *int
 	milestoneIDs            []int
-	priorityName            string
+	priorityID              *int
 	dueDate                 *time.Time
 	createdAt               *time.Time
 	updatedAt               *time.Time

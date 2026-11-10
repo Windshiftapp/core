@@ -541,6 +541,7 @@ func (h *JiraImportHandler) setupJiraProject(
 		workspaceID:         workspaceID,
 		statusMap:           global.statusMap,
 		itemTypeMap:         global.itemTypeMap,
+		priorityMap:         make(map[string]int),
 		customFieldIDMap:    global.customFieldIDMap,
 		choiceOptionIDs:     global.choiceOptionIDs,
 		customFieldMappings: req.Mappings.CustomFields,

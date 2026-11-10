@@ -201,7 +201,9 @@ func (s *Service) UpdateImportedItem(itemID int, params services.ItemCreationPar
 		return 0, err
 	}
 	var priorityID any
-	if strings.TrimSpace(params.Priority) != "" {
+	if params.PriorityID != nil {
+		priorityID = *params.PriorityID
+	} else if strings.TrimSpace(params.Priority) != "" {
 		var resolvedPriorityID int
 		if err := s.db.QueryRow(`
 			SELECT id FROM priorities WHERE LOWER(name) = LOWER(?) ORDER BY id LIMIT 1

@@ -325,6 +325,18 @@ func SuggestPriorityMapping(jiraPriorityName string) string {
 	return "Medium" // Default
 }
 
+// PriorityMappingTarget returns the Windshift priority a Jira name maps to and
+// whether that mapping is a known synonym. Unknown names are returned unchanged
+// so importers can preserve and create them instead of collapsing to the
+// default.
+func PriorityMappingTarget(jiraPriorityName string) (target string, known bool) {
+	name := strings.TrimSpace(jiraPriorityName)
+	if mapped, ok := PriorityMapping[strings.ToLower(name)]; ok {
+		return mapped, true
+	}
+	return name, false
+}
+
 // MentionResolver maps a Jira accountID to the Windshift username that should
 // be rendered for an `@mention`. Returning "" falls back to the mention's
 // display text.

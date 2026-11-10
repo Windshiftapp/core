@@ -206,7 +206,11 @@ func (c *itemCreation) resolvePriority() error {
 	if params.PriorityID != nil {
 		c.priorityID = params.PriorityID
 	} else if params.Priority != "" {
-		c.priorityID = mapTextPriorityToID(params.Priority)
+		resolved, err := resolvePriorityIDByName(c.db, params.Priority)
+		if err != nil {
+			return err
+		}
+		c.priorityID = resolved
 	}
 	if c.priorityID == nil {
 		c.priorityID = c.defaultPriorityID()

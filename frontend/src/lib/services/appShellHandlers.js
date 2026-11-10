@@ -29,12 +29,16 @@ export function installGlobalErrorHandlers(target = typeof window !== 'undefined
   // A promise rejection nobody handled. Aborting is navigation/cancellation
   // control flow, not a failure the user should see. runed's own primitives
   // also cancel an internal debounce during cleanup and discard its promise
-  // (`onClickOutside` does this on every pointerdown), so the cancel sentinel
-  // escapes `useDebouncedAction` and lands here.
+  // (`onClickOutside` does this whenever a modal closes), so the cancel
+  // sentinel escapes `useDebouncedAction` and lands here. `preventDefault()`
+  // marks these as handled so the browser stops logging "Uncaught (in promise)".
   target.addEventListener('unhandledrejection', (event) => {
-    const reason = /** @type {PromiseRejectionEvent} */ (event).reason;
-    if (reason?.name === 'AbortError') return;
-    if (reason === RUNED_CANCEL_SENTINEL) return;
+    const rejectionEvent = /** @type {PromiseRejectionEvent} */ (event);
+    const reason = rejectionEvent.reason;
+    if (reason?.name === 'AbortError' || reason === RUNED_CANCEL_SENTINEL) {
+      rejectionEvent.preventDefault();
+      return;
+    }
     surfaceError(reason, { context: 'unhandledrejection' });
   });
 

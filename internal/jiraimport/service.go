@@ -26,6 +26,7 @@ type Service struct {
 	storage      *blobstore.Store
 	statuses     *repository.StatusRepository
 	itemTypes    *repository.ItemTypeRepository
+	priorities   *repository.PriorityRepository
 	customFields *repository.CustomFieldRepository
 	planning     *services.PlanningService
 	collections  *repository.CollectionRepository
@@ -54,6 +55,7 @@ func New(db database.Database, storage *blobstore.Store) *Service {
 		storage:      storage,
 		statuses:     repository.NewStatusRepository(db),
 		itemTypes:    repository.NewItemTypeRepository(db),
+		priorities:   repository.NewPriorityRepository(db),
 		customFields: repository.NewCustomFieldRepository(db),
 		planning:     services.NewPlanningService(db),
 		collections:  repository.NewCollectionRepository(db),
