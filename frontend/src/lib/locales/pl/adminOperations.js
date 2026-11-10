@@ -315,7 +315,6 @@ export default withEnglishAdminOperations({
     groupOutsideColumnWithType: 'Grupuj elementy typu {type} tylko poza {column}',
     groupOutsideColumn: 'Grupuj elementy tylko poza {column}',
     hiddenCount: '{count} ukrytych',
-    useAsSwimlanes: 'Użyj tych elementów jako torów',
     milestoneSwimlanes: 'Tory kamieni milowych',
     milestoneSwimlanesDescription: 'Grupuj karty według kamienia milowego',
     configureMilestones: 'Konfiguruj tory kamieni milowych',

@@ -309,7 +309,6 @@ export default {
     "groupOutsideColumnWithType": "{column} 외의 열에서만 {type} 작업 그룹화",
     "groupOutsideColumn": "{column} 외의 열에서만 작업 그룹화",
     "hiddenCount": "{count}개 숨겨짐",
-    "useAsSwimlanes": "이 작업을 스윔레인으로 사용"
   },
   "systemImport": {
     "title": "시스템 가져오기",

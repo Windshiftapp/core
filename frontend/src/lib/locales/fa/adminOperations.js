@@ -311,7 +311,6 @@ export default {
     "groupOutsideColumnWithType": "گروه {type} موارد فقط خارج از {column}",
     "groupOutsideColumn": "گروه‌بندی موارد فقط خارج از {column}",
     "hiddenCount": "{count} پنهان شد",
-    "useAsSwimlanes": "از این‌ها به عنوان خط شنا استفاده کنید",
     "milestoneSwimlanes": "خطوط شنای نقاط عطف",
     "milestoneSwimlanesDescription": "کارت ها را بر اساس نقطه عطف گروه بندی کنید",
     "configureMilestones": "خطوط شنای نقاط عطف را پیکربندی کنید",

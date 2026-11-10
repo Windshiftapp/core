@@ -211,7 +211,6 @@ export default withEnglishAdminOperations({
     groupOutsideColumnWithType: '{type}-Vorgänge nur außerhalb von {column} gruppieren',
     groupOutsideColumn: 'Vorgänge nur außerhalb von {column} gruppieren',
     hiddenCount: '{count} ausgeblendet',
-    useAsSwimlanes: 'Diese Vorgänge als Swimlanes verwenden',
   },
   systemImport: {
     title: 'Systemimport',

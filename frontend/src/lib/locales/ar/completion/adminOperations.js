@@ -109,7 +109,6 @@ export default {
     groupOutsideColumnWithType: 'تجميع عناصر {type} خارج {column} فقط',
     groupOutsideColumn: 'تجميع العناصر خارج {column} فقط',
     hiddenCount: '{count} مخفي',
-    useAsSwimlanes: 'استخدام هذه العناصر كمسارات',
     milestoneSwimlanes: 'مسارات المعالم',
     milestoneSwimlanesDescription: 'تجميع البطاقات حسب المعلم',
     configureMilestones: 'تكوين مسارات المعالم',

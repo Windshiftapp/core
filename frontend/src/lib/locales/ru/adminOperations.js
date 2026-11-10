@@ -346,7 +346,6 @@ export default {
     groupOutsideColumnWithType: 'Группировать элементы типа «{type}» только вне столбца «{column}»',
     groupOutsideColumn: 'Группировать элементы только вне столбца «{column}»',
     hiddenCount: 'Скрыто: {count}',
-    useAsSwimlanes: 'Использовать элементы этого типа как дорожки',
   },
   systemImport: {
     title: 'Импорт данных',

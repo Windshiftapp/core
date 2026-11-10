@@ -344,7 +344,6 @@ export default {
     groupOutsideColumnWithType: 'Regrouper les éléments {type} uniquement en dehors de {column}',
     groupOutsideColumn: 'Regrouper les éléments uniquement en dehors de {column}',
     hiddenCount: '{count} masqués',
-    useAsSwimlanes: 'Utiliser ces éléments comme couloirs',
   },
   systemImport: {
     title: 'Importation système',

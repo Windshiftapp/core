@@ -314,7 +314,6 @@ export default withEnglishAdminOperations({
     groupOutsideColumnWithType: 'Raggruppa gli elementi {type} solo fuori da {column}',
     groupOutsideColumn: 'Raggruppa gli elementi solo fuori da {column}',
     hiddenCount: '{count} nascosti',
-    useAsSwimlanes: 'Usa questi elementi come swimlane',
     milestoneSwimlanes: 'Swimlane per milestone',
     milestoneSwimlanesDescription: 'Raggruppa le schede per milestone',
     configureMilestones: 'Configura swimlane per milestone',

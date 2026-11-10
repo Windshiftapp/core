@@ -1301,7 +1301,6 @@
         id: `group-type-${type.id}`,
         testid: `board-group-by-type-${type.id}`,
         title: type.name,
-        subtitle: t('boardControls.useAsSwimlanes'),
         itemType: type,
         selected:
           boardGroupBy?.dimension === BOARD_GROUP_BY_ITEM_TYPE && boardGroupBy.itemTypeId === type.id,

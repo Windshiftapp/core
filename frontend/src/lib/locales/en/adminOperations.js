@@ -312,7 +312,6 @@ export default {
     groupOutsideColumnWithType: 'Group {type} items only outside {column}',
     groupOutsideColumn: 'Group items only outside {column}',
     hiddenCount: '{count} hidden',
-    useAsSwimlanes: 'Use these items as swimlanes',
     milestoneSwimlanes: 'Milestone swimlanes',
     milestoneSwimlanesDescription: 'Group cards by milestone',
     configureMilestones: 'Configure milestone swimlanes',

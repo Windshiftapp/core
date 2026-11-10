@@ -78,7 +78,6 @@ export default withEnglishAdminOperations({
     groupOutsideColumnWithType: '仅在 {column} 之外对 {type} 事项分组',
     groupOutsideColumn: '仅在 {column} 之外对事项分组',
     hiddenCount: '已隐藏 {count} 个',
-    useAsSwimlanes: '将这些事项用作泳道',
     milestoneSwimlanes: '里程碑泳道',
     milestoneSwimlanesDescription: '按里程碑对卡片分组',
     configureMilestones: '配置里程碑泳道',
