@@ -2220,11 +2220,17 @@
         >
           {#snippet actions()}
             <div class="flex flex-wrap items-center justify-end gap-3">
-              {#if allIterations.length > 0}
-                <div class="inline-flex items-center rounded-lg border overflow-hidden text-sm"
-                     style="background-color: var(--ctx-surface, transparent); backdrop-filter: var(--ctx-backdrop, none); border-color: var(--ctx-border, var(--ds-border));">
+              <!-- The filter bar is only useful with an option to pick or an
+                   active filter to clear; a lone "All Items" tab would be a
+                   no-op. -->
+              {#if iterationFilterOptions.length > 0 || iterationFilterId}
+                <div
+                  class="inline-flex items-center rounded-lg border overflow-hidden text-sm"
+                  data-testid="board-iteration-filter"
+                  style="background-color: var(--ctx-surface, transparent); backdrop-filter: var(--ctx-backdrop, none); border-color: var(--ctx-border, var(--ds-border));">
                   <button
                     class="px-3 py-1.5 transition-colors"
+                    data-testid="board-iteration-filter-all"
                     style={!iterationFilterId
                       ? 'background-color: var(--ctx-surface-raised, var(--ds-surface-raised)); color: var(--ds-text); font-weight: 500;'
                       : 'color: var(--ds-text); background-color: transparent;'}
