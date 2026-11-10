@@ -32,10 +32,19 @@
     { key: 'light-collapsed', expanded: false, background: lightBackground, color: lightText },
     { key: 'dark-expanded', expanded: true, background: darkBackground, color: darkText },
     { key: 'dark-collapsed', expanded: false, background: darkBackground, color: darkText },
-  ].map((variant) => ({
-    ...variant,
-    lockup: resolveBrandLockup({ isDark: variant.key.startsWith('dark'), expanded: variant.expanded }, snapshot),
-  })));
+  ].map((variant) => {
+    const lockup = resolveBrandLockup(
+      { isDark: variant.key.startsWith('dark'), expanded: variant.expanded },
+      snapshot
+    );
+    // Mirror the sidebar: full logos and the collapsed mark are centered, the
+    // mark-and-title lockup stays left-aligned with the navigation.
+    return {
+      ...variant,
+      lockup,
+      justify: !variant.expanded || lockup.variant === 'full' ? 'justify-center' : 'justify-start',
+    };
+  }));
 </script>
 
 <div class="space-y-2">
@@ -55,7 +64,7 @@
             : t('settings.themeManager.brandPreviewCollapsed', 'Collapsed')}
         </span>
         <div
-          class="flex h-10 items-center overflow-hidden rounded border border-ds-border px-3"
+          class="flex h-10 items-center overflow-hidden rounded border border-ds-border px-3 {variant.justify}"
           style="background-color: {variant.background}; color: {variant.color};"
           data-testid={`theme-brand-preview-${variant.key}`}
         >

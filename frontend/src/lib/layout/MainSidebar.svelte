@@ -125,6 +125,17 @@
     )
   );
 
+  // The full-logo wordmark spans the sidebar, so center it to keep its margins
+  // even. Mark-based lockups align with the navigation icons on the left, and
+  // the collapsed sidebar always centers the mark.
+  const brandLinkClass = $derived(
+    !$uiStore.navExpanded
+      ? 'justify-center'
+      : brandLockup.variant === 'full'
+        ? 'justify-center px-4'
+        : 'justify-start px-4'
+  );
+
   function showCreateDropdown() {
     onShowCreateModal();
   }
@@ -151,9 +162,7 @@
       href="/"
       onclick={closePopoverSurface}
       data-testid="nav-logo-link"
-      class="flex items-center {$uiStore.navExpanded
-        ? 'justify-start px-4'
-        : 'justify-center'} w-full h-10 mb-2 hover:opacity-80 transition-opacity cursor-pointer"
+      class="flex items-center {brandLinkClass} w-full h-10 mb-2 hover:opacity-80 transition-opacity cursor-pointer"
     >
       {#if brandLockup.src}
         <img
