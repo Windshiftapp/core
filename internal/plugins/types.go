@@ -37,6 +37,17 @@ type Route struct {
 	Auth        RouteAuth `json:"auth,omitempty"`
 }
 
+// Asset declares the authentication required for a plugin asset. Assets are
+// served by the host rather than the WASM module, so they carry their own auth
+// policy instead of inheriting a route's. Path is relative to the plugin's
+// assets directory: a trailing "*" matches a prefix, otherwise the entry is an
+// exact match. Auth uses the same catalog as Route.Auth; the default is
+// session, so public asset access is an explicit opt-in.
+type Asset struct {
+	Path string    `json:"path"`
+	Auth RouteAuth `json:"auth,omitempty"`
+}
+
 // Extension represents a UI extension point provided by a plugin.
 type Extension struct {
 	Point       string   `json:"point"`                 // Extension point type (e.g., "admin.tab")
@@ -148,6 +159,7 @@ type PluginManifest struct {
 	Permissions []string         `json:"permissions,omitempty"`
 	Extensions  []Extension      `json:"extensions,omitempty"` // UI extensions provided by this plugin
 	Routes      []Route          `json:"routes,omitempty"`     // Inline route metadata
+	Assets      []Asset          `json:"assets,omitempty"`     // Per-prefix auth policy for served assets
 	Webhooks    []PluginWebhook  `json:"webhooks,omitempty"`   // Webhooks the plugin wants to receive
 	Schedules   []PluginSchedule `json:"schedules,omitempty"`  // Periodic invocations
 }

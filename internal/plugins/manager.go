@@ -12,8 +12,8 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -30,6 +30,11 @@ import (
 // licenseTokenFileName stores the plugin's license token alongside the
 // manifest and entry point so verification survives restarts.
 const licenseTokenFileName = "license.token"
+
+// defaultMaxHTTPFetchResponseBytes bounds the http_fetch response body. The
+// WASM memory limit bounds what a plugin can hold, not what the host reads from
+// an upstream, so this is the process-level ceiling.
+const defaultMaxHTTPFetchResponseBytes = 32 << 20 // 32 MiB
 
 // LoadedPlugin represents a loaded plugin instance backed by a compiled Extism module.
 type LoadedPlugin struct {
@@ -48,7 +53,10 @@ type LoadedPlugin struct {
 	// functions; an empty set leaves only log available. Manifest.Permissions
 	// holds what the plugin requested.
 	Permissions []string
-	compiled    *extism.CompiledPlugin
+	// Assets is the normalized per-prefix auth policy for served assets. An
+	// asset that matches no entry requires an authenticated session.
+	Assets   []Asset
+	compiled *extism.CompiledPlugin
 }
 
 // Manager handles plugin loading and lifecycle.
@@ -63,6 +71,7 @@ type Manager struct {
 	logger          *slog.Logger
 	pluginTimeout   time.Duration
 	memoryLimit     uint64
+	maxFetchBytes   int64
 	licenseVerifier LicenseVerifier
 	// allowPublicRoutes permits plugin routes that declare auth "none".
 	allowPublicRoutes bool
@@ -143,6 +152,10 @@ func NewManager(pluginDir string, opts ...Option) *Manager {
 		opt(&options)
 	}
 
+	if options.MaxHTTPFetchResponseBytes <= 0 {
+		options.MaxHTTPFetchResponseBytes = defaultMaxHTTPFetchResponseBytes
+	}
+
 	// Build list of plugin directories: primary dir + any additional dirs
 	pluginDirs := make([]string, 0, 1+len(options.AdditionalPluginDirs))
 	pluginDirs = append(pluginDirs, pluginDir)
@@ -159,6 +172,7 @@ func NewManager(pluginDir string, opts ...Option) *Manager {
 		logger:            options.Logger,
 		pluginTimeout:     options.PluginTimeout,
 		memoryLimit:       options.MemoryLimit,
+		maxFetchBytes:     options.MaxHTTPFetchResponseBytes,
 		licenseVerifier:   options.LicenseVerifier,
 		allowPublicRoutes: options.AllowPublicRoutes,
 		db:                options.Database,
@@ -219,6 +233,12 @@ func (m *Manager) loadPluginsFromDir(pluginDir string) error {
 			continue
 		}
 
+		// Staging and backup directories from an interrupted upload start with
+		// a dot; they are not plugins.
+		if strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+
 		pluginPath := filepath.Join(pluginDir, entry.Name())
 		if err := m.LoadPlugin(pluginPath); err != nil {
 			m.logger.Warn("failed to load plugin", "path", pluginPath, "error", err)
@@ -266,6 +286,14 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 		return fmt.Errorf("invalid plugin extensions: %w", err)
 	}
 
+	// Asset auth is manifest-only and validated before compilation so a
+	// malformed or ambiguous policy fails the load without touching the WASM
+	// compiler or any shared state.
+	normalizedAssets, err := normalizeAssets(manifest.Assets, m.allowPublicRoutes)
+	if err != nil {
+		return fmt.Errorf("invalid plugin assets: %w", err)
+	}
+
 	wasmPath := filepath.Join(pluginPath, manifest.EntryPoint)
 	if _, err = os.Stat(wasmPath); err != nil {
 		return fmt.Errorf("failed to read WASM file: %w", err)
@@ -278,6 +306,15 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to compile plugin: %w", err)
 	}
+
+	// Close the compiled module if a later validation step fails, so a rejected
+	// load does not leak a WASM runtime.
+	loaded := false
+	defer func() {
+		if !loaded {
+			_ = compiled.Close(context.Background())
+		}
+	}()
 
 	licensed := m.verifyStoredLicense(pluginPath, manifest.Name)
 	// Capability AND license: an unlicensed plugin gets no host-function
@@ -300,6 +337,7 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 		Enabled:     true,
 		Licensed:    licensed,
 		Permissions: effectivePermissions,
+		Assets:      normalizedAssets,
 		compiled:    compiled,
 	}
 
@@ -329,6 +367,12 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 		}
 	}
 
+	for _, asset := range plugin.Assets {
+		if asset.Auth == RouteAuthNone {
+			m.logger.Warn("plugin asset is public", "plugin", manifest.Name, "path", asset.Path)
+		}
+	}
+
 	// Loud load-time notice of the compatibility break: a plugin that predates
 	// host-function permissions still relies on functions it never declared, and
 	// those calls are now denied.
@@ -337,6 +381,19 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 			"plugin", manifest.Name,
 			"declared_permissions", manifest.Permissions,
 			"denied_host_functions", denied)
+	}
+
+	// Close and unregister any previous runtime for this name so its compiled
+	// module and schedules do not survive a replacement. All fallible
+	// validation is done above, so nothing can fail between here and
+	// registration.
+	m.mu.RLock()
+	_, replacing := m.plugins[manifest.Name]
+	m.mu.RUnlock()
+	if replacing {
+		if err := m.UnloadPlugin(manifest.Name); err != nil {
+			m.logger.Warn("failed to unload plugin being replaced", "name", manifest.Name, "error", err)
+		}
 	}
 
 	m.mu.Lock()
@@ -350,6 +407,7 @@ func (m *Manager) LoadPlugin(pluginPath string) error {
 		m.logger.Warn("failed to register plugin schedules", "name", manifest.Name, "error", err)
 	}
 
+	loaded = true
 	m.logger.Info("loaded plugin", "name", manifest.Name, "version", manifest.Version, "routes", len(plugin.Routes))
 	return nil
 }
@@ -563,46 +621,24 @@ func (m *Manager) CallPluginFunction(pluginName, funcName string, payload any) (
 	})
 }
 
-// validPluginName matches only safe plugin names: alphanumeric, hyphens, underscores.
-var validPluginName = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
-
-// validatePluginName rejects names that could cause path traversal or injection.
-func validatePluginName(name string) error {
-	if name == "" {
-		return fmt.Errorf("plugin name must not be empty")
-	}
-	if strings.Contains(name, "..") || strings.Contains(name, "/") || strings.Contains(name, "\\") {
-		return fmt.Errorf("invalid plugin name: must not contain path separators or '..'")
-	}
-	if !validPluginName.MatchString(name) {
-		return fmt.Errorf("invalid plugin name: must contain only alphanumeric characters, hyphens, and underscores")
-	}
-	return nil
-}
-
-// validateAndPreparePlugin unmarshals the manifest JSON, resolves the plugin
-// name (falling back to the manifest name when name is empty), validates the
-// name, and creates the plugin directory under the primary plugin dir.
-// It returns the parsed manifest and the created plugin directory path.
-func (m *Manager) validateAndPreparePlugin(name string, manifestData []byte) (manifest PluginManifest, pluginPath string, err error) {
-	if err = json.Unmarshal(manifestData, &manifest); err != nil {
+// validateManifest parses the manifest and resolves the plugin name. The
+// requested name, when non-empty, must match the manifest name so the
+// installed directory, registry key, and runtime identity cannot diverge.
+func (m *Manager) validateManifest(name string, manifestData []byte) (PluginManifest, string, error) {
+	var manifest PluginManifest
+	if err := json.Unmarshal(manifestData, &manifest); err != nil {
 		return manifest, "", fmt.Errorf("invalid manifest.json: %w", err)
 	}
-
-	if name == "" {
-		name = manifest.Name
+	if manifest.Name == "" {
+		return manifest, "", fmt.Errorf("invalid manifest.json: name is required")
 	}
-
-	if err := validatePluginName(name); err != nil {
+	if err := validatePluginName(manifest.Name); err != nil {
 		return manifest, "", err
 	}
-
-	pluginPath = filepath.Join(m.pluginDirs[0], name)
-	if err = os.MkdirAll(pluginPath, 0o750); err != nil {
-		return manifest, "", fmt.Errorf("failed to create plugin directory: %w", err)
+	if name != "" && name != manifest.Name {
+		return manifest, "", fmt.Errorf("plugin name %q does not match manifest name %q", name, manifest.Name)
 	}
-
-	return manifest, pluginPath, nil
+	return manifest, manifest.Name, nil
 }
 
 // UploadPlugin handles plugin upload from a zip file.
@@ -620,118 +656,77 @@ func (m *Manager) UploadPluginWithLicense(name string, zipData, license []byte) 
 		return fmt.Errorf("invalid zip file: %w", err)
 	}
 
-	var manifestData []byte
-	for _, file := range zipReader.File {
-		if file.Name != "manifest.json" && filepath.Base(file.Name) != "manifest.json" {
-			continue
-		}
-		rc, err := file.Open()
-		if err != nil {
-			return fmt.Errorf("failed to read manifest from zip: %w", err)
-		}
-		manifestData, err = io.ReadAll(rc)
-		_ = rc.Close()
-		if err != nil {
-			return fmt.Errorf("failed to read manifest data: %w", err)
-		}
-		break
-	}
-
-	if manifestData == nil {
-		return fmt.Errorf("manifest.json not found in zip file")
-	}
-
-	_, pluginPath, err := m.validateAndPreparePlugin(name, manifestData)
+	manifestEntry, root, err := canonicalManifestEntry(zipReader.File)
 	if err != nil {
 		return err
 	}
 
-	// Immediate feedback at upload time; the token is stored either way and
-	// re-verified on every load.
+	manifestData, err := readZipEntry(manifestEntry)
+	if err != nil {
+		return fmt.Errorf("failed to read manifest from zip: %w", err)
+	}
+
+	manifest, pluginName, err := m.validateManifest(name, manifestData)
+	if err != nil {
+		return err
+	}
+
+	// Immediate feedback at upload time; the token is stored with the plugin
+	// and re-verified on every load.
 	if len(license) > 0 && m.licenseVerifier != nil {
-		var uploadedManifest PluginManifest
-		if err := json.Unmarshal(manifestData, &uploadedManifest); err != nil {
-			return fmt.Errorf("invalid manifest.json: %w", err)
-		}
-		if err := m.licenseVerifier(uploadedManifest.Name, license); err != nil {
-			_ = os.RemoveAll(pluginPath)
+		if err := m.licenseVerifier(manifest.Name, license); err != nil {
 			return fmt.Errorf("license rejected: %w", err)
 		}
-		if err := os.WriteFile(filepath.Join(pluginPath, licenseTokenFileName), license, 0o600); err != nil {
+	}
+
+	// Extract into a staging directory first so a malformed archive or a failed
+	// load cannot leave a partial installation behind.
+	stagingPath, err := m.newStagingDir(pluginName)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.RemoveAll(stagingPath) }() // no-op once promoted
+
+	if err := extractPluginArchive(zipReader.File, root, manifestEntry, manifestData, stagingPath); err != nil {
+		return err
+	}
+	if len(license) > 0 {
+		if err := os.WriteFile(filepath.Join(stagingPath, licenseTokenFileName), license, 0o600); err != nil {
 			return fmt.Errorf("failed to store license: %w", err)
 		}
 	}
-
-	assetsPath := filepath.Join(pluginPath, "assets")
-	if err := os.MkdirAll(assetsPath, 0o750); err != nil {
-		return fmt.Errorf("failed to create assets directory: %w", err)
+	if err := ensureEntryPoint(stagingPath, manifest); err != nil {
+		return err
 	}
 
-	for _, file := range zipReader.File {
-		if file.FileInfo().IsDir() {
-			continue
-		}
-
-		// Skip symlinks to prevent symlink-based path traversal
-		if file.FileInfo().Mode()&os.ModeSymlink != 0 {
-			continue
-		}
-
-		// Reject absolute paths in zip entries
-		if filepath.IsAbs(file.Name) {
-			return fmt.Errorf("invalid path in zip file: %s", file.Name)
-		}
-
-		rc, err := file.Open()
-		if err != nil {
-			return fmt.Errorf("failed to open file %s in zip: %w", file.Name, err)
-		}
-
-		fileData, err := io.ReadAll(rc)
-		_ = rc.Close()
-		if err != nil {
-			return fmt.Errorf("failed to read file %s from zip: %w", file.Name, err)
-		}
-
-		fileName := filepath.Base(file.Name)
-
-		// Use securejoin to safely resolve the destination path within the plugin directory
-		var destPath string
-		if strings.HasSuffix(fileName, ".js") || strings.HasSuffix(fileName, ".css") ||
-			strings.HasPrefix(filepath.Dir(file.Name), "assets") {
-			destPath, err = securejoin.SecureJoin(assetsPath, fileName)
-		} else {
-			destPath, err = securejoin.SecureJoin(pluginPath, fileName)
-		}
-		if err != nil {
-			return fmt.Errorf("invalid path in zip file: %s: %w", file.Name, err)
-		}
-
-		if err := os.WriteFile(destPath, fileData, 0o640); err != nil { //nolint:gosec // G306: plugin files need owner rw, group r
-			return fmt.Errorf("failed to write file %s: %w", fileName, err)
-		}
-	}
-
-	return m.LoadPlugin(pluginPath)
+	return m.promoteStagedPlugin(pluginName, stagingPath)
 }
 
 // UploadPluginLegacy handles plugin upload with separate WASM and manifest (backwards compatibility).
 func (m *Manager) UploadPluginLegacy(name string, wasmData, manifestData []byte) error {
-	manifest, pluginPath, err := m.validateAndPreparePlugin(name, manifestData)
+	manifest, pluginName, err := m.validateManifest(name, manifestData)
 	if err != nil {
 		return err
 	}
 
-	manifestPath := filepath.Join(pluginPath, "manifest.json")
-	if err := os.WriteFile(manifestPath, manifestData, 0o640); err != nil { //nolint:gosec // G306: plugin files need owner rw, group r
+	stagingPath, err := m.newStagingDir(pluginName)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.RemoveAll(stagingPath) }() // no-op once promoted
+
+	if err := os.MkdirAll(filepath.Join(stagingPath, "assets"), 0o750); err != nil {
+		return fmt.Errorf("failed to create assets directory: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(stagingPath, "manifest.json"), manifestData, 0o640); err != nil { //nolint:gosec // G306: plugin files need owner rw, group r
 		return fmt.Errorf("failed to write manifest: %w", err)
 	}
 
-	wasmFileName := manifest.EntryPoint
-	if wasmFileName == "" {
-		wasmFileName = "plugin.wasm"
+	entryPoint := manifest.EntryPoint
+	if entryPoint == "" {
+		entryPoint = "plugin.wasm"
 	}
-	wasmPath, err := securejoin.SecureJoin(pluginPath, wasmFileName)
+	wasmPath, err := securejoin.SecureJoin(stagingPath, entryPoint)
 	if err != nil {
 		return fmt.Errorf("invalid entry point path in manifest: %w", err)
 	}
@@ -739,7 +734,209 @@ func (m *Manager) UploadPluginLegacy(name string, wasmData, manifestData []byte)
 		return fmt.Errorf("failed to write WASM file: %w", err)
 	}
 
-	return m.LoadPlugin(pluginPath)
+	return m.promoteStagedPlugin(pluginName, stagingPath)
+}
+
+// newStagingDir creates a staging directory next to the live plugin directory
+// so promotion is a same-filesystem rename. The leading dot keeps an
+// interrupted upload from being picked up as a plugin on the next start.
+func (m *Manager) newStagingDir(pluginName string) (string, error) {
+	if err := os.MkdirAll(m.pluginDirs[0], 0o750); err != nil {
+		return "", fmt.Errorf("failed to create plugin directory: %w", err)
+	}
+	stagingPath, err := os.MkdirTemp(m.pluginDirs[0], "."+pluginName+".staging-")
+	if err != nil {
+		return "", fmt.Errorf("failed to create staging directory: %w", err)
+	}
+	return stagingPath, nil
+}
+
+// promoteStagedPlugin moves a fully staged plugin into the live directory and
+// loads it. The previous installation is moved aside first and restored if the
+// promotion or load fails, so a failed upgrade never leaves a partial plugin.
+func (m *Manager) promoteStagedPlugin(pluginName, stagingPath string) error {
+	pluginPath := filepath.Join(m.pluginDirs[0], pluginName)
+
+	backupPath := ""
+	if _, err := os.Stat(pluginPath); err == nil {
+		// The backup shares the leading dot so a crash mid-upgrade cannot leave
+		// it to be loaded as a plugin on the next start.
+		backupPath = filepath.Join(m.pluginDirs[0], "."+pluginName+".replaced")
+		_ = os.RemoveAll(backupPath)
+		if err := os.Rename(pluginPath, backupPath); err != nil {
+			return fmt.Errorf("failed to move existing plugin aside: %w", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to inspect plugin directory: %w", err)
+	}
+
+	if err := os.Rename(stagingPath, pluginPath); err != nil {
+		if backupPath != "" {
+			_ = os.Rename(backupPath, pluginPath)
+		}
+		return fmt.Errorf("failed to activate plugin: %w", err)
+	}
+
+	if err := m.LoadPlugin(pluginPath); err != nil {
+		_ = os.RemoveAll(pluginPath)
+		if backupPath != "" {
+			_ = os.Rename(backupPath, pluginPath)
+		}
+		return err
+	}
+
+	if backupPath != "" {
+		_ = os.RemoveAll(backupPath)
+	}
+	return nil
+}
+
+// ensureEntryPoint verifies the staged plugin contains the WASM module the
+// manifest names, so a broken archive fails before promotion.
+func ensureEntryPoint(stagingPath string, manifest PluginManifest) error {
+	entryPoint := manifest.EntryPoint
+	if entryPoint == "" {
+		entryPoint = "plugin.wasm"
+	}
+	if _, err := os.Stat(filepath.Join(stagingPath, entryPoint)); err != nil {
+		return fmt.Errorf("entry point %q not found in plugin archive: %w", entryPoint, err)
+	}
+	return nil
+}
+
+// canonicalManifestEntry locates exactly one manifest.json in the archive and
+// returns the archive-root prefix every entry must share. A second
+// manifest.json anywhere in the archive is rejected: extraction must not be
+// able to overwrite the manifest that selected the destination.
+func canonicalManifestEntry(files []*zip.File) (*zip.File, string, error) {
+	var matches []*zip.File
+	for _, file := range files {
+		if file.FileInfo().IsDir() {
+			continue
+		}
+		if path.Base(path.Clean(file.Name)) == "manifest.json" {
+			matches = append(matches, file)
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return nil, "", fmt.Errorf("manifest.json not found in zip file")
+	case 1:
+	default:
+		return nil, "", fmt.Errorf("zip file contains %d manifest.json entries; exactly one is required", len(matches))
+	}
+
+	entry := matches[0]
+	root := path.Dir(path.Clean(entry.Name))
+	if root == "." {
+		root = ""
+	}
+	return entry, root, nil
+}
+
+// extractPluginArchive writes a validated archive into dest. Entries under
+// assets/ keep their relative path so per-prefix asset policies can address
+// them; other entries keep the legacy flattened layout. The manifest entry is
+// written from the validated bytes rather than re-extracted, so the bytes on
+// disk are exactly what was validated.
+func extractPluginArchive(files []*zip.File, root string, manifestEntry *zip.File, manifestData []byte, dest string) error {
+	assetsPath := filepath.Join(dest, "assets")
+	if err := os.MkdirAll(assetsPath, 0o750); err != nil {
+		return fmt.Errorf("failed to create assets directory: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(dest, "manifest.json"), manifestData, 0o640); err != nil { //nolint:gosec // G306: plugin files need owner rw, group r
+		return fmt.Errorf("failed to write manifest: %w", err)
+	}
+
+	for _, file := range files {
+		if file == manifestEntry || file.FileInfo().IsDir() {
+			continue
+		}
+		// Skip symlinks to prevent symlink-based path traversal
+		if file.FileInfo().Mode()&os.ModeSymlink != 0 {
+			continue
+		}
+		// Directory entries that did not set the directory bit.
+		if strings.HasSuffix(file.Name, "/") {
+			continue
+		}
+
+		rel, err := archiveRelativePath(file.Name, root)
+		if err != nil {
+			return err
+		}
+
+		var destPath string
+		switch {
+		case rel == "assets":
+			continue
+		case strings.HasPrefix(rel, "assets/"):
+			// Preserve the directory structure under assets/ so a per-prefix
+			// policy can address subdirectories.
+			destPath, err = securejoin.SecureJoin(assetsPath, strings.TrimPrefix(rel, "assets/"))
+		case strings.HasSuffix(path.Base(rel), ".js") || strings.HasSuffix(path.Base(rel), ".css"):
+			// Legacy layout: root-level scripts and styles are served as assets.
+			destPath, err = securejoin.SecureJoin(assetsPath, path.Base(rel))
+		default:
+			destPath, err = securejoin.SecureJoin(dest, rel)
+		}
+		if err != nil {
+			return fmt.Errorf("invalid path in zip file: %s: %w", file.Name, err)
+		}
+
+		data, err := readZipEntry(file)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(destPath), 0o750); err != nil {
+			return fmt.Errorf("failed to create directory for %s: %w", rel, err)
+		}
+		if err := os.WriteFile(destPath, data, 0o640); err != nil { //nolint:gosec // G306: plugin files need owner rw, group r
+			return fmt.Errorf("failed to write file %s: %w", rel, err)
+		}
+	}
+	return nil
+}
+
+// archiveRelativePath resolves an archive entry name against the archive root
+// and rejects absolute paths, entries outside the root, and traversal.
+func archiveRelativePath(name, root string) (string, error) {
+	clean := path.Clean(strings.ReplaceAll(name, "\\", "/"))
+	if clean == "." || clean == "/" {
+		return "", fmt.Errorf("invalid zip entry %q", name)
+	}
+	if path.IsAbs(clean) {
+		return "", fmt.Errorf("invalid absolute path in zip file: %s", name)
+	}
+	if root != "" {
+		if clean == root {
+			return "", fmt.Errorf("invalid zip entry %q: expected a file", name)
+		}
+		if !strings.HasPrefix(clean, root+"/") {
+			return "", fmt.Errorf("zip entry %q is outside the plugin root %q", name, root)
+		}
+		clean = strings.TrimPrefix(clean, root+"/")
+	}
+	for _, segment := range strings.Split(clean, "/") {
+		if segment == ".." {
+			return "", fmt.Errorf("invalid path in zip file: %s", name)
+		}
+	}
+	return clean, nil
+}
+
+// readZipEntry reads one archive entry in full.
+func readZipEntry(file *zip.File) ([]byte, error) {
+	rc, err := file.Open()
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file %s in zip: %w", file.Name, err)
+	}
+	defer func() { _ = rc.Close() }()
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %s from zip: %w", file.Name, err)
+	}
+	return data, nil
 }
 
 // DeletePlugin removes a plugin from the filesystem.
@@ -768,6 +965,24 @@ func (m *Manager) Close() error {
 		_ = m.UnloadPlugin(name)
 	}
 	return nil
+}
+
+// GetAssetAuth returns the auth policy for a plugin asset. It errors when the
+// plugin is unknown or disabled so callers can fail closed before reading the
+// asset. An asset that matches no declared policy requires a session.
+func (m *Manager) GetAssetAuth(pluginName, assetPath string) (RouteAuth, error) {
+	m.mu.RLock()
+	p, exists := m.plugins[pluginName]
+	m.mu.RUnlock()
+
+	if !exists {
+		return "", fmt.Errorf("plugin not found: %s", pluginName)
+	}
+	if !p.Enabled {
+		return "", fmt.Errorf("plugin is disabled: %s", pluginName)
+	}
+
+	return assetAuth(p.Assets, assetPath), nil
 }
 
 // GetAsset serves a static asset from a plugin's assets directory.
@@ -1001,27 +1216,7 @@ func routesOverlap(a, b Route) bool {
 	return routePatternsOverlap(a.Path, b.Path)
 }
 
-// routePatternsOverlap reports whether two path patterns can match the same
-// path. A trailing star matches a prefix.
-func routePatternsOverlap(a, b string) bool {
-	if a == b {
-		return true
-	}
-	aStar := strings.HasSuffix(a, "*")
-	bStar := strings.HasSuffix(b, "*")
-	aPrefix := strings.TrimSuffix(a, "*")
-	bPrefix := strings.TrimSuffix(b, "*")
-	switch {
-	case aStar && bStar:
-		return strings.HasPrefix(aPrefix, bPrefix) || strings.HasPrefix(bPrefix, aPrefix)
-	case aStar:
-		return strings.HasPrefix(bPrefix, aPrefix)
-	case bStar:
-		return strings.HasPrefix(aPrefix, bPrefix)
-	default:
-		return false
-	}
-}
+// routePatternsOverlap lives in assets.go so both build variants can use it.
 
 func parseRoutes(data []byte) []Route {
 	var wrapper struct {

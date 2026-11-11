@@ -1556,6 +1556,9 @@ func (s *Server) initialize() error {
 
 	pluginHandler := handlers.NewPluginHandler(s.pluginManager, repository.NewPluginRegistryRepository(s.db), logger.NewAuditor(s.db), cfg.Plugins.Disabled)
 	pluginHandler.SetLicensing(pluginLicenseVerifier, instanceService)
+	// Assets are served by the host, so their per-prefix auth policy is enforced
+	// with the same middleware the plugin router uses for handler routes.
+	pluginHandler.SetAssetAuth(authMiddleware.RequireAuth, permissionMiddleware.RequireSystemAdmin(), s.pluginPublicLimiter.Limit)
 
 	auditLogHandler := handlers.NewAuditLogHandler(repository.NewAuditLogRepository(s.db), logger.NewAuditor(s.db))
 
