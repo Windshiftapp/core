@@ -593,7 +593,8 @@
         const source = itemMap.get(link.source_id);
         const target = itemMap.get(link.target_id);
         if (source && target) {
-          arrows.push({ source, target });
+          // "Depends On" links run from the dependent (source) to its blocker (target).
+          arrows.push({ blocker: target, dependent: source });
         }
       }
     }
@@ -648,9 +649,10 @@
 
   // Sync collection name and load links when items change
   $effect(() => {
+    const dependencyLinkTypeId = roadmapConfig.dependency_link_type_id;
     if (!collectionStore.loading) {
       currentCollectionName = collectionStore.collectionName;
-      untrack(() => loadLinksForItems(allItemsSorted));
+      if (dependencyLinkTypeId) untrack(() => loadLinksForItems(allItemsSorted));
     }
   });
 
@@ -914,15 +916,20 @@
     return { startOffset: 0, endOffset: 0 };
   }
 
-  // SVG arrow path between two items (using treeData indices)
-  function getArrowPath(source, target, sourceIndex, targetIndex) {
-    const x1 = (source.barEnd + gridOffset) * colWidth;
-    const y1 = sourceIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
-    const x2 = (target.barStart + gridOffset) * colWidth;
-    const y2 = targetIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
-
+  // Connect the facing bar ends, with direction from blocker to dependent.
+  function getArrowGeometry(blocker, dependent, blockerIndex, dependentIndex) {
+    const forward = blocker.barStart + blocker.barEnd <= dependent.barStart + dependent.barEnd;
+    const x1 = ((forward ? blocker.barEnd : blocker.barStart) + gridOffset) * colWidth;
+    const y1 = blockerIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
+    const x2 = ((forward ? dependent.barStart : dependent.barEnd) + gridOffset) * colWidth;
+    const y2 = dependentIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
     const midX = (x1 + x2) / 2;
-    return `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
+    return {
+      path: `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`,
+      head: forward
+        ? `${x2},${y2} ${x2 - 6},${y2 - 4} ${x2 - 6},${y2 + 4}`
+        : `${x2},${y2} ${x2 + 6},${y2 - 4} ${x2 + 6},${y2 + 4}`,
+    };
   }
 
   // --- Panel resize handlers ---
@@ -1505,7 +1512,7 @@
                             {@const visibleColor = getVisibleColor(roadmapItem.statusColor)}
 
                             {#if roadmapItem.isMilestone && !roadmapConfig.end_field_id}
-                              <!-- Diamond milestone (no end field configured, can't expand) -->
+                              <!-- Diamond milestone when no end field is configured -->
                               <RoadmapItemPreview
                                 item={roadmapItem}
                                 workspace={workspace}
@@ -1621,21 +1628,20 @@
                       style="left: 0; top: 0; width: {totalWidth}px; height: {treeData.length * ROW_HEIGHT}px; z-index: 20;"
                     >
                       {#each dependencyArrows as arrow}
-                        {@const sourceIdx = treeData.findIndex(i => i.id === arrow.source.id)}
-                        {@const targetIdx = treeData.findIndex(i => i.id === arrow.target.id)}
-                        {#if sourceIdx !== -1 && targetIdx !== -1}
+                        {@const blockerIdx = treeData.findIndex(i => i.id === arrow.blocker.id)}
+                        {@const dependentIdx = treeData.findIndex(i => i.id === arrow.dependent.id)}
+                        {@const geometry = getArrowGeometry(arrow.blocker, arrow.dependent, blockerIdx, dependentIdx)}
+                        {#if blockerIdx !== -1 && dependentIdx !== -1}
                           <path
-                            d={getArrowPath(arrow.source, arrow.target, sourceIdx, targetIdx)}
+                            d={geometry.path}
                             fill="none"
                             stroke="var(--ds-text-subtle)"
                             stroke-width="1.5"
                             stroke-dasharray="4,3"
                             opacity="0.6"
                           />
-                          {@const tx = (arrow.target.barStart + gridOffset) * colWidth}
-                          {@const ty = targetIdx * ROW_HEIGHT + ROW_HEIGHT / 2}
                           <polygon
-                            points="{tx},{ty} {tx - 6},{ty - 4} {tx - 6},{ty + 4}"
+                            points={geometry.head}
                             fill="var(--ds-text-subtle)"
                             opacity="0.6"
                           />
