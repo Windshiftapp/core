@@ -1193,11 +1193,51 @@ type cloudWorkflowTransition struct {
 	Type              string                        `json:"type"`
 	ToStatusReference string                        `json:"toStatusReference"`
 	Links             []cloudWorkflowTransitionLink `json:"links"`
-	Validators        []json.RawMessage             `json:"validators"`
-	Actions           []json.RawMessage             `json:"actions"`
-	Triggers          []json.RawMessage             `json:"triggers"`
-	Conditions        []json.RawMessage             `json:"conditions"`
-	Rules             json.RawMessage               `json:"rules"`
+	// Jira serializes these as arrays for most transitions but as an object for
+	// conditions in some configurations, so they are decoded as raw JSON and
+	// counted shape-independently instead of failing the whole workflow read.
+	Validators json.RawMessage `json:"validators"`
+	Actions    json.RawMessage `json:"actions"`
+	Triggers   json.RawMessage `json:"triggers"`
+	Conditions json.RawMessage `json:"conditions"`
+	Rules      json.RawMessage `json:"rules"`
+}
+
+// jiraWorkflowRuleCount counts transition rules that may be absent, an array,
+// or an object.
+func jiraWorkflowRuleCount(raw json.RawMessage) int {
+	if len(raw) == 0 || string(raw) == "null" {
+		return 0
+	}
+	var list []json.RawMessage
+	if err := json.Unmarshal(raw, &list); err == nil {
+		return len(list)
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &object); err == nil {
+		return len(object)
+	}
+	return 1
+}
+
+// jiraWorkflowConditionCount counts conditions in either the object shape
+// (conditions + conditionGroups) or the legacy array shape.
+func jiraWorkflowConditionCount(raw json.RawMessage) int {
+	if len(raw) == 0 || string(raw) == "null" {
+		return 0
+	}
+	var list []json.RawMessage
+	if err := json.Unmarshal(raw, &list); err == nil {
+		return len(list)
+	}
+	var object struct {
+		Conditions      []json.RawMessage `json:"conditions"`
+		ConditionGroups []json.RawMessage `json:"conditionGroups"`
+	}
+	if err := json.Unmarshal(raw, &object); err == nil {
+		return len(object.Conditions) + len(object.ConditionGroups)
+	}
+	return 1
 }
 
 type cloudWorkflowTransitionLink struct {
@@ -1290,10 +1330,10 @@ func (c *cloudClient) GetProjectWorkflowConfiguration(
 				Description:    transition.Description,
 				Type:           JiraConfiguredWorkflowTransitionType(transition.Type),
 				ToStatusID:     toStatusID,
-				ValidatorCount: len(transition.Validators),
-				ActionCount:    len(transition.Actions),
-				TriggerCount:   len(transition.Triggers),
-				ConditionCount: len(transition.Conditions),
+				ValidatorCount: jiraWorkflowRuleCount(transition.Validators),
+				ActionCount:    jiraWorkflowRuleCount(transition.Actions),
+				TriggerCount:   jiraWorkflowRuleCount(transition.Triggers),
+				ConditionCount: jiraWorkflowConditionCount(transition.Conditions),
 			}
 			if len(transition.Rules) > 0 && string(transition.Rules) != "null" && string(transition.Rules) != "{}" {
 				configured.ConditionCount++
