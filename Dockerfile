@@ -26,7 +26,7 @@ RUN VITE_APP_VERSION_CODE="${VERSION}" \
     npm run build
 
 # Stage 2: Build Go binary
-FROM golang:1.27.3-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd AS builder
+FROM golang:1.27.4-alpine@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf AS builder
 
 # Install build dependencies (no gcc/musl-dev needed - pure Go SQLite driver)
 RUN apk add --no-cache git tzdata
