@@ -1939,7 +1939,13 @@ func (c *cloudClient) searchCurrentObjects(ctx context.Context, opts ObjectSearc
 	if pageSize < 1 {
 		pageSize = 100
 	}
-	startAt := (page - 1) * pageSize
+	// An explicit StartAt wins so callers can continue from the exact offset a
+	// server-capped page ended at; the page-number form is retained for callers
+	// that only track pages.
+	startAt := opts.StartAt
+	if page > 1 {
+		startAt = (page - 1) * pageSize
+	}
 
 	clauses := []string{
 		"objectSchemaId = " + quoteAssetsAQLID(opts.ObjectSchemaID),

@@ -807,12 +807,16 @@ type AssetObjectLinks struct {
 
 // ObjectSearchOptions contains options for searching assets
 type ObjectSearchOptions struct {
-	ObjectSchemaID    string `json:"objectSchemaId"`
-	ObjectTypeID      string `json:"objectTypeId,omitempty"`
-	IQL               string `json:"iql,omitempty"` // Insight Query Language
-	Page              int    `json:"page"`
-	PageSize          int    `json:"pageSize"`
-	IncludeAttributes bool   `json:"includeAttributes"`
+	ObjectSchemaID string `json:"objectSchemaId"`
+	ObjectTypeID   string `json:"objectTypeId,omitempty"`
+	IQL            string `json:"iql,omitempty"` // Insight Query Language
+	// StartAt is an explicit row offset. It takes precedence over Page so
+	// callers can advance by the rows a server-capped page actually returned
+	// instead of by the requested page size.
+	StartAt           int  `json:"startAt,omitempty"`
+	Page              int  `json:"page"`
+	PageSize          int  `json:"pageSize"`
+	IncludeAttributes bool `json:"includeAttributes"`
 }
 
 // ObjectSearchResult represents the result of an object search
