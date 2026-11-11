@@ -2,9 +2,9 @@ import { get } from 'svelte/store';
 import { shellBootstrap, themes } from '../api/admin.js';
 import { aiStore } from '../stores/aiStore.svelte.js';
 import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
+import { brandStore } from '../stores/brand.svelte.js';
 import { capabilitiesStore } from '../stores/capabilities.svelte.js';
 import { collectionPreferences } from '../stores/collectionPreferences.svelte.js';
-import { logbookStore } from '../stores/logbook.svelte.js';
 import { moduleSettings } from '../stores/moduleSettings.js';
 import { permissionStore } from '../stores/permissions.svelte.js';
 import { themeStore } from '../stores/theme.svelte.js';
@@ -30,9 +30,7 @@ export function hydrateAuthenticatedShellUI(bootstrap) {
   attachmentStatus.hydrate(bootstrap.attachment_status);
   aiStore.hydrate(bootstrap.ai);
   capabilitiesStore.hydrate(bootstrap.features);
-  logbookStore.hydrateAvailability(bootstrap.features?.logbook_available);
   workItemStalenessSettings.hydrate(bootstrap.work_item_staleness);
-  permissionStore.setLogbookAvailable(bootstrap.features?.logbook_available === true);
   permissionStore.setHasAssetSets(bootstrap.has_asset_sets === true);
   permissionStore.setHasPortals(bootstrap.has_portals === true);
   permissionStore.setHasActivePortals(bootstrap.has_active_portals === true);
@@ -135,9 +133,10 @@ export async function hydrateCurrentWorkspaceFromSharedData(workspaceId) {
  */
 export async function refreshAuthenticatedShellUI() {
   const generation = ++refreshGeneration;
-  const [shellResult, themeResult] = await Promise.allSettled([
+  const [shellResult, themeResult, brandResult] = await Promise.allSettled([
     shellBootstrap.get(),
     themes.getActive(),
+    brandStore.reload(),
     workspacesStore.reload(),
     workspaceDataStore.refresh(),
   ]);
@@ -157,6 +156,10 @@ export async function refreshAuthenticatedShellUI() {
     themeStore.setActiveTheme(themeResult.value);
   } else {
     console.warn('Failed to refresh the active theme after an admin change:', themeResult.reason);
+  }
+
+  if (brandResult.status === 'rejected') {
+    console.warn('Failed to refresh instance branding after an admin change:', brandResult.reason);
   }
 
   return shellResult.status === 'fulfilled';

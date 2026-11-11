@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"log/slog"
 	"net/http"
 	"time"
 
@@ -36,10 +35,7 @@ func NewItemHandler(db database.Database, permissionService *services.Permission
 	if len(cacheSizeMB) > 0 && cacheSizeMB[0] > 0 {
 		cacheConfig.MaxCacheSize = cacheSizeMB[0]
 	}
-	itemCache, err := services.NewItemCacheService(db, cacheConfig)
-	if err != nil {
-		slog.Warn("failed to initialize item cache, continuing without cache", "error", err)
-	}
+	itemCache := services.NewItemCacheService(db, cacheConfig)
 	hierarchy := services.NewHierarchyService(db)
 	itemUpdate := services.NewItemUpdateApplicationService(db, permissionService)
 	itemUpdate.SetActivityTracker(activityTracker)

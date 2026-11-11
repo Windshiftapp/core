@@ -263,6 +263,7 @@ export default {
     backToIterations: 'Back to Iterations',
     filterByIteration: 'Filter by iteration',
     addGlobalIteration: 'Add Iteration',
+    showCompletedIterations: 'Show completed iterations',
 
     // Status
     status: {
@@ -502,6 +503,8 @@ export default {
 
     // Image preview
     failedToDownload: 'Failed to download file',
+    hideFromCustomer: 'Hide from customer',
+    showToCustomer: 'Show to customer',
     editDiagram: 'Edit diagram',
     untitledDiagram: 'Untitled Diagram',
     diagram: 'diagram',
@@ -929,5 +932,14 @@ export default {
     deleted: 'Queue deleted',
     builtinRemoved: 'Built-in queue removed',
     saveFailed: 'Failed to save the queue',
+  },
+  transitionScreen: {
+    title: 'Transition screen',
+    moveTo: 'Move to {status}',
+    comment: 'Comment',
+    commentPlaceholder: 'Add a comment (optional)',
+    confirm: 'Move',
+    failed: 'Could not complete the transition.',
+    missingFields: 'Fill the required fields to continue:',
   },
 };

@@ -510,6 +510,7 @@ func (nm *NotificationManager) MarkAsRead(userID, notificationID int) error {
 	`, now, notificationID, userID); err != nil {
 		return fmt.Errorf("mark notification read: %w", err)
 	}
+	services.PublishUserChange(userID)
 	cache, ok := nm.cacheSnapshot(userID)
 	if !ok {
 		return nil
@@ -539,6 +540,7 @@ func (nm *NotificationManager) MarkAllAsRead(userID int) error {
 	`, now, userID); err != nil {
 		return fmt.Errorf("mark all notifications read: %w", err)
 	}
+	services.PublishUserChange(userID)
 
 	cache, ok := nm.cacheSnapshot(userID)
 	if !ok {
@@ -582,6 +584,7 @@ func (nm *NotificationManager) MarkItemNotificationsAsRead(userID, itemID int) e
 	`, now, userID, itemPath, itemPath+"/%", itemPath+"?%", itemPath+"#%"); err != nil {
 		return fmt.Errorf("mark item notifications read: %w", err)
 	}
+	services.PublishUserChange(userID)
 	cache, ok := nm.cacheSnapshot(userID)
 	if !ok {
 		return nil
@@ -655,6 +658,7 @@ func (nm *NotificationManager) MarkAllAsSeen(userID int) error {
 	`, now, now, userID); err != nil {
 		return fmt.Errorf("mark notifications seen: %w", err)
 	}
+	services.PublishUserChange(userID)
 
 	if cache, ok := nm.cacheSnapshot(userID); ok {
 		seenAt := now
@@ -679,6 +683,27 @@ func (nm *NotificationManager) DeleteUserNotifications(userID int) error {
 	if _, err := nm.db.ExecWrite(`DELETE FROM notifications WHERE user_id = ?`, userID); err != nil {
 		return fmt.Errorf("delete user notifications: %w", err)
 	}
+	services.PublishUserChange(userID)
+	_ = nm.cache.Delete(nm.getCacheKey(userID))
+	return nil
+}
+
+// DeleteNotification removes a single notification owned by the user and drops
+// the user's tray cache so the deleted row cannot survive in a cached page.
+// Deleting an already-gone notification is a no-op.
+func (nm *NotificationManager) DeleteNotification(userID, notificationID int) error {
+	lock := nm.userLock(userID)
+	lock.Lock()
+	defer lock.Unlock()
+
+	result, err := nm.db.ExecWrite(`DELETE FROM notifications WHERE id = ? AND user_id = ?`, notificationID, userID)
+	if err != nil {
+		return fmt.Errorf("delete notification: %w", err)
+	}
+	if affected, _ := result.RowsAffected(); affected == 0 {
+		return nil
+	}
+	services.PublishUserChange(userID)
 	_ = nm.cache.Delete(nm.getCacheKey(userID))
 	return nil
 }
@@ -967,6 +992,29 @@ func (nh *NotificationHandler) ClearNotifications(w http.ResponseWriter, r *http
 
 	if err := nh.manager.DeleteUserNotifications(user.ID); err != nil {
 		slog.Error("failed to clear notifications", slog.String("component", "notifications"), slog.Int("user_id", user.ID), slog.Any("error", err))
+		respondInternalError(w, r, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// DeleteNotification handles DELETE /api/notifications/{id}.
+func (nh *NotificationHandler) DeleteNotification(w http.ResponseWriter, r *http.Request) {
+	user := utils.GetCurrentUser(r)
+	if user == nil {
+		respondUnauthorized(w, r)
+		return
+	}
+
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		respondInvalidID(w, r, "notification ID")
+		return
+	}
+
+	if err := nh.manager.DeleteNotification(user.ID, id); err != nil {
+		slog.Error("failed to delete notification", slog.String("component", "notifications"), slog.Int("user_id", user.ID), slog.Int("notification_id", id), slog.Any("error", err))
 		respondInternalError(w, r, err)
 		return
 	}

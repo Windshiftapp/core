@@ -148,6 +148,15 @@ export const attachments = {
     fetchV2Data(`/attachments/${attachmentId}`, {
       method: 'DELETE',
     }),
+
+  // Hide or reveal an item attachment for portal customers. Only meaningful
+  // on customer requests; the server still enforces item.edit.
+  setInternal: (attachmentId, isInternal) =>
+    fetchV2Data(`/attachments/${attachmentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/merge-patch+json' },
+      body: JSON.stringify({ is_internal: isInternal }),
+    }),
 };
 
 // Attachment Settings (for admin)
@@ -159,6 +168,12 @@ export const attachmentSettings = {
       body: JSON.stringify(data),
     }),
   getStatus: () => fetchAPI('/attachment-settings/status'),
+};
+
+// Public instance branding (site title + active theme logos). No auth required;
+// used by the boot, login, and authenticated shell surfaces.
+export const branding = {
+  get: (options) => fetchAPI('/branding', options),
 };
 
 // Reviews API (daily/weekly review feature)

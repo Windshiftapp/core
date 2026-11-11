@@ -114,8 +114,9 @@ func (e *Engine) ObserveItemFacts(ctx context.Context, tx database.Tx, facts []i
 	var order []int
 	for _, fact := range facts {
 		// Import writes its SLA facts directly; synthetic evaluation would
-		// double-count imported cycles.
-		if fact.Metadata.ActorKind == "import" {
+		// double-count imported cycles. SourceKind is checked too because some
+		// import paths stamp only that field.
+		if itemevents.IsImportOrigin(fact.Metadata.ActorKind, fact.Metadata.SourceKind) {
 			continue
 		}
 		if _, ok := byWorkspace[fact.WorkspaceID]; !ok {

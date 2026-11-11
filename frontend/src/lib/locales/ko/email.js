@@ -1,0 +1,106 @@
+export default {
+  email: {
+    footer: {
+      automated: '자동 발송된 이메일입니다. 회신하지 마세요.',
+      repliable: '문의가 진행 중이어서 이 이메일을 받으셨습니다.',
+    },
+    common: {
+      greeting: '안녕하세요, {name}님.',
+      openInWindshift: 'Windshift에서 보기',
+      manualLinkHint: '버튼이 작동하지 않으면 이 URL을 복사해 브라우저에 붙여넣으세요:',
+    },
+    duration: {
+      minute: '{count}분',
+      minutes: '{count}분',
+      hour: '{count}시간',
+      hours: '{count}시간',
+      day: '{count}일',
+      days: '{count}일',
+    },
+    magicLink: {
+      subject: '포털에 로그인',
+      heading: '포털에 로그인',
+      body: '아래 버튼을 클릭해 로그인하세요. 링크는 {expires} 동안 유효합니다.',
+      button: '로그인',
+      note: '이 링크를 요청하지 않았다면 이 이메일을 무시하셔도 됩니다. 링크 없이는 아무도 로그인할 수 없습니다.',
+    },
+    verification: {
+      subject: '이메일 주소를 인증하세요',
+      heading: '이메일 주소를 인증하세요',
+      body: '계정 설정을 완료하려면 이메일 주소를 확인하세요.',
+      button: '이메일 인증',
+      note: '이 링크는 {expires} 후에 만료됩니다. Windshift 계정을 만들지 않았다면 이 이메일을 무시하셔도 됩니다.',
+    },
+    invitation: {
+      subject: 'Windshift에 초대되었습니다',
+      heading: 'Windshift에 초대되었습니다',
+      body: '비밀번호를 설정해 계정을 활성화하고 팀과 협업을 시작하세요.',
+      button: '비밀번호 설정',
+      note: '이 초대는 {expires} 후에 만료됩니다. 예상하지 못한 초대라면 이 이메일을 무시하셔도 됩니다.',
+    },
+    notificationBatch: {
+      subjectOne: 'Windshift — 새 알림이 1개 있습니다',
+      subjectOther: 'Windshift — 새 알림이 {count}개 있습니다',
+      headingOne: '새 알림 1개',
+      headingOther: '새 알림 {count}개',
+      intro: '안녕하세요, {name}님. 새 소식입니다:',
+      manage: '알림 환경설정에서 이 이메일을 받는 빈도를 관리할 수 있습니다.',
+    },
+    mention: {
+      subject: '{actor}님이 {itemKey}에서 회원님을 언급했습니다',
+      body: '{actor}님이 {itemKey} · {itemTitle}의 {source}에서 회원님을 언급했습니다',
+      source: {
+        comment: '댓글',
+        description: '설명',
+        item: '항목',
+      },
+    },
+    portalReply: {
+      subject: 'Re: {subject}',
+      body: '{author}님이 {itemKey} · {itemTitle}에 답변했습니다',
+      portalLink: '포털에서 이 요청 보기',
+      note: '대화를 계속하려면 이 이메일에 답장하세요.',
+    },
+    approval: {
+      subject: '승인 요청: {itemKey} — {itemTitle}',
+      heading: '승인 요청',
+      body: '{itemKey} · {itemTitle}에 대한 승인이 필요합니다.',
+      body2: '아래 버튼을 클릭해 검토하고 결정하세요. 링크는 {expires} 동안 유효합니다.',
+      button: '승인 검토',
+      note: '이 요청을 예상하지 못했다면 이 이메일을 무시하셔도 됩니다.',
+    },
+    intake: {
+      subject: '접수가 완료되었습니다 ({itemKey})',
+      heading: '접수가 완료되었습니다',
+      body: '문의해 주셔서 감사합니다. 요청을 {itemKey} · {itemTitle}(으)로 등록했습니다.',
+      body2: '팀에서 검토한 후 최대한 빨리 답변드리겠습니다.',
+      body3: '포털에서 진행 상황을 확인하고 세부 정보를 추가할 수 있습니다:',
+      button: '요청 보기',
+      note: '추가 정보를 보내려면 이 이메일에 답장하세요.',
+    },
+  },
+  notification: {
+    dueReminder: {
+        title: "알림: {itemKey}의 마감이 다가옵니다",
+        message: "{itemTitle}의 마감일은 {dueDate}입니다",
+    },
+    mention: {
+        title: "회원님이 언급되었습니다",
+        comment: "{actor}님이 {itemTitle}({itemKey})의 댓글에서 회원님을 언급했습니다",
+        description: "{actor}님이 {itemTitle}({itemKey})의 설명에서 회원님을 언급했습니다",
+        item: "{actor}님이 {itemTitle}({itemKey})에서 회원님을 언급했습니다",
+    },
+    approvalStarted: {
+        title: "승인 필요",
+        message: "{itemKey}에 대한 승인이 필요합니다: {itemTitle}",
+    },
+    approvalEscalated: {
+        title: "승인이 회원님에게 에스컬레이션되었습니다",
+        message: "{itemKey}에 대한 승인이 회원님에게 에스컬레이션되었습니다: {itemTitle}",
+    },
+    incident: {
+        title: "인시던트: {itemTitle}",
+        message: "{itemKey}이(가) 트리거되었으며 확인이 필요합니다",
+    },
+  },
+};

@@ -1,7 +1,7 @@
 -- Plane import idempotency and provenance map (PostgreSQL version).
 -- One row per imported Plane entity, keyed on the source uuid, so a rerun
 -- skips what a previous run already wrote and can reconcile provenance.
--- migration: 20261119_plane_import_mappings
+-- migration: 20261122_plane_import_mappings
 CREATE TABLE IF NOT EXISTS plane_import_mappings (
     id SERIAL PRIMARY KEY,
     workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,

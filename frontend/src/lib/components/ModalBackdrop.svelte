@@ -1,5 +1,6 @@
 <script>
   import { tick } from 'svelte';
+  import { portal as portalAction } from '../actions/portal.js';
 
   let {
     show = $bindable(false),
@@ -7,6 +8,10 @@
     blur = 2,
     extraFilter = '',
     zIndex = 50,
+    // Move the backdrop to <body>. Required when another dialog is itself
+    // portaled: a same-z-index backdrop inside the app root would otherwise
+    // paint underneath the portaled dialog regardless of source order.
+    portal = false,
     align = 'center',
     paddingTop = '',
     scrollable = false,
@@ -15,6 +20,8 @@
     ariaLabelledBy = undefined,
     /** CSS selector for the element that should receive focus first. */
     initialFocus = '[data-autofocus], [autofocus]',
+    /** Called first for every keydown that reaches the backdrop. */
+    onKeydown = undefined,
     onclose = undefined,
     children = undefined,
   } = $props();
@@ -110,6 +117,8 @@
   }
 
   function handleKeydown(event) {
+    onKeydown?.(event);
+
     if (closeOnEscape && event.key === 'Escape') {
       close();
       return;
@@ -150,6 +159,7 @@
 
 {#if show}
   <div
+    use:portalAction={portal ? document.body : null}
     bind:this={backdropRef}
     class="fixed inset-0 {layoutClasses} focus:outline-none"
     style="z-index: {zIndex}; background-color: {bgStyle}; backdrop-filter: {filterStyle};"

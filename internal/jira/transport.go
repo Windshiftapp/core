@@ -23,6 +23,22 @@ type jiraTransport interface {
 	do(ctx context.Context, method, reqURL string, body any) (*http.Response, error)
 }
 
+// jiraHeaderTransport is implemented by clients that can attach per-request
+// headers, used for the Jira Service Management experimental-read opt-in.
+type jiraHeaderTransport interface {
+	doWithHeaders(ctx context.Context, method, reqURL string, body any, headers map[string]string) (*http.Response, error)
+}
+
+// jiraExperimentalAPIOptIn is the header JSM 5.x requires for the
+// organization-list and organization-member reads. Sending it to newer
+// versions is harmless, so the importer always opts in for those reads.
+const jiraExperimentalAPIOptIn = "X-ExperimentalApi"
+
+// jiraExperimentalHeaders returns the read-only experimental opt-in headers.
+func jiraExperimentalHeaders() map[string]string {
+	return map[string]string{jiraExperimentalAPIOptIn: "true"}
+}
+
 // summarizeJiraErrorBody makes an upstream error response useful in the UI
 // and logs. Enterprise reverse proxies commonly return an HTML error page
 // whose actual diagnostic follows a large script or style block. Strip that
@@ -96,7 +112,25 @@ func jiraErrorFromResponse(resp *http.Response) error {
 // jiraRequestJSON executes one request, maps non-200 responses through the
 // shared error contract, and decodes the JSON body into result.
 func jiraRequestJSON(ctx context.Context, t jiraTransport, method, reqURL string, body, result any) error {
-	resp, err := t.do(ctx, method, reqURL, body)
+	return jiraRequestJSONWithHeaders(ctx, t, method, reqURL, body, result, nil)
+}
+
+// jiraRequestJSONWithHeaders is jiraRequestJSON with optional extra request
+// headers. Transports that cannot attach headers fall back to the plain path.
+func jiraRequestJSONWithHeaders(ctx context.Context, t jiraTransport, method, reqURL string, body, result any, headers map[string]string) error {
+	var (
+		resp *http.Response
+		err  error
+	)
+	if len(headers) > 0 {
+		if headerTransport, ok := t.(jiraHeaderTransport); ok {
+			resp, err = headerTransport.doWithHeaders(ctx, method, reqURL, body, headers)
+		} else {
+			resp, err = t.do(ctx, method, reqURL, body)
+		}
+	} else {
+		resp, err = t.do(ctx, method, reqURL, body)
+	}
 	if err != nil {
 		return err
 	}
@@ -118,10 +152,16 @@ func jiraGetJSON(ctx context.Context, t jiraTransport, reqURL string, result any
 // start/limit endpoint. Callers supply the URL for one page; the envelope is
 // always JiraServiceDeskPage regardless of deployment.
 func jiraServiceDeskValues[T any](ctx context.Context, t jiraTransport, pageURL func(start int) string) ([]T, error) {
+	return jiraServiceDeskValuesWithHeaders[T](ctx, t, pageURL, nil)
+}
+
+// jiraServiceDeskValuesWithHeaders is jiraServiceDeskValues with optional extra
+// request headers, used for the JSM experimental-read opt-in.
+func jiraServiceDeskValuesWithHeaders[T any](ctx context.Context, t jiraTransport, pageURL func(start int) string, headers map[string]string) ([]T, error) {
 	var result []T
 	for start := 0; ; {
 		var page JiraServiceDeskPage[T]
-		if err := jiraGetJSON(ctx, t, pageURL(start), &page); err != nil {
+		if err := jiraRequestJSONWithHeaders(ctx, t, http.MethodGet, pageURL(start), nil, &page, headers); err != nil {
 			return nil, err
 		}
 		result = append(result, page.Values...)
@@ -268,26 +308,26 @@ func jiraStartAtPageURL(base string, startAt, maxResults int, extra url.Values) 
 }
 
 // jiraDownloadAttachment streams an attachment from a URL previously returned
-// by the Jira API. The body stays open; the caller owns closing it.
+// by the Jira API. It shares the client's rate limit, throttle cooldown, and
+// retry/backoff contract with the JSON endpoints. The body stays open; the
+// caller owns closing it.
 func jiraDownloadAttachment(
 	ctx context.Context,
 	httpClient *http.Client,
 	limiter *rate.Limiter,
+	throttle *jiraThrottle,
 	authHeader string,
 	attachmentURL string,
 ) (io.ReadCloser, string, error) {
-	if err := limiter.Wait(ctx); err != nil {
-		return nil, "", err
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, attachmentURL, http.NoBody)
-	if err != nil {
-		return nil, "", err
-	}
-	req.Header.Set("Authorization", authHeader)
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := httpClient.Do(req) //nolint:gosec // G704: attachment URL from trusted Jira API response
+	resp, err := jiraRetryRequest(ctx, httpClient, limiter, throttle, 0, nil, func() (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, attachmentURL, http.NoBody)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", authHeader)
+		req.Header.Set("Accept", "application/json")
+		return req, nil
+	})
 	if err != nil {
 		return nil, "", err
 	}

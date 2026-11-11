@@ -24,6 +24,7 @@
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Textarea from '../../components/Textarea.svelte';
+  import EditableField from '../../editors/EditableField.svelte';
   import { draggable, dropTargetForElements, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element';
   import Tooltip from '../../components/Tooltip.svelte';
@@ -41,7 +42,7 @@
   import CollectionLevelFilter from './CollectionLevelFilter.svelte';
   import CollectionHierarchyLoadMore from './CollectionHierarchyLoadMore.svelte';
   import QuickAddForm from './QuickAddForm.svelte';
-  import { childItemTypesForParent } from '../../utils/hierarchy.js';
+  import { childItemTypesForLevel } from '../../utils/hierarchy.js';
   import { showCreatedItemOutsideViewToast } from '../../utils/createdItemToast.js';
   import { useCollectionHierarchy } from '../../composables/useCollectionHierarchy.svelte.js';
   import {
@@ -79,8 +80,7 @@
   let quickAddState = $state({}); // { [parentId]: { show: boolean, workspace: null, itemType: null, title: '', error: null } }
 
   // Inline editing state
-  let editingItemId = $state(null);
-  let editingTitle = $state('');
+  let titleEditors = $state({});
 
   let mapScrollElement = $state(null);
 
@@ -480,22 +480,25 @@
   }
 
   // Quick-add functions
-  function canAddChildren(parentId) {
-    // Get parent item to determine hierarchy level
+  // Child types the workspace offers below a backbone item. A backbone item's
+  // own type is normally workspace-bound, but a level-0 item can carry a type
+  // the configuration set excludes (imports, API). Its level then comes from
+  // the selected hierarchy level so the add card stays usable.
+  function availableChildTypes(parentId) {
     const parentItem = backboneItems.find(item => item.id === parentId);
-
-    if (!parentItem || !parentItem.item_type_id) {
-      return true; // Allow adding children if we can't determine parent type
-    }
+    if (!parentItem) return [];
 
     const parentType = getItemTypeInfo(parentItem.item_type_id);
-    if (!parentType) {
-      return true;
-    }
+    const parentLevel = parentType
+      ? Number(parentType.hierarchy_level)
+      : collectionStore.hierarchyLevel;
 
-    const childTypes = childItemTypesForParent(itemTypes, parentType);
+    return childItemTypesForLevel(itemTypes, parentLevel)
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  }
 
-    return childTypes.length > 0;
+  function canAddChildren(parentId) {
+    return availableChildTypes(parentId).length > 0;
   }
 
   function quickAddKey(parentId, laneKey) {
@@ -504,25 +507,10 @@
 
   function initQuickAdd(parentId, laneKey = null) {
     const stateKey = quickAddKey(parentId, laneKey);
-    // Check if this parent can have children
-    if (!canAddChildren(parentId)) {
-      return; // Don't initialize quick-add for items at lowest hierarchy level
-    }
+    const availableTypes = availableChildTypes(parentId);
 
-    // Get parent item to determine hierarchy level
-    const parentItem = backboneItems.find(item => item.id === parentId);
-
-    // Get available item types for children (next hierarchy level)
-    let availableTypes = [];
-    if (parentItem && parentItem.item_type_id) {
-      const parentType = getItemTypeInfo(parentItem.item_type_id);
-      if (parentType) {
-        availableTypes = childItemTypesForParent(itemTypes, parentType)
-          .sort((a, b) => a.sort_order - b.sort_order);
-      }
-    }
-
-    // If still no types found after all checks, don't proceed
+    // No child types means there is nothing to offer; the add card is hidden
+    // in that case, so this is only a guard against a stale render.
     if (availableTypes.length === 0) {
       return;
     }
@@ -651,50 +639,25 @@
   function startEditingItem(item, event) {
     event.stopPropagation();
     event.preventDefault(); // Prevent default double-click behavior
-
-    editingItemId = item.id;
-    editingTitle = item.title;
-
-    // Focus the textarea after it's rendered
-    setTimeout(() => {
-      const textarea = /** @type {HTMLTextAreaElement | null} */ (document.querySelector(`textarea[data-item-id="${item.id}"]`));
-      if (textarea) {
-        textarea.focus();
-        textarea.select();
-      }
-    }, 0);
+    titleEditors[item.id]?.startEditing();
   }
 
-  function cancelEditingItem() {
-    editingItemId = null;
-    editingTitle = '';
-  }
-
-  async function saveEditingItem(item) {
-    if (!editingTitle.trim()) {
-      cancelEditingItem();
-      return;
-    }
-
-    if (editingTitle === item.title) {
-      cancelEditingItem();
-      return;
-    }
+  async function saveEditingItem(item, draft) {
+    const title = String(draft ?? '').trim();
+    if (!title || title === item.title) return;
 
     try {
-      await items.update(item.id, { title: editingTitle.trim() });
+      await items.update(item.id, { title });
 
       // Update the local item
-      item.title = editingTitle.trim();
+      item.title = title;
 
       // Force reactivity
       backboneItems = [...backboneItems];
       childItemsByParent = { ...childItemsByParent };
-
-      cancelEditingItem();
     } catch (error) {
       console.error('Failed to update item title:', error);
-      cancelEditingItem();
+      throw error;
     }
   }
 
@@ -761,7 +724,7 @@
       <!-- Controls Bar -->
       <div class="flex items-center gap-4 mt-4">
         <SubFilterBar {workspaceId} {collectionId} />
-        <CollectionLevelFilter {workspaceId} {collectionId} view="map" />
+        <CollectionLevelFilter {workspaceId} {collectionId} />
       </div>
 
       <!-- Hierarchy Breadcrumbs -->
@@ -898,30 +861,32 @@
             ondblclick={(e) => startEditingItem(childItem, e)}
           >
             <!-- Title -->
-            {#if editingItemId === childItem.id}
-              <Textarea
-                bind:value={editingTitle}
-                data-item-id={childItem.id}
-                class="text-sm mb-2 leading-snug w-full resize-none overflow-hidden bg-transparent border-none outline-none p-0 m-0"
-                style="color: var(--ds-text); caret-color: var(--ds-text);"
-                rows={2}
-                onblur={() => saveEditingItem(childItem)}
-                onkeydown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    saveEditingItem(childItem);
-                  } else if (e.key === 'Escape') {
-                    e.preventDefault();
-                    cancelEditingItem();
-                  }
-                }}
-                onclick={(e) => e.stopPropagation()}
-              />
-            {:else}
-              <h4 class="text-sm mb-2 leading-snug line-clamp-2" style="{styles.glassTextStyle}">
-                {childItem.title}
-              </h4>
-            {/if}
+            <EditableField
+              bind:this={titleEditors[childItem.id]}
+              headless
+              multiline
+              value={childItem.title}
+              editable={true}
+              oncommit={(draft) => saveEditingItem(childItem, draft)}
+            >
+              {#snippet display()}
+                <h4 class="text-sm mb-2 leading-snug line-clamp-2" style="{styles.glassTextStyle}">
+                  {childItem.title}
+                </h4>
+              {/snippet}
+              {#snippet editor({ draft, setDraft })}
+                <Textarea
+                  data-item-id={childItem.id}
+                  value={draft ?? ''}
+                  class="text-sm mb-2 leading-snug w-full resize-none overflow-hidden bg-transparent border-none outline-none p-0 m-0"
+                  style="color: var(--ds-text); caret-color: var(--ds-text);"
+                  rows={2}
+                  oninput={(e) => setDraft(e.currentTarget.value)}
+                  onclick={(e) => e.stopPropagation()}
+                  autofocus
+                />
+              {/snippet}
+            </EditableField>
 
             <!-- Bottom row: Key, Icon, Status -->
             <div class="flex items-center justify-between">

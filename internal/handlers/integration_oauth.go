@@ -10,16 +10,19 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/integrations"
+	"windshift/internal/integrations/docmost"
 	"windshift/internal/integrations/notion"
 	"windshift/internal/integrations/todoist"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/services"
 	"windshift/internal/sso"
 	"windshift/internal/utils"
 
@@ -31,6 +34,7 @@ type IntegrationOAuthHandler struct {
 	db          database.Database
 	encryption  *sso.SecretEncryption
 	baseURL     string
+	docmost     *services.DocmostService
 	systemFlows map[models.IntegrationProviderType]systemOAuthRegistration
 }
 
@@ -40,12 +44,14 @@ type systemOAuthRegistration struct {
 }
 
 // NewIntegrationOAuthHandler creates a new integration OAuth handler.
-// baseURL: public URL of the application (from config.Load).
-func NewIntegrationOAuthHandler(db database.Database, encryption *sso.SecretEncryption, baseURL string) *IntegrationOAuthHandler {
+// baseURL: public URL of the application (from config.Load). docmost may be nil
+// when the Docmost integration is not wired.
+func NewIntegrationOAuthHandler(db database.Database, encryption *sso.SecretEncryption, baseURL string, docmostService *services.DocmostService) *IntegrationOAuthHandler {
 	return &IntegrationOAuthHandler{
 		db:          db,
 		encryption:  encryption,
 		baseURL:     baseURL,
+		docmost:     docmostService,
 		systemFlows: make(map[models.IntegrationProviderType]systemOAuthRegistration),
 	}
 }
@@ -129,8 +135,10 @@ func (h *IntegrationOAuthHandler) StartOAuth(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if !clientID.Valid || clientID.String == "" {
-		respondBadRequest(w, r, "OAuth not configured for this provider")
+	redirectURI, err := h.getRedirectURI(slug)
+	if err != nil {
+		slog.Error("integration OAuth misconfigured", slog.String("component", "integrations"), slog.Any("error", err))
+		respondServiceUnavailable(w, r, "OAuth is not configured")
 		return
 	}
 
@@ -139,28 +147,15 @@ func (h *IntegrationOAuthHandler) StartOAuth(w http.ResponseWriter, r *http.Requ
 	_, _ = rand.Read(stateBytes)
 	state := base64.URLEncoding.EncodeToString(stateBytes)
 
-	redirectURI, err := h.getRedirectURI(slug)
-	if err != nil {
-		slog.Error("integration OAuth misconfigured", slog.String("component", "integrations"), slog.Any("error", err))
-		respondServiceUnavailable(w, r, "OAuth is not configured")
-		return
-	}
-
-	// Store state
-	expiresAt := time.Now().Add(5 * time.Minute)
-	_, err = h.db.ExecWrite(`
-		INSERT INTO integration_oauth_state (id, provider_id, state, user_id, expires_at)
-		VALUES (?, ?, ?, ?, ?)
-	`, uuid.New().String(), providerID, state, fmt.Sprintf("%d", user.ID), expiresAt)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Build auth URL based on provider type
-	var authURL string
+	// Build the auth URL and, for PKCE providers, the verifier to store with
+	// the state.
+	var authURL, codeVerifier string
 	switch providerType {
 	case models.IntegrationProviderNotion:
+		if !clientID.Valid || clientID.String == "" {
+			respondBadRequest(w, r, "OAuth not configured for this provider")
+			return
+		}
 		authURL = fmt.Sprintf(
 			"https://api.notion.com/v1/oauth/authorize?client_id=%s&response_type=code&state=%s&redirect_uri=%s&owner=user",
 			clientID.String,
@@ -168,15 +163,54 @@ func (h *IntegrationOAuthHandler) StartOAuth(w http.ResponseWriter, r *http.Requ
 			url.QueryEscape(redirectURI),
 		)
 	case models.IntegrationProviderTodoist:
+		if !clientID.Valid || clientID.String == "" {
+			respondBadRequest(w, r, "OAuth not configured for this provider")
+			return
+		}
 		authURL = todoist.AuthorizeURL(clientID.String, "data:read_write", state)
+	case models.IntegrationProviderDocmost:
+		if h.docmost == nil {
+			respondServiceUnavailable(w, r, "OAuth is not configured")
+			return
+		}
+		authURL, codeVerifier, err = h.docmost.StartOAuth(r.Context(), providerID, state, redirectURI)
+		if err != nil {
+			h.respondDocmostStartError(w, r, err)
+			return
+		}
 	default:
 		respondBadRequest(w, r, "OAuth not supported for this provider type")
+		return
+	}
+
+	// Store state
+	expiresAt := time.Now().Add(5 * time.Minute)
+	_, err = h.db.ExecWrite(`
+		INSERT INTO integration_oauth_state (id, provider_id, state, user_id, code_verifier, expires_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, uuid.New().String(), providerID, state, fmt.Sprintf("%d", user.ID), codeVerifier, expiresAt)
+	if err != nil {
+		respondInternalError(w, r, err)
 		return
 	}
 
 	respondJSONOK(w, map[string]string{
 		"auth_url": authURL,
 	})
+}
+
+// respondDocmostStartError maps Docmost OAuth-start failures to HTTP.
+func (h *IntegrationOAuthHandler) respondDocmostStartError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, services.ErrDocmostNotConfigured):
+		respondBadRequest(w, r, "Docmost base URL is not configured")
+	case errors.Is(err, docmost.ErrOAuthDisabled):
+		respondBadRequest(w, r, "Docmost OAuth is not enabled; enable MCP and an enterprise license in Docmost")
+	case errors.Is(err, docmost.ErrUnavailable):
+		respondServiceUnavailable(w, r, "Could not reach Docmost")
+	default:
+		respondInternalError(w, r, err)
+	}
 }
 
 // OAuthCallback handles the OAuth callback from the integration provider
@@ -195,10 +229,11 @@ func (h *IntegrationOAuthHandler) OAuthCallback(w http.ResponseWriter, r *http.R
 
 	// Validate state
 	var providerID, userID string
+	var codeVerifier sql.NullString
 	err := h.db.QueryRow(`
-		SELECT provider_id, user_id FROM integration_oauth_state
+		SELECT provider_id, user_id, code_verifier FROM integration_oauth_state
 		WHERE state = ? AND expires_at > CURRENT_TIMESTAMP
-	`, state).Scan(&providerID, &userID)
+	`, state).Scan(&providerID, &userID, &codeVerifier)
 	if err != nil {
 		slog.Warn("invalid integration OAuth state", slog.String("component", "integrations"), slog.Any("error", err))
 		h.redirectWithError(w, r, "Invalid or expired state")
@@ -239,19 +274,6 @@ func (h *IntegrationOAuthHandler) OAuthCallback(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if !clientSecretEnc.Valid || clientSecretEnc.String == "" {
-		h.redirectWithError(w, r, "OAuth secret not configured")
-		return
-	}
-
-	// Decrypt client secret
-	clientSecret, err := h.encryption.Decrypt(clientSecretEnc.String)
-	if err != nil {
-		slog.Error("failed to decrypt integration client secret", slog.String("component", "integrations"), slog.Any("error", err))
-		h.redirectWithError(w, r, "Configuration error")
-		return
-	}
-
 	redirectURI, err := h.getRedirectURI(providerSlug)
 	if err != nil {
 		slog.Error("integration OAuth misconfigured", slog.String("component", "integrations"), slog.Any("error", err))
@@ -259,15 +281,63 @@ func (h *IntegrationOAuthHandler) OAuthCallback(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Exchange code based on provider type
+	// Exchange code based on provider type. Confidential clients (Notion,
+	// Todoist) exchange with a client secret; public clients (Docmost) use PKCE.
 	switch providerType {
 	case models.IntegrationProviderNotion:
+		clientSecret, ok := h.decryptClientSecret(w, r, clientSecretEnc)
+		if !ok {
+			return
+		}
 		h.handleNotionCallback(w, r, clientIDVal.String, clientSecret, code, redirectURI, providerID, userID, providerSlug)
 	case models.IntegrationProviderTodoist:
+		clientSecret, ok := h.decryptClientSecret(w, r, clientSecretEnc)
+		if !ok {
+			return
+		}
 		h.handleTodoistCallback(w, r, clientIDVal.String, clientSecret, code, providerID, userID, providerSlug)
+	case models.IntegrationProviderDocmost:
+		h.handleDocmostCallback(w, r, providerID, userID, codeVerifier.String, code, redirectURI, providerSlug)
 	default:
 		h.redirectWithError(w, r, "Unsupported provider type")
 	}
+}
+
+// decryptClientSecret decrypts a provider's stored client secret, redirecting
+// with an error when it is missing or undecryptable.
+func (h *IntegrationOAuthHandler) decryptClientSecret(w http.ResponseWriter, r *http.Request, encrypted sql.NullString) (string, bool) {
+	if !encrypted.Valid || encrypted.String == "" {
+		h.redirectWithError(w, r, "OAuth secret not configured")
+		return "", false
+	}
+	secret, err := h.encryption.Decrypt(encrypted.String)
+	if err != nil {
+		slog.Error("failed to decrypt integration client secret", slog.String("component", "integrations"), slog.Any("error", err))
+		h.redirectWithError(w, r, "Configuration error")
+		return "", false
+	}
+	return secret, true
+}
+
+// handleDocmostCallback completes a public-client PKCE exchange and stores the
+// token pair in the shared user_integration_tokens table.
+func (h *IntegrationOAuthHandler) handleDocmostCallback(w http.ResponseWriter, r *http.Request, providerID, userID, codeVerifier, code, redirectURI, providerSlug string) {
+	if h.docmost == nil {
+		h.redirectWithError(w, r, "Docmost is not configured")
+		return
+	}
+	userIDInt, err := strconv.Atoi(userID)
+	if err != nil {
+		h.redirectWithError(w, r, "Invalid user")
+		return
+	}
+	if err := h.docmost.CompleteOAuth(r.Context(), providerID, userIDInt, codeVerifier, code, redirectURI); err != nil {
+		slog.Error("failed to complete Docmost OAuth", slog.String("component", "integrations"), slog.Any("error", err))
+		h.redirectWithError(w, r, "Failed to exchange token")
+		return
+	}
+	slog.Info("integration OAuth completed", slog.String("component", "integrations"), slog.String("provider", providerSlug), slog.String("user_id", userID))
+	http.Redirect(w, r, "/profile?tab=connected-accounts&oauth=success&provider="+url.QueryEscape(providerSlug), http.StatusFound)
 }
 
 // SystemOAuthCallback completes an administrator-managed provider flow on a
@@ -417,7 +487,7 @@ func (h *IntegrationOAuthHandler) GetUserConnections(w http.ResponseWriter, r *h
 	rows, err := h.db.Query(`
 		SELECT
 			uit.id, uit.user_id, uit.integration_provider_id,
-			uit.provider_metadata, uit.connected_at,
+			uit.provider_metadata, uit.invalidated_at, uit.connected_at,
 			uit.created_at, uit.updated_at,
 			ip.name AS provider_name, ip.provider_type, ip.slug AS provider_slug
 		FROM user_integration_tokens uit
@@ -435,9 +505,10 @@ func (h *IntegrationOAuthHandler) GetUserConnections(w http.ResponseWriter, r *h
 	for rows.Next() {
 		var conn models.UserIntegrationToken
 		var metadata sql.NullString
+		var invalidatedAt sql.NullTime
 		err := rows.Scan(
 			&conn.ID, &conn.UserID, &conn.IntegrationProviderID,
-			&metadata, &conn.ConnectedAt,
+			&metadata, &invalidatedAt, &conn.ConnectedAt,
 			&conn.CreatedAt, &conn.UpdatedAt,
 			&conn.ProviderName, &conn.ProviderType, &conn.ProviderSlug,
 		)
@@ -447,6 +518,9 @@ func (h *IntegrationOAuthHandler) GetUserConnections(w http.ResponseWriter, r *h
 		}
 		if metadata.Valid {
 			conn.ProviderMetadata = metadata.String
+		}
+		if invalidatedAt.Valid {
+			conn.InvalidatedAt = &invalidatedAt.Time
 		}
 		connections = append(connections, conn)
 	}
@@ -469,6 +543,12 @@ func (h *IntegrationOAuthHandler) DisconnectProvider(w http.ResponseWriter, r *h
 	if providerID == "" {
 		respondBadRequest(w, r, "Missing provider ID")
 		return
+	}
+
+	// Revoke the provider-side grant before dropping the local row (best-effort).
+	var providerType models.IntegrationProviderType
+	if err := h.db.QueryRow(`SELECT provider_type FROM integration_providers WHERE id = ?`, providerID).Scan(&providerType); err == nil && providerType == models.IntegrationProviderDocmost && h.docmost != nil {
+		h.docmost.Revoke(r.Context(), providerID, user.ID)
 	}
 
 	result, err := h.db.ExecWrite(`

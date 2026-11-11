@@ -7,7 +7,7 @@
 	import Globe from '@lucide/svelte/icons/globe';
 	import Plane from '@lucide/svelte/icons/plane';
 	import User from '@lucide/svelte/icons/user';
-	import { getUser } from '../api/users.js';
+	import { getMyProfile } from '../api/users.js';
 	import AlertBox from '../components/AlertBox.svelte';
 	import Badge from '../components/Badge.svelte';
 	import Tabs from '../components/Tabs.svelte';
@@ -74,7 +74,7 @@
 		const version = ++loadVersion;
 		error = '';
 		try {
-			const loadedUser = await getUser(userId);
+			const loadedUser = await getMyProfile();
 			if (version === loadVersion && userId === currentUserId) {
 				user = loadedUser;
 			}

@@ -86,7 +86,7 @@
           class="block no-underline"
           style="color: inherit;"
         >
-          <div class="font-medium text-sm" style="color: var(--ds-text);">{item.title}</div>
+          <div class="font-medium text-sm" dir="auto" style="color: var(--ds-text);">{item.title}</div>
           <div class="text-xs">
             <ItemKey item={item} clickable={false} />
           </div>

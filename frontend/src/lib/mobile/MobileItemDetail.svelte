@@ -12,11 +12,12 @@
   import Pencil from '@lucide/svelte/icons/pencil';
   import { getAssignableUsers } from '../api/users.js';
   import { items } from '../api/items.js';
+  import TransitionScreenModal from '../dialogs/TransitionScreenModal.svelte';
   import { loadMobileItemDetailSummary } from './mobileItemDetailData.js';
   import { agentRuns as agentRunBus } from '../stores/agentRuns.svelte.js';
   import { navigate } from '../router.js';
   import { notificationActions } from '../stores/notifications.js';
-  import { errorToast, infoToast } from '../stores/toasts.svelte.js';
+  import { errorToast, infoToast, surfaceError } from '../stores/toasts.svelte.js';
   import { timerStore } from '../stores/timerStore.svelte.js';
   import { useItemEventStream } from '../composables/useItemEventStream.svelte.js';
   import { usePullToRefresh } from '../composables/usePullToRefresh.svelte.js';
@@ -40,6 +41,9 @@
   let loading = $state(true);
   let errored = $state(false);
   let transitions = $state([]);
+  // Screen-bearing move requested from the mobile status sheet (WI-1835).
+  let mobileTransition = $state(null);
+  let showMobileTransition = $state(false);
   let transitioning = $state(false);
   let isWatching = $state(false);
   let watcherCount = $state(0);
@@ -77,8 +81,7 @@
     try {
       assigneeOptions = (await getAssignableUsers(item.workspace_id)) ?? [];
     } catch (err) {
-      console.error('Failed to load assignable users:', err);
-      errorToast(t('mobile.item.assigneesFailed'));
+      surfaceError(err, { context: 'loadAssignableUsers', message: t('mobile.item.assigneesFailed') });
       assigneeOptions = [];
     } finally {
       assigneeLoading = false;
@@ -161,22 +164,46 @@
       const res = await items.getAvailableStatusTransitions(id);
       if (token === loadToken) transitions = res?.available_transitions ?? [];
     } catch (err) {
-      console.error('Failed to load transitions:', err);
+      surfaceError(err, { context: 'refreshTransitionState' });
     }
   }
 
   async function changeStatus(statusId) {
     if (transitioning) return;
+    const option = transitions.find((transition) => transition.id === statusId);
+    if (option?.screen) {
+      mobileTransition = { statusId, screen: option.screen, statusName: option.name || '' };
+      showMobileTransition = true;
+      statusSheetOpen = false;
+      return;
+    }
+    try {
+      await performChangeStatus(statusId, null);
+    } catch (err) {
+      errorToast(err?.message || t('mobile.item.saveFailed'));
+    }
+  }
+
+  async function performChangeStatus(statusId, fields) {
+    if (transitioning) return;
     transitioning = true;
     try {
-      const updated = await items.transition(itemId, statusId);
+      const updated = await items.transition(itemId, statusId, fields);
       item = { ...item, ...updated };
       await refreshTransitionState(itemId, loadToken);
     } catch (err) {
       console.error('Failed to transition item:', err);
+      throw err;
     } finally {
       transitioning = false;
     }
+  }
+
+  async function handleMobileTransitionConfirm(fields) {
+    if (!mobileTransition) return;
+    const { statusId } = mobileTransition;
+    await performChangeStatus(statusId, fields);
+    mobileTransition = null;
   }
 
   // Personal-workspace (workflow-less) tasks get no available status
@@ -195,7 +222,7 @@
       const updated = await items.transition(itemId, target);
       item = { ...item, ...updated };
     } catch (err) {
-      console.error('Failed to toggle personal task:', err);
+      surfaceError(err, { context: 'togglePersonalDone' });
     } finally {
       transitioning = false;
     }
@@ -211,7 +238,7 @@
         : null;
       item = { ...item, ...updated, assignee_id: assigneeId, assignee_name: name, assignee_avatar: user?.avatar_url ?? null };
     } catch (err) {
-      console.error('Failed to update assignee:', err);
+      surfaceError(err, { context: 'updateAssignee' });
     }
   }
 
@@ -225,7 +252,7 @@
       isWatching = status?.watching ?? !isWatching;
       watcherCount = status?.watcher_count ?? watcherCount;
     } catch (err) {
-      console.error('Failed to toggle watch:', err);
+      surfaceError(err, { context: 'toggleWatch' });
     } finally {
       watchBusy = false;
     }
@@ -243,7 +270,7 @@
       });
       navigate('/m/timer');
     } catch (err) {
-      console.error('Failed to start timer:', err);
+      surfaceError(err, { context: 'startTimer' });
     } finally {
       startingTimer = false;
     }
@@ -425,7 +452,7 @@
     {/if}
 
     <div class="title-row">
-      <h1 class="title" data-testid="detail-title">{item.title}</h1>
+      <h1 class="title" dir="auto" data-testid="detail-title">{item.title}</h1>
       <button
         class="edit-btn"
         onclick={() => navigate(`/m/items/${item.id}/edit`)}
@@ -648,6 +675,19 @@
       </span>
     {/snippet}
   </MobileOptionSheet>
+{/if}
+
+{#if showMobileTransition && mobileTransition}
+  <TransitionScreenModal
+    bind:show={showMobileTransition}
+    screen={mobileTransition.screen}
+    targetStatusName={mobileTransition.statusName}
+    workspaceId={item?.workspace_id}
+    itemLabels={item?.labels || []}
+    item={item}
+    onconfirm={handleMobileTransitionConfirm}
+    oncancel={() => (mobileTransition = null)}
+  />
 {/if}
 
 <style>

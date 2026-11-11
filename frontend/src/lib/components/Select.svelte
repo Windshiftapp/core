@@ -200,7 +200,7 @@
     onfocus={onfocus}
     onblur={onblur}
   >
-    <span class="truncate flex-1 {!selectedOption ? 'opacity-60' : ''}">
+    <span class="truncate flex-1 {!selectedOption ? 'opacity-60' : ''}" dir="auto">
       {displayText || '\u00A0'}
     </span>
     <ChevronDown
@@ -246,7 +246,7 @@
         onkeydown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !opt.disabled) { e.preventDefault(); selectOption(opt); } }}
         onmouseenter={() => { if (!opt.disabled) highlightedIndex = index; }}
       >
-        <span class="truncate">{opt.label}</span>
+        <span class="truncate" dir="auto">{opt.label}</span>
         {#if isSelected}
           <Check class="w-4 h-4 flex-shrink-0" style="color: var(--ds-interactive);" />
         {/if}

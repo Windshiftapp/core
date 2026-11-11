@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { formatDateWithOptions } from '../utils/dateFormatter.js';
   import { recurrence } from '../api/recurrence.js';
   import { confirm } from '../composables/useConfirm.js';
   import { addToast, errorToast } from '../stores/toasts.svelte.js';
@@ -136,7 +137,7 @@
   function formatDate(dateStr) {
     if (!dateStr) return '-';
     try {
-      return new Date(dateStr).toLocaleDateString(undefined, {
+      return formatDateWithOptions(dateStr, {
         year: 'numeric',
         month: 'short',
         day: 'numeric',

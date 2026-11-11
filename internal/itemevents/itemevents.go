@@ -48,6 +48,11 @@ type Metadata struct {
 	CorrelationID     string
 	CausationEventKey string
 	Automation        *AutomationContext
+	// SuppressSideEffects marks a fact that must not drive live side effects
+	// (notifications, automation, webhooks) even though it is not a historical
+	// import. External reconciliation uses it so machine-driven writes stay
+	// silent while still appearing in the event log.
+	SuppressSideEffects bool
 	// AgentRunID is the agent_runs row that produced this write, when an agent
 	// made it. It is the only precise link from an agent's effect back to the
 	// turn that caused it — a history row stamped with just "an agent did this"
@@ -89,6 +94,32 @@ func Agent(ref, sourceKind string) Metadata {
 // Import records an import job as the actor.
 func Import(ref string) Metadata {
 	return Metadata{ActorKind: "import", ActorRef: ref, SourceKind: "import"}
+}
+
+// IsImportOrigin reports whether an event was written by a historical import.
+// Imported facts are historical: consumers must not turn them into live
+// outbound side effects such as customer email, notifications, or automation.
+func IsImportOrigin(actorKind, sourceKind string) bool {
+	return actorKind == "import" || sourceKind == "import"
+}
+
+// SuppressesSideEffects reports whether a fact was written with live side
+// effects disabled. It probes the shared payload field so durable consumers
+// honor the flag without decoding the full payload. Facts written before the
+// field existed decode as false and keep their prior behavior.
+func SuppressesSideEffects(eventType string, payload json.RawMessage) bool {
+	switch eventType {
+	case Created, Updated, StatusChanged, StatusLooped, Deleted, CommentCreated, Linked, Unlinked:
+	default:
+		return false
+	}
+	var probe struct {
+		SuppressSideEffects bool `json:"suppress_side_effects"`
+	}
+	if err := json.Unmarshal(payload, &probe); err != nil {
+		return false
+	}
+	return probe.SuppressSideEffects
 }
 
 // System records a system-owned mutation.
@@ -165,9 +196,10 @@ func Snapshot(item *models.Item) ItemSnapshot {
 }
 
 type CreatedV1 struct {
-	Item         ItemSnapshot       `json:"item"`
-	MilestoneIDs []int              `json:"milestone_ids,omitempty"`
-	Automation   *AutomationContext `json:"automation,omitempty"`
+	Item                ItemSnapshot       `json:"item"`
+	MilestoneIDs        []int              `json:"milestone_ids,omitempty"`
+	Automation          *AutomationContext `json:"automation,omitempty"`
+	SuppressSideEffects bool               `json:"suppress_side_effects,omitempty"`
 }
 
 type FieldChange struct {
@@ -252,23 +284,26 @@ func addMapChanges(changes *[]FieldChange, prefix string, before, after map[stri
 }
 
 type UpdatedV1 struct {
-	Item       ItemSnapshot       `json:"item"`
-	Changes    []FieldChange      `json:"changes"`
-	Automation *AutomationContext `json:"automation,omitempty"`
+	Item                ItemSnapshot       `json:"item"`
+	Changes             []FieldChange      `json:"changes"`
+	Automation          *AutomationContext `json:"automation,omitempty"`
+	SuppressSideEffects bool               `json:"suppress_side_effects,omitempty"`
 }
 
 type StatusChangedV1 struct {
-	Item        ItemSnapshot       `json:"item"`
-	OldStatusID *int               `json:"old_status_id,omitempty"`
-	NewStatusID *int               `json:"new_status_id,omitempty"`
-	Changes     []FieldChange      `json:"changes"`
-	Automation  *AutomationContext `json:"automation,omitempty"`
+	Item                ItemSnapshot       `json:"item"`
+	OldStatusID         *int               `json:"old_status_id,omitempty"`
+	NewStatusID         *int               `json:"new_status_id,omitempty"`
+	Changes             []FieldChange      `json:"changes"`
+	Automation          *AutomationContext `json:"automation,omitempty"`
+	SuppressSideEffects bool               `json:"suppress_side_effects,omitempty"`
 }
 
 type DeletedV1 struct {
-	Item            ItemSnapshot       `json:"item"`
-	DescendantCount int                `json:"descendant_count"`
-	Automation      *AutomationContext `json:"automation,omitempty"`
+	Item                ItemSnapshot       `json:"item"`
+	DescendantCount     int                `json:"descendant_count"`
+	Automation          *AutomationContext `json:"automation,omitempty"`
+	SuppressSideEffects bool               `json:"suppress_side_effects,omitempty"`
 }
 
 type CommentCreatedV1 struct {
@@ -282,17 +317,18 @@ type CommentCreatedV1 struct {
 }
 
 type LinkChangedV1 struct {
-	ItemID     int                `json:"item_id"`
-	LinkID     int                `json:"link_id"`
-	LinkTypeID int                `json:"link_type_id"`
-	Direction  string             `json:"direction"`
-	OtherType  string             `json:"other_type"`
-	OtherID    int                `json:"other_id"`
-	SourceType string             `json:"source_type"`
-	SourceID   int                `json:"source_id"`
-	TargetType string             `json:"target_type"`
-	TargetID   int                `json:"target_id"`
-	Automation *AutomationContext `json:"automation,omitempty"`
+	ItemID              int                `json:"item_id"`
+	LinkID              int                `json:"link_id"`
+	LinkTypeID          int                `json:"link_type_id"`
+	Direction           string             `json:"direction"`
+	OtherType           string             `json:"other_type"`
+	OtherID             int                `json:"other_id"`
+	SourceType          string             `json:"source_type"`
+	SourceID            int                `json:"source_id"`
+	TargetType          string             `json:"target_type"`
+	TargetID            int                `json:"target_id"`
+	Automation          *AutomationContext `json:"automation,omitempty"`
+	SuppressSideEffects bool               `json:"suppress_side_effects,omitempty"`
 }
 
 // MergedV1 records one duplicate folded into a canonical ticket. Counts are
@@ -402,6 +438,7 @@ func (r *Recorder) observe(ctx context.Context, tx database.Tx, facts []Recorded
 func (r *Recorder) Created(ctx context.Context, tx database.Tx, item *models.Item, milestoneIDs []int, metadata Metadata) (*events.Event, error) {
 	return r.append(ctx, tx, Created, item.WorkspaceID, item.ID, metadata, CreatedV1{
 		Item: Snapshot(item), MilestoneIDs: milestoneIDs, Automation: metadata.Automation,
+		SuppressSideEffects: metadata.SuppressSideEffects,
 	})
 }
 
@@ -414,6 +451,7 @@ func (r *Recorder) CreatedBatch(ctx context.Context, tx database.Tx, records []C
 		}
 		input, err := newEvent(Created, record.Item.WorkspaceID, record.Item.ID, record.Metadata, CreatedV1{
 			Item: Snapshot(record.Item), MilestoneIDs: record.MilestoneIDs, Automation: record.Metadata.Automation,
+			SuppressSideEffects: record.Metadata.SuppressSideEffects,
 		})
 		if err != nil {
 			return nil, err
@@ -443,6 +481,7 @@ func (r *Recorder) CreatedBatch(ctx context.Context, tx database.Tx, records []C
 func (r *Recorder) Updated(ctx context.Context, tx database.Tx, item *models.Item, changes []FieldChange, metadata Metadata) (*events.Event, error) {
 	return r.append(ctx, tx, Updated, item.WorkspaceID, item.ID, metadata, UpdatedV1{
 		Item: Snapshot(item), Changes: changes, Automation: metadata.Automation,
+		SuppressSideEffects: metadata.SuppressSideEffects,
 	})
 }
 
@@ -457,13 +496,15 @@ func (r *Recorder) UpdatedBatch(ctx context.Context, tx database.Tx, records []U
 		eventType := Updated
 		payload := any(UpdatedV1{
 			Item: Snapshot(record.Item), Changes: record.Changes, Automation: record.Metadata.Automation,
+			SuppressSideEffects: record.Metadata.SuppressSideEffects,
 		})
 		if record.StatusChanged {
 			eventType = StatusChanged
 			payload = StatusChangedV1{
 				Item: Snapshot(record.Item), OldStatusID: record.OldStatusID,
 				NewStatusID: record.NewStatusID, Changes: record.Changes,
-				Automation: record.Metadata.Automation,
+				Automation:          record.Metadata.Automation,
+				SuppressSideEffects: record.Metadata.SuppressSideEffects,
 			}
 		}
 		input, err := newEvent(eventType, record.Item.WorkspaceID, record.Item.ID, record.Metadata, payload)
@@ -501,6 +542,7 @@ func (r *Recorder) UpdatedBatch(ctx context.Context, tx database.Tx, records []U
 func (r *Recorder) StatusChanged(ctx context.Context, tx database.Tx, item *models.Item, oldStatusID, newStatusID *int, changes []FieldChange, metadata Metadata) (*events.Event, error) {
 	return r.append(ctx, tx, StatusChanged, item.WorkspaceID, item.ID, metadata, StatusChangedV1{
 		Item: Snapshot(item), OldStatusID: oldStatusID, NewStatusID: newStatusID, Changes: changes, Automation: metadata.Automation,
+		SuppressSideEffects: metadata.SuppressSideEffects,
 	})
 }
 
@@ -509,12 +551,14 @@ func (r *Recorder) StatusChanged(ctx context.Context, tx database.Tx, item *mode
 func (r *Recorder) StatusLooped(ctx context.Context, tx database.Tx, item *models.Item, statusID int, changes []FieldChange, metadata Metadata) (*events.Event, error) {
 	return r.append(ctx, tx, StatusLooped, item.WorkspaceID, item.ID, metadata, StatusChangedV1{
 		Item: Snapshot(item), OldStatusID: &statusID, NewStatusID: &statusID, Changes: changes, Automation: metadata.Automation,
+		SuppressSideEffects: metadata.SuppressSideEffects,
 	})
 }
 
 func (r *Recorder) Deleted(ctx context.Context, tx database.Tx, item *models.Item, descendantCount int, metadata Metadata) (*events.Event, error) {
 	return r.append(ctx, tx, Deleted, item.WorkspaceID, item.ID, metadata, DeletedV1{
 		Item: Snapshot(item), DescendantCount: descendantCount, Automation: metadata.Automation,
+		SuppressSideEffects: metadata.SuppressSideEffects,
 	})
 }
 
@@ -602,7 +646,8 @@ func (r *Recorder) linkChanged(ctx context.Context, tx database.Tx, eventType st
 			Direction: endpoint.direction, OtherType: endpoint.otherType, OtherID: endpoint.otherID,
 			SourceType: link.SourceType, SourceID: link.SourceID,
 			TargetType: link.TargetType, TargetID: link.TargetID,
-			Automation: metadata.Automation,
+			Automation:          metadata.Automation,
+			SuppressSideEffects: metadata.SuppressSideEffects,
 		})
 		if err != nil {
 			return nil, err

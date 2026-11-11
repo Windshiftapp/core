@@ -67,17 +67,4 @@
 
 
 <style>
-  .nav-link {
-    color: var(--ds-text-subtle);
-  }
-
-  .nav-link:hover:not(.active) {
-    background: var(--ds-background-neutral-hovered);
-    color: var(--ds-text);
-  }
-
-  .nav-link.active {
-    background: var(--ds-surface-selected);
-    color: var(--ds-text);
-  }
 </style>

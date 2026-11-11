@@ -1,5 +1,7 @@
+import { untrack } from 'svelte';
 import { items as itemsApi } from '../api/items.js';
 import { collectionStore } from '../stores/collectionContext.js';
+import { collectionPreferences } from '../stores/collectionPreferences.svelte.js';
 
 const DEFAULT_PER_ROOT_LIMIT = 100;
 
@@ -40,6 +42,7 @@ function mergeById(existing, incoming) {
  * @param {object} options
  * @param {() => number|null} [options.getWorkspaceId]
  * @param {() => number|null} [options.getCollectionId]
+ * @param {() => string|null} [options.getView] View key used to persist expansion.
  * @param {() => number} [options.getMaxDepth] 0 = full matching descendants.
  * @param {() => number} [options.getPerRootLimit]
  * @param {() => string} [options.getSubFilterQL]
@@ -47,6 +50,7 @@ function mergeById(existing, incoming) {
 export function useCollectionHierarchy({
   getWorkspaceId = () => null,
   getCollectionId = () => null,
+  getView = () => null,
   getMaxDepth = () => 0,
   getPerRootLimit = () => DEFAULT_PER_ROOT_LIMIT,
   getSubFilterQL = () => '',
@@ -57,6 +61,10 @@ export function useCollectionHierarchy({
   let loadedRoots = $state(new Set());
   let loadingRoots = $state(new Set());
   let expanded = $state(new Set());
+  // Bumped whenever the base set is replaced. A subtree response whose
+  // generation no longer matches is dropped instead of merged, so a fetch for
+  // a previous view, level, or filter cannot change the current hierarchy.
+  let fetchGeneration = 0;
 
   let baseSignature = null;
   let previousBaseIds = null;
@@ -123,7 +131,10 @@ export function useCollectionHierarchy({
         roots.push(item);
       }
     }
-    roots.sort(compareItems);
+    // Base items arrive in the API's rank order, so the root list keeps that
+    // order. Only child buckets need a sort: flattening can merge descendants
+    // from different depths into one parent, and the subtree read is
+    // breadth-first.
     for (const children of childrenByParent.values()) children.sort(compareItems);
     return { roots, childrenByParent };
   });
@@ -165,6 +176,7 @@ export function useCollectionHierarchy({
       (id) => !loadingRoots.has(id) && (force || offsetByRoot[id] != null || !loadedRoots.has(id))
     );
     if (ids.length === 0) return;
+    const generation = fetchGeneration;
     loadingRoots = new Set([...loadingRoots, ...ids]);
     try {
       const groups = await itemsApi.getHierarchy({
@@ -176,6 +188,7 @@ export function useCollectionHierarchy({
         perRootLimit: getPerRootLimit(),
         perRootOffset: 0,
       });
+      if (generation !== fetchGeneration) return;
       const next = { ...overlayByRoot };
       const nextLoaded = new Set(loadedRoots);
       for (const group of groups) {
@@ -198,9 +211,11 @@ export function useCollectionHierarchy({
     } catch (error) {
       console.error('[useCollectionHierarchy] failed to load descendants:', error);
     } finally {
-      const pending = new Set(loadingRoots);
-      for (const id of ids) pending.delete(id);
-      loadingRoots = pending;
+      if (generation === fetchGeneration) {
+        const pending = new Set(loadingRoots);
+        for (const id of ids) pending.delete(id);
+        loadingRoots = pending;
+      }
     }
   }
 
@@ -208,6 +223,7 @@ export function useCollectionHierarchy({
   async function loadMore(itemId) {
     const group = overlayByRoot[itemId];
     if (!group?.hasMore || loadingRoots.has(itemId)) return;
+    const generation = fetchGeneration;
     loadingRoots = new Set([...loadingRoots, itemId]);
     try {
       const groups = await itemsApi.getHierarchy({
@@ -219,6 +235,7 @@ export function useCollectionHierarchy({
         perRootLimit: getPerRootLimit(),
         perRootOffset: group.items.length,
       });
+      if (generation !== fetchGeneration) return;
       const next = groups.find((entry) => entry.root_id === itemId);
       if (!next) return;
       overlayByRoot = {
@@ -232,9 +249,11 @@ export function useCollectionHierarchy({
     } catch (error) {
       console.error('[useCollectionHierarchy] failed to load more descendants:', error);
     } finally {
-      const pending = new Set(loadingRoots);
-      pending.delete(itemId);
-      loadingRoots = pending;
+      if (generation === fetchGeneration) {
+        const pending = new Set(loadingRoots);
+        pending.delete(itemId);
+        loadingRoots = pending;
+      }
     }
   }
 
@@ -245,15 +264,45 @@ export function useCollectionHierarchy({
     void fetchRoots([itemId]);
   }
 
+  // The expanded ids are stored per scope and view so a reload restores the
+  // tree the user left. A stored key (even an empty list) is authoritative over
+  // the default "roots with children start expanded".
+  const EXPANDED_STATE_KEY = 'expanded_ids';
+
+  function readStoredExpanded() {
+    const view = getView();
+    if (!view) return null;
+    const stored = collectionPreferences.viewStateValue(
+      getWorkspaceId(),
+      getCollectionId(),
+      view,
+      EXPANDED_STATE_KEY
+    );
+    return Array.isArray(stored) ? new Set(stored) : null;
+  }
+
+  function persistExpanded() {
+    const view = getView();
+    if (!view) return;
+    const workspaceId = getWorkspaceId();
+    const collectionId = getCollectionId();
+    if (workspaceId == null && collectionId == null) return;
+    collectionPreferences.patchViewState(workspaceId, collectionId, view, {
+      [EXPANDED_STATE_KEY]: [...expanded],
+    });
+  }
+
   function expand(itemId) {
     expanded.add(itemId);
     expanded = new Set(expanded);
     ensureLoaded(itemId);
+    persistExpanded();
   }
 
   function collapse(itemId) {
     expanded.delete(itemId);
     expanded = new Set(expanded);
+    persistExpanded();
   }
 
   function toggleExpanded(itemId) {
@@ -263,6 +312,7 @@ export function useCollectionHierarchy({
 
   function collapseAll() {
     expanded = new Set();
+    persistExpanded();
   }
 
   function expandAll() {
@@ -275,6 +325,7 @@ export function useCollectionHierarchy({
     }
     expanded = next;
     if (toLoad.length > 0) void fetchRoots(toLoad);
+    persistExpanded();
   }
 
   // Reset the overlay when the base set is replaced (level or scope change) and
@@ -294,9 +345,16 @@ export function useCollectionHierarchy({
       // base row that now reports children.
       if (generationChanged) {
         const roots = new Set(loadedRoots);
+        const nextExpanded = new Set(expanded);
         for (const item of baseItems) {
-          if (item.has_children) roots.add(item.id);
+          if (!item.has_children) continue;
+          roots.add(item.id);
+          // A base root can report children only after the level filter
+          // resolves. It missed the initial default expansion, so expand it
+          // now instead of leaving its subtree behind a collapsed expander.
+          if (!hierarchyIndex.childrenByParent.has(item.id)) nextExpanded.add(item.id);
         }
+        expanded = nextExpanded;
         if (roots.size > 0) void fetchRoots([...roots], { force: true });
       }
       return;
@@ -304,11 +362,15 @@ export function useCollectionHierarchy({
     const nextIds = new Set(baseItems.map((item) => item.id));
     const isAppend =
       previousBaseIds !== null && [...previousBaseIds].every((id) => nextIds.has(id));
+    // Read without subscribing: preferences are written by the actions below,
+    // and a tracked read would re-run this effect on every save.
+    const stored = untrack(readStoredExpanded);
     if (!isAppend) {
       overlayByRoot = {};
       loadedRoots = new Set();
       loadingRoots = new Set();
-      expanded = new Set();
+      expanded = stored ?? new Set();
+      fetchGeneration += 1;
     }
     baseSignature = signature;
     previousBaseIds = nextIds;
@@ -318,12 +380,16 @@ export function useCollectionHierarchy({
       .map((item) => item.id);
     if (toLoad.length > 0) void fetchRoots(toLoad);
 
-    // Base roots with children start expanded, matching the previous default.
-    const nextExpanded = new Set(expanded);
-    for (const item of baseItems) {
-      if (item.has_children) nextExpanded.add(item.id);
+    // Base roots with children start expanded until the view has a stored
+    // expansion, after which the user's choice is authoritative.
+    if (stored == null) {
+      const nextExpanded = new Set(expanded);
+      for (const item of baseItems) {
+        if (item.has_children) nextExpanded.add(item.id);
+      }
+      expanded = nextExpanded;
+      if (expanded.size > 0) persistExpanded();
     }
-    expanded = nextExpanded;
   });
 
   return {

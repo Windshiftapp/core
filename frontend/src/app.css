@@ -131,6 +131,72 @@
 
   /* Links */
   --color-ds-text-link-hovered: var(--ds-text-link-hovered);
+
+  /* Inputs */
+  --color-ds-background-input: var(--ds-background-input);
+  --color-ds-background-input-hovered: var(--ds-background-input-hovered);
+
+  /* Surfaces */
+  --color-ds-surface-pressed: var(--ds-surface-pressed);
+  --color-ds-surface-raised-hovered: var(--ds-surface-raised-hovered);
+
+  /* Feedback colors */
+  --color-ds-danger: var(--ds-danger);
+  --color-ds-success: var(--ds-success);
+  --color-ds-border-danger: var(--ds-border-danger);
+  --color-ds-border-info: var(--ds-border-info);
+  --color-ds-border-success: var(--ds-border-success);
+  --color-ds-border-warning: var(--ds-border-warning);
+
+  /* Accent "subtler" fills and gray */
+  --color-ds-accent-gray: var(--ds-accent-gray);
+  --color-ds-accent-gray-subtle: var(--ds-accent-gray-subtle);
+  --color-ds-accent-blue-subtler: var(--ds-accent-blue-subtler);
+  --color-ds-accent-green-subtler: var(--ds-accent-green-subtler);
+  --color-ds-accent-orange-subtler: var(--ds-accent-orange-subtler);
+  --color-ds-accent-purple-subtler: var(--ds-accent-purple-subtler);
+  --color-ds-accent-red-subtler: var(--ds-accent-red-subtler);
+  --color-ds-accent-teal-subtler: var(--ds-accent-teal-subtler);
+  --color-ds-accent-yellow-subtler: var(--ds-accent-yellow-subtler);
+
+  /* Icon accents */
+  --color-ds-icon-accent-blue: var(--ds-icon-accent-blue);
+  --color-ds-icon-accent-green: var(--ds-icon-accent-green);
+  --color-ds-icon-accent-orange: var(--ds-icon-accent-orange);
+  --color-ds-icon-accent-purple: var(--ds-icon-accent-purple);
+  --color-ds-icon-accent-red: var(--ds-icon-accent-red);
+  --color-ds-icon-accent-teal: var(--ds-icon-accent-teal);
+  --color-ds-icon-accent-yellow: var(--ds-icon-accent-yellow);
+
+  /* Status solids and neutral */
+  --color-ds-status-danger-solid: var(--ds-status-danger-solid);
+  --color-ds-status-info-solid: var(--ds-status-info-solid);
+  --color-ds-status-success-solid: var(--ds-status-success-solid);
+  --color-ds-status-warning-solid: var(--ds-status-warning-solid);
+  --color-ds-status-neutral-bg: var(--ds-status-neutral-bg);
+  --color-ds-status-neutral-border: var(--ds-status-neutral-border);
+  --color-ds-status-neutral-solid: var(--ds-status-neutral-solid);
+  --color-ds-status-neutral-text: var(--ds-status-neutral-text);
+
+  /* Progress */
+  --color-ds-progress-fill: var(--ds-progress-fill);
+  --color-ds-progress-track: var(--ds-progress-track);
+
+  /* Gradients */
+  --color-ds-gradient-start: var(--ds-gradient-start);
+  --color-ds-gradient-mid: var(--ds-gradient-mid);
+  --color-ds-gradient-end: var(--ds-gradient-end);
+
+  /* Glass surfaces are intentionally not exposed as Tailwind color utilities:
+     their values are semi-transparent rgba(), and Tailwind's opacity handling
+     mangles already-transparent colors. Keep using var(--ds-glass-*) inline
+     or in component CSS for these. */
+
+  /* Shadows */
+  --shadow-ds-raised: var(--ds-shadow-raised);
+  --shadow-ds-glass: var(--ds-glass-shadow);
+  --shadow-ds-glow-nav: var(--ds-glow-nav);
+  --shadow-ds-glow-primary: var(--ds-glow-primary);
 }
 
 /* Base styles */
@@ -416,6 +482,21 @@ a.link:hover {
   text-align: right;
 }
 
+/* Text whose direction follows its own content. `dir="auto"` resolves the
+   direction from the first strong character, so a Persian title stays
+   right-aligned in an English interface and an English title stays
+   left-aligned in an Arabic one. This rule is unlayered, so it wins over the
+   text-align utilities and an explicit text-left cannot override it. */
+[dir="auto"] {
+  text-align: start;
+}
+
+/* Inline runs of mixed-direction text (keys, URLs, code) stay isolated from
+   the surrounding sentence instead of reordering it. */
+.bidi-isolate {
+  unicode-bidi: isolate;
+}
+
 /* RTL-aware margin utilities using logical properties */
 .ms-auto {
   margin-inline-start: auto;
@@ -569,4 +650,20 @@ a.link:hover {
 }
 .themed-nav .nav-button.nav-button-selected:hover {
   background-color: color-mix(in srgb, var(--ds-interactive) 14%, transparent);
+}
+
+/* Shared navigation-sidebar link styling. Each nav sidebar used to carry its
+   own copy of this block. */
+.nav-link {
+  color: var(--ds-text-subtle);
+}
+
+.nav-link:hover:not(.active) {
+  background: var(--ds-background-neutral-hovered);
+  color: var(--ds-text);
+}
+
+.nav-link.active {
+  background: var(--ds-surface-selected);
+  color: var(--ds-text);
 }

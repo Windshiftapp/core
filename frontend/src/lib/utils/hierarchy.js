@@ -15,6 +15,20 @@ export function childItemTypesForParent(itemTypes, parentType) {
   return (itemTypes || []).filter((type) => canItemTypeBeChildOf(type, parentType));
 }
 
+/**
+ * Child types for a parent whose own type is unknown (for example a level-0
+ * item whose type is not bound to the workspace configuration set). The parent
+ * level comes from the selected hierarchy level instead of the type object.
+ */
+export function childItemTypesForLevel(itemTypes, parentLevel) {
+  const level = Number(parentLevel);
+  if (parentLevel == null || Number.isNaN(level) || level < 0) return [];
+  return (itemTypes || []).filter((type) => {
+    if (isGenericSubtaskType(type)) return true;
+    return Number(type.hierarchy_level) === level + 1;
+  });
+}
+
 export function sortItemTypesByHierarchy(itemTypes) {
   return [...(itemTypes || [])].sort((a, b) => {
     const aGeneric = isGenericSubtaskType(a);

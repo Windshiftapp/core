@@ -40,6 +40,15 @@ var providerCatalog = map[models.IntegrationProviderType]ProviderCapabilities{
 		OAuth:             true,
 		GenericItemLinks:  true,
 	},
+	// Docmost is self-hosted and a public OAuth client: the admin sets a base
+	// URL, Windshift self-registers a client, and the per-user token carries a
+	// rotating refresh token. No item-link surface.
+	models.IntegrationProviderDocmost: {
+		Type:              models.IntegrationProviderDocmost,
+		CredentialOwner:   CredentialOwnerUser,
+		AdminProviderCRUD: true,
+		OAuth:             true,
+	},
 	models.IntegrationProviderZammad: {
 		Type:            models.IntegrationProviderZammad,
 		CredentialOwner: CredentialOwnerSystem,

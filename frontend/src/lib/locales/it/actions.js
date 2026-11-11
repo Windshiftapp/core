@@ -1,0 +1,342 @@
+/**
+ * Actions automation translations (Italian)
+ */
+export default {
+  actions: {
+    title: 'Azioni',
+    description: 'Automatizza i flussi di lavoro con azioni basate su regole',
+    create: 'Crea azione',
+    createFirst: 'Crea la tua prima azione',
+    noActions: 'Ancora nessuna azione',
+    noActionsDescription: 'Crea azioni per automatizzare i flussi di lavoro in base agli eventi degli elementi',
+    enabled: 'Attiva',
+    disabled: 'Disattivata',
+    enable: 'Attiva',
+    disable: 'Disattiva',
+    viewLogs: 'Visualizza log',
+    confirmDelete: 'Vuoi davvero eliminare l’azione "{name}"?',
+    failedToSave: 'Impossibile salvare l’azione',
+    newAction: 'Nuova azione',
+
+    // Action templates (shipped automation blueprints)
+    templates: {
+      pickTitle: 'Scegli un modello di azione',
+      fromTemplate: 'Da modello',
+      empty: 'Nessun modello disponibile.',
+      help: 'Applica a questo workspace un modello di automazione predefinito. Ogni applicazione crea una nuova azione che potrai modificare in seguito.',
+      apply: 'Applica',
+    },
+
+    // Trigger types
+    trigger: {
+      statusTransition: 'Transizione di stato',
+      statusLoop: 'Ciclo di stato',
+      itemCreated: 'Elemento creato',
+      itemUpdated: 'Elemento aggiornato',
+      itemLinked: 'Elemento collegato',
+      slaBreached: 'SLA violato',
+      slaWarning: 'Avviso SLA',
+      commentCreated: 'Commento creato',
+      itemInactive: 'Elemento inattivo',
+      manual: 'Manuale',
+      respondToCascades: 'Rispondi alle modifiche generate da azioni',
+      respondToCascadesHint:
+        'Se attivo, questa azione verrà eseguita anche quando è attivata da altre azioni, non solo dalle modifiche degli utenti.',
+    },
+
+    manualAccess: {
+      label: 'Chi può eseguire questa azione manuale?',
+      allEditors: 'Tutti gli editor del workspace',
+      unrestrictedHint:
+        'Nessuna restrizione di ruolo. Chiunque abbia accesso in modifica può vedere ed eseguire questa azione.',
+      restrictedHint:
+        'Solo i membri con almeno uno dei ruoli selezionati possono vedere ed eseguire questa azione. Gli amministratori del workspace mantengono sempre l’accesso.',
+    },
+
+    // Node types
+    nodes: {
+      trigger: 'Trigger',
+      setField: 'Imposta campo',
+      setStatus: 'Imposta stato',
+      addComment: 'Aggiungi commento',
+      notifyUser: 'Notifica utente',
+      condition: 'Condizione',
+      updateAsset: 'Aggiorna asset',
+      createAsset: 'Crea asset',
+      httpRequest: 'Richiesta HTTP',
+      containerRun: 'Esegui container',
+      aiExtract: 'Estrazione IA',
+      aiAgent: 'Agente IA',
+      relatedItems: 'Per ogni elemento correlato',
+      transitionItem: 'Transizione elemento',
+      roundRobinAssign: 'Assegnazione a rotazione',
+      createMilestone: 'Crea milestone',
+      notifyCustomer: 'Notifica cliente',
+      insertCannedResponse: 'Inserisci risposta predefinita',
+      adjustLabels: 'Modifica etichette',
+    },
+
+    aiUpdated: 'Azione aggiornata dall’IA',
+
+    // Actor override (run-as)
+    runAs: 'Esegui come',
+    runAsTriggerUser: 'Esegui come l’utente che l’ha attivata',
+    runAsHint:
+      'L’azione viene eseguita con i permessi di questo utente. Lascia vuoto per eseguirla come chi l’ha attivata.',
+    runAsReadonlyHint: 'Per modificarlo serve il permesso Imposta esecutore dell’azione.',
+
+    // Node palette and tips
+    addNodes: 'Aggiungi nodi',
+    tips: 'Suggerimenti',
+    tipDragToConnect: 'Trascina dalle maniglie per collegare i nodi',
+    tipClickToEdit: 'Fai clic su un nodo per configurarlo',
+    tipConditionBranches: 'Le condizioni hanno rami vero/falso',
+
+    // Config panel
+    nodeConfig: 'Configurazione del nodo',
+    config: {
+      from: 'Da',
+      to: 'A',
+      selectField: 'Seleziona campo...',
+      selectStatus: 'Seleziona stato...',
+      config: 'Configurazione',
+      configure: 'Configura',
+      selectConfig: 'Seleziona configurazione',
+      enterComment: 'Inserisci commento...',
+      selectRecipient: 'Seleziona destinatario...',
+      setCondition: 'Imposta condizione...',
+      targetStatus: 'Stato di destinazione',
+      fieldName: 'Nome del campo',
+      value: 'Valore',
+      commentContent: 'Contenuto del commento',
+      commentPlaceholder: 'Inserisci il testo del commento. Usa {{item.title}} per le variabili.',
+      privateComment: 'Commento privato (solo interno)',
+      fieldToCheck: 'Campo da verificare',
+      scopeThisItem: 'Questo elemento',
+      scopeParentItem: 'Elemento padre',
+      operator: 'Operatore',
+      compareValue: 'Valore di confronto',
+      private: 'Privato',
+      triggerType: 'Tipo di trigger',
+      fromStatus: 'Stato di partenza',
+      toStatus: 'Stato di arrivo',
+      loopStatus: 'Stato ripetuto',
+      anyStatus: 'Qualsiasi stato',
+      triggerField: 'Campo modificato',
+      anyField: 'Qualsiasi campo (tutte le modifiche)',
+      recipientType: 'Destinatario',
+      notifyMessage: 'Messaggio',
+      notifyPlaceholder: 'Inserisci il messaggio. Usa {{item.title}} per le variabili.',
+      enterMessage: 'Inserisci messaggio...',
+      notifySubject: 'Oggetto',
+      notifySubjectPlaceholder: 'Lascia vuoto per usare l’oggetto del ticket',
+      notifyCustomerPrivacyHint: 'Viene saltato automaticamente quando il commento che lo attiva è privato.',
+      commentAuthor: 'Autore del commento',
+      commentAnyAuthor: 'Qualsiasi autore',
+      commentCustomer: 'Risposte del cliente',
+      commentAgent: 'Commenti dell’operatore',
+      commentPrivacyHint: 'I commenti privati non attivano mai azioni visibili al cliente.',
+      inactiveHours: 'Ore di inattività',
+      inactiveHoursPlaceholder: 'es. 24',
+      inactiveHoursHint: 'Si attiva quando un ticket aperto non ha attività da questo numero di ore.',
+      cannedResponse: 'Risposta predefinita',
+      selectCannedResponse: 'Seleziona risposta predefinita...',
+      cannedResponseHint: 'I frammenti privati e gli inserimenti attivati da un commento privato vengono pubblicati come note interne.',
+      addLabels: 'Aggiungi etichette',
+      removeLabels: 'Rimuovi etichette',
+      selectLabels: 'Seleziona etichette...',
+      noLabels: 'Ancora nessuna etichetta nel workspace.',
+      adjustLabelsHint: 'Le etichette mancanti vengono segnalate nel log di esecuzione invece di far fallire l’azione.',
+      includeLink: 'Includi link all’elemento',
+      // Update Asset config
+      sourceAssetField: 'Campo asset dell’elemento',
+      selectAssetField: 'Seleziona campo asset...',
+      sourceAssetFieldHint: 'Seleziona il campo dell’elemento che contiene l’asset collegato',
+      targetAssetType: 'Tipo di asset di destinazione',
+      selectAssetType: 'Seleziona tipo di asset...',
+      fieldMappingsLabel: 'Mappature dei campi',
+      fieldMappings: '{count} mappature dei campi',
+      fieldMappings_one: '{count} mappatura del campo',
+      fieldMappings_other: '{count} mappature dei campi',
+      configureAssetUpdate: 'Configura aggiornamento asset...',
+      fromField: 'Dal campo',
+      sourceTypeVariable: 'Variabile/Modello',
+      sourceTypeItemField: 'Campo dell’elemento',
+      sourceTypeLiteral: 'Valore letterale',
+      selectTargetField: 'Seleziona campo di destinazione...',
+      addMapping: 'Aggiungi mappatura',
+      milestonePickerHint: 'Memorizza gli ID delle milestone per l’azione; i nomi sono mostrati solo per la modifica.',
+      userPickerHint: 'Scegli un utente specifico oppure digita qui sotto un ID utente/modello.',
+      // Create Asset config
+      assetSet: 'Set di asset',
+      selectAssetSet: 'Seleziona set di asset...',
+      assetTitle: 'Titolo dell’asset',
+      assetTitleHint: 'Usa {{item.title}} o altre variabili',
+      assetDescription: 'Descrizione',
+      assetTagLabel: 'Tag dell’asset',
+      assetCategory: 'Categoria',
+      selectCategory: 'Seleziona categoria (facoltativa)...',
+      assetStatus: 'Stato',
+      selectStatusOptional: 'Seleziona stato (facoltativo)...',
+      requiredField: 'Obbligatorio',
+      configureAssetCreation: 'Configura creazione asset...',
+      // Capability picker (HTTP, Docker, LLM nodes)
+      capability: 'Capacità',
+      selectCapability: 'Seleziona capacità...',
+      noCapabilitiesForWorkspace:
+        'Nessuna capacità disponibile in questo workspace. Chiedi a un amministratore di configurarne una.',
+      configureRequest: 'Configura richiesta HTTP...',
+      configureExtract: 'Configura estrazione IA...',
+      selectModelAndTools: 'Seleziona modello e strumenti...',
+      // HTTP request node
+      httpCapability: 'Capacità client HTTP',
+      httpMethod: 'Metodo',
+      urlTemplate: 'Modello di URL',
+      requestBody: 'Corpo della richiesta',
+      requestBodyPlaceholder: 'Facoltativo. Corpo JSON, può usare {{variables}}.',
+      httpHeaders: 'Intestazioni',
+      addHeader: 'Aggiungi intestazione',
+      headerName: 'Nome dell’intestazione',
+      headerValue: 'Valore',
+      // Container run node
+      dockerCapability: 'Ambiente Docker',
+      timeoutSecs: 'Timeout (secondi)',
+      // AI nodes
+      llmCapability: 'Connessione LLM',
+      model: 'Modello',
+      tools: 'Strumenti',
+      aiPrompt: 'Prompt',
+      aiExtractPromptPlaceholder:
+        'Estrai dati strutturati dall’input. Specifica con precisione cosa estrarre.',
+      systemPrompt: 'Prompt di sistema',
+      systemPromptPlaceholder: 'Sei un assistente utile. Usa gli strumenti per ...',
+      inputField: 'Campo di input',
+      inputFieldPlaceholder: 'nome della variabile da cui leggere l’input',
+      inputFields: 'Campi di input',
+      inputFieldsPlaceholder: 'nomi di variabili separati da virgole',
+      outputField: 'Campo di output',
+      outputFieldPlaceholder: 'nome della variabile in cui scrivere l’output',
+      outputSchema: 'Schema JSON di output',
+      agentTools: 'Strumenti',
+      agentToolsHint:
+        'Capacità client HTTP che l’agente può chiamare. Sono elencate solo le capacità limitate a questo workspace.',
+      noToolsAvailable: 'Nessuna capacità client HTTP disponibile per questo workspace.',
+      maxSteps: 'Iterazioni massime',
+    },
+
+    // Recipients
+    recipients: {
+      assignee: 'Assegnatario',
+      creator: 'Autore',
+      specific: 'Utenti specifici',
+    },
+
+    // Condition
+    condition: {
+      true: 'Sì',
+      false: 'No',
+    },
+
+    // Operators
+    operators: {
+      equals: 'Uguale a',
+      notEquals: 'Diverso da',
+      contains: 'Contiene',
+      greaterThan: 'Maggiore di',
+      lessThan: 'Minore di',
+      isEmpty: 'È vuoto',
+      isNotEmpty: 'Non è vuoto',
+    },
+
+    // Execution logs
+    logs: {
+      title: 'Log di esecuzione',
+      noLogs: 'Nessun log di esecuzione',
+      status: 'Stato',
+      running: 'In esecuzione',
+      completed: 'Completata',
+      failed: 'Non riuscita',
+      skipped: 'Saltata',
+      startedAt: 'Avviata il',
+      completedAt: 'Completata il',
+      error: 'Errore',
+      details: 'Dettagli',
+      viewDetails: 'Visualizza dettagli',
+    },
+
+    // Execution trace
+    trace: {
+      title: 'Dettagli dell’esecuzione',
+      noSteps: 'Nessun passaggio di esecuzione registrato',
+      setStatus: 'Stato cambiato da "{from}" a "{to}"',
+      setField: '{field} impostato da "{from}" a "{to}"',
+      addComment: 'Aggiunto {prefix}commento: "{content}"',
+      notifyUser: 'Notifica inviata a {count} utenti',
+      notifyUser_one: 'Notifica inviata a {count} utente',
+      notifyUser_other: 'Notifica inviata a {count} utenti',
+      notifySkipped: 'Notifica saltata: {reason}',
+      conditionResult: 'Condizione valutata come {result}',
+      updateAsset: 'Asset #{asset_id} aggiornato',
+      updateAssetSkipped: 'Aggiornamento dell’asset saltato: {reason}',
+      createAsset: 'Asset #{asset_id} creato: {title}',
+      createAssetFailed: 'Creazione dell’asset non riuscita: {reason}',
+    },
+
+    // Test/manual execution
+    test: {
+      title: 'Prova azione',
+      description:
+        'Seleziona un elemento su cui eseguire questa azione. L’azione verrà eseguita immediatamente, ignorando il normale trigger.',
+      selectItem: 'Seleziona elemento',
+      itemPlaceholder: 'Cerca un elemento...',
+      execute: 'Esegui azione',
+      run: 'Esecuzione di prova',
+      executionFailed: 'Impossibile eseguire l’azione',
+      executionQueued: 'Azione accodata per l’esecuzione',
+    },
+
+    // Placeholder reference
+    placeholders: {
+      title: 'Segnaposto disponibili',
+      description:
+        'Usa questi segnaposto nel modello. Verranno sostituiti con i valori effettivi quando l’azione viene eseguita.',
+      showReference: 'Mostra riferimento dei segnaposto',
+      categories: {
+        item: 'Campi dell’elemento',
+        user: 'Utente corrente',
+        old: 'Valori precedenti',
+        trigger: 'Contesto del trigger',
+      },
+      item: {
+        title: 'Titolo dell’elemento',
+        id: 'ID dell’elemento',
+        statusId: 'ID dello stato',
+        assigneeId: 'ID utente dell’assegnatario',
+        any: 'Qualsiasi campo dell’elemento',
+      },
+      user: {
+        name: 'Nome completo dell’utente',
+        email: 'Email dell’utente',
+        id: 'ID utente',
+      },
+      old: {
+        description: 'Valore precedente alla modifica',
+        example: 'Valore precedente di qualsiasi campo',
+      },
+      trigger: {
+        itemId: 'ID dell’elemento che ha attivato l’azione',
+        workspaceId: 'ID del workspace',
+        actorUserId: 'Utente che ha attivato l’azione',
+        newField: 'Nuovo valore di un campo modificato, es. trigger.new_iteration_id',
+        fieldFallback: 'Abbreviazione per il nuovo valore, es. trigger.iteration_id',
+        oldField: 'Valore precedente di un campo modificato, es. trigger.old_iteration_id',
+      },
+      parent: {
+        openChildCount: 'Figli diretti aperti dell’elemento padre',
+        any: 'Qualsiasi campo dell’elemento padre',
+      },
+    },
+    switchToVertical: 'Passa al layout verticale',
+    switchToHorizontal: 'Passa al layout orizzontale',
+  },
+};

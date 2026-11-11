@@ -10,7 +10,7 @@
   import Button from '../components/Button.svelte';
   import Seagulls from '../components/Seagulls.svelte';
   import WaveBackground from '../components/WaveBackground.svelte';
-  import { APP_NAME } from '../constants.js';
+  import { brandStore } from '../stores/brand.svelte.js';
   import Toggle from '../components/Toggle.svelte';
   import Progress from '../components/Progress.svelte';
   import { i18n, SUPPORTED_LOCALES, t } from '../stores/i18n.svelte.js';
@@ -178,9 +178,9 @@
       <!-- Header -->
       <div class="text-center mb-8">
         <div class="flex justify-center mb-4">
-          <img src="windshift-3.svg" alt={APP_NAME} class="w-16 h-16" />
+          <img src="windshift-3.svg" alt={brandStore.siteTitle} class="w-16 h-16" />
         </div>
-        <h1 class="text-3xl font-bold mb-2" style="color: var(--ds-text);">{t('setup.welcomeTo', { appName: APP_NAME })}</h1>
+        <h1 class="text-3xl font-bold mb-2" style="color: var(--ds-text);">{t('setup.welcomeTo', { appName: brandStore.siteTitle })}</h1>
         <p class="text-lg" style="color: var(--ds-text-subtle);">{t('setup.setupMessage')}</p>
       </div>
 
@@ -234,7 +234,7 @@
               <User class="w-6 h-6" style="color: var(--ds-icon-info);" />
             </div>
             <h2 data-testid="setup-admin-heading" class="text-xl font-semibold mb-2" style="color: var(--ds-text);">{t('setup.createAdminAccount')}</h2>
-            <p style="color: var(--ds-text-subtle);">{t('setup.adminAccountDesc', { appName: APP_NAME })}</p>
+            <p style="color: var(--ds-text-subtle);">{t('setup.adminAccountDesc', { appName: brandStore.siteTitle })}</p>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -15,7 +15,7 @@
 	import EmptyState from '../components/EmptyState.svelte';
 	import TodoistSyncSettings from './TodoistSyncSettings.svelte';
 	import { t } from '../stores/i18n.svelte.js';
-	import { successToast } from '../stores/toasts.svelte.js';
+	import { successToast, surfaceError } from '../stores/toasts.svelte.js';
 	import { formatDateSimple } from '../utils/dateFormatter.js';
 
 	let loading = $state(true);
@@ -51,9 +51,9 @@
 		try {
 			providers = await userSCM.getAvailableProviders() || [];
 		} catch (err) {
-			console.error('Failed to load SCM providers:', err);
 			error = t('settings.connectedAccounts.failedToLoad');
 			providers = [];
+			surfaceError(err, { context: 'loadScmProviders' });
 		} finally {
 			loading = false;
 		}
@@ -67,8 +67,8 @@
 			// Refresh providers list
 			await loadProviders();
 		} catch (err) {
-			console.error('Failed to disconnect:', err);
 			error = t('settings.connectedAccounts.failedToDisconnect');
+			surfaceError(err, { context: 'disconnectScmProvider' });
 		} finally {
 			disconnecting = null;
 		}
@@ -83,8 +83,8 @@
 				window.location.href = result.auth_url;
 			}
 		}).catch(err => {
-			console.error('Failed to start OAuth:', err);
 			error = t('settings.connectedAccounts.failedToStartConnection');
+			surfaceError(err, { context: 'startScmOAuth' });
 		});
 	}
 
@@ -108,8 +108,8 @@
 			intConnections = connections || [];
 			intAvailable = available || [];
 		} catch (err) {
-			console.error('Failed to load integrations:', err);
 			intError = 'Failed to load integration connections';
+			surfaceError(err, { context: 'loadIntegrationConnections' });
 		} finally {
 			intLoading = false;
 		}
@@ -121,8 +121,8 @@
 			await userIntegrations.disconnect(providerId);
 			await loadIntegrations();
 		} catch (err) {
-			console.error('Failed to disconnect integration:', err);
 			intError = t('integrations.failedToLoadLinks');
+			surfaceError(err, { context: 'disconnectIntegration' });
 		} finally {
 			intDisconnecting = null;
 		}
@@ -135,8 +135,8 @@
 				window.location.href = result.auth_url;
 			}
 		}).catch(err => {
-			console.error('Failed to start integration OAuth:', err);
 			intError = 'Failed to start connection';
+			surfaceError(err, { context: 'startIntegrationOAuth' });
 		});
 	}
 
@@ -319,7 +319,15 @@
 								<h3 class="text-base font-medium" style="color: var(--ds-text);">
 									{provider.name}
 								</h3>
-								{#if connection}
+								{#if connection && connection.invalidated_at}
+									<span
+										class="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+										style="background-color: var(--ds-background-danger); color: var(--ds-text-danger);"
+									>
+										<XCircle class="w-3 h-3" />
+										Reconnect required
+									</span>
+								{:else if connection}
 									<span
 										class="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
 										style="background-color: var(--ds-background-success); color: var(--ds-text-success);"
@@ -364,7 +372,15 @@
 						</div>
 
 						<div class="flex items-center gap-2">
-							{#if connection}
+							{#if connection && connection.invalidated_at}
+								<Button
+									variant="primary"
+									size="small"
+									onclick={() => connectIntegration(provider)}
+								>
+									Reconnect
+								</Button>
+							{:else if connection}
 								<Button
 									variant="danger"
 									size="small"

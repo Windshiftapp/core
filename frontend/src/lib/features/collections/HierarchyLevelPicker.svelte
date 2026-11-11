@@ -1,5 +1,6 @@
 <script>
   import BasePicker from '../../pickers/BasePicker.svelte';
+  import Button from '../../components/Button.svelte';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { t } from '../../stores/i18n.svelte.js';
@@ -63,11 +64,10 @@
   ariaLabel={t('collectionHierarchy.selectLevel')}
   onSelect={(entry) => onchange?.(entry?.level)}
 >
-  <button
-    type="button"
-    data-testid="hierarchy-level-trigger"
-    class="flex items-center gap-2 px-3 py-2 text-sm border rounded-md transition-colors"
-    style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text);"
+  <Button
+    variant="context"
+    size="small"
+    dataTestid="hierarchy-level-trigger"
     {disabled}
   >
     <span class="flex items-center gap-1 flex-shrink-0">
@@ -84,5 +84,5 @@
       </span>
     {/if}
     <ChevronDown class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-  </button>
+  </Button>
 </BasePicker>

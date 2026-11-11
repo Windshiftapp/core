@@ -171,18 +171,16 @@
         return v;
       case 'multi_user':
         return multiUserNames().join(', ');
-      case 'iteration':
-        if (v && iterations) {
-          const iteration = iterations.find(i => i.id === parseInt(v));
-          return iteration ? iteration.name : v;
-        }
-        return v;
-      case 'milestone':
-        if (v && milestones) {
-          const milestone = milestones.find(m => m.id === parseInt(v));
-          return milestone ? milestone.name : v;
-        }
-        return v;
+      case 'iteration': {
+        const iterationId = v && typeof v === 'object' ? v.id : v;
+        const iteration = iterations?.find((i) => i.id === parseInt(iterationId));
+        return iteration ? iteration.name : (v?.name ?? v);
+      }
+      case 'milestone': {
+        const milestoneId = v && typeof v === 'object' ? v.id : v;
+        const milestone = milestones?.find((m) => m.id === parseInt(milestoneId));
+        return milestone ? milestone.name : (v?.name ?? v);
+      }
       case 'multi_milestone':
         return normalizedMilestoneIDs().map((id) => milestoneName(id) ?? id).join(', ');
       case 'asset':
@@ -241,42 +239,37 @@
   const rowRichDisplay = $derived(['user', 'multi_user', 'asset'].includes(field.field_type));
   const rowValueHref = $derived(rowRichDisplay ? null : customFieldLinkHref(field.field_type, value));
 
+  // Icon shown when the field is empty but interactive (prompts the user).
+  const fieldIcon = $derived.by(() => {
+    if (isBooleanCustomFieldType(field.field_type)) return CheckSquare;
+    return {
+      user: User,
+      milestone: Target,
+      asset: Box,
+      portalcustomer: User,
+      customerorganisation: Building2,
+      email: Mail,
+      url: ExternalLink,
+    }[field.field_type] ?? null;
+  });
+
   // Row values are plain text: the per-type icons of the rich display do not
-  // fit the sidebar's label/value row.
+  // fit the sidebar's label/value row. Everything the shared display already
+  // covers delegates to it; the rest is a text-safe fallback for arrays and
+  // objects.
   function rowDisplayValue() {
     if (!hasDisplayValue()) return t('common.none');
     const v = /** @type {any} */ (value);
     switch (field.field_type) {
       case 'date':
-        return formatDateDisplay(v);
       case 'milestone':
-      case 'multi_milestone': {
-        const entries = field.field_type === 'multi_milestone'
-          ? (Array.isArray(v) ? v : [])
-          : [v];
-        return entries.map((entry) => {
-          const id = entry && typeof entry === 'object' ? entry.id : entry;
-          return milestoneName(id) ?? id;
-        }).join(', ');
-      }
-      case 'iteration': {
-        const iteration = iterations?.find((i) => i.id === parseInt(v, 10));
-        return iteration ? iteration.name : v;
-      }
+      case 'multi_milestone':
+      case 'iteration':
       case 'select':
-        return field.options ? resolveOptionLabel(field.options, v) : v;
-      case 'multiselect': {
-        if (!field.options) return v;
-        const values = Array.isArray(v)
-          ? v
-          : typeof v === 'string' && v.includes(',')
-            ? v.split(',').map((entry) => entry.trim()).filter(Boolean)
-            : [v];
-        return resolveOptionLabels(field.options, values).join(', ');
-      }
+      case 'multiselect':
       case 'boolean':
       case 'checkbox':
-        return booleanCustomFieldChecked(v) ? t('common.yes') : t('common.no');
+        return renderDisplayValue();
       default:
         if (Array.isArray(v)) {
           return v
@@ -562,6 +555,20 @@
   // --------------------------------------------------------------------------
 </script>
 
+{#snippet displayWithIcon(Icon)}
+  <div class="flex min-w-0 items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
+    <Icon class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+    <span class={valueTruncate ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
+  </div>
+{/snippet}
+
+{#snippet displayWithIconPlain(Icon)}
+  <div class="flex items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
+    <Icon class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+    <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
+  </div>
+{/snippet}
+
 {#snippet readOnlyContent(interactive)}
   {#if hasDisplayValue()}
     {#if field.field_type === 'user'}
@@ -590,10 +597,7 @@
         {/if}
       </div>
     {:else if field.field_type === 'multi_milestone'}
-      <div class="flex min-w-0 items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
-        <Target class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-        <span class={valueTruncate ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
-      </div>
+      {@render displayWithIcon(Target)}
     {:else if field.field_type === 'iteration'}
       <div class="flex items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
         {#if iterationData}
@@ -608,20 +612,11 @@
         <span class={valueTruncate ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
       </div>
     {:else if field.field_type === 'asset'}
-      <div class="flex min-w-0 items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
-        <Box class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-        <span class={valueTruncate ? 'min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
-      </div>
+      {@render displayWithIcon(Box)}
     {:else if field.field_type === 'portalcustomer'}
-      <div class="flex items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
-        <User class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-        <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
-      </div>
+      {@render displayWithIconPlain(User)}
     {:else if field.field_type === 'customerorganisation'}
-      <div class="flex items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
-        <Building2 class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-        <span style="color: var(--ds-text);">{renderDisplayValue()}</span>
-      </div>
+      {@render displayWithIconPlain(Building2)}
     {:else if field.field_type === 'linking'}
       <div class="flex items-center gap-1 {valueAlignment === 'end' ? 'justify-end' : ''}">
         <Link2 class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
@@ -636,10 +631,7 @@
         </span>
       </div>
     {:else if isBooleanCustomFieldType(field.field_type)}
-      <div class="flex items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
-        <CheckSquare class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-        <span style="color: var(--ds-text);">{booleanCustomFieldChecked(value) ? t('common.yes') : t('common.no')}</span>
-      </div>
+      {@render displayWithIconPlain(CheckSquare)}
     {:else if field.field_type === 'email'}
       <div class="flex items-center gap-2 {valueAlignment === 'end' ? 'justify-end' : ''}">
         <Mail class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
@@ -661,30 +653,65 @@
     {:else if field.field_type === 'number'}
       <span class="tabular-nums" style="color: var(--ds-text);">{renderDisplayValue()}</span>
     {:else}
-      <span class={valueTruncate ? 'block min-w-0 truncate' : ''} style="color: var(--ds-text);">{renderDisplayValue()}</span>
+      <span class={valueTruncate ? 'block min-w-0 truncate' : ''} dir="auto" style="color: var(--ds-text);">{renderDisplayValue()}</span>
     {/if}
   {:else if interactive}
-    {#if field.field_type === 'user'}
-      <User class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-    {:else if field.field_type === 'milestone'}
-      <Target class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-    {:else if field.field_type === 'asset'}
-      <Box class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-    {:else if field.field_type === 'portalcustomer'}
-      <User class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-    {:else if field.field_type === 'customerorganisation'}
-      <Building2 class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-    {:else if isBooleanCustomFieldType(field.field_type)}
-      <CheckSquare class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-    {:else if field.field_type === 'email'}
-      <Mail class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-    {:else if field.field_type === 'url'}
-      <ExternalLink class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+    {#if fieldIcon}
+      {@const EmptyIcon = fieldIcon}
+      <EmptyIcon class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
     {/if}
     <span class={valueTruncate ? 'min-w-0 truncate' : ''} style="color: var(--ds-text-subtle);">{t('items.setField', { field: field.name.toLowerCase() })}</span>
   {:else}
     <span class={valueTruncate ? 'block min-w-0 truncate' : ''} style="color: var(--ds-text-subtle);">{t('items.notSet')}</span>
   {/if}
+{/snippet}
+
+{#snippet freeTextEditor({ type = 'text', multiline = false, step = undefined, numeric = false } = {})}
+  <div use:clickOutside onclickOutside={handleEditorCancel}>
+    <!-- svelte-ignore a11y_autofocus -->
+    {#if multiline}
+      <Textarea
+        value={editorValue}
+        data-testid={`custom-field-input-${field.id}`}
+        oninput={(e) => handleEditorInput(e.target.value)}
+        class="w-full px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-ds-background-input border border-ds-border rounded text-ds-text"
+        placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
+        rows={3}
+        {disabled}
+        required={isRequired}
+        autofocus
+        size="small"
+        onblur={handleCommitBlur}
+      />
+    {:else if type === 'date'}
+      <Input
+        type="date"
+        value={formatDateForInput(editorValue)}
+        dataTestid={`custom-field-input-${field.id}`}
+        oninput={(e) => handleEditorInput(formatDateFromInput(e.target.value))}
+        class="w-full px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-ds-background-input border border-ds-border rounded text-ds-text"
+        onkeydown={handleKeydown}
+        {disabled}
+        required={isRequired}
+        autofocus
+      />
+    {:else}
+      <Input
+        {type}
+        {step}
+        value={editorValue}
+        dataTestid={`custom-field-input-${field.id}`}
+        oninput={(e) => handleEditorInput(e.target.value)}
+        class="w-full px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-ds-background-input border border-ds-border rounded text-ds-text{numeric ? ' tabular-nums' : ''}"
+        placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
+        onkeydown={handleKeydown}
+        onblur={handleCommitBlur}
+        {disabled}
+        required={isRequired}
+        autofocus
+      />
+    {/if}
+  </div>
 {/snippet}
 
 {#snippet editorContent()}
@@ -901,58 +928,11 @@
         onChange={(selected) => handleEditorChange(selected)}
       />
     {:else if field.field_type === 'date'}
-      <div use:clickOutside onclickOutside={handleEditorCancel}>
-        <!-- svelte-ignore a11y_autofocus -->
-        <Input
-          type="date"
-          value={formatDateForInput(editorValue)}
-          dataTestid={`custom-field-input-${field.id}`}
-          oninput={(e) => handleEditorInput(formatDateFromInput(/** @type {HTMLInputElement} */ (e.target).value))}
-          class="w-full px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-transparent border rounded"
-          style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
-          onkeydown={handleKeydown}
-          {disabled}
-          required={isRequired}
-          autofocus
-        />
-      </div>
+      {@render freeTextEditor({ type: 'date' })}
     {:else if field.field_type === 'textarea'}
-      <div use:clickOutside onclickOutside={handleEditorCancel}>
-        <!-- svelte-ignore a11y_autofocus -->
-        <Textarea
-          value={editorValue}
-          data-testid={`custom-field-input-${field.id}`}
-          oninput={(e) => handleEditorInput(/** @type {HTMLTextAreaElement} */ (e.target).value)}
-          class="w-full px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-transparent border rounded"
-          style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
-          placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
-          rows={3}
-          {disabled}
-          required={isRequired}
-          autofocus
-          size="small"
-          onblur={handleCommitBlur}
-        />
-      </div>
+      {@render freeTextEditor({ multiline: true })}
     {:else if field.field_type === 'number'}
-      <div use:clickOutside onclickOutside={handleEditorCancel}>
-        <!-- svelte-ignore a11y_autofocus -->
-        <Input
-          type="number"
-          step="any"
-          value={editorValue}
-          dataTestid={`custom-field-input-${field.id}`}
-          oninput={(e) => handleEditorInput(/** @type {HTMLInputElement} */ (e.target).value)}
-          class="w-full px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-transparent border rounded tabular-nums"
-          style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
-          placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
-          onkeydown={handleKeydown}
-          onblur={handleCommitBlur}
-          {disabled}
-          required={isRequired}
-          autofocus
-        />
-      </div>
+      {@render freeTextEditor({ type: 'number', step: 'any', numeric: true })}
     {:else if isBooleanCustomFieldType(field.field_type)}
       <div
         use:clickOutside
@@ -967,60 +947,11 @@
         />
       </div>
     {:else if field.field_type === 'email'}
-      <div use:clickOutside onclickOutside={handleEditorCancel}>
-        <!-- svelte-ignore a11y_autofocus -->
-        <Input
-          type="email"
-          value={editorValue}
-          dataTestid={`custom-field-input-${field.id}`}
-          oninput={(e) => handleEditorInput(/** @type {HTMLInputElement} */ (e.target).value)}
-          class="w-full px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-transparent border rounded"
-          style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
-          placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
-          onkeydown={handleKeydown}
-          onblur={handleCommitBlur}
-          {disabled}
-          required={isRequired}
-          autofocus
-        />
-      </div>
+      {@render freeTextEditor({ type: 'email' })}
     {:else if field.field_type === 'url'}
-      <div use:clickOutside onclickOutside={handleEditorCancel}>
-        <!-- svelte-ignore a11y_autofocus -->
-        <Input
-          type="url"
-          value={editorValue}
-          dataTestid={`custom-field-input-${field.id}`}
-          oninput={(e) => handleEditorInput(/** @type {HTMLInputElement} */ (e.target).value)}
-          class="w-full px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-transparent border rounded"
-          style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
-          placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
-          onkeydown={handleKeydown}
-          onblur={handleCommitBlur}
-          {disabled}
-          required={isRequired}
-          autofocus
-        />
-      </div>
+      {@render freeTextEditor({ type: 'url' })}
     {:else}
-      <!-- Default: text input -->
-      <div use:clickOutside onclickOutside={handleEditorCancel}>
-        <!-- svelte-ignore a11y_autofocus -->
-        <Input
-          type="text"
-          value={editorValue}
-          dataTestid={`custom-field-input-${field.id}`}
-          oninput={(e) => handleEditorInput(/** @type {HTMLInputElement} */ (e.target).value)}
-          class="w-full px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-transparent border rounded"
-          style="background-color: {isDarkMode ? '#1e293b' : 'var(--ds-background-input)'}; border-color: {isDarkMode ? '#475569' : 'var(--ds-border)'}; color: {isDarkMode ? '#e2e8f0' : 'var(--ds-text)'};"
-          placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
-          onkeydown={handleKeydown}
-          onblur={handleCommitBlur}
-          {disabled}
-          required={isRequired}
-          autofocus
-        />
-      </div>
+      {@render freeTextEditor()}
     {/if}
   </div>
 {/snippet}

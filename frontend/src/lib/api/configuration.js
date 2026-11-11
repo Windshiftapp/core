@@ -36,35 +36,16 @@ export const configurationSets = {
   // cookie automatically; bind this to an <a download> rather than calling
   // fetchAPI so the response streams to a file.
   exportUrl: (id) => `${API_BASE}/configuration-sets/${id}/export`,
-  // Multipart upload of an exported configuration-set bundle. Bypasses
-  // fetchAPI because that helper sets Content-Type: application/json — for
-  // multipart we need the browser to write its own boundary.
-  import: async (file) => {
-    const fd = new FormData();
-    fd.append('file', file);
-    const response = await fetch(`${API_BASE}/configuration-sets/import`, {
+  // Apply an exported configuration-set template. The caller may override the
+  // embedded configuration set name first, which is what turns import into the
+  // clone path. Returns { data, warnings } for the manager's toast handling.
+  import: async (template) => {
+    const document = await fetchAPIV2('/configuration-sets/import', {
       method: 'POST',
-      body: fd,
-      credentials: 'same-origin',
+      body: JSON.stringify(template),
     });
-    const text = await response.text();
-    let body = null;
-    try {
-      body = text ? JSON.parse(text) : null;
-    } catch {
-      // Non-JSON error body: surface raw text below.
-    }
-    if (!response.ok) {
-      const err = /** @type {any} */ (
-        new Error((body && (body.error || body.message)) || text || 'Import failed')
-      );
-      // Carry structured details so the UI can render the unresolved-refs list.
-      err.status = response.status;
-      err.code = body?.code;
-      err.details = body?.details || {};
-      throw err;
-    }
-    return body;
+    const payload = document?.data ?? {};
+    return { data: payload.configuration_set, warnings: payload.warnings ?? [] };
   },
 };
 
@@ -88,7 +69,7 @@ export const catalogs = {
 };
 
 export const customFields = {
-  ...createCrudClient('/custom-fields', { adminBasePath: '/admin/custom-fields', readV2: true }),
+  ...createCrudClient('/custom-fields', { v2: true }),
   getOverview: async (requestOptions = {}) => {
     const document = await fetchAPIV2('/custom-fields', requestOptions);
     return {
@@ -97,7 +78,7 @@ export const customFields = {
     };
   },
   updateSettings: (data) =>
-    fetchAPI('/admin/custom-fields/settings', {
+    fetchV2Data('/custom-fields/settings', {
       method: 'PUT',
       body: JSON.stringify(data),
     }),

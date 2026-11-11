@@ -148,10 +148,25 @@ export default {
     selectScreen: '选择屏幕',
     searchTestCases: '搜索测试用例...',
     selectWorkflow: '选择工作流',
+
+    // 日期选择器
+    datePicker: {
+      previousMonth: '上个月',
+      nextMonth: '下个月',
+      openCalendar: '打开日历',
+      selectDate: '选择日期...',
+    },
   },
 
   editors: {
     enterText: '输入文本...',
+    useProvider: '使用 {label} 编辑',
+    useRichText: '使用富文本编辑器',
+    providerActive: '{label} 已启用',
+    discardProviderChanges: '放弃未保存的更改？',
+    discardProviderChangesMessage: '您在 {label} 中的编辑尚未保存。切换编辑器将放弃这些更改。',
+    discardChanges: '放弃',
+    providerError: '编辑器插件报告错误：{message}',
     selectDate: '选择日期...',
     clickToChangeColor: '点击更改颜色',
     saveEnter: '保存（Enter）',
@@ -316,9 +331,9 @@ export default {
     defaultWidth: '默认：{width}/{columns} 宽度',
     widthQuarter: '四分之一',
     widthThird: '三分之一',
-    widthHalf: '半',
+    widthHalf: '一半',
     widthTwoThirds: '三分之二',
-    widthFull: '满',
+    widthFull: '全宽',
     resizeAriaLabel: '调整小部件大小',
     resizeColumnsValue: '{count} / {total} 列',
     rowCount: '行数',

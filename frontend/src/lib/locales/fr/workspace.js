@@ -950,6 +950,10 @@ export default {
       'Recommandé : PNG ou SVG avec fond transparent. Hauteur maximale dans l’en-tête : 40-50px.',
     lightLogo: 'Logo du mode clair',
     darkLogo: 'Logo du mode sombre',
+    fullLogoLight: 'Logo complet (mode clair)',
+    fullLogoDark: 'Logo complet (mode sombre)',
+    fullLogoHelp:
+      "Logo large ou logotype utilisé dans la barre latérale développée lorsque la disposition est « Logo complet ».",
     darkLogoFallback:
       "Affiché en mode sombre. Utilise le logo du mode clair s'il est vide.",
   },

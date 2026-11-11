@@ -64,12 +64,13 @@
   }
 
   async function handleSave(allTransitions) {
-    try {
-      await workflows.updateTransitions(workflow.id, allTransitions);
-      navigate('/admin/workflows');
-    } catch (error) {
-      throw error;
-    }
+    // Return the persisted transitions so the designer can bind screens staged
+    // on edges that did not have a row id before this save.
+    return workflows.updateTransitions(workflow.id, allTransitions);
+  }
+
+  function handleSaved() {
+    navigate('/admin/workflows');
   }
 
   function handleCancel() {
@@ -116,6 +117,7 @@
         {statuses}
         {statusCategories}
         onSave={handleSave}
+        onSaved={handleSaved}
         onCancel={handleCancel}
       />
     </div>

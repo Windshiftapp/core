@@ -10,6 +10,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/emailutil"
+	"windshift/internal/i18n"
 	"windshift/internal/models"
 )
 
@@ -82,12 +83,13 @@ func (s *EmailVerificationService) SendVerificationEmail(user *models.User, toke
 	if firstName == "" {
 		firstName = "there"
 	}
+	locale := i18n.Normalize(user.Language)
 	url := fmt.Sprintf("%s/verify-email?token=%s", s.baseURL, token)
-	return s.smtpSender.SendTransactional(user.Email, emailutil.TemplateEmailVerification, struct {
+	return s.smtpSender.SendTransactional(user.Email, locale, emailutil.TemplateEmailVerification, struct {
 		FirstName       string
 		VerificationURL string
 		ExpiresIn       string
-	}{firstName, url, emailutil.HumanizeDuration(TokenExpiry)})
+	}{firstName, url, i18n.HumanizeDuration(locale, TokenExpiry)})
 }
 
 // VerifyEmail validates the token and marks the user's email as verified

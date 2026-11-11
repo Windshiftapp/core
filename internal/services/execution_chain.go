@@ -35,7 +35,7 @@ func (c *ExecutionChain) MarkExecuted(key string) {
 }
 
 // ExecutionChainStore provides a shared, thread-safe store for execution chains
-// across workspace, asset, and logbook action services.
+// across workspace and asset action services.
 type ExecutionChainStore struct {
 	cache sync.Map
 }

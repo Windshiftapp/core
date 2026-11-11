@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 
 	"windshift/internal/actionevents"
 	"windshift/internal/assetevents"
@@ -16,74 +15,23 @@ import (
 )
 
 const (
-	DurableAssetActionCompatibilityEvent = "asset.action_triggered.v1"
+	DurableAssetActionRequestedEvent = "asset.action_triggered.v1"
 
-	DurableAssetCompatibilityActionConsumerKey = "actions.assets.compatibility.v1"
-	DurableAssetActionConsumerKey              = "actions.assets.v1"
+	DurableAssetSideEffectActionConsumerKey = "actions.assets.compatibility.v1"
+	DurableAssetActionConsumerKey           = "actions.assets.v1"
 
 	durableAssetActionCutoverKey = "actions.assets.canonical.v1"
 )
 
-// DurableAssetActionIngress persists compatibility events until the recorded
-// canonical asset cutover.
+// DurableAssetActionIngress anchors the canonical asset action boundary. Asset
+// triggers are derived from canonical asset events, so no side-effect events
+// are journaled for them.
 type DurableAssetActionIngress struct {
-	db    database.Database
-	store *events.Store
+	db database.Database
 }
 
 func NewDurableAssetActionIngress(db database.Database) *DurableAssetActionIngress {
-	return &DurableAssetActionIngress{db: db, store: events.NewStore(db)}
-}
-
-func (i *DurableAssetActionIngress) Emit(ctx context.Context, actionEvent *models.AssetActionEvent) error {
-	if actionEvent == nil {
-		return errors.New("asset action event is required")
-	}
-	cutover, err := i.CurrentCanonicalAssetsCutover(ctx)
-	if err != nil {
-		return err
-	}
-	if cutover != nil {
-		return nil
-	}
-	input, err := durableAssetActionEventInput(actionEvent)
-	if err != nil {
-		return err
-	}
-	return appendStandaloneDurableActionEvent(ctx, i.db, i.store, input, "asset action")
-}
-
-func (i *DurableAssetActionIngress) EmitInTx(ctx context.Context, tx database.Tx, actionEvent *models.AssetActionEvent) error {
-	if actionEvent == nil {
-		return errors.New("asset action event is required")
-	}
-	cutover, err := currentActionCutover(ctx, tx, durableAssetActionCutoverKey)
-	if err != nil {
-		return err
-	}
-	if cutover != nil {
-		return nil
-	}
-	input, err := durableAssetActionEventInput(actionEvent)
-	if err != nil {
-		return err
-	}
-	if _, err := i.store.Append(ctx, tx, input); err != nil {
-		return fmt.Errorf("append transactional asset action event: %w", err)
-	}
-	return nil
-}
-
-func durableAssetActionEventInput(actionEvent *models.AssetActionEvent) (events.NewEvent, error) {
-	input, err := actionevents.NewCompatibilityEvent(actionevents.CompatibilityInput{
-		Payload: actionEvent, AggregateType: "asset", AggregateID: strconv.Itoa(actionEvent.AssetID),
-		EventType: DurableAssetActionCompatibilityEvent, ActorUserID: actionEvent.ActorUserID,
-		CorrelationID: actionEvent.ExecutionChainID, CausationEventKey: actionEvent.CausationEventKey,
-	})
-	if err != nil {
-		return events.NewEvent{}, fmt.Errorf("encode durable asset action event: %w", err)
-	}
-	return input, nil
+	return &DurableAssetActionIngress{db: db}
 }
 
 func (i *DurableAssetActionIngress) ActivateCanonicalAssets(ctx context.Context) (*ActionCutover, error) {
@@ -99,13 +47,14 @@ func ConfigureDurableAssetActionConsumers(ctx context.Context, store *events.Sto
 		Key: DurableAssetActionConsumerKey, HandlerVersion: 1,
 		EventTypes: []string{assetevents.Created, assetevents.Updated, assetevents.StatusChanged, assetevents.Deleted},
 	},
-		events.Consumer{Key: DurableAssetCompatibilityActionConsumerKey, HandlerVersion: 1, Active: true, StartEventID: 1, EventTypes: []string{DurableAssetActionCompatibilityEvent}},
+		events.Consumer{Key: DurableAssetSideEffectActionConsumerKey, HandlerVersion: 1, Active: true, StartEventID: 1, EventTypes: []string{DurableAssetActionRequestedEvent}},
 	)
 }
 
 // PrepareDurableAssetActionEngine installs asset subscriptions and handlers on
-// the same engine used by item and SCM actions.
-func PrepareDurableAssetActionEngine(ctx context.Context, engine *events.Engine, actions *AssetActionService, activate bool) error {
+// the same engine used by item and SCM actions. The canonical cutover is
+// recorded on first start.
+func PrepareDurableAssetActionEngine(ctx context.Context, engine *events.Engine, actions *AssetActionService) error {
 	if engine == nil || actions == nil {
 		return errors.New("domain event engine and asset action service are required")
 	}
@@ -113,7 +62,7 @@ func PrepareDurableAssetActionEngine(ctx context.Context, engine *events.Engine,
 	if err != nil {
 		return err
 	}
-	if activate && cutover == nil {
+	if cutover == nil {
 		cutover, err = actions.durableIngress.ActivateCanonicalAssets(ctx)
 		if err != nil {
 			return err
@@ -123,7 +72,7 @@ func PrepareDurableAssetActionEngine(ctx context.Context, engine *events.Engine,
 		return err
 	}
 	handler := NewDurableAssetActionConsumer(actions.db, actions)
-	for _, key := range []string{DurableAssetCompatibilityActionConsumerKey, DurableAssetActionConsumerKey} {
+	for _, key := range []string{DurableAssetSideEffectActionConsumerKey, DurableAssetActionConsumerKey} {
 		if err := engine.RegisterHandler(key, handler); err != nil {
 			return err
 		}
@@ -148,7 +97,7 @@ func NewDurableAssetActionConsumer(db database.Database, actions *AssetActionSer
 }
 
 func (c *DurableAssetActionConsumer) Handle(ctx context.Context, event events.Event) error {
-	if event.Type == DurableAssetActionCompatibilityEvent && c.cutoverStartID > 0 && event.ID >= c.cutoverStartID {
+	if event.Type == DurableAssetActionRequestedEvent && c.cutoverStartID > 0 && event.ID >= c.cutoverStartID {
 		return nil
 	}
 	return handleDurableActionEvent(ctx, event, c.targets,
@@ -201,12 +150,12 @@ func assetActionEventFromDomainEvent(event events.Event) (*models.AssetActionEve
 	if event.PayloadVersion != assetevents.PayloadVersion {
 		return nil, "", fmt.Errorf("unsupported asset action event %s payload version %d", event.Type, event.PayloadVersion)
 	}
-	if event.Type == DurableAssetActionCompatibilityEvent {
+	if event.Type == DurableAssetActionRequestedEvent {
 		var actionEvent models.AssetActionEvent
 		if err := json.Unmarshal(event.Payload, &actionEvent); err != nil {
 			return nil, "", fmt.Errorf("decode %s payload: %w", event.Type, err)
 		}
-		return &actionEvent, DurableAssetCompatibilityActionConsumerKey, nil
+		return &actionEvent, DurableAssetSideEffectActionConsumerKey, nil
 	}
 	actionEvent := &models.AssetActionEvent{ActorUserID: eventActorUserID(event), CausationEventKey: event.Key}
 	switch event.Type {

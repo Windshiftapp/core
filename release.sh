@@ -44,6 +44,7 @@ NOTES_FILE=""
 DRY_RUN=false
 SKIP_FRONTEND=false
 SKIP_DESKTOP=false
+SKIP_HOMEBREW=false
 CONFIRM=true
 TAG_CREATED=false
 SKIP_SECURITY_CHECKS=false
@@ -451,7 +452,7 @@ run_go_vulnerability_check() {
     fi
 
     log_info "Running govulncheck..."
-    govulncheck ./...
+    bash scripts/check-vulnerabilities.sh
 }
 
 check_git_state() {
@@ -1158,6 +1159,90 @@ create_github_release() {
     log_success "GitHub release created: https://github.com/${GITHUB_REPO}/releases/tag/${VERSION}"
 }
 
+# Bump the Homebrew tap to this release. Runs after the GitHub release is
+# published, so a failure here must not fail the release itself: the artifacts
+# are already out and the formula can be bumped by hand afterwards.
+#
+# Uses a checkout at HOMEBREW_TAP_DIR when set, otherwise clones the tap into a
+# temporary directory. The tap's scripts/bump.sh takes the checksums straight
+# from this release's SHA256SUMS.txt, so the formula always matches the signed
+# release manifest.
+update_homebrew_tap() {
+    log_step "Homebrew" "Updating the Homebrew tap..."
+
+    if [ "$SKIP_HOMEBREW" = true ]; then
+        log_info "Skipping Homebrew tap update (--skip-homebrew)"
+        return 0
+    fi
+
+    local sums="dist/releases/SHA256SUMS.txt"
+    if [ ! -s "$sums" ]; then
+        log_warn "Missing $sums — skipping the Homebrew tap update"
+        return 0
+    fi
+
+    if [ "$DRY_RUN" = true ]; then
+        log_info "[DRY-RUN] Would update Windshiftapp/homebrew-tap to ${VERSION}"
+        return 0
+    fi
+
+    # Absolute path: bump.sh runs before we cd into the tap.
+    sums="$(cd "$(dirname "$sums")" && pwd)/$(basename "$sums")"
+
+    local tap_dir cleanup=""
+    if [ -n "${HOMEBREW_TAP_DIR:-}" ]; then
+        tap_dir="$HOMEBREW_TAP_DIR"
+    else
+        cleanup="$(mktemp -d)"
+        tap_dir="$cleanup/homebrew-tap"
+        log_info "Cloning Windshiftapp/homebrew-tap..."
+        if ! git clone --quiet "git@github.com:Windshiftapp/homebrew-tap.git" "$tap_dir"; then
+            rm -rf "$cleanup"
+            log_warn "Could not clone the Homebrew tap. Bump it by hand with:"
+            log_warn "  scripts/bump.sh ${VERSION} ${sums}"
+            return 0
+        fi
+    fi
+
+    if [ ! -x "$tap_dir/scripts/bump.sh" ]; then
+        [ -n "$cleanup" ] && rm -rf "$cleanup"
+        log_warn "No executable bump script at $tap_dir/scripts/bump.sh — skipping"
+        return 0
+    fi
+
+    local status=0
+    "$tap_dir/scripts/bump.sh" "$VERSION" "$sums" || status=$?
+
+    if [ "$status" -eq 0 ]; then
+        (
+            cd "$tap_dir"
+            if git diff --quiet -- Formula/ws.rb; then
+                exit 3
+            fi
+            git add Formula/ws.rb
+            git -c user.name="${RELEASE_COMMIT_NAME:-Windshift Release}" \
+                -c user.email="${RELEASE_COMMIT_EMAIL:-release@windshift.sh}" \
+                commit --quiet -m "ws ${VERSION}"
+            git push --quiet origin HEAD
+        ) || status=$?
+    fi
+
+    [ -n "$cleanup" ] && rm -rf "$cleanup"
+
+    if [ "$status" -eq 3 ]; then
+        log_info "Homebrew formula already at ${VERSION} — nothing to push"
+        return 0
+    fi
+
+    if [ "$status" -ne 0 ]; then
+        log_warn "Homebrew tap update failed. The release itself is unaffected."
+        log_warn "  Bump it by hand with: scripts/bump.sh ${VERSION} ${sums}"
+        return 0
+    fi
+
+    log_success "Homebrew tap updated to ${VERSION} (brew upgrade ws)"
+}
+
 # =============================================================================
 # Commands
 # =============================================================================
@@ -1257,6 +1342,7 @@ cmd_release() {
         echo "  - Build and push Docker images (server + coding-agent runner + windshift-runner + windshift-agent)"
         echo "  - Create git tag and push"
         echo "  - Create GitHub release with assets"
+        echo "  - Bump the Homebrew tap (Windshiftapp/homebrew-tap)"
         echo ""
         echo "Release notes: $NOTES_FILE"
         echo ""
@@ -1281,6 +1367,7 @@ cmd_release() {
     sign_release_checksums
     build_docker
     create_github_release
+    update_homebrew_tap
 
     echo ""
     log_success "Release $VERSION complete!"
@@ -1317,6 +1404,7 @@ Options:
   --skip-frontend         Skip frontend build (use existing dist/)
   --skip-desktop          Skip macOS desktop app build (auto-skipped on non-Mac hosts)
   --skip-security-checks  Skip npm signature/audit and govulncheck release checks
+  --skip-homebrew         Skip the Homebrew tap bump (Windshiftapp/homebrew-tap)
   -y, --yes               Skip confirmation prompts
   -h, --help              Show this help
 
@@ -1338,6 +1426,11 @@ Release signing (required for 'release'):
                           Defaults to Git's SSH user.signingkey when configured.
   RELEASE_SIGNING_IDENTITY
                           SSH signer identity; defaults to Git's user.email.
+
+Homebrew tap (optional, runs after the GitHub release):
+  HOMEBREW_TAP_DIR        Checkout of Windshiftapp/homebrew-tap. When unset the
+                          tap is cloned to a temporary directory.
+                          Skip with --skip-homebrew.
 
 Desktop behavior:
   For 'build' and 'push': when unset, the DMG is produced unsigned and
@@ -1413,6 +1506,10 @@ parse_args() {
                 ;;
             --skip-security-checks)
                 SKIP_SECURITY_CHECKS=true
+                shift
+                ;;
+            --skip-homebrew)
+                SKIP_HOMEBREW=true
                 shift
                 ;;
             -y|--yes)

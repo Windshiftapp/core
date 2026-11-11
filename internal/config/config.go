@@ -25,6 +25,12 @@ type Config struct {
 	TLSKeyPath        string
 	DisableCSRF       bool
 
+	// H2CEnabled accepts unencrypted HTTP/2 (h2c) on the plain HTTP listener, so
+	// a fronting proxy can multiplex streams onto one upstream connection. A TLS
+	// listener already negotiates h2 via ALPN and ignores this. h2c is cleartext
+	// and browsers do not use it, so it stays opt-in.
+	H2CEnabled bool
+
 	// AllowInsecureHTTP permits credentialed browser access from plain-http
 	// origins other than localhost (e.g. http://lanhost:8080). Without it,
 	// such a BASE_URL fails CORS middleware construction, because credentialed
@@ -50,7 +56,6 @@ type Config struct {
 	Plugins      PluginsConfig
 	LLM          LLMConfig
 	CodingAgent  CodingAgentConfig
-	Logbook      LogbookConfig
 	Notification NotificationConfig
 	Reminders    ReminderConfig
 	Email        EmailConfig
@@ -61,15 +66,14 @@ type Config struct {
 	Storage      StorageConfig
 
 	// Flat fields (no logical grouping)
-	AttachmentPath              string
-	EnableAdminFallback         bool
-	DisableIPRateLimit          bool
-	MaxUserConcurrency          int
-	MaxTemplateSeedItems        int
-	MCPEnabled                  bool
-	RecoverUser                 string
-	ActivateDurableActions      bool
-	ActivateDurableAssetActions bool
+	AttachmentPath       string
+	EnableAdminFallback  bool
+	DisableIPRateLimit   bool
+	MaxUserConcurrency   int
+	MaxUserStreams       int
+	MaxTemplateSeedItems int
+	MCPEnabled           bool
+	RecoverUser          string
 
 	// MetricsToken, when non-empty (WINDSHIFT_METRICS_TOKEN), makes GET /metrics
 	// require an "Authorization: Bearer <token>" header. Empty leaves the
@@ -229,11 +233,6 @@ type CodingAgentConfig struct {
 	WSAPIURL string // URL the runner reaches this Windshift API on; defaults to BASE_URL
 }
 
-// LogbookConfig holds the URL of the logbook sidecar (if any).
-type LogbookConfig struct {
-	Endpoint string
-}
-
 // ReminderConfig holds the due-date reminder scheduler knobs.
 type ReminderConfig struct {
 	// Interval is how often the scheduler scans for due-soon items
@@ -305,21 +304,17 @@ type JiraConfig struct {
 	// CapturePayloadsDir, when non-empty, makes the Jira import path write
 	// request/response payloads to this directory for debugging.
 	CapturePayloadsDir string
-}
-
-// LogbookSidecarConfig is the sibling of Config for the standalone logbook
-// sidecar binary (cmd/logbook/main.go). The sidecar never parses CLI flags
-// and has a narrower set of concerns than the main server.
-type LogbookSidecarConfig struct {
-	PostgresConn           string
-	Port                   string
-	StoragePath            string
-	LLMEndpoint            string
-	ArticleEndpoint        string
-	MainServerURL          string
-	MainServerSecret       string
-	BaseURL                string
-	ActivateDurableActions bool
-	Logging                LoggingConfig
-	OutboundTLS            OutboundTLSConfig
+	// ImportMaxDuration caps a single Jira import. Zero (the default) means no
+	// overall wall-clock limit: per-request HTTP timeouts and the worker lease
+	// already keep the import live, and a large project must be allowed to
+	// finish. When set, an import that hits the limit stops and reports a
+	// timed_out status instead of a misleading completed_with_errors.
+	ImportMaxDuration time.Duration
+	// ImportWatchers enables mapping Jira issue watchers to Windshift item
+	// watches. It is off by default: the identities require one extra Jira
+	// request per issue, which dominates large imports for a low-value mapping.
+	ImportWatchers bool
+	// ImportConcurrency overrides how many independent Jira requests an import
+	// keeps in flight. Zero uses the built-in default.
+	ImportConcurrency int
 }

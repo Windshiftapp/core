@@ -1,5 +1,5 @@
 <script>
-  import LazyMilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
+  import PluginEditorHost from '../../editors/PluginEditorHost.svelte';
   import { t } from '../../stores/i18n.svelte.js';
 
   /** Frameless page body editor. */
@@ -16,7 +16,7 @@
 </script>
 
 <div class="editor-frame flex min-h-0 min-w-0 flex-1 flex-col" data-testid="page-editor">
-  <LazyMilkdownEditor
+  <PluginEditorHost
     bind:content
     placeholder={t('pages.editorPlaceholder')}
     showToolbar={true}
@@ -29,6 +29,7 @@
     {onBeforeDiagramOpen}
     {onDiagramPersisted}
     {onContentChange}
+    editorProviders={true}
   />
 </div>
 

@@ -1376,6 +1376,10 @@ export default {
       'Recommended: PNG or SVG with transparent background. Max height in header: 40-50px.',
     lightLogo: 'Light Mode Logo',
     darkLogo: 'Dark Mode Logo',
+    fullLogoLight: 'Full Logo (Light Mode)',
+    fullLogoDark: 'Full Logo (Dark Mode)',
+    fullLogoHelp:
+      'Wide or wordmark logo used in the expanded sidebar when the layout is "Full logo".',
     darkLogoFallback:
       'Shown in dark mode. Falls back to the light mode logo when left empty.',
   },

@@ -291,6 +291,12 @@ export default {
     configureFilter: '配置筛选器以查看项目',
     createToStart: '创建 {item} 以开始使用',
   },
+  bulkActions: {
+    screenRequiredTitle: '部分事项需要填写表单',
+    screenRequiredAll: '每个所选事项都需要填写表单才能移动。请逐个移动。',
+    screenRequiredMessage: '{total} 个所选事项中有 {blocked} 个需要填写表单才能移动。是否移动其余 {remaining} 个？',
+    screenRequiredConfirm: '移动其余',
+  },
   dueDate: {
     noDueDate: '无截止日期',
     dueToday: '今天到期',

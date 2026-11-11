@@ -1,6 +1,59 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"strings"
+	"time"
+)
+
+// NotificationI18n carries the translatable copy for a notification. It is
+// stored in the notifications.metadata JSON so the digest can re-render the
+// title and message in the recipient's locale instead of the stored English.
+type NotificationI18n struct {
+	TitleKey   string         `json:"title_key,omitempty"`
+	MessageKey string         `json:"message_key,omitempty"`
+	Params     map[string]any `json:"params,omitempty"`
+}
+
+// NotificationMetadata is the parsed shape of notifications.metadata. Unknown
+// fields are ignored so other writers can keep using the column.
+type NotificationMetadata struct {
+	I18n *NotificationI18n `json:"i18n,omitempty"`
+}
+
+// ParseNotificationI18n extracts translatable copy from a notification's
+// metadata JSON. ok is false when the row carries no usable i18n metadata.
+func ParseNotificationI18n(metadata string) (titleKey, messageKey string, params map[string]any, ok bool) {
+	if strings.TrimSpace(metadata) == "" {
+		return "", "", nil, false
+	}
+	var parsed NotificationMetadata
+	if err := json.Unmarshal([]byte(metadata), &parsed); err != nil || parsed.I18n == nil {
+		return "", "", nil, false
+	}
+	if parsed.I18n.TitleKey == "" && parsed.I18n.MessageKey == "" {
+		return "", "", nil, false
+	}
+	return parsed.I18n.TitleKey, parsed.I18n.MessageKey, parsed.I18n.Params, true
+}
+
+// NotificationMetadataJSON builds the metadata JSON for a notification that
+// carries translatable copy. Empty keys are omitted; a fully empty input
+// yields an empty string so callers can leave Metadata untouched.
+func NotificationMetadataJSON(titleKey, messageKey string, params map[string]any) string {
+	if titleKey == "" && messageKey == "" {
+		return ""
+	}
+	payload, err := json.Marshal(NotificationMetadata{I18n: &NotificationI18n{
+		TitleKey:   titleKey,
+		MessageKey: messageKey,
+		Params:     params,
+	}})
+	if err != nil {
+		return ""
+	}
+	return string(payload)
+}
 
 // Channel represents an integration channel (inbound/outbound)
 type Channel struct {
@@ -25,6 +78,9 @@ type Channel struct {
 	// Intakes is populated on demand by GET /channels?include_intakes=true so
 	// callers can resolve portal linkage without one request per channel.
 	Intakes []Intake `json:"intakes,omitempty"`
+	// HasEmailOAuthClientSecret reports that a scrubbed email OAuth client
+	// secret is stored, so the UI can show it as saved without receiving it.
+	HasEmailOAuthClientSecret bool `json:"has_email_oauth_client_secret,omitempty"`
 }
 
 // ChannelCategory represents a grouping for channels
@@ -237,10 +293,14 @@ type PortalCustomer struct {
 	CustomerOrganisationID *int           `json:"customer_organisation_id,omitempty"` //nolint:misspell // matches API/database field name
 	IsPrimary              bool           `json:"is_primary"`                         // Primary contact for the organization
 	CustomFieldValues      map[string]any `json:"custom_field_values,omitempty"`
-	DeactivatedAt          *time.Time     `json:"deactivated_at,omitempty"` // Security deactivation (WI-1554); every portal auth path refuses deactivated customers
-	CreatedVia             string         `json:"created_via"`              // Creation provenance (WI-1553)
-	CreatedAt              time.Time      `json:"created_at"`
-	UpdatedAt              time.Time      `json:"updated_at"`
+	// Language and Timezone are the customer's own preferences. Empty means
+	// never chosen or detected; the instance default (en, UTC) applies.
+	Language      string     `json:"language,omitempty"`
+	Timezone      string     `json:"timezone,omitempty"`
+	DeactivatedAt *time.Time `json:"deactivated_at,omitempty"` // Security deactivation (WI-1554); every portal auth path refuses deactivated customers
+	CreatedVia    string     `json:"created_via"`              // Creation provenance (WI-1553)
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
 	// Joined fields for API responses
 	UserName                 string        `json:"user_name,omitempty"`
 	UserEmail                string        `json:"user_email,omitempty"`
@@ -760,16 +820,37 @@ type NotificationCache struct {
 // "magic_link", "notification_batch"). Subject, HTMLBody, and TextBody are
 // all Go html/template / text/template sources.
 type EmailTemplate struct {
-	ID          int       `json:"id"`
-	Name        string    `json:"name"`
-	Subject     string    `json:"subject"`
-	HTMLBody    string    `json:"html_body"`
-	TextBody    string    `json:"text_body"`
-	Description string    `json:"description,omitempty"`
-	IsActive    bool      `json:"is_active"`
-	IsSystem    bool      `json:"is_system"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Subject     string `json:"subject"`
+	HTMLBody    string `json:"html_body"`
+	TextBody    string `json:"text_body"`
+	Description string `json:"description,omitempty"`
+	IsActive    bool   `json:"is_active"`
+	IsSystem    bool   `json:"is_system"`
+	// IsCustomized is set when an admin saves an edit. Unmodified seeds stay
+	// false so the localized built-in default is used instead.
+	IsCustomized bool      `json:"is_customized"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	// Translations holds per-locale overrides (admin UI). Loaded on list/get,
+	// not persisted on the base row.
+	Translations []EmailTemplateTranslation `json:"translations,omitempty"`
+}
+
+// EmailTemplateTranslation is an admin override of a built-in email template
+// for one shipped locale. A row replaces the base template's subject/body for
+// that locale; locales without a row fall back to the base row and then the
+// localized built-in default.
+type EmailTemplateTranslation struct {
+	ID         int       `json:"id"`
+	TemplateID int       `json:"template_id"`
+	Locale     string    `json:"locale"`
+	Subject    string    `json:"subject"`
+	HTMLBody   string    `json:"html_body"`
+	TextBody   string    `json:"text_body"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // NotificationSetting represents a notification configuration that can be assigned to configuration sets

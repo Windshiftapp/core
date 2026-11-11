@@ -22,7 +22,6 @@ function createPermissionStore() {
   const hasPortals = writable(false);
   const managesChannels = writable(false);
   const managesAssetSets = writable(false);
-  const logbookAvailable = writable(false);
   let allPermissionsLoaded = false;
   let allPermissionsLoadPromise = null;
   let allPermissionsLoadGeneration = 0;
@@ -64,15 +63,6 @@ function createPermissionStore() {
     }
   );
 
-  const canAccessLogbook = derived(
-    [authStore, logbookAvailable],
-    ([$authStore, $logbookAvailable]) => {
-      const user = $authStore.currentUser;
-      if (!user) return false;
-      return $logbookAvailable;
-    }
-  );
-
   const canManageAssets = derived(
     [authStore, userPermissionKeys, managesAssetSets],
     ([$authStore, $keys, $managesAssetSets]) => {
@@ -103,7 +93,6 @@ function createPermissionStore() {
       canAccessCustomers,
       canAccessAssets,
       canAccessPortalHub,
-      canAccessLogbook,
       canManageAssets,
       canManageChannels,
       managesAssetSets,
@@ -119,7 +108,6 @@ function createPermissionStore() {
       $canAccessCustomers,
       $canAccessAssets,
       $canAccessPortalHub,
-      $canAccessLogbook,
       $canManageAssets,
       $canManageChannels,
       $managesAssetSets,
@@ -134,7 +122,6 @@ function createPermissionStore() {
       canAccessCustomers: $canAccessCustomers,
       canAccessAssets: $canAccessAssets,
       canAccessPortalHub: $canAccessPortalHub,
-      canAccessLogbook: $canAccessLogbook,
       canManageAssets: $canManageAssets,
       canManageChannels: $canManageChannels,
       managesAssetSets: $managesAssetSets,
@@ -173,12 +160,6 @@ function createPermissionStore() {
     get canAccessPortalHub() {
       let value;
       canAccessPortalHub.subscribe((v) => (value = v))();
-      return value;
-    },
-
-    get canAccessLogbook() {
-      let value;
-      canAccessLogbook.subscribe((v) => (value = v))();
       return value;
     },
 
@@ -223,11 +204,6 @@ function createPermissionStore() {
     // Set whether the current user administers at least one asset set
     setManagesAssetSets(value) {
       managesAssetSets.set(value);
-    },
-
-    // Set whether logbook service is available
-    setLogbookAvailable(value) {
-      logbookAvailable.set(value);
     },
 
     // Load user permissions

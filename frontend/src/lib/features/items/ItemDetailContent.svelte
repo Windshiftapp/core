@@ -23,8 +23,6 @@
     currentItemType = null,
     currentHierarchyLevel = null,
     workspaceId = null,
-    editingTitle = $bindable(false),
-    editTitle = $bindable(''),
     saving = false,
     canEdit = false,
     dropdownItems = [],
@@ -50,9 +48,6 @@
     timeProjects = [],
     activeTimer = null,
     editingStatus = false,
-    editingDueDate = false,
-    editingStartDate = false,
-    editingEndDate = false,
     editingCustomFields = {},
     editCustomFieldValues = {},
     editingPriority = false,
@@ -88,9 +83,6 @@
     onstartEditingMilestone = null,
     onstartEditingIteration = null,
     onstartEditingPriority = null,
-    onstartEditingDueDate = null,
-    onstartEditingStartDate = null,
-    onstartEditingEndDate = null,
     onstartEditingStatus = null,
     onstartEditingProject = null,
     onstartEditingDescription = null,
@@ -103,6 +95,7 @@
     onattachmentUpload = null,
     onattachmentUploadFiles = null,
     onattachmentDelete = null,
+    onattachmentToggleVisibility = null,
     onattachmentPageChange = null,
     onattachmentPageSizeChange = null,
     ondiagramSaved = null,
@@ -151,7 +144,14 @@
   }
 
   function handleSaveField(data) {
-    onsaveField?.(data);
+    return onsaveField?.(data);
+  }
+
+  // Description and sidebar edits are fire-and-forget: the store surfaces the
+  // failure toast, so swallow the rejection here instead of letting it reach
+  // the global unhandledrejection handler and add a second toast.
+  function handleBackgroundSaveField(data) {
+    return handleSaveField(data)?.catch?.(() => {});
   }
 
   function handleCancelEdit(data) {
@@ -188,18 +188,6 @@
 
   function handleStartEditingIteration() {
     onstartEditingIteration?.();
-  }
-
-  function handleStartEditingDueDate() {
-    onstartEditingDueDate?.();
-  }
-
-  function handleStartEditingStartDate() {
-    onstartEditingStartDate?.();
-  }
-
-  function handleStartEditingEndDate() {
-    onstartEditingEndDate?.();
   }
 
   function handleStartEditingPriority() {
@@ -366,12 +354,9 @@
           <ItemDetailHeader
             {item}
             {workspace}
-            bind:editingTitle
-            bind:editTitle
             {saving}
             {canEdit}
             onsavefield={handleSaveField}
-            oncanceledit={handleCancelEdit}
           />
           <ItemDetailDescription
             bind:this={descriptionComponent}
@@ -385,7 +370,7 @@
             {manualActions}
             {canCreate}
             {canEdit}
-            onsavefield={handleSaveField}
+            onsavefield={handleBackgroundSaveField}
             oncanceledit={handleCancelEdit}
             onstartEditingDescription={() => onstartEditingDescription?.()}
             onshowAddLink={handleShowLinkModal}
@@ -394,6 +379,7 @@
             onattachmentUpload={(data) => onattachmentUpload?.(data)}
             onattachmentUploadFiles={(data) => onattachmentUploadFiles?.(data)}
             onattachmentDelete={(data) => onattachmentDelete?.(data)}
+            onattachmentToggleVisibility={(data) => onattachmentToggleVisibility?.(data)}
             onnewDiagram={handleNewDiagram}
             oneditDiagram={handleEditDiagram}
             ondeleteDiagram={handleDeleteDiagram}
@@ -465,9 +451,6 @@
             {pendingApproval}
             {onapprovalsChanged}
             {editingStatus}
-            {editingDueDate}
-            {editingStartDate}
-            {editingEndDate}
             {editingCustomFields}
             {editCustomFieldValues}
             {editingPriority}
@@ -487,15 +470,12 @@
             {timeProjects}
             {moduleSettings}
             {dropdownItems}
-            onsaveField={onsaveField}
+            onsaveField={handleBackgroundSaveField}
             oncancelEdit={oncancelEdit}
             {storyPointsRollup}
             onstartEditingAssignee={onstartEditingAssignee}
             onstartEditingMilestone={onstartEditingMilestone}
             onstartEditingIteration={onstartEditingIteration}
-            onstartEditingDueDate={onstartEditingDueDate}
-            onstartEditingStartDate={onstartEditingStartDate}
-            onstartEditingEndDate={onstartEditingEndDate}
             onstartEditingPriority={onstartEditingPriority}
             onstartEditingStatus={onstartEditingStatus}
             onstartEditingProject={onstartEditingProject}

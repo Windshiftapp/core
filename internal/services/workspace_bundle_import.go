@@ -928,7 +928,10 @@ func (s *WorkspaceBundleImportService) importItems(ctx context.Context, imp *wor
 			input.LabelIDs = ids
 		}
 
-		created, err := s.items.Create(actor.UserID, actor.Username, input)
+		// Bundle items are imported, not authored live: stamp import provenance
+		// so notifications, automation, webhooks, SLA evaluation, and the
+		// coding-agent assignee trigger all stay quiet.
+		created, err := s.items.CreateImported(actor.UserID, actor.Username, input, "workspace_bundle")
 		if err != nil {
 			imp.failedItems[item.Ref] = true
 			imp.outcome("item", item.Ref, item.Title, "failed", err.Error())

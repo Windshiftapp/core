@@ -10,7 +10,7 @@
 -- items.team_id            <- 20260925_items_team (teams table already exists)
 -- items.intake_id          <- 20261110 intake split (plain INTEGER, no FK)
 -- items.portal_org_shared  <- 20261010_portal_org_sharing
--- plane_import_mappings    <- 20261119_plane_import_mappings (this importer)
+-- plane_import_mappings    <- 20261122_plane_import_mappings (this importer)
 
 BEGIN;
 ALTER TABLE items ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL;

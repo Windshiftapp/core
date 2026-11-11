@@ -113,7 +113,6 @@
       workflows = [...workflows, created];
       creating = false;
       newWorkflow = { name: '', description: '', is_default: false };
-      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to create workflow:', error);
       errorToast(t('dialogs.alerts.failedToCreate', { error: error.message || error }));
@@ -151,7 +150,6 @@
       await translationEditor?.save();
       await loadWorkflows();
       editingId = null;
-      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to update workflow:', error);
       errorToast(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
@@ -174,7 +172,6 @@
       await workflowsApi.delete(workflow.id);
       workflows = workflows.filter(wf => wf.id !== workflow.id);
       await loadWorkflows();
-      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to delete workflow:', error);
       errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));

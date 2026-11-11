@@ -49,7 +49,7 @@ func (r *AttachmentRepository) listItem(itemID, limit, offset int, portalOnly bo
 	}
 	rows, err := r.db.Query(`
 		SELECT a.id, a.item_id, a.filename, a.original_filename, a.mime_type, a.file_size,
-		       a.uploaded_by, a.uploaded_by_portal_customer_id, a.has_thumbnail, a.created_at,
+		       a.uploaded_by, a.uploaded_by_portal_customer_id, a.has_thumbnail, a.is_internal, a.created_at,
 		       COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.username, ''),
 		       COALESCE(u.email, ''),
 		       COALESCE(NULLIF(TRIM(pc.name), ''), pc.email, '')
@@ -70,7 +70,7 @@ func (r *AttachmentRepository) listItem(itemID, limit, offset int, portalOnly bo
 		var rowItemID, uploadedBy, uploadedByCustomer sql.NullInt64
 		if err := rows.Scan(&attachment.ID, &rowItemID, &attachment.Filename, &attachment.OriginalFilename,
 			&attachment.MimeType, &attachment.FileSize, &uploadedBy, &uploadedByCustomer, &attachment.HasThumbnail,
-			&attachment.CreatedAt, &attachment.UploaderName, &attachment.UploaderEmail,
+			&attachment.IsInternal, &attachment.CreatedAt, &attachment.UploaderName, &attachment.UploaderEmail,
 			&attachment.UploaderPortalCustomerName); err != nil {
 			return nil, 0, fmt.Errorf("scan item attachment: %w", err)
 		}
@@ -99,7 +99,7 @@ func (r *AttachmentRepository) GetItem(id int) (*models.Attachment, error) {
 	var itemID, uploadedBy, uploadedByCustomer sql.NullInt64
 	err := r.db.QueryRow(`
 		SELECT a.id, a.item_id, a.filename, a.original_filename, a.mime_type, a.file_size,
-		       a.uploaded_by, a.uploaded_by_portal_customer_id, a.has_thumbnail, a.created_at,
+		       a.uploaded_by, a.uploaded_by_portal_customer_id, a.has_thumbnail, a.is_internal, a.created_at,
 		       COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.username, ''),
 		       COALESCE(u.email, ''),
 		       COALESCE(NULLIF(TRIM(pc.name), ''), pc.email, '')
@@ -110,7 +110,7 @@ func (r *AttachmentRepository) GetItem(id int) (*models.Attachment, error) {
 	`, id).Scan(
 		&attachment.ID, &itemID, &attachment.Filename, &attachment.OriginalFilename,
 		&attachment.MimeType, &attachment.FileSize, &uploadedBy, &uploadedByCustomer, &attachment.HasThumbnail,
-		&attachment.CreatedAt, &attachment.UploaderName, &attachment.UploaderEmail,
+		&attachment.IsInternal, &attachment.CreatedAt, &attachment.UploaderName, &attachment.UploaderEmail,
 		&attachment.UploaderPortalCustomerName,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -245,6 +245,26 @@ func (r *AttachmentRepository) GetPortalRequestAttachmentRecord(attachmentID, it
 		return nil, fmt.Errorf("get portal request attachment: %w", err)
 	}
 	return &rec, nil
+}
+
+// SetItemInternal sets the portal-visibility flag on an item-scoped
+// attachment. Non-item rows are refused so the items-scoped surface cannot
+// reclassify page, avatar, or branding attachments.
+func (r *AttachmentRepository) SetItemInternal(attachmentID int, isInternal bool) error {
+	result, err := r.db.ExecWrite(`
+		UPDATE attachments
+		SET is_internal = ?
+		WHERE id = ?
+		  AND item_id IS NOT NULL
+		  AND (entity_type IS NULL OR entity_type = '' OR entity_type = 'item')
+	`, isInternal, attachmentID)
+	if err != nil {
+		return fmt.Errorf("set item attachment visibility: %w", err)
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // GetItemThumbnailRecord returns thumbnail metadata for an item-scoped

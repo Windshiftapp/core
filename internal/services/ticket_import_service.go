@@ -266,6 +266,9 @@ func (s *TicketImportService) importRow(ctx context.Context, workspaceID int, jo
 		WorkspaceID: workspaceID, Title: title, Description: description,
 		CreatorID: &actorUserID, EventMetadata: itemevents.Import(jobID),
 		CreatedAt: &createdAt,
+		// A bulk import of tickets pre-assigned to an agent user must not
+		// start one agent run per imported row.
+		SkipAssigneeTrigger: true,
 		// The importing actor passes the same create-time validation policy
 		// as normal creation — most importantly the workflow/approval checks
 		// on an explicit status column (WI-1560).

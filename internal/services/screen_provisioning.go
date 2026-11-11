@@ -12,6 +12,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 )
 
@@ -207,6 +208,16 @@ func (s *ScreenProvisioningService) Delete(actor AuditActor, id int) error {
 	}
 	if strings.TrimSpace(builtinKey.String) != "" {
 		return NewServiceError(400, "Cannot delete builtin screen")
+	}
+
+	// A screen bound to a workflow transition is a gate; refuse the delete so
+	// the admin unbinds explicitly instead of silently dropping it (WI-1835).
+	usage, err := repository.NewTransitionRepository(s.db).CountTransitionsUsingScreen(id)
+	if err != nil {
+		return fmt.Errorf("count screen %d usage: %w", id, err)
+	}
+	if usage > 0 {
+		return NewServiceError(409, fmt.Sprintf("Cannot delete screen: it is attached to %d workflow transition(s)", usage))
 	}
 
 	if _, err := s.db.ExecWrite("DELETE FROM screens WHERE id = ?", id); err != nil {

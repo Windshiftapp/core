@@ -1,5 +1,8 @@
 <script>
   import { t } from '../stores/i18n.svelte.js';
+  import { getAppLocale } from '../stores/appLocale.svelte.js';
+  import { resolveCalendar } from '../stores/calendar.svelte.js';
+  import { formatDateWithOptions } from '../utils/dateFormatter.js';
   import { recurrence } from '../api/recurrence.js';
   import { parseRRule, buildRRule, rruleToText, DAY_NAMES, DAY_LABELS, FREQ_LABELS } from './rruleUtils.js';
   import { errorToast } from '../stores/toasts.svelte.js';
@@ -175,7 +178,7 @@
 
   function formatPreviewDate(dateStr) {
     try {
-      return new Date(dateStr).toLocaleDateString(undefined, {
+      return formatDateWithOptions(dateStr, {
         weekday: 'short',
         year: 'numeric',
         month: 'short',
@@ -240,6 +243,10 @@
       </div>
     </FormField>
   </div>
+
+  {#if resolveCalendar(getAppLocale()) !== 'gregory' && (frequency === 'MONTHLY' || frequency === 'YEARLY')}
+    <p class="text-sm text-ds-text-subtle">{t('recurrence.gregorianRuleHint')}</p>
+  {/if}
 
   {#if frequency === 'WEEKLY'}
     <FormField label={t('recurrence.daysOfWeek')} class="mb-0">

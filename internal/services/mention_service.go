@@ -402,7 +402,7 @@ func (s *MentionService) ProcessMentions(params ProcessMentionsParams) error {
 
 // canUserReceiveMention reports whether userID has enough access to the
 // workspace that we can legitimately notify them they were mentioned. If the
-// permission service isn't wired (tests, logbook sidecar), fail open to stay
+// permission service isn't wired (tests), fail open to stay
 // compatible — production always configures one.
 func (s *MentionService) canUserReceiveMention(userID, workspaceID int) bool {
 	if s.permissionService == nil {
@@ -520,7 +520,7 @@ func (s *MentionService) emitMentionNotification(params ProcessMentionsParams, m
 	title := "You were mentioned"
 	message := fmt.Sprintf("%s mentioned you in %s on %s (%s)",
 		actorName, sourceTypeDesc, item.Title, itemKey)
-	notifications, err := s.notificationService.NotifyUsersWithRecords(
+	notifications, err := s.notificationService.NotifyUsersWithRecordsI18n(
 		[]int{mentionedUserID},
 		params.WorkspaceID,
 		params.ItemID,
@@ -528,6 +528,13 @@ func (s *MentionService) emitMentionNotification(params ProcessMentionsParams, m
 		"mention", // notifType — short form used by the UI; matches getNotificationType(EventMention)
 		title,
 		message,
+		"notification.mention.title",
+		mentionMessageKey(params.SourceType),
+		map[string]any{
+			"actor":     actorName,
+			"itemTitle": item.Title,
+			"itemKey":   itemKey,
+		},
 	)
 	if err != nil {
 		slog.Error("failed to add mention notification",
@@ -580,4 +587,18 @@ func (s *MentionService) DeleteMentionsForSource(sourceType string, sourceID int
 		DELETE FROM mentions WHERE source_type = ? AND source_id = ?
 	`, sourceType, sourceID)
 	return err
+}
+
+// mentionMessageKey maps a mention source to its translated message entry. The
+// source noun is baked into each translation so word order and grammatical
+// case stay correct per locale.
+func mentionMessageKey(sourceType string) string {
+	switch sourceType {
+	case "comment":
+		return "notification.mention.comment"
+	case "item_description":
+		return "notification.mention.description"
+	default:
+		return "notification.mention.item"
+	}
 }

@@ -19,7 +19,7 @@
   import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import { getStatusStyleFromStatuses } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { errorToast, infoToast } from '../../stores/toasts.svelte.js';
+  import { infoToast, surfaceError } from '../../stores/toasts.svelte.js';
   import { navigate } from '../../router.js';
   import { publicBaseURL } from '../../runtime/contextPath.js';
   import { dateOnlyKey, formatDate, formatDateOnly, formatDateWithOptions } from '../../utils/dateFormatter.js';
@@ -31,7 +31,7 @@
   // Get current date and week
   let currentDate = $state(new Date());
   let currentWeekStart = $state(new Date());
-  let weekDays = $state([]);
+  let weekDays = $derived(generateWeekDays(currentWeekStart));
   let workItems = $state({}); // Store scheduled work items for each day
   let showTasksSidebar = $state(false);
   let assignedWorkItems = $state([]); // Real work items assigned to user
@@ -172,7 +172,7 @@
       const statusResponse = await statuses.getAll();
       availableStatuses = statusResponse || [];
     } catch (error) {
-      console.error('Failed to load work items:', error);
+      surfaceError(error, { context: 'loadAssignedWorkItems' });
       assignedWorkItems = [];
       availableStatuses = [];
     }
@@ -223,7 +223,7 @@
         workItems = { ...workItems };
       }
     } catch (error) {
-      console.error('Failed to toggle personal task:', error);
+      surfaceError(error, { context: 'togglePersonalTask' });
     }
   }
 
@@ -239,7 +239,7 @@
         assignedWorkItems = [...assignedWorkItems];
       }
     } catch (error) {
-      console.error('Failed to update work item status:', error);
+      surfaceError(error, { context: 'updateWorkItemStatus' });
     }
   }
 
@@ -304,9 +304,9 @@
       days.push({
         date: new Date(date),
         dayName: formatDateWithOptions(date, { weekday: 'short' }),
-        dayNumber: date.getDate(),
+        dayNumber: formatDateWithOptions(date, { day: 'numeric' }),
         isToday: isToday(date),
-        isCurrentMonth: date.getMonth() === currentDate.getMonth(),
+        isCurrentMonth: formatDateWithOptions(date, { year: 'numeric', month: 'numeric' }) === formatDateWithOptions(currentDate, { year: 'numeric', month: 'numeric' }),
         dateKey: formatDateKey(date)
       });
     }
@@ -343,7 +343,6 @@
     const newWeekStart = new Date(currentWeekStart);
     newWeekStart.setDate(currentWeekStart.getDate() + (direction * 7));
     currentWeekStart = newWeekStart;
-    weekDays = generateWeekDays(currentWeekStart);
     loadScheduledItems();
   }
 
@@ -408,8 +407,10 @@
       // Reload assigned work items to stay in sync
       await loadAssignedWorkItems();
     } catch (error) {
-      console.error('Failed to create calendar task:', error);
-      errorToast(t('time.calendar.failedToCreateTask') + ': ' + error.message);
+      surfaceError(error, {
+        context: 'createCalendarTask',
+        message: t('time.calendar.failedToCreateTask') + ': ' + error.message,
+      });
     }
   }
 
@@ -431,7 +432,7 @@
           const { scheduledDate, scheduledTime, durationMinutes, ...originalItem } = workItem;
           assignedWorkItems = [...assignedWorkItems, originalItem];
         } catch (error) {
-          console.error('Failed to unschedule item:', error);
+          surfaceError(error, { context: 'unscheduleItem' });
         }
       }
     }
@@ -550,7 +551,7 @@
       assignedWorkItems = assignedWorkItems.filter(item => !scheduledItemIds.has(item.id));
 
     } catch (error) {
-      console.error('Failed to load scheduled items:', error);
+      surfaceError(error, { context: 'loadScheduledItems' });
     }
   }
 
@@ -624,7 +625,7 @@
         try {
           await updateItemSchedule(item.id, dateKey, item.scheduledTime, item.durationMinutes);
         } catch (error) {
-          console.error('Failed to save resize:', error);
+          surfaceError(error, { context: 'saveResize' });
         }
       }
     }
@@ -1018,7 +1019,7 @@
                       }
                     }
                   } catch (error) {
-                    console.error('Failed to drop item:', error);
+                    surfaceError(error, { context: 'dropItem' });
                   }
                 }}
               >

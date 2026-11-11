@@ -18,6 +18,9 @@ const RETRY_JITTER_MS = 250;
 export const API_BASE = '/api';
 export const API_V2_BASE = '/api/v2';
 export const ADMIN_UI_MUTATION_EVENT = 'windshift:admin-ui-mutation';
+// Fires after every successful mutating request. The app shell listens to drop
+// stale reference caches; the API layer stays store-free.
+export const API_MUTATION_EVENT = 'windshift:api-mutation';
 
 // Ensure the clock-drift warning toast fires at most once per session
 let driftWarningShown = false;
@@ -108,13 +111,13 @@ function isAdminUIPath() {
   return pathname === '/admin' || pathname.startsWith('/admin/');
 }
 
-function notifyAdminUIMutation(endpoint, method) {
-  if (!isAdminUIPath()) return;
-  window.dispatchEvent(
-    new CustomEvent(ADMIN_UI_MUTATION_EVENT, {
-      detail: { endpoint, method },
-    })
-  );
+function notifyAPIMutation(endpoint, method) {
+  if (typeof window === 'undefined') return;
+  const detail = { endpoint, method };
+  window.dispatchEvent(new CustomEvent(API_MUTATION_EVENT, { detail }));
+  if (isAdminUIPath()) {
+    window.dispatchEvent(new CustomEvent(ADMIN_UI_MUTATION_EVENT, { detail }));
+  }
 }
 
 /** Replace the in-flight ownership scope after authentication changes. */
@@ -127,6 +130,15 @@ export function setAPIRequestSessionKey(sessionKey) {
 
 export function clearAPIRequestSessionKey() {
   setAPIRequestSessionKey(null);
+}
+
+// The server answers 408 with REQUEST_CANCELED when the request context was
+// canceled by the client (navigation, modal teardown, superseded work). The
+// backend treats that as expected control flow, so present it to callers as an
+// AbortError instead of a failure they should report.
+function isCanceledRequest(error) {
+  const code = String(error?.code ?? error?.errorCode ?? '').toLowerCase();
+  return code === 'request_canceled';
 }
 
 /**
@@ -289,6 +301,9 @@ async function performFetchAPI(base, endpoint, options = {}) {
         // If we can't read the error body, use the status text
       }
       const apiError = createApiError(response, errorData);
+      if (isCanceledRequest(apiError)) {
+        throw new DOMException('The request was canceled', 'AbortError');
+      }
       if (
         response.status === 401 &&
         /** @type {any} */ (apiError).code !== 'AUTHENTICATION_PENDING'
@@ -310,7 +325,7 @@ async function performFetchAPI(base, endpoint, options = {}) {
 
     const method = String(fetchOptions.method || 'GET').toUpperCase();
     if (!SAFE_METHODS.includes(method)) {
-      notifyAdminUIMutation(endpoint, method);
+      notifyAPIMutation(endpoint, method);
     }
 
     return result;

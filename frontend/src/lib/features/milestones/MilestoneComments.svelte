@@ -11,6 +11,7 @@
 	import { formatRelativeTime } from '../../utils/dateFormatter.js';
 	import { getShortcut, matchesShortcut, getDisplayString } from '../../utils/keyboardShortcuts.js';
 	import { t } from '../../stores/i18n.svelte.js';
+	import { surfaceError } from '../../stores/toasts.svelte.js';
 	import { confirm } from '../../composables/useConfirm.js';
 	import { newestCommentsFirst } from './milestoneCommentOrder.js';
 
@@ -108,8 +109,8 @@
 			newCommentContent = '';
 			editorRef?.clear();
 		} catch (err) {
-			console.error('Failed to create milestone comment:', err);
 			error = t('comments.failedToCreate');
+			surfaceError(err, { context: 'createMilestoneComment' });
 		} finally {
 			isSubmitting = false;
 		}
@@ -136,8 +137,8 @@
 			comments = comments.filter((comment) => comment.id !== commentId);
 			totalCount = Math.max(0, totalCount - 1);
 		} catch (err) {
-			console.error('Failed to delete milestone comment:', err);
 			error = t('comments.failedToDelete');
+			surfaceError(err, { context: 'deleteMilestoneComment' });
 		}
 	}
 
@@ -162,8 +163,8 @@
 			comments = comments.map((comment) => (comment.id === updated.id ? updated : comment));
 			cancelEdit();
 		} catch (err) {
-			console.error('Failed to update milestone comment:', err);
 			error = t('comments.failedToUpdate');
+			surfaceError(err, { context: 'updateMilestoneComment' });
 		} finally {
 			isSavingEdit = false;
 		}

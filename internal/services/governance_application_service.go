@@ -55,6 +55,17 @@ type TransitionGovernance struct {
 	ToStatusName    string                     `json:"to_status_name"`
 	Conditions      []TransitionConditionTouch `json:"conditions"`
 	ApprovalDrivers []TransitionApprovalDriver `json:"approval_drivers"`
+	// Screen is the transition screen shown when this edge is taken, or nil
+	// when none is bound (WI-1835).
+	Screen *TransitionScreenSummary `json:"screen"`
+}
+
+// TransitionScreenSummary describes the screen bound to a transition.
+type TransitionScreenSummary struct {
+	ID                 int    `json:"id"`
+	Name               string `json:"name"`
+	FieldCount         int    `json:"field_count"`
+	RequiredFieldCount int    `json:"required_field_count"`
 }
 
 // GovernanceApplicationService owns approval authorization and workflow-governance composition.
@@ -301,7 +312,51 @@ func (s *GovernanceApplicationService) GetTransitionGovernance(ctx context.Conte
 	for _, item := range drivers {
 		result.ApprovalDrivers = append(result.ApprovalDrivers, TransitionApprovalDriver{ApprovalSetID: item.ApprovalSetID, ApprovalSetName: item.ApprovalSetName, ApprovalSetStatusID: item.ApprovalSetStatusID, Role: item.Role})
 	}
+	screen, err := s.transitions.GetScreen(transitionID)
+	if err != nil {
+		return nil, err
+	}
+	if screen != nil {
+		result.Screen = &TransitionScreenSummary{ID: screen.ID, Name: screen.Name, FieldCount: screen.FieldCount, RequiredFieldCount: screen.RequiredFieldCount}
+	}
 	return result, nil
+}
+
+// SetTransitionScreen binds a screen to a transition, or clears the binding
+// when screenID is nil. System-admin only. The binding saves immediately and
+// is never part of the bulk workflow-graph payload (WI-1835).
+func (s *GovernanceApplicationService) SetTransitionScreen(ctx context.Context, actor AuditActor, transitionID int, screenID *int) error {
+	if err := s.requireSystemAdmin(actor.UserID); err != nil {
+		return err
+	}
+	transition, err := s.transitions.GetWithStatusNames(transitionID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return ErrGovernanceNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if screenID != nil {
+		exists, err := s.transitions.ScreenExists(*screenID)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return governanceValidation("screen not found")
+		}
+	}
+	if err := s.transitions.SetScreen(transitionID, screenID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return ErrGovernanceNotFound
+		}
+		return err
+	}
+	label := transition.ToStatusName
+	if transition.FromStatusName != "" {
+		label = transition.FromStatusName + " -> " + transition.ToStatusName
+	}
+	emitServiceAudit(s.db, actor, logger.ActionTransitionScreenUpdate, logger.ResourceWorkflowTransition, &transitionID, label, map[string]any{"screen_id": screenID})
+	return nil
 }
 
 func (s *GovernanceApplicationService) requireSystemAdmin(userID int) error {

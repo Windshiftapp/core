@@ -8,6 +8,7 @@ type IntegrationProviderType string
 const (
 	IntegrationProviderNotion  IntegrationProviderType = "notion"
 	IntegrationProviderTodoist IntegrationProviderType = "todoist"
+	IntegrationProviderDocmost IntegrationProviderType = "docmost"
 	// Future: IntegrationProviderConfluence, IntegrationProviderGoogleDocs
 )
 
@@ -48,14 +49,15 @@ type IntegrationOAuthState struct {
 
 // UserIntegrationToken holds a user's OAuth token for an integration provider
 type UserIntegrationToken struct {
-	ID                        string    `json:"id" db:"id"`
-	UserID                    string    `json:"user_id" db:"user_id"`
-	IntegrationProviderID     string    `json:"integration_provider_id" db:"integration_provider_id"`
-	OAuthAccessTokenEncrypted string    `json:"-" db:"oauth_access_token_encrypted"`
-	ProviderMetadata          string    `json:"provider_metadata,omitempty" db:"provider_metadata"`
-	ConnectedAt               time.Time `json:"connected_at" db:"connected_at"`
-	CreatedAt                 time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt                 time.Time `json:"updated_at" db:"updated_at"`
+	ID                        string     `json:"id" db:"id"`
+	UserID                    string     `json:"user_id" db:"user_id"`
+	IntegrationProviderID     string     `json:"integration_provider_id" db:"integration_provider_id"`
+	OAuthAccessTokenEncrypted string     `json:"-" db:"oauth_access_token_encrypted"`
+	ProviderMetadata          string     `json:"provider_metadata,omitempty" db:"provider_metadata"`
+	InvalidatedAt             *time.Time `json:"invalidated_at,omitempty" db:"invalidated_at"`
+	ConnectedAt               time.Time  `json:"connected_at" db:"connected_at"`
+	CreatedAt                 time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt                 time.Time  `json:"updated_at" db:"updated_at"`
 	// Joined fields for API responses
 	ProviderName string `json:"provider_name,omitempty" db:"provider_name"`
 	ProviderType string `json:"provider_type,omitempty" db:"provider_type"`

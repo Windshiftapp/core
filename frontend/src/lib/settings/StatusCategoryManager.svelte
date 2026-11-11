@@ -71,12 +71,10 @@
     } else {
       await statusCategoriesApi.create(formData);
     }
-    window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
   }
 
   async function deleteCategory(category) {
     await statusCategoriesApi.delete(category.id);
-    window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
   }
 
   function handleError(err, phase, item) {

@@ -10,6 +10,8 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-2e7dbd?style=flat-square" alt="AGPL-3.0 License"></a>
   <a href="https://windshift.sh/docs"><img src="https://img.shields.io/badge/docs-windshift.sh-2e7dbd?style=flat-square" alt="Documentation"></a>
   <a href="https://matrix.to/#/%23windshift:matrix.org"><img src="https://img.shields.io/badge/matrix-%23windshift-2e7dbd?style=flat-square" alt="Matrix chat"></a>
+  <a href="https://github.com/Windshiftapp/core/stargazers"><img src="https://img.shields.io/github/stars/Windshiftapp/core?style=flat-square&label=stars&color=2e7dbd" alt="GitHub stars"></a>
+  <a href="https://github.com/Windshiftapp/core/releases/latest"><img src="https://img.shields.io/github/v/release/Windshiftapp/core?style=flat-square&label=release&color=2e7dbd" alt="Latest release"></a>
 </p>
 
 <p align="center">Windshift is an open-source, self-hosted work management platform and a Jira alternative, licensed under AGPL v3. It runs as a single Go binary with the Svelte frontend built in, using embedded SQLite by default or PostgreSQL, and ships as an official Docker image and a desktop app. See <a href="https://windshift.sh">windshift.sh</a> and the <a href="https://windshift.sh/docs">documentation</a>.</p>
@@ -33,6 +35,12 @@ A built-in importer handles the move off Jira.
 
 It ships as a single Go binary with the Svelte frontend built in, SQLite by default or PostgreSQL for data storage. No Java, no Elasticsearch cluster, no per-user pricing, and your data stays on your infrastructure.
 
+## Agents and automation
+
+Windshift runs coding agents against your repositories. Agent Studio binds an agent to a workspace, launches it from a work item, and links the resulting pull request back to that item. Source control integrations cover GitHub, GitLab, Gitea, and Forgejo.
+
+The built-in MCP server exposes work items, comments, pages, knowledge, tests, time tracking, and actions over the Model Context Protocol, with OAuth so agents and assistants authenticate as a real user and inherit that user's permissions.
+
 ## Highlights
 
 - Plan Jira-style without the Jira footprint: boards, backlogs, sprints, epics and sub-tasks, hierarchy trees, roadmaps, and dashboards.
@@ -40,7 +48,7 @@ It ships as a single Go binary with the Svelte frontend built in, SQLite by defa
 - Filter with a JQL-style query language and save the results as shared views.
 - Automate the busywork with event-driven rules that update fields, notify people, and create work.
 - Serve customers with SLAs, queues, approvals, and a public request portal.
-- Connect GitHub, Gitlab, Gitea, and Forgejo, import Jira projects, and send email or webhook notifications.
+- Connect GitHub, GitLab, Gitea, and Forgejo, import Jira projects, and send email or webhook notifications.
 - Extend it with test management, time tracking, a knowledge base, or an asset register.
 
 ## Coming from Jira
@@ -58,6 +66,54 @@ It ships as a single Go binary with the Svelte frontend built in, SQLite by defa
 | Jira Assets / Insight | Asset and CMDB register |
 | Xray / Zephyr | Test cases, test sets, test runs, and reports |
 | Marketplace apps | Built-in modules, packs, and plugins (extensible via WASM runtime) |
+
+<details>
+<summary>Full feature list</summary>
+
+**Planning and tracking**
+
+- Workspaces, collections, and configurable hierarchy levels: epics, stories, sub-tasks, and custom item types.
+- Boards, backlogs, sprints and iterations, roadmaps, milestones, dashboards, and hierarchy tree views.
+- Custom fields, screens, statuses, workflows, priorities, and per-workspace permissions.
+- Windshift Query Language (JQL-style) filters, saved collections, and links between work items.
+
+**Service management**
+
+- Service level agreements, queues, approvals, and a public customer request portal.
+- Request types and SLA reporting.
+
+**Test management**
+
+- Test cases, test sets, test runs, per-case results, and release reports.
+
+**Time tracking**
+
+- Time projects, worklogs, timers, and reporting.
+
+**Knowledge base**
+
+- Pages with revisions, permissions, diagrams, and search.
+
+**Assets and CMDB**
+
+- Asset sets, asset types, custom fields, and reports.
+
+**Automation**
+
+- Event-driven rules that update fields, notify people, and create work.
+- Actions with conditions, templates, and validation.
+
+**Integrations and API**
+
+- GitHub, GitLab, Gitea, and Forgejo source control with pull request linking.
+- Jira importer, email and webhook notifications, SMTP/IMAP, LDAP, and OIDC single sign-on.
+- MCP server with OAuth, REST API v2, and a WASM plugin runtime.
+
+**Internationalization**
+
+- Twelve built-in languages: English, Deutsch, Español, Français, Italiano, Polski, Português (Brasil), العربية, فارسی, Русский, 简体中文, and 한국어, with right-to-left support for Arabic and Persian.
+
+</details>
 
 ## Take a look
 
@@ -117,9 +173,9 @@ It ships as a single Go binary with the Svelte frontend built in, SQLite by defa
 
 ## Language support
 
-<p align="center"><strong>Available in many languages · متوفر بالعديد من اللغات · 支持多种语言<br>Доступно на многих языках · 다양한 언어로 사용 가능</strong></p>
+<p align="center"><strong>Available in many languages · Disponibile in molte lingue · Dostępne w wielu językach · متوفر بالعديد من اللغات · 支持多种语言<br>Доступно на многих языках · 다양한 언어로 사용 가능</strong></p>
 
-Windshift ships with nine built-in languages — English, Deutsch, Español, Français, Português (Brasil), العربية, Русский, 简体中文, and 한국어 — including right-to-left support for Arabic.
+Windshift ships with twelve built-in languages: English, Deutsch, Español, Français, Italiano, Polski, Português (Brasil), العربية, فارسی, Русский, 简体中文, and 한국어, including right-to-left support for Arabic and Persian.
 
 <p align="center">
   <picture>
@@ -130,15 +186,37 @@ Windshift ships with nine built-in languages — English, Deutsch, Español, Fra
 
 ## Get started
 
-[Download the latest release](https://windshift.sh/download), then follow the [quick start guide](https://windshift.sh/self-hosting/01-getting-started/02-quick-start). Windshift is designed to run comfortably on anything from a Raspberry Pi to a dedicated server.
+Run the official Docker image:
+
+```bash
+docker run -d --name windshift -p 8080:8080 \
+  -e SSO_SECRET="$(openssl rand -hex 32)" \
+  -e BASE_URL=http://localhost:8080 \
+  -v windshift-data:/data \
+  ghcr.io/windshiftapp/windshift:latest
+```
+
+Then open `http://localhost:8080`. For a production setup, follow the [Docker deployment guide](https://windshift.sh/self-hosting/02-deployment/01-docker) or the [quick start guide](https://windshift.sh/self-hosting/01-getting-started/02-quick-start).
+
+There is also a desktop app that connects to your server or runs locally. Get both from the [download page](https://windshift.sh/download). Windshift is designed to run comfortably on anything from a Raspberry Pi to a dedicated server.
+
+The `ws` command-line client is available through Homebrew:
+
+```sh
+brew install windshiftapp/tap/ws
+```
+
+See the [CLI installation guide](https://windshift.sh/self-hosting/04-cli/01-installation) for configuration.
 
 Want to build from source? See [BUILD.md](BUILD.md). For local development and contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing
 
-Code contributions, bug reports, and feedback are all welcome here on GitHub. Open pull requests against `main`; use GitHub Issues and Discussions for bug reports and feedback. Contributions require a signed, one-time [CLA](CLA.md) — see the [contributing guide](CONTRIBUTING.md) for details.
+Code contributions, bug reports, and feedback are all welcome here on GitHub. Open pull requests against `main`; use GitHub Issues and Discussions for bug reports and feedback. Contributions require a signed, one-time [CLA](CLA.md); see the [contributing guide](CONTRIBUTING.md) for details.
 
-We are especially interested in early bug reports and real-world feedback about OIDC providers.
+If Windshift is useful to you, a star on GitHub helps other teams find it. Questions and ideas are welcome in [GitHub Discussions](https://github.com/Windshiftapp/core/discussions).
+
+Windshift supports OIDC single sign-on with any standards-compliant provider. We welcome feedback about the providers you connect.
 
 ## Tech stack
 
@@ -153,6 +231,7 @@ We are especially interested in early bug reports and real-world feedback about 
 - [Logging configuration](LOGGING.md)
 - [Docker backup and restore](deploy/backup-restore.md)
 - [Kubernetes deployment](deploy/kubernetes.md)
+- [Release notes](https://windshift.sh/self-hosting/08-release-notes/) and [GitHub releases](https://github.com/Windshiftapp/core/releases)
 - [Product documentation](https://windshift.sh/docs)
 
 ## License

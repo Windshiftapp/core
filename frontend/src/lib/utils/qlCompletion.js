@@ -27,7 +27,12 @@ export function findQlCompletionField(catalog, filterField) {
 
 export function completionFieldToFilterField(field) {
   const customFieldId = /^cfid_(\d+)$/i.exec(field?.name || '')?.[1];
-  const id = (field?.aliases || []).find((alias) => alias.startsWith('cf_')) || field?.name;
+  // Custom fields are addressed by their collision-free cfid_<id> name. The
+  // legacy cf_<name> alias is not unique: two custom fields sharing a name
+  // produce the same id and crash keyed pickers (GH #454).
+  const id = customFieldId
+    ? field.name
+    : (field?.aliases || []).find((alias) => alias.startsWith('cf_')) || field?.name;
   return {
     id,
     customFieldId: customFieldId ? Number(customFieldId) : undefined,

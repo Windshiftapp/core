@@ -15,6 +15,8 @@ import (
 	"charm.land/fantasy/providers/anthropic"
 	"charm.land/fantasy/providers/openai"
 	sdkoption "github.com/openai/openai-go/v3/option"
+
+	"windshift/internal/toolschema"
 )
 
 type dynamicFantasyClient struct {
@@ -353,8 +355,11 @@ func (c *fantasyClient) generateObject(ctx context.Context, call fantasy.Call, c
 	return normalizedFantasyResponse(content, nil, nil, normalizeFantasyUsage(response.Usage, response.ProviderMetadata), response.FinishReason), nil
 }
 
+// Health exercises the same request shape in-product chat sends so a provider
+// that rejects chat's temperature, tools, or configured reasoning also fails
+// the admin connection test.
 func (c *fantasyClient) Health(ctx context.Context) error {
-	_, err := c.Complete(ctx, CompletionRequest{Messages: []Message{{Role: "user", Content: "hi"}}, MaxTokens: 1})
+	_, err := c.Complete(ctx, ConnectionProbeRequest())
 	if err != nil {
 		if isCompletionTokenLimitError(err) {
 			return nil
@@ -431,6 +436,10 @@ func toFantasyTools(tools []ToolDefinition, enablePromptCache bool) []fantasy.To
 	for i, tool := range tools {
 		var schema map[string]any
 		_ = json.Unmarshal(tool.Function.Parameters, &schema)
+		// Externally supplied tools (the coding-agent runner broker decodes its
+		// own CompletionRequest) bypass the aitools registry, so canonicalize
+		// here too: every provider request sees the same portable shape.
+		toolschema.EnsureProperties(schema)
 		mapped := fantasy.FunctionTool{
 			Name:        tool.Function.Name,
 			Description: tool.Function.Description,

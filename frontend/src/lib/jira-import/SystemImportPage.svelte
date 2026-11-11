@@ -137,6 +137,7 @@
     switch (status) {
       case 'completed': return 'var(--ds-text-success)';
       case 'completed_with_errors': return 'var(--ds-text-warning)';
+      case 'timed_out': return 'var(--ds-text-warning)';
       case 'running': return 'var(--ds-text-accent-blue)';
       case 'failed': return 'var(--ds-text-danger)';
       case 'data_deleted': return 'var(--ds-text-subtle)';
@@ -149,6 +150,7 @@
     switch (status) {
       case 'completed': return CheckCircle;
       case 'completed_with_errors': return AlertTriangle;
+      case 'timed_out': return AlertTriangle;
       case 'running': return Loader;
       case 'failed': return XCircle;
       case 'data_deleted': return Trash2;

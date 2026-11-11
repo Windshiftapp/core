@@ -12892,6 +12892,36 @@
                       "description": "The name value.",
                       "type": "string"
                     },
+                    "screen": {
+                      "additionalProperties": false,
+                      "description": "The screen value.",
+                      "nullable": true,
+                      "properties": {
+                        "field_count": {
+                          "description": "The field count value.",
+                          "type": "integer"
+                        },
+                        "id": {
+                          "description": "The id value.",
+                          "type": "integer"
+                        },
+                        "name": {
+                          "description": "The name value.",
+                          "type": "string"
+                        },
+                        "required_field_count": {
+                          "description": "The required field count value.",
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "field_count",
+                        "id",
+                        "name",
+                        "required_field_count"
+                      ],
+                      "type": "object"
+                    },
                     "value": {
                       "description": "The value value.",
                       "type": "string"
@@ -19435,6 +19465,36 @@
                         "name": {
                           "description": "The name value.",
                           "type": "string"
+                        },
+                        "screen": {
+                          "additionalProperties": false,
+                          "description": "The screen value.",
+                          "nullable": true,
+                          "properties": {
+                            "field_count": {
+                              "description": "The field count value.",
+                              "type": "integer"
+                            },
+                            "id": {
+                              "description": "The id value.",
+                              "type": "integer"
+                            },
+                            "name": {
+                              "description": "The name value.",
+                              "type": "string"
+                            },
+                            "required_field_count": {
+                              "description": "The required field count value.",
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "field_count",
+                            "id",
+                            "name",
+                            "required_field_count"
+                          ],
+                          "type": "object"
                         },
                         "value": {
                           "description": "The value value.",
@@ -31265,6 +31325,36 @@
                 "description": "The from status name value.",
                 "type": "string"
               },
+              "screen": {
+                "additionalProperties": false,
+                "description": "The screen value.",
+                "nullable": true,
+                "properties": {
+                  "field_count": {
+                    "description": "The field count value.",
+                    "type": "integer"
+                  },
+                  "id": {
+                    "description": "The id value.",
+                    "type": "integer"
+                  },
+                  "name": {
+                    "description": "The name value.",
+                    "type": "string"
+                  },
+                  "required_field_count": {
+                    "description": "The required field count value.",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "field_count",
+                  "id",
+                  "name",
+                  "required_field_count"
+                ],
+                "type": "object"
+              },
               "to_status_id": {
                 "description": "The to status id value.",
                 "type": "integer"
@@ -31300,6 +31390,10 @@
           "data": {
             "additionalProperties": false,
             "properties": {
+              "calendar": {
+                "description": "The calendar value.",
+                "type": "string"
+              },
               "color_mode": {
                 "description": "The color mode value.",
                 "type": "string"
@@ -31328,6 +31422,10 @@
                 "description": "The theme value.",
                 "nullable": true,
                 "properties": {
+                  "brand_layout": {
+                    "description": "The brand layout value.",
+                    "type": "string"
+                  },
                   "builtin_key": {
                     "description": "The builtin key value.",
                     "type": "string"
@@ -31360,6 +31458,14 @@
                   "is_default": {
                     "description": "The is default value.",
                     "type": "boolean"
+                  },
+                  "logo_full_url": {
+                    "description": "The logo full url value.",
+                    "type": "string"
+                  },
+                  "logo_full_url_dark": {
+                    "description": "The logo full url dark value.",
+                    "type": "string"
                   },
                   "logo_url": {
                     "description": "The logo url value.",
@@ -31396,6 +31502,7 @@
                   }
                 },
                 "required": [
+                  "brand_layout",
                   "created_at",
                   "description",
                   "display_name",
@@ -31449,6 +31556,7 @@
               }
             },
             "required": [
+              "calendar",
               "color_mode",
               "comment_sort_order",
               "due_date_reminder_days",
@@ -31516,6 +31624,10 @@
                 "description": "The last name value.",
                 "type": "string"
               },
+              "requires_password_reset": {
+                "description": "The requires password reset value.",
+                "type": "boolean"
+              },
               "timezone": {
                 "description": "The timezone value.",
                 "type": "string"
@@ -31536,6 +31648,7 @@
               "is_agent",
               "language",
               "last_name",
+              "requires_password_reset",
               "timezone",
               "username"
             ],
@@ -45130,6 +45243,36 @@
                         "description": "The name value.",
                         "type": "string"
                       },
+                      "screen": {
+                        "additionalProperties": false,
+                        "description": "The screen value.",
+                        "nullable": true,
+                        "properties": {
+                          "field_count": {
+                            "description": "The field count value.",
+                            "type": "integer"
+                          },
+                          "id": {
+                            "description": "The id value.",
+                            "type": "integer"
+                          },
+                          "name": {
+                            "description": "The name value.",
+                            "type": "string"
+                          },
+                          "required_field_count": {
+                            "description": "The required field count value.",
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "field_count",
+                          "id",
+                          "name",
+                          "required_field_count"
+                        ],
+                        "type": "object"
+                      },
                       "value": {
                         "description": "The value value.",
                         "type": "string"
@@ -49480,6 +49623,36 @@
                           "description": "The name value.",
                           "type": "string"
                         },
+                        "screen": {
+                          "additionalProperties": false,
+                          "description": "The screen value.",
+                          "nullable": true,
+                          "properties": {
+                            "field_count": {
+                              "description": "The field count value.",
+                              "type": "integer"
+                            },
+                            "id": {
+                              "description": "The id value.",
+                              "type": "integer"
+                            },
+                            "name": {
+                              "description": "The name value.",
+                              "type": "string"
+                            },
+                            "required_field_count": {
+                              "description": "The required field count value.",
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "field_count",
+                            "id",
+                            "name",
+                            "required_field_count"
+                          ],
+                          "type": "object"
+                        },
                         "value": {
                           "description": "The value value.",
                           "type": "string"
@@ -53619,6 +53792,102 @@
         ],
         "type": "object"
       },
+      "PatchAttachmentsAttachmentIdPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "is_internal": {
+            "description": "The is internal value.",
+            "nullable": true,
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "PatchAttachmentsAttachmentIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "file_size": {
+                "description": "The file size value.",
+                "type": "integer"
+              },
+              "filename": {
+                "description": "The filename value.",
+                "type": "string"
+              },
+              "has_thumbnail": {
+                "description": "The has thumbnail value.",
+                "type": "boolean"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "is_internal": {
+                "description": "The is internal value.",
+                "type": "boolean"
+              },
+              "item_id": {
+                "description": "The item id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "mime_type": {
+                "description": "The mime type value.",
+                "type": "string"
+              },
+              "original_filename": {
+                "description": "The original filename value.",
+                "type": "string"
+              },
+              "uploaded_by": {
+                "description": "The uploaded by value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "uploaded_by_portal_customer_id": {
+                "description": "The uploaded by portal customer id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "uploader_email": {
+                "description": "The uploader email value.",
+                "type": "string"
+              },
+              "uploader_name": {
+                "description": "The uploader name value.",
+                "type": "string"
+              },
+              "uploader_portal_customer_name": {
+                "description": "The uploader portal customer name value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "created_at",
+              "file_size",
+              "filename",
+              "has_thumbnail",
+              "id",
+              "is_internal",
+              "mime_type",
+              "original_filename"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "PatchCollectionCategoriesCategoryIdPayload": {
         "additionalProperties": false,
         "properties": {
@@ -53679,6 +53948,488 @@
               "description",
               "id",
               "name",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PatchCollectionsCollectionIdBoardConfigurationPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "backlog_status_ids": {
+            "description": "The backlog status ids value.",
+            "items": {
+              "type": "integer"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "card_fields": {
+            "description": "The card fields value.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "display_order": {
+                  "description": "The display order value.",
+                  "type": "integer"
+                },
+                "field_identifier": {
+                  "description": "The field identifier value.",
+                  "type": "string"
+                },
+                "field_type": {
+                  "description": "The field type value.",
+                  "type": "string"
+                },
+                "width": {
+                  "description": "The width value.",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "display_order",
+                "field_identifier",
+                "field_type",
+                "width"
+              ],
+              "type": "object"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "columns": {
+            "description": "The columns value.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "color": {
+                  "description": "The color value.",
+                  "type": "string"
+                },
+                "display_order": {
+                  "description": "The display order value.",
+                  "type": "integer"
+                },
+                "id": {
+                  "description": "The id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "name": {
+                  "description": "The name value.",
+                  "type": "string"
+                },
+                "status_ids": {
+                  "description": "The status ids value.",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                "wip_limit": {
+                  "description": "The wip limit value.",
+                  "nullable": true,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "color",
+                "display_order",
+                "name",
+                "status_ids"
+              ],
+              "type": "object"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "completed_item_retention_days": {
+            "description": "The completed item retention days value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "list_columns": {
+            "description": "The list columns value.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "display_order": {
+                  "description": "The display order value.",
+                  "type": "integer"
+                },
+                "field_identifier": {
+                  "description": "The field identifier value.",
+                  "type": "string"
+                },
+                "field_type": {
+                  "description": "The field type value.",
+                  "type": "string"
+                },
+                "width": {
+                  "description": "The width value.",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "display_order",
+                "field_identifier",
+                "field_type",
+                "width"
+              ],
+              "type": "object"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "roadmap_config": {
+            "additionalProperties": false,
+            "description": "The roadmap config value.",
+            "nullable": true,
+            "properties": {
+              "dependency_link_type_id": {
+                "description": "The dependency link type id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "end_field_id": {
+                "description": "The end field id value.",
+                "type": "string"
+              },
+              "start_field_id": {
+                "description": "The start field id value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "end_field_id",
+              "start_field_id"
+            ],
+            "type": "object"
+          },
+          "show_rightmost_column_last_50": {
+            "description": "The show rightmost column last 50 value.",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "view_settings": {
+            "additionalProperties": false,
+            "description": "The view settings value.",
+            "nullable": true,
+            "properties": {
+              "completed_limit": {
+                "description": "The completed limit value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "completed_visibility": {
+                "description": "The completed visibility value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "enabled_views": {
+                "description": "The enabled views value.",
+                "items": {
+                  "type": "string"
+                },
+                "nullable": true,
+                "type": "array"
+              },
+              "milestone_swimlanes": {
+                "additionalProperties": false,
+                "description": "The milestone swimlanes value.",
+                "nullable": true,
+                "properties": {
+                  "global_milestone_ids": {
+                    "description": "The global milestone ids value.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "show_completed": {
+                    "description": "The show completed value.",
+                    "type": "boolean"
+                  },
+                  "show_open_from_completed": {
+                    "description": "The show open from completed value.",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "show_completed",
+                  "show_open_from_completed"
+                ],
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "PatchCollectionsCollectionIdBoardConfigurationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "backlog_status_ids": {
+                "description": "The backlog status ids value.",
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "card_fields": {
+                "description": "The card fields value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "display_order": {
+                      "description": "The display order value.",
+                      "type": "integer"
+                    },
+                    "field_identifier": {
+                      "description": "The field identifier value.",
+                      "type": "string"
+                    },
+                    "field_type": {
+                      "description": "The field type value.",
+                      "type": "string"
+                    },
+                    "width": {
+                      "description": "The width value.",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "display_order",
+                    "field_identifier",
+                    "field_type",
+                    "width"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "collection_id": {
+                "description": "The collection id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "columns": {
+                "description": "The columns value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "board_configuration_id": {
+                      "description": "The board configuration id value.",
+                      "type": "integer"
+                    },
+                    "color": {
+                      "description": "The color value.",
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "description": "The created at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "display_order": {
+                      "description": "The display order value.",
+                      "type": "integer"
+                    },
+                    "id": {
+                      "description": "The id value.",
+                      "type": "integer"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    },
+                    "status_ids": {
+                      "description": "The status ids value.",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array"
+                    },
+                    "updated_at": {
+                      "description": "The updated at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "wip_limit": {
+                      "description": "The wip limit value.",
+                      "nullable": true,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "board_configuration_id",
+                    "color",
+                    "created_at",
+                    "display_order",
+                    "id",
+                    "name",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "completed_item_retention_days": {
+                "description": "The completed item retention days value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "list_columns": {
+                "description": "The list columns value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "display_order": {
+                      "description": "The display order value.",
+                      "type": "integer"
+                    },
+                    "field_identifier": {
+                      "description": "The field identifier value.",
+                      "type": "string"
+                    },
+                    "field_type": {
+                      "description": "The field type value.",
+                      "type": "string"
+                    },
+                    "width": {
+                      "description": "The width value.",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "display_order",
+                    "field_identifier",
+                    "field_type",
+                    "width"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "roadmap_config": {
+                "additionalProperties": false,
+                "description": "The roadmap config value.",
+                "nullable": true,
+                "properties": {
+                  "dependency_link_type_id": {
+                    "description": "The dependency link type id value.",
+                    "nullable": true,
+                    "type": "integer"
+                  },
+                  "end_field_id": {
+                    "description": "The end field id value.",
+                    "type": "string"
+                  },
+                  "start_field_id": {
+                    "description": "The start field id value.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "end_field_id",
+                  "start_field_id"
+                ],
+                "type": "object"
+              },
+              "show_rightmost_column_last_50": {
+                "description": "The show rightmost column last 50 value.",
+                "type": "boolean"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "view_settings": {
+                "additionalProperties": false,
+                "description": "The view settings value.",
+                "nullable": true,
+                "properties": {
+                  "completed_limit": {
+                    "description": "The completed limit value.",
+                    "nullable": true,
+                    "type": "integer"
+                  },
+                  "completed_visibility": {
+                    "description": "The completed visibility value.",
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "enabled_views": {
+                    "description": "The enabled views value.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "nullable": true,
+                    "type": "array"
+                  },
+                  "milestone_swimlanes": {
+                    "additionalProperties": false,
+                    "description": "The milestone swimlanes value.",
+                    "nullable": true,
+                    "properties": {
+                      "global_milestone_ids": {
+                        "description": "The global milestone ids value.",
+                        "items": {
+                          "type": "integer"
+                        },
+                        "type": "array"
+                      },
+                      "show_completed": {
+                        "description": "The show completed value.",
+                        "type": "boolean"
+                      },
+                      "show_open_from_completed": {
+                        "description": "The show open from completed value.",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "show_completed",
+                      "show_open_from_completed"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "view_settings_inherited": {
+                "description": "The view settings inherited value.",
+                "type": "boolean"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "nullable": true,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "created_at",
+              "id",
+              "show_rightmost_column_last_50",
               "updated_at"
             ],
             "type": "object"
@@ -58949,6 +59700,11 @@
       "PatchUsersMePreferencesPayload": {
         "additionalProperties": false,
         "properties": {
+          "calendar": {
+            "description": "The calendar value.",
+            "nullable": true,
+            "type": "string"
+          },
           "color_mode": {
             "description": "The color mode value.",
             "nullable": true,
@@ -59025,6 +59781,10 @@
           "data": {
             "additionalProperties": false,
             "properties": {
+              "calendar": {
+                "description": "The calendar value.",
+                "type": "string"
+              },
               "color_mode": {
                 "description": "The color mode value.",
                 "type": "string"
@@ -59053,6 +59813,10 @@
                 "description": "The theme value.",
                 "nullable": true,
                 "properties": {
+                  "brand_layout": {
+                    "description": "The brand layout value.",
+                    "type": "string"
+                  },
                   "builtin_key": {
                     "description": "The builtin key value.",
                     "type": "string"
@@ -59085,6 +59849,14 @@
                   "is_default": {
                     "description": "The is default value.",
                     "type": "boolean"
+                  },
+                  "logo_full_url": {
+                    "description": "The logo full url value.",
+                    "type": "string"
+                  },
+                  "logo_full_url_dark": {
+                    "description": "The logo full url dark value.",
+                    "type": "string"
                   },
                   "logo_url": {
                     "description": "The logo url value.",
@@ -59121,6 +59893,7 @@
                   }
                 },
                 "required": [
+                  "brand_layout",
                   "created_at",
                   "description",
                   "display_name",
@@ -59174,6 +59947,7 @@
               }
             },
             "required": [
+              "calendar",
               "color_mode",
               "comment_sort_order",
               "due_date_reminder_days",
@@ -59799,6 +60573,488 @@
               "name",
               "updated_at",
               "workspace_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PatchWorkspacesWorkspaceIdBoardConfigurationPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "backlog_status_ids": {
+            "description": "The backlog status ids value.",
+            "items": {
+              "type": "integer"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "card_fields": {
+            "description": "The card fields value.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "display_order": {
+                  "description": "The display order value.",
+                  "type": "integer"
+                },
+                "field_identifier": {
+                  "description": "The field identifier value.",
+                  "type": "string"
+                },
+                "field_type": {
+                  "description": "The field type value.",
+                  "type": "string"
+                },
+                "width": {
+                  "description": "The width value.",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "display_order",
+                "field_identifier",
+                "field_type",
+                "width"
+              ],
+              "type": "object"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "columns": {
+            "description": "The columns value.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "color": {
+                  "description": "The color value.",
+                  "type": "string"
+                },
+                "display_order": {
+                  "description": "The display order value.",
+                  "type": "integer"
+                },
+                "id": {
+                  "description": "The id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "name": {
+                  "description": "The name value.",
+                  "type": "string"
+                },
+                "status_ids": {
+                  "description": "The status ids value.",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                "wip_limit": {
+                  "description": "The wip limit value.",
+                  "nullable": true,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "color",
+                "display_order",
+                "name",
+                "status_ids"
+              ],
+              "type": "object"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "completed_item_retention_days": {
+            "description": "The completed item retention days value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "list_columns": {
+            "description": "The list columns value.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "display_order": {
+                  "description": "The display order value.",
+                  "type": "integer"
+                },
+                "field_identifier": {
+                  "description": "The field identifier value.",
+                  "type": "string"
+                },
+                "field_type": {
+                  "description": "The field type value.",
+                  "type": "string"
+                },
+                "width": {
+                  "description": "The width value.",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "display_order",
+                "field_identifier",
+                "field_type",
+                "width"
+              ],
+              "type": "object"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "roadmap_config": {
+            "additionalProperties": false,
+            "description": "The roadmap config value.",
+            "nullable": true,
+            "properties": {
+              "dependency_link_type_id": {
+                "description": "The dependency link type id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "end_field_id": {
+                "description": "The end field id value.",
+                "type": "string"
+              },
+              "start_field_id": {
+                "description": "The start field id value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "end_field_id",
+              "start_field_id"
+            ],
+            "type": "object"
+          },
+          "show_rightmost_column_last_50": {
+            "description": "The show rightmost column last 50 value.",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "view_settings": {
+            "additionalProperties": false,
+            "description": "The view settings value.",
+            "nullable": true,
+            "properties": {
+              "completed_limit": {
+                "description": "The completed limit value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "completed_visibility": {
+                "description": "The completed visibility value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "enabled_views": {
+                "description": "The enabled views value.",
+                "items": {
+                  "type": "string"
+                },
+                "nullable": true,
+                "type": "array"
+              },
+              "milestone_swimlanes": {
+                "additionalProperties": false,
+                "description": "The milestone swimlanes value.",
+                "nullable": true,
+                "properties": {
+                  "global_milestone_ids": {
+                    "description": "The global milestone ids value.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "show_completed": {
+                    "description": "The show completed value.",
+                    "type": "boolean"
+                  },
+                  "show_open_from_completed": {
+                    "description": "The show open from completed value.",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "show_completed",
+                  "show_open_from_completed"
+                ],
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "PatchWorkspacesWorkspaceIdBoardConfigurationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "backlog_status_ids": {
+                "description": "The backlog status ids value.",
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "card_fields": {
+                "description": "The card fields value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "display_order": {
+                      "description": "The display order value.",
+                      "type": "integer"
+                    },
+                    "field_identifier": {
+                      "description": "The field identifier value.",
+                      "type": "string"
+                    },
+                    "field_type": {
+                      "description": "The field type value.",
+                      "type": "string"
+                    },
+                    "width": {
+                      "description": "The width value.",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "display_order",
+                    "field_identifier",
+                    "field_type",
+                    "width"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "collection_id": {
+                "description": "The collection id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "columns": {
+                "description": "The columns value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "board_configuration_id": {
+                      "description": "The board configuration id value.",
+                      "type": "integer"
+                    },
+                    "color": {
+                      "description": "The color value.",
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "description": "The created at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "display_order": {
+                      "description": "The display order value.",
+                      "type": "integer"
+                    },
+                    "id": {
+                      "description": "The id value.",
+                      "type": "integer"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    },
+                    "status_ids": {
+                      "description": "The status ids value.",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array"
+                    },
+                    "updated_at": {
+                      "description": "The updated at value.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "wip_limit": {
+                      "description": "The wip limit value.",
+                      "nullable": true,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "board_configuration_id",
+                    "color",
+                    "created_at",
+                    "display_order",
+                    "id",
+                    "name",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "completed_item_retention_days": {
+                "description": "The completed item retention days value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "list_columns": {
+                "description": "The list columns value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "display_order": {
+                      "description": "The display order value.",
+                      "type": "integer"
+                    },
+                    "field_identifier": {
+                      "description": "The field identifier value.",
+                      "type": "string"
+                    },
+                    "field_type": {
+                      "description": "The field type value.",
+                      "type": "string"
+                    },
+                    "width": {
+                      "description": "The width value.",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "display_order",
+                    "field_identifier",
+                    "field_type",
+                    "width"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "roadmap_config": {
+                "additionalProperties": false,
+                "description": "The roadmap config value.",
+                "nullable": true,
+                "properties": {
+                  "dependency_link_type_id": {
+                    "description": "The dependency link type id value.",
+                    "nullable": true,
+                    "type": "integer"
+                  },
+                  "end_field_id": {
+                    "description": "The end field id value.",
+                    "type": "string"
+                  },
+                  "start_field_id": {
+                    "description": "The start field id value.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "end_field_id",
+                  "start_field_id"
+                ],
+                "type": "object"
+              },
+              "show_rightmost_column_last_50": {
+                "description": "The show rightmost column last 50 value.",
+                "type": "boolean"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "view_settings": {
+                "additionalProperties": false,
+                "description": "The view settings value.",
+                "nullable": true,
+                "properties": {
+                  "completed_limit": {
+                    "description": "The completed limit value.",
+                    "nullable": true,
+                    "type": "integer"
+                  },
+                  "completed_visibility": {
+                    "description": "The completed visibility value.",
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "enabled_views": {
+                    "description": "The enabled views value.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "nullable": true,
+                    "type": "array"
+                  },
+                  "milestone_swimlanes": {
+                    "additionalProperties": false,
+                    "description": "The milestone swimlanes value.",
+                    "nullable": true,
+                    "properties": {
+                      "global_milestone_ids": {
+                        "description": "The global milestone ids value.",
+                        "items": {
+                          "type": "integer"
+                        },
+                        "type": "array"
+                      },
+                      "show_completed": {
+                        "description": "The show completed value.",
+                        "type": "boolean"
+                      },
+                      "show_open_from_completed": {
+                        "description": "The show open from completed value.",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "show_completed",
+                      "show_open_from_completed"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "view_settings_inherited": {
+                "description": "The view settings inherited value.",
+                "type": "boolean"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "nullable": true,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "created_at",
+              "id",
+              "show_rightmost_column_last_50",
+              "updated_at"
             ],
             "type": "object"
           }
@@ -81093,12 +82349,20 @@
       "PostItemsItemIdTransitionPayload": {
         "additionalProperties": false,
         "properties": {
+          "fields": {
+            "additionalProperties": {
+              "description": "Arbitrary JSON extension value."
+            },
+            "description": "The fields value.",
+            "type": "object"
+          },
           "to_status_id": {
             "description": "The to status id value.",
             "type": "integer"
           }
         },
         "required": [
+          "fields",
           "to_status_id"
         ],
         "type": "object"
@@ -97399,6 +98663,150 @@
         ],
         "type": "object"
       },
+      "PutTransitionsTransitionIdScreenPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "screen_id": {
+            "description": "The screen id value.",
+            "nullable": true,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PutTransitionsTransitionIdScreenResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "approval_drivers": {
+                "description": "The approval drivers value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "approval_set_id": {
+                      "description": "The approval set id value.",
+                      "type": "integer"
+                    },
+                    "approval_set_name": {
+                      "description": "The approval set name value.",
+                      "type": "string"
+                    },
+                    "approval_set_status_id": {
+                      "description": "The approval set status id value.",
+                      "type": "integer"
+                    },
+                    "role": {
+                      "description": "The role value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "approval_set_id",
+                    "approval_set_name",
+                    "approval_set_status_id",
+                    "role"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "conditions": {
+                "description": "The conditions value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "condition_count": {
+                      "description": "The condition count value.",
+                      "type": "integer"
+                    },
+                    "condition_set_id": {
+                      "description": "The condition set id value.",
+                      "type": "integer"
+                    },
+                    "condition_set_name": {
+                      "description": "The condition set name value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "condition_count",
+                    "condition_set_id",
+                    "condition_set_name"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "from_status_id": {
+                "description": "The from status id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "from_status_name": {
+                "description": "The from status name value.",
+                "type": "string"
+              },
+              "screen": {
+                "additionalProperties": false,
+                "description": "The screen value.",
+                "nullable": true,
+                "properties": {
+                  "field_count": {
+                    "description": "The field count value.",
+                    "type": "integer"
+                  },
+                  "id": {
+                    "description": "The id value.",
+                    "type": "integer"
+                  },
+                  "name": {
+                    "description": "The name value.",
+                    "type": "string"
+                  },
+                  "required_field_count": {
+                    "description": "The required field count value.",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "field_count",
+                  "id",
+                  "name",
+                  "required_field_count"
+                ],
+                "type": "object"
+              },
+              "to_status_id": {
+                "description": "The to status id value.",
+                "type": "integer"
+              },
+              "to_status_name": {
+                "description": "The to status name value.",
+                "type": "string"
+              },
+              "transition_id": {
+                "description": "The transition id value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "approval_drivers",
+              "conditions",
+              "from_status_name",
+              "to_status_id",
+              "to_status_name",
+              "transition_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "PutWorkflowsWorkflowIdTransitionsPayload": {
         "additionalProperties": false,
         "properties": {
@@ -103644,6 +105052,80 @@
         "x-required-scopes": [
           "items:read"
         ]
+      },
+      "patch": {
+        "description": "Update item attachment visibility. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "operationId": "patchAttachmentsAttachmentId",
+        "parameters": [
+          {
+            "description": "The attachment identifier.",
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchAttachmentsAttachmentIdPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchAttachmentsAttachmentIdResult"
+                }
+              }
+            },
+            "description": "Update item attachment visibility response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Update item attachment visibility",
+        "tags": [
+          "Work items"
+        ],
+        "x-required-scopes": [
+          "items:write"
+        ]
       }
     },
     "/attachments/{attachment_id}/content": {
@@ -104610,6 +106092,80 @@
         ],
         "x-required-scopes": [
           "collections:read"
+        ]
+      },
+      "patch": {
+        "description": "Patch collection board configuration. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "operationId": "patchCollectionsCollectionIdBoardConfiguration",
+        "parameters": [
+          {
+            "description": "The collection identifier.",
+            "in": "path",
+            "name": "collection_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchCollectionsCollectionIdBoardConfigurationPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchCollectionsCollectionIdBoardConfigurationResult"
+                }
+              }
+            },
+            "description": "Patch collection board configuration response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Patch collection board configuration",
+        "tags": [
+          "Planning"
+        ],
+        "x-required-scopes": [
+          "collections:write"
         ]
       },
       "put": {
@@ -119888,6 +121444,82 @@
         ]
       }
     },
+    "/transitions/{transition_id}/screen": {
+      "put": {
+        "description": "Bind a transition screen. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "putTransitionsTransitionIdScreen",
+        "parameters": [
+          {
+            "description": "The transition identifier.",
+            "in": "path",
+            "name": "transition_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutTransitionsTransitionIdScreenPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PutTransitionsTransitionIdScreenResult"
+                }
+              }
+            },
+            "description": "Bind a transition screen response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Bind a transition screen",
+        "tags": [
+          "Governance"
+        ],
+        "x-required-scopes": [
+          "workflows:write"
+        ]
+      }
+    },
     "/users": {
       "get": {
         "description": "List users. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -122739,6 +124371,80 @@
         ],
         "x-required-scopes": [
           "collections:read"
+        ]
+      },
+      "patch": {
+        "description": "Patch workspace board configuration. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "operationId": "patchWorkspacesWorkspaceIdBoardConfiguration",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchWorkspacesWorkspaceIdBoardConfigurationPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchWorkspacesWorkspaceIdBoardConfigurationResult"
+                }
+              }
+            },
+            "description": "Patch workspace board configuration response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Patch workspace board configuration",
+        "tags": [
+          "Planning"
+        ],
+        "x-required-scopes": [
+          "collections:write"
         ]
       },
       "put": {

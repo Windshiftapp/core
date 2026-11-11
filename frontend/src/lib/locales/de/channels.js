@@ -166,6 +166,7 @@ export default {
     clientIdRequired: 'OAuth-Client-ID ist erforderlich',
     clientSecret: 'Client-Geheimnis',
     clientSecretRequired: 'OAuth-Client-Geheimnis ist erforderlich',
+    secretSaved: 'Ein Client-Geheimnis ist gespeichert. Feld leer lassen, um es zu behalten.',
     leaveBlankToKeep: 'Leer lassen, um bestehendes zu behalten',
     tenantId: 'Mandanten-ID',
     tenantIdHelp: '"common" verwenden, um jeden Microsoft-Account zuzulassen, oder eine spezifische Mandanten-ID eingeben',

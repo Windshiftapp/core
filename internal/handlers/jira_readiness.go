@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strconv"
 
 	"windshift/internal/jira"
 )
@@ -53,8 +54,9 @@ func (h *JiraImportHandler) analyzeReadiness(ctx context.Context, client jira.Cl
 	}
 
 	report := JiraReadinessReport{
-		Projects:       make([]JiraProjectReadiness, 0, len(req.ProjectKeys)),
-		OpenIssuesOnly: req.OpenIssuesOnly,
+		Projects:           make([]JiraProjectReadiness, 0, len(req.ProjectKeys)),
+		OpenIssuesOnly:     req.OpenIssuesOnly,
+		AssessmentComplete: true,
 	}
 
 	// Custom-field definitions are instance-wide; fetch suggestions once and
@@ -70,6 +72,9 @@ func (h *JiraImportHandler) analyzeReadiness(ctx context.Context, client jira.Cl
 		report.AttachmentBytes += attachmentBytes
 		if pr.SampledIssues < pr.TotalIssues {
 			report.Extrapolated = true
+		}
+		if !pr.AssessmentComplete {
+			report.AssessmentComplete = false
 		}
 		allFindings = append(allFindings, pr.Findings...)
 	}
@@ -161,14 +166,29 @@ func (h *JiraImportHandler) scanProject(ctx context.Context, client jira.Client,
 		hasSprints = true
 	}
 
-	issues := h.sampleIssues(ctx, client, projectKey, openOnly, sampleSize)
+	issues, sampleErr := h.sampleIssues(ctx, client, projectKey, openOnly, sampleSize)
 	tally := newProjectScanTally()
 	for i := range issues {
 		h.tallyIssue(&issues[i], fields, tally)
 	}
 	pr.SampledIssues = tally.sampled
+	pr.AssessmentComplete = sampleErr == nil
+	if sampleErr != nil {
+		// A rejected page must not look like a complete sample: record the
+		// exact sampled count and an explicit incomplete finding.
+		pr.AssessmentError = sampleErr.Error()
+	}
 
 	pr.Findings = buildFindings(tally, fields, hasSprints)
+	if sampleErr != nil {
+		pr.Findings = append(pr.Findings, jira.Finding{
+			Entity:     "Issue sample completeness",
+			Category:   "assessment",
+			Severity:   jira.SeverityBlocked,
+			Reason:     "The Jira issue sample could not be read in full (" + sampleErr.Error() + "), so fidelity findings for " + projectKey + " reflect only the " + strconv.Itoa(tally.sampled) + " sampled issues.",
+			UsageCount: tally.sampled,
+		})
+	}
 	pr.Findings = append(pr.Findings, h.jiraConfigurationReadinessFindings(
 		ctx,
 		client,
@@ -379,7 +399,7 @@ func jiraScreenFieldIsImportable(
 // sampleIssues pages through a project's issues (newest first) up to limit,
 // requesting all fields plus the changelog so the tally can see history,
 // comment bodies, and custom-field values.
-func (h *JiraImportHandler) sampleIssues(ctx context.Context, client jira.Client, projectKey string, openOnly bool, limit int) []jira.JiraIssue {
+func (h *JiraImportHandler) sampleIssues(ctx context.Context, client jira.Client, projectKey string, openOnly bool, limit int) ([]jira.JiraIssue, error) {
 	jql := `project = "` + escapeHandlerJQLString(projectKey) + `" ORDER BY created DESC`
 	if openOnly {
 		jql = `project = "` + escapeHandlerJQLString(projectKey) + `" AND statusCategory != Done ORDER BY created DESC`
@@ -398,7 +418,7 @@ func (h *JiraImportHandler) sampleIssues(ctx context.Context, client jira.Client
 		if err != nil {
 			slog.Warn("readiness: issue sample failed",
 				slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
-			break
+			return out, err
 		}
 		if res == nil || len(res.Issues) == 0 {
 			break
@@ -412,7 +432,7 @@ func (h *JiraImportHandler) sampleIssues(ctx context.Context, client jira.Client
 	if len(out) > limit {
 		out = out[:limit]
 	}
-	return out
+	return out, nil
 }
 
 // tallyIssue folds one sampled issue's fidelity signals into the running tally.

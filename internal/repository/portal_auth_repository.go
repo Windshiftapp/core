@@ -26,6 +26,8 @@ func NewPortalAuthRepository(db database.Database) *PortalAuthRepository {
 type PortalCustomerSessionInfo struct {
 	PasskeyCount             int
 	DismissedPasskeyPromptAt *time.Time
+	Language                 string
+	Timezone                 string
 }
 
 // FindPortalBySlug resolves an enabled portal channel by its public slug.
@@ -68,8 +70,9 @@ func (r *PortalAuthRepository) GetCustomerSessionInfo(ctx context.Context, custo
 
 	var dismissedAt sql.NullTime
 	if err := r.db.QueryRowContext(ctx, `
-		SELECT dismissed_passkey_prompt_at FROM portal_customers WHERE id = ?
-	`, customerID).Scan(&dismissedAt); err != nil {
+		SELECT dismissed_passkey_prompt_at, COALESCE(language, ''), COALESCE(timezone, '')
+		FROM portal_customers WHERE id = ?
+	`, customerID).Scan(&dismissedAt, &out.Language, &out.Timezone); err != nil {
 		return nil, fmt.Errorf("load dismissed passkey prompt: %w", err)
 	}
 	if dismissedAt.Valid {

@@ -7,6 +7,7 @@ import (
 	"windshift/internal/actionevents"
 	"windshift/internal/database"
 	"windshift/internal/events"
+	"windshift/internal/itemevents"
 )
 
 func appendStandaloneDurableActionEvent(
@@ -29,6 +30,15 @@ func handleDurableActionEvent[T any](
 	actionsExecuted *int64,
 	eventsProcessed *int64,
 ) error {
+	// Imported facts are historical: never let them trigger automation, which
+	// can itself send email or call external endpoints.
+	if itemevents.IsImportOrigin(event.ActorKind, event.SourceKind) {
+		return nil
+	}
+	// Machine-driven writes can opt out of live side effects explicitly.
+	if itemevents.SuppressesSideEffects(event.Type, event.Payload) {
+		return nil
+	}
 	actionEvent, consumerKey, err := decode(event)
 	if err != nil {
 		return events.Permanent(err)

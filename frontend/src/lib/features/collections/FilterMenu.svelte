@@ -1,4 +1,5 @@
 <script>
+  import { untrack } from 'svelte';
   import { createPopover, melt } from '@melt-ui/svelte';
   import { toStore } from 'svelte/store';
   import Filter from '@lucide/svelte/icons/filter';
@@ -14,6 +15,7 @@
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import FilterBuilderModal from './FilterBuilderModal.svelte';
+  import { isFilterRowActive } from '../shared/filterOperators.js';
   import { queues } from '../../api/queues.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { successToast, warningToast } from '../../stores/toasts.svelte.js';
@@ -95,7 +97,9 @@
   }
 
   function removePersonal(entry) {
+    const wasApplied = isApplied(entry);
     persist(removeSavedFilter(filters, entry.id));
+    if (wasApplied) onclear();
     successToast(t('collections.filterDeleted'));
   }
 
@@ -126,7 +130,16 @@
   let editingViewName = $state('');
 
   const workspaceKey = $derived(workspaceDataStore.workspace?.key ?? null);
-  const scopeKey = $derived(`${workspaceKey ?? ''}|${collectionId ?? ''}`);
+  // A collection-scoped list ignores the workspace key, so its request scope is
+  // the collection id alone. Keying the effect on the workspace too re-issued
+  // the same read when the shell resolved the workspace during bootstrap.
+  const requestScope = $derived(
+    collectionId
+      ? `collection:${collectionId}`
+      : workspaceKey
+        ? `workspace:${workspaceKey}`
+        : null
+  );
   // The backend lets a collection's owner manage its views; the workspace
   // default view belongs to workspace admins.
   const canAuthor = $derived(
@@ -140,9 +153,12 @@
   );
 
   $effect(() => {
-    const key = scopeKey;
-    if (!key || (!workspaceKey && !collectionId)) return;
-    void loadViews();
+    const scope = requestScope;
+    if (!scope) return;
+    // loadViews reads the workspace key and collection id synchronously; keep
+    // those reads out of the effect so a bootstrap key change for the same
+    // request scope cannot fire a second identical read.
+    untrack(() => loadViews());
   });
 
   async function loadViews() {
@@ -184,9 +200,11 @@
 
   async function removeView(view) {
     if (busy) return;
+    const wasApplied = isApplied({ ql: view.ql });
     busy = true;
     try {
       await queues.remove(view.id);
+      if (wasApplied) onclear();
       successToast(t('collections.sharedViewDeleted'));
       await loadViews();
     } catch (error) {
@@ -216,9 +234,25 @@
 
   // --- Applying and saving ------------------------------------------------
 
-  const hasActiveFilter = $derived(
-    applied || activeRows.some((row) => row.field && (row.value || row.values?.length))
+  const hasActiveFilter = $derived(applied || activeRows.some(isFilterRowActive));
+  // Built from the live rows so the menu can show what is applied and tell
+  // which saved entry it came from. Deleting that entry must clear it too.
+  const activeQl = $derived(
+    QLBuilder.buildQuery({ dynamicFields: activeRows.filter(isFilterRowActive) }) || ''
   );
+  const activeRowsList = $derived(activeRows.filter(isFilterRowActive));
+
+  function isApplied(entry) {
+    return Boolean(activeQl) && activeQl === entry.ql;
+  }
+
+  function describeRow(row) {
+    const field = row?.field;
+    const label = field?.label || field?.name || field?.id || t('common.filter');
+    const operator = row?.operator || '=';
+    const value = row?.values?.length ? row.values.join(', ') : row?.value;
+    return value == null || value === '' ? `${label} ${operator}` : `${label} ${operator} ${value}`;
+  }
 
   function parseRows(filterState) {
     if (!filterState) return [];
@@ -300,7 +334,7 @@
     <span>{t('common.filter')}</span>
     {#if hasActiveFilter}
       <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-semibold rounded-full" style="background-color: var(--ds-interactive-subtle, var(--ds-background-neutral)); color: var(--ds-text);">
-        {activeRows.filter((row) => row.field && (row.value || row.values?.length)).length || 1}
+        {activeRows.filter(isFilterRowActive).length || 1}
       </span>
     {/if}
   </button>
@@ -313,6 +347,39 @@
     class="z-[60] max-h-[70vh] w-80 overflow-y-auto rounded border p-3 shadow-xl"
     style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
   >
+    <!-- Active -->
+    {#if hasActiveFilter}
+      <section class="mb-3" data-testid="filter-menu-active">
+        <div class="mb-1.5 flex items-center justify-between gap-2">
+          <h4 class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ds-text-subtle">
+            <Filter class="h-3.5 w-3.5" />
+            {t('common.active')}
+          </h4>
+          <button
+            type="button"
+            class="rounded px-1.5 py-0.5 text-xs font-medium text-ds-interactive"
+            data-testid="filter-menu-clear"
+            onclick={() => onclear()}
+          >
+            {t('common.clear')}
+          </button>
+        </div>
+        {#if activeRowsList.length > 0}
+          <div class="flex flex-col gap-1">
+            {#each activeRowsList as row, index (index)}
+              <div
+                class="truncate rounded px-1 py-1 text-sm text-ds-text"
+                title={describeRow(row)}
+                data-testid={`filter-menu-active-row-${index}`}
+              >
+                {describeRow(row)}
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </section>
+    {/if}
+
     <!-- Shared -->
     <section>
       <h4 class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide" style="color: var(--ds-text-subtle);">
@@ -369,6 +436,9 @@
               >
                 {view.name}
               </button>
+              {#if isApplied({ ql: view.ql })}
+                <Check class="h-3.5 w-3.5 flex-shrink-0 text-ds-interactive" data-testid={`filter-menu-shared-applied-${view.id}`} />
+              {/if}
               {#if canAuthor}
                 <button
                   type="button"
@@ -477,6 +547,9 @@
               >
                 {entry.name}
               </button>
+              {#if isApplied(entry)}
+                <Check class="h-3.5 w-3.5 flex-shrink-0 text-ds-interactive" data-testid={`filter-menu-personal-applied-${entry.id}`} />
+              {/if}
               <button
                 type="button"
                 class="rounded p-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100"

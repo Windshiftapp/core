@@ -328,6 +328,14 @@ export default {
     configureFilter: 'Configurez un filtre pour afficher des éléments',
     createToStart: 'Créez un(e) {item} pour commencer',
   },
+  bulkActions: {
+    screenRequiredTitle: 'Certains éléments nécessitent un formulaire',
+    screenRequiredAll:
+      'Chaque élément sélectionné nécessite un formulaire avant de pouvoir être déplacé. Déplacez-les un par un.',
+    screenRequiredMessage:
+      '{blocked} des {total} éléments sélectionnés nécessitent un formulaire avant de pouvoir être déplacés. Déplacer les {remaining} autres ?',
+    screenRequiredConfirm: 'Déplacer le reste',
+  },
   dueDate: {
     noDueDate: 'Pas de date d’échéance',
     dueToday: 'À échéance aujourd’hui',

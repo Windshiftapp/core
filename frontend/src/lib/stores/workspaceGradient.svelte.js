@@ -319,6 +319,7 @@ export function useGradientStyles() {
           '--ctx-text-interactive: white',
           '--ctx-backdrop: blur(12px)',
           '--ctx-active-bg: rgba(255, 255, 255, 0.16)',
+          '--ctx-hover-bg: rgba(255, 255, 255, 0.85)',
           '--ctx-active-text: #ffffff',
           '--ctx-inactive-text: rgba(255, 255, 255, 0.55)',
         ].join('; ')};`;
@@ -337,6 +338,7 @@ export function useGradientStyles() {
         '--ctx-text-interactive: var(--ds-interactive)',
         '--ctx-backdrop: none',
         '--ctx-active-bg: var(--ds-interactive-subtle)',
+        '--ctx-hover-bg: var(--ds-surface-hovered)',
         '--ctx-active-text: var(--ds-interactive)',
         '--ctx-inactive-text: var(--ds-text-subtle)',
       ].join('; ')};`;

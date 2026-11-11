@@ -49,7 +49,6 @@
   import DescriptionText from '../components/DescriptionText.svelte';
   import { customFieldFormData, customFieldUpdatePayload, linkingFieldOptions, loadCustomFieldsOverview } from './customFieldsData.js';
   import { BOOLEAN_CUSTOM_FIELD_TYPE, canonicalCustomFieldType, isBooleanCustomFieldType } from '../utils/customFieldTypes.js';
-  import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
 	import TextField from '../components/TextField.svelte';
 	import SelectField from '../components/SelectField.svelte';
 	import TextareaField from '../components/TextareaField.svelte';
@@ -437,9 +436,7 @@
       }
 
       await loadCustomFields();
-      await workspaceDataStore.invalidate('customFieldDefinitions');
       cancelForm();
-      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to save custom field:', error);
       errorToast(t('dialogs.alerts.failedToSave', { error: error.message || error }));
@@ -458,7 +455,6 @@
       try {
         await customFieldsApi.delete(field.id);
         await loadCustomFields();
-        window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
       } catch (error) {
         console.error('Failed to delete custom field:', error);
         errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));

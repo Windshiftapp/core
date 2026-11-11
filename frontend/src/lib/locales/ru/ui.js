@@ -168,10 +168,26 @@ export default {
     selectWorkflow: 'Выберите рабочий процесс',
     selectConditionSet: 'Выберите набор условий',
     selectApprovalSet: 'Выберите набор согласований',
+
+    // Выбор даты
+    datePicker: {
+      previousMonth: 'Предыдущий месяц',
+      nextMonth: 'Следующий месяц',
+      openCalendar: 'Открыть календарь',
+      selectDate: 'Выберите дату…',
+    },
   },
 
   editors: {
     enterText: 'Введите текст…',
+    useProvider: 'Редактировать с помощью {label}',
+    useRichText: 'Использовать визуальный редактор',
+    providerActive: '{label} активен',
+    discardProviderChanges: 'Отменить несохранённые изменения?',
+    discardProviderChangesMessage:
+      'Ваши изменения в {label} не сохранены. При смене редактора они будут потеряны.',
+    discardChanges: 'Отменить',
+    providerError: 'Плагин редактора сообщил об ошибке: {message}',
     selectDate: 'Выберите дату…',
     clickToChangeColor: 'Нажмите, чтобы изменить цвет',
     saveEnter: 'Сохранить (Enter)',
@@ -467,6 +483,7 @@ export default {
   },
 
   recurrence: {
+    gregorianRuleHint: 'Ежемесячные и ежегодные повторения используют григорианский календарь.',
     title: 'Повторение',
     description: 'Управление правилами повторяющихся задач',
     frequency: 'Периодичность',

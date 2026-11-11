@@ -37,19 +37,47 @@ type Route struct {
 	Auth        RouteAuth `json:"auth,omitempty"`
 }
 
+// Asset declares the authentication required for a plugin asset. Assets are
+// served by the host rather than the WASM module, so they carry their own auth
+// policy instead of inheriting a route's. Path is relative to the plugin's
+// assets directory: a trailing "*" matches a prefix, otherwise the entry is an
+// exact match. Auth uses the same catalog as Route.Auth; the default is
+// session, so public asset access is an explicit opt-in.
+type Asset struct {
+	Path string    `json:"path"`
+	Auth RouteAuth `json:"auth,omitempty"`
+}
+
 // Extension represents a UI extension point provided by a plugin.
 type Extension struct {
-	Point       string `json:"point"`            // Extension point type (e.g., "admin.tab")
-	ID          string `json:"id"`               // Unique identifier for this extension
-	Label       string `json:"label"`            // Display label
-	Description string `json:"description"`      // Description of what this extension does
-	Icon        string `json:"icon,omitempty"`   // Icon name (kebab-case, e.g. shield-check)
-	Component   string `json:"component"`        // Path to the frontend component (e.g., "frontend.js")
-	Styles      string `json:"styles,omitempty"` // Optional path to CSS file
-	Group       string `json:"group,omitempty"`  // Grouping for organization (e.g., "Security & Audit")
-	Order       int    `json:"order,omitempty"`  // Display order (higher = later)
-	PluginName  string `json:"pluginName"`       // Name of the plugin this extension belongs to
+	Point       string   `json:"point"`                 // Extension point type (e.g., "admin.tab")
+	ID          string   `json:"id"`                    // Unique identifier for this extension
+	Label       string   `json:"label"`                 // Display label
+	Description string   `json:"description"`           // Description of what this extension does
+	Icon        string   `json:"icon,omitempty"`        // Icon name (kebab-case, e.g. shield-check)
+	Component   string   `json:"component"`             // Path to the frontend component (e.g., "frontend.js")
+	Styles      string   `json:"styles,omitempty"`      // Optional path to CSS file
+	Group       string   `json:"group,omitempty"`       // Grouping for organization (e.g., "Security & Audit")
+	Order       int      `json:"order,omitempty"`       // Display order (higher = later)
+	Mode        string   `json:"mode,omitempty"`        // editor.markdown: "toggle" (default) or "replace"
+	EntityTypes []string `json:"entityTypes,omitempty"` // editor.markdown: surfaces the provider may edit
+	PluginName  string   `json:"pluginName"`            // Name of the plugin this extension belongs to
 }
+
+// ExtensionPointEditorMarkdown lets an installed plugin render its own editor
+// for a Markdown surface (e.g. a plain textarea). The host remains the only
+// writer: it holds the content, validates it, and calls the normal item/page/
+// comment APIs. See docs/durable-action-delivery.md for the bridge protocol.
+const ExtensionPointEditorMarkdown = "editor.markdown"
+
+// Editor extension modes.
+const (
+	// EditorModeToggle lets the user opt into the provider from the editor
+	// toolbar; the native editor stays the default.
+	EditorModeToggle = "toggle"
+	// EditorModeReplace makes the provider the default editor for the surface.
+	EditorModeReplace = "replace"
+)
 
 // Principal is the authoritative caller identity forwarded to a plugin. It is
 // nil on public routes. Raw headers stay for compatibility, but this is the
@@ -131,6 +159,7 @@ type PluginManifest struct {
 	Permissions []string         `json:"permissions,omitempty"`
 	Extensions  []Extension      `json:"extensions,omitempty"` // UI extensions provided by this plugin
 	Routes      []Route          `json:"routes,omitempty"`     // Inline route metadata
+	Assets      []Asset          `json:"assets,omitempty"`     // Per-prefix auth policy for served assets
 	Webhooks    []PluginWebhook  `json:"webhooks,omitempty"`   // Webhooks the plugin wants to receive
 	Schedules   []PluginSchedule `json:"schedules,omitempty"`  // Periodic invocations
 }

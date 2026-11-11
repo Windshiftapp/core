@@ -14,6 +14,7 @@
   import Text from '../../components/Text.svelte';
   import Input from '../../components/Input.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { surfaceError } from '../../stores/toasts.svelte.js';
 
   let {
     itemId,
@@ -173,8 +174,8 @@
       newTaskTitle = '';
       showAddForm = false;
     } catch (err) {
-      console.error('Failed to create personal task:', err);
       error = err.message;
+      surfaceError(err, { context: 'createPersonalTask' });
     } finally {
       adding = false;
     }
@@ -193,8 +194,8 @@
         t.id === task.id ? { ...t, status_id: newStatusId } : t
       );
     } catch (err) {
-      console.error('Failed to update task:', err);
       error = err.message;
+      surfaceError(err, { context: 'togglePersonalTask' });
     }
   }
 
@@ -206,8 +207,8 @@
       // Remove from list
       personalTasks = personalTasks.filter(t => t.id !== task.id);
     } catch (err) {
-      console.error('Failed to unlink task:', err);
       error = err.message;
+      surfaceError(err, { context: 'unlinkPersonalTask' });
     }
   }
 

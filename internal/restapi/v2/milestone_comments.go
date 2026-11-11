@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"windshift/internal/logger"
 	"windshift/internal/markdown"
 	"windshift/internal/models"
 	"windshift/internal/services"
@@ -99,6 +100,9 @@ func createMilestoneComment(comments milestoneCommentApplication) jsonOperation[
 		if err := renderMilestoneCommentHTML(created); err != nil {
 			return models.MilestoneComment{}, internalError(err)
 		}
+		logger.Record(r, logger.ActionMilestoneCommentCreate, logger.ResourceMilestoneComment, &created.ID, "", map[string]any{
+			"milestone_id": milestoneID,
+		})
 		return *created, nil
 	}
 }
@@ -119,6 +123,9 @@ func updateMilestoneComment(comments milestoneCommentApplication) jsonOperation[
 		if err := renderMilestoneCommentHTML(updated); err != nil {
 			return models.MilestoneComment{}, internalError(err)
 		}
+		logger.Record(r, logger.ActionMilestoneCommentUpdate, logger.ResourceMilestoneComment, &updated.ID, "", map[string]any{
+			"milestone_id": milestoneID,
+		})
 		return *updated, nil
 	}
 }
@@ -129,7 +136,13 @@ func deleteMilestoneComment(comments milestoneCommentApplication) commandOperati
 		if err != nil {
 			return err
 		}
-		return milestoneCommentError(comments.Delete(user.ID, milestoneID, commentID))
+		if err := comments.Delete(user.ID, milestoneID, commentID); err != nil {
+			return milestoneCommentError(err)
+		}
+		logger.Record(r, logger.ActionMilestoneCommentDelete, logger.ResourceMilestoneComment, &commentID, "", map[string]any{
+			"milestone_id": milestoneID,
+		})
+		return nil
 	}
 }
 

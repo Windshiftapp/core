@@ -139,6 +139,7 @@ export default {
     backToIterations: 'Zurück zu Iterationen',
     filterByIteration: 'Nach Iteration filtern',
     addGlobalIteration: 'Iteration hinzufügen',
+    showCompletedIterations: 'Abgeschlossene Iterationen anzeigen',
 
     // Status
     status: {
@@ -345,6 +346,8 @@ export default {
     assignee: 'Bearbeiter',
     role: 'Rolle',
     failedToDownload: 'Datei konnte nicht heruntergeladen werden',
+    hideFromCustomer: 'Vor Kunden verbergen',
+    showToCustomer: 'Für Kunden sichtbar machen',
     editDiagram: 'Diagramm bearbeiten',
     untitledDiagram: 'Unbenanntes Diagramm',
     diagram: 'Diagramm',
@@ -744,5 +747,14 @@ export default {
     projectCreated: 'Projekt erfolgreich erstellt',
     projectUpdated: 'Projekt erfolgreich aktualisiert',
     projectDeleted: 'Projekt erfolgreich gelöscht',
+  },
+  transitionScreen: {
+    title: 'Übergangsbildschirm',
+    moveTo: 'Nach {status} verschieben',
+    comment: 'Kommentar',
+    commentPlaceholder: 'Kommentar hinzufügen (optional)',
+    confirm: 'Verschieben',
+    failed: 'Der Übergang konnte nicht abgeschlossen werden.',
+    missingFields: 'Füllen Sie die erforderlichen Felder aus:',
   },
 };

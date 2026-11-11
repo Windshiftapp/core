@@ -6,6 +6,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import { getStatusCategory } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import EditableField from '../../editors/EditableField.svelte';
 
   /**
    * Reusable list-row props. Lookup arrays enrich the item; leading and trailing
@@ -36,10 +37,6 @@
     leading = null,
     trailing = null,
   } = $props();
-
-  let editingStoryPoints = $state(false);
-  let storyPointsEditValue = $state('');
-  let storyPointsError = $state(false);
 
   // Look up the item type for icon and color
   const itemType = $derived(item.item_type_id ? itemTypes.find(t => t.id === item.item_type_id) : null);
@@ -95,49 +92,14 @@
   // (e.g. status_color from the homepage activity API where statuses arrays aren't loaded)
   const statusColor = $derived(item.status_color || statusCategory?.color || '#6b7280');
 
-  function startEditingStoryPoints(event) {
-    event?.stopPropagation();
-    if (storyPointsSaving) return;
-    storyPointsEditValue = item.story_points == null ? '' : String(item.story_points);
-    storyPointsError = false;
-    editingStoryPoints = true;
-  }
-
-  function cancelStoryPointsEdit(event) {
-    event?.stopPropagation();
-    editingStoryPoints = false;
-    storyPointsError = false;
-  }
-
-  function saveStoryPoints(event) {
-    event?.stopPropagation();
-    const raw = String(storyPointsEditValue ?? '').trim();
+  function commitStoryPoints(draft) {
+    const raw = String(draft ?? '').trim();
     const parsed = raw === '' ? null : Number(raw);
     if (parsed !== null && (!Number.isFinite(parsed) || parsed < 0)) {
-      storyPointsError = true;
-      return;
+      throw new Error(t('items.enterField', { field: t('items.storyPoints') }));
     }
-
-    if (parsed === (item.story_points ?? null)) {
-      editingStoryPoints = false;
-      storyPointsError = false;
-      return;
-    }
-
-    editingStoryPoints = false;
-    storyPointsError = false;
+    if (parsed === (item.story_points ?? null)) return;
     onStoryPointsChange?.(parsed);
-  }
-
-  function handleStoryPointsKeydown(event) {
-    event.stopPropagation();
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      saveStoryPoints(event);
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      cancelStoryPointsEdit(event);
-    }
   }
 </script>
 
@@ -171,11 +133,11 @@
       {/if}
 
       <!-- Title -->
-      <h4 class="text-sm flex-1 min-w-0 truncate" style="color: var(--ds-text);">{item.title}</h4>
+      <h4 class="text-sm flex-1 min-w-0 truncate" dir="auto" style="color: var(--ds-text);">{item.title}</h4>
 
       <!-- Optional Workspace Name -->
       {#if showWorkspace && item.workspace_name}
-        <span class="text-xs min-w-0 truncate" style="color: var(--ds-text-subtle);">{item.workspace_name}</span>
+        <span class="text-xs min-w-0 truncate" dir="auto" style="color: var(--ds-text-subtle);">{item.workspace_name}</span>
       {/if}
 
       <!-- Optional Timestamp -->
@@ -193,43 +155,46 @@
           class="flex-shrink-0"
           data-testid={`backlog-story-points-${item.id}`}
         >
-          {#if editingStoryPoints}
-            <input
-              type="number"
-              min="0"
-              step="0.5"
-              aria-label={t('items.storyPoints')}
-              aria-invalid={storyPointsError}
-              aria-describedby={storyPointsError ? `backlog-story-points-error-${item.id}` : undefined}
-              data-testid={`backlog-story-points-input-${item.id}`}
-              class="w-16 rounded border px-2 py-1 text-xs tabular-nums outline-none"
-              style="background-color: var(--ds-surface-card); border-color: {storyPointsError ? 'var(--ds-text-danger)' : 'var(--ds-border-focused)'}; color: var(--ds-text);"
-              bind:value={storyPointsEditValue}
-              disabled={storyPointsSaving}
-              onclick={(event) => event.stopPropagation()}
-              onblur={saveStoryPoints}
-              onkeydown={handleStoryPointsKeydown}
-            />
-            {#if storyPointsError}
-              <span id={`backlog-story-points-error-${item.id}`} class="sr-only">
-                {t('items.enterField', { field: t('items.storyPoints') })}
+          <EditableField
+            value={item.story_points ?? null}
+            editable={!storyPointsSaving}
+            oncommit={commitStoryPoints}
+            stopPropagation
+          >
+            {#snippet display()}
+              <span
+                class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs tabular-nums transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                style="color: var(--ds-text-subtle);"
+                title={t('items.setField', { field: t('items.storyPoints') })}
+                aria-label={t('items.setField', { field: t('items.storyPoints') })}
+                data-testid={`backlog-story-points-button-${item.id}`}
+              >
+                <span style="color: var(--ds-text);">{item.story_points ?? t('items.notSet')}</span>
+                <span>SP</span>
               </span>
-            {/if}
-          {:else}
-            <button
-              type="button"
-              class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs tabular-nums transition-colors hover:bg-black/5 dark:hover:bg-white/10 disabled:cursor-wait disabled:opacity-60"
-              style="color: var(--ds-text-subtle);"
-              title={t('items.setField', { field: t('items.storyPoints') })}
-              aria-label={t('items.setField', { field: t('items.storyPoints') })}
-              data-testid={`backlog-story-points-button-${item.id}`}
-              disabled={storyPointsSaving}
-              onclick={startEditingStoryPoints}
-            >
-              <span style="color: var(--ds-text);">{item.story_points ?? t('items.notSet')}</span>
-              <span>SP</span>
-            </button>
-          {/if}
+            {/snippet}
+            {#snippet editor({ draft, setDraft, error })}
+              <!-- svelte-ignore a11y_autofocus -->
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                aria-label={t('items.storyPoints')}
+                aria-invalid={error ? 'true' : 'false'}
+                aria-describedby={error ? `backlog-story-points-error-${item.id}` : undefined}
+                data-testid={`backlog-story-points-input-${item.id}`}
+                class="w-16 rounded border px-2 py-1 text-xs tabular-nums outline-none"
+                style="background-color: var(--ds-surface-card); border-color: {error ? 'var(--ds-text-danger)' : 'var(--ds-border-focused)'}; color: var(--ds-text);"
+                value={draft ?? ''}
+                oninput={(e) => setDraft(e.currentTarget.value)}
+                onclick={(event) => event.stopPropagation()}
+                autofocus
+              />
+              {#if error}
+                <span id={`backlog-story-points-error-${item.id}`} class="sr-only">{error}</span>
+              {/if}
+            {/snippet}
+          </EditableField>
         </div>
       {/if}
 

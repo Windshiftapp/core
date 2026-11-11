@@ -34,12 +34,30 @@ func (h *JiraImportHandler) importJiraSavedFilters(ctx context.Context, jobID, p
 	if filters == nil {
 		return
 	}
+	if filters.Partial {
+		// The source cannot enumerate every saved filter (Data Center only
+		// exposes favorites). Record the boundary so the result is not read as a
+		// complete saved-filter import.
+		_ = h.recordMapping(jobID, "fidelity_finding", "filter-discovery:"+projectKey, filters.PartialReason, 0, map[string]any{
+			"code":           "jira_saved_filters_partial",
+			"severity":       "warning",
+			"disposition":    "unavailable",
+			"source_count":   len(filters.Values),
+			"resolved_count": len(filters.Values),
+		})
+	}
 	for _, filter := range filters.Values {
 		if strings.TrimSpace(filter.ID) == "" {
 			continue
 		}
-		ql, unsupported := jira.TranslateJQLToWindshiftQL(filter.JQL, workspaceID)
-		description := jiraFilterCollectionDescription(filter, unsupported)
+		translation := jira.TranslateJQL(filter.JQL, workspaceID)
+		ql := translation.QL
+		if !translation.MembershipComplete {
+			// A partial predicate tree would otherwise match every issue in the
+			// workspace. Keep the collection non-executable for review.
+			ql = jira.UnsupportedJQLSelector(workspaceID)
+		}
+		description := jiraFilterCollectionDescription(filter, translation.Unsupported, translation.MembershipComplete)
 		metadata := map[string]any{
 			"jira_entity": "filter",
 			"jira_jql":    filter.JQL,
@@ -47,8 +65,12 @@ func (h *JiraImportHandler) importJiraSavedFilters(ctx context.Context, jobID, p
 		if filter.ViewURL != "" {
 			metadata["view_url"] = filter.ViewURL
 		}
-		if len(unsupported) > 0 {
-			metadata["unsupported_jql"] = unsupported
+		if len(translation.Unsupported) > 0 {
+			metadata["unsupported_jql"] = translation.Unsupported
+		}
+		if !translation.MembershipComplete {
+			metadata["needs_review"] = true
+			metadata["unsupported_membership"] = true
 		}
 		collectionID, ok := h.ensureJiraCollection(jobID, "filter:"+filter.ID, filter.ID, jiraCollectionName("Jira Filter", filter.Name, filter.ID), description, ql, workspaceID, createdByUserID, metadata)
 		if ok {
@@ -100,7 +122,11 @@ func (h *JiraImportHandler) importJiraBoards(ctx context.Context, jobID, project
 			jql = fmt.Sprintf("project = %s", projectKey)
 		}
 
-		ql, unsupported := jira.TranslateJQLToWindshiftQL(jql, workspaceID)
+		translation := jira.TranslateJQL(jql, workspaceID)
+		ql := translation.QL
+		if !translation.MembershipComplete {
+			ql = jira.UnsupportedJQLSelector(workspaceID)
+		}
 		metadata := map[string]any{
 			"jira_entity":   "board",
 			"jira_board_id": board.ID,
@@ -110,10 +136,14 @@ func (h *JiraImportHandler) importJiraBoards(ctx context.Context, jobID, project
 		for k, v := range filterMeta {
 			metadata[k] = v
 		}
-		if len(unsupported) > 0 {
-			metadata["unsupported_jql"] = unsupported
+		if len(translation.Unsupported) > 0 {
+			metadata["unsupported_jql"] = translation.Unsupported
 		}
-		collectionID, ok := h.ensureJiraCollection(jobID, fmt.Sprintf("board:%d", board.ID), strconv.Itoa(board.ID), jiraCollectionName("Jira Board", board.Name, strconv.Itoa(board.ID)), jiraBoardCollectionDescription(board, config, jql, unsupported), ql, workspaceID, createdByUserID, metadata)
+		if !translation.MembershipComplete {
+			metadata["needs_review"] = true
+			metadata["unsupported_membership"] = true
+		}
+		collectionID, ok := h.ensureJiraCollection(jobID, fmt.Sprintf("board:%d", board.ID), strconv.Itoa(board.ID), jiraCollectionName("Jira Board", board.Name, strconv.Itoa(board.ID)), jiraBoardCollectionDescription(board, config, jql, translation.Unsupported, translation.MembershipComplete), ql, workspaceID, createdByUserID, metadata)
 		if !ok {
 			continue
 		}
@@ -140,7 +170,7 @@ func jiraCollectionName(prefix, name, fallbackID string) string {
 	return fmt.Sprintf("%s: %s", prefix, name)
 }
 
-func jiraFilterCollectionDescription(filter jira.JiraFilter, unsupported []string) string {
+func jiraFilterCollectionDescription(filter jira.JiraFilter, unsupported []string, membershipComplete bool) string {
 	parts := []string{"Imported from Jira saved filter."}
 	if strings.TrimSpace(filter.Description) != "" {
 		parts = append(parts, strings.TrimSpace(filter.Description))
@@ -148,13 +178,11 @@ func jiraFilterCollectionDescription(filter jira.JiraFilter, unsupported []strin
 	if strings.TrimSpace(filter.JQL) != "" {
 		parts = append(parts, "Original JQL:\n```jql\n"+strings.TrimSpace(filter.JQL)+"\n```")
 	}
-	if len(unsupported) > 0 {
-		parts = append(parts, "Unsupported JQL clauses not translated into Windshift QL:\n- "+strings.Join(unsupported, "\n- "))
-	}
+	parts = appendJiraUnsupportedJQLNote(parts, unsupported, membershipComplete)
 	return strings.Join(parts, "\n\n")
 }
 
-func jiraBoardCollectionDescription(board jira.JiraBoard, config *jira.JiraBoardConfiguration, jql string, unsupported []string) string {
+func jiraBoardCollectionDescription(board jira.JiraBoard, config *jira.JiraBoardConfiguration, jql string, unsupported []string, membershipComplete bool) string {
 	parts := []string{fmt.Sprintf("Imported from Jira %s board %d.", strings.TrimSpace(board.Type), board.ID)}
 	if config != nil && config.SubQuery != nil && strings.TrimSpace(config.SubQuery.Query) != "" {
 		parts = append(parts, "Board sub-query preserved for reference:\n```jql\n"+strings.TrimSpace(config.SubQuery.Query)+"\n```")
@@ -162,10 +190,21 @@ func jiraBoardCollectionDescription(board jira.JiraBoard, config *jira.JiraBoard
 	if strings.TrimSpace(jql) != "" {
 		parts = append(parts, "Original board/filter JQL:\n```jql\n"+strings.TrimSpace(jql)+"\n```")
 	}
+	parts = appendJiraUnsupportedJQLNote(parts, unsupported, membershipComplete)
+	return strings.Join(parts, "\n\n")
+}
+
+// appendJiraUnsupportedJQLNote records unsupported clauses and, when the
+// predicate tree is incomplete, that the imported collection is intentionally
+// non-executable until an administrator reviews it.
+func appendJiraUnsupportedJQLNote(parts, unsupported []string, membershipComplete bool) []string {
 	if len(unsupported) > 0 {
 		parts = append(parts, "Unsupported JQL clauses not translated into Windshift QL:\n- "+strings.Join(unsupported, "\n- "))
 	}
-	return strings.Join(parts, "\n\n")
+	if !membershipComplete {
+		parts = append(parts, "This collection is intentionally empty and needs review: its Jira predicate tree could not be translated in full, so matching every workspace issue would be incorrect.")
+	}
+	return parts
 }
 
 func (h *JiraImportHandler) ensureJiraCollection(jobID, jiraID, jiraKey, name, description, ql string, workspaceID, createdByUserID int, metadata map[string]any) (int, bool) {

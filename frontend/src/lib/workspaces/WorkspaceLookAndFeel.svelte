@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { useDebounce } from 'runed';
+  import { useDebouncedAction } from '../composables/useDebouncedAction.svelte.js';
   import { workspaces } from '../api/workspaces.js';
   import { attachments } from '../api/misc.js';
   import { navigate } from '../router.js';
@@ -82,7 +82,7 @@
   });
 
   // Debounced auto-save (cleanup runs automatically on component teardown)
-  const debouncedSave = useDebounce(() => save(), 1000);
+  const debouncedSave = useDebouncedAction(() => save(), 1000);
 
   onMount(async () => {
     try {

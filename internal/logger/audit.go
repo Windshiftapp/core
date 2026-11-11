@@ -558,6 +558,9 @@ const (
 	ActionWorkflowCreate = "workflow.create"
 	ActionWorkflowUpdate = "workflow.update"
 	ActionWorkflowDelete = "workflow.delete"
+	// ActionTransitionScreenUpdate binds or clears the screen attached to a
+	// workflow transition (WI-1835).
+	ActionTransitionScreenUpdate = "transition.screen_update"
 
 	// Status management
 	ActionStatusCategoryCreate = "status_category.create"
@@ -574,18 +577,19 @@ const (
 
 	// Work item lifecycle. Routine create/update/transition changes are also
 	// captured in work item history; central audit starts with destructive gaps.
-	ActionItemDelete         = "item.delete"
-	ActionItemDeleteCascade  = "item.delete_cascade"
-	ActionItemMoveWorkspace  = "item.move_workspace"
-	ActionItemAssign         = "item.assign"
-	ActionItemMerge          = "item.merge"
-	ActionItemSplit          = "item.split"
-	ActionItemBulkUpdate     = "item.bulk_update"
-	ActionItemBulkTransition = "item.bulk_transition"
-	ActionItemBulkLabels     = "item.bulk_labels"
-	ActionCommentDelete      = "comment.delete"
-	ActionCommentCreate      = "comment.create"
-	ActionAttachmentDelete   = "attachment.delete"
+	ActionItemDelete           = "item.delete"
+	ActionItemDeleteCascade    = "item.delete_cascade"
+	ActionItemMoveWorkspace    = "item.move_workspace"
+	ActionItemAssign           = "item.assign"
+	ActionItemMerge            = "item.merge"
+	ActionItemSplit            = "item.split"
+	ActionItemBulkUpdate       = "item.bulk_update"
+	ActionItemBulkTransition   = "item.bulk_transition"
+	ActionItemBulkLabels       = "item.bulk_labels"
+	ActionCommentDelete        = "comment.delete"
+	ActionCommentCreate        = "comment.create"
+	ActionAttachmentDelete     = "attachment.delete"
+	ActionAttachmentVisibility = "attachment.visibility"
 
 	// External request participants (WI-1136).
 	ActionItemParticipantAdd    = "item.participant_add"
@@ -709,6 +713,13 @@ const (
 	ActionMilestoneCategoryUpdate = "milestone_category.update"
 	ActionMilestoneCategoryDelete = "milestone_category.delete"
 
+	// Milestone comments and page links
+	ActionMilestoneCommentCreate  = "milestone_comment.create"
+	ActionMilestoneCommentUpdate  = "milestone_comment.update"
+	ActionMilestoneCommentDelete  = "milestone_comment.delete"
+	ActionMilestonePageLinkCreate = "milestone_page_link.create"
+	ActionMilestonePageLinkDelete = "milestone_page_link.delete"
+
 	// Collection management
 	ActionCollectionCreate = "collection.create"
 	ActionCollectionUpdate = "collection.update"
@@ -744,6 +755,7 @@ const (
 	ActionAuthPolicyUpdate       = "auth_policy.update"
 	ActionAIFeaturesConfigUpdate = "ai_features_config.update"
 	ActionHubConfigUpdate        = "hub_config.update"
+	ActionGeneralSettingsUpdate  = "general_settings.update"
 
 	// Configuration-set migration execution
 	ActionConfigSetMigrationExecute              = "config_set.migration_execute"
@@ -1129,6 +1141,7 @@ const (
 	ResourceGroup                = "group"
 	ResourceConfigurationSet     = "configuration_set"
 	ResourceWorkflow             = "workflow"
+	ResourceWorkflowTransition   = "workflow_transition"
 	ResourceStatusCategory       = "status_category"
 	ResourceStatus               = "status"
 	ResourceCustomField          = "custom_field"
@@ -1138,6 +1151,7 @@ const (
 	ResourceItemType             = "item_type"
 	ResourceScreen               = "screen"
 	ResourceTheme                = "theme"
+	ResourceGeneralSettings      = "general_settings"
 	ResourceModule               = "module"
 	ResourceAPIToken             = "api_token"
 	ResourceOAuthClient          = "oauth_client"
@@ -1153,6 +1167,8 @@ const (
 	ResourceTimeProject          = "time_project"
 	ResourceMilestone            = "milestone"
 	ResourceMilestoneCategory    = "milestone_category"
+	ResourceMilestoneComment     = "milestone_comment"
+	ResourceMilestonePageLink    = "milestone_page_link"
 	ResourceCollection           = "collection"
 	ResourceTestCase             = "test_case"
 	ResourceTestRun              = "test_run"

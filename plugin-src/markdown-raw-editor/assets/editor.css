@@ -1,0 +1,96 @@
+/*
+ * Styles for the raw Markdown editor iframe.
+ *
+ * This file is loaded by editor.html only. It is intentionally NOT declared as
+ * the extension's `styles` asset: PluginEditorHost injects that asset into the
+ * host document, where rules like `html, body { ... }` would leak into the app.
+ */
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --surface: #f8fafc;
+  --border: #d8dee9;
+  --text: #1f2937;
+  --text-subtle: #64748b;
+  --accent: #2563eb;
+  --danger: #dc2626;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+html[data-theme='dark'] {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --border: #334155;
+  --text: #e2e8f0;
+  --text-subtle: #94a3b8;
+  --accent: #3b82f6;
+  --danger: #f87171;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+}
+
+#editor-root {
+  display: flex;
+  flex-direction: column;
+}
+
+#markdown-input {
+  width: 100%;
+  min-height: 200px;
+  resize: none;
+  border: none;
+  outline: none;
+  padding: 0.75rem;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  tab-size: 2;
+}
+
+#markdown-input:read-only {
+  background: var(--surface);
+  color: var(--text-subtle);
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 1.5rem;
+  padding: 0.125rem 0.5rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-subtle);
+  font-size: 0.75rem;
+}
+
+.status-spacer {
+  flex: 1;
+}
+
+#status[data-error='true'] {
+  color: var(--danger);
+}
+
+.byte-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.byte-count[data-over='true'] {
+  color: var(--danger);
+  font-weight: 600;
+}

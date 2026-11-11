@@ -41,6 +41,7 @@
   import { authStore } from '../stores/auth.svelte.js';
   import { loadPermissionProfile } from '../stores/permissionProfile.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { surfaceError } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import DescriptionText from '../components/DescriptionText.svelte';
   import RequestTypeFieldsBuilder from '../dialogs/RequestTypeFieldsBuilder.svelte';
@@ -245,7 +246,7 @@
       await assetReports.delete(portalStore.portalData?.channel_id, id);
       await portalCatalogStore.loadAssetReports();
     } catch (err) {
-      console.error('Failed to delete asset report:', err);
+      surfaceError(err, { context: 'deleteAssetReport' });
     }
   }
 
@@ -265,7 +266,7 @@
       await requestTypes.delete(portalStore.portalData?.channel_id, id);
       await portalCatalogStore.loadRequestTypes();
     } catch (err) {
-      console.error('Failed to delete request type:', err);
+      surfaceError(err, { context: 'deleteRequestType' });
     }
   }
 

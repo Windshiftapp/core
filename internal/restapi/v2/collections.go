@@ -29,7 +29,23 @@ func registerBoardConfigurationRoutes(builder *routeBuilder, collections collect
 	builder.Read(base+"/board-configuration", AuthAuthenticated, []string{"collections:read"}, getBoardConfiguration(collections, scopeParam))
 	builder.Read(base+"/board-configuration/bootstrap", AuthAuthenticated, []string{"collections:read"}, getBoardConfigurationBootstrap(collections, scopeParam))
 	builder.JSON(http.MethodPut, base+"/board-configuration", http.StatusOK, false, AuthAuthenticated, []string{"collections:write"}, putBoardConfiguration(collections, scopeParam))
+	builder.JSON(http.MethodPatch, base+"/board-configuration", http.StatusOK, true, AuthAuthenticated, []string{"collections:write"}, patchBoardConfiguration(collections, scopeParam))
 	builder.Command(http.MethodDelete, base+"/board-configuration", AuthAuthenticated, []string{"collections:delete"}, deleteBoardConfiguration(collections, scopeParam))
+}
+
+// boardConfigurationPatchRequest is a merge patch: every field is optional,
+// and a set field replaces the stored value. Used by callers that own only a
+// slice of the configuration (for example the navigation config page, which
+// edits view_settings) and must not round-trip the rest.
+type boardConfigurationPatchRequest struct {
+	Columns                    Optional[[]models.BoardColumnRequest] `json:"columns"`
+	BacklogStatusIDs           Optional[[]int]                       `json:"backlog_status_ids"`
+	ListColumns                Optional[[]models.ListColumn]         `json:"list_columns"`
+	CardFields                 Optional[[]models.ListColumn]         `json:"card_fields"`
+	RoadmapConfig              Optional[models.RoadmapConfig]        `json:"roadmap_config"`
+	ShowRightmostColumnLast50  Optional[bool]                        `json:"show_rightmost_column_last_50"`
+	CompletedItemRetentionDays Optional[int]                         `json:"completed_item_retention_days"`
+	ViewSettings               Optional[models.ViewSettings]         `json:"view_settings"`
 }
 
 type collectionPatchRequest struct {
@@ -316,6 +332,29 @@ func putBoardConfiguration(collections collectionApplication, scopeParam string)
 	}
 }
 
+func patchBoardConfiguration(collections collectionApplication, scopeParam string) jsonOperation[boardConfigurationPatchRequest, models.BoardConfiguration] {
+	return func(r *http.Request, input boardConfigurationPatchRequest) (models.BoardConfiguration, error) {
+		user, scope, err := boardConfigurationContext(r, scopeParam)
+		if err != nil {
+			return models.BoardConfiguration{}, err
+		}
+		config, err := collections.PatchBoardConfiguration(auditActor(r, user), scope, services.BoardConfigurationPatch{
+			Columns:                    optionalPatch(input.Columns),
+			BacklogStatusIDs:           optionalPatch(input.BacklogStatusIDs),
+			ListColumns:                optionalPatch(input.ListColumns),
+			CardFields:                 optionalPatch(input.CardFields),
+			RoadmapConfig:              optionalPatch(input.RoadmapConfig),
+			ShowRightmostColumnLast50:  optionalPatch(input.ShowRightmostColumnLast50),
+			CompletedItemRetentionDays: optionalPatch(input.CompletedItemRetentionDays),
+			ViewSettings:               optionalPatch(input.ViewSettings),
+		})
+		if config == nil {
+			return models.BoardConfiguration{}, collectionError(err)
+		}
+		return *config, collectionError(err)
+	}
+}
+
 func deleteBoardConfiguration(collections collectionApplication, scopeParam string) commandOperation {
 	return func(r *http.Request) error {
 		user, scope, err := boardConfigurationContext(r, scopeParam)
@@ -354,6 +393,10 @@ func optionalPositiveQueryID(r *http.Request, name string) (*int, error) {
 		return nil, newError(http.StatusBadRequest, "invalid_request", name+" must be a positive integer")
 	}
 	return &id, nil
+}
+
+func optionalPatch[T any](value Optional[T]) services.OptionalPatch[T] {
+	return services.OptionalPatch[T]{Set: value.Set, Null: value.Null, Value: value.Value}
 }
 
 func optionalInt(value Optional[int]) *int {

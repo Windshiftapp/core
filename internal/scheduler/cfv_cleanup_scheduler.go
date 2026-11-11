@@ -223,14 +223,22 @@ func (s *CFVCleanupScheduler) claimNextJob() (job claimedJob, claimed bool, err 
 	return job, true, nil
 }
 
-// processJob scrubs the deleted field from item, asset, and legacy portal
-// storage in bounded keyset-paginated batches.
+// processJob scrubs the deleted field from item, asset, portal customer, and
+// legacy portal storage in bounded keyset-paginated batches.
 func (s *CFVCleanupScheduler) processJob(fieldID int) (int, error) {
 	fieldKey := strconv.Itoa(fieldID)
+	fieldName := s.customFieldName(fieldID)
 	cfRepo := repository.NewCustomFieldRepository(s.db)
 	total := 0
 	for _, table := range []string{"items", "assets"} {
-		processed, err := s.scrubTableField(cfRepo, table, fieldKey)
+		processed, err := s.scrubTableField(cfRepo, table, []string{fieldKey})
+		total += processed
+		if err != nil {
+			return total, err
+		}
+	}
+	for _, table := range []string{"portal_customers", "customer_organisations"} {
+		processed, err := s.scrubTableField(cfRepo, table, cfvKeys(fieldKey, fieldName))
 		total += processed
 		if err != nil {
 			return total, err
@@ -244,11 +252,30 @@ func (s *CFVCleanupScheduler) processJob(fieldID int) (int, error) {
 	return total, nil
 }
 
-func (s *CFVCleanupScheduler) scrubTableField(cfRepo *repository.CustomFieldRepository, table, fieldKey string) (int, error) {
+// customFieldName resolves a field's stored name, or "" when the row is gone.
+func (s *CFVCleanupScheduler) customFieldName(fieldID int) string {
+	var name string
+	if err := s.db.QueryRow(`SELECT name FROM custom_field_definitions WHERE id = ?`, fieldID).Scan(&name); err != nil {
+		return ""
+	}
+	return name
+}
+
+// cfvKeys returns the numeric id key plus, when present, the legacy name
+// mirror key (WI-2025).
+func cfvKeys(fieldKey, fieldName string) []string {
+	keys := []string{fieldKey}
+	if fieldName != "" {
+		keys = append(keys, fieldName)
+	}
+	return keys
+}
+
+func (s *CFVCleanupScheduler) scrubTableField(cfRepo *repository.CustomFieldRepository, table string, fieldKeys []string) (int, error) {
 	processed := 0
 	lastID := 0
 	for {
-		batch, err := cfRepo.ListRowsWithCustomFieldsPageByKey(table, lastID, fieldKey, s.batchSize)
+		batch, err := cfRepo.ListRowsWithCustomFieldsPageByKey(table, lastID, fieldKeys[0], s.batchSize)
 		if err != nil {
 			return processed, err
 		}
@@ -258,7 +285,7 @@ func (s *CFVCleanupScheduler) scrubTableField(cfRepo *repository.CustomFieldRepo
 		for _, row := range batch {
 			lastID = row.ID
 			changed, malformed, err := applyTableCFVCleanup(cfRepo, table, row.ID, row.Value, func(current string) (string, bool, error) {
-				return stripCFVKey(current, fieldKey)
+				return stripCFVKey(current, fieldKeys...)
 			})
 			if err != nil {
 				if malformed {
@@ -305,19 +332,27 @@ func (s *CFVCleanupScheduler) scrubPortalField(cfRepo *repository.CustomFieldRep
 	}
 }
 
-// stripCFVKey removes one key from a cfv JSON object. Returns the new
-// JSON string, whether the key was actually present, and any parse error.
-// If the resulting object would be empty, returns "" (the items.cfv
-// column treats empty/NULL identically).
-func stripCFVKey(cfvJSON, key string) (newJSON string, changed bool, err error) {
+// stripCFVKey removes one or more keys from a cfv JSON object. Returns the new
+// JSON string, whether anything changed, and any parse error. If the resulting
+// object would be empty, returns "" (the cfv column treats empty/NULL
+// identically).
+func stripCFVKey(cfvJSON string, keys ...string) (newJSON string, changed bool, err error) {
 	var m map[string]any
 	if err := json.Unmarshal([]byte(cfvJSON), &m); err != nil {
 		return "", false, err
 	}
-	if _, ok := m[key]; !ok {
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		if _, ok := m[key]; ok {
+			delete(m, key)
+			changed = true
+		}
+	}
+	if !changed {
 		return cfvJSON, false, nil
 	}
-	delete(m, key)
 	if len(m) == 0 {
 		return "", true, nil
 	}
@@ -357,11 +392,19 @@ func (s *CFVCleanupScheduler) processOptionRemoval(payload string) (int, error) 
 		removed[id] = true
 	}
 	fieldKey := strconv.Itoa(p.FieldID)
+	fieldName := s.customFieldName(p.FieldID)
 	cfRepo := repository.NewCustomFieldRepository(s.db)
 	total := 0
 
 	for _, table := range []string{"items", "assets"} {
-		n, err := s.scrubTableOptions(cfRepo, table, fieldKey, p.FieldType, removed)
+		n, err := s.scrubTableOptions(cfRepo, table, []string{fieldKey}, p.FieldType, removed)
+		total += n
+		if err != nil {
+			return total, err
+		}
+	}
+	for _, table := range []string{"portal_customers", "customer_organisations"} {
+		n, err := s.scrubTableOptions(cfRepo, table, cfvKeys(fieldKey, fieldName), p.FieldType, removed)
 		total += n
 		if err != nil {
 			return total, err
@@ -379,13 +422,14 @@ func (s *CFVCleanupScheduler) processOptionRemoval(payload string) (int, error) 
 	return total, nil
 }
 
-// scrubTableOptions removes deleted option ids from items/assets cfv JSON in
-// keyset-paginated batches.
-func (s *CFVCleanupScheduler) scrubTableOptions(cfRepo *repository.CustomFieldRepository, table, fieldKey, fieldType string, removed map[int]bool) (int, error) {
+// scrubTableOptions removes deleted option ids from a trusted table's cfv JSON
+// in keyset-paginated batches. fieldKeys carries the numeric id key plus the
+// legacy name mirror where one exists.
+func (s *CFVCleanupScheduler) scrubTableOptions(cfRepo *repository.CustomFieldRepository, table string, fieldKeys []string, fieldType string, removed map[int]bool) (int, error) {
 	processed := 0
 	lastID := 0
 	for {
-		batch, err := cfRepo.ListRowsWithCustomFieldsPageByKey(table, lastID, fieldKey, s.batchSize)
+		batch, err := cfRepo.ListRowsWithCustomFieldsPageByKey(table, lastID, fieldKeys[0], s.batchSize)
 		if err != nil {
 			return processed, err
 		}
@@ -395,7 +439,7 @@ func (s *CFVCleanupScheduler) scrubTableOptions(cfRepo *repository.CustomFieldRe
 		for _, row := range batch {
 			lastID = row.ID
 			changed, malformed, err := applyTableCFVCleanup(cfRepo, table, row.ID, row.Value, func(current string) (string, bool, error) {
-				return stripCFVOptionIDs(current, fieldKey, fieldType, removed)
+				return stripCFVOptionIDs(current, fieldKeys, fieldType, removed)
 			})
 			if err != nil {
 				if malformed {
@@ -537,44 +581,51 @@ func (s *CFVCleanupScheduler) scrubPortalOptions(cfRepo *repository.CustomFieldR
 }
 
 // stripCFVOptionIDs removes the given option ids from one cfv JSON object's
-// entry for fieldKey. For select the whole key is dropped when its value is a
+// entries for fieldKeys (the numeric id key and, for portal customers, the
+// unique-name mirror). For select the whole key is dropped when its value is a
 // removed id; for multiselect the removed ids are filtered out (and the key
 // dropped if the array empties). Returns the new JSON, whether anything
 // changed, and any parse error.
-func stripCFVOptionIDs(cfvJSON, fieldKey, fieldType string, removed map[int]bool) (newJSON string, changed bool, err error) {
+func stripCFVOptionIDs(cfvJSON string, fieldKeys []string, fieldType string, removed map[int]bool) (newJSON string, changed bool, err error) {
 	var cfv map[string]any
 	if err := json.Unmarshal([]byte(cfvJSON), &cfv); err != nil {
 		return "", false, err
 	}
-	val, exists := cfv[fieldKey]
-	if !exists {
-		return cfvJSON, false, nil
-	}
-
-	switch fieldType {
-	case "select", "milestone":
-		if optionID, ok := cleanupOptionID(val); ok && removed[optionID] {
-			delete(cfv, fieldKey)
-			changed = true
+	for _, fieldKey := range fieldKeys {
+		if fieldKey == "" {
+			continue
 		}
-	case "multiselect", "multi_milestone":
-		if arr, ok := val.([]any); ok {
-			var filtered []any
-			for _, item := range arr {
-				if optionID, ok := cleanupOptionID(item); ok && removed[optionID] {
-					changed = true
-					continue
-				}
-				filtered = append(filtered, item)
+		val, exists := cfv[fieldKey]
+		if !exists {
+			continue
+		}
+		keyChanged := false
+		switch fieldType {
+		case "select", "milestone":
+			if optionID, ok := cleanupOptionID(val); ok && removed[optionID] {
+				delete(cfv, fieldKey)
+				keyChanged = true
 			}
-			if changed {
-				if len(filtered) == 0 {
-					delete(cfv, fieldKey)
-				} else {
-					cfv[fieldKey] = filtered
+		case "multiselect", "multi_milestone":
+			if arr, ok := val.([]any); ok {
+				var filtered []any
+				for _, item := range arr {
+					if optionID, ok := cleanupOptionID(item); ok && removed[optionID] {
+						keyChanged = true
+						continue
+					}
+					filtered = append(filtered, item)
+				}
+				if keyChanged {
+					if len(filtered) == 0 {
+						delete(cfv, fieldKey)
+					} else {
+						cfv[fieldKey] = filtered
+					}
 				}
 			}
 		}
+		changed = changed || keyChanged
 	}
 
 	if !changed {

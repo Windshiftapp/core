@@ -11,6 +11,7 @@
   import { time } from '../../api/time.js';
   import { recurrence } from '../../api/recurrence.js';
   import { items as itemsApi } from '../../api/items.js';
+  import TransitionScreenModal from '../../dialogs/TransitionScreenModal.svelte';
   import { ai } from '../../api/ai.js';
   import { navigate, currentRoute } from '../../router.js';
   import { publicBaseURL } from '../../runtime/contextPath.js';
@@ -30,7 +31,7 @@
   import Bookmark from '@lucide/svelte/icons/bookmark';
   import BookmarkCheck from '@lucide/svelte/icons/bookmark-check';
   import ExternalLink from '@lucide/svelte/icons/external-link';
-  import { addToast, successToast, errorToast, infoToast } from '../../stores/toasts.svelte.js';
+  import { addToast, successToast, errorToast, infoToast, surfaceError } from '../../stores/toasts.svelte.js';
   import { timerStore } from '../../stores/timerStore.svelte.js';
   import { useItemAttachments } from '../../composables/useItemAttachments.svelte.js';
   import { useItemEventStream } from '../../composables/useItemEventStream.svelte.js';
@@ -111,19 +112,16 @@ import NativeSelect from '../../components/NativeSelect.svelte';
       return Promise.resolve();
     }
     reconcilePending = false;
-    itemDetailStore.transitioning = true;
-    return loadData()
-      .then((loaded) => {
-        if (loaded) populateDropdownItems();
-      })
-      .finally(() => {
-        itemDetailStore.transitioning = false;
-      });
+    // A background reconcile of the item already on screen is not a view
+    // transition. Dimming the content here made every field save flicker.
+    return loadData().then((loaded) => {
+      if (loaded) populateDropdownItems();
+    });
   }
 
   $effect(() => {
     if (reconcilePending && !itemDetailStore.loading) {
-      void runFullReconcile().catch((err) => console.error('SSE reconcile failed:', err));
+      void runFullReconcile().catch((err) => surfaceError(err, { silent: true, context: 'sseReconcile' }));
     }
   });
 
@@ -190,7 +188,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
   // the user wait up to 30s for the next poll tick to see the agent's effects.
   $effect(() => agentRuns.subscribe(() => {
     itemDetailStore.refreshCurrentItem().catch((err) => {
-      console.error('Failed to refresh item after agent run:', err);
+      surfaceError(err, { context: 'refreshAfterAgentRun' });
     });
   }));
 
@@ -200,6 +198,9 @@ import NativeSelect from '../../components/NativeSelect.svelte';
   // Recurrence state
   let recurrenceRule = $state(null);
   let showRecurrenceModal = $state(false);
+  // Transition screen requested from the status picker (WI-1835).
+  let transitionScreen = $state(null);
+  let showTransitionScreen = $state(false);
   let recurrenceEditorRef = $state(null);
   let recurrenceSaving = $state(false);
 
@@ -314,7 +315,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
           : [];
       if (!parents.some((parentId) => Number(parentId) === Number(currentId))) return;
       itemDetailStore.loadChildItems().catch((err) => {
-        console.error('Failed to reload child items after child creation:', err);
+        surfaceError(err, { context: 'reloadChildItemsAfterCreate' });
       });
     })
   );
@@ -418,8 +419,24 @@ import NativeSelect from '../../components/NativeSelect.svelte';
   }
   
   async function handleSaveField(detail) {
-    const { field, value, assigneeName, iterationName, teamName } = detail;
+    const { field, value, assigneeName, iterationName, teamName, screen, statusName } = detail;
+    // A move whose transition carries a screen opens the modal first; the
+    // modal's confirm submits the collected fields with the transition.
+    if (field === 'status_id' && screen) {
+      transitionScreen = { statusId: value, screen, statusName };
+      showTransitionScreen = true;
+      return;
+    }
     await saveField(field, value, assigneeName, iterationName, teamName);
+  }
+
+  async function handleTransitionConfirm(fields) {
+    if (!transitionScreen) return;
+    const { statusId } = transitionScreen;
+    // Errors propagate back to the modal so it can render screen_required
+    // missing fields inline instead of a toast.
+    await itemDetailStore.saveField('status_id', statusId, null, null, null, fields);
+    transitionScreen = null;
   }
 
   function handleCancelEdit(detail) {
@@ -433,6 +450,10 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     } catch (err) {
       console.error('Failed to update item:', err);
       showError('Failed to update item', err.message || String(err));
+      // Inline editors keep their draft open by rejecting their commit. The
+      // toast above is the user-facing message, so fire-and-forget callers
+      // attach their own catch instead of relying on this one.
+      throw err;
     }
   }
 
@@ -459,7 +480,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     tab = detail.tab;
     if (tab === 'time') {
       itemDetailStore.loadWorklogs().catch((error) => {
-        console.error('Failed to load time entries:', error);
+        surfaceError(error, { context: 'loadTimeEntries' });
       });
     }
     // The modal is mounted on top of a board/list route; navigating to the item
@@ -519,7 +540,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     try {
       await itemDetailStore.removeLink(linkId);
     } catch (error) {
-      console.error('Error removing link:', error);
+      surfaceError(error, { context: 'removeLink' });
     }
   }
 
@@ -545,22 +566,6 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     // Cancel all custom field editing when starting to edit priority
     itemDetailStore.editing.customFields.active = {};
     itemDetailStore.startEditing('priority');
-  }
-
-  function handleStartEditingDueDate() {
-    // Cancel all custom field editing when starting to edit due date
-    itemDetailStore.editing.customFields.active = {};
-    itemDetailStore.startEditing('dueDate');
-  }
-
-  function handleStartEditingStartDate() {
-    itemDetailStore.editing.customFields.active = {};
-    itemDetailStore.startEditing('startDate');
-  }
-
-  function handleStartEditingEndDate() {
-    itemDetailStore.editing.customFields.active = {};
-    itemDetailStore.startEditing('endDate');
   }
 
   function handleStartEditingStatus() {
@@ -762,7 +767,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     try {
       await itemDetailStore.loadChildItems();
     } catch (error) {
-      console.error('Failed to reload child items after reorder:', error);
+      surfaceError(error, { context: 'reloadChildItemsAfterReorder' });
     }
   }
 
@@ -781,7 +786,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     try {
       await loadData();
     } catch (error) {
-      console.error('Failed to reload data after parent change:', error);
+      surfaceError(error, { context: 'reloadAfterParentChange' });
     }
   }
 
@@ -1018,7 +1023,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
         .then((loaded) => {
           if (loaded) populateDropdownItems();
         })
-        .catch((error) => console.error('Failed to load item data after navigation:', error))
+        .catch((error) => surfaceError(error, { context: 'loadItemAfterNavigation' }))
         .finally(() => { itemDetailStore.transitioning = false; });
     }
   });
@@ -1038,7 +1043,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
       .then((loaded) => {
         if (loaded) populateDropdownItems();
       })
-      .catch((error) => console.error('Failed to reload open item detail:', error))
+      .catch((error) => surfaceError(error, { context: 'reloadOpenItemDetail' }))
       .finally(() => { itemDetailStore.transitioning = false; });
   });
 
@@ -1267,7 +1272,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     if (previousActiveTimer && !currentTimer && previousActiveTimer.item_id === parseInt(itemId)) {
       // Timer was stopped, reload worklogs for this item
       itemDetailStore.reloadWorklogs().catch(err => {
-        console.error('Failed to reload worklogs after timer stop:', err);
+        surfaceError(err, { context: 'reloadWorklogsAfterTimerStop' });
       });
     }
 
@@ -1396,8 +1401,6 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     currentItemType={itemDetailStore.currentItemType}
     currentHierarchyLevel={itemDetailStore.currentHierarchyLevel}
     {workspaceId}
-    editingTitle={itemDetailStore.editing.title.active}
-    editTitle={itemDetailStore.editing.title.value}
     saving={itemDetailStore.saving}
     dropdownItems={itemDetailStore.dropdownItems}
     statusOptions={itemDetailStore.statusOptions}
@@ -1420,9 +1423,6 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     activeTimer={timerStore.activeTimer}
     editingStatus={itemDetailStore.editing.status.active}
     editingPriority={itemDetailStore.editing.priority.active}
-    editingDueDate={itemDetailStore.editing.dueDate.active}
-    editingStartDate={itemDetailStore.editing.startDate.active}
-    editingEndDate={itemDetailStore.editing.endDate.active}
     editingProject={itemDetailStore.editing.project.active}
     editingAssignee={itemDetailStore.editing.assignee.active}
     editingMilestone={itemDetailStore.editing.milestone.active}
@@ -1459,9 +1459,6 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     onstartEditingMilestone={handleStartEditingMilestone}
     onstartEditingIteration={handleStartEditingIteration}
     onstartEditingPriority={handleStartEditingPriority}
-    onstartEditingDueDate={handleStartEditingDueDate}
-    onstartEditingStartDate={handleStartEditingStartDate}
-    onstartEditingEndDate={handleStartEditingEndDate}
     onstartEditingStatus={handleStartEditingStatus}
     onstartEditingProject={handleStartEditingProject}
     onstartEditingDescription={handleStartEditingDescription}
@@ -1476,6 +1473,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     onattachmentUpload={attachmentManager.handleUpload}
     onattachmentUploadFiles={attachmentManager.uploadFiles}
     onattachmentDelete={attachmentManager.handleDelete}
+    onattachmentToggleVisibility={attachmentManager.handleToggleVisibility}
     onattachmentPageChange={attachmentManager.handlePageChange}
     onattachmentPageSizeChange={attachmentManager.handlePageSizeChange}
     ondiagramSaved={handleDiagramSaved}
@@ -1763,6 +1761,21 @@ import NativeSelect from '../../components/NativeSelect.svelte';
       onsave={handleRecurrenceSave}
     />
   </FormModal>
+{/if}
+
+{#if showTransitionScreen && transitionScreen}
+  <TransitionScreenModal
+    bind:show={showTransitionScreen}
+    screen={transitionScreen.screen}
+    targetStatusName={transitionScreen.statusName}
+    workspaceId={itemDetailStore.item?.workspace_id}
+    milestones={itemDetailStore.milestones}
+    iterations={itemDetailStore.iterations}
+    itemLabels={itemDetailStore.item?.labels || []}
+    item={itemDetailStore.item}
+    onconfirm={handleTransitionConfirm}
+    oncancel={() => (transitionScreen = null)}
+  />
 {/if}
 
 <style>

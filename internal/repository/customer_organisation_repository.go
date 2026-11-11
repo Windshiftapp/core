@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"windshift/internal/customfields"
 	"windshift/internal/database"
 	"windshift/internal/models"
 )
@@ -40,10 +41,14 @@ func (r *CustomerOrganisationRepository) List() ([]models.CustomerOrganisation, 
 	defer func() { _ = rows.Close() }()
 
 	var customers []models.CustomerOrganisation
+	fieldIndex, _ := customfields.LoadCustomFieldNameIndex(r.db, customfields.AppliesToCustomerOrganisations)
 	for rows.Next() {
 		c, scanErr := scanCustomerOrganisation(rows)
 		if scanErr != nil {
 			return nil, fmt.Errorf("scan customer_organisation: %w", scanErr)
+		}
+		if fieldIndex != nil {
+			fieldIndex.Resolve(c.CustomFieldValues)
 		}
 		customers = append(customers, c)
 	}
@@ -65,6 +70,9 @@ func (r *CustomerOrganisationRepository) GetByID(id int) (*models.CustomerOrgani
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get customer_organisation %d: %w", id, err)
+	}
+	if fieldIndex, indexErr := customfields.LoadCustomFieldNameIndex(r.db, customfields.AppliesToCustomerOrganisations); indexErr == nil && fieldIndex != nil {
+		fieldIndex.Resolve(c.CustomFieldValues)
 	}
 	return &c, nil
 }
@@ -217,6 +225,12 @@ func scanCustomerOrganisation(scanner interface {
 		_ = json.Unmarshal([]byte(settingsStr.String), &c.Settings)
 	}
 	return c, nil
+}
+
+// DB exposes the underlying database so callers can run shared custom-field
+// validation helpers that need a database handle.
+func (r *CustomerOrganisationRepository) DB() database.Database {
+	return r.db
 }
 
 // encodeCustomFieldValues returns the JSON string form for SQL params, or

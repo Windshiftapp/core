@@ -56,6 +56,7 @@
 <span
   class="inline-flex items-center font-medium {appearanceClasses} {className}"
   style={appearanceStyles}
+  dir="auto"
   {title}
 >
   {#if dotColor}

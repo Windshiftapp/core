@@ -87,7 +87,7 @@ export default {
     title: 'Итерации', subtitle: 'Управление итерациями и выпусками', iteration: 'Итерация',
     iterations_one: '{count} итерация', iterations_few: '{count} итерации', iterations_many: '{count} итераций', iterations_other: '{count} итерации',
     createIteration: 'Создать итерацию', editIteration: 'Изменить итерацию', updateIteration: 'Обновить итерацию', deleteIteration: 'Удалить итерацию', startIteration: 'Начать итерацию', completeIteration: 'Завершить итерацию', start: 'Начать',
-    noIterations: 'Итерации не найдены', allTypes: 'Все типы', manageTypes: 'Управление типами', backToIterations: 'Вернуться к итерациям', filterByIteration: 'Фильтр по итерации', addGlobalIteration: 'Добавить итерацию',
+    noIterations: 'Итерации не найдены', allTypes: 'Все типы', manageTypes: 'Управление типами', backToIterations: 'Вернуться к итерациям', filterByIteration: 'Фильтр по итерации', addGlobalIteration: 'Добавить итерацию', showCompletedIterations: 'Показывать завершённые итерации',
     status: { planned: 'Запланирована', active: 'Активна', completed: 'Завершена', cancelled: 'Отменена' },
     statusPlanned: 'Запланирована', statusActive: 'Активна', statusCompleted: 'Завершена', statusCancelled: 'Отменена',
     global: 'Глобальная', local: 'Локальная', thisWorkspace: 'Это рабочее пространство', globalIteration: 'Глобальная итерация', globalIterations: 'Глобальные итерации', globalIterationDescription: 'Видна во всех рабочих пространствах', localIteration: 'Локальная итерация', localIterations: 'Локальные итерации', localIterationDescription: 'Видна только в этом рабочем пространстве', switchTo: 'Переключиться на область «{scope}»', scope: 'Область',
@@ -132,7 +132,7 @@ export default {
     newType: 'Новый тип', createType: 'Создать тип', editType: 'Изменить тип', noAssetTypes: 'Нет типов ресурсов', noAssetTypesDesc: 'Создайте типы, чтобы классифицировать ресурсы.', assetType: 'Тип ресурса',
     newCategory: 'Новая категория', createCategory: 'Создать категорию', editCategory: 'Изменить категорию', noCategories: 'Нет категорий', noCategoriesDesc: 'Создайте категории, чтобы упорядочить ресурсы.', parentCategory: 'Родительская категория', noParent: 'Без родителя (верхний уровень)',
     assignRole: 'Назначить роль', everyoneRole: 'Общая роль', everyoneRoleDesc: 'Стандартная роль для всех пользователей. Индивидуальные назначения имеют приоритет.', noRoleAssignments: 'Роли не назначены', noRoleAssignmentsDesc: 'Назначьте роли, чтобы управлять доступом к набору ресурсов.', assignee: 'Получатель', role: 'Роль',
-    failedToDownload: 'Не удалось скачать файл', editDiagram: 'Изменить диаграмму', untitledDiagram: 'Диаграмма без названия', diagram: 'диаграмма', uploadedBy: 'Загрузил {name}', zoomOut: 'Уменьшить (-)', zoomIn: 'Увеличить (+)', rotate: 'Повернуть (R)', fitToScreen: 'Вписать в экран (F)', shortcutScroll: 'Колесо: масштаб', shortcutDrag: 'Перетаскивание: перемещение', shortcutRotate: 'R: повернуть', shortcutFit: 'F: вписать', shortcutReset: '0: сбросить', shortcutClose: 'Esc: закрыть',
+    failedToDownload: 'Не удалось скачать файл', editDiagram: 'Изменить диаграмму', untitledDiagram: 'Диаграмма без названия', diagram: 'диаграмма', uploadedBy: 'Загрузил {name}', zoomOut: 'Уменьшить (-)', zoomIn: 'Увеличить (+)', rotate: 'Повернуть (R)', fitToScreen: 'Вписать в экран (F)', shortcutScroll: 'Колесо: масштаб', shortcutDrag: 'Перетаскивание: перемещение', shortcutRotate: 'R: повернуть', shortcutFit: 'F: вписать', shortcutReset: '0: сбросить', shortcutClose: 'Esc: закрыть', hideFromCustomer: 'Скрыть от клиента', showToCustomer: 'Показать клиенту',
   },
 
   personal: {
@@ -222,5 +222,14 @@ export default {
     deleted: 'Очередь удалена',
     builtinRemoved: 'Встроенная очередь убрана',
     saveFailed: 'Не удалось сохранить очередь',
+  },
+  transitionScreen: {
+    title: 'Экран перехода',
+    moveTo: 'Перейти в {status}',
+    comment: 'Комментарий',
+    commentPlaceholder: 'Добавить комментарий (необязательно)',
+    confirm: 'Перейти',
+    failed: 'Не удалось выполнить переход.',
+    missingFields: 'Заполните обязательные поля, чтобы продолжить:',
   },
 };

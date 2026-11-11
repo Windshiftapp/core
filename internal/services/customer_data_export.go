@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
+	"strconv"
 	"time"
 
+	"windshift/internal/customfields"
 	"windshift/internal/database"
 	"windshift/internal/logger"
 )
@@ -14,7 +17,7 @@ import (
 // CustomerDataExportSchemaVersion pins the export payload structure so
 // repeated DSAR exports are comparable across executions. Bump on any
 // field-level change.
-const CustomerDataExportSchemaVersion = 2
+const CustomerDataExportSchemaVersion = 3
 
 // CustomerDataExport is the Article 15/20 export payload: every personal-data
 // category Windshift holds about one portal customer. Sections are ordered
@@ -37,15 +40,24 @@ type CustomerDataExport struct {
 }
 
 type CustomerExportProfile struct {
-	ID                int             `json:"id"`
-	Name              string          `json:"name"`
-	Email             string          `json:"email"`
-	Phone             *string         `json:"phone"`
-	CustomFieldValues json.RawMessage `json:"custom_field_values"`
-	Organisation      *string         `json:"organisation"` //nolint:misspell // British spelling used throughout codebase
-	Roles             []string        `json:"roles"`
-	IsPrimary         bool            `json:"is_primary"`
-	CreatedAt         *string         `json:"created_at"`
+	ID                int                         `json:"id"`
+	Name              string                      `json:"name"`
+	Email             string                      `json:"email"`
+	Phone             *string                     `json:"phone"`
+	CustomFieldValues json.RawMessage             `json:"custom_field_values"`
+	CustomFields      []CustomerExportCustomField `json:"custom_fields"`
+	Organisation      *string                     `json:"organisation"` //nolint:misspell // British spelling used throughout codebase
+	Roles             []string                    `json:"roles"`
+	IsPrimary         bool                        `json:"is_primary"`
+	CreatedAt         *string                     `json:"created_at"`
+}
+
+// CustomerExportCustomField is one resolved custom-field value: the numeric id
+// is stable, the name is the human-readable label for the legal artifact.
+type CustomerExportCustomField struct {
+	FieldID int    `json:"field_id"`
+	Name    string `json:"name"`
+	Value   any    `json:"value"`
 }
 
 type CustomerExportItem struct {
@@ -128,6 +140,42 @@ type CustomerExportKBEvent struct {
 	CreatedAt *string `json:"created_at"`
 }
 
+// resolveCustomerExportCustomFields rewrites legacy name keys to numeric id
+// keys (WI-2025) and returns the normalised JSON plus the human-readable
+// resolved list.
+func resolveCustomerExportCustomFields(db database.Database, raw string) (json.RawMessage, []CustomerExportCustomField) {
+	var cfv map[string]any
+	if err := json.Unmarshal([]byte(raw), &cfv); err != nil {
+		return json.RawMessage(raw), nil
+	}
+	index, err := customfields.LoadCustomFieldNameIndex(db, customfields.AppliesToPortalCustomers)
+	if err != nil {
+		return json.RawMessage(raw), nil
+	}
+	index.Resolve(cfv)
+
+	resolved := make([]CustomerExportCustomField, 0, len(cfv))
+	for key, value := range cfv {
+		id, err := strconv.Atoi(key)
+		if err != nil {
+			// Orphan/ambiguous name key: not attributable to a field id.
+			continue
+		}
+		name, ok := index.Name(id)
+		if !ok {
+			name = key
+		}
+		resolved = append(resolved, CustomerExportCustomField{FieldID: id, Name: name, Value: value})
+	}
+	sort.Slice(resolved, func(i, j int) bool { return resolved[i].FieldID < resolved[j].FieldID })
+
+	normalized, err := json.Marshal(cfv)
+	if err != nil {
+		return json.RawMessage(raw), resolved
+	}
+	return normalized, resolved
+}
+
 // ExportCustomerData assembles the personal-data payload for one portal
 // customer and records the disclosure in the audit trail (who exported which
 // customer, when, and how much was disclosed).
@@ -196,7 +244,11 @@ func ExportCustomerData(db database.Database, customerID int, actor AuditActor, 
 		return export, fmt.Errorf("load customer profile: %w", err)
 	}
 	if customFields.Valid && json.Valid([]byte(customFields.String)) && customFields.String != "" {
-		export.Customer.CustomFieldValues = json.RawMessage(customFields.String)
+		normalized, resolved := resolveCustomerExportCustomFields(db, customFields.String)
+		export.Customer.CustomFieldValues = normalized
+		export.Customer.CustomFields = resolved
+	} else {
+		export.Customer.CustomFields = []CustomerExportCustomField{}
 	}
 	if orgName.Valid && orgName.String != "" {
 		export.Customer.Organisation = &orgName.String //nolint:misspell // British spelling used throughout codebase

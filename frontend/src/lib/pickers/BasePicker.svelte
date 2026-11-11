@@ -376,6 +376,11 @@
 
   // Handle keyboard navigation
   async function handleKeydown(event) {
+    // A closed picker owns no keys. Consuming Escape here (preventDefault)
+    // would make Modal.svelte's defaultPrevented guard swallow it, so an
+    // enclosing dialog could never close while a picker had focus.
+    if (!$open) return;
+
     if (event.key === 'Escape') {
       event.preventDefault();
       // Return focus to the in-modal trigger so the next Tab continues inside
@@ -390,7 +395,6 @@
     // rather than tabbing out. Focus is kept inside the modal by restoring it to
     // the trigger on select/Escape (see restoreFocusToTrigger), not by
     // intercepting Tab.
-    if (!$open) return;
 
     const totalItems = visibleOptions.length;
 
@@ -590,7 +594,7 @@
           {#if chipSnippet}
             {@render chipSnippet({ item })}
           {:else}
-            <span class="font-medium truncate max-w-[150px]">{labelFor(item)}</span>
+            <span class="font-medium truncate max-w-[150px]" dir="auto">{labelFor(item)}</span>
           {/if}
           <button type="button" onclick={(e) => removeItem(e, itemValue(item))}
                   class="picker-clear rounded p-0.5 transition-colors" {disabled}>
@@ -683,7 +687,7 @@
                     {:else}
                       {#if iconSnippet}{@render iconSnippet({ item: opt.item })}{/if}
                       <div class="flex flex-col min-w-0">
-                        <span class="font-medium truncate">{opt.label}</span>
+                        <span class="font-medium truncate" dir="auto">{opt.label}</span>
                       </div>
                     {/if}
                   </div>

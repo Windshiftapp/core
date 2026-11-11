@@ -13,6 +13,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/emailutil"
+	"windshift/internal/i18n"
 	"windshift/internal/markdown"
 	"windshift/internal/models"
 	"windshift/internal/smtp"
@@ -289,18 +290,19 @@ func (s *MentionEmailService) deliverPendingMention(ctx context.Context, outboxI
 		}
 	}
 
+	locale := s.recipientLanguage(row.UserID)
 	data := MentionEmailData{
 		RecipientName: row.ToName,
 		ActorName:     row.ActorName,
 		ItemKey:       row.ItemKey,
 		ItemTitle:     row.ItemTitle,
-		SourceLabel:   mentionSourceLabel(row.SourceType),
+		SourceLabel:   mentionSourceLabel(locale, row.SourceType),
 		// Strip the embedded id once so every template, including an admin
 		// override that renders .Content directly, shows the display name.
 		Content:   markdown.StripMentionIDs(row.Content),
 		ActionURL: smtp.AbsoluteActionURL(s.baseURL, row.ActionURL),
 	}
-	if err := s.sender.SendTransactionalContext(ctx, row.ToEmail, emailutil.TemplateMention, data); err != nil {
+	if err := s.sender.SendTransactionalContext(ctx, row.ToEmail, locale, emailutil.TemplateMention, data); err != nil {
 		s.recordMentionFailure(row.ID, row.AttemptCount, err)
 		return false, fmt.Errorf("send mention email: %w", err)
 	}
@@ -402,13 +404,23 @@ func (s *MentionEmailService) recordMentionFailure(outboxID, previousAttempts in
 	}
 }
 
-func mentionSourceLabel(sourceType string) string {
+// recipientLanguage resolves the mention recipient's locale, falling back to
+// the default when the lookup fails.
+func (s *MentionEmailService) recipientLanguage(userID int) string {
+	var language string
+	if err := s.db.QueryRow(`SELECT COALESCE(language, '') FROM users WHERE id = ?`, userID).Scan(&language); err != nil {
+		return i18n.Default
+	}
+	return i18n.Normalize(language)
+}
+
+func mentionSourceLabel(locale, sourceType string) string {
 	switch sourceType {
 	case "comment":
-		return "a comment"
+		return i18n.Translate(locale, "email.mention.source.comment", nil)
 	case "item_description":
-		return "the description"
+		return i18n.Translate(locale, "email.mention.source.description", nil)
 	default:
-		return "an item"
+		return i18n.Translate(locale, "email.mention.source.item", nil)
 	}
 }

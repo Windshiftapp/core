@@ -1,4 +1,3 @@
-import IconBook from '@tabler/icons-svelte-runes/icons/book';
 import IconCalendar from '@tabler/icons-svelte-runes/icons/calendar';
 import IconClock from '@tabler/icons-svelte-runes/icons/clock';
 import IconFlag from '@tabler/icons-svelte-runes/icons/flag';
@@ -48,14 +47,6 @@ export const mainNavItems = [
     labelKey: 'nav.iterations',
     href: '/iterations',
     activeViews: ['iterations', 'iteration-detail'],
-  },
-  {
-    id: 'logbook',
-    icon: IconBook,
-    labelKey: 'nav.knowledgeBase',
-    href: '/logbook',
-    activeViews: ['logbook', 'logbook-document'],
-    permission: 'canAccessLogbook',
   },
   {
     id: 'assets',

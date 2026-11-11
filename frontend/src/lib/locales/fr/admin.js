@@ -21,6 +21,14 @@ export default {
     systemDefault: 'Paramètre système par défaut',
     themeManager: {
       background: 'Arrière-plan', text: 'Texte',
+      brandLayout: 'Marque de la barre latérale',
+      brandLayoutMarkText: 'Symbole + texte',
+      brandLayoutMarkOnly: 'Symbole seul',
+      brandLayoutFullLogo: 'Logo complet',
+      brandLayoutHelp: 'Contrôle la barre latérale développée. La barre latérale réduite affiche toujours le symbole.',
+      brandPreview: 'Aperçu de la barre latérale',
+      brandPreviewExpanded: 'Développée',
+      brandPreviewCollapsed: 'Réduite',
       failedToLoad: 'Échec du chargement des thèmes.', failedToCreate: 'Échec de la création du thème.',
       failedToUpdate: 'Échec de la mise à jour du thème.', failedToDelete: 'Échec de la suppression du thème.',
       failedToActivate: 'Échec de l\'activation du thème.',
@@ -31,6 +39,17 @@ export default {
       },
     },
 
+    generalSettings: {
+      title: 'Général',
+      subtitle: "Configuration à l'échelle de l'instance",
+      siteIdentity: 'Identité du site',
+      siteIdentityDescription:
+        "Le nom du produit affiché dans l'onglet du navigateur, la barre latérale et les écrans de connexion et de configuration.",
+      siteTitle: 'Titre du site',
+      preview: 'Aperçu',
+      saved: 'Paramètres généraux enregistrés',
+    },
+
     // Admin settings
     admin: 'Administration',
     systemSettings: 'Paramètres système',
@@ -39,6 +58,7 @@ export default {
 
     // Admin panel group labels (for Admin.svelte)
     adminGroups: {
+      general: 'Général',
       contentStructure: 'Contenu et structure',
       workflowProcess: 'Flux de travail et processus',
       integrationLinks: 'Intégrations et liens',
@@ -50,6 +70,10 @@ export default {
 
     // Admin panel item labels and descriptions (for Admin.svelte)
     adminItems: {
+      general: {
+        title: 'Général',
+        description: "Configuration à l'échelle de l'instance, comme le titre du site",
+      },
       customFields: { title: 'Champs personnalisés', description: 'Gérer les définitions des champs personnalisés' },
       screens: { title: 'Écrans', description: 'Configurer les écrans de formulaires et les dispositions' },
       hierarchyLevels: {
@@ -293,6 +317,10 @@ export default {
       importing: 'Importation en cours…',
       importWarning: 'L\'ensemble de configuration a été importé avec des avertissements.',
       importFailed: 'Échec de l\'importation de l\'ensemble de configuration.',
+      importNameTitle: 'Nommer l\'ensemble importé',
+      importNameDescription:
+        'L\'importation crée une copie. Choisissez un nom pour l\'ensemble importé.',
+      importInvalidFile: 'Ce fichier n\'est pas un modèle d\'ensemble de configuration.',
       unresolvedReferencesHeading: 'L\'importation fait référence à des entités qui n\'existent pas sur cette instance.',
       defaultConflictHeading: 'L\'importation entre en conflit avec une entité par défaut sur cette instance.',
       unresolvedImportTitle: 'Importation : références non résolues',
@@ -547,6 +575,9 @@ export default {
       notConfigured: 'Non configuré',
       callbackUrl: 'URL de rappel (Callback)',
       callbackUrlHelp: 'Configurez cette URL comme URL de redirection dans votre fournisseur d\'identité',
+      baseUrlWarningTitle: 'L\'URL de base du serveur n\'est pas configurée',
+      baseUrlWarningBody:
+        'Windshift utilise {url} par défaut pour les liens et les callbacks OAuth. La connexion SSO enverra donc cette adresse à votre fournisseur d\'identité. Définissez la variable d\'environnement BASE_URL et redémarrez Windshift avant d\'enregistrer l\'URL de rappel.',
       scopes: 'Portées (Scopes)',
       scopesHelp: 'Liste des portées OIDC séparées par des espaces',
       nameClaimsHelp:
@@ -652,6 +683,14 @@ export default {
       textBody: 'Corps texte brut',
       adminNotes: 'Description (notes d\'administration)',
       activeHint: 'Actif (décocher pour réutiliser la valeur par défaut)',
+      localeLabel: "Langue",
+      defaultLocale: "Par défaut (toutes les langues)",
+      translationHint: "Vous modifiez la version de cette langue. Les autres langues utilisent le modèle par défaut.",
+      translationSaved: "Traduction enregistrée",
+      translationDelete: "Supprimer la traduction",
+      translationDeleted: "Traduction supprimée",
+      translationSaveFailed: "Échec de l'enregistrement de la traduction : {error}",
+      translationDeleteFailed: "Échec de la suppression de la traduction : {error}",
       availableVariables: 'Variables disponibles',
       syntaxHint:
         "Les modèles utilisent la syntaxe html/template de Go. Utilisez {open} .Field {close} pour les valeurs et {open} range .Items {close}…{open} end {close} pour boucler.",
@@ -910,11 +949,6 @@ export default {
         dependency_analysis: {
           name: 'Analyse des dépendances',
           description: 'Analyser et suggérer des dépendances entre éléments',
-        },
-        logbook_articles: {
-          name: 'Articles de journal de bord',
-          description:
-            'Classification, nettoyage et génération d\'articles automatisés pour le journal de bord',
         },
       },
     },

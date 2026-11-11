@@ -232,6 +232,7 @@ export default {
     "backToIterations": "반복 주기로 돌아가기",
     "filterByIteration": "반복 주기로 필터링",
     "addGlobalIteration": "반복 주기 추가",
+    "showCompletedIterations": "완료된 반복 주기 표시",
     "status": {
       "planned": "계획됨",
       "active": "활성",

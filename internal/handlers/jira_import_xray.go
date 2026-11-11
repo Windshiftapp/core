@@ -247,7 +247,7 @@ func jiraTestCasePriority(priority *jira.JiraPriority) string {
 		return "critical"
 	case "high", "major":
 		return "high"
-	case "low", "minor":
+	case "low", "lowest", "minor", "trivial":
 		return "low"
 	default:
 		return "medium"

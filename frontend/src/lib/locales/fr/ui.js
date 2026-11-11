@@ -212,10 +212,26 @@ export default {
 
     // Sélecteur de jeu d'approbations
     selectApprovalSet: 'Sélectionner un ensemble d’approbations',
+
+    // Sélecteur de date
+    datePicker: {
+      previousMonth: 'Mois précédent',
+      nextMonth: 'Mois suivant',
+      openCalendar: 'Ouvrir le calendrier',
+      selectDate: 'Sélectionner une date...',
+    },
   },
 
   editors: {
     enterText: 'Saisir du texte…',
+    useProvider: 'Modifier avec {label}',
+    useRichText: 'Utiliser l’éditeur de texte enrichi',
+    providerActive: '{label} est actif',
+    discardProviderChanges: 'Ignorer les modifications non enregistrées ?',
+    discardProviderChangesMessage:
+      'Vos modifications dans {label} n’ont pas été enregistrées. Changer d’éditeur les supprime.',
+    discardChanges: 'Ignorer',
+    providerError: 'Le plugin d’éditeur a signalé une erreur : {message}',
     selectDate: 'Sélectionner une date…',
     clickToChangeColor: 'Cliquer pour changer la couleur',
     saveEnter: 'Enregistrer (Entrée)',
@@ -543,6 +559,7 @@ export default {
   },
 
   recurrence: {
+    gregorianRuleHint: 'Les répétitions mensuelles et annuelles utilisent le calendrier grégorien.',
     title: 'Récurrence',
     description: 'Gérer les règles de tâches récurrentes',
     frequency: 'Fréquence',

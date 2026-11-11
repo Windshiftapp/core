@@ -29,6 +29,7 @@
   import Modal from '../../dialogs/Modal.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import { createDeleteItemHandler, createItemActionsBuilder } from '../../utils/workItemTableHelpers.js';
+  import { runBulkTransitionWithScreenRetry } from '../../utils/bulkActions.js';
   import {
     buildListColumnConfiguration,
     DEFAULT_LIST_COLUMNS,
@@ -399,7 +400,13 @@
     if (ids.length === 0 || bulkRunning || !bulkStatusId) return;
     bulkRunning = true;
     try {
-      const result = await itemsApi.bulkTransition(ids, Number(bulkStatusId));
+      const result = await runBulkTransitionWithScreenRetry(
+        itemsApi.bulkTransition,
+        ids,
+        Number(bulkStatusId)
+      );
+      // The user declined the retry; nothing moved and the selection stays.
+      if (result === null) return;
       if (result.failed_count > 0) {
         errorToast(
           t('supportQueue.bulkPartial', {

@@ -7,6 +7,7 @@
   import { homepageStore } from '../stores/homepageStore.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { themeStore } from '../stores/theme.svelte.js';
+  import { brandStore, resolveBrandLockup } from '../stores/brand.svelte.js';
   import { aiStore } from '../stores/aiStore.svelte.js';
   import { getShortcutDisplay } from '../utils/keyboardShortcuts.js';
   import { workspaceMenuItems } from '../navigation/workspaceMenu.js';
@@ -117,6 +118,24 @@
     bottomNavItems.filter(item => !item.permission || $permissionStore[item.permission])
   );
 
+  const brandLockup = $derived(
+    resolveBrandLockup(
+      { isDark: themeStore.isDarkMode, expanded: $uiStore.navExpanded },
+      brandStore.snapshot
+    )
+  );
+
+  // The full-logo wordmark spans the sidebar, so center it to keep its margins
+  // even. Mark-based lockups align with the navigation icons on the left, and
+  // the collapsed sidebar always centers the mark.
+  const brandLinkClass = $derived(
+    !$uiStore.navExpanded
+      ? 'justify-center'
+      : brandLockup.variant === 'full'
+        ? 'justify-center px-4'
+        : 'justify-start px-4'
+  );
+
   function showCreateDropdown() {
     onShowCreateModal();
   }
@@ -137,35 +156,33 @@
 </script>
 
 {#snippet sidebarHeader()}
-  <!-- Logo -->
-  <Tooltip content="Windshift" placement="right" disabled={$uiStore.navExpanded}>
+  <!-- Brand lockup: mark + site title, mark only, or full logo per brand_layout -->
+  <Tooltip content={brandLockup.text} placement="right" disabled={$uiStore.navExpanded}>
     <a
       href="/"
       onclick={closePopoverSurface}
       data-testid="nav-logo-link"
-      class="flex items-center {$uiStore.navExpanded
-        ? 'justify-start px-4'
-        : 'justify-center'} w-full h-10 mb-2 hover:opacity-80 transition-opacity cursor-pointer"
+      class="flex items-center {brandLinkClass} w-full h-10 mb-2 hover:opacity-80 transition-opacity cursor-pointer"
     >
-      {#if themeStore.isDarkMode && themeStore.activeTheme?.logo_url_dark}
+      {#if brandLockup.src}
         <img
-          src={themeStore.activeTheme.logo_url_dark}
-          alt={themeStore.activeTheme.name || 'Windshift'}
+          src={brandLockup.src}
+          alt={brandLockup.text}
           data-testid="nav-logo"
-          class="max-w-8 max-h-8 object-contain flex-shrink-0"
-        />
-      {:else if themeStore.activeTheme?.logo_url}
-        <img
-          src={themeStore.activeTheme.logo_url}
-          alt={themeStore.activeTheme.name || 'Windshift'}
-          data-testid="nav-logo"
-          class="max-w-8 max-h-8 object-contain flex-shrink-0"
+          class={brandLockup.variant === 'full'
+            ? 'max-h-8 max-w-full object-contain flex-shrink-0'
+            : 'max-w-8 max-h-8 object-contain flex-shrink-0'}
         />
       {:else}
-        <img src="windshift-3.svg" alt="Windshift" class="w-8 h-8 flex-shrink-0" />
+        <img
+          src="windshift-3.svg"
+          alt={brandLockup.text}
+          data-testid="nav-logo"
+          class="w-8 h-8 flex-shrink-0"
+        />
       {/if}
-      {#if $uiStore.navExpanded}
-        <span class="ml-3 font-semibold text-sm whitespace-nowrap">Windshift</span>
+      {#if brandLockup.showText}
+        <span class="ml-3 font-semibold text-sm whitespace-nowrap truncate" data-testid="nav-brand-title">{brandLockup.text}</span>
       {/if}
     </a>
   </Tooltip>

@@ -11,13 +11,9 @@ import { workspaceDataStore } from './workspaceDataStore.svelte.js';
 import { workspacesStore } from './workspaces.svelte.js';
 
 const FIELD_MAP = {
-  title: 'title',
   description: 'description',
   status: 'status_id',
   priority: 'priority_id',
-  dueDate: 'due_date',
-  startDate: 'start_date',
-  endDate: 'end_date',
   milestone: 'milestones',
   iteration: 'iteration_id',
   assignee: 'assignee_id',
@@ -82,13 +78,9 @@ const RELATED_ITEM_FIELDS = {
 };
 
 const DEFAULT_EDITING_STATE = {
-  title: { active: false, value: '' },
   description: { active: false, value: '' },
   status: { active: false, value: null },
   priority: { active: false, value: null },
-  dueDate: { active: false, value: null },
-  startDate: { active: false, value: null },
-  endDate: { active: false, value: null },
   milestone: { active: false, value: [] },
   iteration: { active: false, value: null },
   project: { active: false, value: null },
@@ -231,6 +223,8 @@ class ItemDetailStore {
         label: transition.name,
         builtin_key: transition.builtin_key,
         categoryColor: transition.category_color || null,
+        // Screen summary the transition modal opens before moving (WI-1835).
+        screen: transition.screen || null,
       }));
     }
     return this.loadingStatusTransitions ? [{ value: '', label: 'Loading...' }] : [];
@@ -286,13 +280,17 @@ class ItemDetailStore {
     this.#diagramsLoadedItemId = null;
     this.error = null;
     this.notFound = false;
+    // Only the first load flashes placeholders. A background reconcile of the
+    // item already on screen keeps its loaded sections in place; flipping
+    // these flags replaces the linked/child lists with a loading message and
+    // makes every field save flicker.
     if (!isSwitch) {
       this.loading = true;
       this.loadingLinks = true;
+      this.loadingStatusTransitions = true;
+      this.loadingWatchStatus = true;
+      this.loadingChildItems = true;
     }
-    this.loadingStatusTransitions = true;
-    this.loadingWatchStatus = true;
-    this.loadingChildItems = true;
 
     try {
       // Do not activate a different scope (e.g. a global board) just because
@@ -390,7 +388,13 @@ class ItemDetailStore {
       this.watcherCount = summary.watcher_count || 0;
       this.watchers = null;
       this.mergedIntoItemId = summary.merged_into_item_id || null;
-      this.childItems = summary.children || [];
+      const nextChildItems = summary.children || [];
+      // Replacing the array on every reconcile re-runs the child list's
+      // drag-and-drop setup; keep the reference when nothing display-relevant
+      // changed.
+      if (!childItemListsMatch(this.childItems, nextChildItems)) {
+        this.childItems = nextChildItems;
+      }
       this.currentItemType = summary.current_item_type || null;
       this.currentHierarchyLevel = summary.current_hierarchy_level || null;
       this.availableSubIssueTypes = summary.available_sub_issue_types || [];
@@ -900,7 +904,8 @@ class ItemDetailStore {
     directValue = null,
     assigneeName = null,
     iterationName = null,
-    teamName = null
+    teamName = null,
+    transitionFields = null
   ) {
     if (this.saving) {
       // A save is in flight; remember the latest requested value per field
@@ -910,6 +915,7 @@ class ItemDetailStore {
         assigneeName,
         iterationName,
         teamName,
+        transitionFields,
       });
       return;
     }
@@ -919,11 +925,8 @@ class ItemDetailStore {
       let updateData = {};
 
       if (field === 'title') {
-        const newTitle = directValue || this.editing.title.value.trim();
-        if (newTitle === this.item.title) {
-          this.cancelEditing('title');
-          return;
-        }
+        const newTitle = directValue;
+        if (newTitle === this.item.title) return;
         updateData.title = newTitle;
       } else if (field === 'description') {
         const newDescription = directValue !== null ? directValue : this.editing.description.value;
@@ -939,7 +942,9 @@ class ItemDetailStore {
           return;
         }
         // Status changes must use the transition endpoint for workflow validation.
-        const updatedItem = await items.transition(this.item.id, newStatusId);
+        const updatedItem = transitionFields
+          ? await items.transition(this.item.id, newStatusId, transitionFields)
+          : await items.transition(this.item.id, newStatusId);
         this.item = { ...this.item, ...updatedItem };
         this.cancelEditing('status');
         await this.refreshAvailableTransitions();
@@ -954,26 +959,17 @@ class ItemDetailStore {
         this.item = { ...this.item, priority_id: newPriorityId };
       } else if (field === 'due_date') {
         const newDueDate = directValue !== null ? directValue : null;
-        if (newDueDate === this.item.due_date) {
-          this.cancelEditing('dueDate');
-          return;
-        }
+        if (newDueDate === this.item.due_date) return;
         updateData.due_date = newDueDate;
         this.item = { ...this.item, due_date: newDueDate };
       } else if (field === 'start_date') {
         const newStartDate = directValue !== null ? directValue : null;
-        if (newStartDate === this.item.start_date) {
-          this.cancelEditing('startDate');
-          return;
-        }
+        if (newStartDate === this.item.start_date) return;
         updateData.start_date = newStartDate;
         this.item = { ...this.item, start_date: newStartDate };
       } else if (field === 'end_date') {
         const newEndDate = directValue !== null ? directValue : null;
-        if (newEndDate === this.item.end_date) {
-          this.cancelEditing('endDate');
-          return;
-        }
+        if (newEndDate === this.item.end_date) return;
         updateData.end_date = newEndDate;
         this.item = { ...this.item, end_date: newEndDate };
       } else if (field === 'milestone') {
@@ -1141,7 +1137,8 @@ class ItemDetailStore {
           pending.directValue,
           pending.assigneeName,
           pending.iterationName,
-          pending.teamName
+          pending.teamName,
+          pending.transitionFields ?? null
         );
       }
     } finally {

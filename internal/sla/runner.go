@@ -2,6 +2,7 @@ package sla
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"strconv"
 	"time"
@@ -81,6 +82,15 @@ func (e *Engine) runBreachJob(ctx context.Context, job models.SLAJob) error {
 			cycle.NextDeadlineAt == nil || !cycle.NextDeadlineAt.Equal(*job.DeadlineAt) {
 			return e.retireClaimedJob(ctx, tx, job)
 		}
+		// A deactivated metric (or one imported inactive) must not emit a
+		// breach. Retire the job; activation re-enqueues recalculation.
+		compiled, err := e.metricCompiled(ctx, tx, cycle)
+		if err != nil {
+			return err
+		}
+		if !compiled {
+			return e.retireClaimedJob(ctx, tx, job)
+		}
 		config, workspaceID, stoppedAt, stopped, err := e.stopPrecedesDeadline(ctx, tx, cycle, *job.DeadlineAt)
 		if err != nil {
 			return err
@@ -153,6 +163,36 @@ func (e *Engine) stopPrecedesDeadline(ctx context.Context, tx database.Tx, cycle
 	return config, snapshot.WorkspaceID, updatedAt, true, nil
 }
 
+// metricCompiled reports whether a cycle's metric is part of the workspace's
+// active compiled configuration. A job can outlive a metric deactivation or
+// belong to a metric imported inactive; such jobs must retire silently instead
+// of emitting a breach or warning for a metric the workspace does not run.
+func (e *Engine) metricCompiled(ctx context.Context, tx database.Tx, cycle *models.ItemSLACycle) (bool, error) {
+	snapshot, err := loadItemSnapshotTx(ctx, tx, cycle.ItemID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if snapshot.WorkspaceID == 0 {
+		return false, nil
+	}
+	generations, err := e.repo.GenerationsForWorkspacesTx(ctx, tx, []int{snapshot.WorkspaceID})
+	if err != nil {
+		return false, err
+	}
+	generation, ok := generations[snapshot.WorkspaceID]
+	if !ok {
+		return false, nil
+	}
+	config, err := e.configuration(ctx, snapshot.WorkspaceID, generation)
+	if err != nil {
+		return false, err
+	}
+	return config.metricsByID[cycle.MetricID] != nil, nil
+}
+
 func (e *Engine) runWarningJob(ctx context.Context, job models.SLAJob) error {
 	if job.CycleID == nil || job.DeadlineAt == nil {
 		return e.repo.FailJob(ctx, job.ID, "malformed SLA job")
@@ -167,6 +207,15 @@ func (e *Engine) runWarningJob(ctx context.Context, job models.SLAJob) error {
 		}
 		if cycle.Status != models.SLACycleOngoing ||
 			cycle.NextDeadlineAt == nil || !cycle.NextDeadlineAt.Equal(*job.DeadlineAt) {
+			return e.retireClaimedJob(ctx, tx, job)
+		}
+		// A deactivated metric (or one imported inactive) must not emit a
+		// warning. Retire the job; activation re-enqueues recalculation.
+		compiled, err := e.metricCompiled(ctx, tx, cycle)
+		if err != nil {
+			return err
+		}
+		if !compiled {
 			return e.retireClaimedJob(ctx, tx, job)
 		}
 		firedAt := e.clock.Now()

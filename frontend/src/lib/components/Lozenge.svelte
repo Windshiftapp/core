@@ -113,6 +113,7 @@
 <span
   class="inline-flex items-center whitespace-nowrap {square ? '' : 'gap-1'} font-semibold border {rounded} {square ? 'w-4 h-4 flex-shrink-0' : sizeClass} {className}"
   style={computedStyle}
+  dir="auto"
   data-testid={dataTestid}
 >
   {#if Icon}

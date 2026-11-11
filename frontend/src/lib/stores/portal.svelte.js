@@ -34,7 +34,7 @@ import {
   removeSectionMember,
   updateSectionField,
 } from './sectionManagement.js';
-import { errorToast } from './toasts.svelte.js';
+import { errorToast, surfaceError } from './toasts.svelte.js';
 
 // Transitional exports for consumers that have not moved to portalPresentation yet.
 export { gradients, iconMap } from './portalPresentation.js';
@@ -186,8 +186,8 @@ async function loadPortal(slug) {
       isInitialLoad = false;
     }, 100);
   } catch (err) {
-    console.error('Failed to load portal:', err);
     error = err.message || 'Failed to load portal';
+    surfaceError(err, { context: 'loadPortal' });
   } finally {
     loading = false;
   }
@@ -276,7 +276,7 @@ async function handleBackgroundUpload(files) {
       selectBackgroundImage(url);
     }
   } catch (err) {
-    console.error('Failed to upload portal background:', err);
+    surfaceError(err, { context: 'uploadPortalBackground' });
   } finally {
     uploadingBackground = false;
   }
@@ -298,7 +298,7 @@ async function handleLogoUpload(files) {
       saveCustomizations();
     }
   } catch (err) {
-    console.error('Failed to upload portal logo:', err);
+    surfaceError(err, { context: 'uploadPortalLogo' });
   } finally {
     uploadingLogo = false;
   }
@@ -386,7 +386,7 @@ async function saveCustomizations() {
     try {
       await channels.updateConfig(portalData.channel_id, buildPortalConfig());
     } catch (err) {
-      console.error('Failed to save customizations:', err);
+      surfaceError(err, { context: 'savePortalCustomizations' });
     }
   }, 1000);
 }
@@ -448,7 +448,7 @@ async function loadRequestTypes({ forCustomization = isEditing || showCustomizeP
   } catch (err) {
     if (loadId !== requestTypesLoadId) return;
     requestTypes = [];
-    console.error('Failed to load request types:', err);
+    surfaceError(err, { context: 'loadPortalRequestTypes' });
   } finally {
     if (loadId === requestTypesLoadId) {
       loadingRequestTypes = false;
@@ -504,7 +504,7 @@ async function loadAssetReports({ forCustomization = isEditing || showCustomizeP
     if (loadId !== assetReportsLoadId) return;
     assetReports = [];
     hasAssetSets = false;
-    console.error('Failed to load asset reports:', err);
+    surfaceError(err, { context: 'loadPortalAssetReports' });
   } finally {
     if (loadId === assetReportsLoadId) {
       loadingAssetReports = false;

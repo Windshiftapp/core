@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
@@ -52,6 +53,10 @@ func createMilestonePageLink(links milestonePageLinkApplication) jsonOperation[m
 		if err != nil {
 			return models.MilestonePageLink{}, milestonePageLinkError(err)
 		}
+		logger.Record(r, logger.ActionMilestonePageLinkCreate, logger.ResourceMilestonePageLink, &created.ID, "", map[string]any{
+			"milestone_id": milestoneID,
+			"page_id":      input.PageID,
+		})
 		return *created, nil
 	}
 }
@@ -66,7 +71,13 @@ func deleteMilestonePageLink(links milestonePageLinkApplication) commandOperatio
 		if err != nil {
 			return err
 		}
-		return milestonePageLinkError(links.Delete(user.ID, milestoneID, linkID))
+		if err := links.Delete(user.ID, milestoneID, linkID); err != nil {
+			return milestonePageLinkError(err)
+		}
+		logger.Record(r, logger.ActionMilestonePageLinkDelete, logger.ResourceMilestonePageLink, &linkID, "", map[string]any{
+			"milestone_id": milestoneID,
+		})
+		return nil
 	}
 }
 

@@ -3325,6 +3325,7 @@
           "item_updated",
           "item_linked",
           "manual",
+          "status_loop",
           "sla_breached",
           "sla_warning",
           "scm_tag_created",
@@ -3341,6 +3342,7 @@
           "ActionTriggerItemUpdated",
           "ActionTriggerItemLinked",
           "ActionTriggerManual",
+          "ActionTriggerStatusLoop",
           "ActionTriggerSLABreached",
           "ActionTriggerSLAWarning",
           "ActionTriggerSCMTagCreated",
@@ -3744,6 +3746,10 @@
           "frac_index": {
             "description": "Manual sorting field",
             "type": "string"
+          },
+          "has_children": {
+            "description": "HasChildren is set only by list reads that opt into hierarchy support. It\nis true when at least one child exists in a workspace the caller can view.",
+            "type": "boolean"
           },
           "id": {
             "type": "integer"
@@ -4284,6 +4290,10 @@
           "is_global": {
             "description": "false=local to workspace, true=global (shared)",
             "type": "boolean"
+          },
+          "last_activity_at": {
+            "description": "LastActivityAt is the time of the newest milestone Activity entry; nil\nuntil the first activity.",
+            "type": "string"
           },
           "latest_release": {
             "$ref": "#/components/schemas/models.MilestoneRelease"
@@ -5561,7 +5571,7 @@
   },
   "info": {
     "contact": {},
-    "description": "Public API reference for Windshift. REST operations use the `/rest/api/v1` base path and bearer tokens (`Authorization: Bearer crw_*`). Operational health and metrics endpoints are unauthenticated and use root-level paths.",
+    "description": "Public API reference for the deprecated v1 API. REST operations use the `/rest/api/v1` base path and bearer tokens (`Authorization: Bearer crw_*`). Superseded by v2 (`/rest/api/v2`, contract at `/rest/api/v2/openapi.json`); new integrations must not use v1. Operational health and metrics endpoints are unauthenticated and use root-level paths.",
     "title": "Windshift HTTP API",
     "version": "1"
   },

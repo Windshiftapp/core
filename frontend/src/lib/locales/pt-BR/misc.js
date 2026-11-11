@@ -242,6 +242,7 @@ export default {
     backToIterations: 'Voltar para Iterações',
     filterByIteration: 'Filtrar por iteração',
     addGlobalIteration: 'Adicionar Iteração',
+    showCompletedIterations: 'Mostrar iterações concluídas',
 
     // Status
     status: {
@@ -417,6 +418,8 @@ export default {
     assignee: 'Responsável',
     role: 'Papel',
     failedToDownload: 'Falha ao baixar arquivo',
+    hideFromCustomer: 'Ocultar do cliente',
+    showToCustomer: 'Mostrar ao cliente',
     editDiagram: 'Editar diagrama',
     untitledDiagram: 'Diagrama sem Título',
     diagram: 'diagrama',

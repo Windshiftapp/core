@@ -94,7 +94,7 @@ func loadCutover(ctx context.Context, query cutoverQuery, key string) (*Cutover,
 	return cutover, nil
 }
 
-// AppendStandalone stores a compatibility trigger idempotently.
+// AppendStandalone stores a side-effect trigger idempotently.
 func AppendStandalone(ctx context.Context, db database.Database, store *events.Store, input events.NewEvent, label string) error {
 	if _, err := store.AppendStandalone(ctx, input); err != nil {
 		var existing int
@@ -106,42 +106,61 @@ func AppendStandalone(ctx context.Context, db database.Database, store *events.S
 	return nil
 }
 
-// CompatibilityInput describes one legacy trigger admitted to the journal.
-type CompatibilityInput struct {
+// SideEffectInput describes one side-effect trigger admitted to the journal.
+// These events have no domain mutation of their own (approvals, SLA,
+// reminders, sweeps), so the caller supplies the provenance explicitly.
+type SideEffectInput struct {
 	Payload           any
 	WorkspaceID       *int
 	AggregateType     string
 	AggregateID       string
 	EventType         string
 	ActorUserID       int
+	ActorKind         string
+	ActorRef          string
+	SourceKind        string
+	SourceRef         string
 	CorrelationID     string
 	CausationEventKey string
 }
 
-// NewCompatibilityEvent encodes the common envelope used during domain
-// producer cutovers.
-func NewCompatibilityEvent(input CompatibilityInput) (events.NewEvent, error) {
+// NewSideEffectEvent encodes the shared envelope for durable side-effect
+// events. Provenance is preserved so consumers can apply the same import and
+// suppression rules as canonical domain facts.
+func NewSideEffectEvent(input SideEffectInput) (events.NewEvent, error) {
 	payload, err := json.Marshal(input.Payload)
 	if err != nil {
-		return events.NewEvent{}, fmt.Errorf("encode durable compatibility event: %w", err)
+		return events.NewEvent{}, fmt.Errorf("encode durable side-effect event: %w", err)
 	}
 	event := events.NewEvent{
 		Key: uuid.New().String(), WorkspaceID: input.WorkspaceID,
 		AggregateType: input.AggregateType, AggregateID: input.AggregateID,
 		Type: input.EventType, PayloadVersion: 1, OccurredAt: time.Now().UTC(),
-		ActorKind: "system", SourceKind: "compatibility",
+		ActorKind: input.ActorKind, ActorRef: input.ActorRef,
+		SourceKind: input.SourceKind, SourceRef: input.SourceRef,
 		CorrelationID: input.CorrelationID, CausationEventKey: input.CausationEventKey,
 		Payload: payload,
 	}
-	if input.ActorUserID > 0 {
-		event.ActorKind = "user"
+	if event.ActorKind == "" {
+		if input.ActorUserID > 0 {
+			event.ActorKind = "user"
+		} else {
+			event.ActorKind = "system"
+		}
+	}
+	if event.ActorRef == "" && input.ActorUserID > 0 {
 		event.ActorRef = strconv.Itoa(input.ActorUserID)
+	}
+	if event.SourceKind == "" {
+		event.SourceKind = "side_effect"
 	}
 	return event, nil
 }
 
-// ConfigureCutoverConsumers installs always-on compatibility subscriptions
-// followed by the canonical subscription at its recorded boundary.
+// ConfigureCutoverConsumers installs the always-on side-effect subscription
+// followed by the canonical domain subscription at its recorded boundary. The
+// boundary keeps an upgrade from re-delivering facts a previous consumer
+// already handled.
 func ConfigureCutoverConsumers(ctx context.Context, store *events.Store, cutover *Cutover, canonical events.Consumer, always ...events.Consumer) error {
 	canonical.Active = cutover != nil
 	canonical.StartEventID = 1

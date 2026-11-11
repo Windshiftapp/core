@@ -65,6 +65,15 @@ export const collections = {
       body: JSON.stringify(data),
     });
   },
+  // Merge patch: only the fields present are written, so a caller that owns one
+  // slice of the configuration does not have to round-trip the rest.
+  patchBoardConfiguration: (collectionId, data, workspaceId = null) => {
+    return fetchV2Data(boardConfigurationPath(collectionId, workspaceId), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/merge-patch+json' },
+      body: JSON.stringify(data),
+    });
+  },
   deleteBoardConfiguration: (collectionId, _configId, workspaceId = null) => {
     return fetchV2Data(boardConfigurationPath(collectionId, workspaceId), {
       method: 'DELETE',

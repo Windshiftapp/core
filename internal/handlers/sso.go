@@ -111,18 +111,21 @@ type SSOProviderResponse struct {
 	UpdatedAt          time.Time `json:"updated_at"`
 }
 
-// SSOProviderRequest represents the request body for creating/updating a provider
+// SSOProviderRequest represents the request body for creating/updating a provider.
+// The booleans are pointers so an update can tell an omitted field (leave the
+// stored value alone) from an explicit false (clear it). Create treats nil as
+// the field's default.
 type SSOProviderRequest struct {
 	Slug                 string `json:"slug"`
 	Name                 string `json:"name"`
 	ProviderType         string `json:"provider_type"`
-	Enabled              bool   `json:"enabled"`
-	IsDefault            bool   `json:"is_default"`
+	Enabled              *bool  `json:"enabled,omitempty"`
+	IsDefault            *bool  `json:"is_default,omitempty"`
 	IssuerURL            string `json:"issuer_url"`
 	ClientID             string `json:"client_id"`
 	ClientSecret         string `json:"client_secret,omitempty"`
 	Scopes               string `json:"scopes"`
-	AutoProvisionUsers   bool   `json:"auto_provision_users"`
+	AutoProvisionUsers   *bool  `json:"auto_provision_users,omitempty"`
 	RequireVerifiedEmail *bool  `json:"require_verified_email"` // Pointer distinguishes false from an omitted trust setting.
 	AttributeMapping     string `json:"attribute_mapping"`
 	// SAML-specific fields
@@ -130,7 +133,7 @@ type SSOProviderRequest struct {
 	SAMLIdPSSOURL      string `json:"saml_idp_sso_url,omitempty"`
 	SAMLIdPCertificate string `json:"saml_idp_certificate,omitempty"`
 	SAMLSPEntityID     string `json:"saml_sp_entity_id,omitempty"`
-	SAMLSignRequests   bool   `json:"saml_sign_requests"`
+	SAMLSignRequests   *bool  `json:"saml_sign_requests,omitempty"`
 }
 
 // sanitizeSSOProviderRequest bounds the user-supplied text fields shared by
@@ -735,7 +738,7 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isDefault := count == 0 || req.IsDefault
+	isDefault := count == 0 || boolValue(req.IsDefault)
 
 	// Encrypt client secret if provided (OIDC)
 	if req.ClientSecret != "" {
@@ -763,20 +766,20 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 		Slug:                  req.Slug,
 		Name:                  req.Name,
 		ProviderType:          req.ProviderType,
-		Enabled:               req.Enabled,
+		Enabled:               boolValue(req.Enabled),
 		IsDefault:             isDefault,
 		IssuerURL:             req.IssuerURL,
 		ClientID:              req.ClientID,
 		ClientSecretEncrypted: encryptedSecret,
 		Scopes:                req.Scopes,
-		AutoProvisionUsers:    req.AutoProvisionUsers,
+		AutoProvisionUsers:    boolValue(req.AutoProvisionUsers),
 		RequireVerifiedEmail:  trustProviderEmail,
 		AttributeMapping:      req.AttributeMapping,
 		SAMLIdPMetadataURL:    req.SAMLIdPMetadataURL,
 		SAMLIdPSSOURL:         req.SAMLIdPSSOURL,
 		SAMLIdPCertificate:    req.SAMLIdPCertificate,
 		SAMLSPEntityID:        req.SAMLSPEntityID,
-		SAMLSignRequests:      req.SAMLSignRequests,
+		SAMLSignRequests:      boolValue(req.SAMLSignRequests),
 	}
 
 	if err := h.providerStore.Create(provider); err != nil {
@@ -861,9 +864,15 @@ func (h *SSOHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 	if req.Scopes != "" {
 		existing.Scopes = req.Scopes
 	}
-	existing.Enabled = req.Enabled
-	existing.IsDefault = req.IsDefault
-	existing.AutoProvisionUsers = req.AutoProvisionUsers
+	if req.Enabled != nil {
+		existing.Enabled = *req.Enabled
+	}
+	if req.IsDefault != nil {
+		existing.IsDefault = *req.IsDefault
+	}
+	if req.AutoProvisionUsers != nil {
+		existing.AutoProvisionUsers = *req.AutoProvisionUsers
+	}
 	if req.RequireVerifiedEmail != nil {
 		existing.RequireVerifiedEmail = *req.RequireVerifiedEmail
 	}
@@ -883,7 +892,9 @@ func (h *SSOHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 	if req.SAMLSPEntityID != "" {
 		existing.SAMLSPEntityID = req.SAMLSPEntityID
 	}
-	existing.SAMLSignRequests = req.SAMLSignRequests
+	if req.SAMLSignRequests != nil {
+		existing.SAMLSignRequests = *req.SAMLSignRequests
+	}
 
 	if err := h.providerStore.Update(existing); err != nil {
 		respondInternalError(w, r, err)

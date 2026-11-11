@@ -3,7 +3,7 @@
   import Spinner from '../components/Spinner.svelte';
   import { setOAuthReturnURL } from '../utils/oauthReturn.js';
   import StateDisplay from '../components/StateDisplay.svelte';
-  import { useDebounce } from 'runed';
+  import { useDebouncedAction } from '../composables/useDebouncedAction.svelte.js';
   import { workspaceSCM } from '../api/scm.js';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
@@ -85,7 +85,7 @@
   // Debounced re-fetch on search input so each keystroke doesn't hit the SCM
   // API — the query goes to the provider (page 1) rather than only filtering
   // whatever pages happen to be loaded already.
-  const debouncedSearch = useDebounce(() => loadRepositories(true), 350);
+  const debouncedSearch = useDebouncedAction(() => loadRepositories(true), 350);
 
   function toggleRepo(repo) {
     if (repo.is_linked) return; // Already linked, can't select

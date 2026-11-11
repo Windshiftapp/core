@@ -26,7 +26,31 @@ export const MESSAGE_TYPES = {
   THEME_UPDATE: 'host:themeUpdate',
   MODAL_RESULT: 'host:modalResult',
   USER_PICKER_RESULT: 'host:userPickerResult',
+
+  // Editor provider protocol (editor.markdown). Every plugin → host editor
+  // message must echo the sessionId the host sent in host:editorInit; the host
+  // drops mismatches so two editors on one page cannot cross-talk.
+  EDITOR_READY: 'plugin:editorReady',
+  EDITOR_CHANGE: 'plugin:editorChange',
+  EDITOR_SAVE: 'plugin:editorSave',
+  EDITOR_CANCEL: 'plugin:editorCancel',
+  EDITOR_ERROR: 'plugin:editorError',
+  EDITOR_INIT: 'host:editorInit',
+  EDITOR_UPDATE: 'host:editorUpdate',
+  EDITOR_SAVE_REQUEST: 'host:editorSaveRequest',
+  EDITOR_CANCEL_REQUEST: 'host:editorCancelRequest',
+  EDITOR_DISPOSE: 'host:editorDispose',
 };
+
+// Editor messages that must echo the sessionId from host:editorInit. READY is
+// deliberately excluded: it is the pre-session handshake, and the plugin only
+// learns the sessionId from the host's reply to it.
+const EDITOR_MESSAGE_TYPES = new Set([
+  MESSAGE_TYPES.EDITOR_CHANGE,
+  MESSAGE_TYPES.EDITOR_SAVE,
+  MESSAGE_TYPES.EDITOR_CANCEL,
+  MESSAGE_TYPES.EDITOR_ERROR,
+]);
 
 /**
  * Initialize plugin bridge for an iframe
@@ -40,6 +64,14 @@ export function createPluginBridge(iframe, options = {}) {
     onResize = () => {},
     onShowUserPicker = () => {},
     pluginName = 'unknown',
+    // sessionId is set for editor providers. Editor messages that do not echo
+    // it are ignored.
+    sessionId = null,
+    onEditorReady = () => {},
+    onEditorChange = () => {},
+    onEditorSave = () => {},
+    onEditorCancel = () => {},
+    onEditorError = () => {},
   } = options;
 
   // Track active modals by ID
@@ -65,9 +97,44 @@ export function createPluginBridge(iframe, options = {}) {
     if (event.origin !== expectedOrigin) {
       return;
     }
+    // Only accept messages from this bridge's own iframe. Two plugins (or two
+    // editor instances) on one page would otherwise receive each other's
+    // messages.
+    if (!iframe?.contentWindow || event.source !== iframe.contentWindow) {
+      return;
+    }
     const message = event.data;
 
     if (!message?.type) return;
+
+    // The plugin cannot echo a sessionId it has not received yet, so the ready
+    // handshake is accepted without one. The source/origin checks above still
+    // pin it to this bridge's iframe. Every later editor message is gated.
+    if (message.type === MESSAGE_TYPES.EDITOR_READY) {
+      onEditorReady(message);
+      return;
+    }
+
+    if (EDITOR_MESSAGE_TYPES.has(message.type)) {
+      if (sessionId == null || message.sessionId !== sessionId) {
+        return;
+      }
+      switch (message.type) {
+        case MESSAGE_TYPES.EDITOR_CHANGE:
+          onEditorChange(message);
+          break;
+        case MESSAGE_TYPES.EDITOR_SAVE:
+          onEditorSave(message);
+          break;
+        case MESSAGE_TYPES.EDITOR_CANCEL:
+          onEditorCancel(message);
+          break;
+        case MESSAGE_TYPES.EDITOR_ERROR:
+          onEditorError(message);
+          break;
+      }
+      return;
+    }
 
     switch (message.type) {
       case MESSAGE_TYPES.READY:
@@ -216,6 +283,12 @@ export function createPluginBridge(iframe, options = {}) {
   // Listen for messages from plugin
   window.addEventListener('message', handleMessage);
 
+  // Editor provider protocol. The host is the only writer: it holds the
+  // markdown and persists it through the normal item/page APIs.
+  function sendEditorInit(payload) {
+    sendToPlugin({ type: MESSAGE_TYPES.EDITOR_INIT, sessionId, ...payload });
+  }
+
   // Return API for host to interact with plugin
   return {
     destroy: () => {
@@ -226,5 +299,13 @@ export function createPluginBridge(iframe, options = {}) {
     },
     sendThemeUpdate,
     sendToPlugin,
+    sendEditorInit,
+    sendEditorUpdate: (markdown) =>
+      sendToPlugin({ type: MESSAGE_TYPES.EDITOR_UPDATE, sessionId, markdown }),
+    sendEditorSaveRequest: () =>
+      sendToPlugin({ type: MESSAGE_TYPES.EDITOR_SAVE_REQUEST, sessionId }),
+    sendEditorCancelRequest: () =>
+      sendToPlugin({ type: MESSAGE_TYPES.EDITOR_CANCEL_REQUEST, sessionId }),
+    sendEditorDispose: () => sendToPlugin({ type: MESSAGE_TYPES.EDITOR_DISPOSE, sessionId }),
   };
 }

@@ -95,6 +95,58 @@ func NewPriorityRepository(db database.Database) *PriorityRepository {
 	return &PriorityRepository{db: db}
 }
 
+// FindByName resolves a priority by its display name, case-insensitively.
+func (r *PriorityRepository) FindByName(name string) (*models.Priority, error) {
+	var priority models.Priority
+	err := scanPriority(
+		r.db.QueryRow("SELECT "+priorityColumns+" FROM priorities p WHERE LOWER(p.name) = LOWER(?) ORDER BY p.id LIMIT 1", name),
+		&priority,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("find priority %q: %w", name, err)
+	}
+	return &priority, nil
+}
+
+// NextSortOrder returns a sort order that appends after the current catalog.
+func (r *PriorityRepository) NextSortOrder() (int, error) {
+	var sortOrder int
+	if err := r.db.QueryRow("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM priorities").Scan(&sortOrder); err != nil {
+		return 0, fmt.Errorf("resolve next priority sort order: %w", err)
+	}
+	return sortOrder, nil
+}
+
+// ConfigurationSetHasPriorities reports whether a configuration set curates
+// priorities explicitly. An empty list means every catalog priority is allowed.
+func (r *PriorityRepository) ConfigurationSetHasPriorities(configSetID int) (bool, error) {
+	var curated bool
+	err := r.db.QueryRow(
+		"SELECT EXISTS(SELECT 1 FROM configuration_set_priorities WHERE configuration_set_id = ?)",
+		configSetID,
+	).Scan(&curated)
+	if err != nil {
+		return false, fmt.Errorf("check priority configuration set %d: %w", configSetID, err)
+	}
+	return curated, nil
+}
+
+// EnsureConfigurationSetLink links a priority to a configuration set unless the
+// association already exists.
+func (r *PriorityRepository) EnsureConfigurationSetLink(priorityID, configSetID int) error {
+	if _, err := r.db.ExecWrite(`
+		INSERT INTO configuration_set_priorities (configuration_set_id, priority_id, created_at)
+		VALUES (?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT (configuration_set_id, priority_id) DO NOTHING
+	`, configSetID, priorityID); err != nil {
+		return fmt.Errorf("link priority %d to configuration set %d: %w", priorityID, configSetID, err)
+	}
+	return nil
+}
+
 const priorityColumns = `p.id, COALESCE(p.builtin_key, ''), p.name,
 	COALESCE(p.description, ''), p.is_default, COALESCE(p.icon, ''),
 	COALESCE(p.color, ''), p.sort_order, p.created_at, p.updated_at`

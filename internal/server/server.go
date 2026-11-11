@@ -34,6 +34,7 @@ import (
 	"windshift/internal/events"
 	"windshift/internal/handlers"
 	"windshift/internal/health"
+	"windshift/internal/integrations/docmost"
 	"windshift/internal/itemevents"
 	"windshift/internal/ldap"
 	"windshift/internal/licensing"
@@ -585,7 +586,7 @@ func (s *Server) initialize() error {
 	s.actionService = services.NewActionService(s.db, services.DefaultActionServiceConfig(), chainStore)
 	s.actionService.SetNotificationService(s.notificationService)
 	s.actionService.SetPermissionService(permService)
-	if err := services.PrepareDurableActionEngine(context.Background(), s.eventEngine, s.actionService, cfg.ActivateDurableActions); err != nil {
+	if err := services.PrepareDurableActionEngine(context.Background(), s.eventEngine, s.actionService); err != nil {
 		return fmt.Errorf("prepare durable action consumers: %w", err)
 	}
 	slog.Info("action service initialized")
@@ -593,7 +594,7 @@ func (s *Server) initialize() error {
 	s.assetActionService = services.NewAssetActionService(s.db, services.DefaultActionServiceConfig(), chainStore)
 	s.assetActionService.SetNotificationService(s.notificationService)
 	s.assetActionService.SetPermissionService(permService)
-	if err := services.PrepareDurableAssetActionEngine(context.Background(), s.eventEngine, s.assetActionService, cfg.ActivateDurableAssetActions); err != nil {
+	if err := services.PrepareDurableAssetActionEngine(context.Background(), s.eventEngine, s.assetActionService); err != nil {
 		return fmt.Errorf("prepare durable asset action consumers: %w", err)
 	}
 	slog.Info("asset action service initialized")
@@ -788,7 +789,15 @@ func (s *Server) initialize() error {
 		pagePermissionService,
 		permService,
 	)
+	docmostClient := docmost.NewClient()
+	docmostService := services.NewDocmostService(
+		repository.NewIntegrationProviderRepository(s.db),
+		repository.NewIntegrationTokenRepository(s.db),
+		services.NewDocmostCredentialEncryption(cfg.Auth.SessionSecret),
+		docmostClient,
+	)
 	knowledgeRetrieval := services.NewKnowledgeRetrievalService(s.db, pagePermissionService)
+	knowledgeRetrieval.SetDocmost(docmostService, docmostClient)
 	knowledgeSearchHandler := handlers.NewKnowledgeSearchHandler(knowledgeRetrieval)
 	knowledgePublication := services.NewKnowledgePublicationService(s.db)
 	pageLabelService := services.NewPageLabelService(pageLabelRepo, logger.NewAuditor(s.db))
@@ -883,6 +892,7 @@ func (s *Server) initialize() error {
 	invitationHandler := handlers.NewInvitationHandler(invitationService)
 
 	themeHandler := handlers.NewThemeHandler(services.NewThemeService(repository.NewThemeRepository(s.db)), logger.NewAuditor(s.db)).WithObjectTranslations(objectTranslationService)
+	generalSettingsHandler := handlers.NewGeneralSettingsHandler(repository.NewSystemSettingRepository(s.db), repository.NewThemeRepository(s.db), logger.NewAuditor(s.db))
 	objectTranslationHandler := handlers.NewObjectTranslationHandler(objectTranslationService, logger.NewAuditor(s.db))
 	userPreferencesService := services.NewUserPreferencesService(repository.NewUserPreferencesRepository(s.db), repository.NewThemeRepository(s.db), permService)
 	userPreferencesHandler := handlers.NewUserPreferencesHandler(userPreferencesService)
@@ -1067,7 +1077,10 @@ func (s *Server) initialize() error {
 	assetActionHandler := handlers.NewAssetActionHandler(repository.NewAssetActionRepository(s.db), assetHandler, s.assetActionService, logger.NewAuditor(s.db))
 
 	jiraImportHandler := handlers.NewJiraImportHandler(s.db, cfg.Auth.SessionSecret, cfg.Jira.CapturePayloadsDir, attachmentStorage).
-		WithAuthorizationCacheInvalidator(authorizationCacheInvalidator)
+		WithAuthorizationCacheInvalidator(authorizationCacheInvalidator).
+		WithImportMaxDuration(cfg.Jira.ImportMaxDuration).
+		WithImportWatchers(cfg.Jira.ImportWatchers).
+		WithImportConcurrency(cfg.Jira.ImportConcurrency)
 	if n, err := jiraImportHandler.ReconcileInterruptedImports(); err != nil {
 		slog.Warn("failed to reconcile interrupted Jira imports", slog.Any("error", err))
 	} else if n > 0 {
@@ -1110,7 +1123,7 @@ func (s *Server) initialize() error {
 	s.kbEventsRetention.Start()
 
 	integrationProviderHandler := handlers.NewIntegrationProviderHandler(repository.NewIntegrationProviderRepository(s.db), scmProviderHandler.GetEncryption(), logger.NewAuditor(s.db))
-	integrationOAuthHandler := handlers.NewIntegrationOAuthHandler(s.db, scmProviderHandler.GetEncryption(), baseURL)
+	integrationOAuthHandler := handlers.NewIntegrationOAuthHandler(s.db, scmProviderHandler.GetEncryption(), baseURL, docmostService)
 	integrationItemLinksHandler := handlers.NewIntegrationItemLinksHandler(s.db, scmProviderHandler.GetEncryption(), permService)
 	todoistSyncHandler := handlers.NewTodoistSyncHandler(s.db, scmProviderHandler.GetEncryption())
 	s.todoistSyncScheduler = scheduler.NewTodoistSyncScheduler(s.db, scmProviderHandler.GetEncryption())
@@ -1151,6 +1164,11 @@ func (s *Server) initialize() error {
 	// process-wide item-change publisher (WI-483 installed a no-op default), and
 	// give the item handler the hub so GET /items/{id}/events can subscribe.
 	sseHub := services.NewSSEHub()
+	// Each tab holds one stream per topic family (notifications, workspace/
+	// collection, item detail) and reconnects briefly overlap, so the old
+	// default of 8 tripped on ordinary multi-tab use. Bound the count, but
+	// leave room for several tabs per user.
+	sseHub.SetMaxUserStreams(cfg.MaxUserStreams)
 	if os.Getenv("WINDSHIFT_E2E_TEST_HOOKS") == "1" {
 		// Parallel e2e workers share the admin user; rapid reloads briefly
 		// overlap streams and would trip the production per-user cap, turning a
@@ -1392,7 +1410,7 @@ func (s *Server) initialize() error {
 	portalHandler.SetKnowledgePublicationService(knowledgePublication)
 	portalHandler.SetKBSignalService(services.NewKBSignalService(s.db))
 	portalHandler.SetCommentService(commentService)
-	portalAuthHandler := handlers.NewPortalAuthHandler(repository.NewPortalAuthRepository(s.db), portalSessionManager, sessionManager, magicLinkService, ipExtractor)
+	portalAuthHandler := handlers.NewPortalAuthHandler(repository.NewPortalAuthRepository(s.db), repository.NewPortalCustomerRepository(s.db), portalSessionManager, sessionManager, magicLinkService, ipExtractor)
 	var portalWebAuthnHandler *handlers.PortalWebAuthnHandler
 	if portalWebAuthnConfig != nil {
 		portalWebAuthnHandler = handlers.NewPortalWebAuthnHandler(
@@ -1456,6 +1474,17 @@ func (s *Server) initialize() error {
 		var pluginOpts []plugins.Option
 		pluginOpts = append(pluginOpts, plugins.WithDatabase(s.db), plugins.WithSCMService(scmSyncService), plugins.WithCommentService(commentService), plugins.WithAllowPublicRoutes(cfg.Plugins.AllowPublicRoutes))
 
+		// The instance identity is a stable install id, independent of license
+		// enforcement: the admin module settings page reads it to issue a
+		// license. Generate it whenever plugins are enabled so the endpoint
+		// works before a license key is configured.
+		instanceService = services.NewInstanceService(repository.NewSystemSettingRepository(s.db))
+		instanceID, instanceErr := instanceService.GetOrCreate()
+		if instanceErr != nil {
+			slog.Error("failed to load instance id", "error", instanceErr)
+			instanceService = nil
+		}
+
 		// License enforcement: when a license public key is configured, a
 		// plugin only contributes capabilities if its license verifies against
 		// this install's instance ID.
@@ -1463,17 +1492,10 @@ func (s *Server) initialize() error {
 			licensePubKey, err := base64.StdEncoding.DecodeString(cfg.Plugins.LicensePubKey)
 			if err != nil || len(licensePubKey) != ed25519.PublicKeySize {
 				slog.Error("invalid PLUGIN_LICENSE_PUBKEY; license enforcement disabled", "error", err)
-			} else {
-				instanceService = services.NewInstanceService(repository.NewSystemSettingRepository(s.db))
-				instanceID, err := instanceService.GetOrCreate()
-				if err != nil {
-					slog.Error("failed to load instance id; license enforcement disabled", "error", err)
-					instanceService = nil
-				} else {
-					pluginLicenseVerifier = licensing.MakeVerifier(ed25519.PublicKey(licensePubKey), instanceID)
-					pluginOpts = append(pluginOpts, plugins.WithLicenseVerifier(pluginLicenseVerifier))
-					slog.Info("plugin license enforcement enabled", "instance_id", instanceID)
-				}
+			} else if instanceService != nil {
+				pluginLicenseVerifier = licensing.MakeVerifier(ed25519.PublicKey(licensePubKey), instanceID)
+				pluginOpts = append(pluginOpts, plugins.WithLicenseVerifier(pluginLicenseVerifier))
+				slog.Info("plugin license enforcement enabled", "instance_id", instanceID)
 			}
 		}
 
@@ -1534,6 +1556,9 @@ func (s *Server) initialize() error {
 
 	pluginHandler := handlers.NewPluginHandler(s.pluginManager, repository.NewPluginRegistryRepository(s.db), logger.NewAuditor(s.db), cfg.Plugins.Disabled)
 	pluginHandler.SetLicensing(pluginLicenseVerifier, instanceService)
+	// Assets are served by the host, so their per-prefix auth policy is enforced
+	// with the same middleware the plugin router uses for handler routes.
+	pluginHandler.SetAssetAuth(authMiddleware.RequireAuth, permissionMiddleware.RequireSystemAdmin(), s.pluginPublicLimiter.Limit)
 
 	auditLogHandler := handlers.NewAuditLogHandler(repository.NewAuditLogRepository(s.db), logger.NewAuditor(s.db))
 
@@ -1545,7 +1570,7 @@ func (s *Server) initialize() error {
 	s.ldapHandler = handlers.NewLDAPHandler(s.db, ldapSyncService, ssoHandler.GetEncryption())
 	ldapHandler := s.ldapHandler
 
-	featuresHandler := handlers.NewFeaturesHandler(s.pluginManager, cfg.SSH.Enabled, cfg.Logbook.Endpoint != "")
+	featuresHandler := handlers.NewFeaturesHandler(s.pluginManager, cfg.SSH.Enabled)
 
 	shutdownChan := cfg.ShutdownChan
 	if shutdownChan == nil {
@@ -1591,51 +1616,6 @@ func (s *Server) initialize() error {
 
 	s.briefingScheduler = scheduler.NewBriefingScheduler(s.db, llmManager, permService, timePermissionService, services.NewUserReadService(s.db), promptStore)
 	s.briefingScheduler.Start()
-
-	if cfg.Logbook.Endpoint != "" {
-		proxyCfg := LogbookProxyConfig{
-			Endpoint:          cfg.Logbook.Endpoint,
-			AuthMiddleware:    authMiddleware,
-			PermissionService: permService,
-			UploadLimiter:     s.uploadLimiter,
-			SharedSecret:      cfg.Auth.SessionSecret,
-		}
-		logbookProxy := NewLogbookProxy(proxyCfg)
-
-		// Rate-limited upload routes (registered before the catch-all so they take priority)
-		logbookUploadProxy := NewLogbookUploadProxy(proxyCfg)
-		mux.Handle("POST /api/logbook/buckets/{bucketID}/documents/upload", logbookUploadProxy)
-		mux.Handle("POST /api/logbook/documents/{documentID}/attachments", logbookUploadProxy)
-
-		// All logbook routes (including actions) are proxied to the sidecar
-		mux.Handle("GET /api/logbook/", logbookProxy)
-		mux.Handle("POST /api/logbook/", logbookProxy)
-		mux.Handle("PUT /api/logbook/", logbookProxy)
-		mux.Handle("PATCH /api/logbook/", logbookProxy)
-		mux.Handle("DELETE /api/logbook/", logbookProxy)
-		slog.Info("logbook proxy enabled", "endpoint", cfg.Logbook.Endpoint)
-
-		// Internal endpoints for sidecar → main server communication.
-		// cfg.Auth.SessionSecret is already validated non-empty by config.Load,
-		// so the guard is cosmetic — kept for defense-in-depth.
-		if ssoSecret := cfg.Auth.SessionSecret; ssoSecret != "" {
-			// LLM proxy for logbook article generation
-			llmProxy := NewInternalLLMProxy(llmManager, ssoSecret)
-			mux.Handle("POST /api/internal/llm/v1/chat/completions", llmProxy)
-			mux.Handle("GET /api/internal/llm/health", NewInternalLLMHealthCheck(llmManager, ssoSecret))
-			slog.Info("internal LLM proxy enabled for logbook article generation")
-
-			// Node execution endpoint for logbook actions (create_item, create_asset on SQLite)
-			nodeExecHandler := handlers.NewLogbookNodeExecutionHandler(
-				ssoSecret,
-				permService,
-				assetHandler,
-				itemHandler.ItemCreationService(),
-			)
-			mux.Handle("POST /api/internal/logbook/execute-node", http.HandlerFunc(nodeExecHandler.HandleNodeExecution))
-			slog.Info("internal logbook node execution endpoint enabled")
-		}
-	}
 
 	// Build API middleware chain
 	corsMiddleware := createCORSMiddleware(cfg.AllowedHosts, effectivePort, corsScheme, cfg.DisableCSRF, cfg.UseProxy, cfg.AllowInsecureHTTP)
@@ -1770,6 +1750,7 @@ func (s *Server) initialize() error {
 		},
 		Admin: routes.AdminHandlers{
 			SecuritySettings: securitySettingsHandler,
+			GeneralSettings:  generalSettingsHandler,
 			AuthPolicy:       authPolicyHandler,
 			Theme:            themeHandler,
 			UserPreferences:  userPreferencesHandler,
@@ -2018,6 +1999,7 @@ func (s *Server) initialize() error {
 		WithCache(itemHandler.ItemCacheService()).
 		WithWorkflow(conditionService, eventCoordinator, issueSyncService).
 		WithMutationEffects(mentionService).
+		WithComments(commentService).
 		WithClock(slaClock)
 	itemDetailApplication := services.NewItemDetailApplicationService(s.db, itemApplication, itemLinkService, permService).
 		WithContextReaders(screenHandler, requestTypeHandler, actionApplication).
@@ -2205,7 +2187,14 @@ func (s *Server) initialize() error {
 				slog.Warn("could not read index.html from embedded FS", "error", err)
 			}
 
-			contextPath := cfg.ContextPath
+			// The SPA shell carries the server's effective public base URL so admin
+			// screens can show the exact URLs the server will send to third parties
+			// instead of guessing from the browser origin.
+			indexBoot := indexBootstrap{
+				ContextPath:       cfg.ContextPath,
+				BaseURL:           baseURL,
+				BaseURLConfigured: cfg.BaseURL != "",
+			}
 			mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 				// Anything under an API root that hasn't matched a specific
 				// route is a 404 — don't fall through to the SPA shell.
@@ -2222,9 +2211,9 @@ func (s *Server) initialize() error {
 				}
 
 				// Inject CSP nonce into the inline theme script tag and expose the
-				// externally visible context path for the SPA translation layer.
+				// externally visible context path and base URL for the SPA.
 				nonce := CSPNonceFromContext(r.Context())
-				html := prepareIndexHTML(indexHTML, nonce, contextPath)
+				html := prepareIndexHTML(indexHTML, nonce, indexBoot)
 
 				w.Header().Set("Content-Type", "text/html")
 				// Force the SPA shell to revalidate on every load so that a
@@ -2358,6 +2347,21 @@ func (s *Server) recoverUser(username string) {
 	slog.Warn("RECOVER_USER: re-enabled disabled user", "username", username, "email", userEmail, "id", id)
 }
 
+// configureServerProtocols selects the protocols the HTTP server accepts. A TLS
+// listener negotiates h2 through ALPN with no configuration, so it is left
+// alone. A plain listener is HTTP/1.1 unless h2c is explicitly enabled; h2c is
+// cleartext and browsers do not use it, so it exists for a fronting proxy that
+// multiplexes streams onto one upstream connection.
+func configureServerProtocols(server *http.Server, enableHTTPS, h2cEnabled bool) {
+	if enableHTTPS || !h2cEnabled {
+		return
+	}
+	protocols := new(http.Protocols)
+	protocols.SetHTTP1(true)
+	protocols.SetUnencryptedHTTP2(true)
+	server.Protocols = protocols
+}
+
 // Start begins listening for HTTP requests.
 // This method is non-blocking; the server runs in a goroutine.
 // Use Shutdown to stop the server gracefully.
@@ -2380,6 +2384,7 @@ func (s *Server) Start() error {
 	s.actualPort = tcpAddr.Port
 
 	enableHTTPS := s.config.TLSCertPath != "" && s.config.TLSKeyPath != ""
+	configureServerProtocols(s.httpServer, enableHTTPS, s.config.H2CEnabled)
 
 	if enableHTTPS {
 		slog.Info("HTTPS server starting", "port", s.actualPort)

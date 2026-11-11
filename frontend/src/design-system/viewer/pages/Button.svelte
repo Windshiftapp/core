@@ -20,6 +20,7 @@
       <Button variant="primary">Primary</Button>
       <Button variant="default">Default</Button>
       <Button variant="secondary">Secondary</Button>
+      <Button variant="context">Context</Button>
       <Button variant="danger">Danger</Button>
       <Button variant="selected">Selected</Button>
       <Button variant="ghost">Ghost</Button>

@@ -885,11 +885,15 @@
   // the current permission state.
   $effect(() => {
     readonly;
-    if (!editor) return;
-    editor.action((ctx) => {
-      const view = ctx.get(editorViewCtx);
-      view.setProps({ nodeViews: { ...(view.props.nodeViews || {}) } });
-    });
+    if (!editor || disposed) return;
+    try {
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        view.setProps({ nodeViews: { ...(view.props.nodeViews || {}) } });
+      });
+    } catch {
+      // The editor can be torn down between the effect and the action.
+    }
   });
 </script>
 
@@ -977,6 +981,7 @@
     bind:this={editorElement}
     data-testid={testId}
     data-ready={editor ? 'true' : 'false'}
+    dir="auto"
     class="milkdown-editor"
     class:readonly
     class:compact

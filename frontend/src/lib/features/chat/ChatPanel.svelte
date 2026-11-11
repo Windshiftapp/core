@@ -374,6 +374,15 @@
               <div class="max-w-full rounded-lg px-3 py-2 text-sm" style="background-color: var(--ds-surface-sunken); color: var(--ds-text);">
                 {#if msg.error}
                   <p class="text-sm" style="color: var(--ds-text-danger);">{msg.error}</p>
+                  {#if msg.errorDetail}
+                    <p
+                      class="mt-1 text-xs break-words font-mono"
+                      style="color: var(--ds-text-subtle);"
+                      data-testid="chat-provider-error"
+                    >
+                      {msg.errorDetail}
+                    </p>
+                  {/if}
                   {#if msg === chatStore.messages[chatStore.messages.length - 1] && !chatStore.loading}
                     <button
                       onclick={() => chatStore.retryLastMessage()}

@@ -2835,6 +2835,35 @@
         "tags": [
           "Work items"
         ]
+      },
+      "patch": {
+        "description": "Update item attachment visibility. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "parameters": [
+          {
+            "Name": "attachment_id",
+            "In": "path",
+            "Description": "The attachment identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Update item attachment visibility",
+        "tags": [
+          "Work items"
+        ]
       }
     },
     "/attachments/{attachment_id}/content": {
@@ -3295,6 +3324,35 @@
           "500": {}
         },
         "summary": "Get collection board configuration",
+        "tags": [
+          "Planning"
+        ]
+      },
+      "patch": {
+        "description": "Patch collection board configuration. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "parameters": [
+          {
+            "Name": "collection_id",
+            "In": "path",
+            "Description": "The collection identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Patch collection board configuration",
         "tags": [
           "Planning"
         ]
@@ -10737,6 +10795,37 @@
         ]
       }
     },
+    "/transitions/{transition_id}/screen": {
+      "put": {
+        "description": "Bind a transition screen. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [
+          {
+            "Name": "transition_id",
+            "In": "path",
+            "Description": "The transition identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Bind a transition screen",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
     "/users": {
       "get": {
         "description": "List users. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -12097,6 +12186,35 @@
           "500": {}
         },
         "summary": "Get workspace board configuration",
+        "tags": [
+          "Planning"
+        ]
+      },
+      "patch": {
+        "description": "Patch workspace board configuration. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Patch workspace board configuration",
         "tags": [
           "Planning"
         ]

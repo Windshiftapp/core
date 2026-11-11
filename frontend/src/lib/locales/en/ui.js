@@ -216,6 +216,14 @@ export default {
 
     // Approval Set Picker
     selectApprovalSet: 'Select approval set',
+
+    // Date Picker
+    datePicker: {
+      previousMonth: 'Previous month',
+      nextMonth: 'Next month',
+      openCalendar: 'Open calendar',
+      selectDate: 'Select date...',
+    },
   },
 
   editors: {
@@ -257,6 +265,14 @@ export default {
     mermaidRendering: 'Rendering diagram',
     mermaidParseError: 'Mermaid parse error',
     mermaidEmpty: 'Empty mermaid block',
+    useProvider: 'Edit with {label}',
+    useRichText: 'Use rich text editor',
+    providerActive: '{label} is active',
+    discardProviderChanges: 'Discard unsaved changes?',
+    discardProviderChangesMessage:
+      'Your edits in {label} have not been saved. Switching editors discards them.',
+    discardChanges: 'Discard',
+    providerError: 'The editor plugin reported an error: {message}',
   },
 
   dialogs: {
@@ -551,6 +567,7 @@ export default {
   },
 
   recurrence: {
+    gregorianRuleHint: 'Monthly and yearly recurrence rules use the Gregorian calendar.',
     title: 'Recurrence',
     description: 'Manage recurring task rules',
     frequency: 'Frequency',

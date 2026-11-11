@@ -23,6 +23,7 @@ func registerAttachmentRoutes(builder *routeBuilder, deps Deps) {
 	builder.RawDocument[attachmentUploadForm, models.Attachment](http.MethodPost, "/items/{item_id}/attachments", http.StatusCreated, "multipart/form-data", AuthAuthenticated, []string{"items:write"}, uploadItemAttachment(attachments))
 	builder.RawDocument[attachmentUploadForm, models.Attachment](http.MethodPost, "/workspaces/{workspace_id}/pages/{page_id}/attachments", http.StatusCreated, "multipart/form-data", AuthAuthenticated, []string{"pages:write"}, uploadPageAttachment(deps))
 	builder.Read("/attachments/{attachment_id}", AuthAuthenticated, []string{"items:read"}, getItemAttachment(attachments))
+	builder.JSON(http.MethodPatch, "/attachments/{attachment_id}", http.StatusOK, true, AuthAuthenticated, []string{"items:write"}, updateItemAttachmentVisibility(attachments))
 	builder.RawResponseAnyScope[[]byte](http.MethodGet, "/attachments/{attachment_id}/content", http.StatusOK, "application/octet-stream", AuthAuthenticated, nil, []string{"items:read", "pages:read"}, serveAttachment(attachments, pageAttachments, attachmentServeContent))
 	builder.RawResponseAnyScope[[]byte](http.MethodGet, "/attachments/{attachment_id}/download", http.StatusOK, "application/octet-stream", AuthAuthenticated, nil, []string{"items:read", "pages:read"}, serveAttachment(attachments, pageAttachments, attachmentServeDownload))
 	builder.RawResponseAnyScope[[]byte](http.MethodGet, "/attachments/{attachment_id}/thumbnail", http.StatusOK, "application/octet-stream", AuthAuthenticated, nil, []string{"items:read", "pages:read"}, serveAttachment(attachments, pageAttachments, attachmentServeThumbnail))
@@ -201,6 +202,41 @@ func serveAttachment(attachments attachmentApplication, pageAttachments pageAtta
 		}
 		http.ServeContent(w, r, binary.OriginalFilename, binary.File.ModTime(), binary.File)
 		return nil
+	}
+}
+
+type attachmentVisibilityPatch struct {
+	IsInternal Optional[bool] `json:"is_internal"`
+}
+
+// updateItemAttachmentVisibility hides or reveals one item attachment for
+// portal customers. It is the only way to change is_internal after upload;
+// the Jira importer is the other writer.
+func updateItemAttachmentVisibility(attachments attachmentApplication) jsonOperation[attachmentVisibilityPatch, models.Attachment] {
+	return func(r *http.Request, input attachmentVisibilityPatch) (models.Attachment, error) {
+		user, err := principal(r)
+		if err != nil {
+			return models.Attachment{}, err
+		}
+		attachmentID, err := pathID(r, "attachment_id")
+		if err != nil {
+			return models.Attachment{}, err
+		}
+		if !input.IsInternal.Set || input.IsInternal.Null {
+			return models.Attachment{}, newError(http.StatusBadRequest, "invalid_request", "is_internal is required")
+		}
+		attachment, err := attachments.SetItemAttachmentInternal(attachmentID, user.ID, input.IsInternal.Value)
+		if err != nil {
+			return models.Attachment{}, attachmentError(err)
+		}
+		if attachment == nil || attachment.ItemID == nil {
+			return models.Attachment{}, attachmentError(services.ErrItemAttachmentNotFound)
+		}
+		logger.Record(r, logger.ActionAttachmentVisibility, logger.ResourceAttachment, &attachmentID, attachment.OriginalFilename, map[string]any{
+			"item_id":     *attachment.ItemID,
+			"is_internal": attachment.IsInternal,
+		})
+		return *attachment, nil
 	}
 }
 

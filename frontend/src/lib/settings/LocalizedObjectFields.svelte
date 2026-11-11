@@ -203,7 +203,6 @@
         [field]: await resolveFallback(locale, field),
       };
     }
-    window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
   }
 
   export function validate() {
@@ -247,7 +246,6 @@
         }
       }
     }
-    window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
   }
 </script>
 

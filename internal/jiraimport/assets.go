@@ -12,7 +12,6 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
-	"windshift/internal/services"
 )
 
 func (s *Service) EnsureAssetSet(name, description string, creatorUserID int) (setID int, created bool, err error) {
@@ -192,18 +191,13 @@ func (s *Service) InsertAsset(input repository.JiraImportAssetRowInput) (int, er
 				values[key] = value
 			}
 		}
-		metadata := assetevents.System("jira_import")
-		metadata.SourceRef = input.ImportJobID
+		metadata := assetevents.Import(input.ImportJobID)
 		snapshot := assetevents.AssetSnapshot{
 			ID: assetID, SetID: input.SetID, AssetTypeID: input.AssetTypeID,
 			StatusID: input.StatusID, Title: input.Title, Description: input.Description, AssetTag: input.AssetTag,
 		}
-		if _, err = assetevents.NewRecorder(s.db).Created(context.Background(), tx, snapshot, values, metadata); err != nil {
-			return err
-		}
-		return services.NewDurableAssetActionIngress(s.db).EmitInTx(context.Background(), tx, &models.AssetActionEvent{
-			EventType: models.AssetTriggerAssetCreated, SetID: input.SetID, AssetID: assetID, NewValues: values,
-		})
+		_, err = assetevents.NewRecorder(s.db).Created(context.Background(), tx, snapshot, values, metadata)
+		return err
 	})
 	return assetID, err
 }

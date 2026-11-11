@@ -307,6 +307,14 @@ export default {
     configureFilter: 'Настройте фильтр, чтобы увидеть элементы',
     createToStart: 'Создайте {item}, чтобы начать работу',
   },
+  bulkActions: {
+    screenRequiredTitle: 'Некоторым элементам нужна форма',
+    screenRequiredAll:
+      'Каждому выбранному элементу нужна форма, прежде чем его можно переместить. Переместите их по одному.',
+    screenRequiredMessage:
+      '{blocked} из {total} выбранных элементов требуют формы, прежде чем их можно переместить. Переместить остальные {remaining}?',
+    screenRequiredConfirm: 'Переместить остальные',
+  },
   dueDate: {
     noDueDate: 'Срок не указан',
     dueToday: 'Срок сегодня',

@@ -2,8 +2,11 @@ package plugins
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -24,6 +27,23 @@ type SCMService interface {
 	CreateItemSCMLink(ctx context.Context, itemID, workspaceRepoID int, linkType, externalID, externalURL, title string) (int, error)
 }
 
+// validPluginName matches only safe plugin names: alphanumeric, hyphens, underscores.
+var validPluginName = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+// validatePluginName rejects names that could cause path traversal or injection.
+func validatePluginName(name string) error {
+	if name == "" {
+		return fmt.Errorf("plugin name must not be empty")
+	}
+	if strings.Contains(name, "..") || strings.Contains(name, "/") || strings.Contains(name, "\\") {
+		return fmt.Errorf("invalid plugin name: must not contain path separators or '..'")
+	}
+	if !validPluginName.MatchString(name) {
+		return fmt.Errorf("invalid plugin name: must contain only alphanumeric characters, hyphens, and underscores")
+	}
+	return nil
+}
+
 // ManagerOptions controls runtime behavior of the plugin manager.
 type ManagerOptions struct {
 	PluginTimeout        time.Duration
@@ -35,6 +55,11 @@ type ManagerOptions struct {
 	Logger               *slog.Logger
 	Database             database.Database
 	AdditionalPluginDirs []string
+	// MaxHTTPFetchResponseBytes bounds the response body http_fetch will read
+	// from a plugin-controlled URL. The WASM memory limit does not bound the
+	// Go-side read, so this is the ceiling that protects the process from a
+	// hostile or buggy upstream. Zero falls back to the default.
+	MaxHTTPFetchResponseBytes int64
 	// LicenseVerifier, when set, enables license enforcement: a plugin only
 	// contributes capabilities when its stored license verifies. Nil keeps the
 	// legacy behavior where every loaded plugin's capabilities count.
@@ -87,5 +112,13 @@ func WithLicenseVerifier(verifier LicenseVerifier) Option {
 func WithAllowPublicRoutes(allow bool) Option {
 	return func(o *ManagerOptions) {
 		o.AllowPublicRoutes = allow
+	}
+}
+
+// WithMaxHTTPFetchResponseBytes bounds the http_fetch response body. Zero or a
+// negative value keeps the default.
+func WithMaxHTTPFetchResponseBytes(limit int64) Option {
+	return func(o *ManagerOptions) {
+		o.MaxHTTPFetchResponseBytes = limit
 	}
 }

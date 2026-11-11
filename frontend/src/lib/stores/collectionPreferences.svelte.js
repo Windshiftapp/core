@@ -1,4 +1,5 @@
 import { userPreferences } from '../api/users.js';
+import { setCalendarPreference } from './calendar.svelte.js';
 
 // Per-user collection view configuration and other top-level user
 // preferences, stored in user_preferences so they follow the user across
@@ -21,6 +22,7 @@ class CollectionPreferencesStore {
   /** @type {'oldest' | 'newest'} preferred comment thread order */
   commentSortOrder = $state('oldest');
   loaded = $state(false);
+  loadError = $state(false);
 
   #userId = null;
   #loadPromise = null;
@@ -43,6 +45,8 @@ class CollectionPreferencesStore {
     if (this.loaded) return Promise.resolve();
     if (this.#loadPromise) return this.#loadPromise;
 
+    this.loadError = false;
+
     const generation = this.#generation;
     const promise = userPreferences
       .get({ timeout })
@@ -50,10 +54,13 @@ class CollectionPreferencesStore {
         if (generation !== this.#generation) return;
         this.viewState = prefs?.view_state ?? {};
         this.savedFilters = prefs?.saved_filters ?? {};
+        setCalendarPreference(prefs?.calendar);
         this.commentSortOrder = prefs?.comment_sort_order === 'newest' ? 'newest' : 'oldest';
         this.loaded = true;
       })
       .catch((error) => {
+        if (generation !== this.#generation) return;
+        this.loadError = true;
         console.warn('[collectionPreferences] failed to load preferences', error);
       })
       .finally(() => {
@@ -66,10 +73,12 @@ class CollectionPreferencesStore {
   /** Clear the cache on logout or user change. */
   reset() {
     this.#generation += 1;
+    setCalendarPreference('auto');
     this.viewState = {};
     this.savedFilters = {};
     this.commentSortOrder = 'oldest';
     this.loaded = false;
+    this.loadError = false;
     this.#userId = null;
     this.#loadPromise = null;
     this.#dirtyViewScopes.clear();

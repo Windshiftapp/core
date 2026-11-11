@@ -54,6 +54,12 @@ func RegisterMiscRoutes(deps *Deps) {
 	// metadata so clients can detect when a newer release is available.
 	api.HandleH("GET /version", http.HandlerFunc(versionHandler))
 
+	// Public branding projection (site title + active theme logos) for the
+	// login, boot, and authenticated shell surfaces.
+	if deps.Admin.GeneralSettings != nil {
+		api.HandleH("GET /branding", http.HandlerFunc(deps.Admin.GeneralSettings.GetBranding))
+	}
+
 	// Hosted runner install script (WI-313) — public, no auth required: it
 	// contains no secrets, just the server's public URL + image references.
 	// The registration token travels as a flag the operator passes to bash.

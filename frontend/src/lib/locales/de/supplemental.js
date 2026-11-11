@@ -170,6 +170,10 @@ export default {
     "orSignInWithEmail": "oder melden Sie sich mit E-Mail an",
     "profileAndSecurity": "Profil und Sicherheit",
     "profileTitle": "Profil",
+    "languageTitle": "Sprache",
+    "languageSubtitle": "Wählen Sie die Sprache für dieses Portal und die E-Mails, die Sie erhalten.",
+    "languageLabel": "Sprache",
+    "languageSaved": "Sprache aktualisiert",
     "profileSubtitle": "Verwalten Sie, wie Sie sich bei diesem Portal anmelden.",
     "profileSection": "Konto",
     "passkeysTitle": "Passkeys",
@@ -402,6 +406,7 @@ export default {
     }
   },
   "recurrence": {
+    "gregorianRuleHint": "Monatliche und jährliche Wiederholungen verwenden den gregorianischen Kalender.",
     "title": "Wiederholung",
     "description": "Regeln für wiederkehrende Aufgaben verwalten",
     "frequency": "Häufigkeit",

@@ -10,7 +10,6 @@ windshift
 .dev-windshift
 cx
 /ws
-/logbook
 # Local build of scripts/openapi-v2-generate.
 /openapi-v2-generate
 
@@ -32,6 +31,9 @@ cx
 *.spec.ts
 
 # Public regression coverage for the locale runtime ships with the implementation.
+!frontend/src/lib/stores/calendar.spec.js
+!internal/services/calendar_preferences_test.go
+!internal/restapi/v2/calendar_preferences_test.go
 !frontend/src/lib/stores/i18n-utils.spec.js
 !frontend/src/lib/mobile/mobile-i18n.spec.js
 !frontend/scripts/hardcoded-i18n-ast.spec.js
@@ -169,7 +171,6 @@ windshift.dsl
 endpoints.txt
 RELEASE_NOTES.md
 .dev-windshift-pg
-releases/v0.3.2.md
 .crush
 .jscpd-frontend-report
 .jscpd-report
@@ -182,6 +183,9 @@ scripts/*
 !scripts/check-schema-migration-pairing.sh
 !scripts/check-sql-boolean-literals.mjs
 !scripts/check-audit-literals.mjs
+!scripts/check-vulnerabilities.sh
+!scripts/generate-i18n-catalog.mjs
+!scripts/check-deprecated-v1-api.sh
 !scripts/audit_coverage_inventory.py
 !scripts/.layering-baseline
 !scripts/.handler-db-access-allowlist

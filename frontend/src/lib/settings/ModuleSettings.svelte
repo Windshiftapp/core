@@ -19,6 +19,7 @@
   import { getSecuritySettings } from '../api/admin.js';
   import { fetchAPI } from '../api/core.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { surfaceError } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import DescriptionText from '../components/DescriptionText.svelte';
   import EmptyState from '../components/EmptyState.svelte';
@@ -73,7 +74,7 @@
       const data = await fetchAPI('/plugins/instance-id');
       instanceId = data?.instance_id || '';
     } catch (err) {
-      console.error('Failed to load instance ID:', err);
+      surfaceError(err, { context: 'loadInstanceId' });
     }
   }
 
@@ -89,7 +90,7 @@
       const settings = await getSecuritySettings();
       pluginsDisabled = settings.plugins_disabled ?? false;
     } catch (err) {
-      console.error('Failed to load security settings:', err);
+      surfaceError(err, { context: 'loadSecuritySettings' });
     }
   }
   
@@ -100,7 +101,7 @@
       const data = await fetchAPI('/plugins');
       plugins = Array.isArray(data) ? data : [];
     } catch (err) {
-      console.error('Failed to load plugins:', err);
+      surfaceError(err, { context: 'loadPlugins' });
       plugins = [];
     } finally {
       loadingPlugins = false;
@@ -197,7 +198,7 @@
       });
       await loadPlugins();
     } catch (err) {
-      console.error(`Failed to toggle plugin ${plugin.name}:`, err);
+      surfaceError(err, { context: `togglePlugin:${plugin.name}` });
     }
   }
   
@@ -258,8 +259,8 @@
         successMessage = '';
       }, 3000);
     } catch (err) {
-      console.error('Failed to save module settings:', err);
       error = t('settings.modules.failedToSave');
+      surfaceError(err, { context: 'saveModuleSettings' });
     } finally {
       saving = false;
     }
@@ -280,8 +281,8 @@
 
       await moduleSettings.update(newSettings);
     } catch (err) {
-      console.error('Failed to auto-save module settings:', err);
       error = t('settings.modules.failedToSave');
+      surfaceError(err, { context: 'autoSaveModuleSettings' });
     } finally {
       saving = false;
     }

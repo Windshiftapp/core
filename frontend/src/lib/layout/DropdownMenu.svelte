@@ -189,12 +189,13 @@
     disabled={isDisabled}
     data-testid={triggerTestid || undefined}
     data-active={triggerActive ? 'true' : undefined}
+    data-open={$open ? 'true' : undefined}
     aria-label={triggerLabel || triggerText || undefined}
     title={triggerText || undefined}
     onclick={(e) => e.stopPropagation()}
     onkeydown={(e) => e.stopPropagation()}
-    class="{triggerAvatar ? 'p-0' : iconOnly ? '' : triggerClass ? '' : 'px-4 py-2'} rounded text-sm font-medium transition flex items-center {alignmentClass} {triggerGap} flex-shrink-0 {triggerBgColor ? getTextColorForBackground(triggerBgColor) : ''} {triggerClass} {isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}"
-    style="{triggerBgColor ? `background-color: ${triggerBgColor}; ${triggerStyle}` : triggerStyle}{$open && !triggerBgColor ? '; background-color: var(--ctx-surface-raised, var(--ds-background-neutral-hovered));' : ''}"
+    class="menu-trigger {triggerAvatar ? 'p-0' : iconOnly ? '' : triggerClass ? '' : 'px-4 py-2'} rounded text-sm font-medium transition flex items-center {alignmentClass} {triggerGap} flex-shrink-0 {triggerBgColor ? getTextColorForBackground(triggerBgColor) : ''} {triggerClass} {isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}"
+    style={triggerBgColor ? `background-color: ${triggerBgColor}; ${triggerStyle}` : triggerStyle}
   >
     {#if children}
       {@render children()}
@@ -474,6 +475,14 @@
 {/if}
 
 <style>
+  /* The trigger owns its open state. It must not override an active segment's
+     selected surface, so the open tint only applies when the trigger is not
+     marked active (ButtonGroup active segments set --ds-surface-selected).
+     --ctx-hover-bg lightens glass surfaces and darkens plain ones. */
+  .menu-trigger[data-open='true']:not([data-active='true']) {
+    background-color: var(--ctx-hover-bg, var(--ds-surface-hovered));
+  }
+
   .menu-item:hover {
     background-color: var(--ds-surface-raised-hovered);
   }

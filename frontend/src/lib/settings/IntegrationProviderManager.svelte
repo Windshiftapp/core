@@ -26,6 +26,7 @@
 	const providerTypes = [
 		{ value: 'notion', label: 'Notion' },
 		{ value: 'todoist', label: 'Todoist' },
+		{ value: 'docmost', label: 'Docmost' },
 	];
 
 	let providers = $state([]);
@@ -43,6 +44,7 @@
 		oauth_client_id: '',
 		oauth_client_secret: '',
 		provider_config: '',
+		docmost_base_url: '',
 	});
 
 	const callbackUrl = $derived(() => {
@@ -76,12 +78,19 @@
 			oauth_client_id: '',
 			oauth_client_secret: '',
 			provider_config: '',
+			docmost_base_url: '',
 		};
 		showModal = true;
 	}
 
 	function openEdit(provider) {
 		editingProvider = provider;
+		let baseUrl = '';
+		try {
+			baseUrl = JSON.parse(provider.provider_config || '{}').base_url || '';
+		} catch {
+			baseUrl = '';
+		}
 		formData = {
 			slug: provider.slug,
 			name: provider.name,
@@ -90,6 +99,7 @@
 			oauth_client_id: provider.oauth_client_id || '',
 			oauth_client_secret: '',
 			provider_config: provider.provider_config || '',
+			docmost_base_url: baseUrl,
 		};
 		showModal = true;
 	}
@@ -98,11 +108,20 @@
 		saving = true;
 		try {
 			const data = { ...formData };
-			if (!data.oauth_client_secret) {
+			delete data.docmost_base_url;
+			if (data.provider_type === 'docmost') {
+				// Public client: Windshift self-registers, so no client id/secret.
+				// The base URL is the only provider-specific config.
+				delete data.oauth_client_id;
 				delete data.oauth_client_secret;
-			}
-			if (!data.provider_config) {
-				delete data.provider_config;
+				data.provider_config = JSON.stringify({ base_url: formData.docmost_base_url || '' });
+			} else {
+				if (!data.oauth_client_secret) {
+					delete data.oauth_client_secret;
+				}
+				if (!data.provider_config) {
+					delete data.provider_config;
+				}
 			}
 
 			if (editingProvider) {
@@ -229,17 +248,26 @@
 				/>
 			</FormField>
 
-			<FormField label={t('integrations.oauthClientId')}>
-				<Input bind:value={formData.oauth_client_id} placeholder={t('integrations.oauthClientId')} />
-			</FormField>
-
-			<FormField label={t('integrations.oauthClientSecret')}>
-				<Input
-					bind:value={formData.oauth_client_secret}
-					type="password"
-					placeholder={editingProvider?.has_oauth_client_secret ? '••••••••' : t('integrations.oauthClientSecret')}
-				/>
-			</FormField>
+			{#if formData.provider_type === 'docmost'}
+				<FormField label="Base URL" required>
+					<Input bind:value={formData.docmost_base_url} placeholder="https://wiki.example.com" />
+				</FormField>
+				<p class="text-xs" style="color: var(--ds-text-subtle);">
+					The Docmost instance URL. Windshift registers its own OAuth client, so no client
+					ID or secret is needed. Docmost must have an enterprise license and MCP enabled.
+				</p>
+			{:else}
+				<FormField label={t('integrations.oauthClientId')}>
+					<Input bind:value={formData.oauth_client_id} placeholder={t('integrations.oauthClientId')} />
+				</FormField>
+				<FormField label={t('integrations.oauthClientSecret')}>
+					<Input
+						bind:value={formData.oauth_client_secret}
+						type="password"
+						placeholder={editingProvider?.has_oauth_client_secret ? '••••••••' : t('integrations.oauthClientSecret')}
+					/>
+				</FormField>
+			{/if}
 
 			{#if formData.slug}
 				<FormField label={t('integrations.callbackUrl')}>

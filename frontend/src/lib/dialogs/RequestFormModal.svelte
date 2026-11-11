@@ -17,6 +17,7 @@
   import Paperclip from '@lucide/svelte/icons/paperclip';
   import X from '@lucide/svelte/icons/x';
   import { t } from '../stores/i18n.svelte.js';
+  import { surfaceError } from '../stores/toasts.svelte.js';
   import FormFields from '../features/forms/FormFields.svelte';
   import {
     buildFormSteps,
@@ -153,8 +154,8 @@
       // be dropped by the submit API anyway.
       applyPrefill(prefillValues);
     } catch (err) {
-      console.error('Failed to load request type fields:', err);
       error = err.message || t('requestForm.failedToLoadFields');
+      surfaceError(err, { context: 'loadRequestTypeFields' });
     } finally {
       loading = false;
     }
@@ -180,7 +181,7 @@
       // A missing draft already returns null; anything that reaches here is a
       // real failure. Log and continue with the empty form — losing the
       // resume is far better than blocking submission.
-      console.warn('Failed to load draft for resume:', err);
+      surfaceError(err, { silent: true, context: 'resumeDraft' });
       resumedDraft = null;
     }
   }
@@ -247,7 +248,7 @@
         }, 1500);
       }
     } catch (err) {
-      console.warn('Failed to save draft:', err);
+      surfaceError(err, { silent: true, context: 'saveDraft' });
     } finally {
       savingDraft = false;
     }
@@ -260,7 +261,7 @@
     } catch (err) {
       // 404 (no draft to delete) is fine — the user is starting fresh anyway.
       if (err?.status !== 404) {
-        console.warn('Failed to delete draft:', err);
+        surfaceError(err, { silent: true, context: 'deleteDraft' });
       }
     }
     // Reset form state to a pristine first-step view, but keep the loaded
@@ -367,7 +368,7 @@
       if (portalSlug) {
         portal.drafts.delete(portalSlug, requestType.id).catch((err) => {
           if (err?.status !== 404) {
-            console.warn('Failed to delete draft after submit:', err);
+            surfaceError(err, { silent: true, context: 'deleteDraftAfterSubmit' });
           }
         });
       }
@@ -382,8 +383,8 @@
         uploadFailures.length > 0 ? 6000 : 1500
       );
     } catch (err) {
-      console.error('Failed to submit request:', err);
       error = err.message || t('requestForm.failedToSubmit');
+      surfaceError(err, { context: 'submitRequest' });
     } finally {
       submitting = false;
     }

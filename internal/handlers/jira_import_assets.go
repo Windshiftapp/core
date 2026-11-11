@@ -24,6 +24,17 @@ func (h *JiraImportHandler) importJiraAssets(ctx context.Context, jobID string, 
 	if err != nil {
 		if errors.Is(err, jira.ErrAssetsNotAvailable) {
 			slog.Debug("Jira Assets API not available; skipping Assets import", slog.String("component", "jira"))
+			// Record a durable finding so the result does not imply native asset
+			// resolution when no inventory could be read.
+			_ = h.recordMapping(jobID, "fidelity_finding", "assets-capability",
+				"Jira Assets/Insight object reads are not available for this connection; asset custom fields keep their original reference identifiers and no native asset inventory was imported.",
+				0, map[string]any{
+					"code":           "jira_assets_unavailable",
+					"severity":       "warning",
+					"disposition":    "unavailable",
+					"source_count":   0,
+					"resolved_count": 0,
+				})
 			return
 		}
 		slog.Warn("Failed to list Jira Assets schemas", slog.String("component", "jira"), slog.Any("error", err))
@@ -431,16 +442,19 @@ func (h *JiraImportHandler) importJiraAssetObjectsForType(
 	attributeFields map[string]int,
 ) []jiraPendingAssetReference {
 	var pending []jiraPendingAssetReference
-	for page := 1; ; page++ {
+	startAt := 0
+	for {
 		result, err := client.SearchObjects(ctx, jira.ObjectSearchOptions{
 			ObjectSchemaID:    schemaID,
 			ObjectTypeID:      objectTypeID,
-			Page:              page,
+			StartAt:           startAt,
+			Page:              1,
 			PageSize:          jiraAssetsPageSize,
 			IncludeAttributes: true,
 		})
 		if err != nil {
-			slog.Warn("Failed to search Jira asset objects", slog.String("component", "jira"), slog.String("schemaID", schemaID), slog.String("objectTypeID", objectTypeID), slog.Int("page", page), slog.Any("error", err))
+			slog.Warn("Failed to search Jira asset objects", slog.String("component", "jira"), slog.String("schemaID", schemaID), slog.String("objectTypeID", objectTypeID), slog.Int("startAt", startAt), slog.Any("error", err))
+			h.recordJiraAssetObjectPageFailure(jobID, schemaID, objectTypeID, startAt, "search failed: "+err.Error())
 			return pending
 		}
 		if result == nil || len(result.ObjectEntries) == 0 {
@@ -459,10 +473,57 @@ func (h *JiraImportHandler) importJiraAssetObjectsForType(
 				object,
 			)...)
 		}
-		if result.IsLast || len(result.ObjectEntries) < jiraAssetsPageSize {
+		if result.IsLast {
 			return pending
 		}
+		// Advance by the rows the response actually covered. The Assets API
+		// defines maxResults as a maximum, so a short non-final page must not
+		// stop the walk or be mistaken for the requested page size.
+		next, advanced := jiraNextAssetObjectOffset(startAt, result)
+		if !advanced {
+			slog.Warn("Jira asset object search did not advance", slog.String("component", "jira"), slog.String("schemaID", schemaID), slog.String("objectTypeID", objectTypeID), slog.Int("startAt", startAt))
+			h.recordJiraAssetObjectPageFailure(jobID, schemaID, objectTypeID, startAt, "search response did not advance")
+			return pending
+		}
+		startAt = next
 	}
+}
+
+// jiraNextAssetObjectOffset computes the next request offset from the rows a
+// response actually covered. It returns false when the response cannot advance
+// the walk, so callers report an explicit incomplete state instead of looping
+// or silently truncating.
+func jiraNextAssetObjectOffset(startAt int, result *jira.ObjectSearchResult) (int, bool) {
+	if result == nil {
+		return 0, false
+	}
+	consumed := len(result.ObjectEntries)
+	if result.ToIndex > result.StartIndex {
+		consumed = result.ToIndex - result.StartIndex
+	}
+	pageStart := result.StartIndex
+	if pageStart < startAt {
+		pageStart = startAt
+	}
+	next := pageStart + consumed
+	if consumed <= 0 || next <= startAt {
+		return 0, false
+	}
+	return next, true
+}
+
+// recordJiraAssetObjectPageFailure records a durable finding when an Assets
+// object page cannot be read or does not advance, so a partial inventory is
+// not reported as a complete one.
+func (h *JiraImportHandler) recordJiraAssetObjectPageFailure(jobID, schemaID, objectTypeID string, startAt int, reason string) {
+	_ = h.recordMapping(jobID, "fidelity_finding", "asset-object-page:"+schemaID+":"+objectTypeID, reason, 0, map[string]any{
+		"code":           "jira_asset_object_page_incomplete",
+		"severity":       "warning",
+		"disposition":    "incomplete",
+		"source_count":   0,
+		"resolved_count": 0,
+		"start_at":       startAt,
+	})
 }
 
 func (h *JiraImportHandler) importJiraAssetObject(
@@ -502,7 +563,8 @@ func (h *JiraImportHandler) importJiraAssetObject(
 				break
 			}
 		}
-		switch jiraAssetAttributeFieldType(definition) {
+		fieldType := jiraAssetAttributeFieldType(definition)
+		switch fieldType {
 		case "asset":
 			if rawValue, ok := jiraAssetAttributeValue(attr); ok {
 				customValues["_jira_asset_attribute_"+string(attr.ObjectTypeAttributeID)] = rawValue
@@ -530,8 +592,15 @@ func (h *JiraImportHandler) importJiraAssetObject(
 			}
 			continue
 		}
-		if value, ok := jiraAssetAttributeValue(attr); ok {
+		if value, ok := jiraAssetAttributeNativeValue(attr, fieldType); ok {
 			customValues[strconv.Itoa(fieldID)] = value
+		}
+		// A DateTime attribute is stored in a calendar-date field, so keep the
+		// canonical timestamp as provenance for the intentional time-of-day loss.
+		if fieldType == "date" && definition.DefaultTypeID == 6 {
+			if rawValue, rawOK := jiraAssetAttributeValue(attr); rawOK {
+				customValues["_jira_asset_attribute_"+string(attr.ObjectTypeAttributeID)] = rawValue
+			}
 		}
 	}
 
@@ -787,12 +856,15 @@ func jiraAssetAttributeFieldType(attr jira.AssetObjectAttribute) string {
 	default:
 		return "textarea"
 	}
+	// DefaultTypeId: 4=Date, 5=Time, 6=DateTime. Windshift has a calendar-date
+	// field but no time field, so Time is preserved as text and DateTime uses
+	// the native date with the original timestamp kept as provenance.
 	switch attr.DefaultTypeID {
 	case 1, 3:
 		return "number"
 	case 2:
 		return models.CustomFieldTypeBoolean
-	case 4, 5:
+	case 4, 6:
 		return "date"
 	default:
 		return "textarea"
@@ -808,6 +880,72 @@ func jiraAssetBooleanAttributeValue(attr jira.AssetObjectAttributeValue) (value,
 		}
 	}
 	return false, false
+}
+
+// jiraAssetAttributeNativeValue converts an attribute to the native shape for
+// the resolved field type. It prefers the canonical `value` over
+// locale-formatted display text so numbers and dates do not depend on the
+// importing user's locale.
+func jiraAssetAttributeNativeValue(attr jira.AssetObjectAttributeValue, fieldType string) (any, bool) {
+	if len(attr.ObjectAttributeValues) == 0 {
+		return nil, false
+	}
+	values := make([]string, 0, len(attr.ObjectAttributeValues))
+	for _, raw := range attr.ObjectAttributeValues {
+		if value := jiraAssetAttributeCanonicalValue(raw); value != "" {
+			values = append(values, value)
+		}
+	}
+	if len(values) == 0 {
+		return nil, false
+	}
+	if len(values) > 1 {
+		// A scalar native field cannot represent multiple values without
+		// pretending; keep the joined canonical text instead.
+		return strings.Join(values, "\n"), true
+	}
+	switch fieldType {
+	case "number":
+		number, err := strconv.ParseFloat(strings.TrimSpace(values[0]), 64)
+		if err != nil {
+			return nil, false
+		}
+		return number, true
+	case "date":
+		if parsed := jira.ParseJiraTimestamp(values[0]); parsed != nil {
+			return parsed.Format("2006-01-02"), true
+		}
+		if parsed, err := time.Parse("2006-01-02", strings.TrimSpace(values[0])); err == nil {
+			return parsed.Format("2006-01-02"), true
+		}
+		return nil, false
+	}
+	return values[0], true
+}
+
+// jiraAssetAttributeCanonicalValue returns the canonical raw value for one
+// attribute value, falling back to display/search text only when no typed value
+// is present.
+func jiraAssetAttributeCanonicalValue(raw jira.AssetAttributeValue) string {
+	switch typed := raw.Value.(type) {
+	case string:
+		if strings.TrimSpace(typed) != "" {
+			return typed
+		}
+	case bool:
+		return strconv.FormatBool(typed)
+	case float64:
+		return strconv.FormatFloat(typed, 'f', -1, 64)
+	case json.Number:
+		return typed.String()
+	}
+	if raw.DisplayValue != "" {
+		return raw.DisplayValue
+	}
+	if raw.SearchValue != "" {
+		return raw.SearchValue
+	}
+	return ""
 }
 
 func jiraAssetAttributeValue(attr jira.AssetObjectAttributeValue) (any, bool) {

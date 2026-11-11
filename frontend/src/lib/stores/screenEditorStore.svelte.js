@@ -255,8 +255,10 @@ class ScreenEditorStore extends DragStateStore {
   async saveScreenFields() {
     try {
       this.ensureAlwaysVisibleSystemFields(this.editingScreenFields.id);
-      await screens.updateFields(this.editingScreenFields.id, this.screenFields);
+      const fields = this.screenFields;
+      await screens.updateFields(this.editingScreenFields.id, fields);
       this.cancelFieldEditor();
+      return fields;
     } catch (err) {
       console.error('Failed to save screen fields:', err);
       throw err;

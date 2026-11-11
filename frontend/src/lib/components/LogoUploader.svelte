@@ -15,7 +15,10 @@
     uploading = false,
     label = null,
     helpText = null,
-    maxHeight = '50px'
+    maxHeight = '50px',
+    // SVG is script-capable and only some logo surfaces accept it server-side,
+    // so each caller opts in through this prop.
+    accept = 'image/png,image/jpeg,image/gif,image/webp'
   } = $props();
 
   function handleFileChange(e) {
@@ -61,7 +64,7 @@
   <div class="flex items-center gap-3">
     <label class="cursor-pointer">
       <FileInput
-        accept="image/png,image/jpeg,image/svg+xml,image/gif,image/webp"
+        {accept}
         onchange={handleFileChange}
         disabled={uploading || !attachmentStatus.enabled}
         class="hidden"

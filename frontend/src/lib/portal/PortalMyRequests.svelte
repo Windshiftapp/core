@@ -297,9 +297,9 @@
                   </span>
                   <StatusBadge status={{ label: request.status, categoryColor: request.status_category_color }} />
                 </div>
-                <h2 class="font-semibold" style="color: var(--ds-text);">{request.title}</h2>
+                <h2 class="font-semibold" dir="auto" style="color: var(--ds-text);">{request.title}</h2>
                 {#if request.description}
-                  <p class="text-sm mt-1 line-clamp-2" style="color: var(--ds-text-subtle);">
+                  <p class="text-sm mt-1 line-clamp-2" dir="auto" style="color: var(--ds-text-subtle);">
                     {request.description}
                   </p>
                 {/if}

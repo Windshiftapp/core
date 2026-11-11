@@ -633,6 +633,14 @@ export default {
       textBody: 'Plain-text body',
       adminNotes: 'Description (admin notes)',
       activeHint: 'Active (uncheck to fall back to the built-in default)',
+      localeLabel: "Idioma",
+      defaultLocale: "Predeterminado (todos los idiomas)",
+      translationHint: "Estás editando la versión de este idioma. Los demás idiomas usan la plantilla predeterminada.",
+      translationSaved: "Traducción guardada",
+      translationDelete: "Eliminar traducción",
+      translationDeleted: "Traducción eliminada",
+      translationSaveFailed: "No se pudo guardar la traducción: {error}",
+      translationDeleteFailed: "No se pudo eliminar la traducción: {error}",
       availableVariables: 'Available variables',
       syntaxHint:
         "Templates use Go's html/template syntax. Use {open} .Field {close} for values and {open} range .Items {close}…{open} end {close} to iterate.",
@@ -866,10 +874,6 @@ export default {
         dependency_analysis: {
           name: 'Análisis de dependencias',
           description: 'Analizar y sugerir dependencias entre elementos',
-        },
-        logbook_articles: {
-          name: 'Artículos del registro',
-          description: 'Clasificación, limpieza y generación de artículos con IA para el registro',
         },
       },
     },

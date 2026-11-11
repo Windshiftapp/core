@@ -108,7 +108,8 @@ type itemRankRequest struct {
 }
 
 type itemTransitionRequest struct {
-	ToStatusID int `json:"to_status_id"`
+	ToStatusID int            `json:"to_status_id"`
+	Fields     map[string]any `json:"fields"`
 }
 
 type itemTypeChangeRequest struct {
@@ -726,7 +727,7 @@ func registerItemReadRoutes(builder *routeBuilder, app *services.ItemApplication
 		if input.ToStatusID < 1 {
 			return nil, invalidQuery("to_status_id")
 		}
-		result, err := app.Transition(r.Context(), auditActor(r, user), id, input.ToStatusID)
+		result, err := app.Transition(r.Context(), auditActor(r, user), id, input.ToStatusID, input.Fields)
 		return result, itemError(err)
 	})
 	builder.Read(path+"/type-change-analysis", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (*services.ItemTypeChangeAnalysis, error) {
@@ -1126,6 +1127,12 @@ func itemError(err error) error {
 	if errors.Is(err, services.ErrItemMergeConflict) {
 		return newError(http.StatusConflict, "merge_conflict", err.Error())
 	}
+	var screenRequired *services.BulkTransitionScreenRequiredError
+	if errors.As(err, &screenRequired) {
+		apiErr := newError(http.StatusConflict, "screen_required", "Some items need a transition screen before they can move. Retry without the listed items.")
+		apiErr.Details = map[string]any{"items": screenRequired.Blocked}
+		return apiErr
+	}
 	if errors.Is(err, services.ErrBulkItemNotFound) {
 		return newError(http.StatusNotFound, "not_found", "Item not found")
 	}
@@ -1150,9 +1157,21 @@ func itemError(err error) error {
 		errors.Is(err, services.ErrItemWorkspaceMoveInvalidStatus) || errors.Is(err, services.ErrItemWorkspaceMoveInvalidPriority) {
 		return newError(http.StatusBadRequest, "validation_failed", err.Error())
 	}
-	var creation *services.ItemCreationValidationError
 	var transition *services.TransitionRejection
-	if errors.As(err, &creation) || errors.As(err, &transition) ||
+	if errors.As(err, &transition) {
+		status := http.StatusBadRequest
+		switch transition.Code {
+		case "approval_pending", "approval_must_decide", "approval_rejected":
+			status = http.StatusConflict
+		}
+		apiErr := newError(status, transition.Code, transition.Message)
+		if transition.Details != nil {
+			apiErr.Details = transition.Details
+		}
+		return apiErr
+	}
+	var creation *services.ItemCreationValidationError
+	if errors.As(err, &creation) ||
 		errors.Is(err, services.ErrMissingItemType) || errors.Is(err, services.ErrInvalidItemType) || errors.Is(err, services.ErrProjectNotFound) {
 		return newError(http.StatusBadRequest, "validation_failed", err.Error())
 	}

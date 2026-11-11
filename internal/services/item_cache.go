@@ -1,8 +1,6 @@
 package services
 
 import (
-	"encoding/json"
-	"fmt"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -11,61 +9,66 @@ import (
 	"windshift/internal/cacheutil"
 	"windshift/internal/database"
 	"windshift/internal/repository"
-
-	"github.com/allegro/bigcache/v3"
 )
 
-// ItemHierarchyCache stores cached hierarchy data for an item
-type ItemHierarchyCache struct {
-	ItemID                 int       `json:"item_id"`
-	EffectiveProjectID     *int      `json:"effective_project_id"`
-	ProjectInheritanceMode string    `json:"project_inheritance_mode"` // "direct" | "inherit" | "none"
-	AncestorPath           []int     `json:"ancestor_path"`            // IDs from root to parent
-	Level                  int       `json:"level"`
-	CachedAt               time.Time `json:"cached_at"`
+// effectiveProjectCacheEntry is the cached effective-project resolution for one
+// item. The cache returns it by value; EffectiveProjectID points at an
+// immutable int, so callers never need to copy before reading.
+type effectiveProjectCacheEntry struct {
+	EffectiveProjectID     *int
+	ProjectInheritanceMode string // "direct" | "inherit" | "none"
 }
 
-// ItemCacheService handles cached per-item hierarchy data.
+// ItemCacheService caches the resolved effective project for an item so a read
+// does not re-walk the parent chain. The store is a count-bounded typed cache
+// rather than BigCache: cardinality is items and the value is a small struct, so
+// the byte API only added marshal/copy overhead (see WI-1906 for the same call
+// on the permission snapshot cache).
 type ItemCacheService struct {
-	hierarchyCache *bigcache.BigCache
-	db             database.Database
-	closeOnce      sync.Once
-	closeErr       error
+	cache     *cacheutil.TypedCache[effectiveProjectCacheEntry]
+	db        database.Database
+	repo      *repository.ItemRepository
+	closeOnce sync.Once
+	closeErr  error
 
-	// Cache statistics
+	// Cache statistics, reported by GetStats.
 	hierarchyHits   int64
 	hierarchyMisses int64
 	errors          int64
 
-	// Configuration
 	config ItemCacheConfig
 }
 
-// Close stops the hierarchy cache's background worker without closing the
-// shared database. It may be called more than once.
-func (ics *ItemCacheService) Close() error {
-	ics.closeOnce.Do(func() {
-		if ics.hierarchyCache != nil {
-			ics.closeErr = ics.hierarchyCache.Close()
+// Close stops the cache's background sweep without closing the shared database.
+// It may be called more than once.
+func (s *ItemCacheService) Close() error {
+	s.closeOnce.Do(func() {
+		if s.cache != nil {
+			s.closeErr = s.cache.Close()
 		}
 	})
-	return ics.closeErr
+	return s.closeErr
 }
 
-// ItemCacheConfig represents configuration for the item cache
+// ItemCacheConfig represents configuration for the item cache.
 type ItemCacheConfig struct {
 	HierarchyTTL    time.Duration `json:"hierarchy_ttl"`     // Default: 30min
-	MaxCacheSize    int           `json:"max_cache_size"`    // Default: 196MB
+	MaxCacheSize    int           `json:"max_cache_size"`    // Legacy MiB budget; seeds MaxEntries when unset
+	MaxEntries      int           `json:"max_entries"`       // Entry bound; 0 derives from MaxCacheSize
 	WarmupBatchSize int           `json:"warmup_batch_size"` // Default: 500
 	EnablePreWarm   bool          `json:"enable_pre_warm"`   // Default: true
 }
 
-// DefaultItemCacheConfig returns default configuration
+// itemEffectiveProjectEstimateBytes is the rough working-set cost of one cached
+// entry, used to translate the legacy MiB budget into an entry bound.
+const itemEffectiveProjectEstimateBytes = 96
+
+// DefaultItemCacheConfig returns default configuration.
 func DefaultItemCacheConfig() ItemCacheConfig {
 	return ItemCacheConfig{
 		// The measured workload revisits a deterministic hot set throughout a
 		// qualification window longer than five minutes. Retain those entries;
-		// mutation paths explicitly invalidate affected items and ancestors.
+		// mutation paths explicitly invalidate affected items and descendants.
 		HierarchyTTL:    30 * time.Minute,
 		MaxCacheSize:    196,
 		WarmupBatchSize: 500,
@@ -73,87 +76,88 @@ func DefaultItemCacheConfig() ItemCacheConfig {
 	}
 }
 
-// NewItemCacheService creates a new item cache service
-func NewItemCacheService(db database.Database, config ItemCacheConfig) (*ItemCacheService, error) {
-	// Configure hierarchy cache
-	hierarchyCache, err := cacheutil.New("item_hierarchy", cacheutil.BigCacheOptions{
-		TTL:               config.HierarchyTTL,
-		MaxCacheMB:        config.MaxCacheSize,
-		Shards:            128,
-		MaxEntrySize:      4096, // 4KB per entry
-		InitialCapacityMB: 4,
-		CleanWindow:       1 * time.Minute,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create hierarchy cache: %w", err)
+// itemCacheMaxEntries resolves the entry bound, preferring an explicit
+// MaxEntries and otherwise translating the legacy MiB budget.
+func itemCacheMaxEntries(config ItemCacheConfig) int {
+	if config.MaxEntries > 0 {
+		return config.MaxEntries
 	}
+	if config.MaxCacheSize <= 0 {
+		return 0
+	}
+	return config.MaxCacheSize * 1024 * 1024 / itemEffectiveProjectEstimateBytes
+}
 
+// NewItemCacheService creates a new item cache service.
+func NewItemCacheService(db database.Database, config ItemCacheConfig) *ItemCacheService {
 	service := &ItemCacheService{
-		hierarchyCache: hierarchyCache,
-		db:             db,
-		config:         config,
+		cache: cacheutil.NewTyped[effectiveProjectCacheEntry]("item_effective_project", cacheutil.TypedCacheOptions{
+			TTL:        config.HierarchyTTL,
+			MaxEntries: itemCacheMaxEntries(config),
+			Shards:     64,
+		}),
+		db:     db,
+		repo:   repository.NewItemRepository(db),
+		config: config,
 	}
 
-	// Warm up cache if configured
+	// Warm up the cache in the background so startup is not blocked. The fill is
+	// bounded by WarmupBatchSize; on-demand reads cover everything else.
 	if config.EnablePreWarm {
 		go func() { _ = service.WarmCache() }()
 	}
 
-	return service, nil
+	return service
 }
 
-// GetItemHierarchy retrieves cached hierarchy data for an item
-func (ics *ItemCacheService) GetItemHierarchy(itemID int) (*ItemHierarchyCache, error) {
-	key := ics.getHierarchyKey(itemID)
-
-	data, err := ics.hierarchyCache.Get(key)
-	if err == nil {
-		atomic.AddInt64(&ics.hierarchyHits, 1)
-
-		var cache ItemHierarchyCache
-		if err = json.Unmarshal(data, &cache); err != nil {
-			atomic.AddInt64(&ics.errors, 1)
-			return nil, fmt.Errorf("failed to unmarshal hierarchy cache: %w", err)
-		}
-		return &cache, nil
+// GetEffectiveProjectForItem resolves the effective project for an item, serving
+// a cached resolution when one is fresh and caching a fresh one otherwise.
+// Returns: (effective_project_id, inheritance_mode, error) where mode is
+// "none" / "inherit" / "direct".
+func (s *ItemCacheService) GetEffectiveProjectForItem(itemID int) (effectiveProjectID *int, projectInheritanceMode string, err error) {
+	if entry, ok := s.cache.Get(itemID); ok {
+		atomic.AddInt64(&s.hierarchyHits, 1)
+		return entry.EffectiveProjectID, entry.ProjectInheritanceMode, nil
 	}
+	atomic.AddInt64(&s.hierarchyMisses, 1)
 
-	atomic.AddInt64(&ics.hierarchyMisses, 1)
-	return nil, err
-}
-
-// SetItemHierarchy stores hierarchy data in cache
-func (ics *ItemCacheService) SetItemHierarchy(cache *ItemHierarchyCache) error {
-	cache.CachedAt = time.Now()
-
-	data, err := json.Marshal(cache)
+	res, err := s.repo.ResolveEffectiveProject(itemID)
 	if err != nil {
-		atomic.AddInt64(&ics.errors, 1)
-		return fmt.Errorf("failed to marshal hierarchy cache: %w", err)
+		atomic.AddInt64(&s.errors, 1)
+		return nil, "", err
 	}
 
-	key := ics.getHierarchyKey(cache.ItemID)
-	return ics.hierarchyCache.Set(key, data)
+	// A populated entry always carries the resolved mode (including "none"), so
+	// the mode alone gates a hit and "none" items cache instead of recomputing.
+	mode := "direct"
+	switch {
+	case res.DirectProjectID == nil && !res.InheritProject:
+		mode = "none"
+	case res.InheritProject:
+		mode = "inherit"
+	}
+	s.cache.Set(itemID, effectiveProjectCacheEntry{
+		EffectiveProjectID:     res.EffectiveProjectID,
+		ProjectInheritanceMode: mode,
+	})
+	return res.EffectiveProjectID, mode, nil
 }
 
-// InvalidateItemHierarchy removes an item and its ancestors from cache
-func (ics *ItemCacheService) InvalidateItemHierarchy(itemID int, ancestorIDs []int) error {
-	// Invalidate the item itself
-	key := ics.getHierarchyKey(itemID)
-	_ = ics.hierarchyCache.Delete(key)
-
-	// Invalidate all ancestors (their descendant counts changed)
+// InvalidateItemHierarchy drops the item and any ids the caller names (ancestors
+// whose descendant set changed, or descendants whose inherited project changed).
+// Mutation paths call this after a committed project, inherit_project or
+// parent_id change.
+func (s *ItemCacheService) InvalidateItemHierarchy(itemID int, ancestorIDs []int) error {
+	s.cache.Delete(itemID)
 	for _, ancestorID := range ancestorIDs {
-		key := ics.getHierarchyKey(ancestorID)
-		_ = ics.hierarchyCache.Delete(key)
+		s.cache.Delete(ancestorID)
 	}
-
 	return nil
 }
 
-// WarmCache pre-loads frequently accessed items
-func (ics *ItemCacheService) WarmCache() error {
-	// Identify hot items (recently accessed or frequently updated)
+// WarmCache pre-loads the effective project for recently active items. Bounded
+// by WarmupBatchSize and intended to run in the background.
+func (s *ItemCacheService) WarmCache() error {
 	query := `
 		SELECT DISTINCT item_id
 		FROM (
@@ -167,14 +171,14 @@ func (ics *ItemCacheService) WarmCache() error {
 	`
 
 	oneHourAgo := time.Now().Add(-time.Hour).UTC()
-	rows, err := ics.db.Query(query, oneHourAgo, ics.config.WarmupBatchSize)
+	rows, err := s.db.Query(query, oneHourAgo, s.config.WarmupBatchSize)
 	if err != nil {
 		slog.Error("failed to identify hot items for cache warming", slog.String("component", "item_cache"), slog.Any("error", err))
 		return err
 	}
 	defer rows.Close()
 
-	itemIDs := make([]int, 0, ics.config.WarmupBatchSize)
+	itemIDs := make([]int, 0, s.config.WarmupBatchSize)
 	for rows.Next() {
 		var itemID int
 		if err := rows.Scan(&itemID); err != nil {
@@ -186,83 +190,30 @@ func (ics *ItemCacheService) WarmCache() error {
 		return err
 	}
 
-	// Load hierarchy data for hot items
+	warmed := 0
 	for _, itemID := range itemIDs {
-		// In production, this would call the actual hierarchy calculation
-		// For now, we'll skip the implementation details
-		_ = itemID
+		if _, _, err := s.GetEffectiveProjectForItem(itemID); err != nil {
+			// A vanished or unreadable item must not abort the warm-up.
+			continue
+		}
+		warmed++
 	}
 
-	slog.Debug("item cache warmed", slog.String("component", "item_cache"), slog.Int("hot_items_count", len(itemIDs)))
+	slog.Debug("item cache warmed", slog.String("component", "item_cache"), slog.Int("hot_items_count", len(itemIDs)), slog.Int("warmed", warmed))
 	return nil
 }
 
-// GetStats returns cache statistics
-func (ics *ItemCacheService) GetStats() map[string]any {
-	hierarchyTotal := ics.hierarchyHits + ics.hierarchyMisses
+// GetStats returns cache statistics.
+func (s *ItemCacheService) GetStats() map[string]any {
+	hits := atomic.LoadInt64(&s.hierarchyHits)
+	misses := atomic.LoadInt64(&s.hierarchyMisses)
+	total := hits + misses
 
-	stats := map[string]any{
-		"hierarchy_hits":       ics.hierarchyHits,
-		"hierarchy_misses":     ics.hierarchyMisses,
-		"hierarchy_hit_rate":   float64(ics.hierarchyHits) / float64(max(hierarchyTotal, 1)),
-		"errors":               ics.errors,
-		"hierarchy_cache_size": ics.hierarchyCache.Len(),
+	return map[string]any{
+		"hierarchy_hits":       hits,
+		"hierarchy_misses":     misses,
+		"hierarchy_hit_rate":   float64(hits) / float64(max(total, 1)),
+		"errors":               atomic.LoadInt64(&s.errors),
+		"hierarchy_cache_size": s.cache.Len(),
 	}
-
-	return stats
-}
-
-// GetEffectiveProjectForItem retrieves or calculates the effective project for an item
-// This method first checks the cache, then falls back to database calculation if needed
-func (ics *ItemCacheService) GetEffectiveProjectForItem(itemID int) (effectiveProjectID *int, projectInheritanceMode string, err error) {
-	// Try cache first. A populated entry always carries the resolved mode
-	// (including "none"), so the mode gates the hit — this both avoids the old
-	// hardcoded "direct" on every hit and lets "none" items hit the cache
-	// instead of recomputing each call.
-	hierarchyCache, err := ics.GetItemHierarchy(itemID)
-	if err == nil && hierarchyCache != nil && hierarchyCache.ProjectInheritanceMode != "" {
-		return hierarchyCache.EffectiveProjectID, hierarchyCache.ProjectInheritanceMode, nil
-	}
-
-	// Cache miss - calculate from database
-	effectiveProjectID, inheritProject, directProjectID, err := ics.calculateEffectiveProject(itemID)
-	if err != nil {
-		return nil, "", err
-	}
-
-	// Determine inheritance mode
-	switch {
-	case directProjectID == nil && !inheritProject:
-		projectInheritanceMode = "none"
-	case inheritProject:
-		projectInheritanceMode = "inherit"
-	default:
-		projectInheritanceMode = "direct"
-	}
-
-	// Store in cache for future use, including the resolved mode.
-	cacheEntry := &ItemHierarchyCache{
-		ItemID:                 itemID,
-		EffectiveProjectID:     effectiveProjectID,
-		ProjectInheritanceMode: projectInheritanceMode,
-		CachedAt:               time.Now(),
-	}
-	_ = ics.SetItemHierarchy(cacheEntry) // Ignore cache write errors
-
-	return effectiveProjectID, projectInheritanceMode, nil
-}
-
-// calculateEffectiveProject walks up the hierarchy to find the effective project
-func (ics *ItemCacheService) calculateEffectiveProject(itemID int) (effectiveProjectID *int, inheritProject bool, directProjectID *int, err error) {
-	res, err := repository.NewItemRepository(ics.db).ResolveEffectiveProject(itemID)
-	if err != nil {
-		return nil, false, nil, err
-	}
-	return res.EffectiveProjectID, res.InheritProject, res.DirectProjectID, nil
-}
-
-// Helper methods
-
-func (ics *ItemCacheService) getHierarchyKey(itemID int) string {
-	return fmt.Sprintf("item:hierarchy:%d", itemID)
 }

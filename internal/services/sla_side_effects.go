@@ -126,10 +126,11 @@ func (e *SLASideEffectEmitter) appendNotification(ctx context.Context, tx databa
 	if thresholdKey != "" {
 		notificationEvent.TemplateData["sla.threshold"] = thresholdKey
 	}
-	input, err := actionevents.NewCompatibilityEvent(actionevents.CompatibilityInput{
+	input, err := actionevents.NewSideEffectEvent(actionevents.SideEffectInput{
 		Payload: notificationEvent, WorkspaceID: &workspaceID,
 		AggregateType: "notification_item", AggregateID: strconv.Itoa(cycle.ItemID),
-		EventType: DurableNotificationCompatibilityEvent,
+		EventType: DurableNotificationRequestedEvent,
+		ActorKind: slaCycleActorKind(cycle), SourceKind: slaCycleSourceKind(cycle),
 	})
 	if err != nil {
 		return fmt.Errorf("encode SLA notification event: %w", err)
@@ -161,10 +162,11 @@ func (e *SLASideEffectEmitter) appendAction(ctx context.Context, tx database.Tx,
 		ItemID:      cycle.ItemID,
 		NewValues:   newValues,
 	}
-	input, err := actionevents.NewCompatibilityEvent(actionevents.CompatibilityInput{
+	input, err := actionevents.NewSideEffectEvent(actionevents.SideEffectInput{
 		Payload: actionEvent, WorkspaceID: &workspaceID,
 		AggregateType: "action_item", AggregateID: strconv.Itoa(cycle.ItemID),
-		EventType: DurableActionCompatibilityEvent,
+		EventType: DurableActionRequestedEvent,
+		ActorKind: slaCycleActorKind(cycle), SourceKind: slaCycleSourceKind(cycle),
 	})
 	if err != nil {
 		return fmt.Errorf("encode SLA action event: %w", err)
@@ -181,4 +183,20 @@ func slaOutcomeLabel(eventType string) string {
 		return "warning"
 	}
 	return "breached"
+}
+
+// slaCycleActorKind and slaCycleSourceKind preserve the cycle's import origin
+// on the side-effect event so an imported SLA can never drive live output.
+func slaCycleActorKind(cycle *models.ItemSLACycle) string {
+	if cycle.Origin == models.SLAOriginImport {
+		return "import"
+	}
+	return "system"
+}
+
+func slaCycleSourceKind(cycle *models.ItemSLACycle) string {
+	if cycle.Origin == models.SLAOriginImport {
+		return "import"
+	}
+	return "sla"
 }

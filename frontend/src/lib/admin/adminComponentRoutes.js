@@ -1,6 +1,7 @@
 // Keep admin settings out of the initial admin bundle. Each tab is loaded only
 // when its route is active.
 export const ADMIN_COMPONENT_LOADERS = {
+  general: () => import('../settings/GeneralSettings.svelte'),
   'custom-fields': () => import('../settings/CustomFields.svelte'),
   workspaces: () => import('../workspaces/Workspaces.svelte'),
   screens: () => import('../pages/Screens.svelte'),

@@ -101,7 +101,7 @@
   let theadClass = '';
   let tbodyClass = 'divide-y';
   let trClass = 'transition-colors duration-150';
-  let thClass = 'px-6 py-4 text-left text-xs font-semibold tracking-wide';
+  let thClass = 'px-6 py-4 text-xs font-semibold tracking-wide';
   let tdClass = 'px-6 py-4';
   
   function getColumnWidth(column) {
@@ -127,7 +127,7 @@
   }
   
   function getColumnAlign(column) {
-    return column.align || 'text-left';
+    return column.align || 'text-start';
   }
   
   function getColumnPadding(column) {
@@ -229,9 +229,9 @@
                       {@html sanitizeHtml(getCellValue(item, column)) || '—'}
                     {:else if column.render}
                       <!-- Render function output as text (safe by default) -->
-                      {getCellValue(item, column) || '—'}
+                      <span dir="auto">{getCellValue(item, column) || '—'}</span>
                     {:else}
-                      <span style="color: {column.textColor || (column.key === 'actions' ? 'var(--ds-text)' : 'var(--ds-text)')};">
+                      <span dir="auto" style="color: {column.textColor || 'var(--ds-text)'};">
                         {getCellValue(item, column) || '—'}
                       </span>
                     {/if}

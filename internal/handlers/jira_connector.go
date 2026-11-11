@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"time"
 
 	"windshift/internal/blobstore"
 	"windshift/internal/database"
@@ -35,10 +36,44 @@ type JiraImportHandler struct {
 	// through every import helper.
 	jobTokens        map[string]string
 	cacheInvalidator *services.AuthorizationCacheInvalidator
+	// importMaxDuration caps a single import. Zero disables the overall limit.
+	importMaxDuration time.Duration
+	// importWatchers enables the per-issue watcher fetch and item-watch import.
+	importWatchers bool
+	// importConcurrency bounds in-flight Jira requests for independent work.
+	importConcurrency int
 }
 
 func (h *JiraImportHandler) WithAuthorizationCacheInvalidator(invalidator *services.AuthorizationCacheInvalidator) *JiraImportHandler {
 	h.cacheInvalidator = invalidator
+	return h
+}
+
+// WithImportMaxDuration sets the overall import limit. Zero (the default) means
+// no wall-clock cap.
+func (h *JiraImportHandler) WithImportMaxDuration(maxDuration time.Duration) *JiraImportHandler {
+	h.importMaxDuration = maxDuration
+	return h
+}
+
+// WithImportWatchers enables mapping Jira watchers to Windshift item watches.
+// It is off by default because the identities cost one Jira request per issue.
+func (h *JiraImportHandler) WithImportWatchers(enabled bool) *JiraImportHandler {
+	h.importWatchers = enabled
+	return h
+}
+
+// WithImportConcurrency overrides how many independent Jira requests the import
+// keeps in flight. Values below 1 keep the default; values above the maximum
+// are clamped so a misconfiguration cannot spawn an unbounded pool.
+func (h *JiraImportHandler) WithImportConcurrency(workers int) *JiraImportHandler {
+	if workers <= 0 {
+		return h
+	}
+	if workers > jiraImportMaxConcurrency {
+		workers = jiraImportMaxConcurrency
+	}
+	h.importConcurrency = workers
 	return h
 }
 
@@ -57,6 +92,7 @@ func NewJiraImportHandler(db database.Database, sessionSecret, capturePayloadsDi
 		encryption:         sso.NewSecretEncryption(sessionSecret),
 		capturePayloadsDir: capturePayloadsDir,
 		mappingFailures:    make(map[string]error),
+		importConcurrency:  jiraImportDefaultConcurrency,
 	}
 }
 

@@ -22,6 +22,7 @@ type dataCenterClient struct {
 	authHeader     string
 	httpClient     *http.Client
 	limiter        *rate.Limiter
+	throttle       *jiraThrottle
 	retryWait      func(context.Context, time.Duration) error
 	retryAttempts  int
 }
@@ -31,7 +32,14 @@ type dataCenterClient struct {
 //nolint:unparam // method is always "GET" currently but kept for future flexibility
 func (c *dataCenterClient) do(ctx context.Context, method, reqURL string, body any) (*http.Response, error) {
 	return doReadOnlyJiraRequest(
-		ctx, c.httpClient, c.limiter, c.authHeader, method, reqURL, body,
+		ctx, c.httpClient, c.limiter, c.throttle, c.authHeader, method, reqURL, body,
+		c.retryAttempts, c.retryWait,
+	)
+}
+
+func (c *dataCenterClient) doWithHeaders(ctx context.Context, method, reqURL string, body any, headers map[string]string) (*http.Response, error) {
+	return doReadOnlyJiraRequestWithHeaders(
+		ctx, c.httpClient, c.limiter, c.throttle, c.authHeader, method, reqURL, body, headers,
 		c.retryAttempts, c.retryWait,
 	)
 }
@@ -86,7 +94,7 @@ func (c *dataCenterClient) TestConnection(ctx context.Context) (*JiraInstanceInf
 		URL:         serverInfo.BaseURL,
 	}
 	if info.URL == "" {
-		info.URL = c.baseURL
+		info.URL = jiraSiteURLFromBase(c.baseURL)
 	}
 	if user.DisplayName != "" {
 		info.DisplayName = user.DisplayName
@@ -136,18 +144,23 @@ func (c *dataCenterClient) ListServiceDeskRequestComments(ctx context.Context, i
 	})
 }
 
+// ListServiceDeskOrganizations reads the customer-organization catalog. JSM
+// 5.x marks this read experimental and requires an opt-in header; newer
+// versions accept it as well.
 func (c *dataCenterClient) ListServiceDeskOrganizations(ctx context.Context, serviceDeskID string) ([]JiraServiceDeskOrganization, error) {
-	return jiraServiceDeskValues[JiraServiceDeskOrganization](ctx, c, func(start int) string {
+	return jiraServiceDeskValuesWithHeaders[JiraServiceDeskOrganization](ctx, c, func(start int) string {
 		return fmt.Sprintf("%s/servicedesk/%s/organization?start=%d&limit=100",
 			c.serviceDeskURL, url.PathEscape(serviceDeskID), start)
-	})
+	}, jiraExperimentalHeaders())
 }
 
+// ListServiceDeskOrganizationUsers reads organization members. Like the
+// organization list, JSM 5.x requires the experimental-read opt-in.
 func (c *dataCenterClient) ListServiceDeskOrganizationUsers(ctx context.Context, organizationID string) ([]JiraUser, error) {
-	return jiraServiceDeskValues[JiraUser](ctx, c, func(start int) string {
+	return jiraServiceDeskValuesWithHeaders[JiraUser](ctx, c, func(start int) string {
 		return fmt.Sprintf("%s/organization/%s/user?start=%d&limit=100",
 			c.serviceDeskURL, url.PathEscape(organizationID), start)
-	})
+	}, jiraExperimentalHeaders())
 }
 
 // ================================================================
@@ -412,7 +425,21 @@ func (c *dataCenterClient) BulkFetchIssues(ctx context.Context, req BulkFetchReq
 
 // GetAllIssueKeys retrieves all issue keys matching a JQL query
 func (c *dataCenterClient) GetAllIssueKeys(ctx context.Context, jql string) ([]string, error) {
-	var keys []string
+	refs, err := c.GetAllIssueRefs(ctx, jql)
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		keys = append(keys, ref.Key)
+	}
+	return keys, nil
+}
+
+// GetAllIssueRefs retrieves the numeric id and key of every issue matching a
+// JQL query.
+func (c *dataCenterClient) GetAllIssueRefs(ctx context.Context, jql string) ([]JiraIssueRef, error) {
+	var refs []JiraIssueRef
 	startAt := 0
 	maxResults := 100
 
@@ -424,11 +451,11 @@ func (c *dataCenterClient) GetAllIssueKeys(ctx context.Context, jql string) ([]s
 			Fields:     []string{"key"},
 		})
 		if err != nil {
-			return keys, err
+			return refs, err
 		}
 
 		for _, issue := range result.Issues {
-			keys = append(keys, issue.Key)
+			refs = append(refs, JiraIssueRef{ID: issue.ID, Key: issue.Key})
 		}
 
 		startAt += len(result.Issues)
@@ -437,7 +464,7 @@ func (c *dataCenterClient) GetAllIssueKeys(ctx context.Context, jql string) ([]s
 		}
 	}
 
-	return keys, nil
+	return refs, nil
 }
 
 // ================================================================
@@ -463,9 +490,24 @@ func (c *dataCenterClient) GetBoardConfiguration(ctx context.Context, boardID in
 	return jiraGetBoardConfiguration(ctx, c, c.agileURL, boardID)
 }
 
-// ListFilters lists saved filters associated with a project.
-func (c *dataCenterClient) ListFilters(ctx context.Context, projectKey string) (*FilterSearchResult, error) {
-	return jiraListFilters(ctx, c, c.baseURL, projectKey)
+// ListFilters returns the caller's favorite saved filters. Data Center does
+// not expose Cloud's project filter search, so only favorites are discoverable
+// here; board-referenced filters are resolved separately by ID. The result is
+// marked partial so the importer reports the boundary.
+func (c *dataCenterClient) ListFilters(ctx context.Context, _ string) (*FilterSearchResult, error) {
+	var filters []JiraFilter
+	if err := jiraGetJSON(ctx, c, c.baseURL+"/filter/favourite?expand=jql,description,owner,viewUrl", &filters); err != nil { //nolint:misspell // Atlassian's Data Center route uses the British spelling
+		return nil, err
+	}
+	return &FilterSearchResult{
+		MaxResults:    len(filters),
+		StartAt:       0,
+		Total:         len(filters),
+		IsLast:        true,
+		Values:        filters,
+		Partial:       true,
+		PartialReason: "Data Center only exposes favorite saved filters; non-favorite filters cannot be enumerated through the supported API.",
+	}, nil
 }
 
 // GetFilter gets a saved filter with expanded JQL where available.
@@ -485,9 +527,18 @@ func (c *dataCenterClient) GetBoardSprints(ctx context.Context, boardID int) (*S
 // Attachment Methods
 // ================================================================
 
-// DownloadAttachment downloads an attachment and returns the reader and content type
-func (c *dataCenterClient) DownloadAttachment(ctx context.Context, attachmentURL string) (io.ReadCloser, string, error) {
-	return jiraDownloadAttachment(ctx, c.httpClient, c.limiter, c.authHeader, attachmentURL)
+// DownloadAttachment downloads an attachment and returns the reader and content
+// type. Data Center prefers the API-returned content URL and falls back to the
+// attachment-content endpoint under its base URL.
+func (c *dataCenterClient) DownloadAttachment(ctx context.Context, attachmentID, contentURL string) (io.ReadCloser, string, error) {
+	downloadURL := contentURL
+	if downloadURL == "" && attachmentID != "" {
+		downloadURL = c.baseURL + "/attachment/content/" + url.PathEscape(attachmentID)
+	}
+	if downloadURL == "" {
+		return nil, "", fmt.Errorf("%w: attachment has no download URL", ErrAPIError)
+	}
+	return jiraDownloadAttachment(ctx, c.httpClient, c.limiter, c.throttle, c.authHeader, downloadURL)
 }
 
 // ================================================================
@@ -525,30 +576,14 @@ func (c *dataCenterClient) GetUserEmail(ctx context.Context, accountID string) (
 // Jira Assets (Insight) Methods - Limited support on Data Center
 // ================================================================
 
-// ListObjectSchemas lists all object schemas in Assets
-// Note: Insight/Assets API on Data Center is different and may not be available
+// ListObjectSchemas reports Assets as unavailable on Data Center. Schema
+// discovery against the legacy Insight endpoint can succeed, but every object,
+// type, attribute, and AQL read is unimplemented. Advertising discoverable
+// inventories would create empty asset sets and clean field promises, so the
+// whole capability is reported unsupported until a version-appropriate adapter
+// is implemented. Original asset reference identifiers are preserved.
 func (c *dataCenterClient) ListObjectSchemas(ctx context.Context) ([]AssetObjectSchema, error) {
-	// Try the Insight API path for Data Center
-	resp, err := c.do(ctx, "GET", strings.TrimSuffix(c.baseURL, "/rest/api/2")+"/rest/insight/1.0/objectschema/list", nil)
-	if err != nil {
-		return nil, ErrAssetsNotAvailable
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, ErrAssetsNotAvailable
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, ErrAssetsNotAvailable
-	}
-
-	var result struct {
-		ObjectSchemas []AssetObjectSchema `json:"objectschemas"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, ErrAssetsNotAvailable
-	}
-	return result.ObjectSchemas, nil
+	return nil, ErrAssetsNotAvailable
 }
 
 // GetObjectSchema gets a single object schema by ID

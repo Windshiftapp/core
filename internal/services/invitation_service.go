@@ -14,6 +14,7 @@ import (
 	"windshift/internal/auth"
 	"windshift/internal/database"
 	"windshift/internal/emailutil"
+	"windshift/internal/i18n"
 	"windshift/internal/models"
 )
 
@@ -111,12 +112,13 @@ func (s *InvitationService) SendInvitationEmail(user *models.User, token string)
 	if firstName == "" {
 		firstName = "there"
 	}
+	locale := i18n.Normalize(user.Language)
 	url := fmt.Sprintf("%s/set-password/%s", s.baseURL, token)
-	return s.smtpSender.SendTransactional(user.Email, emailutil.TemplateInvitation, struct {
+	return s.smtpSender.SendTransactional(user.Email, locale, emailutil.TemplateInvitation, struct {
 		FirstName     string
 		InvitationURL string
 		ExpiresIn     string
-	}{firstName, url, emailutil.HumanizeDuration(InvitationExpiry)})
+	}{firstName, url, i18n.HumanizeDuration(locale, InvitationExpiry)})
 }
 
 // VerifyInvitation validates an invitation token and returns the user info

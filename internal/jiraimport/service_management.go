@@ -109,6 +109,42 @@ func (s *Service) EnsureRequestType(
 	return id, err == nil, err
 }
 
+// Request type restriction dispositions recorded in import mapping metadata.
+// Only an OPEN source type is active by default; RESTRICTED and unrecognized
+// statuses fail closed until an administrator configures an audience.
+const (
+	RequestTypeDispositionActive              = "active"
+	RequestTypeDispositionDisabledNeedsReview = "disabled_needs_review"
+	RequestTypeDispositionAudienceConfigured  = "audience_configured"
+)
+
+// ReconcileImportedRequestTypeRestriction aligns a reused request type with a
+// fail-closed reading of its Jira source. When failClosed is false (source
+// OPEN) the row's active flag is left alone so administrator edits survive.
+// Otherwise the row is disabled unless it already carries an explicit
+// visibility audience. Returns the effective disposition for mapping metadata.
+func (s *Service) ReconcileImportedRequestTypeRestriction(id, channelID int, failClosed bool) (string, error) {
+	rt, err := s.requestTypes.GetByID(id)
+	if err != nil {
+		return "", err
+	}
+	if !failClosed {
+		if rt.IsActive {
+			return RequestTypeDispositionActive, nil
+		}
+		return RequestTypeDispositionDisabledNeedsReview, nil
+	}
+	if len(rt.VisibilityGroupIDs) > 0 || len(rt.VisibilityOrgIDs) > 0 {
+		return RequestTypeDispositionAudienceConfigured, nil
+	}
+	if rt.IsActive {
+		if err := s.requestTypes.SetActive(id, channelID, false); err != nil {
+			return "", err
+		}
+	}
+	return RequestTypeDispositionDisabledNeedsReview, nil
+}
+
 type PortalCustomer struct {
 	ID             int
 	OrganisationID *int

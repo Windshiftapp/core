@@ -34,14 +34,24 @@
   import Plus from '@lucide/svelte/icons/plus';
   import SearchInput from '../../components/SearchInput.svelte';
   import StatusModal from '../../dialogs/StatusModal.svelte';
+  import TransitionInspector from './TransitionInspector.svelte';
+  import { transitions as transitionsApi } from '../../api/transitions.js';
 
-  let { workflow, statuses = [], statusCategories = [], onSave, onCancel } = $props();
+  let { workflow, statuses = [], statusCategories = [], onSave, onSaved = null, onCancel } = $props();
 
   // Local state
   let nodes = $state([]);
   let edges = $state([]);
   let workflowStatuses = $state([]);
   let workingTransitions = $state([]);
+  // Selected transition (edge) for the right-hand inspector and the screen
+  // binding map that drives the edge badges (WI-1835).
+  let selectedTransition = $state(null);
+  let screenByTransition = $state({});
+  // Screens chosen for edges drawn in this session. They have no transition id
+  // until the graph is saved, so the binding is staged here and applied after
+  // the transitions commit.
+  let pendingScreens = $state({});
   let savingTransitions = $state(false);
   let initialStatusId = $state(null);
 
@@ -139,6 +149,65 @@
       initialStatusId = nodes[0].data.statusId;
       nodes = markInitialNode(nodes, initialStatusId);
     }
+
+    void loadTransitionScreens();
+  }
+
+  // The graph payload deliberately omits screen_id, so the designer resolves
+  // the binding per transition through governance and badges the edges.
+  async function loadTransitionScreens() {
+    const ids = edges.map((edge) => edge.data?.transitionId).filter(Boolean);
+    if (ids.length === 0) {
+      screenByTransition = {};
+      return;
+    }
+    const entries = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const governance = await transitionsApi.governance(id);
+          return [id, governance?.screen || null];
+        } catch {
+          return [id, null];
+        }
+      })
+    );
+    screenByTransition = Object.fromEntries(entries);
+    applyScreenBadges();
+  }
+
+  // Mirror the resolved bindings onto the edge data so ReconnectableEdge can
+  // render a badge without another lookup. Edges without a transition id read
+  // their staged binding instead.
+  function applyScreenBadges() {
+    edges = edges.map((edge) => ({
+      ...edge,
+      data: {
+        ...edge.data,
+        screen: edge.data?.transitionId
+          ? screenByTransition[edge.data.transitionId] || null
+          : pendingScreens[edge.id] || null,
+      },
+    }));
+  }
+
+  function handleScreenChanged({ edgeId, transitionId, screen }) {
+    if (transitionId) {
+      screenByTransition = { ...screenByTransition, [transitionId]: screen };
+    } else if (edgeId) {
+      pendingScreens = { ...pendingScreens, [edgeId]: screen };
+      if (selectedTransition?.edgeId === edgeId) {
+        selectedTransition = { ...selectedTransition, screen };
+      }
+    }
+    applyScreenBadges();
+  }
+
+  // @xyflow/svelte invokes onedgeclick with `{ event, edge }`, not a
+  // CustomEvent, so read `edge` directly. The from-all loop is edited through
+  // its status checkbox, not the inspector.
+  function handleEdgeClick({ edge }) {
+    if (!edge || isAllIncomingEdge(edge)) return;
+    selectedTransition = { ...edge.data, edgeId: edge.id };
   }
 
   function onConnect(params) {
@@ -399,12 +468,45 @@
         workflow.id
       );
 
-      await onSave(allTransitions);
+      const persisted = await onSave(allTransitions);
+      await applyPendingScreens(persisted);
+      onSaved?.();
     } catch (error) {
       console.error('Failed to save workflow design:', error);
       errorToast(t('workflows.failedToSaveDesign') + ': ' + (error.message || error));
     } finally {
       savingTransitions = false;
+    }
+  }
+
+  // Screens staged on edges drawn in this session are bound to the transition
+  // rows the save just created, matched by the from/to status pair.
+  async function applyPendingScreens(persisted) {
+    const edgeIds = Object.keys(pendingScreens).filter((id) => pendingScreens[id]?.id);
+    if (edgeIds.length === 0 || !Array.isArray(persisted)) return;
+
+    const byKey = new Map(
+      persisted.map((transition) => [
+        `${transition.from?.id ?? 'null'}:${transition.to?.id}`,
+        transition,
+      ])
+    );
+    const bindings = edgeIds
+      .map((edgeId) => {
+        const edge = edges.find((candidate) => candidate.id === edgeId);
+        const transition = byKey.get(
+          `${edge?.data?.from_status_id ?? 'null'}:${edge?.data?.to_status_id}`
+        );
+        return transition ? { id: transition.id, screenId: pendingScreens[edgeId].id } : null;
+      })
+      .filter(Boolean);
+
+    try {
+      await Promise.all(
+        bindings.map((binding) => transitionsApi.setScreen(binding.id, binding.screenId))
+      );
+    } catch (error) {
+      errorToast(t('workflows.failedToSaveScreen') + ': ' + (error.message || error));
     }
   }
 
@@ -461,7 +563,6 @@
       lastCreatedStatusId = created.id;
       showStatusModal = false;
       statusFilter = '';
-      window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
     } catch (error) {
       console.error('Failed to create status:', error);
       errorToast(t('dialogs.alerts.failedToCreate', { error: error.message || error }));
@@ -612,7 +713,7 @@
   </div>
 
   <!-- Svelte Flow Canvas -->
-  <div class="flex-1 relative" data-testid="workflow-canvas">
+  <div class="flex-1 min-w-0 relative" data-testid="workflow-canvas">
     <SvelteFlow
       bind:nodes
       bind:edges
@@ -620,6 +721,7 @@
       {edgeTypes}
       onconnect={onConnect}
       onnodedragstop={onNodeDragStop}
+      onedgeclick={handleEdgeClick}
       {...legacyChangeHandlers}
       {...flowOptions}
       fitView
@@ -698,6 +800,15 @@
   </div>
 
   <!-- Shared create-status dialog -->
+  {#if selectedTransition}
+    <TransitionInspector
+      transition={selectedTransition}
+      {statuses}
+      onClose={() => (selectedTransition = null)}
+      onChanged={handleScreenChanged}
+    />
+  {/if}
+
   <StatusModal
     isOpen={showStatusModal}
     bind:formData={statusFormData}

@@ -1,0 +1,20 @@
+{
+  "name": "markdown-raw-editor",
+  "version": "1.0.0",
+  "description": "Edit Markdown surfaces as raw source in a plain textarea",
+  "author": "Windshift",
+  "entryPoint": "plugin.wasm",
+  "extensions": [
+    {
+      "point": "editor.markdown",
+      "id": "raw-markdown",
+      "label": "Raw Markdown",
+      "description": "Edit the exact Markdown source instead of the WYSIWYG editor",
+      "icon": "code",
+      "component": "editor.html",
+      "order": 100,
+      "mode": "toggle",
+      "entityTypes": ["item", "page", "comment"]
+    }
+  ]
+}

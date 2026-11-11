@@ -27,6 +27,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/emailutil"
+	"windshift/internal/i18n"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/utils"
@@ -257,15 +258,21 @@ func (s *NotificationSMTPSender) SetEncryption(enc Encryptor) {
 }
 
 // RenderEmail resolves the named email template (admin-edited DB row preferred,
-// embedded fallback otherwise) and renders subject/html/text against `data`.
-// The rendered Subject is also exposed to the HTML/text body templates as
-// `{{.Subject}}` (used by the shared shell's <title> tag), so each call site
-// only has to pass its native fields without remembering to mirror the
-// subject in the struct.
+// embedded fallback otherwise) and renders subject/html/text against `data` in
+// the default locale. The rendered Subject is also exposed to the HTML/text body
+// templates as `{{.Subject}}` (used by the shared shell's <title> tag), so each
+// call site only has to pass its native fields without remembering to mirror
+// the subject in the struct.
 func (s *NotificationSMTPSender) RenderEmail(templateName string, data any) (subject, htmlBody, textBody string, err error) {
-	subjectSrc, htmlSrc, textSrc, fromDB := s.resolveTemplate(templateName)
+	return s.RenderEmailLocale(i18n.Default, templateName, data)
+}
 
-	subject, htmlBody, textBody, err = renderEmailTemplates(subjectSrc, htmlSrc, textSrc, data)
+// RenderEmailLocale is RenderEmail with copy and date formatting bound to the
+// recipient's locale.
+func (s *NotificationSMTPSender) RenderEmailLocale(locale, templateName string, data any) (subject, htmlBody, textBody string, err error) {
+	subjectSrc, htmlSrc, textSrc, fromDB := s.resolveTemplate(locale, templateName)
+
+	subject, htmlBody, textBody, err = renderEmailTemplates(locale, subjectSrc, htmlSrc, textSrc, data)
 	if err == nil {
 		return subject, htmlBody, textBody, nil
 	}
@@ -284,18 +291,18 @@ func (s *NotificationSMTPSender) RenderEmail(templateName string, data any) (sub
 		slog.String("template", templateName),
 		slog.Any("error", err),
 	)
-	return renderEmailTemplates(def.Subject, def.HTMLBody, def.TextBody, data)
+	return renderEmailTemplates(locale, def.Subject, def.HTMLBody, def.TextBody, data)
 }
 
 // renderEmailTemplates renders subject then body, exposing the rendered subject
 // to the body as {{.Subject}} (used by the shared shell's <title> tag).
-func renderEmailTemplates(subjectSrc, htmlSrc, textSrc string, data any) (subject, htmlBody, textBody string, err error) {
-	_, subject, err = emailutil.RenderTemplates(subjectSrc, subjectSrc, data)
+func renderEmailTemplates(locale, subjectSrc, htmlSrc, textSrc string, data any) (subject, htmlBody, textBody string, err error) {
+	_, subject, err = emailutil.RenderTemplatesLocale(locale, subjectSrc, subjectSrc, data)
 	if err != nil {
 		return "", "", "", err
 	}
-	enriched := emailutil.EnrichWithSubject(data, subject)
-	htmlBody, textBody, err = emailutil.RenderTemplates(htmlSrc, textSrc, enriched)
+	enriched := emailutil.EnrichWithSubjectLocale(data, subject, locale)
+	htmlBody, textBody, err = emailutil.RenderTemplatesLocale(locale, htmlSrc, textSrc, enriched)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -313,21 +320,22 @@ func defaultTemplate(name string) (emailutil.DefaultTemplate, bool) {
 }
 
 // SendTransactional renders a named template against `data` and sends it via
-// SMTP to `toEmail`. Returns ErrSMTPNotConfigured if SMTP isn't set up. This
-// is the shared one-call surface used by the magic-link / verification /
-// invitation services so each one stays a thin URL-builder + caller.
-func (s *NotificationSMTPSender) SendTransactional(toEmail, templateName string, data any) error {
-	return s.SendTransactionalContext(context.Background(), toEmail, templateName, data)
+// SMTP to `toEmail` in the recipient's locale. Returns ErrSMTPNotConfigured if
+// SMTP isn't set up. This is the shared one-call surface used by the magic-link
+// / verification / invitation services so each one stays a thin URL-builder +
+// caller.
+func (s *NotificationSMTPSender) SendTransactional(toEmail, locale, templateName string, data any) error {
+	return s.SendTransactionalContext(context.Background(), toEmail, locale, templateName, data)
 }
 
 // SendTransactionalContext is SendTransactional with cancellation propagated
 // through SMTP dialing, handshake, commands, and DATA completion. The
 // mention-email outbox uses it so a scheduler shutdown cannot wedge a send.
-func (s *NotificationSMTPSender) SendTransactionalContext(ctx context.Context, toEmail, templateName string, data any) error {
+func (s *NotificationSMTPSender) SendTransactionalContext(ctx context.Context, toEmail, locale, templateName string, data any) error {
 	if !s.IsSMTPConfigured() {
 		return ErrSMTPNotConfigured
 	}
-	subject, htmlBody, textBody, err := s.RenderEmail(templateName, data)
+	subject, htmlBody, textBody, err := s.RenderEmailLocale(locale, templateName, data)
 	if err != nil {
 		return fmt.Errorf("render %s: %w", templateName, err)
 	}
@@ -346,11 +354,14 @@ func AbsoluteActionURL(baseURL, actionURL string) string {
 }
 
 // resolveTemplate returns the template sources and whether they came from the
-// admin-editable DB row (as opposed to the embedded default).
-func (s *NotificationSMTPSender) resolveTemplate(name string) (subject, html, text string, fromDB bool) {
+// admin-editable DB row (as opposed to the embedded default). It resolves the
+// recipient locale first: an exact-locale override wins, then a customized base
+// row; an unmodified seed falls through to the embedded default, which is
+// localized at render time.
+func (s *NotificationSMTPSender) resolveTemplate(locale, name string) (subject, html, text string, fromDB bool) {
 	if s.templates != nil {
-		if t, err := s.templates.GetByName(name); err == nil && t != nil {
-			return t.Subject, t.HTMLBody, t.TextBody, true
+		if t, fromDB, err := s.templates.ResolveForLocale(name, locale); err == nil && t != nil {
+			return t.Subject, t.HTMLBody, t.TextBody, fromDB
 		}
 	}
 	if t, ok := defaultTemplate(name); ok {
@@ -400,13 +411,14 @@ func (s *NotificationSMTPSender) getSMTPConfig() (*models.ChannelConfig, error) 
 }
 
 // SendBatchedNotifications sends a batch of notifications to a user via email
-func (s *NotificationSMTPSender) SendBatchedNotifications(userEmail, userName string, notifications []models.Notification) error {
-	return s.SendBatchedNotificationsContext(context.Background(), userEmail, userName, notifications)
+func (s *NotificationSMTPSender) SendBatchedNotifications(userEmail, userName, locale, timezone string, notifications []models.Notification) error {
+	return s.SendBatchedNotificationsContext(context.Background(), userEmail, userName, locale, timezone, notifications)
 }
 
 // SendBatchedNotificationsContext sends a batch with cancellation propagated
-// through SMTP dialing, handshake, commands, and DATA completion.
-func (s *NotificationSMTPSender) SendBatchedNotificationsContext(ctx context.Context, userEmail, userName string, notifications []models.Notification) error {
+// through SMTP dialing, handshake, commands, and DATA completion. locale and
+// timezone are the recipient's preferences and drive date rendering.
+func (s *NotificationSMTPSender) SendBatchedNotificationsContext(ctx context.Context, userEmail, userName, locale, timezone string, notifications []models.Notification) error {
 	if len(notifications) == 0 {
 		return nil
 	}
@@ -419,7 +431,7 @@ func (s *NotificationSMTPSender) SendBatchedNotificationsContext(ctx context.Con
 		return fmt.Errorf("failed to get SMTP config: %w", err)
 	}
 
-	subject, htmlBody, textBody, err := s.RenderEmail(emailutil.TemplateNotificationBatch, buildNotificationBatchData(s.baseURL, userName, notifications))
+	subject, htmlBody, textBody, err := s.RenderEmailLocale(locale, emailutil.TemplateNotificationBatch, buildNotificationBatchData(s.baseURL, userName, locale, timezone, notifications))
 	if err != nil {
 		return fmt.Errorf("failed to render notification email: %w", err)
 	}
@@ -439,7 +451,8 @@ type notificationBatchEntry struct {
 	ActionURL     string
 }
 
-func buildNotificationBatchData(baseURL, userName string, notifications []models.Notification) any {
+func buildNotificationBatchData(baseURL, userName, locale, timezone string, notifications []models.Notification) any {
+	location := i18n.Location(timezone)
 	data := struct {
 		UserName          string
 		NotificationCount int
@@ -449,16 +462,35 @@ func buildNotificationBatchData(baseURL, userName string, notifications []models
 		NotificationCount: len(notifications),
 	}
 	for _, n := range notifications {
+		title, message := localizedNotificationCopy(locale, n)
 		data.Notifications = append(data.Notifications, notificationBatchEntry{
-			Title:         n.Title,
-			Message:       n.Message,
+			Title:         title,
+			Message:       message,
 			Type:          n.Type,
 			AccentColor:   notificationAccentColor(n.Type),
-			FormattedTime: n.Timestamp.Format("January 2, 2006 at 3:04 PM"),
+			FormattedTime: i18n.FormatDateTimeZ(locale, n.Timestamp, location),
 			ActionURL:     absoluteActionURL(baseURL, n.ActionURL),
 		})
 	}
 	return data
+}
+
+// localizedNotificationCopy re-renders a notification's stored English copy in
+// the recipient's locale when the row carries i18n metadata, falling back to
+// the stored text for rule-based or user-authored notifications.
+func localizedNotificationCopy(locale string, n models.Notification) (title, message string) {
+	title, message = n.Title, n.Message
+	titleKey, messageKey, params, ok := models.ParseNotificationI18n(n.Metadata)
+	if !ok {
+		return title, message
+	}
+	if translated, found := i18n.TranslateOK(locale, titleKey, params); found {
+		title = translated
+	}
+	if translated, found := i18n.TranslateOK(locale, messageKey, params); found {
+		message = translated
+	}
+	return title, message
 }
 
 // absoluteActionURL turns a stored relative notification action path into a

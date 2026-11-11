@@ -152,14 +152,12 @@ type AssetService struct {
 	db            database.Database
 	repo          *repository.AssetRepository
 	eventRecorder assetEventRecorder
-	compatibility *DurableAssetActionIngress
 }
 
 // NewAssetService constructs an AssetService backed by the given repository.
 func NewAssetService(db database.Database, repo *repository.AssetRepository) *AssetService {
 	return &AssetService{
 		db: db, repo: repo, eventRecorder: assetevents.NewRecorder(db),
-		compatibility: NewDurableAssetActionIngress(db),
 	}
 }
 
@@ -175,13 +173,6 @@ func (s *AssetService) events() assetEventRecorder {
 		return assetevents.NewRecorder(s.db)
 	}
 	return s.eventRecorder
-}
-
-func (s *AssetService) compatibilityEvents() *DurableAssetActionIngress {
-	if s.compatibility == nil {
-		return NewDurableAssetActionIngress(s.db)
-	}
-	return s.compatibility
 }
 
 // ValidateActionTaxonomyReferences rejects asset action nodes whose taxonomy
@@ -271,16 +262,6 @@ func assetEventSnapshot(assetID, setID, assetTypeID int, categoryID, statusID *i
 		ID: assetID, SetID: setID, AssetTypeID: assetTypeID,
 		CategoryID: categoryID, StatusID: statusID, Title: title,
 		Description: description, AssetTag: assetTag,
-	}
-}
-
-func assetCompatibilityEvent(eventType models.AssetActionTriggerType, snapshot assetevents.AssetSnapshot, actorUserID int, oldValues, newValues map[string]any, automation AssetAutomationContext) *models.AssetActionEvent {
-	return &models.AssetActionEvent{
-		EventType: eventType, SetID: snapshot.SetID, AssetID: snapshot.ID, ActorUserID: actorUserID,
-		OldValues: oldValues, NewValues: newValues,
-		TriggeredByAction: automation.TriggeredByAction, ExecutionChainID: automation.ExecutionChainID,
-		CascadeDepth: automation.CascadeDepth, SourceApplication: automation.SourceApplication,
-		CausationEventKey: automation.CausationEventKey,
 	}
 }
 
@@ -726,12 +707,7 @@ func (s *AssetService) CreateAssetWithContext(actor AuditActor, in repository.Cr
 			newValues,
 			assetEventMetadata(actor.UserID, "application", context),
 		)
-		if err != nil {
-			return err
-		}
-		return s.compatibilityEvents().EmitInTx(stdctx.Background(), tx, assetCompatibilityEvent(
-			models.AssetTriggerAssetCreated, snapshot, actor.UserID, nil, newValues, context,
-		))
+		return err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create asset: %w", err)
@@ -764,14 +740,9 @@ func (s *AssetService) InsertImportedAsset(in repository.ImportAssetRowInput) (i
 		_, err = s.events().Created(
 			stdctx.Background(), tx, snapshot,
 			newValues,
-			assetEventMetadata(in.CreatedBy, "asset_import", AssetAutomationContext{}),
+			assetevents.Import(in.ImportJobID),
 		)
-		if err != nil {
-			return err
-		}
-		return s.compatibilityEvents().EmitInTx(stdctx.Background(), tx, assetCompatibilityEvent(
-			models.AssetTriggerAssetCreated, snapshot, in.CreatedBy, nil, newValues, AssetAutomationContext{},
-		))
+		return err
 	})
 	return assetID, err
 }
@@ -851,18 +822,9 @@ func (s *AssetService) UpdateAssetWithContext(actor AuditActor, assetID int, old
 			if _, err := recorder.StatusChanged(stdctx.Background(), tx, snapshot, oldStatusID, newStatusID, oldValues, newValues, metadata); err != nil {
 				return err
 			}
-			if err := s.compatibilityEvents().EmitInTx(stdctx.Background(), tx, assetCompatibilityEvent(
-				models.AssetTriggerAssetStatusChanged, snapshot, actor.UserID, oldValues, newValues, context,
-			)); err != nil {
-				return err
-			}
 		}
-		if _, err := recorder.Updated(stdctx.Background(), tx, snapshot, nil, newValues, metadata); err != nil {
-			return err
-		}
-		return s.compatibilityEvents().EmitInTx(stdctx.Background(), tx, assetCompatibilityEvent(
-			models.AssetTriggerAssetUpdated, snapshot, actor.UserID, nil, newValues, context,
-		))
+		_, err = recorder.Updated(stdctx.Background(), tx, snapshot, nil, newValues, metadata)
+		return err
 	})
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -1019,9 +981,7 @@ func (s *AssetService) DeleteAsset(actor AuditActor, assetID int) error {
 		if _, err := s.events().Deleted(stdctx.Background(), tx, snapshot, oldValues, metadata); err != nil {
 			return err
 		}
-		return s.compatibilityEvents().EmitInTx(stdctx.Background(), tx, assetCompatibilityEvent(
-			models.AssetTriggerAssetDeleted, snapshot, actor.UserID, oldValues, nil, AssetAutomationContext{},
-		))
+		return nil
 	})
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {

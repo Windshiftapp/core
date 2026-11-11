@@ -214,7 +214,7 @@
             {/if}
           </button>
         {/if}
-        <h4 class="min-w-0 flex-1 break-words text-sm font-medium leading-5" style={textStyle}>
+        <h4 class="min-w-0 flex-1 break-words text-sm font-medium leading-5" dir="auto" style={textStyle}>
           {item.title}
         </h4>
         {#if showMoveMenu}

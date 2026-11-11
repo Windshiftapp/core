@@ -1,5 +1,5 @@
 // Package template implements the {{var}} placeholder syntax shared
-// between asset actions, logbook actions, and portal title templates.
+// between asset actions and portal title templates.
 // Unknown variables are left as the literal placeholder so admins notice
 // typos at runtime instead of silently producing empty strings.
 package template

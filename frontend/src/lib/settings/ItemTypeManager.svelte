@@ -116,7 +116,6 @@
     } else {
       await itemTypesApi.create(formData);
     }
-    window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
   }
 
   function handleError(err, phase) {
@@ -131,7 +130,6 @@
 
   async function deleteItemType(itemType) {
     await itemTypesApi.delete(itemType.id);
-    window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
   }
 
   function onHierarchyLevelChange() {

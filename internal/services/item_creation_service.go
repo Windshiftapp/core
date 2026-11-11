@@ -2,10 +2,12 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/itemevents"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/validation"
@@ -47,6 +49,13 @@ type ItemCreateInput struct {
 	CustomFieldValues map[string]any
 	MilestoneIDs      []int
 	LabelIDs          []int
+	// EventMetadata overrides the inferred actor/source provenance for the
+	// canonical item.created fact. Import callers set it so durable consumers
+	// and the SLA engine can recognize historical writes.
+	EventMetadata itemevents.Metadata
+	// SkipAssigneeTrigger suppresses the coding-agent assignee trigger for bulk
+	// or import paths where a pre-assigned item must not start a run.
+	SkipAssigneeTrigger bool
 }
 
 // ItemCreateResult contains the committed item and mandatory-template detail
@@ -106,6 +115,11 @@ func (s *ItemCreationService) SetPermissionService(perm *PermissionService) {
 func resolveCreateItemType(db database.Database, workspaceID int, parentID *int) (*int, error) {
 	if parentID != nil && *parentID != 0 {
 		parent, err := repository.NewItemRepository(db).FindByID(*parentID)
+		if errors.Is(err, repository.ErrNotFound) {
+			// A missing parent is a client error, not a repository failure: the
+			// create contract reports it as a parent_id validation error.
+			return nil, &validation.ValidationError{Field: "parent_id", Message: "Parent item not found"}
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -115,6 +129,16 @@ func resolveCreateItemType(db database.Database, workspaceID int, parentID *int)
 }
 
 func (s *ItemCreationService) Create(actorUserID int, actorUsername string, input ItemCreateInput) (*ItemCreateResult, error) {
+	return s.create(actorUserID, actorUsername, input, nil)
+}
+
+// CreateImported runs the same validation pipeline as Create but records the
+// item as a historical import: the canonical fact carries import provenance,
+// live notifications/webhooks/automation are suppressed, and no coding-agent
+// assignee run starts.
+func (s *ItemCreationService) CreateImported(actorUserID int, actorUsername string, input ItemCreateInput, sourceRef string) (*ItemCreateResult, error) {
+	input.EventMetadata = mergeItemEventMetadata(input.EventMetadata, itemevents.Import(sourceRef))
+	input.SkipAssigneeTrigger = true
 	return s.create(actorUserID, actorUsername, input, nil)
 }
 
@@ -182,6 +206,7 @@ func (s *ItemCreationService) create(
 	}
 
 	var mandatoryTemplate MandatoryTemplateInfo
+	metadata := mergeItemEventMetadata(input.EventMetadata, itemEventMetadata(actorUserID, "application", actionContext))
 	itemID, err := CreateItem(s.db, ItemCreationParams{
 		WorkspaceID:           input.WorkspaceID,
 		Title:                 input.Title,
@@ -210,7 +235,8 @@ func (s *ItemCreationService) create(
 		ValidatingUserID:      actorUserID,
 		PermService:           s.perm,
 		MandatoryTemplateOut:  &mandatoryTemplate,
-		EventMetadata:         itemEventMetadata(actorUserID, "application", actionContext),
+		EventMetadata:         metadata,
+		SkipAssigneeTrigger:   input.SkipAssigneeTrigger,
 	})
 	if err != nil {
 		return nil, err
@@ -220,10 +246,14 @@ func (s *ItemCreationService) create(
 	if err != nil {
 		return nil, fmt.Errorf("load created item: %w", err)
 	}
-	if contextual, ok := s.emitter.(contextualItemCreatedEmitter); ok && actionContext != nil {
-		contextual.EmitItemCreatedWithContext(item, actorUserID, *actionContext, actorUsername)
-	} else if s.emitter != nil {
-		s.emitter.EmitItemCreated(item, actorUserID, actorUsername)
+	// Imported facts are historical: skip the live notification/webhook/automation
+	// pipeline even though validation and persistence used the canonical path.
+	if !itemevents.IsImportOrigin(metadata.ActorKind, metadata.SourceKind) {
+		if contextual, ok := s.emitter.(contextualItemCreatedEmitter); ok && actionContext != nil {
+			contextual.EmitItemCreatedWithContext(item, actorUserID, *actionContext, actorUsername)
+		} else if s.emitter != nil {
+			s.emitter.EmitItemCreated(item, actorUserID, actorUsername)
+		}
 	}
 	return &ItemCreateResult{Item: item, MandatoryTemplate: mandatoryTemplate}, nil
 }

@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -156,8 +157,15 @@ func (m *Manager) httpFetchHostFunction(ctx context.Context, plugin *extism.Curr
 	}
 	defer resp.Body.Close()
 
-	body, readErr := io.ReadAll(resp.Body)
+	body, readErr := readBoundedResponse(resp.Body, m.maxFetchBytes)
 	if readErr != nil {
+		if errors.Is(readErr, errHTTPFetchResponseTooLarge) {
+			m.writeHostResponse(plugin, stack, HTTPFetchResponse{
+				Status: http.StatusBadGateway,
+				Body:   []byte(fmt.Sprintf("http_fetch response exceeds %d bytes", m.maxFetchBytes)),
+			})
+			return
+		}
 		m.writeHostResponse(plugin, stack, HTTPFetchResponse{Status: http.StatusBadGateway, Body: []byte(readErr.Error())})
 		return
 	}
@@ -173,6 +181,27 @@ func (m *Manager) httpFetchHostFunction(ctx context.Context, plugin *extism.Curr
 		Headers: headers,
 		Body:    body,
 	})
+}
+
+// errHTTPFetchResponseTooLarge reports an upstream response that exceeded the
+// configured http_fetch ceiling. The host returns a deterministic error rather
+// than a silently truncated body.
+var errHTTPFetchResponseTooLarge = errors.New("http_fetch response too large")
+
+// readBoundedResponse reads at most limit bytes. It returns
+// errHTTPFetchResponseTooLarge when the source has more than limit bytes.
+func readBoundedResponse(r io.Reader, limit int64) ([]byte, error) {
+	if limit <= 0 {
+		limit = defaultMaxHTTPFetchResponseBytes
+	}
+	data, err := io.ReadAll(io.LimitReader(r, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > limit {
+		return nil, errHTTPFetchResponseTooLarge
+	}
+	return data, nil
 }
 
 func (m *Manager) writeHostResponse(plugin *extism.CurrentPlugin, stack []uint64, payload any) {

@@ -110,6 +110,10 @@ func (r *recordingClient) GetAllIssueKeys(ctx context.Context, jql string) ([]st
 	return keys, err
 }
 
+func (r *recordingClient) GetAllIssueRefs(ctx context.Context, jql string) ([]jira.JiraIssueRef, error) {
+	return r.inner.GetAllIssueRefs(ctx, jql)
+}
+
 func (r *recordingClient) BulkFetchIssues(ctx context.Context, req jira.BulkFetchRequest) (*jira.BulkFetchResponse, error) {
 	resp, err := r.inner.BulkFetchIssues(ctx, req)
 	if err == nil && resp != nil {
@@ -416,8 +420,8 @@ func (r *recordingClient) GetFilter(ctx context.Context, filterID string) (*jira
 	return resp, err
 }
 
-func (r *recordingClient) DownloadAttachment(ctx context.Context, attachmentURL string) (io.ReadCloser, string, error) {
-	return r.inner.DownloadAttachment(ctx, attachmentURL)
+func (r *recordingClient) DownloadAttachment(ctx context.Context, attachmentID, contentURL string) (io.ReadCloser, string, error) {
+	return r.inner.DownloadAttachment(ctx, attachmentID, contentURL)
 }
 
 func (r *recordingClient) ListObjectSchemas(ctx context.Context) ([]jira.AssetObjectSchema, error) {

@@ -56,6 +56,10 @@ func (c *DurableEmailReplyConsumer) Handle(ctx context.Context, event events.Eve
 	if event.Type != itemevents.CommentCreated || event.PayloadVersion != itemevents.PayloadVersion {
 		return events.Permanent(fmt.Errorf("unsupported email reply event %s v%d", event.Type, event.PayloadVersion))
 	}
+	// Imported comments are historical; emailing them would replay the archive.
+	if itemevents.IsImportOrigin(event.ActorKind, event.SourceKind) {
+		return nil
+	}
 	var payload itemevents.CommentCreatedV1
 	if err := json.Unmarshal(event.Payload, &payload); err != nil {
 		return events.Permanent(fmt.Errorf("decode email reply comment event: %w", err))
@@ -74,5 +78,6 @@ func (c *DurableEmailReplyConsumer) Handle(ctx context.Context, event events.Eve
 	return c.replies.handleCommentCreated(HandleCommentParams{
 		CommentID: int(payload.CommentID), ItemID: payload.ItemID,
 		AuthorID: *payload.AuthorID, Content: content,
+		SourceKind: event.SourceKind, ActorKind: event.ActorKind,
 	}, false)
 }

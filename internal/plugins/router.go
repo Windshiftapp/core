@@ -202,6 +202,10 @@ func (r *Router) forward(w http.ResponseWriter, req *http.Request, pluginName, p
 	}
 
 	for key, value := range pluginResp.Headers {
+		if forbiddenPluginResponseHeader(key) {
+			r.deps.Logger.Debug("dropped plugin response header", "plugin", pluginName, "header", key)
+			continue
+		}
 		w.Header().Set(key, value)
 	}
 
@@ -225,6 +229,52 @@ func (r *Router) forward(w http.ResponseWriter, req *http.Request, pluginName, p
 		// Log error but response is already partially written
 		r.deps.Logger.Error("failed to write plugin response", slog.Any("error", err))
 	}
+}
+
+// hopByHopPluginResponseHeaders are connection-scoped headers a plugin must
+// not set; net/http manages them.
+var hopByHopPluginResponseHeaders = map[string]struct{}{
+	"connection":          {},
+	"keep-alive":          {},
+	"proxy-authenticate":  {},
+	"proxy-authorization": {},
+	"proxy-connection":    {},
+	"te":                  {},
+	"trailer":             {},
+	"transfer-encoding":   {},
+	"upgrade":             {},
+}
+
+// forbiddenPluginResponseHeaders are same-origin effects a WASM plugin must
+// not be able to trigger through its HTTP response. The list is a deny-list
+// rather than an allow-list so legitimate headers (Content-Disposition,
+// Location, Cache-Control, ETag, custom X-*) keep working.
+var forbiddenPluginResponseHeaders = map[string]struct{}{
+	"set-cookie":                          {},
+	"set-cookie2":                         {},
+	"strict-transport-security":           {},
+	"content-security-policy":             {},
+	"content-security-policy-report-only": {},
+	"x-frame-options":                     {},
+	"clear-site-data":                     {},
+	"content-length":                      {},
+	"cross-origin-opener-policy":          {},
+	"cross-origin-embedder-policy":        {},
+	"cross-origin-resource-policy":        {},
+}
+
+// forbiddenPluginResponseHeader reports whether a plugin response header is
+// hop-by-hop, security-sensitive, or a CORS header.
+func forbiddenPluginResponseHeader(name string) bool {
+	lower := strings.ToLower(name)
+	if strings.HasPrefix(lower, "access-control-") {
+		return true
+	}
+	if _, bad := hopByHopPluginResponseHeaders[lower]; bad {
+		return true
+	}
+	_, bad := forbiddenPluginResponseHeaders[lower]
+	return bad
 }
 
 // principal builds the authoritative caller identity for a private route. It is

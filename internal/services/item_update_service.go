@@ -104,6 +104,31 @@ func (s *ItemUpdateService) UpdateItem(req UpdateItemRequest) (*UpdateItemResult
 	})
 }
 
+// ApplyFieldsInTx validates and persists field updates inside a caller-owned
+// transaction, reusing the canonical update operation so history and domain
+// events stay consistent. status_id, item_type_id and workspace_id are
+// rejected (those have dedicated endpoints). The caller owns the commit, so
+// this composes with another write in the same transaction — used by the
+// transition-with-screen path so submitted fields and the status change commit
+// atomically.
+func (s *ItemUpdateService) ApplyFieldsInTx(ctx context.Context, tx database.Tx, itemID int, updateData map[string]any, userID int) error {
+	if len(updateData) == 0 {
+		return nil
+	}
+	req := UpdateItemRequest{ItemID: itemID, UpdateData: updateData, UserID: userID}
+	if err := validateItemUpdateRequest(ctx, req, itemUpdateOptions{}); err != nil {
+		return err
+	}
+	op := itemUpdateOperation{
+		service: s,
+		ctx:     ctx,
+		req:     req,
+		opts:    itemUpdateOptions{recordHistory: true, triggerAssignee: true},
+		tx:      tx,
+	}
+	return op.apply()
+}
+
 func (s *ItemUpdateService) updateItem(ctx context.Context, req UpdateItemRequest, opts itemUpdateOptions) (*UpdateItemResult, error) {
 	// A merged duplicate is a read-only redirect to its canonical ticket
 	// (WI-1528); edits must go to the canonical.

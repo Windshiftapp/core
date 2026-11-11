@@ -1,0 +1,107 @@
+export default {
+  email: {
+    footer: {
+      automated: 'Это автоматическое письмо — пожалуйста, не отвечайте на него.',
+      repliable: 'Вы получили это письмо, потому что у вас есть открытый запрос у нас.',
+    },
+    common: {
+      greeting: 'Здравствуйте, {name}!',
+      openInWindshift: 'Открыть в Windshift',
+      manualLinkHint: 'Если кнопка не работает, скопируйте и вставьте эту ссылку в браузер:',
+    },
+    duration: {
+      minute: '{count} минута',
+      minutes: '{count} минут',
+      hour: '{count} час',
+      hours: '{count} часов',
+      day: '{count} день',
+      days: '{count} дней',
+    },
+    magicLink: {
+      subject: 'Вход в ваш портал',
+      heading: 'Вход в ваш портал',
+      body: 'Нажмите кнопку ниже, чтобы войти. Ссылка действительна {expires}.',
+      button: 'Войти',
+      note: 'Если вы не запрашивали эту ссылку, просто проигнорируйте письмо — без неё никто не сможет войти.',
+    },
+    verification: {
+      subject: 'Подтвердите адрес электронной почты',
+      heading: 'Подтвердите адрес электронной почты',
+      body: 'Подтвердите адрес электронной почты, чтобы завершить настройку аккаунта.',
+      button: 'Подтвердить адрес',
+      note: 'Ссылка действует {expires}. Если вы не создавали аккаунт Windshift, проигнорируйте это письмо.',
+    },
+    invitation: {
+      subject: 'Вас пригласили в Windshift',
+      heading: 'Вас пригласили в Windshift',
+      body: 'Задайте пароль, чтобы активировать аккаунт и начать работать с командой.',
+      button: 'Задать пароль',
+      note: 'Приглашение действует {expires}. Если вы его не ожидали, проигнорируйте это письмо.',
+    },
+    notificationBatch: {
+      subjectOne: 'Windshift — у вас 1 новое уведомление',
+      subjectOther: 'Windshift — у вас {count} новых уведомлений',
+      headingOne: '1 новое уведомление',
+      headingOther: '{count} новых уведомлений',
+      intro: 'Здравствуйте, {name}! Вот что нового:',
+      manage: 'Настройте частоту таких писем в параметрах уведомлений.',
+    },
+    mention: {
+      subject: '{actor} упомянул вас в {itemKey}',
+      body: '{actor} упомянул вас в {source} в {itemKey} · {itemTitle}',
+      source: {
+        comment: 'комментарии',
+        description: 'описании',
+        item: 'элементе',
+      },
+    },
+    portalReply: {
+      subject: 'Re: {subject}',
+      body: '{author} ответил в {itemKey} · {itemTitle}',
+      portalLink: 'Открыть этот запрос в портале',
+      note: 'Чтобы продолжить переписку, просто ответьте на это письмо.',
+    },
+    approval: {
+      subject: 'Требуется согласование: {itemKey} — {itemTitle}',
+      heading: 'Требуется согласование',
+      body: 'Требуется ваше согласование по {itemKey} · {itemTitle}.',
+      body2:
+        'Нажмите кнопку ниже, чтобы рассмотреть и принять решение. Ссылка действительна {expires}.',
+      button: 'Рассмотреть',
+      note: 'Если вы не ожидали этот запрос, проигнорируйте это письмо.',
+    },
+    intake: {
+      subject: 'Мы получили ваше обращение ({itemKey})',
+      heading: 'Мы получили ваше обращение',
+      body: 'Спасибо за обращение. Мы зарегистрировали ваш запрос как {itemKey} · {itemTitle}.',
+      body2: 'Наша команда рассмотрит его и ответит вам как можно скорее.',
+      body3: 'Вы можете следить за ходом и добавлять детали в портале:',
+      button: 'Открыть обращение',
+      note: 'Чтобы добавить информацию, просто ответьте на это письмо.',
+    },
+  },
+  notification: {
+    dueReminder: {
+        title: "Напоминание: срок {itemKey} скоро истекает",
+        message: "Срок {itemTitle} — {dueDate}",
+    },
+    mention: {
+        title: "Вас упомянули",
+        comment: "{actor} упомянул вас в комментарии к {itemTitle} ({itemKey})",
+        description: "{actor} упомянул вас в описании {itemTitle} ({itemKey})",
+        item: "{actor} упомянул вас в {itemTitle} ({itemKey})",
+    },
+    approvalStarted: {
+        title: "Требуется согласование",
+        message: "Требуется ваше согласование по {itemKey}: {itemTitle}",
+    },
+    approvalEscalated: {
+        title: "Согласование передано вам",
+        message: "Вам передано согласование по {itemKey}: {itemTitle}",
+    },
+    incident: {
+        title: "Инцидент: {itemTitle}",
+        message: "{itemKey} сработал и требует подтверждения",
+    },
+  },
+};

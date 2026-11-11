@@ -67,7 +67,7 @@ func (h *ThemeHandler) GetActiveTheme(w http.ResponseWriter, r *http.Request) {
 // dark logo URLs). Returns the labeled warnings so the handler can surface
 // them on the response. Colors are short identifier-shaped CSS values (hex /
 // rgb / hsl); HTML inside them would corrupt the rendered CSS rule.
-func sanitizeThemeFields(name, description, navBgLight, navTextLight, navBgDark, navTextDark, logoURL, logoURLDark *string) []string {
+func sanitizeThemeFields(name, description, navBgLight, navTextLight, navBgDark, navTextDark, logoURL, logoURLDark, logoFullURL, logoFullURLDark *string) []string {
 	return sanitize.ApplyAllWithWarnings(
 		sanitize.Pair{Target: name, Policy: sanitize.PlainTextField, Label: "Name"},
 		sanitize.Pair{Target: description, Policy: sanitize.RichText, Label: "Description"},
@@ -77,6 +77,8 @@ func sanitizeThemeFields(name, description, navBgLight, navTextLight, navBgDark,
 		sanitize.Pair{Target: navTextDark, Policy: sanitize.ShortIdentifier, Label: "Dark navigation text color"},
 		sanitize.Pair{Target: logoURL, Policy: sanitize.PlainTextField, Label: "Logo URL"},
 		sanitize.Pair{Target: logoURLDark, Policy: sanitize.PlainTextField, Label: "Dark mode logo URL"},
+		sanitize.Pair{Target: logoFullURL, Policy: sanitize.PlainTextField, Label: "Full logo URL"},
+		sanitize.Pair{Target: logoFullURLDark, Policy: sanitize.PlainTextField, Label: "Dark mode full logo URL"},
 	)
 }
 
@@ -90,7 +92,7 @@ func validateLogoURL(label, logoURL string) string {
 }
 
 // validateThemeFields checks the required color and name fields shared by create and update requests.
-func validateThemeFields(name, navBgLight, navTextLight, navBgDark, navTextDark string) string {
+func validateThemeFields(name, navBgLight, navTextLight, navBgDark, navTextDark, brandLayout string) string {
 	if name == "" {
 		return "Name is required"
 	}
@@ -106,6 +108,9 @@ func validateThemeFields(name, navBgLight, navTextLight, navBgDark, navTextDark 
 	if navTextDark == "" {
 		return "Navigation text color (dark) is required"
 	}
+	if !models.IsValidBrandLayout(brandLayout) {
+		return "Brand layout must be one of mark_text, mark_only, full_logo"
+	}
 	return ""
 }
 
@@ -117,8 +122,12 @@ func (h *ThemeHandler) CreateTheme(w http.ResponseWriter, r *http.Request) {
 	}
 	warnings := sanitizeThemeFields(&req.Name, &req.Description,
 		&req.NavBackgroundColorLight, &req.NavTextColorLight,
-		&req.NavBackgroundColorDark, &req.NavTextColorDark, &req.LogoURL, &req.LogoURLDark)
-	if msg := validateThemeFields(req.Name, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark); msg != "" {
+		&req.NavBackgroundColorDark, &req.NavTextColorDark,
+		&req.LogoURL, &req.LogoURLDark, &req.LogoFullURL, &req.LogoFullURLDark)
+	if req.BrandLayout == "" {
+		req.BrandLayout = models.BrandLayoutMarkText
+	}
+	if msg := validateThemeFields(req.Name, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark, req.BrandLayout); msg != "" {
 		respondValidationError(w, r, msg)
 		return
 	}
@@ -127,6 +136,14 @@ func (h *ThemeHandler) CreateTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if msg := validateLogoURL("Dark mode logo URL", req.LogoURLDark); msg != "" {
+		respondValidationError(w, r, msg)
+		return
+	}
+	if msg := validateLogoURL("Full logo URL", req.LogoFullURL); msg != "" {
+		respondValidationError(w, r, msg)
+		return
+	}
+	if msg := validateLogoURL("Dark mode full logo URL", req.LogoFullURLDark); msg != "" {
 		respondValidationError(w, r, msg)
 		return
 	}
@@ -162,8 +179,12 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 	}
 	warnings := sanitizeThemeFields(&req.Name, &req.Description,
 		&req.NavBackgroundColorLight, &req.NavTextColorLight,
-		&req.NavBackgroundColorDark, &req.NavTextColorDark, &req.LogoURL, &req.LogoURLDark)
-	if msg := validateThemeFields(req.Name, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark); msg != "" {
+		&req.NavBackgroundColorDark, &req.NavTextColorDark,
+		&req.LogoURL, &req.LogoURLDark, &req.LogoFullURL, &req.LogoFullURLDark)
+	if req.BrandLayout == "" {
+		req.BrandLayout = models.BrandLayoutMarkText
+	}
+	if msg := validateThemeFields(req.Name, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark, req.BrandLayout); msg != "" {
 		respondValidationError(w, r, msg)
 		return
 	}
@@ -172,6 +193,14 @@ func (h *ThemeHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if msg := validateLogoURL("Dark mode logo URL", req.LogoURLDark); msg != "" {
+		respondValidationError(w, r, msg)
+		return
+	}
+	if msg := validateLogoURL("Full logo URL", req.LogoFullURL); msg != "" {
+		respondValidationError(w, r, msg)
+		return
+	}
+	if msg := validateLogoURL("Dark mode full logo URL", req.LogoFullURLDark); msg != "" {
 		respondValidationError(w, r, msg)
 		return
 	}

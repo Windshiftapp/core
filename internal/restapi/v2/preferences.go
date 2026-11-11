@@ -16,6 +16,7 @@ func registerPreferenceRoutes(builder *routeBuilder, preferences preferencesAppl
 }
 
 type preferencesDTO struct {
+	Calendar     string                    `json:"calendar"`
 	ColorMode    string                    `json:"color_mode"`
 	ThemeID      *int                      `json:"theme_id"`
 	Theme        *models.Theme             `json:"theme"`
@@ -37,6 +38,7 @@ type tuiPreferencesPatch struct {
 }
 
 type preferencesPatchRequest struct {
+	Calendar     Optional[string]                    `json:"calendar"`
 	ColorMode    Optional[string]                    `json:"color_mode"`
 	ThemeID      Optional[int]                       `json:"theme_id"`
 	TUI          Optional[tuiPreferencesPatch]       `json:"tui"`
@@ -73,8 +75,12 @@ func updatePreferences(preferences preferencesApplication) jsonOperation[prefere
 			return preferencesDTO{}, newError(http.StatusBadRequest, "invalid_request", "color_mode cannot be null")
 		}
 		patch := services.UserPreferencesPatch{
+			CalendarSet: input.Calendar.Set, Calendar: input.Calendar.Value,
 			ColorModeSet: input.ColorMode.Set, ColorMode: input.ColorMode.Value,
 			ThemeIDSet: input.ThemeID.Set,
+		}
+		if input.Calendar.Null {
+			patch.Calendar = "auto"
 		}
 		if input.ThemeID.Set && !input.ThemeID.Null {
 			patch.ThemeID = &input.ThemeID.Value
@@ -141,7 +147,7 @@ func preferencesFromSnapshot(snapshot services.UserPreferencesSnapshot) preferen
 		savedFilters = map[string]any{}
 	}
 	return preferencesDTO{
-		ColorMode: snapshot.ColorMode, ThemeID: snapshot.ThemeID,
+		Calendar: snapshot.Calendar, ColorMode: snapshot.ColorMode, ThemeID: snapshot.ThemeID,
 		Theme: snapshot.Theme, TUI: snapshot.TUI,
 		ViewState: viewState, SavedFilters: savedFilters,
 		DueDateRemindersEnabled: snapshot.DueDateRemindersEnabled,
@@ -152,6 +158,10 @@ func preferencesFromSnapshot(snapshot services.UserPreferencesSnapshot) preferen
 
 func preferenceMutationError(err error) error {
 	switch {
+	case errors.Is(err, repository.ErrConcurrentUpdate):
+		return newError(http.StatusConflict, "conflict", "Preferences changed concurrently; retry")
+	case errors.Is(err, services.ErrInvalidCalendar):
+		return newError(http.StatusBadRequest, "invalid_request", err.Error())
 	case errors.Is(err, services.ErrInvalidColorMode):
 		return newError(http.StatusBadRequest, "invalid_request", "color_mode must be light, dark, or system")
 	case errors.Is(err, services.ErrInvalidReminderDays):

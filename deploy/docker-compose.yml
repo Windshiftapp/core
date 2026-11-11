@@ -252,98 +252,12 @@ services:
   #     retries: 3
   #     start_period: 120s
 
-  # ---------------------------------------------------------------------------
-  # Logbook Service — UNMAINTAINED. The ghcr.io/windshiftapp/logbook image is
-  # no longer published; do not enable for new deployments. Source remains
-  # in-tree but is not built in CI.
-  # ---------------------------------------------------------------------------
-  # When using the Logbook service:
-  #   1. Uncomment this service and the logbook-postgres service below
-  #   2. Add LOGBOOK_ENDPOINT=http://logbook:8090 to windshift environment above
-  #   3. Optionally configure LOGBOOK_LLM_ENDPOINT for article generation
-  #   4. The main server authenticates users and proxies to logbook with trusted headers
-  # Note: Requires system tools (poppler, kreuzberg-cli) for text extraction
-  # ---------------------------------------------------------------------------
-  # logbook:
-  #   image: ghcr.io/windshiftapp/logbook:latest
-  #   # build:
-  #   #   context: ..
-  #   #   dockerfile: Dockerfile.logbook
-  #   container_name: windshift-logbook
-  #   environment:
-  #     LOGBOOK_DATABASE_URL: postgresql://logbook:${LOGBOOK_POSTGRES_PASSWORD}@logbook-postgres:5432/logbook?sslmode=disable
-  #     LOGBOOK_LLM_ENDPOINT: http://llm:8081
-  #     LOGBOOK_ARTICLE_ENDPOINT: http://windshift:8080/api/internal/llm
-  #     WINDSHIFT_URL: http://windshift:8080
-  #     SSO_SECRET: ${SSO_SECRET}
-  #     LOGBOOK_PORT: 8090
-  #     LOGBOOK_STORAGE_PATH: /data/logbook
-  #     LOG_LEVEL: info
-  #   volumes:
-  #     - logbook-data:/data/logbook
-  #     # The logbook pre-warms and uses a kreuzberg model cache at /root/...
-  #     # on the kreuzberg-cli base image. Running read-only requires tmpfs
-  #     # mounts for everything the process writes at runtime.
-  #     - type: tmpfs
-  #       target: /tmp
-  #       tmpfs:
-  #         size: 128M
-  #         mode: 1777
-  #   # Hardening: the logbook runs untrusted parsers (poppler, kreuzberg with
-  #   # OCR/layout models) on user-uploaded files. Drop everything the process
-  #   # does not need so a parser RCE has minimal room to pivot.
-  #   user: "65534:65534"
-  #   read_only: true
-  #   cap_drop:
-  #     - ALL
-  #   security_opt:
-  #     - no-new-privileges:true
-  #   pids_limit: 512
-  #   mem_limit: 2g
-  #   cpus: 2.0
-  #   depends_on:
-  #     logbook-postgres:
-  #       condition: service_healthy
-  #   expose:
-  #     - "8090"
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:8090/api/logbook/health"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 3
-  #     start_period: 10s
-
-  # ---------------------------------------------------------------------------
-  # Logbook PostgreSQL (uncomment when using logbook service)
-  # ---------------------------------------------------------------------------
-  # logbook-postgres:
-  #   image: postgres:18
-  #   container_name: windshift-logbook-postgres
-  #   environment:
-  #     POSTGRES_USER: logbook
-  #     POSTGRES_PASSWORD: ${LOGBOOK_POSTGRES_PASSWORD}
-  #     POSTGRES_DB: logbook
-  #   volumes:
-  #     - logbook-postgres-data:/var/lib/postgresql/data
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U logbook -d logbook"]
-  #     interval: 5s
-  #     timeout: 5s
-  #     retries: 5
-
 volumes:
   windshift-data:
     name: windshift-data
   # --- PostgreSQL volume (uncomment when using postgres service) ---
   # postgres-data:
   #   name: windshift-postgres-data
-  # --- Logbook volumes (uncomment when using logbook service) ---
-  # logbook-data:
-  #   name: windshift-logbook-data
-  # logbook-postgres-data:
-  #   name: windshift-logbook-postgres-data
   # --- Traefik certificates volume (uncomment when using traefik service) ---
   # traefik-certs:
   #   name: windshift-traefik-certs

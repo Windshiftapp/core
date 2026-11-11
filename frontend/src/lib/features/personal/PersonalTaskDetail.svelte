@@ -7,20 +7,19 @@
   import Modal from '../../dialogs/Modal.svelte';
   import Comments from '../items/Comments.svelte';
   import ItemDetailDescription from '../items/ItemDetailDescription.svelte';
+  import TitleField from '../items/TitleField.svelte';
+  import SidebarDateField from '../items/SidebarDateField.svelte';
   import X from '@lucide/svelte/icons/x';
-  import Calendar from '@lucide/svelte/icons/calendar';
   import MessageSquare from '@lucide/svelte/icons/message-square';
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import Button from '../../components/Button.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
-  import Input from '../../components/Input.svelte';
   import { copyToClipboard } from '../../utils/clipboard.js';
-  import { formatDateOnly } from '../../utils/dateFormatter.js';
   import { navigate } from '../../router.js';
   import ItemDetailBreadcrumbs from '../items/ItemDetailBreadcrumbs.svelte';
   import { useItemEventStream } from '../../composables/useItemEventStream.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
-  import { errorToast } from '../../stores/toasts.svelte.js';
+  import { errorToast, surfaceError } from '../../stores/toasts.svelte.js';
   import { runWithConcurrency } from '../../utils/concurrency.js';
 
   let {
@@ -41,11 +40,8 @@
   let error = $state(null);
 
   // Editing states
-  let editingTitle = $state(false);
-  let editTitle = $state('');
   let editingDescription = $state(false);
   let editDescription = $state('');
-  let editingDueDate = $state(false);
 
 
   // Attachment state
@@ -78,7 +74,6 @@
       const loaded = await items.get(id);
       if (generation !== itemGeneration) return; // a newer load superseded this one
       item = loaded;
-      editTitle = item.title || '';
       editDescription = item.description || '';
       if (!isModal) await loadHierarchyData();
     } catch (err) {
@@ -167,29 +162,27 @@
       item = { ...item, status_id: targetStatusId };
       onupdate?.();
     } catch (err) {
-      console.error('Failed to toggle done status:', err);
       error = err.message;
+      surfaceError(err, { context: 'togglePersonalTask' });
     } finally {
       saving = false;
     }
   }
 
-  async function saveTitle() {
-    if (!editTitle.trim() || editTitle === item.title) {
-      editingTitle = false;
-      editTitle = item.title || '';
-      return;
-    }
+  async function commitTitle(draft) {
+    const next = String(draft ?? '').trim();
+    if (!next || next === item.title) return;
 
     try {
       saving = true;
-      await items.update(item.id, { title: editTitle.trim() });
-      item = { ...item, title: editTitle.trim() };
-      editingTitle = false;
+      await items.update(item.id, { title: next });
+      item = { ...item, title: next };
       onupdate?.();
     } catch (err) {
-      console.error('Failed to save title:', err);
       error = err.message;
+      surfaceError(err, { context: 'saveTitle' });
+      // Keep the editor open so the value is not lost.
+      throw err;
     } finally {
       saving = false;
     }
@@ -203,41 +196,25 @@
       editingDescription = false;
       onupdate?.();
     } catch (err) {
-      console.error('Failed to save description:', err);
       error = err.message;
+      surfaceError(err, { context: 'saveDescription' });
     } finally {
       saving = false;
     }
   }
 
-  async function saveDueDate(newValue) {
+  async function commitDueDate(newValue) {
     try {
       saving = true;
       const dueDate = newValue || null;
       await items.update(item.id, { due_date: dueDate });
       item = { ...item, due_date: dueDate };
-      editingDueDate = false;
       onupdate?.();
     } catch (err) {
-      console.error('Failed to save due date:', err);
       error = err.message;
+      surfaceError(err, { context: 'saveDueDate' });
     } finally {
       saving = false;
-    }
-  }
-
-  function clearDueDate(e) {
-    e.stopPropagation();
-    saveDueDate(null);
-  }
-
-  function handleTitleKeydown(e) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      saveTitle();
-    } else if (e.key === 'Escape') {
-      editingTitle = false;
-      editTitle = item.title || '';
     }
   }
 
@@ -280,8 +257,8 @@
       await attachmentsApi.delete(attachment.id);
       attachments = attachments.filter(a => a.id !== attachment.id);
     } catch (err) {
-      console.error('Failed to delete attachment:', err);
       error = 'Failed to delete attachment';
+      surfaceError(err, { context: 'deleteAttachment' });
     }
   }
 
@@ -318,7 +295,6 @@
       const fresh = await items.get(id);
       if (item?.id !== id) return;
       item = { ...item, ...fresh };
-      if (!editingTitle) editTitle = fresh.title || '';
       if (!editingDescription) editDescription = fresh.description || '';
     } catch (err) {
       if (err?.status === 404) closeModal();
@@ -366,26 +342,15 @@
         />
 
         <!-- Editable Title -->
-        {#if editingTitle}
-          <Input
-            type="text"
-            bind:value={editTitle}
-            onblur={saveTitle}
-            onkeydown={handleTitleKeydown}
-            class="flex-1 text-lg font-semibold border-b-2 focus:outline-none min-w-0"
-            style="background: transparent; color: var(--ds-text); border-color: #3b82f6;"
-            autofocus
+        <div class="flex-1 min-w-0">
+          <TitleField
+            value={item.title}
+            editable={true}
+            oncommit={commitTitle}
+            displayClass="block text-lg font-semibold cursor-pointer hover:opacity-70 truncate text-left {isTaskCompleted() ? 'line-through opacity-60' : ''}"
+            inputClass="w-full text-lg font-semibold border-b-2 focus:outline-none min-w-0"
           />
-        {:else}
-          <button
-            type="button"
-            onclick={() => { editingTitle = true; }}
-            class="flex-1 text-lg font-semibold cursor-pointer hover:opacity-70 truncate text-left {isTaskCompleted() ? 'line-through opacity-60' : ''}"
-            style="color: var(--ds-text); background: none; border: none; padding: 0;"
-          >
-            {item.title}
-          </button>
-        {/if}
+        </div>
       </div>
 
       {#if isModal}
@@ -400,42 +365,13 @@
     <div class="{isModal ? 'p-4 max-h-[70vh] overflow-y-auto' : 'px-6 py-6'}">
       <!-- Due Date -->
       <div class="mb-4" data-testid="personal-task-due-date">
-        {#if editingDueDate}
-          <div class="flex items-center gap-2">
-            <Calendar class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-            <!-- svelte-ignore a11y_autofocus -->
-            <Input
-              type="date"
-              value={item.due_date?.split('T')[0] || ''}
-              onchange={(e) => saveDueDate(e.currentTarget.value || null)}
-              onblur={() => editingDueDate = false}
-              size="small"
-              autofocus
-            />
-          </div>
-        {:else}
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
-              onclick={() => editingDueDate = true}
-              class="flex items-center gap-2 text-sm hover:opacity-70"
-              style="color: {item.due_date ? 'var(--ds-text)' : 'var(--ds-text-subtle)'}; background: none; border: none; padding: 0;"
-            >
-              <Calendar class="w-4 h-4" />
-              {item.due_date ? formatDateOnly(item.due_date) : t('personal.setDueDate')}
-            </button>
-            {#if item.due_date}
-              <button
-                type="button"
-                onclick={clearDueDate}
-                class="p-0.5 hover:opacity-70 rounded"
-                style="color: var(--ds-text-subtle);"
-              >
-                <X class="w-3 h-3" />
-              </button>
-            {/if}
-          </div>
-        {/if}
+        <SidebarDateField
+          fieldKey="due_date"
+          label={t('common.dueDate')}
+          value={item.due_date}
+          editable={true}
+          onSave={commitDueDate}
+        />
       </div>
 
       <!-- Description -->

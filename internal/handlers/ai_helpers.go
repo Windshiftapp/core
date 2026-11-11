@@ -8,7 +8,10 @@ import (
 	"time"
 
 	"windshift/internal/llm"
+	"windshift/internal/redact"
 	"windshift/internal/restapi"
+	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 // parseConnectionIDParam extracts connection_id from the query string.
@@ -63,8 +66,32 @@ func extendWriteDeadline(w http.ResponseWriter) {
 	_ = rc.SetWriteDeadline(time.Now().Add(aiWriteDeadline))
 }
 
+// requestIsSystemAdmin reports whether the authenticated caller is a system
+// admin. It consults the permission service because the user attached to a
+// session is reloaded without the cached IsSystemAdmin flag.
+func requestIsSystemAdmin(r *http.Request, permService *services.PermissionService) bool {
+	user := utils.GetCurrentUser(r)
+	if user == nil || permService == nil {
+		return false
+	}
+	isAdmin, err := permService.IsSystemAdmin(user.ID)
+	return err == nil && isAdmin
+}
+
 // respondLLMError logs an LLM call failure and writes a structured 503 response.
-func respondLLMError(w http.ResponseWriter, r *http.Request, err error) {
-	slog.Error("LLM chat completion failed", slog.String("error_type", fmt.Sprintf("%T", err)))
-	respondServiceUnavailable(w, r, "The AI service could not complete this request.")
+// The provider's own message is logged in full (redacted) and attached to the
+// response for system admins so a rejected request is diagnosable without a
+// proxy capture. Non-admins get the generic message.
+func respondLLMError(w http.ResponseWriter, r *http.Request, err error, permService *services.PermissionService) {
+	detail := redact.String(err.Error())
+	slog.ErrorContext(r.Context(), "LLM request failed",
+		slog.String("error_type", fmt.Sprintf("%T", err)),
+		slog.String("error", detail),
+	)
+	apiErr := restapi.NewAPIError(http.StatusServiceUnavailable, restapi.ErrCodeServiceUnavailable,
+		"The AI service could not complete this request.")
+	if requestIsSystemAdmin(r, permService) {
+		apiErr.Details = map[string]string{"provider_error": detail}
+	}
+	respondError(w, r, apiErr)
 }

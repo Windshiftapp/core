@@ -1,0 +1,2150 @@
+{
+  "version": 1,
+  "total": 7786,
+  "files": [
+    {
+      "file": "src/App.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/design-system/viewer/App.svelte",
+      "count": 9
+    },
+    {
+      "file": "src/design-system/viewer/pages/ActionButton.svelte",
+      "count": 48
+    },
+    {
+      "file": "src/design-system/viewer/pages/AlertBox.svelte",
+      "count": 26
+    },
+    {
+      "file": "src/design-system/viewer/pages/BackButton.svelte",
+      "count": 30
+    },
+    {
+      "file": "src/design-system/viewer/pages/Badge.svelte",
+      "count": 26
+    },
+    {
+      "file": "src/design-system/viewer/pages/Button.svelte",
+      "count": 25
+    },
+    {
+      "file": "src/design-system/viewer/pages/CategoryMultiSelectPage.svelte",
+      "count": 47
+    },
+    {
+      "file": "src/design-system/viewer/pages/Chip.svelte",
+      "count": 34
+    },
+    {
+      "file": "src/design-system/viewer/pages/ColorDot.svelte",
+      "count": 46
+    },
+    {
+      "file": "src/design-system/viewer/pages/Colors.svelte",
+      "count": 31
+    },
+    {
+      "file": "src/design-system/viewer/pages/ComboboxPickersPage.svelte",
+      "count": 134
+    },
+    {
+      "file": "src/design-system/viewer/pages/DatePickerPage.svelte",
+      "count": 9
+    },
+    {
+      "file": "src/design-system/viewer/pages/DropdownMenu.svelte",
+      "count": 31
+    },
+    {
+      "file": "src/design-system/viewer/pages/EmptyState.svelte",
+      "count": 40
+    },
+    {
+      "file": "src/design-system/viewer/pages/FieldSelectorPage.svelte",
+      "count": 71
+    },
+    {
+      "file": "src/design-system/viewer/pages/FormExample.svelte",
+      "count": 26
+    },
+    {
+      "file": "src/design-system/viewer/pages/FormField.svelte",
+      "count": 24
+    },
+    {
+      "file": "src/design-system/viewer/pages/icon-navigation/NavigationMock.svelte",
+      "count": 41
+    },
+    {
+      "file": "src/design-system/viewer/pages/IconNavigationLab.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/design-system/viewer/pages/IconSelectorPage.svelte",
+      "count": 49
+    },
+    {
+      "file": "src/design-system/viewer/pages/InlineSelectEditorPage.svelte",
+      "count": 64
+    },
+    {
+      "file": "src/design-system/viewer/pages/Input.svelte",
+      "count": 31
+    },
+    {
+      "file": "src/design-system/viewer/pages/ItemKey.svelte",
+      "count": 39
+    },
+    {
+      "file": "src/design-system/viewer/pages/ItemPickerPage.svelte",
+      "count": 50
+    },
+    {
+      "file": "src/design-system/viewer/pages/Label.svelte",
+      "count": 24
+    },
+    {
+      "file": "src/design-system/viewer/pages/Link.svelte",
+      "count": 49
+    },
+    {
+      "file": "src/design-system/viewer/pages/Lozenge.svelte",
+      "count": 30
+    },
+    {
+      "file": "src/design-system/viewer/pages/MentionPickerPage.svelte",
+      "count": 78
+    },
+    {
+      "file": "src/design-system/viewer/pages/Modal.svelte",
+      "count": 33
+    },
+    {
+      "file": "src/design-system/viewer/pages/PageHeader.svelte",
+      "count": 39
+    },
+    {
+      "file": "src/design-system/viewer/pages/Pagination.svelte",
+      "count": 44
+    },
+    {
+      "file": "src/design-system/viewer/pages/Progress.svelte",
+      "count": 49
+    },
+    {
+      "file": "src/design-system/viewer/pages/SearchInput.svelte",
+      "count": 28
+    },
+    {
+      "file": "src/design-system/viewer/pages/SectionHeader.svelte",
+      "count": 39
+    },
+    {
+      "file": "src/design-system/viewer/pages/Select.svelte",
+      "count": 31
+    },
+    {
+      "file": "src/design-system/viewer/pages/Spacing.svelte",
+      "count": 32
+    },
+    {
+      "file": "src/design-system/viewer/pages/Spinner.svelte",
+      "count": 46
+    },
+    {
+      "file": "src/design-system/viewer/pages/Tabs.svelte",
+      "count": 45
+    },
+    {
+      "file": "src/design-system/viewer/pages/Textarea.svelte",
+      "count": 30
+    },
+    {
+      "file": "src/design-system/viewer/pages/Toggle.svelte",
+      "count": 24
+    },
+    {
+      "file": "src/design-system/viewer/pages/Tooltip.svelte",
+      "count": 30
+    },
+    {
+      "file": "src/design-system/viewer/pages/Typography.svelte",
+      "count": 35
+    },
+    {
+      "file": "src/design-system/viewer/pages/WorkspaceSelectorPage.svelte",
+      "count": 49
+    },
+    {
+      "file": "src/lib/components/AIModalShell.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/components/AlertBox.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/components/AvatarUpload.svelte",
+      "count": 12
+    },
+    {
+      "file": "src/lib/components/BackgroundImageSelector.svelte",
+      "count": 10
+    },
+    {
+      "file": "src/lib/components/BrandedLoader.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/components/ButtonGroup.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/components/Card.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/components/ConsentCard.svelte",
+      "count": 17
+    },
+    {
+      "file": "src/lib/components/CopyButton.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/components/DataTable.svelte",
+      "count": 17
+    },
+    {
+      "file": "src/lib/components/DiagramModal.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/components/FieldChip.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/components/GradientPicker.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/components/GradientSelector.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/components/ItemsByStatusCategory.svelte",
+      "count": 18
+    },
+    {
+      "file": "src/lib/components/LazyRootDialog.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/components/LazyRootView.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/components/LogoUploader.svelte",
+      "count": 11
+    },
+    {
+      "file": "src/lib/components/NativeSelect.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/components/Progress.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/components/ProgressSummary.svelte",
+      "count": 20
+    },
+    {
+      "file": "src/lib/components/SearchInput.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/components/Select.svelte",
+      "count": 9
+    },
+    {
+      "file": "src/lib/components/Spinner.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/components/StatCard.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/components/StateDisplay.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/components/Stepper.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/components/TableHeaderBar.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/components/TabNav.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/components/Tabs.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/components/TabStrip.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/components/Textarea.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/components/Toggle.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/components/TransitionOverrideWarning.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/components/TruncatedFieldValue.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/components/WorkspaceCheckboxList.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/dialogs/AboutModal.svelte",
+      "count": 8
+    },
+    {
+      "file": "src/lib/dialogs/AddIntegrationLinkModal.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/dialogs/AddSCMLinkModal.svelte",
+      "count": 9
+    },
+    {
+      "file": "src/lib/dialogs/AIConfirmModal.svelte",
+      "count": 13
+    },
+    {
+      "file": "src/lib/dialogs/AssetReportFormModal.svelte",
+      "count": 11
+    },
+    {
+      "file": "src/lib/dialogs/AssetReportModal.svelte",
+      "count": 35
+    },
+    {
+      "file": "src/lib/dialogs/CategoryModal.svelte",
+      "count": 10
+    },
+    {
+      "file": "src/lib/dialogs/ChannelConfigModal.svelte",
+      "count": 10
+    },
+    {
+      "file": "src/lib/dialogs/CompleteIterationDialog.svelte",
+      "count": 12
+    },
+    {
+      "file": "src/lib/dialogs/ConfirmDialog.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/dialogs/CreateBranchModal.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/dialogs/CreateModal.svelte",
+      "count": 9
+    },
+    {
+      "file": "src/lib/dialogs/CreatePRFromBranchModal.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/dialogs/DeleteItemDialog.svelte",
+      "count": 18
+    },
+    {
+      "file": "src/lib/dialogs/DialogFooter.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/dialogs/EmailLogModal.svelte",
+      "count": 31
+    },
+    {
+      "file": "src/lib/dialogs/FormModal.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/dialogs/IterationModal.svelte",
+      "count": 13
+    },
+    {
+      "file": "src/lib/dialogs/LinkItemModal.svelte",
+      "count": 13
+    },
+    {
+      "file": "src/lib/dialogs/LinkItemSearchResult.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/dialogs/Modal.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/dialogs/ModalHeader.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/dialogs/PomodoroSettingsModal.svelte",
+      "count": 22
+    },
+    {
+      "file": "src/lib/dialogs/RequestFormModal.svelte",
+      "count": 16
+    },
+    {
+      "file": "src/lib/dialogs/RequestTypeFieldsBuilder.svelte",
+      "count": 63
+    },
+    {
+      "file": "src/lib/dialogs/RequestTypeModal.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/dialogs/RequestTypeVisibilityModal.svelte",
+      "count": 26
+    },
+    {
+      "file": "src/lib/dialogs/SCMRepositoryModal.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/dialogs/StatusCategoryModal.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/dialogs/TestCaseViewModal.svelte",
+      "count": 18
+    },
+    {
+      "file": "src/lib/dialogs/TimeCustomerModal.svelte",
+      "count": 13
+    },
+    {
+      "file": "src/lib/dialogs/TimeLogModal.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/dialogs/TimeProjectCategoryModal.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/dialogs/TimeProjectModal.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/dialogs/TimeProjectPermissionsModal.svelte",
+      "count": 33
+    },
+    {
+      "file": "src/lib/dialogs/TransitionScreenModal.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/editors/FieldLayoutEditor.svelte",
+      "count": 22
+    },
+    {
+      "file": "src/lib/editors/InlineDateEditor.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/editors/InlineDurationEditor.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/editors/InlineNumberEditor.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/editors/InlineSelectEditor.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/editors/InlineTextEditor.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/editors/LazyMilkdownEditor.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/editors/RecurrenceEditor.svelte",
+      "count": 14
+    },
+    {
+      "file": "src/lib/editors/ScreenFieldLayoutEditor.svelte",
+      "count": 22
+    },
+    {
+      "file": "src/lib/features/actions/ActionFlowEditor.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/features/actions/ActionLogs.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/features/actions/ActionsSettings.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/features/actions/ActionTemplatePicker.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/features/actions/CreateAssetConfigPanel.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/features/actions/ExecutionTraceModal.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/features/actions/PlaceholderReferenceModal.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/features/actions/shared/BaseActionFlowEditor.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/features/actions/shared/FieldMappingsEditor.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/features/actions/shared/HttpHeadersEditor.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/features/actions/TestActionModal.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/features/agents/AgentCatalog.svelte",
+      "count": 10
+    },
+    {
+      "file": "src/lib/features/agents/AgentCreate.svelte",
+      "count": 8
+    },
+    {
+      "file": "src/lib/features/agents/AgentProfile.svelte",
+      "count": 45
+    },
+    {
+      "file": "src/lib/features/agents/AgentRunnerSetup.svelte",
+      "count": 11
+    },
+    {
+      "file": "src/lib/features/assets/AssetBrowser.svelte",
+      "count": 31
+    },
+    {
+      "file": "src/lib/features/assets/AssetDetailContent.svelte",
+      "count": 22
+    },
+    {
+      "file": "src/lib/features/assets/AssetManager.svelte",
+      "count": 15
+    },
+    {
+      "file": "src/lib/features/assets/AssetRelationshipGraph.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/assets/AttachmentDiagramList.svelte",
+      "count": 15
+    },
+    {
+      "file": "src/lib/features/assets/import/AssetImportWizard.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/features/assets/import/ImportStep.svelte",
+      "count": 24
+    },
+    {
+      "file": "src/lib/features/assets/import/MappingStep.svelte",
+      "count": 18
+    },
+    {
+      "file": "src/lib/features/assets/import/PreviewStep.svelte",
+      "count": 37
+    },
+    {
+      "file": "src/lib/features/assets/import/UploadStep.svelte",
+      "count": 33
+    },
+    {
+      "file": "src/lib/features/channels/ChannelAdminSettings.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/features/channels/ChannelAdminShell.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/channels/ChannelEmailConfig.svelte",
+      "count": 26
+    },
+    {
+      "file": "src/lib/features/channels/ChannelFormConfig.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/features/channels/ChannelIntakesSection.svelte",
+      "count": 12
+    },
+    {
+      "file": "src/lib/features/channels/ChannelNavigation.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/features/channels/ChannelPortalConfig.svelte",
+      "count": 11
+    },
+    {
+      "file": "src/lib/features/channels/Channels.svelte",
+      "count": 11
+    },
+    {
+      "file": "src/lib/features/channels/ChannelSMTPConfig.svelte",
+      "count": 13
+    },
+    {
+      "file": "src/lib/features/channels/ChannelWebhookConfig.svelte",
+      "count": 20
+    },
+    {
+      "file": "src/lib/features/channels/FormBuilder.svelte",
+      "count": 26
+    },
+    {
+      "file": "src/lib/features/channels/FormChannelPage.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/channels/FormFieldPalette.svelte",
+      "count": 12
+    },
+    {
+      "file": "src/lib/features/channels/FormIntegrationPanel.svelte",
+      "count": 12
+    },
+    {
+      "file": "src/lib/features/channels/FormPreviewModal.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/features/channels/ManagerChannels.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/features/chat/ChatPanel.svelte",
+      "count": 24
+    },
+    {
+      "file": "src/lib/features/collections/BacklogIterationSection.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/features/collections/BoardColumn.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/features/collections/BoardItemCard.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/features/collections/CollectionBacklog.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/collections/CollectionBoard.svelte",
+      "count": 26
+    },
+    {
+      "file": "src/lib/features/collections/CollectionHierarchyLoadMore.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/features/collections/CollectionList.svelte",
+      "count": 12
+    },
+    {
+      "file": "src/lib/features/collections/CollectionMap.svelte",
+      "count": 23
+    },
+    {
+      "file": "src/lib/features/collections/CollectionNavigation.svelte",
+      "count": 10
+    },
+    {
+      "file": "src/lib/features/collections/CollectionRoadmap.svelte",
+      "count": 51
+    },
+    {
+      "file": "src/lib/features/collections/Collections.svelte",
+      "count": 13
+    },
+    {
+      "file": "src/lib/features/collections/CollectionsBreadcrumbs.svelte",
+      "count": 10
+    },
+    {
+      "file": "src/lib/features/collections/CollectionsList.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/features/collections/CollectionsNavigation.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/collections/CollectionsSidebar.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/features/collections/CollectionTree.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/features/collections/ColumnSelector.svelte",
+      "count": 27
+    },
+    {
+      "file": "src/lib/features/collections/DependencySummary.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/features/collections/FilterBuilderModal.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/features/collections/FilterMenu.svelte",
+      "count": 32
+    },
+    {
+      "file": "src/lib/features/collections/HierarchyLevelPicker.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/features/collections/IterationCellEditor.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/collections/IterationCellValue.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/features/collections/ListCellRenderer.svelte",
+      "count": 25
+    },
+    {
+      "file": "src/lib/features/collections/MilestoneCellValue.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/features/collections/MilestoneSwimlaneConfigDialog.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/features/collections/PublicBoardSharingDialog.svelte",
+      "count": 11
+    },
+    {
+      "file": "src/lib/features/collections/QuickAddForm.svelte",
+      "count": 22
+    },
+    {
+      "file": "src/lib/features/collections/UserCellValue.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/collections/WorkItemListRow.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/features/forms/FormFields.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/features/forms/FormRenderer.svelte",
+      "count": 15
+    },
+    {
+      "file": "src/lib/features/forms/PublicFormPage.svelte",
+      "count": 18
+    },
+    {
+      "file": "src/lib/features/items/AIActionsDropdown.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/features/items/ApprovalsTimeline.svelte",
+      "count": 21
+    },
+    {
+      "file": "src/lib/features/items/CatchMeUpBriefing.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/features/items/CommentReactions.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/features/items/Comments.svelte",
+      "count": 11
+    },
+    {
+      "file": "src/lib/features/items/CustomerContextSection.svelte",
+      "count": 17
+    },
+    {
+      "file": "src/lib/features/items/CustomFieldRenderer.svelte",
+      "count": 62
+    },
+    {
+      "file": "src/lib/features/items/DynamicFieldFilter.svelte",
+      "count": 17
+    },
+    {
+      "file": "src/lib/features/items/FindSimilarResults.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/features/items/ItemAgentLog.svelte",
+      "count": 26
+    },
+    {
+      "file": "src/lib/features/items/ItemDetail.svelte",
+      "count": 20
+    },
+    {
+      "file": "src/lib/features/items/ItemDetailBreadcrumbs.svelte",
+      "count": 54
+    },
+    {
+      "file": "src/lib/features/items/ItemDetailContent.svelte",
+      "count": 13
+    },
+    {
+      "file": "src/lib/features/items/ItemDetailDescription.svelte",
+      "count": 10
+    },
+    {
+      "file": "src/lib/features/items/ItemDetailHeader.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/features/items/ItemDetailLinks.svelte",
+      "count": 22
+    },
+    {
+      "file": "src/lib/features/items/ItemDetailSidebar.svelte",
+      "count": 32
+    },
+    {
+      "file": "src/lib/features/items/ItemDetailTabs.svelte",
+      "count": 14
+    },
+    {
+      "file": "src/lib/features/items/ItemHistory.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/items/ItemIncidentPanel.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/features/items/ItemIntegrationLinks.svelte",
+      "count": 13
+    },
+    {
+      "file": "src/lib/features/items/ItemMergeDialog.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/items/ItemSCMLinks.svelte",
+      "count": 24
+    },
+    {
+      "file": "src/lib/features/items/ItemSLAPanel.svelte",
+      "count": 10
+    },
+    {
+      "file": "src/lib/features/items/ItemSplitDialog.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/features/items/LinkSectionHeader.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/features/items/ParticipantsSection.svelte",
+      "count": 12
+    },
+    {
+      "file": "src/lib/features/items/RequesterOpenTickets.svelte",
+      "count": 10
+    },
+    {
+      "file": "src/lib/features/items/ScreenFieldsForm.svelte",
+      "count": 8
+    },
+    {
+      "file": "src/lib/features/items/SidebarDateField.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/items/SidebarStoryPointsField.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/features/items/TodoList.svelte",
+      "count": 20
+    },
+    {
+      "file": "src/lib/features/items/WatchersSection.svelte",
+      "count": 10
+    },
+    {
+      "file": "src/lib/features/items/WorkItemFilterPanel.svelte",
+      "count": 13
+    },
+    {
+      "file": "src/lib/features/items/WorkItemRow.svelte",
+      "count": 8
+    },
+    {
+      "file": "src/lib/features/items/ZammadItemPanel.svelte",
+      "count": 23
+    },
+    {
+      "file": "src/lib/features/items/ZammadLinkResolver.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/iterations/IterationBurndown.svelte",
+      "count": 9
+    },
+    {
+      "file": "src/lib/features/iterations/IterationDependencies.svelte",
+      "count": 29
+    },
+    {
+      "file": "src/lib/features/iterations/IterationDetail.svelte",
+      "count": 8
+    },
+    {
+      "file": "src/lib/features/iterations/Iterations.svelte",
+      "count": 15
+    },
+    {
+      "file": "src/lib/features/actions/CreateItemConfigPanel.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/features/milestones/MilestoneActivity.svelte",
+      "count": 8
+    },
+    {
+      "file": "src/lib/features/milestones/MilestoneComments.svelte",
+      "count": 11
+    },
+    {
+      "file": "src/lib/features/milestones/MilestoneDetail.svelte",
+      "count": 11
+    },
+    {
+      "file": "src/lib/features/milestones/MilestoneFormDialog.svelte",
+      "count": 10
+    },
+    {
+      "file": "src/lib/features/milestones/MilestoneNavigation.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/features/milestones/MilestonePages.svelte",
+      "count": 9
+    },
+    {
+      "file": "src/lib/features/milestones/MilestoneReleaseModal.svelte",
+      "count": 13
+    },
+    {
+      "file": "src/lib/features/milestones/Milestones.svelte",
+      "count": 12
+    },
+    {
+      "file": "src/lib/features/notifications/EmailVerificationBanner.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/notifications/NotificationCard.svelte",
+      "count": 8
+    },
+    {
+      "file": "src/lib/features/notifications/NotificationTray.svelte",
+      "count": 10
+    },
+    {
+      "file": "src/lib/features/notifications/ToastContainer.svelte",
+      "count": 9
+    },
+    {
+      "file": "src/lib/features/pages/PageDiagramModal.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/features/pages/PageLabelPicker.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/features/pages/PageLabelsRow.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/features/pages/PagePermissionsDialog.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/pages/PagePrintView.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/features/pages/PagesNavSidebar.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/features/personal/PersonalReview.svelte",
+      "count": 25
+    },
+    {
+      "file": "src/lib/features/personal/PersonalTaskDetail.svelte",
+      "count": 13
+    },
+    {
+      "file": "src/lib/features/personal/PersonalTasksPanel.svelte",
+      "count": 18
+    },
+    {
+      "file": "src/lib/features/personal/PlanMyDay.svelte",
+      "count": 19
+    },
+    {
+      "file": "src/lib/features/shared/DynamicFilterPopover.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/features/shared/PlanningEntityDetail.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/features/shared/QlFilterBuilder.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/shared/QlQueryBar.svelte",
+      "count": 9
+    },
+    {
+      "file": "src/lib/features/sla/SLABadge.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/sla/SlaCalendarsTab.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/sla/SlaComplianceReportTab.svelte",
+      "count": 11
+    },
+    {
+      "file": "src/lib/features/sla/SlaMetricsTab.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/sla/SlaRecalculationTab.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/features/sla/SlaTeamBindingsTab.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/features/sla/SlaWarningThresholdsTab.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/features/sla/WorkingCalendarEditor.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/features/support/SupportQueue.svelte",
+      "count": 19
+    },
+    {
+      "file": "src/lib/features/terminal/TerminalPanel.svelte",
+      "count": 15
+    },
+    {
+      "file": "src/lib/features/terminal/WsTomlProvisioner.svelte",
+      "count": 23
+    },
+    {
+      "file": "src/lib/features/testing/BDDExampleExecution.svelte",
+      "count": 20
+    },
+    {
+      "file": "src/lib/features/testing/BDDScenarioView.svelte",
+      "count": 18
+    },
+    {
+      "file": "src/lib/features/testing/GherkinField.svelte",
+      "count": 8
+    },
+    {
+      "file": "src/lib/features/testing/TestCaseDetail.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/features/testing/TestCases.svelte",
+      "count": 42
+    },
+    {
+      "file": "src/lib/features/testing/TestCoverageReport.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/features/testing/TestExecution.svelte",
+      "count": 33
+    },
+    {
+      "file": "src/lib/features/testing/TestReports.svelte",
+      "count": 14
+    },
+    {
+      "file": "src/lib/features/testing/TestRunDetail.svelte",
+      "count": 56
+    },
+    {
+      "file": "src/lib/features/testing/TestRuns.svelte",
+      "count": 8
+    },
+    {
+      "file": "src/lib/features/testing/TestSets.svelte",
+      "count": 13
+    },
+    {
+      "file": "src/lib/features/testing/TestSteps.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/features/testing/TestTemplateDetail.svelte",
+      "count": 18
+    },
+    {
+      "file": "src/lib/features/testing/TestTemplates.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/features/time/Time.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/features/time/TimeEntry.svelte",
+      "count": 15
+    },
+    {
+      "file": "src/lib/features/time/TimeProjectCategories.svelte",
+      "count": 8
+    },
+    {
+      "file": "src/lib/features/time/TimeProjects.svelte",
+      "count": 9
+    },
+    {
+      "file": "src/lib/features/time/TimeReports.svelte",
+      "count": 28
+    },
+    {
+      "file": "src/lib/features/time/Timesheet.svelte",
+      "count": 27
+    },
+    {
+      "file": "src/lib/features/time/TimeTrackingOnboarding.svelte",
+      "count": 17
+    },
+    {
+      "file": "src/lib/features/time/WeeklyCalendar.svelte",
+      "count": 41
+    },
+    {
+      "file": "src/lib/features/workflows/WorkflowBuilder.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/features/workflows/WorkflowDesigner.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/forms/CollectionForm.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/forms/CreateFormFrame.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/forms/MilestoneForm.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/forms/WorkItemForm.svelte",
+      "count": 61
+    },
+    {
+      "file": "src/lib/forms/WorkspaceForm.svelte",
+      "count": 8
+    },
+    {
+      "file": "src/lib/hub/HubCustomizePanel.svelte",
+      "count": 17
+    },
+    {
+      "file": "src/lib/hub/HubHero.svelte",
+      "count": 14
+    },
+    {
+      "file": "src/lib/hub/HubInbox.svelte",
+      "count": 8
+    },
+    {
+      "file": "src/lib/hub/HubPortalCard.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/hub/HubSections.svelte",
+      "count": 13
+    },
+    {
+      "file": "src/lib/jira-import/JiraImportWizard.svelte",
+      "count": 250
+    },
+    {
+      "file": "src/lib/jira-import/SystemImportPage.svelte",
+      "count": 65
+    },
+    {
+      "file": "src/lib/layout/BaseHeader.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/layout/CommandPalette.svelte",
+      "count": 19
+    },
+    {
+      "file": "src/lib/layout/DashboardBackgroundPanel.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/layout/DropdownMenu.svelte",
+      "count": 23
+    },
+    {
+      "file": "src/lib/layout/Footer.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/layout/Hub.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/layout/MainSidebar.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/layout/NavigationSidebar.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/layout/PluginModalContainer.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/layout/Portal.svelte",
+      "count": 16
+    },
+    {
+      "file": "src/lib/layout/SectionHeader.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/layout/SidebarHeader.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/layout/WidgetCustomizationSidebar.svelte",
+      "count": 9
+    },
+    {
+      "file": "src/lib/openui/components/ActivityFeed.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/openui/components/BipartiteList.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/openui/components/Divider.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/openui/components/ItemList.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/openui/components/ItemsTable.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/openui/components/LinkButton.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/openui/components/Matrix.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/openui/components/Metric.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/openui/components/NetworkGraph.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/openui/components/ProgressList.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/openui/components/Section.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/openui/components/SourceBoundary.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/openui/components/Title.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/openui/CustomWidgetRenderer.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/openui/WidgetBuilderModal.svelte",
+      "count": 11
+    },
+    {
+      "file": "src/lib/pages/About.svelte",
+      "count": 17
+    },
+    {
+      "file": "src/lib/pages/Admin.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/pages/ApprovalsInbox.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/pages/CliAuthorize.svelte",
+      "count": 26
+    },
+    {
+      "file": "src/lib/pages/DashboardOnboarding.svelte",
+      "count": 24
+    },
+    {
+      "file": "src/lib/pages/DelegatedAdmin.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/pages/Homepage.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/pages/MainApp.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/pages/MainAppOverlays.svelte",
+      "count": 12
+    },
+    {
+      "file": "src/lib/pages/MainRouteContent.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/pages/MigrationAssistant.svelte",
+      "count": 27
+    },
+    {
+      "file": "src/lib/pages/NotificationsPage.svelte",
+      "count": 12
+    },
+    {
+      "file": "src/lib/pages/OAuthAuthorize.svelte",
+      "count": 18
+    },
+    {
+      "file": "src/lib/pages/PublicBoard.svelte",
+      "count": 47
+    },
+    {
+      "file": "src/lib/pages/PublicBoardItemDetail.svelte",
+      "count": 18
+    },
+    {
+      "file": "src/lib/pages/Screens.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/pages/SearchPage.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/pages/Security.svelte",
+      "count": 42
+    },
+    {
+      "file": "src/lib/pages/UnauthorizedAccess.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/pages/UserProfile.svelte",
+      "count": 15
+    },
+    {
+      "file": "src/lib/pages/WelcomeAssistant.svelte",
+      "count": 26
+    },
+    {
+      "file": "src/lib/pickers/ApprovalSetPicker.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/pickers/AssetPicker.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/pickers/AssigneePicker.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/pickers/BasePicker.svelte",
+      "count": 38
+    },
+    {
+      "file": "src/lib/pickers/CategoryMultiSelect.svelte",
+      "count": 9
+    },
+    {
+      "file": "src/lib/pickers/ChipPicker.svelte",
+      "count": 12
+    },
+    {
+      "file": "src/lib/pickers/ConditionSetPicker.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/pickers/ConfigurationSetEntityPicker.svelte",
+      "count": 29
+    },
+    {
+      "file": "src/lib/pickers/ConfigurationSetPicker.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/pickers/CustomerOrganisationPicker.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/pickers/DocumentPicker.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/pickers/FieldSelector.svelte",
+      "count": 10
+    },
+    {
+      "file": "src/lib/pickers/GroupPicker.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/pickers/IconSelector.svelte",
+      "count": 24
+    },
+    {
+      "file": "src/lib/pickers/ItemPicker.svelte",
+      "count": 24
+    },
+    {
+      "file": "src/lib/pickers/LabelCombobox.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/pickers/LabelCreateRow.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/pickers/LabelItemRow.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/pickers/LinkingFieldPicker.svelte",
+      "count": 18
+    },
+    {
+      "file": "src/lib/pickers/MilestoneCombobox.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/pickers/PagePicker.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/pickers/PortalCustomerPicker.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/pickers/PriorityPicker.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/pickers/RepositorySelector.svelte",
+      "count": 22
+    },
+    {
+      "file": "src/lib/pickers/RolePicker.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/pickers/ScreenPicker.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/pickers/TeamPicker.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/pickers/TestCasePicker.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/pickers/UserPicker.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/pickers/WorkflowPicker.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/pickers/WorkspacePicker.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/portal/AssetReportTable.svelte",
+      "count": 26
+    },
+    {
+      "file": "src/lib/portal/PortalCustomizePanel.svelte",
+      "count": 93
+    },
+    {
+      "file": "src/lib/portal/PortalFooter.svelte",
+      "count": 15
+    },
+    {
+      "file": "src/lib/portal/PortalHeader.svelte",
+      "count": 15
+    },
+    {
+      "file": "src/lib/portal/PortalHero.svelte",
+      "count": 17
+    },
+    {
+      "file": "src/lib/portal/PortalLoginModal.svelte",
+      "count": 31
+    },
+    {
+      "file": "src/lib/portal/PortalMyApprovals.svelte",
+      "count": 35
+    },
+    {
+      "file": "src/lib/portal/PortalMyDrafts.svelte",
+      "count": 15
+    },
+    {
+      "file": "src/lib/portal/PortalMyRequests.svelte",
+      "count": 36
+    },
+    {
+      "file": "src/lib/portal/PortalPasskeyBanner.svelte",
+      "count": 8
+    },
+    {
+      "file": "src/lib/portal/PortalProfile.svelte",
+      "count": 27
+    },
+    {
+      "file": "src/lib/portal/PortalSections.svelte",
+      "count": 28
+    },
+    {
+      "file": "src/lib/portal/PortalVerifyLink.svelte",
+      "count": 14
+    },
+    {
+      "file": "src/lib/profile/LeavePeriods.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/profile/ProfileAgentsTab.svelte",
+      "count": 32
+    },
+    {
+      "file": "src/lib/profile/ProfileAvatarTab.svelte",
+      "count": 15
+    },
+    {
+      "file": "src/lib/profile/ProfileCalendarTab.svelte",
+      "count": 23
+    },
+    {
+      "file": "src/lib/profile/ProfileNotificationsTab.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/profile/ProfileRegionalSettingsTab.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/services/IframePluginLoader.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/settings/ActionCredentialsManager.svelte",
+      "count": 34
+    },
+    {
+      "file": "src/lib/settings/AgentSecurityAllowlistEditor.svelte",
+      "count": 17
+    },
+    {
+      "file": "src/lib/settings/AgentTemplateManager.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/settings/AIFeaturesSettings.svelte",
+      "count": 12
+    },
+    {
+      "file": "src/lib/settings/ApprovalSetDetail.svelte",
+      "count": 45
+    },
+    {
+      "file": "src/lib/settings/ApprovalSetManager.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/settings/AttachmentSettings.svelte",
+      "count": 34
+    },
+    {
+      "file": "src/lib/settings/BoardConfigurationPage.svelte",
+      "count": 70
+    },
+    {
+      "file": "src/lib/settings/CapabilityManager.svelte",
+      "count": 41
+    },
+    {
+      "file": "src/lib/settings/ChannelManagersTab.svelte",
+      "count": 23
+    },
+    {
+      "file": "src/lib/settings/ConditionSetDetail.svelte",
+      "count": 46
+    },
+    {
+      "file": "src/lib/settings/ConditionSetManager.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/settings/ConfigurationSetDetail.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/settings/ConfigurationSetItemTypes.svelte",
+      "count": 19
+    },
+    {
+      "file": "src/lib/settings/ConfigurationSetManager.svelte",
+      "count": 36
+    },
+    {
+      "file": "src/lib/settings/ConfigurationSetPriorities.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/settings/ConfigurationSetWorkspaces.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/settings/ConnectedAccountsTab.svelte",
+      "count": 28
+    },
+    {
+      "file": "src/lib/settings/CustomFields.svelte",
+      "count": 31
+    },
+    {
+      "file": "src/lib/settings/diagnostics/ActionLogsSection.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/settings/diagnostics/CacheMemorySection.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/settings/diagnostics/DatabasePoolsSection.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/settings/diagnostics/DiagnosticsFailuresTable.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/settings/diagnostics/DiagnosticsSection.svelte",
+      "count": 14
+    },
+    {
+      "file": "src/lib/settings/diagnostics/DomainEventsSection.svelte",
+      "count": 14
+    },
+    {
+      "file": "src/lib/settings/diagnostics/EmailIntakeSection.svelte",
+      "count": 17
+    },
+    {
+      "file": "src/lib/settings/diagnostics/FracIndexSection.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/settings/diagnostics/LLMHealthSection.svelte",
+      "count": 33
+    },
+    {
+      "file": "src/lib/settings/diagnostics/RecurrenceVolumeSection.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/settings/diagnostics/RunnerPoolsSection.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/settings/diagnostics/SchedulerRunsSection.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/settings/diagnostics/SCMHealthSection.svelte",
+      "count": 15
+    },
+    {
+      "file": "src/lib/settings/diagnostics/ServerClockSection.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/settings/diagnostics/WebhookDeliveriesSection.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/settings/EmailTemplateManager.svelte",
+      "count": 20
+    },
+    {
+      "file": "src/lib/settings/EnabledStatus.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/settings/EntityFormModal.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/settings/EntityRowActions.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/settings/GroupManager.svelte",
+      "count": 12
+    },
+    {
+      "file": "src/lib/settings/IntegrationProviderManager.svelte",
+      "count": 9
+    },
+    {
+      "file": "src/lib/settings/IntegrationsManager.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/settings/IssueSyncSettings.svelte",
+      "count": 42
+    },
+    {
+      "file": "src/lib/settings/ItemTypeManager.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/settings/LinkTypeManager.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/settings/LLMConnectionManager.svelte",
+      "count": 30
+    },
+    {
+      "file": "src/lib/settings/LocalizedObjectFields.svelte",
+      "count": 17
+    },
+    {
+      "file": "src/lib/settings/ModuleSettings.svelte",
+      "count": 37
+    },
+    {
+      "file": "src/lib/settings/NotificationSettings.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/settings/OAuthClientManager.svelte",
+      "count": 15
+    },
+    {
+      "file": "src/lib/settings/PackManager.svelte",
+      "count": 10
+    },
+    {
+      "file": "src/lib/settings/PermissionManager.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/settings/PermissionSetEdit.svelte",
+      "count": 21
+    },
+    {
+      "file": "src/lib/settings/RecurrenceDetail.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/settings/RecurrenceManager.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/settings/RoleManager.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/settings/RunnerPoolManager.svelte",
+      "count": 28
+    },
+    {
+      "file": "src/lib/settings/SCMProviderManager.svelte",
+      "count": 32
+    },
+    {
+      "file": "src/lib/settings/SecuritySettings.svelte",
+      "count": 60
+    },
+    {
+      "file": "src/lib/settings/SetDetailActions.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/settings/SetDetailShell.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/settings/SetListPage.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/settings/SSOSettings.svelte",
+      "count": 33
+    },
+    {
+      "file": "src/lib/settings/StatusCategoryManager.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/settings/StatusManager.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/settings/ThemeManager.svelte",
+      "count": 39
+    },
+    {
+      "file": "src/lib/settings/TodoistSyncSettings.svelte",
+      "count": 8
+    },
+    {
+      "file": "src/lib/settings/UserManager.svelte",
+      "count": 29
+    },
+    {
+      "file": "src/lib/settings/WorkItemStalenessSettings.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/settings/ZammadConnectionManager.svelte",
+      "count": 14
+    },
+    {
+      "file": "src/lib/teams/GroupsTab.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/teams/LayerEditor.svelte",
+      "count": 28
+    },
+    {
+      "file": "src/lib/teams/MembersTab.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/teams/OnCallTab.svelte",
+      "count": 18
+    },
+    {
+      "file": "src/lib/teams/OverrideEditor.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/teams/OverviewTab.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/teams/ScheduleEditor.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/teams/ServiceHoursTab.svelte",
+      "count": 8
+    },
+    {
+      "file": "src/lib/teams/TeamDetail.svelte",
+      "count": 1
+    },
+    {
+      "file": "src/lib/teams/TeamsList.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/widgets/dashboard/CustomWidgetWidget.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/widgets/dashboard/DailyBriefingWidget.svelte",
+      "count": 7
+    },
+    {
+      "file": "src/lib/widgets/dashboard/DashboardItemRow.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/widgets/dashboard/DashboardTaskList.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/widgets/dashboard/QuickAccessWidget.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/widgets/dashboard/RecentWorkspacesWidget.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/widgets/dashboard/SavedSearchWidget.svelte",
+      "count": 13
+    },
+    {
+      "file": "src/lib/widgets/dashboard/UpcomingMilestonesWidget.svelte",
+      "count": 9
+    },
+    {
+      "file": "src/lib/widgets/dashboard/WatchedItemsWidget.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/widgets/dashboard/WhatsNewWidget.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/widgets/dashboard/YourActivityWidget.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/widgets/IterationTimelineWidget.svelte",
+      "count": 12
+    },
+    {
+      "file": "src/lib/widgets/MyTasksWidget.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/widgets/OverdueItemsWidget.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/widgets/RecentItemsWidget.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/widgets/StatCard.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/widgets/StoryPointsWidget.svelte",
+      "count": 8
+    },
+    {
+      "file": "src/lib/widgets/SupportMetricsWidget.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/widgets/SupportOverviewWidget.svelte",
+      "count": 11
+    },
+    {
+      "file": "src/lib/widgets/SupportStatTile.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/widgets/UpcomingDeadlinesWidget.svelte",
+      "count": 5
+    },
+    {
+      "file": "src/lib/widgets/ZammadSupportWidget.svelte",
+      "count": 32
+    },
+    {
+      "file": "src/lib/workspaces/ContactDetail.svelte",
+      "count": 33
+    },
+    {
+      "file": "src/lib/workspaces/CustomerOrganisationNavigation.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/workspaces/Customers.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/workspaces/NavigationConfigPage.svelte",
+      "count": 16
+    },
+    {
+      "file": "src/lib/workspaces/OrganisationDetail.svelte",
+      "count": 29
+    },
+    {
+      "file": "src/lib/workspaces/WorkspaceAgentBindings.svelte",
+      "count": 47
+    },
+    {
+      "file": "src/lib/workspaces/WorkspaceAgentSkills.svelte",
+      "count": 9
+    },
+    {
+      "file": "src/lib/workspaces/WorkspaceCannedResponses.svelte",
+      "count": 11
+    },
+    {
+      "file": "src/lib/workspaces/WorkspaceConfigurationAssigner.svelte",
+      "count": 3
+    },
+    {
+      "file": "src/lib/workspaces/WorkspaceConfigurationPreview.svelte",
+      "count": 23
+    },
+    {
+      "file": "src/lib/workspaces/WorkspaceDetail.svelte",
+      "count": 2
+    },
+    {
+      "file": "src/lib/workspaces/WorkspaceItemTemplates.svelte",
+      "count": 13
+    },
+    {
+      "file": "src/lib/workspaces/WorkspaceLookAndFeel.svelte",
+      "count": 24
+    },
+    {
+      "file": "src/lib/workspaces/WorkspaceMembers.svelte",
+      "count": 11
+    },
+    {
+      "file": "src/lib/workspaces/WorkspaceNavigation.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/workspaces/Workspaces.svelte",
+      "count": 6
+    },
+    {
+      "file": "src/lib/workspaces/WorkspaceSCMSettings.svelte",
+      "count": 47
+    },
+    {
+      "file": "src/lib/workspaces/WorkspaceSelector.svelte",
+      "count": 4
+    },
+    {
+      "file": "src/lib/workspaces/WorkspaceSettings.svelte",
+      "count": 19
+    },
+    {
+      "file": "src/lib/workspaces/WorkspaceWelcome.svelte",
+      "count": 5
+    }
+  ]
+}

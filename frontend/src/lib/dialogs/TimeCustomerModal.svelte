@@ -4,12 +4,14 @@
   import FileInput from '../components/FileInput.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import Label from '../components/Label.svelte';
+  import Text from '../components/Text.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import Camera from '@lucide/svelte/icons/camera';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import { attachments } from '../api/misc.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, warningToast } from '../stores/toasts.svelte.js';
+  import { fieldValue } from '../utils/customFieldValues.js';
 	import TextField from '../components/TextField.svelte';
 	import TextareaField from '../components/TextareaField.svelte';
 
@@ -26,6 +28,7 @@
     }),
     customerOrgFields = [],
     attachmentsEnabled = false,
+    entityId = 0,
     isEditing = false,
     onsave = () => {},
     oncancel = () => {}
@@ -54,7 +57,7 @@
     try {
       const uploadFormData = new FormData();
       uploadFormData.append('file', file);
-      uploadFormData.append('item_id', '0');
+      uploadFormData.append('entity_id', String(entityId ?? 0));
       uploadFormData.append('category', 'customer_avatar');
 
       const uploadResult = await attachments.upload(uploadFormData);
@@ -212,17 +215,20 @@
       <!-- Custom Fields -->
       {#if customerOrgFields.length > 0}
         <div class="mt-6 pt-6 border-t" style="border-color: var(--ds-border);">
-          <h3 class="text-sm font-medium mb-4" style="color: var(--ds-text);">{t('organization.customFields')}</h3>
+          <Text as="h3" variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider mb-4">{t('organization.customFields')}</Text>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {#each customerOrgFields as field}
-              <CustomFieldRenderer
-                {field}
-                value={formData.custom_field_values[field.name] ?? ''}
-                readonly={false}
-                onChange={(val) => {
-                  formData.custom_field_values[field.name] = val;
-                }}
-              />
+            {#each customerOrgFields as field (field.id)}
+              <div>
+                <Label required={field.required} class="mb-2">{field.name}</Label>
+                <CustomFieldRenderer
+                  {field}
+                  value={fieldValue(formData.custom_field_values, field) ?? ''}
+                  readonly={false}
+                  onChange={(val) => {
+                    formData.custom_field_values[String(field.id)] = val;
+                  }}
+                />
+              </div>
             {/each}
           </div>
         </div>

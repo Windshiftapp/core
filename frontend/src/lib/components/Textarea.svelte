@@ -9,6 +9,7 @@
     autofocus = false,
     spellcheck = undefined,
     rows = 3,
+    dir = 'auto',
     size = 'medium',
     id = undefined,
     class: className = '',
@@ -28,6 +29,9 @@
 
   // Size variants
   const sizeClasses = $derived(controlSizeClasses(size));
+
+  /** @type {'ltr' | 'rtl' | 'auto'} */
+  const dirValue = $derived(/** @type {any} */ (dir));
 
   // Combine all classes
   const allClasses = $derived([
@@ -50,6 +54,7 @@
   {autofocus}
   {spellcheck}
   {rows}
+  dir={dirValue}
   class={allClasses}
   style="background-color: var(--ds-background-input); border-color: var(--ds-border); color: var(--ds-text); {style}"
   data-testid={dataTestid}

@@ -275,6 +275,14 @@ export default {
     configureFilter: 'Filter konfigurieren, um Vorgänge zu sehen',
     createToStart: '{item} erstellen, um zu beginnen',
   },
+  bulkActions: {
+    screenRequiredTitle: 'Einige Einträge brauchen ein Formular',
+    screenRequiredAll:
+      'Jeder ausgewählte Eintrag braucht ein Formular, bevor er verschoben werden kann. Verschiebe sie einzeln.',
+    screenRequiredMessage:
+      '{blocked} von {total} ausgewählten Einträgen brauchen ein Formular, bevor sie verschoben werden können. Die übrigen {remaining} verschieben?',
+    screenRequiredConfirm: 'Rest verschieben',
+  },
   dueDate: {
     noDueDate: 'Kein Fälligkeitsdatum',
     dueToday: 'Heute fällig',

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"windshift/internal/customfields"
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
@@ -18,6 +19,7 @@ import (
 	"windshift/internal/sanitize"
 	"windshift/internal/services"
 	"windshift/internal/utils"
+	"windshift/internal/validation"
 )
 
 // PortalCustomersHandler handles portal customer management operations
@@ -145,6 +147,27 @@ func scanPortalCustomer(scanner interface{ Scan(...any) error }) (models.PortalC
 	return c, nil
 }
 
+// resolvePortalCustomerCustomFieldKeys rewrites legacy name keys to id keys on
+// a response map so the API contract stays id-keyed (WI-2025).
+func resolvePortalCustomerCustomFieldKeys(c *models.PortalCustomer, index *customfields.CustomFieldNameIndex) {
+	if index == nil || c == nil || len(c.CustomFieldValues) == 0 {
+		return
+	}
+	index.Resolve(c.CustomFieldValues)
+}
+
+// loadPortalCustomerFieldIndex loads the portal-customer name index. A lookup
+// failure is logged and treated as "no normalisation" so a read never fails on
+// it.
+func (h *PortalCustomersHandler) loadPortalCustomerFieldIndex() *customfields.CustomFieldNameIndex {
+	index, err := customfields.LoadCustomFieldNameIndex(h.db, customfields.AppliesToPortalCustomers)
+	if err != nil {
+		slog.Warn("failed to load custom field names for portal customers", slog.String("component", "portal"), slog.Any("error", err))
+		return nil
+	}
+	return index
+}
+
 // loadPortalCustomerWithRoles fetches a single portal customer by ID and loads its roles.
 func (h *PortalCustomersHandler) loadPortalCustomerWithRoles(id int64) (models.PortalCustomer, error) {
 	row := h.db.QueryRow(portalCustomerBaseQuery+" WHERE pc.id = ?", id)
@@ -161,6 +184,7 @@ func (h *PortalCustomersHandler) loadPortalCustomerWithRoles(id int64) (models.P
 		c.Roles = roles
 	}
 
+	resolvePortalCustomerCustomFieldKeys(&c, h.loadPortalCustomerFieldIndex())
 	return c, nil
 }
 
@@ -193,6 +217,11 @@ func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *ht
 	if err := rows.Err(); err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	fieldIndex := h.loadPortalCustomerFieldIndex()
+	for i := range customers {
+		resolvePortalCustomerCustomFieldKeys(&customers[i], fieldIndex)
 	}
 
 	// Batched role lookup avoids the previous N+1 per customer.
@@ -374,20 +403,20 @@ type portalCustomerInput struct {
 	Email                  string
 	Phone                  string
 	CustomerOrganisationID *int
-	IsPrimary              bool
+	IsPrimary              *bool
 	RoleIDs                []int
 	CustomFieldValuesJSON  *string
 }
 
 // decodePortalCustomerInput decodes, validates, and serializes custom fields for portal customer create/update.
-func decodePortalCustomerInput(w http.ResponseWriter, r *http.Request) (portalCustomerInput, bool) {
+func (h *PortalCustomersHandler) decodePortalCustomerInput(w http.ResponseWriter, r *http.Request) (portalCustomerInput, bool) {
 	//nolint:misspell // API uses British spelling (customer_organisation_id)
 	var requestData struct {
 		Name                   string         `json:"name"`
 		Email                  string         `json:"email"`
 		Phone                  string         `json:"phone"`
 		CustomerOrganisationID *int           `json:"customer_organisation_id"`
-		IsPrimary              bool           `json:"is_primary"`
+		IsPrimary              *bool          `json:"is_primary"`
 		RoleIDs                []int          `json:"role_ids"`
 		CustomFieldValues      map[string]any `json:"custom_field_values"`
 	}
@@ -411,6 +440,22 @@ func decodePortalCustomerInput(w http.ResponseWriter, r *http.Request) (portalCu
 
 	var customFieldValuesJSON *string
 	if len(requestData.CustomFieldValues) > 0 {
+		// Normalise legacy name keys to numeric field ids, then validate and
+		// re-add the unique-name mirror for the downgrade window (WI-2025).
+		index, err := customfields.LoadCustomFieldNameIndex(h.db, customfields.AppliesToPortalCustomers)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return portalCustomerInput{}, false
+		}
+		if err := index.Validate(requestData.CustomFieldValues); err != nil {
+			respondValidationError(w, r, err.Error())
+			return portalCustomerInput{}, false
+		}
+		if err := validation.ValidateAndNormalizeCustomFieldValues(h.db, requestData.CustomFieldValues); err != nil {
+			respondValidationError(w, r, err.Error())
+			return portalCustomerInput{}, false
+		}
+		index.RebuildMirrors(requestData.CustomFieldValues)
 		b, err := json.Marshal(requestData.CustomFieldValues)
 		if err != nil {
 			respondBadRequest(w, r, "Invalid custom field values")
@@ -433,7 +478,7 @@ func decodePortalCustomerInput(w http.ResponseWriter, r *http.Request) (portalCu
 
 // CreatePortalCustomer creates a new portal customer
 func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *http.Request) {
-	input, ok := decodePortalCustomerInput(w, r)
+	input, ok := h.decodePortalCustomerInput(w, r)
 	if !ok {
 		return
 	}
@@ -446,7 +491,7 @@ func (h *PortalCustomersHandler) CreatePortalCustomer(w http.ResponseWriter, r *
 		err := tx.QueryRow(`
 			INSERT INTO portal_customers (name, email, phone, customer_organisation_id, is_primary, custom_field_values, created_via, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
-		`, input.Name, input.Email, input.Phone, input.CustomerOrganisationID, input.IsPrimary, input.CustomFieldValuesJSON, models.CustomerCreatedViaAgent).Scan(&customerID)
+		`, input.Name, input.Email, input.Phone, input.CustomerOrganisationID, boolValue(input.IsPrimary), input.CustomFieldValuesJSON, models.CustomerCreatedViaAgent).Scan(&customerID)
 		if err != nil {
 			return err
 		}
@@ -537,7 +582,7 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 		return
 	}
 
-	input, ok := decodePortalCustomerInput(w, r)
+	input, ok := h.decodePortalCustomerInput(w, r)
 	if !ok {
 		return
 	}
@@ -545,10 +590,13 @@ func (h *PortalCustomersHandler) UpdatePortalCustomer(w http.ResponseWriter, r *
 	// Wrap update + role assignment in a transaction so partial failures
 	// don't leave the customer in a half-updated state.
 	txErr := database.WithTx(h.db, func(tx database.Tx) error {
+		// is_primary is preserved when the request omits it; an explicit value
+		// wins. The detail edit form does not carry the flag, so a metadata save
+		// must not demote the primary contact.
 		//nolint:misspell // customer_organisation_id is a database column name
 		query := `
 			UPDATE portal_customers
-			SET name = ?, email = ?, phone = ?, customer_organisation_id = ?, is_primary = ?, custom_field_values = ?, updated_at = CURRENT_TIMESTAMP
+			SET name = ?, email = ?, phone = ?, customer_organisation_id = ?, is_primary = COALESCE(?, is_primary), custom_field_values = ?, updated_at = CURRENT_TIMESTAMP
 			WHERE id = ? AND erased_at IS NULL
 		`
 		result, err := tx.Exec(query, input.Name, input.Email, input.Phone, input.CustomerOrganisationID, input.IsPrimary, input.CustomFieldValuesJSON, customerID)
@@ -950,6 +998,11 @@ func (h *PortalCustomersHandler) GetOrganisationContacts(w http.ResponseWriter, 
 	if err := rows.Err(); err != nil {
 		respondInternalError(w, r, err)
 		return
+	}
+
+	fieldIndex := h.loadPortalCustomerFieldIndex()
+	for i := range contacts {
+		resolvePortalCustomerCustomFieldKeys(&contacts[i], fieldIndex)
 	}
 
 	rolesByContact, err := h.loadRolesForCustomers(contactIDs)

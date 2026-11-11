@@ -9,12 +9,14 @@
   import Button from '../../components/Button.svelte';
   import FileInput from '../../components/FileInput.svelte';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
+  import PluginEditorHost from '../../editors/PluginEditorHost.svelte';
   import AttachmentDiagramList from '../assets/AttachmentDiagramList.svelte';
   import AIActionsDropdown from './AIActionsDropdown.svelte';
   import { getShortcut, matchesShortcut, getDisplayString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { attachmentStatus } from '../../stores/attachmentStatus.svelte.js';
   import { aiStore } from '../../stores/aiStore.svelte.js';
+  import { isExternalRequest } from '../../utils/requestOrigin.js';
   import { onClickOutside } from 'runed';
 
   // Get shortcut configurations
@@ -47,6 +49,7 @@
     onattachmentUpload = undefined,
     onattachmentUploadFiles = undefined,
     onattachmentDelete = undefined,
+    onattachmentToggleVisibility = undefined,
     onnewDiagram = undefined,
     oneditDiagram = undefined,
     ondeleteDiagram = undefined,
@@ -57,6 +60,10 @@
   let milkdownEditor = $state(null);
   let showActionsMenu = $state(false);
   let actionsMenuRef = $state(null);
+
+  // Portal visibility only applies to customer requests, where the portal can
+  // read the item; direct agent-created items have no portal audience.
+  const canToggleAttachmentVisibility = $derived(canEdit && isExternalRequest(item));
 
   // Local state for editor content (initialized from prop when editing starts)
   let editorContent = $state('');
@@ -149,6 +156,10 @@
     onattachmentDelete?.(attachment);
   }
 
+  function handleToggleAttachmentVisibility(attachment) {
+    onattachmentToggleVisibility?.(attachment);
+  }
+
   function handleNewDiagram() {
     onnewDiagram?.();
   }
@@ -177,14 +188,17 @@
   {#if editingDescription}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="space-y-3" onkeydown={handleKeydown} data-testid="item-description-editor">
-      <MilkdownEditor
+      <PluginEditorHost
         bind:this={milkdownEditor}
         bind:content={editorContent}
         placeholder={t('items.enterDescription')}
         showToolbar={true}
         itemId={item.id}
+        entityType="item"
+        entityId={item.id}
         workspaceId={item.workspace_id}
         onImageInsert={handleImageInsert}
+        editorProviders={true}
       />
       <div class="flex items-center gap-2">
         <Button variant="primary" onclick={saveDescription} disabled={saving} keyboardHint={getDisplayString(saveShortcut)} dataTestid="item-description-save">
@@ -202,7 +216,8 @@
         onkeydown={handleDescriptionKeydown}
         role="button"
         tabindex="0"
-        class="description-hover text-left rounded cursor-pointer transition-colors duration-150"
+        class="description-hover text-start rounded cursor-pointer transition-colors duration-150"
+        dir="auto"
         style="color: var(--ds-text);"
         title={t('items.clickToEditDescription')}
         data-testid="item-description-display"
@@ -211,7 +226,8 @@
       </div>
     {:else}
       <div
-        class="text-left rounded"
+        class="text-start rounded"
+        dir="auto"
         style="color: var(--ds-text);"
         data-testid="item-description-display"
       >
@@ -222,7 +238,7 @@
     <button
       data-testid="item-description-empty"
       onclick={startEditingDescription}
-      class="description-empty text-left text-[0.875rem] transition-colors cursor-pointer"
+      class="description-empty text-start text-[0.875rem] transition-colors cursor-pointer"
       title={t('items.clickToAddDescription')}
     >
       {t('items.noDescriptionProvided')}
@@ -230,7 +246,7 @@
   {:else}
     <p
       data-testid="item-description-empty"
-      class="text-left w-full py-2 text-[0.875rem]"
+      class="text-start w-full py-2 text-[0.875rem]"
       style="color: var(--ds-text-subtle);"
     >
       {t('items.noDescriptionProvided')}
@@ -342,7 +358,9 @@
     <AttachmentDiagramList
       {attachments}
       {diagrams}
+      canToggleVisibility={canToggleAttachmentVisibility}
       ondelete={handleDeleteAttachment}
+      ontogglevisibility={handleToggleAttachmentVisibility}
       oneditdiagram={handleEditDiagram}
       ondeletediagram={handleDeleteDiagram}
     />

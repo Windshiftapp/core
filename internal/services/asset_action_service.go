@@ -216,24 +216,6 @@ func (as *AssetActionService) SetAssetPermissionChecker(checker AssetSetPermissi
 	as.assetPermChecker = checker
 }
 
-// EmitAssetActionEvent durably admits a compatibility trigger before the
-// recorded canonical asset cutover.
-func (as *AssetActionService) EmitAssetActionEvent(event *models.AssetActionEvent) {
-	if event == nil {
-		return
-	}
-	if err := as.durableIngress.Emit(context.Background(), event); err != nil {
-		slog.Error("failed to persist asset action event",
-			slog.String("component", "asset-actions"),
-			slog.String("event_type", string(event.EventType)),
-			slog.Int("set_id", event.SetID),
-			slog.Int("asset_id", event.AssetID),
-			slog.Any("error", err),
-		)
-		atomic.AddInt64(&as.errors, 1)
-	}
-}
-
 // InvalidateSetCache invalidates the cache for a specific asset set
 func (as *AssetActionService) InvalidateSetCache(setID int) {
 	actions, err := as.repo.ListEnabledBySet(setID)

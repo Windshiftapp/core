@@ -20,6 +20,14 @@ export default {
     systemDefault: 'Системная тема',
     themeManager: {
       background: 'Фон', text: 'Текст',
+      brandLayout: 'Бренд в боковой панели',
+      brandLayoutMarkText: 'Знак + текст',
+      brandLayoutMarkOnly: 'Только знак',
+      brandLayoutFullLogo: 'Полный логотип',
+      brandLayoutHelp: 'Управляет развёрнутой боковой панелью. В свёрнутой панели всегда отображается знак.',
+      brandPreview: 'Предпросмотр боковой панели',
+      brandPreviewExpanded: 'Развёрнутая',
+      brandPreviewCollapsed: 'Свёрнутая',
       failedToLoad: 'Не удалось загрузить темы.', failedToCreate: 'Не удалось создать тему.',
       failedToUpdate: 'Не удалось обновить тему.', failedToDelete: 'Не удалось удалить тему.',
       failedToActivate: 'Не удалось включить тему.', failedToUploadLogo: 'Не удалось загрузить логотип.',
@@ -30,12 +38,24 @@ export default {
       },
     },
 
+    generalSettings: {
+      title: 'Общие',
+      subtitle: 'Общесистемные настройки',
+      siteIdentity: 'Идентичность сайта',
+      siteIdentityDescription:
+        'Название продукта, отображаемое на вкладке браузера, в боковой панели, а также на экранах входа и настройки.',
+      siteTitle: 'Название сайта',
+      preview: 'Предпросмотр',
+      saved: 'Общие настройки сохранены',
+    },
+
     admin: 'Администрирование',
     systemSettings: 'Системные настройки',
     organizationSettings: 'Настройки организации',
     workspaceSettings: 'Настройки рабочего пространства',
 
     adminGroups: {
+      general: 'Общие',
       contentStructure: 'Содержимое и структура',
       workflowProcess: 'Рабочие процессы',
       integrationLinks: 'Интеграции и связи',
@@ -46,6 +66,10 @@ export default {
     },
 
     adminItems: {
+      general: {
+        title: 'Общие',
+        description: 'Общесистемные настройки, например название сайта',
+      },
       customFields: {
         title: 'Настраиваемые поля',
         description: 'Создание и настройка дополнительных полей',
@@ -385,6 +409,10 @@ export default {
       importing: 'Импорт…',
       importWarning: 'Набор конфигураций импортирован с предупреждениями.',
       importFailed: 'Не удалось импортировать набор конфигураций.',
+      importNameTitle: 'Назовите импортируемый набор',
+      importNameDescription:
+        'Импорт создаёт копию. Выберите имя для импортируемого набора.',
+      importInvalidFile: 'Этот файл не является шаблоном набора конфигураций.',
       unresolvedReferencesHeading: 'В импортируемом наборе есть объекты, которых нет в этой системе.',
       defaultConflictHeading: 'Импортируемый набор конфликтует с системным объектом.',
       unresolvedImportTitle: 'Импорт: неразрешённые ссылки',
@@ -647,6 +675,9 @@ export default {
       callbackUrl: 'URL перенаправления OAuth',
       callbackUrlHelp:
         'Укажите этот адрес как URL перенаправления у провайдера идентификации',
+      baseUrlWarningTitle: 'Базовый URL сервера не настроен',
+      baseUrlWarningBody:
+        'Windshift использует {url} для ссылок и OAuth-callback-запросов, поэтому при входе через SSO этот адрес будет отправлен поставщику удостоверений. Задайте переменную окружения BASE_URL и перезапустите Windshift, прежде чем регистрировать URL обратного вызова.',
       scopes: 'Области доступа',
       scopesHelp: 'Список областей доступа OIDC через пробел',
       nameClaimsHelp:
@@ -753,6 +784,14 @@ export default {
       textBody: 'Текстовая версия',
       adminNotes: 'Описание (заметки администратора)',
       activeHint: 'Активен (снимите флажок, чтобы использовать встроенный шаблон)',
+      localeLabel: "Язык",
+      defaultLocale: "По умолчанию (все языки)",
+      translationHint: "Вы редактируете версию для этого языка. Остальные языки используют шаблон по умолчанию.",
+      translationSaved: "Перевод сохранён",
+      translationDelete: "Удалить перевод",
+      translationDeleted: "Перевод удалён",
+      translationSaveFailed: "Не удалось сохранить перевод: {error}",
+      translationDeleteFailed: "Не удалось удалить перевод: {error}",
       availableVariables: 'Доступные переменные',
       syntaxHint:
         'Шаблоны используют синтаксис Go html/template. Для значений укажите {open} .Field {close}, а для перебора — {open} range .Items {close}…{open} end {close}.',
@@ -1007,11 +1046,6 @@ export default {
         dependency_analysis: {
           name: 'Анализ зависимостей',
           description: 'Анализ и рекомендации зависимостей между элементами',
-        },
-        logbook_articles: {
-          name: 'Статьи базы знаний',
-          description:
-            'Классификация и очистка документов, а также создание статей базы знаний с помощью ИИ',
         },
       },
     },

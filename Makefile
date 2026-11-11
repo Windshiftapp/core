@@ -19,7 +19,7 @@ LDFLAGS=-ldflags="-s -w"
 # Directories
 FRONTEND_DIR=frontend
 
-.PHONY: all build build-linux build-windows build-windows-arm64 clean deps frontend help hooks lint dev-build release openapi openapi-v2 openapi-check openapi-v2-check openapi-v2-client-smoke coding-agent-image dev-tools install-golangci-lint install-govulncheck install-deadcode ci-tools-check ci-go ci-frontend ci
+.PHONY: all build build-linux build-windows build-windows-arm64 clean deps frontend help hooks lint vulncheck dev-build release openapi openapi-v2 openapi-check openapi-v2-check openapi-v2-client-smoke coding-agent-image dev-tools install-golangci-lint install-govulncheck install-deadcode ci-tools-check ci-go ci-frontend ci
 
 # Tooling. swag is a tool dependency tracked in go.mod (see `tool` directive),
 # so the version is pinned and CI / dev installs always agree. `go tool swag`
@@ -119,7 +119,7 @@ ci-tools-check:
 ci-go: ci-tools-check
 	cd $(FRONTEND_DIR) && npm ci && npm run build
 	$(MAKE) lint
-	govulncheck ./...
+	$(MAKE) vulncheck
 	$(MAKE) openapi-check
 	$(GOBUILD) $(LDFLAGS) -o /tmp/windshift-ci .
 
@@ -127,6 +127,7 @@ ci-frontend: ci-tools-check
 	cd $(FRONTEND_DIR) && npm ci
 	cd $(FRONTEND_DIR) && npm audit signatures --min-release-age=0
 	cd $(FRONTEND_DIR) && npm run check
+	cd $(FRONTEND_DIR) && npm run check:inline-styles
 	cd $(FRONTEND_DIR) && npm run typecheck
 	cd $(FRONTEND_DIR) && npm run build
 
@@ -196,8 +197,15 @@ lint:
 	@scripts/run-golangci-lint.sh run --timeout=5m
 	@node scripts/check-sql-boolean-literals.mjs
 	@node scripts/check-audit-literals.mjs
+	@node scripts/generate-i18n-catalog.mjs --check
 	@bash scripts/check-layering.sh
 	@bash scripts/check-handler-db-access.sh
+	@bash scripts/check-deprecated-v1-api.sh
+
+# Vulnerability scan with a documented accepted-risk list (see
+# scripts/check-vulnerabilities.sh). New findings still fail the build.
+vulncheck:
+	@bash scripts/check-vulnerabilities.sh
 
 # Install git hooks
 hooks:

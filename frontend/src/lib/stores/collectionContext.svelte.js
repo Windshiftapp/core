@@ -2,6 +2,7 @@ import { collections } from '../api/collections.js';
 import { items as itemsApi } from '../api/items.js';
 import { BACKGROUND_READ, FOREGROUND_READ } from '../api/readScheduler.js';
 import { normalizeCompletedLimit } from '../features/collections/boardConfigPayload.js';
+import { collectionSubFilterQL } from '../features/collections/collectionFilters.js';
 import {
   fetchCollectionBacklog,
   fetchCollectionItemChanges,
@@ -10,10 +11,15 @@ import {
   fetchItemsById,
   getCollection,
 } from '../features/collections/collectionService.js';
+import {
+  buildHierarchyLevels,
+  defaultHierarchyLevel,
+} from '../features/collections/hierarchyLevels.js';
 import { currentRoute, GLOBAL_COLLECTION_VIEWS } from '../router.js';
 import { isExpectedBackgroundSyncError } from '../utils/backgroundSync.js';
 import { calcHasMore } from '../utils/paginationUtils.js';
 import { collectionPreferences } from './collectionPreferences.svelte.js';
+import { surfaceError } from './toasts.svelte.js';
 import { workspaceDataStore } from './workspaceDataStore.svelte.js';
 
 const COLLECTION_VIEWS = new Set([
@@ -47,6 +53,9 @@ const TREE_PAGE_SIZE = 100;
 const LARGE_COLLECTION_PAGE_SIZE = 250;
 const BOARD_UNFINISHED_PAGE_SIZE = 1000;
 const BOARD_UNTHROTTLED_ITEM_COUNT = 1000;
+// The items API clamps `page_size` to this. A hierarchy refresh that has
+// accumulated more rows than this must replay its pages instead of one request.
+const MAX_ITEMS_PAGE_SIZE = 1000;
 const BOARD_BACKGROUND_PAGE_DELAY_MS = 250;
 const SEARCH_PAGE_SIZE = 100;
 // Local refresh-work-items bursts coalesce into one authoritative delta
@@ -151,10 +160,11 @@ class CollectionStore {
   showCompleted = $state(false);
 
   get effectiveSubFilterQL() {
-    if (this.showCompleted) return this.subFilterQL;
-    return this.subFilterQL
-      ? `(${this.subFilterQL}) AND status_completed = false`
-      : 'status_completed = false';
+    return collectionSubFilterQL(this.subFilterQL, { hideCompleted: !this.showCompleted });
+  }
+
+  get effectiveBacklogSubFilterQL() {
+    return collectionSubFilterQL(this.subFilterQL, { hideCompleted: false });
   }
 
   #completionPreferenceKey(wsId, colId, view) {
@@ -203,15 +213,90 @@ class CollectionStore {
 
   /**
    * Select the item-type hierarchy level for a hierarchy view and reload the
-   * level-scoped base page. The picker persists the choice per scope.
+   * level-scoped base page. Persists the choice per scope so the next load
+   * applies it before the first item fetch.
    */
   setHierarchyLevel(level) {
     const normalized = Number.isFinite(Number(level)) ? Number(level) : null;
     if (normalized === this.hierarchyLevel) return;
     this.hierarchyLevel = normalized;
+    if (normalized != null)
+      this.#persistHierarchyLevel(this.#wsId, this.#colId, this.#currentView, normalized);
     if (this.#wsId || this.#colId) {
       this.load(this.#wsId, this.#colId, this.#currentView);
     }
+  }
+
+  #persistHierarchyLevel(wsId, colId, view, level) {
+    if (level == null || (!wsId && !colId)) return;
+    collectionPreferences.patchViewState(wsId, colId, view?.split('-').at(-1), {
+      hierarchy_level: level,
+    });
+  }
+
+  /**
+   * Filtered level counts for a scope, cached and single-flight. A different
+   * workspace, collection, or sub-filter is a different scope and starts fresh,
+   * so counts cannot leak across workspace boundaries.
+   */
+  ensureLevelCounts(wsId = this.#wsId, colId = this.#colId, subQl = this.effectiveSubFilterQL) {
+    const scope = `${wsId ?? ''}|${colId ?? ''}|${subQl ?? ''}`;
+    if (this.#levelCountsScope === scope) {
+      if (this.#levelCountsLoaded) return Promise.resolve(this.levelCounts);
+      if (this.#levelCountsPromise) return this.#levelCountsPromise;
+    }
+
+    this.#levelCountsScope = scope;
+    this.#levelCountsLoaded = false;
+    this.levelCounts = [];
+    this.levelCountsLoading = true;
+
+    const promise = itemsApi
+      .getLevelCounts(
+        {
+          workspace_id: wsId || undefined,
+          collection_id: colId || undefined,
+          sub_ql: subQl || undefined,
+        },
+        { readPolicy: { priority: 'background' } }
+      )
+      .then((result) => {
+        if (this.#levelCountsScope !== scope) return this.levelCounts;
+        this.levelCounts = Array.isArray(result) ? result : [];
+        this.#levelCountsLoaded = true;
+        return this.levelCounts;
+      })
+      .catch((error) => {
+        // Leave the scope unloaded so a later mount retries instead of pinning
+        // an empty level set for the session. Background work with a visible
+        // fallback, so log without a toast.
+        if (this.#levelCountsScope === scope) this.levelCounts = [];
+        surfaceError(error, { context: 'collectionStore', silent: true });
+        return this.levelCounts;
+      })
+      .finally(() => {
+        if (this.#levelCountsPromise === promise) {
+          this.#levelCountsPromise = null;
+          if (this.#levelCountsScope === scope) this.levelCountsLoading = false;
+        }
+      });
+    this.#levelCountsPromise = promise;
+    return promise;
+  }
+
+  /**
+   * Resolve a hierarchy level before the first item fetch when the scope has
+   * no stored choice. Resolving here instead of after the item page prevents a
+   * mixed-level page from painting first.
+   */
+  async #ensureHierarchyLevel(wsId, colId, view, loadId) {
+    if (this.hierarchyLevel != null) return;
+    const counts = await this.ensureLevelCounts(wsId, colId, this.effectiveSubFilterQL);
+    if (loadId !== this.#loadId) return;
+    const level = defaultHierarchyLevel(buildHierarchyLevels(workspaceDataStore.itemTypes, counts));
+    if (level == null) return;
+    this.hierarchyLevel = level;
+    this.#persistHierarchyLevel(wsId, colId, view, level);
   }
 
   // Server-side sort state
@@ -228,6 +313,11 @@ class CollectionStore {
   // view resolves a persisted or default level; hierarchy item fetches are
   // level-scoped and opt into has_children while it is set.
   hierarchyLevel = $state(null);
+  // Filtered level counts for the active scope, shared by the picker and the
+  // default-level resolution. Cached per scope so remounting a hierarchy view
+  // does not re-issue the lookup.
+  levelCounts = $state([]);
+  levelCountsLoading = $state(false);
 
   // Internal tracking
   #wsId = null;
@@ -245,6 +335,9 @@ class CollectionStore {
   #reconcileTimer = null;
   #reconcileInFlight = null;
   #reconcilePending = false;
+  #levelCountsScope = null;
+  #levelCountsPromise = null;
+  #levelCountsLoaded = false;
 
   constructor() {
     this.#unsubscribe = currentRoute.subscribe(($route) => {
@@ -367,6 +460,13 @@ class CollectionStore {
       this.#countPendingGeneration = -1;
       this.#countDirty = false;
       this.clearSearch();
+      // Level counts are scope-owned; dropping them here keeps another
+      // workspace's levels from painting during the next load.
+      this.levelCounts = [];
+      this.levelCountsLoading = false;
+      this.#levelCountsScope = null;
+      this.#levelCountsPromise = null;
+      this.#levelCountsLoaded = false;
     }
     this.#wsId = wsId;
     this.#colId = colId;
@@ -377,12 +477,16 @@ class CollectionStore {
     this.loading = true;
 
     try {
+      // Hierarchy views are always rooted at one level. Resolve and persist it
+      // before the item page so an unscoped mixed-level page never paints.
+      if (HIERARCHY_VIEWS.has(view)) {
+        await this.#ensureHierarchyLevel(wsId, colId, view, loadId);
+        if (loadId !== this.#loadId) return;
+      }
       const boardPartition = await this.#resolveBoardPartition(wsId, colId, view);
-      const collection = colId
-        ? BOARD_VIEWS.has(view)
-          ? (this.boardCollection ?? (await getCollection(colId)))
-          : await getCollection(colId)
-        : null;
+      // Reuse the collection already fetched for this scope. A hierarchy level
+      // change reloads the item page and must not repeat the metadata read.
+      const collection = colId ? (this.boardCollection ?? (await getCollection(colId))) : null;
       if (loadId !== this.#loadId) return; // stale
       // Keep the collection record available to view-scoped controls (shared
       // named views, configure affordances) on every collection view, not just
@@ -404,7 +508,7 @@ class CollectionStore {
           ? fetchCollectionBacklog(wsId, colId, {
               page: 1,
               limit: DEFAULT_PAGE_SIZE,
-              sub_ql: this.effectiveSubFilterQL || undefined,
+              sub_ql: this.effectiveBacklogSubFilterQL || undefined,
               collection,
               requestOptions: FOREGROUND_READ,
             })
@@ -424,8 +528,12 @@ class CollectionStore {
         collection,
       });
       this.dataGeneration += 1;
-      // The count is not needed to paint rows; fetch it after they are visible.
-      void this.#requestCollectionTotal();
+      // The count is scope-scoped, not filter-scoped: only a scope change needs
+      // a read. A same-scope reload (level, sub-filter, completed visibility)
+      // keeps the value it already has, and mutations refresh it directly.
+      if (!sameCollection) {
+        void this.#requestCollectionTotal();
+      }
       if (itemsResult && BOARD_VIEWS.has(view)) {
         void this.#loadRemainingBoardItems({
           first: itemsResult,
@@ -782,16 +890,51 @@ class CollectionStore {
     isBoard,
     page = 1
   ) {
+    // A hierarchy view accumulates pages. While the loaded set fits one request
+    // it reloads from page 1 in one go; past the API page cap it replays the
+    // accumulated pages with the view's own page size, so the pagination cursor
+    // stays aligned with the loaded set instead of offsetting past it.
+    const replaysHierarchyPages =
+      !isBoard && HIERARCHY_VIEWS.has(this.#currentView) && limit > MAX_ITEMS_PAGE_SIZE;
+    const firstLimit = replaysHierarchyPages ? initialItemsPageSize(this.#currentView) : limit;
     const first = await this.#fetchMainItems(
       wsId,
       colId,
-      limit,
+      firstLimit,
       boardPartition,
       collection,
       isBoard,
       page
     );
     const totalPages = first.pagination?.total_pages ?? 1;
+
+    if (replaysHierarchyPages) {
+      const target = Math.min(limit, first.pagination?.total_items ?? limit);
+      const pages = [first];
+      let loadedCount = first.items.length;
+      for (let next = 2; loadedCount < target && next <= totalPages; next += 1) {
+        if (loadId !== this.#loadId) return first;
+        const result = await this.#fetchMainItems(
+          wsId,
+          colId,
+          firstLimit,
+          boardPartition,
+          collection,
+          false,
+          next
+        );
+        if (result.items.length === 0) break;
+        pages.push(result);
+        loadedCount += result.items.length;
+      }
+      return {
+        ...first,
+        items: pages.flatMap((result) => result.items),
+        pagination: pages.at(-1).pagination,
+        watermark: snapshotWatermark(...pages),
+      };
+    }
+
     if (!isBoard || totalPages <= 1) return first;
 
     const pages = [first];
@@ -1032,7 +1175,7 @@ class CollectionStore {
       const result = await fetchCollectionBacklog(this.#wsId, this.#colId, {
         page: nextPage,
         limit: this.backlogPagination?.limit ?? DEFAULT_PAGE_SIZE,
-        sub_ql: this.effectiveSubFilterQL || undefined,
+        sub_ql: this.effectiveBacklogSubFilterQL || undefined,
         requestOptions: BACKGROUND_READ,
       });
 
@@ -1107,8 +1250,12 @@ class CollectionStore {
     const itemsLimit = Math.max(initialItemsPageSize(this.#currentView), this.mainItemsLoadedCount);
     // Page-based list views replace their rows per page, so a background
     // refresh must reload the page the user is on instead of jumping to the
-    // first page. Board views keep starting at page 1 and accumulate.
-    const itemsPage = BOARD_VIEWS.has(this.#currentView) ? 1 : (this.itemsPagination?.page ?? 1);
+    // first page. Board and hierarchy views accumulate their pages, so a
+    // refresh must reload from page 1; otherwise page N with limit = loaded
+    // count offsets past the loaded set and blanks the view.
+    const accumulatesPages =
+      BOARD_VIEWS.has(this.#currentView) || HIERARCHY_VIEWS.has(this.#currentView);
+    const itemsPage = accumulatesPages ? 1 : (this.itemsPagination?.page ?? 1);
     const backlogLimit = Math.max(DEFAULT_PAGE_SIZE, this.backlogItems.length);
 
     try {
@@ -1143,7 +1290,7 @@ class CollectionStore {
               this.#wsId,
               this.#colId,
               backlogLimit,
-              this.effectiveSubFilterQL || undefined,
+              this.effectiveBacklogSubFilterQL || undefined,
               collection,
               loadId
             )
@@ -1369,7 +1516,10 @@ class CollectionStore {
 
       const changes = await fetchCollectionItemChanges(this.#wsId, this.#colId, {
         since: this.#changesWatermark,
-        sub_ql: this.effectiveSubFilterQL || undefined,
+        sub_ql:
+          (BACKLOG_VIEWS.has(this.#currentView)
+            ? this.effectiveBacklogSubFilterQL
+            : this.effectiveSubFilterQL) || undefined,
       });
       if (loadId !== this.#loadId) return false;
       const nextWatermark = changes?.watermark ?? this.#changesWatermark;
@@ -1448,7 +1598,10 @@ class CollectionStore {
     const wsId = this.#wsId;
     const colId = this.#colId;
     const changes = await fetchCollectionItemChanges(wsId, colId, {
-      sub_ql: this.effectiveSubFilterQL || undefined,
+      sub_ql:
+        (BACKLOG_VIEWS.has(this.#currentView)
+          ? this.effectiveBacklogSubFilterQL
+          : this.effectiveSubFilterQL) || undefined,
     });
     if (loadId !== this.#loadId || wsId !== this.#wsId || colId !== this.#colId) return;
     this.#changesWatermark = changes?.watermark ?? 0;
@@ -1465,6 +1618,9 @@ class CollectionStore {
   }
 
   #hideCompletedItem(item) {
+    // Backlog membership is defined by the configured status IDs, which may
+    // intentionally include completed statuses.
+    if (BACKLOG_VIEWS.has(this.#currentView)) return false;
     if (this.showCompleted) return false;
     const status =
       workspaceDataStore.statuses.find((candidate) => candidate.id === item.status_id) ??

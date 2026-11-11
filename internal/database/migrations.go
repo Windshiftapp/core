@@ -9,7 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/lib/pq"
 )
@@ -2504,6 +2507,69 @@ var Catalog = []Migration{
 		Postgres:        notificationDigestLinksMigration,
 	},
 	{
+		Version:       "20261121_notification_template_customized",
+		Name:          "Track admin-customized email templates so localized defaults apply (WI-2034)",
+		CheckSQLite:   sqliteColumnCheck("notification_templates", "is_customized"),
+		CheckPostgres: pgColumnCheck("notification_templates", "is_customized"),
+		SQLite: `
+			ALTER TABLE notification_templates ADD COLUMN is_customized BOOLEAN NOT NULL DEFAULT FALSE;
+			UPDATE notification_templates SET is_customized = TRUE WHERE updated_at > created_at;
+		`,
+		Postgres: `
+			ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS is_customized BOOLEAN NOT NULL DEFAULT false;
+			UPDATE notification_templates SET is_customized = true WHERE updated_at > created_at;
+		`,
+	},
+	{
+		Version:       "20261122_portal_customer_language",
+		Name:          "Store portal customer language and timezone preferences (WI-2034)",
+		CheckSQLite:   sqliteColumnCheck("portal_customers", "language"),
+		CheckPostgres: pgColumnCheck("portal_customers", "language"),
+		SQLite: `
+			ALTER TABLE portal_customers ADD COLUMN language TEXT;
+			ALTER TABLE portal_customers ADD COLUMN timezone TEXT;
+		`,
+		Postgres: `
+			ALTER TABLE portal_customers ADD COLUMN IF NOT EXISTS language TEXT;
+			ALTER TABLE portal_customers ADD COLUMN IF NOT EXISTS timezone TEXT;
+		`,
+	},
+	{
+		Version:       "20261123_notification_template_translations",
+		Name:          "Store per-locale overrides for built-in email templates (WI-2034)",
+		CheckSQLite:   sqliteTableCheck("notification_template_translations"),
+		CheckPostgres: pgTableCheck("notification_template_translations"),
+		SQLite: `
+			CREATE TABLE notification_template_translations (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				template_id INTEGER NOT NULL,
+				locale TEXT NOT NULL,
+				subject TEXT,
+				content TEXT,
+				text_body TEXT,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(template_id, locale),
+				FOREIGN KEY (template_id) REFERENCES notification_templates(id) ON DELETE CASCADE
+			);
+			CREATE INDEX idx_notification_template_translations_template ON notification_template_translations(template_id);
+		`,
+		Postgres: `
+			CREATE TABLE IF NOT EXISTS notification_template_translations (
+				id SERIAL PRIMARY KEY,
+				template_id INTEGER NOT NULL,
+				locale TEXT NOT NULL,
+				subject TEXT,
+				content TEXT,
+				text_body TEXT,
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(template_id, locale),
+				FOREIGN KEY (template_id) REFERENCES notification_templates(id) ON DELETE CASCADE
+			);
+		`,
+	},
+	{
 		Version:       "20261015_request_types_kind",
 		Name:          "Add system intake kind to request types (WI-1644)",
 		CheckSQLite:   sqliteColumnCheck("request_types", "kind"),
@@ -3144,7 +3210,6 @@ var Catalog = []Migration{
 		ApplyPostgres: applyItemSearchIndexPostgres,
 	},
 	{
-
 		Version: "20261117_time_project_customer_backfill",
 		Name:    "Backfill NULL time-project customers to the no-customer placeholder",
 		// Effect present when no project lacks a customer. Projects written before
@@ -3181,7 +3246,94 @@ var Catalog = []Migration{
 		`,
 	},
 	{
-		Version:       "20261119_plane_import_mappings",
+		Version:       "20261119_workflow_transition_screen",
+		Name:          "Attach a screen to a workflow transition",
+		CheckSQLite:   sqliteColumnCheck("workflow_transitions", "screen_id"),
+		CheckPostgres: pgColumnCheck("workflow_transitions", "screen_id"),
+		// A transition has at most one screen, so the binding is a nullable FK on
+		// the topology row. ON DELETE RESTRICT means an in-use screen cannot be
+		// deleted and silently drop a gate; the admin unbinds instead.
+		SQLite: `
+			ALTER TABLE workflow_transitions ADD COLUMN screen_id INTEGER REFERENCES screens(id) ON DELETE RESTRICT;
+			CREATE INDEX IF NOT EXISTS idx_workflow_transitions_screen_id ON workflow_transitions(screen_id);
+		`,
+		Postgres: `
+			ALTER TABLE workflow_transitions ADD COLUMN IF NOT EXISTS screen_id INTEGER REFERENCES screens(id) ON DELETE RESTRICT;
+			CREATE INDEX IF NOT EXISTS idx_workflow_transitions_screen_id ON workflow_transitions(screen_id);
+		`,
+	},
+	{
+		Version:         "20261120_customer_cfv_numeric_keys",
+		Name:            "Key portal customer/organisation custom field values by field id",
+		CheckSQLiteFn:   checkCustomerCFVNumericKeys,
+		CheckPostgresFn: checkCustomerCFVNumericKeys,
+		SQLite:          "applyCustomerCFVNumericKeys:v1",
+		Postgres:        "applyCustomerCFVNumericKeys:v1",
+		ApplySQLite:     applyCustomerCFVNumericKeys,
+		ApplyPostgres:   applyCustomerCFVNumericKeys,
+	},
+	{
+		Version:       "20261120_integration_oauth_pkce_refresh",
+		Name:          "Add PKCE and refresh-token support to the integration OAuth framework",
+		CheckSQLite:   sqliteColumnCheck("integration_oauth_state", "code_verifier"),
+		CheckPostgres: pgColumnCheck("integration_oauth_state", "code_verifier"),
+		// Public-client providers (Docmost) need a PKCE verifier on the state row
+		// and refresh/expiry on the per-user token. Existing confidential-client
+		// providers (Notion, Todoist) leave the new token columns NULL.
+		SQLite: `
+			ALTER TABLE integration_oauth_state ADD COLUMN code_verifier TEXT;
+			ALTER TABLE user_integration_tokens ADD COLUMN encrypted_refresh_token TEXT;
+			ALTER TABLE user_integration_tokens ADD COLUMN expires_at DATETIME;
+			ALTER TABLE user_integration_tokens ADD COLUMN scopes TEXT;
+			ALTER TABLE user_integration_tokens ADD COLUMN refresh_lock_until DATETIME;
+			ALTER TABLE user_integration_tokens ADD COLUMN refresh_claim_owner TEXT;
+			ALTER TABLE user_integration_tokens ADD COLUMN auth_method TEXT NOT NULL DEFAULT 'oauth';
+			ALTER TABLE user_integration_tokens ADD COLUMN invalidated_at DATETIME;
+		`,
+		Postgres: `
+			ALTER TABLE integration_oauth_state ADD COLUMN IF NOT EXISTS code_verifier TEXT;
+			ALTER TABLE user_integration_tokens ADD COLUMN IF NOT EXISTS encrypted_refresh_token TEXT;
+			ALTER TABLE user_integration_tokens ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+			ALTER TABLE user_integration_tokens ADD COLUMN IF NOT EXISTS scopes TEXT;
+			ALTER TABLE user_integration_tokens ADD COLUMN IF NOT EXISTS refresh_lock_until TIMESTAMPTZ;
+			ALTER TABLE user_integration_tokens ADD COLUMN IF NOT EXISTS refresh_claim_owner TEXT;
+			ALTER TABLE user_integration_tokens ADD COLUMN IF NOT EXISTS auth_method TEXT NOT NULL DEFAULT 'oauth';
+			ALTER TABLE user_integration_tokens ADD COLUMN IF NOT EXISTS invalidated_at TIMESTAMPTZ;
+		`,
+	},
+	{
+		Version:       "20261121_item_due_reminders_delivered",
+		Name:          "Track whether a due-date reminder was delivered so skipped candidates can be retried",
+		CheckSQLite:   sqliteColumnCheck("item_due_reminders", "delivered"),
+		CheckPostgres: pgColumnCheck("item_due_reminders", "delivered"),
+		// Existing rows predate the distinction and are treated as delivered so
+		// the sweep keeps its previous behavior. New skipped rows carry
+		// delivered=false and are retried after the retry backoff.
+		SQLite: `
+			ALTER TABLE item_due_reminders ADD COLUMN delivered BOOLEAN NOT NULL DEFAULT TRUE;
+		`,
+		Postgres: `
+			ALTER TABLE item_due_reminders ADD COLUMN IF NOT EXISTS delivered BOOLEAN NOT NULL DEFAULT TRUE;
+		`,
+	},
+	{
+		Version:       "20261121_theme_branding",
+		Name:          "Add full-logo and brand layout columns to themes",
+		CheckSQLite:   sqliteColumnCheck("themes", "brand_layout"),
+		CheckPostgres: pgColumnCheck("themes", "brand_layout"),
+		SQLite: `
+			ALTER TABLE themes ADD COLUMN logo_full_url TEXT;
+			ALTER TABLE themes ADD COLUMN logo_full_url_dark TEXT;
+			ALTER TABLE themes ADD COLUMN brand_layout TEXT NOT NULL DEFAULT 'mark_text';
+		`,
+		Postgres: `
+			ALTER TABLE themes ADD COLUMN IF NOT EXISTS logo_full_url TEXT;
+			ALTER TABLE themes ADD COLUMN IF NOT EXISTS logo_full_url_dark TEXT;
+			ALTER TABLE themes ADD COLUMN IF NOT EXISTS brand_layout TEXT NOT NULL DEFAULT 'mark_text';
+		`,
+	},
+	{
+		Version:       "20261122_plane_import_mappings",
 		Name:          "External-id map for the Plane importer (idempotent re-runs, provenance)",
 		CheckSQLite:   `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='plane_import_mappings'`,
 		CheckPostgres: `SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='plane_import_mappings'`,
@@ -3210,6 +3362,207 @@ CREATE TABLE IF NOT EXISTS plane_import_mappings (
 );
 CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_mappings(workspace_id, entity_type, windshift_id);`,
 	},
+}
+
+// isNumericJSONKey reports whether a custom-field value key is a numeric field
+// id (the canonical form) rather than a legacy name key.
+func isNumericJSONKey(key string) bool {
+	_, err := strconv.Atoi(key)
+	return err == nil
+}
+
+// checkCustomerCFVNumericKeys reports whether every stored customer custom-field
+// value is already keyed by numeric field id (nothing left to migrate). Fresh
+// installs have no rows, so the migration is stamped without running.
+func checkCustomerCFVNumericKeys(db Database) (bool, error) {
+	for _, table := range []string{"portal_customers", "customer_organisations"} {
+		rows, err := db.Query(fmt.Sprintf(`SELECT custom_field_values FROM %s
+			WHERE custom_field_values IS NOT NULL
+			  AND CAST(custom_field_values AS TEXT) != ''`, table))
+		if err != nil {
+			return false, fmt.Errorf("check %s custom field values: %w", table, err)
+		}
+		for rows.Next() {
+			var raw sql.NullString
+			if err := rows.Scan(&raw); err != nil {
+				_ = rows.Close()
+				return false, fmt.Errorf("scan %s custom field values: %w", table, err)
+			}
+			if !raw.Valid || raw.String == "" {
+				continue
+			}
+			decoder := json.NewDecoder(strings.NewReader(raw.String))
+			decoder.UseNumber()
+			var cfv map[string]any
+			if err := decoder.Decode(&cfv); err != nil {
+				continue
+			}
+			for key := range cfv {
+				if !isNumericJSONKey(key) {
+					_ = rows.Close()
+					return false, nil
+				}
+			}
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return false, fmt.Errorf("iterate %s custom field values: %w", table, err)
+		}
+		_ = rows.Close()
+	}
+	return true, nil
+}
+
+// applyCustomerCFVNumericKeys rewrites portal_customers.custom_field_values and
+// customer_organisations.custom_field_values from name keys to numeric field-id
+// keys (WI-2025). The legacy name key is kept as a downgrade mirror for fields
+// whose name is unique in the scope; ambiguous and orphan names are left
+// untouched. Idempotent: a second pass finds only numeric keys and no-ops.
+func applyCustomerCFVNumericKeys(db Database) error {
+	indexByTable := map[string]map[string][]int{
+		"portal_customers":       {},
+		"customer_organisations": {},
+	}
+	nameByID := map[int]string{}
+
+	rows, err := db.Query(`SELECT id, name, applies_to_portal_customers, applies_to_customer_organisations FROM custom_field_definitions`)
+	if err != nil {
+		return fmt.Errorf("load custom fields: %w", err)
+	}
+	for rows.Next() {
+		var id int
+		var name string
+		var portal, org sql.NullBool
+		if err := rows.Scan(&id, &name, &portal, &org); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("scan custom field: %w", err)
+		}
+		nameByID[id] = name
+		lower := strings.ToLower(name)
+		if portal.Valid && portal.Bool {
+			indexByTable["portal_customers"][lower] = append(indexByTable["portal_customers"][lower], id)
+		}
+		if org.Valid && org.Bool {
+			indexByTable["customer_organisations"][lower] = append(indexByTable["customer_organisations"][lower], id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return fmt.Errorf("iterate custom fields: %w", err)
+	}
+	_ = rows.Close()
+
+	for _, table := range []string{"portal_customers", "customer_organisations"} {
+		if err := migrateCustomerCFVTable(db, table, indexByTable[table], nameByID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// migrateCustomerCFVTable migrates one JSON column in keyset-paginated batches.
+func migrateCustomerCFVTable(db Database, table string, index map[string][]int, nameByID map[int]string) error {
+	const batchSize = 500
+	lastID := 0
+	for {
+		rows, err := db.Query(fmt.Sprintf(`SELECT id, custom_field_values FROM %s
+			WHERE id > ? AND custom_field_values IS NOT NULL
+			  AND CAST(custom_field_values AS TEXT) != ''
+			ORDER BY id ASC LIMIT ?`, table), lastID, batchSize)
+		if err != nil {
+			return fmt.Errorf("read %s custom field values: %w", table, err)
+		}
+
+		type update struct {
+			id    int
+			value string
+		}
+		var updates []update
+		batch := 0
+		for rows.Next() {
+			var id int
+			var raw sql.NullString
+			if err := rows.Scan(&id, &raw); err != nil {
+				_ = rows.Close()
+				return fmt.Errorf("scan %s row: %w", table, err)
+			}
+			batch++
+			lastID = id
+			if !raw.Valid || raw.String == "" {
+				continue
+			}
+
+			decoder := json.NewDecoder(strings.NewReader(raw.String))
+			decoder.UseNumber()
+			var cfv map[string]any
+			if err := decoder.Decode(&cfv); err != nil {
+				// Malformed JSON is left for the read path to skip.
+				continue
+			}
+
+			changed := false
+			// 1. Legacy name keys become id keys; the name key stays as the mirror.
+			for key, value := range cfv {
+				if isNumericJSONKey(key) {
+					continue
+				}
+				ids := index[strings.ToLower(key)]
+				switch len(ids) {
+				case 0:
+					// Orphan (renamed/deleted field): leave alone.
+				case 1:
+					idKey := strconv.Itoa(ids[0])
+					if _, exists := cfv[idKey]; !exists {
+						cfv[idKey] = value
+						changed = true
+					}
+				default:
+					slog.Warn("customer cfv migration: ambiguous custom field name",
+						"table", table, "id", id, "name", key)
+				}
+			}
+			// 2. Refresh unique-name mirrors from the authoritative id keys.
+			for key, value := range cfv {
+				fieldID, err := strconv.Atoi(key)
+				if err != nil {
+					continue
+				}
+				name, ok := nameByID[fieldID]
+				if !ok || len(index[strings.ToLower(name)]) != 1 {
+					continue
+				}
+				if existing, exists := cfv[name]; !exists || !reflect.DeepEqual(existing, value) {
+					cfv[name] = value
+					changed = true
+				}
+			}
+
+			if !changed {
+				continue
+			}
+			encoded, err := json.Marshal(cfv)
+			if err != nil {
+				_ = rows.Close()
+				return fmt.Errorf("encode %s row %d: %w", table, id, err)
+			}
+			updates = append(updates, update{id: id, value: string(encoded)})
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("iterate %s rows: %w", table, err)
+		}
+		_ = rows.Close()
+
+		for _, u := range updates {
+			if _, err := db.Exec(fmt.Sprintf(`UPDATE %s SET custom_field_values = ? WHERE id = ?`, table), u.value, u.id); err != nil {
+				return fmt.Errorf("update %s row %d: %w", table, u.id, err)
+			}
+		}
+
+		if batch < batchSize {
+			return nil
+		}
+	}
 }
 
 // dropTimeWorklogCustomerSQLite rebuilds time_worklogs without the customer_id

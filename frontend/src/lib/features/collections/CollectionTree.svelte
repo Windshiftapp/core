@@ -35,6 +35,7 @@
   import ListCellRenderer from './ListCellRenderer.svelte';
   import ColumnSelector from './ColumnSelector.svelte';
   import CollectionLevelFilter from './CollectionLevelFilter.svelte';
+  import CollectionHierarchyLoadMore from './CollectionHierarchyLoadMore.svelte';
   import ItemKey from '../../components/ItemKey.svelte';
   import { useListColumnConfig } from './listColumnConfig.svelte.js';
   import { useCollectionHierarchy } from '../../composables/useCollectionHierarchy.svelte.js';
@@ -60,6 +61,7 @@
   const hierarchy = useCollectionHierarchy({
     getWorkspaceId: () => workspaceId ?? null,
     getCollectionId: () => collectionId ?? null,
+    getView: () => 'tree',
     getMaxDepth: () => 0,
     getSubFilterQL: () => collectionStore.effectiveSubFilterQL,
   });
@@ -375,7 +377,13 @@
       ? 'title'
       : listColumns[0]?.field_identifier
   );
-  const treeGridOptions = { titleMinWidth: 24, keyWidth: 10 };
+  // The parent-reference chip needs a wider key track, but only when a row
+  // actually shows one; otherwise the default key width keeps the row compact.
+  let hasParentReferences = $derived(allItems.some((item) => parentReference(item) != null));
+  let treeGridOptions = $derived({
+    titleMinWidth: 24,
+    keyWidth: hasParentReferences ? 10 : undefined,
+  });
   let gridTemplateColumns = $derived(listGridTemplateColumns(listColumns, treeGridOptions));
   let gridMinWidth = $derived(listGridMinWidth(listColumns, treeGridOptions));
 </script>
@@ -435,6 +443,7 @@
       href="#view-test-case"
       onClick={(e) => handleTestCaseClick(e, item.id, item.testCaseData?.workspaceId)}
       class="block text-left w-full text-sm transition-colors truncate cursor-pointer text-ds-text-accent-green hover:opacity-80"
+      dir="auto"
     >
       {item.title}
     </LinkComponent>
@@ -469,7 +478,7 @@
       <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-4">
           <SubFilterBar {workspaceId} {collectionId} />
-          <CollectionLevelFilter {workspaceId} {collectionId} view="tree" />
+          <CollectionLevelFilter {workspaceId} {collectionId} />
         </div>
         <div class="flex items-center gap-2">
           <ColumnSelector
@@ -493,6 +502,7 @@
         <div class="flex justify-between items-center mb-4">
           <div class="flex items-center gap-2">
             <button
+              data-testid="tree-expand-toggle"
               class="flex items-center gap-2 px-3 py-2 text-sm border rounded-md transition-colors"
               style="{styles.glassStyle(12)} {styles.glassTextStyle}"
               onclick={toggleExpandCollapse}
@@ -509,6 +519,8 @@
             <!-- Test Case Toggle Button (only show if module enabled) -->
             {#if $moduleSettings.test_management_enabled}
               <button
+                data-testid="tree-show-tests"
+                aria-pressed={showTestCases}
                 class="flex items-center gap-2 px-3 py-2 text-sm border rounded-md transition-colors"
                 style="{styles.glassStyle(12)} {showTestCases ? 'color: var(--ds-accent-green);' : styles.glassTextStyle}"
                 onclick={toggleShowTestCases}
@@ -666,6 +678,7 @@
         </div>
       </div>
 
+        <CollectionHierarchyLoadMore testid="tree-load-more" />
       {/if}
   </StaticViewBackground>
 {:else}

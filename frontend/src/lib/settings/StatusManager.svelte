@@ -76,7 +76,6 @@
     } else {
       await statusesApi.create(formData);
     }
-    window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
   }
 
   async function deleteStatus(status) {
@@ -91,7 +90,6 @@
       return;
     }
     await statusesApi.delete(status.id);
-    window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
   }
 
   function getCategoryColor(categoryId) {

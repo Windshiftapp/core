@@ -73,12 +73,10 @@
     } else {
       await prioritiesApi.create(formData);
     }
-    window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
   }
 
   async function deletePriority(priority) {
     await prioritiesApi.delete(priority.id);
-    window.dispatchEvent(new CustomEvent('refresh-workspace-data'));
   }
 
   const priorityColumns = [

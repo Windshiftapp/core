@@ -17,17 +17,20 @@ import (
 )
 
 const (
-	DurableNotificationCompatibilityEvent = "notification.requested.v1"
+	DurableNotificationRequestedEvent = "notification.requested.v1"
 
-	DurableNotificationCompatibilityConsumerKey = "notifications.compatibility.v1"
-	DurableItemNotificationConsumerKey          = "notifications.items.v1"
+	// Consumer key strings keep their historic names so an upgrade does not
+	// re-deliver notifications that were already processed.
+	DurableNotificationRequestedConsumerKey = "notifications.compatibility.v1"
+	DurableItemNotificationConsumerKey      = "notifications.items.v1"
 
 	durableItemNotificationCutoverKey = "notifications.items.canonical.v1"
 )
 
-// DurableNotificationIngress journals notification types that do not yet have
-// a canonical mutation event. Canonical item events are admitted in their
-// source transaction after the cutover.
+// DurableNotificationIngress journals notifications that have no canonical
+// mutation event of their own (approvals, SLA, reminders, comment edits). Item
+// notifications are derived from canonical item facts and are not journaled
+// here.
 type DurableNotificationIngress struct {
 	engine    *events.Engine
 	canonical bool
@@ -41,10 +44,11 @@ func (i *DurableNotificationIngress) Emit(ctx context.Context, notificationEvent
 		return nil
 	}
 	workspaceID := notificationEvent.WorkspaceID
-	input, err := actionevents.NewCompatibilityEvent(actionevents.CompatibilityInput{
+	input, err := actionevents.NewSideEffectEvent(actionevents.SideEffectInput{
 		Payload: notificationEvent, WorkspaceID: &workspaceID,
 		AggregateType: "notification_item", AggregateID: fmt.Sprint(notificationEvent.ItemID),
-		EventType: DurableNotificationCompatibilityEvent, ActorUserID: notificationEvent.ActorUserID,
+		EventType: DurableNotificationRequestedEvent, ActorUserID: notificationEvent.ActorUserID,
+		ActorKind: notificationEvent.ActorKind, SourceKind: notificationEvent.SourceKind,
 	})
 	if err != nil {
 		return fmt.Errorf("encode durable notification event: %w", err)
@@ -75,13 +79,13 @@ func PrepareDurableNotificationEngine(ctx context.Context, engine *events.Engine
 		Key: DurableItemNotificationConsumerKey, HandlerVersion: 1,
 		EventTypes: []string{itemevents.Created, itemevents.Updated, itemevents.StatusChanged, itemevents.Deleted, itemevents.CommentCreated, itemevents.Linked, itemevents.Unlinked},
 	}, events.Consumer{
-		Key: DurableNotificationCompatibilityConsumerKey, HandlerVersion: 1,
-		Active: true, StartEventID: 1, EventTypes: []string{DurableNotificationCompatibilityEvent},
+		Key: DurableNotificationRequestedConsumerKey, HandlerVersion: 1,
+		Active: true, StartEventID: 1, EventTypes: []string{DurableNotificationRequestedEvent},
 	}); err != nil {
 		return err
 	}
 	handler := &DurableNotificationConsumer{db: notifications.db, notifications: notifications}
-	for _, key := range []string{DurableNotificationCompatibilityConsumerKey, DurableItemNotificationConsumerKey} {
+	for _, key := range []string{DurableNotificationRequestedConsumerKey, DurableItemNotificationConsumerKey} {
 		if err := engine.RegisterHandler(key, handler); err != nil {
 			return err
 		}
@@ -113,7 +117,16 @@ func (c *DurableNotificationConsumer) notificationEvents(ctx context.Context, ev
 	if event.PayloadVersion != 1 {
 		return nil, events.Permanent(fmt.Errorf("unsupported notification event %s payload version %d", event.Type, event.PayloadVersion))
 	}
-	if event.Type == DurableNotificationCompatibilityEvent {
+	// Imported facts are historical: never turn them into live notifications.
+	if itemevents.IsImportOrigin(event.ActorKind, event.SourceKind) {
+		return nil, nil
+	}
+	// External reconciliation and other machine-driven writes mark their facts
+	// explicitly so a canonical event can still skip live notifications.
+	if itemevents.SuppressesSideEffects(event.Type, event.Payload) {
+		return nil, nil
+	}
+	if event.Type == DurableNotificationRequestedEvent {
 		var notificationEvent NotificationEvent
 		if err := json.Unmarshal(event.Payload, &notificationEvent); err != nil {
 			return nil, events.Permanent(fmt.Errorf("decode durable notification event: %w", err))

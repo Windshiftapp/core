@@ -241,7 +241,6 @@
       testid: 'workspace-collection-option-default',
       title: `${workspaceName} — ${t('collections.allItems')}`,
       badge: currentCollectionId === null ? '✓' : null,
-      badgeClass: currentCollectionId === null ? '' : '',
       badgeStyle: currentCollectionId === null ? 'color: var(--ds-text-link);' : 'color: var(--ds-text-subtlest);',
       style: currentCollectionId === null ? 'background-color: var(--ds-background-selected); color: var(--ds-text); font-weight: 600;' : '',
       onClick: () => selectCollection(null)
@@ -256,7 +255,6 @@
         title: collection.name,
         subtitle: collection.description || undefined,
         badge: currentCollectionId == collection.id ? '✓' : null,
-        badgeClass: currentCollectionId == collection.id ? '' : '',
         badgeStyle: currentCollectionId == collection.id ? 'color: var(--ds-text-link);' : 'color: var(--ds-text-subtlest);',
         style: currentCollectionId == collection.id ? 'background-color: var(--ds-background-selected); color: var(--ds-text); font-weight: 600;' : '',
         onClick: () => selectCollection(collection)

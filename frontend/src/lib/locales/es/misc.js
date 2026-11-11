@@ -262,6 +262,7 @@ export default {
     backToIterations: 'Volver a iteraciones',
     filterByIteration: 'Filtrar por iteración',
     addGlobalIteration: 'Agregar iteración',
+    showCompletedIterations: 'Mostrar iteraciones completadas',
 
     // Status
     status: {
@@ -454,6 +455,8 @@ export default {
 
     // Image preview
     failedToDownload: 'No se pudo descargar el archivo',
+    hideFromCustomer: 'Ocultar al cliente',
+    showToCustomer: 'Mostrar al cliente',
     editDiagram: 'Editar diagrama',
     untitledDiagram: 'Diagrama sin título',
     diagram: 'diagrama',

@@ -221,7 +221,9 @@ func (r *ItemRepository) HierarchyDescendantsContext(ctx context.Context, params
 		return nil, fmt.Errorf("failed to iterate hierarchy descendants: %w", err)
 	}
 	for i := range groups {
-		groups[i].HasMore = groups[i].Total > len(groups[i].Items)
+		// The page skipped perRootOffset rows, so more remain only when the
+		// total exceeds what has been served so far.
+		groups[i].HasMore = groups[i].Total > perRootOffset+len(groups[i].Items)
 	}
 	return groups, nil
 }
