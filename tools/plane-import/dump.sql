@@ -1,6 +1,7 @@
 -- plane-import dumper: JSONL import contract from Plane's own PostgreSQL DB.
 --
--- Run against the Plane database with psql 10+. It is ONE SELECT, so with
+-- Run against the Plane database with psql 12+ (the params CTE uses AS
+-- MATERIALIZED, added in PostgreSQL 12). It is ONE SELECT, so with
 -- -q -t -A stdout is exactly one JSON record per line. Record order: meta,
 -- users, issues (ascending sequence_id, soft-deleted rows included so their
 -- numbers stay reserved), comments, states, labels.

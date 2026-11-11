@@ -160,10 +160,15 @@ func (l *Loader) convergeIssue(i *Issue, itemID int, q rowQuerier, w writer) err
 // their call — and labels the contract never defined are reported, not
 // invented.
 func (l *Loader) attachIssueLabels(planeIDs []string, itemID int, q rowQuerier, w writer) error {
+	seen := map[string]struct{}{}
 	for _, planeID := range planeIDs {
+		if _, dup := seen[planeID]; dup {
+			continue
+		}
+		seen[planeID] = struct{}{}
 		labelID, ok := l.labelByPlane[planeID]
 		if !ok {
-			l.report.Collisions = append(l.report.Collisions,
+			l.report.MissingReferences = append(l.report.MissingReferences,
 				fmt.Sprintf("item %d references source label %s the contract never carried", itemID, planeID))
 			continue
 		}
@@ -208,9 +213,14 @@ func (l *Loader) labelNamesFor(planeIDs []string) []string {
 // write pass would add. Unknown ids are reported exactly as the write pass
 // reports them.
 func (l *Loader) countNewIssueLabels(planeIDs []string, itemID int) {
+	seen := map[string]struct{}{}
 	for _, planeID := range planeIDs {
+		if _, dup := seen[planeID]; dup {
+			continue
+		}
+		seen[planeID] = struct{}{}
 		if _, ok := l.labelByPlane[planeID]; !ok {
-			l.report.Collisions = append(l.report.Collisions,
+			l.report.MissingReferences = append(l.report.MissingReferences,
 				fmt.Sprintf("item %d references source label %s the contract never carried", itemID, planeID))
 			continue
 		}
@@ -319,6 +329,8 @@ func (l *Loader) dryRunBatch(batch []*Issue, commentsByIssue map[string][]*Comme
 				}
 				if _, done := existing["comment"][c.ID]; done {
 					l.report.CommentsExisting++
+				} else if commentContent(c) == "" {
+					l.report.CommentsSkippedEmpty++
 				} else {
 					l.report.CommentsImported++
 				}
@@ -340,7 +352,11 @@ func (l *Loader) dryRunBatch(batch []*Issue, commentsByIssue map[string][]*Comme
 			if c.DeletedAt != nil {
 				continue
 			}
-			l.report.CommentsImported++
+			if commentContent(c) == "" {
+				l.report.CommentsSkippedEmpty++
+			} else {
+				l.report.CommentsImported++
+			}
 		}
 	}
 }
@@ -474,6 +490,11 @@ func idOf(existing map[string]map[string]int, planeID string) int {
 // reach — the deferred pairs. Parents are resolved through the same mapping
 // map, so a rerun that re-imported the parent also fixes the child.
 func (l *Loader) parentPass(existing map[string]map[string]int) error {
+	tx, err := l.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin parent pass: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
 	for _, pair := range l.deferred {
 		childID, ok := existing["issue"][pair.child]
 		if !ok {
@@ -481,13 +502,9 @@ func (l *Loader) parentPass(existing map[string]map[string]int) error {
 		}
 		parentID, ok := existing["issue"][pair.parent]
 		if !ok {
-			l.report.Collisions = append(l.report.Collisions,
+			l.report.MissingReferences = append(l.report.MissingReferences,
 				fmt.Sprintf("issue %s has parent %s which the contract never carried", pair.child, pair.parent))
 			continue
-		}
-		tx, err := l.db.Begin()
-		if err != nil {
-			return fmt.Errorf("begin parent pass: %w", err)
 		}
 		// A targeted parent_id write, not repo.Update: the repository's
 		// Update stamps updated_at with import time, and this tool promises
@@ -495,15 +512,26 @@ func (l *Loader) parentPass(existing map[string]map[string]int) error {
 		// at import" and every later convergence run would defer to a Windshift
 		// edit that never happened.
 		if _, err := tx.ExecWrite(`UPDATE items SET parent_id = ? WHERE id = ?`, parentID, childID); err != nil {
-			_ = tx.Rollback()
 			return fmt.Errorf("link child %d to parent %d: %w", childID, parentID, err)
-		}
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit parent pass: %w", err)
 		}
 		l.report.ParentsLinkedLate++
 	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit parent pass: %w", err)
+	}
 	return nil
+}
+
+// commentContent resolves a comment's body: the editor document when it
+// converts, otherwise Plane's own HTML, otherwise the stripped text.
+func commentContent(c *Comment) string {
+	content := c.Text
+	if md, ok := ConvertDescriptionJSON(c.CommentJSON); ok && md != "" {
+		content = md
+	} else if strings.TrimSpace(content) == "" {
+		content = ConvertDescriptionFromHTML(c.CommentHTML)
+	}
+	return strings.TrimSpace(content)
 }
 
 // insertComment writes one comment row with the contract's author and
@@ -513,13 +541,16 @@ func (l *Loader) insertComment(tx database.Tx, existing map[string]map[string]in
 		l.report.CommentsExisting++
 		return nil
 	}
-	content := c.Text
-	if md, ok := ConvertDescriptionJSON(c.CommentJSON); ok && md != "" {
-		content = md
-	} else if strings.TrimSpace(content) == "" {
-		content = ConvertDescriptionFromHTML(c.CommentHTML)
-	}
+	content := commentContent(c)
 	if content == "" {
+		// Plane allows a comment with no body. There is nothing to write, but
+		// the drop is counted and mapped so it is visible and a rerun does not
+		// process it again.
+		if err := l.recordMapping(tx, "comment", c.ID, 0, map[string]any{"empty": true}); err != nil {
+			return err
+		}
+		existing["comment"][c.ID] = 0
+		l.report.CommentsSkippedEmpty++
 		return nil
 	}
 	var authorID any

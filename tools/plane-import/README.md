@@ -4,7 +4,7 @@ Two pieces, one contract:
 
 | file | runs where | does |
 |---|---|---|
-| `dump.sql` | against the **Plane** Postgres (psql 10+) | emits the JSONL import contract: meta, users, issues (full sequence range incl. soft-deletes, each with its `state_group` and `label_ids`), comments, plus the project's full `states` and `labels` vocabulary |
+| `dump.sql` | against the **Plane** Postgres (psql 12+) | emits the JSONL import contract: meta, users, issues (full sequence range incl. soft-deletes, each with its `state_group` and `label_ids`), comments, plus the project's full `states` and `labels` vocabulary |
 | `cmd/plane-import` | against the **Windshift** Postgres | loads the contract into a workspace: numbers, authors, and timestamps from the source, and the source's state/priority/label vocabulary materialised where the destination lacks it |
 
 ## Why psql and not a Go fetcher

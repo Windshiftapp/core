@@ -224,14 +224,13 @@ func renderInline(nodes []tiptapNode, outerMarks []tiptapMark) (string, bool) {
 	for _, n := range nodes {
 		switch n.Type {
 		case "text":
-			segment := escapeMarkdownText(n.Text)
-			b.WriteString(applyMarks(segment, append(outerMarks, n.Marks...)))
+			b.WriteString(renderMarkedText(n.Text, append(outerMarks, n.Marks...)))
 		case "mention":
 			label, _ := n.Attrs["label"].(string)
 			if label == "" {
 				label = nodeText(n)
 			}
-			b.WriteString(applyMarks("@ "+label, append(outerMarks, n.Marks...)))
+			b.WriteString(renderMarkedText("@ "+label, append(outerMarks, n.Marks...)))
 			b.WriteString(" ")
 		case "hardBreak":
 			b.WriteString("\\\n")
@@ -240,6 +239,49 @@ func renderInline(nodes []tiptapNode, outerMarks []tiptapMark) (string, bool) {
 		}
 	}
 	return b.String(), true
+}
+
+// renderMarkedText escapes plain text and applies its marks. A code mark makes
+// the run literal: the content is not escaped (a backslash would render inside
+// the span) and the fence grows past any backtick run so it cannot be broken.
+func renderMarkedText(text string, marks []tiptapMark) string {
+	if hasMark(marks, "code") {
+		return applyMarks(codeSpan(text), withoutMark(marks, "code"))
+	}
+	return applyMarks(escapeMarkdownText(text), marks)
+}
+
+func hasMark(marks []tiptapMark, typ string) bool {
+	for _, m := range marks {
+		if m.Type == typ {
+			return true
+		}
+	}
+	return false
+}
+
+func withoutMark(marks []tiptapMark, typ string) []tiptapMark {
+	out := make([]tiptapMark, 0, len(marks))
+	for _, m := range marks {
+		if m.Type != typ {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// codeSpan renders a Markdown code span. The fence is one backtick longer than
+// the longest backtick run in the content; content that starts or ends with a
+// backtick is space-padded so the fence stays unambiguous.
+func codeSpan(text string) string {
+	fence := "`"
+	for strings.Contains(text, fence) {
+		fence += "`"
+	}
+	if strings.HasPrefix(text, "`") || strings.HasSuffix(text, "`") {
+		return fence + " " + text + " " + fence
+	}
+	return fence + text + fence
 }
 
 func applyMarks(text string, marks []tiptapMark) string {
@@ -255,16 +297,15 @@ func applyMarks(text string, marks []tiptapMark) string {
 			text = "*" + text + "*"
 		case "strike":
 			text = "~~" + text + "~~"
-		case "code":
-			text = "`" + text + "`"
-		case "underline":
-			text = "<u>" + text + "</u>"
 		case "link":
 			href, _ := m.Attrs["href"].(string)
 			if href != "" {
 				link = href
 			}
 		}
+		// An underline mark is dropped: Markdown has no underline, and
+		// Windshift's renderer escapes raw HTML, so emitting <u> would show
+		// the tags as text instead of formatting.
 	}
 	if link != "" {
 		text = "[" + text + "](" + link + ")"
@@ -280,7 +321,7 @@ func renderTable(n tiptapNode) (string, bool) {
 			return "", false
 		}
 		var cells []string
-		for ci, cell := range row.Content {
+		for _, cell := range row.Content {
 			if cell.Type != "tableHeader" && cell.Type != "tableCell" {
 				return "", false
 			}
@@ -295,7 +336,6 @@ func renderTable(n tiptapNode) (string, bool) {
 				}
 			}
 			cells = append(cells, strings.Join(cellText, " "))
-			_ = ci
 		}
 		if row.Content[0].Type == "tableHeader" && headerRow == -1 {
 			headerRow = ri
@@ -317,7 +357,10 @@ func renderTable(n tiptapNode) (string, bool) {
 			r = append(r, "")
 		}
 		lines = append(lines, "| "+strings.Join(r, " | ")+" |")
-		if ri == 0 || (headerRow == -1 && ri == 0) {
+		// The separator belongs under the header row. When the source has no
+		// header cell, the first row carries the header (a Markdown table needs
+		// one) and takes the separator.
+		if ri == headerRow || (headerRow == -1 && ri == 0) {
 			seps := make([]string, width)
 			for i := range seps {
 				seps[i] = "---"

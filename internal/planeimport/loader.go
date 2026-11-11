@@ -48,34 +48,36 @@ type Options struct {
 // Report is the reconciliation output of one run. Every count is measured
 // during the run; zero means "none seen", not "not checked".
 type Report struct {
-	WorkspaceKey       string    `json:"workspace_key"`
-	DryRun             bool      `json:"dry_run"`
-	StartedAt          time.Time `json:"started_at"`
-	FinishedAt         time.Time `json:"finished_at"`
-	IssuesImported     int       `json:"issues_imported"`
-	IssuesExisting     int       `json:"issues_skipped_existing"`
-	IssuesSoftDeleted  int       `json:"issues_skipped_soft_deleted"`
-	IssuesDraft        int       `json:"issues_skipped_draft"`
-	CommentsImported   int       `json:"comments_imported"`
-	CommentsExisting   int       `json:"comments_skipped_existing"`
-	CommentsSkipped    int       `json:"comments_skipped_unmapped_issue"`
-	ParentsLinkedLate  int       `json:"parents_linked_in_second_pass"`
-	HTMLFallbacks      int       `json:"descriptions_html_fallback"`
-	UnmappedUsers      []string  `json:"unmapped_users,omitempty"`
-	UnmappedStates     []string  `json:"unmapped_state_names,omitempty"`
-	UnmappedPriorities []string  `json:"unmapped_priorities,omitempty"`
-	CreatedCategories  []string  `json:"created_status_categories,omitempty"`
-	CreatedStatuses    []string  `json:"created_statuses,omitempty"`
-	CreatedPriorities  []string  `json:"created_priorities,omitempty"`
-	CreatedLabels      []string  `json:"created_labels,omitempty"`
-	TransitionsAdded   int       `json:"workflow_transitions_added"`
-	IssuesConverged    int       `json:"issues_converged_to_contract"`
-	IssuesLeftEdited   int       `json:"issues_left_alone_edited_since_import"`
-	LabelLinksAdded    int       `json:"label_links_added"`
-	Collisions         []string  `json:"collisions,omitempty"`
-	NumberGaps         []int     `json:"number_gaps_preserved,omitempty"`
-	MaxNumber          int       `json:"max_number_after_import"`
-	Batches            int       `json:"batches"`
+	WorkspaceKey         string    `json:"workspace_key"`
+	DryRun               bool      `json:"dry_run"`
+	StartedAt            time.Time `json:"started_at"`
+	FinishedAt           time.Time `json:"finished_at"`
+	IssuesImported       int       `json:"issues_imported"`
+	IssuesExisting       int       `json:"issues_skipped_existing"`
+	IssuesSoftDeleted    int       `json:"issues_skipped_soft_deleted"`
+	IssuesDraft          int       `json:"issues_skipped_draft"`
+	CommentsImported     int       `json:"comments_imported"`
+	CommentsExisting     int       `json:"comments_skipped_existing"`
+	CommentsSkipped      int       `json:"comments_skipped_unmapped_issue"`
+	CommentsSkippedEmpty int       `json:"comments_skipped_empty"`
+	ParentsLinkedLate    int       `json:"parents_linked_in_second_pass"`
+	HTMLFallbacks        int       `json:"descriptions_html_fallback"`
+	UnmappedUsers        []string  `json:"unmapped_users,omitempty"`
+	UnmappedStates       []string  `json:"unmapped_state_names,omitempty"`
+	UnmappedPriorities   []string  `json:"unmapped_priorities,omitempty"`
+	CreatedCategories    []string  `json:"created_status_categories,omitempty"`
+	CreatedStatuses      []string  `json:"created_statuses,omitempty"`
+	CreatedPriorities    []string  `json:"created_priorities,omitempty"`
+	CreatedLabels        []string  `json:"created_labels,omitempty"`
+	TransitionsAdded     int       `json:"workflow_transitions_added"`
+	IssuesConverged      int       `json:"issues_converged_to_contract"`
+	IssuesLeftEdited     int       `json:"issues_left_alone_edited_since_import"`
+	LabelLinksAdded      int       `json:"label_links_added"`
+	Collisions           []string  `json:"collisions,omitempty"`
+	MissingReferences    []string  `json:"missing_references,omitempty"`
+	NumberGaps           []int     `json:"number_gaps_preserved,omitempty"`
+	MaxNumber            int       `json:"max_number_after_import"`
+	Batches              int       `json:"batches"`
 }
 
 // DefaultPlaneStatusMap maps Plane state NAMES to Windshift status-category
@@ -310,17 +312,16 @@ func (l *Loader) Resolve() error {
 	l.userID = map[string]int{}
 	unmapped := map[string]struct{}{}
 	for _, iss := range l.issues {
-		for _, uid := range []string{iss.CreatedByID} {
-			if uid == "" {
-				continue
-			}
-			if _, done := l.userID[uid]; done {
-				continue
-			}
-			id, ok := l.resolveUser(uid, byEmail, unmapped)
-			if ok {
-				l.userID[uid] = id
-			}
+		uid := iss.CreatedByID
+		if uid == "" {
+			continue
+		}
+		if _, done := l.userID[uid]; done {
+			continue
+		}
+		id, ok := l.resolveUser(uid, byEmail, unmapped)
+		if ok {
+			l.userID[uid] = id
 		}
 	}
 	for _, c := range l.comments {
