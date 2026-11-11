@@ -24,6 +24,17 @@ func (h *JiraImportHandler) importJiraAssets(ctx context.Context, jobID string, 
 	if err != nil {
 		if errors.Is(err, jira.ErrAssetsNotAvailable) {
 			slog.Debug("Jira Assets API not available; skipping Assets import", slog.String("component", "jira"))
+			// Record a durable finding so the result does not imply native asset
+			// resolution when no inventory could be read.
+			_ = h.recordMapping(jobID, "fidelity_finding", "assets-capability",
+				"Jira Assets/Insight object reads are not available for this connection; asset custom fields keep their original reference identifiers and no native asset inventory was imported.",
+				0, map[string]any{
+					"code":           "jira_assets_unavailable",
+					"severity":       "warning",
+					"disposition":    "unavailable",
+					"source_count":   0,
+					"resolved_count": 0,
+				})
 			return
 		}
 		slog.Warn("Failed to list Jira Assets schemas", slog.String("component", "jira"), slog.Any("error", err))

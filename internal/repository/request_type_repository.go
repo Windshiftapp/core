@@ -331,6 +331,23 @@ func (r *RequestTypeRepository) UpdateVisibility(id, channelID int, groupIDs, or
 	return nil
 }
 
+// SetActive toggles only the is_active flag, scoped to channelID. Import
+// reconciliation uses it to fail closed without rewriting the editable fields.
+// Returns ErrNotFound when no row matches.
+func (r *RequestTypeRepository) SetActive(id, channelID int, active bool) error {
+	res, err := r.db.ExecWrite(
+		"UPDATE request_types SET is_active = ?, updated_at = ? WHERE id = ? AND channel_id = ?",
+		active, time.Now(), id, channelID,
+	)
+	if err != nil {
+		return fmt.Errorf("set request_type %d active=%t: %w", id, active, err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // Delete removes a request_type's fields and the row itself, scoped to
 // channel_id. Returns ErrNotFound when the row doesn't exist in that channel.
 func (r *RequestTypeRepository) Delete(id, channelID int) error {

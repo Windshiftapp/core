@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"sort"
 	"strconv"
@@ -88,7 +89,14 @@ func (h *JiraImportHandler) prepareJiraServiceManagementImport(
 		ctx, jobID, project.Key, serviceDesk.ID, client, importOrganizations,
 	)
 	if err != nil {
-		return nil, err
+		// Organization metadata is optional enrichment. A JSM version that
+		// rejects the experimental read must not abort the whole project's
+		// core issue import, so degrade to no organization customers.
+		slog.Warn("Jira customer organization metadata unavailable; continuing without it",
+			slog.String("component", "jira"),
+			slog.String("project", projectKey),
+			slog.Any("error", err))
+		organizationCustomers, customerOrganizations = nil, nil
 	}
 
 	return &jiraServiceManagementImport{
@@ -187,6 +195,7 @@ func (h *JiraImportHandler) ensureJiraRequestTypes(
 			continue
 		}
 
+		restriction := classifyJiraRequestTypeRestriction(requestType.RestrictionStatus)
 		description := strings.TrimSpace(requestType.Description)
 		if description == "" {
 			description = strings.TrimSpace(requestType.HelpText)
@@ -199,7 +208,7 @@ func (h *JiraImportHandler) ensureJiraRequestTypes(
 			Icon:         "LifeBuoy",
 			Color:        "#0ea5e9",
 			DisplayOrder: order + 1,
-			IsActive:     !strings.EqualFold(requestType.RestrictionStatus, "CLOSED"),
+			IsActive:     !restriction.failClosed(),
 			WorkspaceID:  &workspaceID,
 		}, models.RequestTypeConfig{
 			RequireAuth:      true,
@@ -208,17 +217,56 @@ func (h *JiraImportHandler) ensureJiraRequestTypes(
 		if err != nil {
 			return nil, fmt.Errorf("ensure Jira request type %s: %w", requestType.ID, err)
 		}
+		// Reused rows keep an administrator-configured audience; otherwise a
+		// restricted or unknown source type is disabled again on reimport.
+		disposition, err := h.imports.ReconcileImportedRequestTypeRestriction(id, channelID, restriction.failClosed())
+		if err != nil {
+			return nil, fmt.Errorf("reconcile Jira request type %s restriction: %w", requestType.ID, err)
+		}
 		result[requestType.ID] = id
 		if err := h.recordMapping(jobID, "request_type", requestType.ID, requestType.Name, id, map[string]any{
-			"was_created":        created,
-			"service_desk_id":    requestType.ServiceDeskID,
-			"jira_issue_type_id": requestType.IssueTypeID,
-			"jira_group_ids":     requestType.GroupIDs,
+			"was_created":             created,
+			"service_desk_id":         requestType.ServiceDeskID,
+			"jira_issue_type_id":      requestType.IssueTypeID,
+			"jira_group_ids":          requestType.GroupIDs,
+			"restriction_status":      restriction.SourceStatus,
+			"restriction_disposition": disposition,
 		}); err != nil {
 			return nil, fmt.Errorf("record Jira request type mapping: %w", err)
 		}
 	}
 	return result, nil
+}
+
+// jiraRequestTypeRestriction is the fail-closed reading of a Jira
+// RequestTypeDTO.restrictionStatus. Jira documents OPEN and RESTRICTED; every
+// other value (including empty) is treated as unknown so a missing status
+// cannot silently grant access.
+type jiraRequestTypeRestriction struct {
+	SourceStatus string
+	Disposition  string
+}
+
+const (
+	jiraRequestTypeStatusOpen       = "OPEN"
+	jiraRequestTypeStatusRestricted = "RESTRICTED"
+	jiraRequestTypeDispositionOpen  = "open"
+)
+
+func classifyJiraRequestTypeRestriction(status string) jiraRequestTypeRestriction {
+	normalized := strings.ToUpper(strings.TrimSpace(status))
+	switch normalized {
+	case jiraRequestTypeStatusOpen:
+		return jiraRequestTypeRestriction{SourceStatus: normalized, Disposition: jiraRequestTypeDispositionOpen}
+	case jiraRequestTypeStatusRestricted:
+		return jiraRequestTypeRestriction{SourceStatus: normalized, Disposition: "restricted"}
+	default:
+		return jiraRequestTypeRestriction{SourceStatus: normalized, Disposition: "unknown"}
+	}
+}
+
+func (r jiraRequestTypeRestriction) failClosed() bool {
+	return r.Disposition != jiraRequestTypeDispositionOpen
 }
 
 func (h *JiraImportHandler) ensureJiraPortalRequestTypeSection(channelID int, requestTypes map[string]int) error {

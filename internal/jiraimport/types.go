@@ -69,6 +69,8 @@ type Progress struct {
 	FailedLinks         int    `json:"failed_links"`
 	TotalAttachments    int    `json:"total_attachments"`
 	ImportedAttachments int    `json:"imported_attachments"`
+	FailedAttachments   int    `json:"failed_attachments"`
+	SkippedAttachments  int    `json:"skipped_attachments"`
 	TotalComments       int    `json:"total_comments"`
 	ImportedComments    int    `json:"imported_comments"`
 	FailedComments      int    `json:"failed_comments"`

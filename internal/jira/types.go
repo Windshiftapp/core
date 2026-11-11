@@ -849,6 +849,10 @@ type FilterSearchResult struct {
 	Total      int          `json:"total"`
 	IsLast     bool         `json:"isLast"`
 	Values     []JiraFilter `json:"values"`
+	// Partial marks an enumeration that cannot list every saved filter, such as
+	// Data Center where only favorites are discoverable.
+	Partial       bool   `json:"partial,omitempty"`
+	PartialReason string `json:"partial_reason,omitempty"`
 }
 
 // ================================================================
@@ -949,6 +953,19 @@ type JQLSearchRequest struct {
 	NextPageToken string   `json:"nextPageToken,omitempty"`
 }
 
+// MarshalJSON serializes expand as the comma-delimited string
+// SearchAndReconcileRequestBean expects. Bulk fetch keeps its array shape.
+func (r JQLSearchRequest) MarshalJSON() ([]byte, error) {
+	type alias JQLSearchRequest
+	return json.Marshal(struct {
+		alias
+		Expand string `json:"expand,omitempty"`
+	}{
+		alias:  alias(r),
+		Expand: strings.Join(r.Expand, ","),
+	})
+}
+
 // JQLSearchResponse is the response from POST /rest/api/3/search/jql
 type JQLSearchResponse struct {
 	Issues        []JiraIssue `json:"issues"`
@@ -983,15 +1000,23 @@ type BulkFetchResponse struct {
 	IssueErrors []BulkFetchError `json:"issueErrors,omitempty"`
 }
 
-// BulkFetchError represents a per-issue failure in a bulk-fetch response.
+// BulkFetchError represents a per-issue failure in a bulk-fetch response. The
+// published Cloud IssueError shape is {id, errorMessage}; the id is the numeric
+// issue id, not the issue key. The legacy issueIdOrKey/errorMessages/errors
+// fields are decoded defensively for older deployments.
 type BulkFetchError struct {
-	IssueIDOrKey  string            `json:"issueIdOrKey"`
+	ID            string            `json:"id,omitempty"`
+	ErrorMessage  string            `json:"errorMessage,omitempty"`
+	IssueIDOrKey  string            `json:"issueIdOrKey,omitempty"`
 	ErrorMessages []string          `json:"errorMessages,omitempty"`
 	Errors        map[string]string `json:"errors,omitempty"`
 }
 
 // Message renders the per-issue failure for logs and error accounting.
 func (e BulkFetchError) Message() string {
+	if message := strings.TrimSpace(e.ErrorMessage); message != "" {
+		return message
+	}
 	if len(e.ErrorMessages) > 0 {
 		return strings.Join(e.ErrorMessages, "; ")
 	}
@@ -1004,4 +1029,12 @@ func (e BulkFetchError) Message() string {
 		return strings.Join(parts, "; ")
 	}
 	return "unknown Jira bulk fetch error"
+}
+
+// JiraIssueRef is a stable Jira issue identity: the numeric id plus the
+// human-readable key. Discovery returns both so bulk-fetch IssueError ids can
+// be correlated to requested keys without guessing.
+type JiraIssueRef struct {
+	ID  string
+	Key string
 }

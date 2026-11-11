@@ -516,20 +516,26 @@ func (h *JiraImportHandler) collectSampleUsers(
 }
 
 // collectUserSummary records one issue participant in userMap, keeping the
-// first sighting of each account ID.
+// first sighting of each identity. Cloud users carry an accountId; Data Center
+// users carry name/key, so the shared GetIdentifier is used to match what the
+// execution path resolves.
 func collectUserSummary(userMap map[string]JiraUserSummary, user *jira.JiraUser) {
-	if user == nil || user.AccountID == "" {
+	if user == nil {
 		return
 	}
-	if _, exists := userMap[user.AccountID]; exists {
+	identifier := user.GetIdentifier()
+	if identifier == "" {
+		return
+	}
+	if _, exists := userMap[identifier]; exists {
 		return
 	}
 	avatarURL := ""
 	if user.AvatarURLs != nil {
 		avatarURL = user.AvatarURLs["48x48"]
 	}
-	userMap[user.AccountID] = JiraUserSummary{
-		AccountID:   user.AccountID,
+	userMap[identifier] = JiraUserSummary{
+		AccountID:   identifier,
 		AccountType: user.AccountType,
 		Email:       user.EmailAddress,
 		DisplayName: user.DisplayName,

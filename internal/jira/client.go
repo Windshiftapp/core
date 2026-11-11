@@ -63,6 +63,9 @@ type Client interface {
 	// Issues (Bulk - uses POST /rest/api/3/issue/bulkfetch)
 	BulkFetchIssues(ctx context.Context, req BulkFetchRequest) (*BulkFetchResponse, error)
 	GetAllIssueKeys(ctx context.Context, jql string) ([]string, error)
+	// GetAllIssueRefs returns the numeric id and key of every matching issue so
+	// bulk-fetch errors can be correlated to requested keys.
+	GetAllIssueRefs(ctx context.Context, jql string) ([]JiraIssueRef, error)
 
 	// Versions & Sprints
 	GetProjectVersions(ctx context.Context, projectKey string) ([]JiraVersion, error)
@@ -74,8 +77,10 @@ type Client interface {
 	ListFilters(ctx context.Context, projectKey string) (*FilterSearchResult, error)
 	GetFilter(ctx context.Context, filterID string) (*JiraFilter, error)
 
-	// Attachments
-	DownloadAttachment(ctx context.Context, attachmentURL string) (io.ReadCloser, string, error)
+	// Attachments. The Cloud client downloads through the attachment-content
+	// endpoint under its resolved base (gateway or site) so scoped tokens work;
+	// Data Center keeps using the API-returned content URL.
+	DownloadAttachment(ctx context.Context, attachmentID, contentURL string) (io.ReadCloser, string, error)
 
 	// Users
 	GetUserEmail(ctx context.Context, accountID string) (string, error)
@@ -205,6 +210,17 @@ func jiraAuthHeader(cfg Config) (string, error) {
 	return "Basic " + base64.StdEncoding.EncodeToString([]byte(authString)), nil
 }
 
+// jiraSiteURLFromBase strips the REST path prefix from a client base URL so
+// user-facing fallback URLs show the site root, not .../rest/api/3.
+func jiraSiteURLFromBase(baseURL string) string {
+	for _, suffix := range []string{"/rest/api/3", "/rest/api/2"} {
+		if strings.HasSuffix(baseURL, suffix) {
+			return strings.TrimSuffix(baseURL, suffix)
+		}
+	}
+	return baseURL
+}
+
 // defaultCloudGatewayBase is the Atlassian gateway host prefix. The discovered
 // cloud ID is appended to form the per-tenant gateway base.
 const defaultCloudGatewayBase = "https://api.atlassian.com/ex/jira/"
@@ -222,8 +238,9 @@ type cloudRouting struct {
 
 // cloudRoutingProbe selects the gateway for scoped tokens and the site URL for
 // legacy tokens. Scoped tokens sent to a site URL appear anonymous, so it probes
-// gateway /myself after discovering the cloud ID. Any discovery or probe failure
-// falls back to the site URL, preserving legacy and private-network behavior.
+// gateway /myself after discovering the cloud ID. A missing cloud ID falls back
+// to the site URL; an inconclusive probe keeps gateway routing rather than
+// silently downgrading an authenticated scoped token.
 func cloudRoutingProbe(siteURL, authHeader string, httpClient *http.Client) cloudRouting {
 	return cloudRoutingProbeWithGateway(siteURL, authHeader, httpClient, defaultCloudGatewayBase)
 }
@@ -242,18 +259,28 @@ func cloudRoutingProbeWithGateway(siteURL, authHeader string, httpClient *http.C
 	}
 
 	gatewayBase := gatewayPrefix + cloudID
-	if !gatewayAuthProbe(gatewayBase, authHeader, httpClient) {
-		slog.Info("Jira cloud routing: gateway probe declined, using site URL",
+	switch gatewayAuthProbe(gatewayBase, authHeader, httpClient) {
+	case gatewayProbeUnauthenticated:
+		slog.Info("Jira cloud routing: gateway declined the credentials, using site URL",
 			slog.String("component", "jira"),
 			slog.String("cloud_id", cloudID),
 		)
 		return resolveSiteRouting(siteURL, authHeader, httpClient)
+	case gatewayProbeTransient:
+		// The probe could not classify the token (network error, 429 or 5xx).
+		// Keep gateway routing: falling back here could move a scoped token to
+		// a site URL that rejects it entirely.
+		slog.Warn("Jira cloud routing: gateway probe inconclusive, keeping gateway routing",
+			slog.String("component", "jira"),
+			slog.String("cloud_id", cloudID),
+		)
+	default:
+		slog.Info("Jira cloud routing: using api.atlassian.com gateway (scoped token detected)",
+			slog.String("component", "jira"),
+			slog.String("cloud_id", cloudID),
+		)
 	}
 
-	slog.Info("Jira cloud routing: using api.atlassian.com gateway (scoped token detected)",
-		slog.String("component", "jira"),
-		slog.String("cloud_id", cloudID),
-	)
 	assetsBase, assetsErr := discoverAssetsWorkspaceBase(gatewayBase, authHeader, httpClient)
 	if assetsErr != nil {
 		slog.Info("Jira cloud routing: Assets workspace is unavailable",
@@ -369,36 +396,63 @@ func discoverCloudID(siteURL string, httpClient *http.Client) (string, error) {
 	return body.CloudID, nil
 }
 
-// gatewayAuthProbe asks "does this token authenticate against the gateway?"
-// by hitting /rest/api/3/myself. A 200 means scoped-token routing is in
-// effect for this caller; anything else means it isn't (legacy token, or a
-// scoped token that the gateway has rejected outright).
-//
-// /myself is the right probe here: it requires an authenticated identity,
-// so the response distinguishes "auth succeeded" (200) from "auth was
-// silently dropped to anonymous" (401). Other endpoints like /serverInfo
-// return 200 even anonymously and would give false positives.
-func gatewayAuthProbe(gatewayBase, authHeader string, httpClient *http.Client) bool {
+// gatewayProbeOutcome classifies the gateway /myself probe.
+type gatewayProbeOutcome int
+
+const (
+	// gatewayProbeAuthenticated means the gateway accepted the credential.
+	// /myself needs its own scope, so a valid scoped token can still receive
+	// 403 here while issue reads succeed. Both 200 and 403 count as
+	// authenticated evidence.
+	gatewayProbeAuthenticated gatewayProbeOutcome = iota
+	// gatewayProbeUnauthenticated means the gateway rejected the credential
+	// outright (401); this is a legacy token or invalid credentials.
+	gatewayProbeUnauthenticated
+	// gatewayProbeTransient means the probe could not classify the token
+	// (network error, 429 or 5xx). Callers must not downgrade routing on it.
+	gatewayProbeTransient
+)
+
+// gatewayAuthProbe asks "does this token authenticate against the gateway?" by
+// hitting /rest/api/3/myself. A 200 or 403 means the gateway accepted the
+// credential; a 401 means it did not. Other statuses and transport failures are
+// transient. /myself is used because it requires an authenticated identity,
+// unlike /serverInfo which answers anonymously.
+func gatewayAuthProbe(gatewayBase, authHeader string, httpClient *http.Client) gatewayProbeOutcome {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", gatewayBase+"/rest/api/3/myself", http.NoBody)
 	if err != nil {
-		return false
+		return gatewayProbeTransient
 	}
 	req.Header.Set("Authorization", authHeader)
 	req.Header.Set("Accept", "application/json")
 	resp, err := httpClient.Do(req) //nolint:gosec // gatewayBase derived from discovered cloudId
 	if err != nil {
-		return false
+		return gatewayProbeTransient
 	}
 	defer func() { _ = resp.Body.Close() }()
-	return resp.StatusCode == http.StatusOK
+	switch resp.StatusCode {
+	case http.StatusOK, http.StatusForbidden:
+		return gatewayProbeAuthenticated
+	case http.StatusUnauthorized:
+		return gatewayProbeUnauthenticated
+	default:
+		return gatewayProbeTransient
+	}
 }
 
 // do performs an HTTP request with rate limiting
 func (c *cloudClient) do(ctx context.Context, method, reqURL string, body any) (*http.Response, error) {
 	return doReadOnlyJiraRequest(
 		ctx, c.httpClient, c.limiter, c.throttle, c.authHeader, method, reqURL, body,
+		c.retryAttempts, c.retryWait,
+	)
+}
+
+func (c *cloudClient) doWithHeaders(ctx context.Context, method, reqURL string, body any, headers map[string]string) (*http.Response, error) {
+	return doReadOnlyJiraRequestWithHeaders(
+		ctx, c.httpClient, c.limiter, c.throttle, c.authHeader, method, reqURL, body, headers,
 		c.retryAttempts, c.retryWait,
 	)
 }
@@ -456,6 +510,25 @@ func doReadOnlyJiraRequest(
 	retryAttempts int,
 	retryWait func(context.Context, time.Duration) error,
 ) (*http.Response, error) {
+	return doReadOnlyJiraRequestWithHeaders(
+		ctx, httpClient, limiter, throttle, authHeader, method, reqURL, body, nil,
+		retryAttempts, retryWait,
+	)
+}
+
+func doReadOnlyJiraRequestWithHeaders(
+	ctx context.Context,
+	httpClient *http.Client,
+	limiter *rate.Limiter,
+	throttle *jiraThrottle,
+	authHeader string,
+	method string,
+	reqURL string,
+	body any,
+	headers map[string]string,
+	retryAttempts int,
+	retryWait func(context.Context, time.Duration) error,
+) (*http.Response, error) {
 	if err := validateReadOnlyRequest(method, reqURL); err != nil {
 		return nil, err
 	}
@@ -480,6 +553,9 @@ func doReadOnlyJiraRequest(
 		req.Header.Set("Accept", "application/json")
 		if bodyBytes != nil {
 			req.Header.Set("Content-Type", "application/json")
+		}
+		for name, value := range headers {
+			req.Header.Set(name, value)
 		}
 		return req, nil
 	})
@@ -658,14 +734,34 @@ func isAssetsWorkspaceAQLPath(path string) bool {
 
 // TestConnection tests if the credentials are valid.
 //
-// Probe order is deliberate: /serverInfo first, /myself second. Atlassian's
-// scoped API tokens (rolled out 2024) can grant read access to projects /
-// fields / issues without granting read:me, so /myself returns 401 even
-// though the token is perfectly usable for the importer. Probing with
-// /serverInfo confirms credentials reach the instance without depending on
-// the account-identity scope. /myself is then a best-effort enrichment for
-// the human-readable connection label — failure is logged and ignored.
+// /myself is the authentication proof: /serverInfo is anonymously accessible,
+// so a 200 there says nothing about the token. A 200 or 403 on /myself is
+// authenticated evidence — Atlassian's scoped tokens can grant project and
+// issue reads without read:me, in which case /myself returns 403. Only a 401
+// means the credentials were rejected. /myself also enriches the human-readable
+// connection label when the token can read the account.
 func (c *cloudClient) TestConnection(ctx context.Context) (*JiraInstanceInfo, error) {
+	userResp, err := c.do(ctx, "GET", c.baseURL+"/myself", nil)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
+	}
+
+	var identityDisplayName string
+	switch userResp.StatusCode {
+	case http.StatusOK:
+		var user JiraUser
+		if decodeErr := json.NewDecoder(userResp.Body).Decode(&user); decodeErr == nil {
+			identityDisplayName = user.DisplayName
+		}
+	case http.StatusForbidden:
+		// Authenticated evidence; read:me is missing, not the credentials.
+	default:
+		responseErr := jiraErrorFromResponse(userResp)
+		_ = userResp.Body.Close()
+		return nil, responseErr
+	}
+	_ = userResp.Body.Close()
+
 	serverResp, err := c.do(ctx, "GET", c.baseURL+"/serverInfo", nil)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
@@ -691,20 +787,11 @@ func (c *cloudClient) TestConnection(ctx context.Context) (*JiraInstanceInfo, er
 		URL:         serverInfo.BaseURL,
 	}
 	if info.URL == "" {
-		info.URL = c.baseURL
+		info.URL = jiraSiteURLFromBase(c.baseURL)
 	}
 
-	// Best-effort: enrich DisplayName with the authenticating user's name.
-	// 401 here is expected for scoped tokens without read:me — do not fail
-	// the whole TestConnection over it.
-	if userResp, userErr := c.do(ctx, "GET", c.baseURL+"/myself", nil); userErr == nil {
-		defer func() { _ = userResp.Body.Close() }()
-		if userResp.StatusCode == http.StatusOK {
-			var user JiraUser
-			if decodeErr := json.NewDecoder(userResp.Body).Decode(&user); decodeErr == nil && user.DisplayName != "" {
-				info.DisplayName = user.DisplayName
-			}
-		}
+	if identityDisplayName != "" {
+		info.DisplayName = identityDisplayName
 	}
 
 	if info.DisplayName == "" {
@@ -1594,7 +1681,21 @@ func (c *cloudClient) BulkFetchIssues(ctx context.Context, req BulkFetchRequest)
 // GetAllIssueKeys retrieves all issue keys matching a JQL query
 // Paginates through all results using nextPageToken
 func (c *cloudClient) GetAllIssueKeys(ctx context.Context, jql string) ([]string, error) {
-	var keys []string
+	refs, err := c.GetAllIssueRefs(ctx, jql)
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		keys = append(keys, ref.Key)
+	}
+	return keys, nil
+}
+
+// GetAllIssueRefs retrieves the numeric id and key of every issue matching a
+// JQL query.
+func (c *cloudClient) GetAllIssueRefs(ctx context.Context, jql string) ([]JiraIssueRef, error) {
+	var refs []JiraIssueRef
 	nextPageToken := ""
 
 	for {
@@ -1605,11 +1706,11 @@ func (c *cloudClient) GetAllIssueKeys(ctx context.Context, jql string) ([]string
 			NextPageToken: nextPageToken,
 		})
 		if err != nil {
-			return keys, err
+			return refs, err
 		}
 
 		for _, issue := range result.Issues {
-			keys = append(keys, issue.Key)
+			refs = append(refs, JiraIssueRef{ID: issue.ID, Key: issue.Key})
 		}
 
 		if result.NextPageToken == "" {
@@ -1618,7 +1719,7 @@ func (c *cloudClient) GetAllIssueKeys(ctx context.Context, jql string) ([]string
 		nextPageToken = result.NextPageToken
 	}
 
-	return keys, nil
+	return refs, nil
 }
 
 // ================================================================
@@ -1666,9 +1767,19 @@ func (c *cloudClient) GetBoardSprints(ctx context.Context, boardID int) (*Sprint
 // Attachment Methods
 // ================================================================
 
-// DownloadAttachment downloads an attachment and returns the reader and content type
-func (c *cloudClient) DownloadAttachment(ctx context.Context, attachmentURL string) (io.ReadCloser, string, error) {
-	return jiraDownloadAttachment(ctx, c.httpClient, c.limiter, c.throttle, c.authHeader, attachmentURL)
+// DownloadAttachment downloads an attachment and returns the reader and content
+// type. Cloud uses the attachment-content endpoint under the client's resolved
+// base rather than the tenant-hosted content URL Jira returns: scoped tokens
+// only authenticate against api.atlassian.com, so the returned URL would fail.
+func (c *cloudClient) DownloadAttachment(ctx context.Context, attachmentID, contentURL string) (io.ReadCloser, string, error) {
+	downloadURL := contentURL
+	if attachmentID != "" {
+		downloadURL = c.baseURL + "/attachment/content/" + url.PathEscape(attachmentID)
+	}
+	if downloadURL == "" {
+		return nil, "", fmt.Errorf("%w: attachment has no download URL", ErrAPIError)
+	}
+	return jiraDownloadAttachment(ctx, c.httpClient, c.limiter, c.throttle, c.authHeader, downloadURL)
 }
 
 // ================================================================

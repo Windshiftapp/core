@@ -142,16 +142,21 @@ type JiraReadinessReport struct {
 	Extrapolated    bool                   `json:"extrapolated"`
 	AttachmentBytes int64                  `json:"attachment_bytes_sampled"`
 	OpenIssuesOnly  bool                   `json:"open_issues_only"`
+	// AssessmentComplete is false when any project's issue sample could not be
+	// fully read, so the score reflects only the issues that were sampled.
+	AssessmentComplete bool `json:"assessment_complete"`
 }
 
 // JiraProjectReadiness is the per-project slice of the readiness assessment.
 type JiraProjectReadiness struct {
-	Key           string         `json:"key"`
-	Name          string         `json:"name"`
-	TotalIssues   int            `json:"total_issues"`
-	SampledIssues int            `json:"sampled_issues"`
-	Score         int            `json:"score"`
-	Findings      []jira.Finding `json:"findings"`
+	Key                string         `json:"key"`
+	Name               string         `json:"name"`
+	TotalIssues        int            `json:"total_issues"`
+	SampledIssues      int            `json:"sampled_issues"`
+	Score              int            `json:"score"`
+	Findings           []jira.Finding `json:"findings"`
+	AssessmentComplete bool           `json:"assessment_complete"`
+	AssessmentError    string         `json:"assessment_error,omitempty"`
 }
 
 // JiraProjectAnalysis contains analysis for a single project

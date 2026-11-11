@@ -62,6 +62,7 @@ type jiraGlobalModel struct {
 	choiceOptionIDs           map[string]map[string]int
 	affectsVersionField       *jiraAffectsVersionCustomField
 	issueKeysByProject        map[string][]string
+	issueKeysByIDByProject    map[string]map[string]string
 	applicableFieldsByProject map[string]map[string]bool
 }
 

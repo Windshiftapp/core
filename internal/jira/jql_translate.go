@@ -14,36 +14,70 @@ var (
 	jqlIdentifierSafe      = regexp.MustCompile(`^[A-Za-z0-9_.:-]+$`)
 )
 
+// JQLTranslation is the outcome of translating a Jira JQL expression. QL is the
+// Windshift selector; Unsupported lists clauses that could not be translated.
+// MembershipComplete is false when an unsupported clause changes which issues
+// the expression matches, so callers must not execute QL as the full predicate.
+// An unsupported ORDER BY alone leaves membership complete.
+type JQLTranslation struct {
+	QL                 string
+	Unsupported        []string
+	MembershipComplete bool
+}
+
 // TranslateJQLToWindshiftQL translates a Jira JQL expression into Windshift QL
 // scoped to workspaceID. Clauses that cannot be translated are returned in
 // unsupported; callers must preserve the original JQL and keep the imported
 // selector inactive rather than widening it.
 func TranslateJQLToWindshiftQL(jql string, workspaceID int) (ql string, unsupported []string) {
-	base := fmt.Sprintf("workspace_id = %d", workspaceID)
+	translation := TranslateJQL(jql, workspaceID)
+	return translation.QL, translation.Unsupported
+}
+
+// TranslateJQL translates a Jira JQL expression and reports whether the
+// translated selector preserves the source predicate tree.
+func TranslateJQL(jql string, workspaceID int) JQLTranslation {
+	result := JQLTranslation{
+		QL:                 fmt.Sprintf("workspace_id = %d", workspaceID),
+		MembershipComplete: true,
+	}
 	jql = strings.TrimSpace(jql)
 	if jql == "" {
-		return base, nil
+		return result
 	}
-	unsupported = []string{}
 	if match := jqlOrderByPattern.FindString(jql); match != "" {
-		unsupported = append(unsupported, strings.TrimSpace(match))
+		result.Unsupported = append(result.Unsupported, strings.TrimSpace(match))
 		jql = strings.TrimSpace(jqlOrderByPattern.ReplaceAllString(jql, ""))
 	}
 	if jql == "" {
-		return base, unsupported
+		return result
 	}
 	expr, err := parseJQLExpression(jql)
 	if err != nil {
 		// Preserve the whole expression when the grammar is not understood;
 		// callers surface this as an unsupported clause rather than guessing.
-		return base, append(unsupported, jql)
+		result.Unsupported = append(result.Unsupported, jql)
+		result.MembershipComplete = false
+		return result
 	}
 	translated, clauseUnsupported := translateJQLBoolean(expr)
-	unsupported = append(unsupported, clauseUnsupported...)
+	result.Unsupported = append(result.Unsupported, clauseUnsupported...)
 	if translated == "" {
-		return base, unsupported
+		if len(clauseUnsupported) > 0 {
+			result.MembershipComplete = false
+		}
+		return result
 	}
-	return base + " AND (" + translated + ")", unsupported
+	result.QL = result.QL + " AND (" + translated + ")"
+	return result
+}
+
+// UnsupportedJQLSelector returns a workspace-scoped selector that matches
+// nothing. Importers use it when a Jira predicate tree could not be fully
+// translated, keeping the imported collection non-executable instead of
+// widening it to the whole workspace.
+func UnsupportedJQLSelector(workspaceID int) string {
+	return fmt.Sprintf("workspace_id = %d AND 1 = 0", workspaceID)
 }
 
 func translateJQLClause(clause string) (string, bool) {

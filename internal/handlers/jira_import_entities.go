@@ -2199,6 +2199,11 @@ func jiraInternalAttachmentIDs(issue *jira.JiraIssue, rawDescription any, servic
 	return internal
 }
 
+// errJiraAttachmentDownloadSkipped marks a staged attachment that the download
+// pool never reached because the import context was canceled. It keeps an
+// un-attempted entry from being written as a record with an empty file path.
+var errJiraAttachmentDownloadSkipped = errors.New("attachment download skipped because the import stopped")
+
 // jiraAttachmentDownload is one attachment staged for download. The concurrent
 // phase fills the stored fields; the record-writing phase consumes them in
 // attachment order.
@@ -2222,7 +2227,12 @@ func (h *JiraImportHandler) importAttachments(ctx context.Context, jobID string,
 		return nil, nil
 	}
 
+	progress.TotalAttachments += len(issue.Fields.Attachment)
+
 	if !h.storage.Enabled() {
+		// Intentionally disabled storage: count these separately from a failed
+		// attempted download so the terminal outcome is not misread as success.
+		progress.SkippedAttachments += len(issue.Fields.Attachment)
 		slog.Warn("Attachment storage not configured, skipping attachment import",
 			slog.String("component", "jira"), slog.String("issue", issue.Key))
 		return jiraNoAttachmentMediaRefs()
@@ -2235,11 +2245,10 @@ func (h *JiraImportHandler) importAttachments(ctx context.Context, jobID string,
 	// goroutine so mapping order and DB access remain deterministic.
 	var downloads []*jiraAttachmentDownload
 	for _, attachment := range issue.Fields.Attachment {
-		if attachment.Content == "" {
+		if attachment.ID == "" && attachment.Content == "" {
+			progress.SkippedAttachments++
 			continue
 		}
-
-		progress.TotalAttachments++
 
 		previousMapping, lookupErr := h.previousSubresourceMapping(jobID, "attachment", attachment.ID, itemID, forked)
 		if lookupErr != nil {
@@ -2274,7 +2283,12 @@ func (h *JiraImportHandler) importAttachments(ctx context.Context, jobID string,
 			}
 		}
 
-		downloads = append(downloads, &jiraAttachmentDownload{attachment: attachment})
+		// Seed the error so an entry the pool never reaches is not mistaken for a
+		// successful download with an empty path.
+		downloads = append(downloads, &jiraAttachmentDownload{
+			attachment: attachment,
+			err:        errJiraAttachmentDownloadSkipped,
+		})
 	}
 
 	jiraParallel(ctx, h.importConcurrency, len(downloads), func(ctx context.Context, i int) {
@@ -2285,7 +2299,12 @@ func (h *JiraImportHandler) importAttachments(ctx context.Context, jobID string,
 
 	for _, download := range downloads {
 		attachment := download.attachment
+		if errors.Is(download.err, errJiraAttachmentDownloadSkipped) {
+			progress.FailedAttachments++
+			continue
+		}
 		if download.err != nil {
+			progress.FailedAttachments++
 			slog.Error("Failed to store Jira attachment",
 				slog.String("component", "jira"),
 				slog.String("issue", issue.Key),
@@ -2314,6 +2333,7 @@ func (h *JiraImportHandler) importAttachments(ctx context.Context, jobID string,
 			IsInternal:       internalIDs[attachment.ID],
 		})
 		if err != nil {
+			progress.FailedAttachments++
 			slog.Error("Failed to insert attachment record",
 				slog.String("component", "jira"),
 				slog.String("issue", issue.Key),
@@ -2398,7 +2418,7 @@ func sniffAttachmentMimeType(f *os.File) (string, error) {
 // file is always removed. Returns the stored path, stored filename, detected
 // MIME type, and size.
 func (h *JiraImportHandler) storeJiraAttachment(ctx context.Context, attachment jira.JiraAttachment, client jira.Client) (storedPath, storedFilename, mimeType string, size int64, err error) {
-	reader, _, err := client.DownloadAttachment(ctx, attachment.Content)
+	reader, _, err := client.DownloadAttachment(ctx, attachment.ID, attachment.Content)
 	if err != nil {
 		return "", "", "", 0, fmt.Errorf("download: %w", err)
 	}
