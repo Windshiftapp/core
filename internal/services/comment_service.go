@@ -412,13 +412,23 @@ func (s *CommentService) UpdateImported(params UpdateImportedCommentParams) erro
 // themselves after they commit. authorID == 0 inserts a system (NULL author)
 // comment.
 func (s *CommentService) CreateInTx(ctx context.Context, tx database.Tx, itemID, authorID int, content string, createdAt time.Time, eventMetadata ...itemevents.Metadata) (int64, error) {
+	return s.CreateImportedInTx(ctx, tx, itemID, authorID, content, createdAt, createdAt, eventMetadata...)
+}
+
+// CreateImportedInTx inserts an imported comment inside an existing
+// transaction, preserving the source's created_at and updated_at. It is the
+// in-transaction counterpart of CreateImported for importers that must write a
+// comment atomically with their own rows, and it records the canonical
+// comment-created fact with side effects suppressed. authorID == 0 inserts a
+// system (NULL author) comment.
+func (s *CommentService) CreateImportedInTx(ctx context.Context, tx database.Tx, itemID, authorID int, content string, createdAt, updatedAt time.Time, eventMetadata ...itemevents.Metadata) (int64, error) {
 	content = normalizeImportedCommentSource(content)
 	var author any
 	if authorID != 0 {
 		author = authorID
 	}
 	var id int64
-	err := tx.QueryRowContext(ctx, insertCommentAuthorSQL, itemID, author, content, false, createdAt, createdAt).Scan(&id)
+	err := tx.QueryRowContext(ctx, insertCommentAuthorSQL, itemID, author, content, false, createdAt, updatedAt).Scan(&id)
 	if err != nil {
 		return 0, err
 	}
