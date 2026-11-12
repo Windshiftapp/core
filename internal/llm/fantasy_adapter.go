@@ -17,6 +17,7 @@ import (
 	sdkoption "github.com/openai/openai-go/v3/option"
 
 	"windshift/internal/toolschema"
+	"windshift/internal/utils"
 )
 
 type dynamicFantasyClient struct {
@@ -115,7 +116,7 @@ func newFantasyClient(opts fantasyClientOptions) *fantasyClient {
 	httpClient := newAdminConfiguredHTTPClient(opts.timeout)
 	transport := httpClient.Transport
 	if transport == nil {
-		transport = http.DefaultTransport
+		transport = utils.NewSSRFSafeTransport(opts.timeout)
 	}
 	httpClient.Transport = &providerHeaderTransport{
 		next:          &reasoningReplayTransport{next: transport, state: client.replay},

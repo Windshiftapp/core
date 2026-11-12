@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
+	"net/url"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -25,6 +27,19 @@ func SetAllowLocalConnections(v bool) { blockLocalConnections.Store(!v) }
 // AllowLocalConnections reports whether the global loopback/private override is
 // enabled.
 func AllowLocalConnections() bool { return !blockLocalConnections.Load() }
+
+// ProxyFromEnvironmentUnlessBlocked returns the HTTP(S)_PROXY / NO_PROXY
+// proxy for req, but only while local connections are allowed (the default).
+// Use it as Transport.Proxy on dialer-backed SSRF-safe transports: a proxy
+// resolves and dials the target itself, so the post-resolution blocklist
+// cannot see the real destination. When --allow-local-connections=false it
+// returns nil and the transport dials directly, preserving the SSRF guard.
+func ProxyFromEnvironmentUnlessBlocked(req *http.Request) (*url.URL, error) {
+	if !AllowLocalConnections() {
+		return nil, nil
+	}
+	return http.ProxyFromEnvironment(req)
+}
 
 // ErrBlockedSSRFAddr is returned by SafeNetDialer when the resolved IP
 // for a connection is in a non-public range (loopback, RFC1918, link-local,

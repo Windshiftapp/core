@@ -47,6 +47,7 @@ import (
 	"time"
 
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 func main() {
@@ -280,7 +281,7 @@ func preflightAPIURL(ctx context.Context, logger *log.Logger, baseURL string) {
 	if err != nil {
 		logger.Fatalf("WS_API_URL preflight: %v", err)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := utils.NewHTTPClient(10 * time.Second).Do(req)
 	if err != nil {
 		logger.Printf("warning: WS_API_URL preflight: %s unreachable (%v); continuing — the worker retries, "+
 			"but verify the URL and network if this persists", versionURL, err)

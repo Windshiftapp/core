@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -19,7 +18,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"windshift/internal/database"
@@ -3185,31 +3183,9 @@ var errDisallowedRedirect = errors.New("redirect URL not in allowlist")
 
 // newSSRFSafeClient enforces redirect allowlists and public-only destinations.
 func newSSRFSafeClient(timeout time.Duration, allowedPatterns []string) *http.Client {
-	dialer := &net.Dialer{
-		Timeout:   10 * time.Second,
-		KeepAlive: 30 * time.Second,
-		ControlContext: func(_ context.Context, network, address string, _ syscall.RawConn) error {
-			host, _, err := net.SplitHostPort(address)
-			if err != nil {
-				return fmt.Errorf("invalid dial address %q: %w", address, err)
-			}
-			ip := net.ParseIP(host)
-			if ip == nil {
-				return fmt.Errorf("dial host %q did not resolve to an IP", host)
-			}
-			if utils.IsBlockedSSRFAddr(ip) {
-				return fmt.Errorf("%w: %s (%s)", utils.ErrBlockedSSRFAddr, ip.String(), network)
-			}
-			return nil
-		},
-	}
-	transport := utils.ConfigureHTTPTransport(&http.Transport{
-		DialContext:           dialer.DialContext,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ResponseHeaderTimeout: timeout,
-		ExpectContinueTimeout: 1 * time.Second,
-		DisableKeepAlives:     true,
-	})
+	transport := utils.NewSSRFSafeTransport(10 * time.Second)
+	transport.ResponseHeaderTimeout = timeout
+	transport.DisableKeepAlives = true
 	return &http.Client{
 		Transport: transport,
 		Timeout:   timeout,

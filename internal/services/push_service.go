@@ -331,7 +331,7 @@ func newPushService(db database.Database, cfg config.PushConfig, serviceCfg Push
 		serviceCfg: serviceCfg,
 		httpClient: &http.Client{
 			Timeout:   serviceCfg.HTTPTimeout,
-			Transport: utils.ConfigureHTTPTransport(nil),
+			Transport: utils.NewSSRFSafeTransport(serviceCfg.HTTPTimeout),
 			// Redirects re-run the endpoint SSRF policy so a validated
 			// endpoint cannot bounce delivery to an internal address.
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {

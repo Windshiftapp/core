@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -180,38 +179,12 @@ func ValidateExternalURL(rawURL string) error {
 }
 
 // NewSSRFSafeHTTPClient returns an *http.Client that blocks redirects and
-// validates resolved IPs against private ranges before connecting (DNS rebinding defense).
+// refuses loopback/private/metadata destinations at connect time (DNS rebinding
+// defense), using the shared SSRF-safe transport.
 func NewSSRFSafeHTTPClient(timeout time.Duration) *http.Client {
-	dialer := &net.Dialer{
-		Timeout: 5 * time.Second,
-	}
-
-	transport := ConfigureHTTPTransport(&http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			host, port, err := net.SplitHostPort(addr)
-			if err != nil {
-				return nil, fmt.Errorf("split host/port: %w", err)
-			}
-
-			ips, err := net.LookupIP(host)
-			if err != nil {
-				return nil, fmt.Errorf("lookup host: %w", err)
-			}
-
-			for _, ip := range ips {
-				if IsBlockedSSRFAddr(ip) {
-					return nil, fmt.Errorf("%w: %s (%s)", ErrBlockedSSRFAddr, ip.String(), network)
-				}
-			}
-
-			// Connect to the first valid resolved IP
-			return dialer.DialContext(ctx, network, net.JoinHostPort(ips[0].String(), port))
-		},
-	})
-
 	return &http.Client{
 		Timeout:   timeout,
-		Transport: transport,
+		Transport: NewSSRFSafeTransport(timeout),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},

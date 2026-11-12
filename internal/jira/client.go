@@ -161,7 +161,7 @@ func NewClient(cfg Config) (Client, error) {
 	// credential. Redirect-following is preserved; each hop is re-checked.
 	httpClient := &http.Client{
 		Timeout:   timeout,
-		Transport: utils.ConfigureHTTPTransport(&http.Transport{DialContext: utils.SafeNetDialer(timeout).DialContext}),
+		Transport: utils.NewSSRFSafeTransport(timeout),
 	}
 	limiter := rate.NewLimiter(rate.Limit(rateLimit), rateLimit)
 	throttle := &jiraThrottle{}

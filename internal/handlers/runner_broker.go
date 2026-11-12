@@ -485,26 +485,18 @@ func (h *RunnerBrokerHandler) ProxyHTTP(w http.ResponseWriter, r *http.Request) 
 	proxy.ServeHTTP(w, r)
 }
 
-// ssrfSafeTransport is an http.RoundTripper whose dialer rejects connections
-// to non-public IPs. It reuses utils.SafeNetDialer, which checks the resolved
-// address post-resolution but pre-handshake (via ControlContext), so the guard
-// is robust against DNS rebinding. The blocklist is the conservative SSRF
-// superset (loopback, RFC1918, CGNAT 100.64/10, link-local, multicast and the
-// unspecified 0.0.0.0/:: addresses that route to localhost) — broader than the
-// plain IsPrivateIP check, which misses several localhost-reachable ranges.
-// Used by the HTTP egress broker.
+// ssrfSafeTransport is the shared SSRF-safe RoundTripper for the egress
+// brokers. The dialer checks the resolved address post-resolution but
+// pre-handshake (utils.SafeNetDialer), so the guard is robust against DNS
+// rebinding, and the transport honors HTTP(S)_PROXY / NO_PROXY only while local
+// connections are allowed. With --allow-local-connections=false the proxy hook
+// returns nil, so an environment proxy cannot become an unchecked alternate
+// dial path. Used by the git and HTTP egress brokers.
 func ssrfSafeTransport(responseHeaderTimeout time.Duration) http.RoundTripper {
-	return utils.ConfigureHTTPTransport(&http.Transport{
-		// No ProxyFromEnvironment (WI-238 security Phase 7): an env-configured
-		// HTTP(S)_PROXY would be dialed directly, bypassing the post-resolution
-		// blocklist below and reopening the SSRF hole the dialer closes. The
-		// broker always connects to the validated target itself.
-		Proxy:                 nil,
-		ResponseHeaderTimeout: responseHeaderTimeout,
-		IdleConnTimeout:       60 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		DialContext:           utils.SafeNetDialer(10 * time.Second).DialContext,
-	})
+	transport := utils.NewSSRFSafeTransport(10 * time.Second)
+	transport.ResponseHeaderTimeout = responseHeaderTimeout
+	transport.IdleConnTimeout = 60 * time.Second
+	return transport
 }
 
 // authorizeGitPush parses the pushed ref-update commands from a

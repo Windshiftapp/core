@@ -79,7 +79,7 @@ func NewCloudClient(config CloudConfig) (DefinitionClient, error) {
 	timeout := 30 * time.Second
 	httpClient := &http.Client{
 		Timeout:   timeout,
-		Transport: utils.ConfigureHTTPTransport(&http.Transport{DialContext: utils.SafeNetDialer(timeout).DialContext}),
+		Transport: utils.NewSSRFSafeTransport(timeout),
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
 			if req.URL.Scheme != "https" || !strings.EqualFold(req.URL.Hostname(), host) {
 				return errors.New("xray redirect changed origin")
