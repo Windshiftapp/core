@@ -12,11 +12,11 @@ require (
 	github.com/BurntSushi/toml v1.3.2
 	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/allegro/bigcache/v3 v3.1.0
-	github.com/aws/aws-sdk-go-v2 v1.47.3
+	github.com/aws/aws-sdk-go-v2 v1.47.7
 	github.com/aws/aws-sdk-go-v2/config v1.32.33
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.32
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.3
-	github.com/aws/smithy-go v1.28.5
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.8
+	github.com/aws/smithy-go v1.28.8
 	github.com/charmbracelet/log v0.4.2
 	github.com/charmbracelet/ssh v0.0.0-20250826160808-ebfa259c7309
 	github.com/crewjam/saml v0.5.2
@@ -71,15 +71,15 @@ require (
 	github.com/alecthomas/chroma/v2 v2.14.0 // indirect
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
-	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.22 // indirect
+	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.26 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.33 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.6 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.6 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.6 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.21 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.11.7 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.6 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.6 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.10 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.10 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.10 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.24 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.11.11 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.10 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.10 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.5.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.33.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.38.2 // indirect
