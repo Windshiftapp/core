@@ -19914,6 +19914,11 @@
                   "description": "The portal customer name value.",
                   "type": "string"
                 },
+                "resolved_field_name": {
+                  "description": "The resolved field name value.",
+                  "nullable": true,
+                  "type": "string"
+                },
                 "resolved_new_value": {
                   "description": "The resolved new value value.",
                   "nullable": true,
@@ -51985,6 +51990,11 @@
           },
           "old_value": {
             "description": "Previous stored value.",
+            "nullable": true,
+            "type": "string"
+          },
+          "resolved_field_name": {
+            "description": "Human-readable field label for id-encoded keys.",
             "nullable": true,
             "type": "string"
           },

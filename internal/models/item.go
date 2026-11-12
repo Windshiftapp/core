@@ -190,6 +190,10 @@ type ItemHistory struct {
 	// Resolved values for display (when value is an ID)
 	ResolvedOldValue *string `json:"resolved_old_value,omitempty"` // Human-readable version of old_value
 	ResolvedNewValue *string `json:"resolved_new_value,omitempty"` // Human-readable version of new_value
+	// ResolvedFieldName is the display label for field keys that encode an id
+	// (custom fields, virtual request-type fields). Empty when FieldName is
+	// already readable.
+	ResolvedFieldName *string `json:"resolved_field_name,omitempty"`
 }
 
 // ItemStatusDuration is the accumulated time an item has spent in one status.
