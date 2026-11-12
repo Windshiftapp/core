@@ -112,12 +112,16 @@ func (h *ConfigurationSetHandler) Update(w http.ResponseWriter, r *http.Request)
 			return
 		}
 
-		if currentConfigSetID != nil && *currentConfigSetID != id {
+		if currentConfigSetID == nil || *currentConfigSetID != id {
+			sourceConfigSetID := 0
+			if currentConfigSetID != nil {
+				sourceConfigSetID = *currentConfigSetID
+			}
 			var override *int
 			if workflowChanging {
 				override = effectiveNewWorkflowID
 			}
-			if h.respondMigrationConflictIfNeeded(w, r, workspaceID, *currentConfigSetID, id, override) {
+			if h.respondMigrationConflictIfNeeded(w, r, workspaceID, sourceConfigSetID, id, override) {
 				return
 			}
 		}

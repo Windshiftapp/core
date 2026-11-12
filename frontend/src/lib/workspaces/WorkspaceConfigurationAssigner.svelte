@@ -99,18 +99,12 @@
             return;
           }
         } catch (error) {
+          // Surface the analysis failure directly. Opening the migration
+          // assistant would re-run the same failing request and cannot produce
+          // an executable plan, so revert the picker to the assigned set.
           console.error('Failed to analyze migration requirements:', error);
-          // If analysis fails, show migration assistant as a fallback
-          pendingConfigurationChange = {
-            currentConfigSet,
-            newConfigSet,
-            newConfigSetId
-          };
-          migrationConfigSet = {
-            ...newConfigSet,
-            workspace_ids: [parseInt(workspaceId)]
-          };
-          showMigrationAssistant = true;
+          errorToast(t('dialogs.alerts.failedToUpdate', { error: error.message || error }));
+          selectedConfigurationSetId = currentConfigSet ? currentConfigSet.id : null;
           return;
         }
       }
@@ -152,13 +146,16 @@
     
     try {
       if (success && pendingConfigurationChange) {
-        // Migration was successful - apply the configuration change
+        // The comprehensive migration already swapped the workspace assignment
+        // inside the migration transaction. Reload the server state and notify
+        // the parent instead of issuing a second assignment request, which
+        // could fail after an otherwise successful migration.
         saving = true;
-        await applyConfigurationChange(
-          pendingConfigurationChange.newConfigSetId,
-          pendingConfigurationChange.currentConfigSet,
-          pendingConfigurationChange.newConfigSet
-        );
+        await loadData();
+        onconfigurationChanged?.({
+          oldConfigSet: pendingConfigurationChange.currentConfigSet,
+          newConfigSet: pendingConfigurationChange.newConfigSet
+        });
       } else if (cancelled || !success) {
         // Migration was cancelled or failed - revert the UI selection
         const currentConfigSet = configurationSets.find(cs => 
@@ -167,7 +164,7 @@
         selectedConfigurationSetId = currentConfigSet ? currentConfigSet.id : null;
       }
     } catch (error) {
-      console.error('Failed to apply configuration change after migration:', error);
+      console.error('Failed to refresh state after migration:', error);
       errorToast(t('dialogs.alerts.failedToApplyConfig', { error: error.message || error }));
       
       // Revert the UI selection on error

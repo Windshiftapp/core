@@ -61,12 +61,15 @@ func (h *ConfigurationSetHandler) AssignWorkspaceConfigurationSet(w http.Respons
 		return
 	}
 
-	// Switching between two sets requires the workspace's items to be
-	// compatible with the target. Mirror the PUT /configuration-sets/{id} 409
-	// contract so clients can drive the migration flow; unassigning has no
-	// compatibility constraint.
-	if currentID != nil && req.ConfigurationSetID != nil && *currentID != *req.ConfigurationSetID {
-		if h.respondMigrationConflictIfNeeded(w, r, workspaceID, *currentID, *req.ConfigurationSetID, nil) {
+	// Any move to an explicit set requires the workspace's items to be
+	// compatible with the target. A nil current assignment still inherits the
+	// default set, so use 0 as the migration/CAS source sentinel.
+	if req.ConfigurationSetID != nil && (currentID == nil || *currentID != *req.ConfigurationSetID) {
+		sourceID := 0
+		if currentID != nil {
+			sourceID = *currentID
+		}
+		if h.respondMigrationConflictIfNeeded(w, r, workspaceID, sourceID, *req.ConfigurationSetID, nil) {
 			return
 		}
 	}

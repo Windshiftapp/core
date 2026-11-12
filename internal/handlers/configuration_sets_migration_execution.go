@@ -89,13 +89,11 @@ func (h *ConfigurationSetHandler) ExecuteMigration(w http.ResponseWriter, r *htt
 	}
 	sanitizeStatusMappings(migrationReq.StatusMappings)
 
-	// Validate configuration set exists and load its workflow_id for membership checks.
+	// Validate the configuration set exists.
 	var configSetExists bool
-	var targetWorkflowID sql.NullInt64
 	err := h.db.QueryRow(`
-		SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?),
-		       (SELECT workflow_id FROM configuration_sets WHERE id = ?)
-	`, migrationReq.ConfigurationSetID, migrationReq.ConfigurationSetID).Scan(&configSetExists, &targetWorkflowID)
+		SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)
+	`, migrationReq.ConfigurationSetID).Scan(&configSetExists)
 	if err != nil || !configSetExists {
 		respondBadRequest(w, r, "Configuration set not found")
 		return
@@ -107,13 +105,20 @@ func (h *ConfigurationSetHandler) ExecuteMigration(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// Validate target status IDs are members of the target workflow.
-	if !targetWorkflowID.Valid && len(migrationReq.StatusMappings) > 0 {
-		respondBadRequest(w, r, "Target configuration set has no workflow; cannot accept status mappings")
-		return
-	}
+	// Validate target status IDs against each mapping's effective target
+	// workflow. Item-type workflow overrides take precedence over the set's
+	// default workflow.
 	for _, mapping := range migrationReq.StatusMappings {
-		if !h.statusIsInWorkflow(mapping.ToStatusID, int(targetWorkflowID.Int64)) {
+		workflowID, resolveErr := h.resolveConfigSetWorkflowID(migrationReq.ConfigurationSetID, mapping.ItemTypeID, nil)
+		if resolveErr != nil {
+			respondInternalError(w, r, resolveErr)
+			return
+		}
+		if workflowID == nil {
+			respondBadRequest(w, r, "Target configuration set has no workflow; cannot accept status mappings")
+			return
+		}
+		if !h.statusIsInWorkflow(mapping.ToStatusID, *workflowID) {
 			respondBadRequest(w, r, fmt.Sprintf("Target status ID %d is not part of the target workflow", mapping.ToStatusID))
 			return
 		}
@@ -190,11 +195,9 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 			return
 		}
 	}
-	var targetWorkflowID sql.NullInt64
 	if err := h.db.QueryRow(`
-		SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?),
-		       (SELECT workflow_id FROM configuration_sets WHERE id = ?)
-	`, req.NewConfigurationSetID, req.NewConfigurationSetID).Scan(&newConfigSetExists, &targetWorkflowID); err != nil {
+		SELECT EXISTS(SELECT 1 FROM configuration_sets WHERE id = ?)
+	`, req.NewConfigurationSetID).Scan(&newConfigSetExists); err != nil {
 		slog.Error("migration validation failed", slog.Any("error", err), slog.String("check", "new_configuration_set"))
 		respondInternalError(w, r, fmt.Errorf("failed to validate new configuration set: %w", err))
 		return
@@ -202,6 +205,17 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 	if !newConfigSetExists {
 		respondBadRequest(w, r, "New configuration set not found")
 		return
+	}
+	if req.ApplyWorkflowToConfigSet != nil {
+		var exists bool
+		if err := h.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM workflows WHERE id = ?)`, *req.ApplyWorkflowToConfigSet).Scan(&exists); err != nil {
+			respondInternalError(w, r, fmt.Errorf("failed to validate apply_workflow_to_config_set: %w", err))
+			return
+		}
+		if !exists {
+			respondBadRequest(w, r, fmt.Sprintf("apply_workflow_to_config_set: workflow %d not found", *req.ApplyWorkflowToConfigSet))
+			return
+		}
 	}
 
 	// Validate workspace IDs provided
@@ -294,34 +308,45 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 		}
 	}
 
-	// Target statuses: must be members of the target workflow. When the caller
-	// supplies ApplyWorkflowToConfigSet, validate against *that* workflow
-	// instead of the workflow currently persisted on the config set — this is
-	// the intra-set workflow-change path, where the new workflow_id will be
-	// written inside this same transaction below.
-	effectiveTargetWorkflowID := int(targetWorkflowID.Int64)
-	effectiveTargetWorkflowValid := targetWorkflowID.Valid
-	if req.ApplyWorkflowToConfigSet != nil {
-		// Verify the target workflow actually exists.
-		var exists bool
-		if err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workflows WHERE id = ?)", *req.ApplyWorkflowToConfigSet).Scan(&exists); err != nil {
-			respondInternalError(w, r, fmt.Errorf("failed to validate apply_workflow_to_config_set: %w", err))
+	// Target statuses are validated against the workflow effective for each
+	// mapping's item type. A pending default-workflow change overrides only the
+	// set-level workflow; item-type overrides still win.
+	for _, mapping := range req.StatusMappings {
+		workflowID, resolveErr := h.resolveConfigSetWorkflowID(req.NewConfigurationSetID, mapping.ItemTypeID, req.ApplyWorkflowToConfigSet)
+		if resolveErr != nil {
+			respondInternalError(w, r, resolveErr)
 			return
 		}
-		if !exists {
-			respondBadRequest(w, r, fmt.Sprintf("apply_workflow_to_config_set: workflow %d not found", *req.ApplyWorkflowToConfigSet))
+		if workflowID == nil {
+			respondBadRequest(w, r, "Target configuration set has no workflow; cannot accept status mappings")
 			return
 		}
-		effectiveTargetWorkflowID = *req.ApplyWorkflowToConfigSet
-		effectiveTargetWorkflowValid = true
+		if !h.statusIsInWorkflow(mapping.ToStatusID, *workflowID) {
+			respondBadRequest(w, r, fmt.Sprintf("Target status ID %d is not part of the target workflow", mapping.ToStatusID))
+			return
+		}
 	}
-	if !effectiveTargetWorkflowValid && len(req.StatusMappings) > 0 {
-		respondBadRequest(w, r, "Target configuration set has no workflow; cannot accept status mappings")
+
+	// Reject forged, stale, or malformed mappings before any write.
+	if invalid, err := h.validateMigrationMappingPayload(&req); err != nil {
+		respondInternalError(w, r, err)
+		return
+	} else if invalid != "" {
+		respondBadRequest(w, r, invalid)
 		return
 	}
-	for _, mapping := range req.StatusMappings {
-		if !h.statusIsInWorkflow(mapping.ToStatusID, effectiveTargetWorkflowID) {
-			respondBadRequest(w, r, fmt.Sprintf("Target status ID %d is not part of the target workflow", mapping.ToStatusID))
+
+	if req.AttachAfterMigration {
+		incomplete, validateErr := h.validateAttachMigrationMappings(&req)
+		if validateErr != nil {
+			respondInternalError(w, r, validateErr)
+			return
+		}
+		if incomplete != "" {
+			respondJSON(w, http.StatusConflict, map[string]any{
+				"error":   "migration_incomplete",
+				"message": incomplete,
+			})
 			return
 		}
 	}
@@ -771,6 +796,277 @@ func (h *ConfigurationSetHandler) addDefaultFieldValue(tx database.Tx, workspace
 	}
 
 	return count, nil
+}
+
+// migrationStatusSourceKey identifies a status-migration source. statusID 0
+// means items with NULL status_id; itemTypeID 0 means "no per-type filter".
+type migrationStatusSourceKey struct {
+	statusID   int
+	itemTypeID int
+}
+
+// validateMigrationMappingPayload rejects forged, stale, or malformed mappings
+// before any write. It returns a user-facing message for a 400 response, or an
+// error when the analysis itself fails.
+func (h *ConfigurationSetHandler) validateMigrationMappingPayload(req *models.ComprehensiveMigrationRequest) (string, error) {
+	seenWorkspaces := make(map[int]struct{}, len(req.WorkspaceIDs))
+	for _, workspaceID := range req.WorkspaceIDs {
+		if _, duplicate := seenWorkspaces[workspaceID]; duplicate {
+			return fmt.Sprintf("Duplicate workspace ID %d", workspaceID), nil
+		}
+		seenWorkspaces[workspaceID] = struct{}{}
+		exists, err := h.repo.WorkspaceExists(workspaceID)
+		if err != nil {
+			return "", err
+		}
+		if !exists {
+			return fmt.Sprintf("Workspace %d not found", workspaceID), nil
+		}
+	}
+
+	effectiveSourceID, _, err := h.resolveMigrationSourceConfigSet(req.OldConfigurationSetID)
+	if err != nil {
+		return "", err
+	}
+
+	// Item-type sources are path-dependent: an intra-set allow-list change is
+	// validated against the proposed list, not the persisted one.
+	validItemTypeSources := make(map[int]struct{})
+	if req.ApplyItemTypeConfigsToConfigSet != nil {
+		required, _, _, err := h.analyzeItemTypesAgainstConfigs(req.WorkspaceIDs, *req.ApplyItemTypeConfigsToConfigSet)
+		if err != nil {
+			return "", err
+		}
+		for _, migration := range required {
+			validItemTypeSources[nullableInt(migration.CurrentItemTypeID)] = struct{}{}
+		}
+	} else {
+		for _, workspaceID := range req.WorkspaceIDs {
+			migrations, _, _, err := h.analyzeItemTypeMigration(workspaceID, req.NewConfigurationSetID)
+			if err != nil {
+				return "", err
+			}
+			for _, migration := range migrations {
+				if migration.RequiresMigration {
+					validItemTypeSources[nullableInt(migration.CurrentItemTypeID)] = struct{}{}
+				}
+			}
+		}
+	}
+
+	validPrioritySources := make(map[int]struct{})
+	for _, workspaceID := range req.WorkspaceIDs {
+		migrations, _, _, err := h.analyzePriorityMigration(workspaceID, req.NewConfigurationSetID)
+		if err != nil {
+			return "", err
+		}
+		for _, migration := range migrations {
+			if migration.RequiresMigration {
+				validPrioritySources[nullableInt(migration.CurrentPriorityID)] = struct{}{}
+			}
+		}
+	}
+
+	statusMigrations, _, err := h.analyzeStatusMigrationForConfigSet(req.WorkspaceIDs, req.NewConfigurationSetID, req.ApplyWorkflowToConfigSet)
+	if err != nil {
+		return "", err
+	}
+	validStatusSources := make(map[migrationStatusSourceKey]struct{}, len(statusMigrations))
+	for _, migration := range statusMigrations {
+		validStatusSources[migrationStatusSourceKey{
+			statusID:   nullableInt(migration.CurrentStatusID),
+			itemTypeID: nullableInt(migration.ItemTypeID),
+		}] = struct{}{}
+	}
+
+	validFieldActions := make(map[int]string)
+	for _, workspaceID := range req.WorkspaceIDs {
+		migrations, _, err := h.analyzeCustomFieldMigration(workspaceID, effectiveSourceID, req.NewConfigurationSetID)
+		if err != nil {
+			return "", err
+		}
+		for _, migration := range migrations {
+			validFieldActions[migration.FieldID] = migration.Action
+		}
+	}
+
+	seenItemTypes := make(map[int]struct{}, len(req.ItemTypeMappings))
+	for _, mapping := range req.ItemTypeMappings {
+		fromID := nullableInt(mapping.FromItemTypeID)
+		if _, duplicate := seenItemTypes[fromID]; duplicate {
+			return "Duplicate item type mapping", nil
+		}
+		seenItemTypes[fromID] = struct{}{}
+		if _, ok := validItemTypeSources[fromID]; !ok {
+			return fmt.Sprintf("Item type mapping for source item type ID %d is not part of the migration", fromID), nil
+		}
+	}
+
+	seenPriorities := make(map[int]struct{}, len(req.PriorityMappings))
+	for _, mapping := range req.PriorityMappings {
+		fromID := nullableInt(mapping.FromPriorityID)
+		if _, duplicate := seenPriorities[fromID]; duplicate {
+			return "Duplicate priority mapping", nil
+		}
+		seenPriorities[fromID] = struct{}{}
+		if _, ok := validPrioritySources[fromID]; !ok {
+			return fmt.Sprintf("Priority mapping for source priority ID %d is not part of the migration", fromID), nil
+		}
+	}
+
+	seenStatuses := make(map[migrationStatusSourceKey]struct{}, len(req.StatusMappings))
+	for _, mapping := range req.StatusMappings {
+		key := migrationStatusSourceKey{
+			statusID:   nullableInt(mapping.FromStatusID),
+			itemTypeID: nullableInt(mapping.ItemTypeID),
+		}
+		if _, duplicate := seenStatuses[key]; duplicate {
+			return "Duplicate status mapping", nil
+		}
+		seenStatuses[key] = struct{}{}
+		if _, ok := validStatusSources[key]; !ok {
+			return "Status mapping source is not part of the migration", nil
+		}
+	}
+
+	seenFields := make(map[int]struct{}, len(req.CustomFieldMappings))
+	for _, mapping := range req.CustomFieldMappings {
+		if _, duplicate := seenFields[mapping.FieldID]; duplicate {
+			return "Duplicate custom field mapping", nil
+		}
+		seenFields[mapping.FieldID] = struct{}{}
+		switch mapping.Action {
+		case "keep", "orphan", "add_default":
+		default:
+			return fmt.Sprintf("Unsupported custom field action %q", mapping.Action), nil
+		}
+		action, ok := validFieldActions[mapping.FieldID]
+		if !ok {
+			return fmt.Sprintf("Custom field mapping references unknown field ID %d", mapping.FieldID), nil
+		}
+		if mapping.Action != action {
+			return fmt.Sprintf("Custom field %d action %q does not match the analyzed action %q", mapping.FieldID, mapping.Action, action), nil
+		}
+		if mapping.Action == "add_default" && mapping.DefaultValue == nil {
+			return fmt.Sprintf("Custom field %d requires a default value", mapping.FieldID), nil
+		}
+	}
+
+	return "", nil
+}
+
+func (h *ConfigurationSetHandler) validateAttachMigrationMappings(req *models.ComprehensiveMigrationRequest) (string, error) {
+	providedItemTypes := make(map[int]struct{}, len(req.ItemTypeMappings))
+	for _, mapping := range req.ItemTypeMappings {
+		fromID := 0
+		if mapping.FromItemTypeID != nil {
+			fromID = *mapping.FromItemTypeID
+		}
+		providedItemTypes[fromID] = struct{}{}
+	}
+	providedPriorities := make(map[int]struct{}, len(req.PriorityMappings))
+	for _, mapping := range req.PriorityMappings {
+		fromID := 0
+		if mapping.FromPriorityID != nil {
+			fromID = *mapping.FromPriorityID
+		}
+		providedPriorities[fromID] = struct{}{}
+	}
+	type statusKey struct {
+		statusID   int
+		itemTypeID int
+	}
+	providedStatuses := make(map[statusKey]struct{}, len(req.StatusMappings))
+	for _, mapping := range req.StatusMappings {
+		key := statusKey{}
+		if mapping.FromStatusID != nil {
+			key.statusID = *mapping.FromStatusID
+		}
+		if mapping.ItemTypeID != nil {
+			key.itemTypeID = *mapping.ItemTypeID
+		}
+		providedStatuses[key] = struct{}{}
+	}
+	providedDefaults := make(map[int]struct{}, len(req.CustomFieldMappings))
+	for _, mapping := range req.CustomFieldMappings {
+		if mapping.Action == "add_default" && mapping.DefaultValue != nil {
+			providedDefaults[mapping.FieldID] = struct{}{}
+		}
+	}
+
+	effectiveSourceID, _, err := h.resolveMigrationSourceConfigSet(req.OldConfigurationSetID)
+	if err != nil {
+		return "", err
+	}
+	for _, workspaceID := range req.WorkspaceIDs {
+		itemTypes, _, _, err := h.analyzeItemTypeMigration(workspaceID, req.NewConfigurationSetID)
+		if err != nil {
+			return "", err
+		}
+		for _, migration := range itemTypes {
+			if !migration.RequiresMigration {
+				continue
+			}
+			fromID := 0
+			if migration.CurrentItemTypeID != nil {
+				fromID = *migration.CurrentItemTypeID
+			}
+			if _, ok := providedItemTypes[fromID]; !ok {
+				return fmt.Sprintf("A migration mapping is required for item type %q", migration.CurrentItemTypeName), nil
+			}
+		}
+
+		priorities, _, _, err := h.analyzePriorityMigration(workspaceID, req.NewConfigurationSetID)
+		if err != nil {
+			return "", err
+		}
+		for _, migration := range priorities {
+			if !migration.RequiresMigration {
+				continue
+			}
+			fromID := 0
+			if migration.CurrentPriorityID != nil {
+				fromID = *migration.CurrentPriorityID
+			}
+			if _, ok := providedPriorities[fromID]; !ok {
+				return fmt.Sprintf("A migration mapping is required for priority %q", migration.CurrentPriorityName), nil
+			}
+		}
+
+		fields, _, err := h.analyzeCustomFieldMigration(workspaceID, effectiveSourceID, req.NewConfigurationSetID)
+		if err != nil {
+			return "", err
+		}
+		for _, migration := range fields {
+			if !migration.RequiresDefault {
+				continue
+			}
+			if _, ok := providedDefaults[migration.FieldID]; !ok {
+				return fmt.Sprintf("A default value is required for custom field %q", migration.FieldName), nil
+			}
+		}
+	}
+
+	statuses, _, err := h.analyzeStatusMigrationForConfigSet(req.WorkspaceIDs, req.NewConfigurationSetID, req.ApplyWorkflowToConfigSet)
+	if err != nil {
+		return "", err
+	}
+	for _, migration := range statuses {
+		if !migration.RequiresMigration {
+			continue
+		}
+		key := statusKey{}
+		if migration.CurrentStatusID != nil {
+			key.statusID = *migration.CurrentStatusID
+		}
+		if migration.ItemTypeID != nil {
+			key.itemTypeID = *migration.ItemTypeID
+		}
+		if _, ok := providedStatuses[key]; !ok {
+			return fmt.Sprintf("A migration mapping is required for status %q", migration.CurrentStatus), nil
+		}
+	}
+	return "", nil
 }
 
 func inIntSet(s map[int]struct{}, v int) bool {

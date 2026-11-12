@@ -16,6 +16,23 @@ import (
 	"windshift/internal/utils"
 )
 
+func (h *ConfigurationSetHandler) requireMigrationAnalysisAccess(w http.ResponseWriter, r *http.Request, workspaceIDs []int) bool {
+	if h.permissionService == nil {
+		return true
+	}
+	user := utils.GetCurrentUser(r)
+	if user == nil {
+		respondUnauthorized(w, r)
+		return false
+	}
+	for _, workspaceID := range workspaceIDs {
+		if !RequireWorkspacePermission(w, r, user.ID, workspaceID, models.PermissionWorkspaceAdmin, h.permissionService) {
+			return false
+		}
+	}
+	return true
+}
+
 // normalizeStatusName normalizes status names for comparison by replacing underscores with spaces and converting to lowercase
 func normalizeStatusName(name string) string {
 	normalized := strings.ReplaceAll(name, "_", " ")
@@ -60,6 +77,15 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 			respondBadRequest(w, r, "Invalid workspace_id parameter")
 			return
 		}
+		exists, err := h.repo.WorkspaceExists(workspaceID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		if !exists {
+			respondNotFound(w, r, "Workspace")
+			return
+		}
 		affectedWorkspaces = []int{workspaceID}
 	} else {
 		workspaceQuery := `
@@ -87,6 +113,10 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 			respondInternalError(w, r, err)
 			return
 		}
+	}
+
+	if !h.requireMigrationAnalysisAccess(w, r, affectedWorkspaces) {
+		return
 	}
 
 	if len(affectedWorkspaces) == 0 {
@@ -188,6 +218,10 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 			if workflowStatus, exists := workflowStatuses[normalizedCurrentStatus]; exists {
 				migration.SuggestedStatusID = &workflowStatus.ID
 				migration.SuggestedStatusName = workflowStatus.Name
+				if migration.CurrentStatusID == nil || *migration.CurrentStatusID != workflowStatus.ID {
+					migration.RequiresMigration = true
+					requiresMigration = true
+				}
 			} else {
 				migration.RequiresMigration = true
 				requiresMigration = true
@@ -264,6 +298,10 @@ func (h *ConfigurationSetHandler) AnalyzeMigration(w http.ResponseWriter, r *htt
 			if workflowStatus, exists := workflowStatuses[normalizedCurrentStatus]; exists {
 				migration.SuggestedStatusID = &workflowStatus.ID
 				migration.SuggestedStatusName = workflowStatus.Name
+				if migration.CurrentStatusID == nil || *migration.CurrentStatusID != workflowStatus.ID {
+					migration.RequiresMigration = true
+					requiresMigration = true
+				}
 			} else {
 				migration.RequiresMigration = true
 				requiresMigration = true
@@ -305,8 +343,21 @@ func (h *ConfigurationSetHandler) AnalyzeComprehensiveMigration(w http.ResponseW
 		respondBadRequest(w, r, "Invalid workspace_id parameter")
 		return
 	}
+	workspaceExists, err := h.repo.WorkspaceExists(workspaceID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !workspaceExists {
+		respondNotFound(w, r, "Workspace")
+		return
+	}
 
-	// Get workspace's current configuration set
+	if !h.requireMigrationAnalysisAccess(w, r, []int{workspaceID}) {
+		return
+	}
+
+	// Get workspace's current explicit configuration set.
 	var sourceConfigSetID sql.NullInt64
 	var sourceConfigSetName string
 	err = h.db.QueryRow(`
@@ -317,11 +368,11 @@ func (h *ConfigurationSetHandler) AnalyzeComprehensiveMigration(w http.ResponseW
 	`, workspaceID).Scan(&sourceConfigSetID, &sourceConfigSetName)
 
 	if errors.Is(err, sql.ErrNoRows) {
-		// Workspace has no config set assigned - treat source as having no restrictions
-		// But still need to check if items are compatible with target restrictions
+		// No explicit assignment means the default configuration set is applied
+		// automatically. Keep 0 as the assignment CAS sentinel, but analyze from
+		// the effective default set below.
 		sourceConfigSetID = sql.NullInt64{Int64: 0, Valid: false}
 		sourceConfigSetName = "(No Configuration Set)"
-		// Don't return early - continue with migration analysis
 	} else if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -340,6 +391,14 @@ func (h *ConfigurationSetHandler) AnalyzeComprehensiveMigration(w http.ResponseW
 	}
 
 	sourceID := int(sourceConfigSetID.Int64)
+	effectiveSourceID, effectiveSourceName, err := h.resolveMigrationSourceConfigSet(sourceID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if sourceID == 0 {
+		sourceConfigSetName = effectiveSourceName
+	}
 
 	// Get target configuration set details
 	var targetConfigSetName string
@@ -379,24 +438,40 @@ func (h *ConfigurationSetHandler) AnalyzeComprehensiveMigration(w http.ResponseW
 	}
 
 	// Analyze item types
-	itemTypeMigrations, availableItemTypes, requiresItemTypeMigration := h.analyzeItemTypeMigration(workspaceID, sourceID, targetConfigSetID)
+	itemTypeMigrations, availableItemTypes, requiresItemTypeMigration, err := h.analyzeItemTypeMigration(workspaceID, targetConfigSetID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	analysis.ItemTypeMigrations = itemTypeMigrations
 	analysis.AvailableItemTypes = availableItemTypes
 	analysis.RequiresItemTypeMigration = requiresItemTypeMigration
 
 	// Analyze custom fields
-	customFieldMigrations, requiresFieldMigration := h.analyzeCustomFieldMigration(workspaceID, sourceID, targetConfigSetID)
+	customFieldMigrations, requiresFieldMigration, err := h.analyzeCustomFieldMigration(workspaceID, effectiveSourceID, targetConfigSetID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	analysis.CustomFieldMigrations = customFieldMigrations
 	analysis.RequiresFieldMigration = requiresFieldMigration
 
 	// Analyze priorities
-	priorityMigrations, availablePriorities, requiresPriorityMigration := h.analyzePriorityMigration(workspaceID, sourceID, targetConfigSetID)
+	priorityMigrations, availablePriorities, requiresPriorityMigration, err := h.analyzePriorityMigration(workspaceID, targetConfigSetID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	analysis.PriorityMigrations = priorityMigrations
 	analysis.AvailablePriorities = availablePriorities
 	analysis.RequiresPriorityMigration = requiresPriorityMigration
 
-	// Analyze statuses (reuse existing logic)
-	statusMigrations, requiresStatusMigration := h.analyzeStatusMigration(workspaceID, targetConfigSetID)
+	// Analyze statuses against the target configuration's effective workflows.
+	statusMigrations, requiresStatusMigration, err := h.analyzeStatusMigration(workspaceID, targetConfigSetID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	analysis.StatusMigrations = statusMigrations
 	analysis.RequiresStatusMigration = requiresStatusMigration
 
@@ -408,45 +483,31 @@ func (h *ConfigurationSetHandler) AnalyzeComprehensiveMigration(w http.ResponseW
 }
 
 // analyzeItemTypeMigration compares item types between source and target config sets
-func (h *ConfigurationSetHandler) analyzeItemTypeMigration(workspaceID, sourceConfigSetID, targetConfigSetID int) ([]models.ItemTypeMigrationInfo, []models.ItemTypeTarget, bool) {
-	// Get item types in source config set
-	sourceItemTypes := make(map[int]string)
-	rows, err := h.db.Query(`
-		SELECT it.id, it.name
-		FROM configuration_set_item_types csit
-		JOIN item_types it ON csit.item_type_id = it.id
-		WHERE csit.configuration_set_id = ?
-	`, sourceConfigSetID)
-	if err == nil {
-		defer func() { _ = rows.Close() }()
-		for rows.Next() {
-			var id int
-			var name string
-			_ = rows.Scan(&id, &name)
-			sourceItemTypes[id] = name
-		}
-		_ = rows.Err()
-	}
-
+func (h *ConfigurationSetHandler) analyzeItemTypeMigration(workspaceID, targetConfigSetID int) ([]models.ItemTypeMigrationInfo, []models.ItemTypeTarget, bool, error) {
 	// Get item types in target config set
 	targetItemTypes := make(map[int]models.ItemTypeTarget)
 	var availableTargets []models.ItemTypeTarget
-	rows, err = h.db.Query(`
+	rows, err := h.db.Query(`
 		SELECT it.id, it.name, it.icon, it.color, it.hierarchy_level
 		FROM configuration_set_item_types csit
 		JOIN item_types it ON csit.item_type_id = it.id
 		WHERE csit.configuration_set_id = ?
 		ORDER BY CASE WHEN it.hierarchy_level = -1 THEN 1 ELSE 0 END, it.hierarchy_level, it.sort_order
 	`, targetConfigSetID)
-	if err == nil {
-		defer func() { _ = rows.Close() }()
-		for rows.Next() {
-			var target models.ItemTypeTarget
-			_ = rows.Scan(&target.ID, &target.Name, &target.Icon, &target.Color, &target.HierarchyLevel)
-			targetItemTypes[target.ID] = target
-			availableTargets = append(availableTargets, target)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var target models.ItemTypeTarget
+		if err := rows.Scan(&target.ID, &target.Name, &target.Icon, &target.Color, &target.HierarchyLevel); err != nil {
+			return nil, nil, false, err
 		}
-		_ = rows.Err()
+		targetItemTypes[target.ID] = target
+		availableTargets = append(availableTargets, target)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, false, err
 	}
 
 	// If target config set has no explicit item types, it accepts ALL item types
@@ -456,15 +517,20 @@ func (h *ConfigurationSetHandler) analyzeItemTypeMigration(workspaceID, sourceCo
 			FROM item_types
 			ORDER BY CASE WHEN hierarchy_level = -1 THEN 1 ELSE 0 END, hierarchy_level, sort_order
 		`)
-		if err == nil {
-			defer func() { _ = rows.Close() }()
-			for rows.Next() {
-				var target models.ItemTypeTarget
-				_ = rows.Scan(&target.ID, &target.Name, &target.Icon, &target.Color, &target.HierarchyLevel)
-				targetItemTypes[target.ID] = target
-				availableTargets = append(availableTargets, target)
+		if err != nil {
+			return nil, nil, false, err
+		}
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			var target models.ItemTypeTarget
+			if err := rows.Scan(&target.ID, &target.Name, &target.Icon, &target.Color, &target.HierarchyLevel); err != nil {
+				return nil, nil, false, err
 			}
-			_ = rows.Err()
+			targetItemTypes[target.ID] = target
+			availableTargets = append(availableTargets, target)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, nil, false, err
 		}
 	}
 
@@ -482,7 +548,7 @@ func (h *ConfigurationSetHandler) analyzeItemTypeMigration(workspaceID, sourceCo
 
 	typeCounts, err := repository.NewItemRepository(h.db).ListItemTypeCountsForWorkspace(workspaceID)
 	if err != nil {
-		return migrations, availableTargets, false
+		return nil, nil, false, err
 	}
 
 	for _, tc := range typeCounts {
@@ -493,11 +559,10 @@ func (h *ConfigurationSetHandler) analyzeItemTypeMigration(workspaceID, sourceCo
 		mappingTargets := availableTargets
 		sourceLevel := 0
 		if typeID != 0 {
-			if err := h.db.QueryRow(`SELECT hierarchy_level FROM item_types WHERE id = ?`, typeID).Scan(&sourceLevel); err == nil {
-				mappingTargets = append([]models.ItemTypeTarget{}, targetsByLevel[sourceLevel]...)
-			} else {
-				mappingTargets = []models.ItemTypeTarget{}
+			if err := h.db.QueryRow(`SELECT hierarchy_level FROM item_types WHERE id = ?`, typeID).Scan(&sourceLevel); err != nil {
+				return nil, nil, false, err
 			}
+			mappingTargets = append([]models.ItemTypeTarget{}, targetsByLevel[sourceLevel]...)
 		}
 
 		migration := models.ItemTypeMigrationInfo{
@@ -518,10 +583,12 @@ func (h *ConfigurationSetHandler) analyzeItemTypeMigration(workspaceID, sourceCo
 			migration.SuggestedItemTypeName = target.Name
 			migration.RequiresMigration = false
 		} else if target, exists := targetByNameAndLevel[fmt.Sprintf("%d:%s", sourceLevel, strings.ToLower(typeName))]; exists {
-			// Match by name
+			// A same-name target is a useful suggestion, but the persisted item
+			// still references the disallowed source ID and must be remapped.
 			migration.SuggestedItemTypeID = &target.ID
 			migration.SuggestedItemTypeName = target.Name
-			migration.RequiresMigration = false
+			migration.RequiresMigration = true
+			requiresMigration = true
 		} else if typeID == 0 && len(mappingTargets) > 0 {
 			// No type set - suggest first available
 			migration.SuggestedItemTypeID = &mappingTargets[0].ID
@@ -537,11 +604,11 @@ func (h *ConfigurationSetHandler) analyzeItemTypeMigration(workspaceID, sourceCo
 		migrations = append(migrations, migration)
 	}
 
-	return migrations, availableTargets, requiresMigration
+	return migrations, availableTargets, requiresMigration, nil
 }
 
 // analyzeCustomFieldMigration compares custom fields between source and target screens
-func (h *ConfigurationSetHandler) analyzeCustomFieldMigration(workspaceID, sourceConfigSetID, targetConfigSetID int) ([]models.CustomFieldMigrationInfo, bool) {
+func (h *ConfigurationSetHandler) analyzeCustomFieldMigration(workspaceID, sourceConfigSetID, targetConfigSetID int) ([]models.CustomFieldMigrationInfo, bool, error) {
 	// Get custom fields from source config set screens
 	sourceFields := make(map[int]struct {
 		name      string
@@ -555,18 +622,23 @@ func (h *ConfigurationSetHandler) analyzeCustomFieldMigration(workspaceID, sourc
 			AND (CASE WHEN sf.field_type = 'custom' THEN CAST(sf.field_identifier AS INTEGER) END) = cfd.id
 		WHERE css.configuration_set_id = ?
 	`, sourceConfigSetID)
-	if err == nil {
-		defer func() { _ = rows.Close() }()
-		for rows.Next() {
-			var id int
-			var name, fieldType string
-			_ = rows.Scan(&id, &name, &fieldType)
-			sourceFields[id] = struct {
-				name      string
-				fieldType string
-			}{name, fieldType}
+	if err != nil {
+		return nil, false, err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var id int
+		var name, fieldType string
+		if err := rows.Scan(&id, &name, &fieldType); err != nil {
+			return nil, false, err
 		}
-		_ = rows.Err()
+		sourceFields[id] = struct {
+			name      string
+			fieldType string
+		}{name, fieldType}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, err
 	}
 
 	// Get custom fields from target config set screens
@@ -583,20 +655,25 @@ func (h *ConfigurationSetHandler) analyzeCustomFieldMigration(workspaceID, sourc
 			AND (CASE WHEN sf.field_type = 'custom' THEN CAST(sf.field_identifier AS INTEGER) END) = cfd.id
 		WHERE css.configuration_set_id = ?
 	`, targetConfigSetID)
-	if err == nil {
-		defer func() { _ = rows.Close() }()
-		for rows.Next() {
-			var id int
-			var name, fieldType string
-			var required bool
-			_ = rows.Scan(&id, &name, &fieldType, &required)
-			targetFields[id] = struct {
-				name      string
-				fieldType string
-				required  bool
-			}{name, fieldType, required}
+	if err != nil {
+		return nil, false, err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var id int
+		var name, fieldType string
+		var required bool
+		if err := rows.Scan(&id, &name, &fieldType, &required); err != nil {
+			return nil, false, err
 		}
-		_ = rows.Err()
+		targetFields[id] = struct {
+			name      string
+			fieldType string
+			required  bool
+		}{name, fieldType, required}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, err
 	}
 
 	var migrations []models.CustomFieldMigrationInfo
@@ -605,15 +682,17 @@ func (h *ConfigurationSetHandler) analyzeCustomFieldMigration(workspaceID, sourc
 	// Count items with values for each source field
 	fieldValueCounts := make(map[int]int)
 	cfvJSONs, err := repository.NewItemRepository(h.db).ListNonEmptyCustomFieldJSONForWorkspace(workspaceID)
-	if err == nil {
-		for _, cfvJSON := range cfvJSONs {
-			var cfv map[string]any
-			if json.Unmarshal([]byte(cfvJSON), &cfv) == nil {
-				for key := range cfv {
-					if fieldID, err := strconv.Atoi(key); err == nil {
-						fieldValueCounts[fieldID]++
-					}
-				}
+	if err != nil {
+		return nil, false, err
+	}
+	for _, cfvJSON := range cfvJSONs {
+		var cfv map[string]any
+		if err := json.Unmarshal([]byte(cfvJSON), &cfv); err != nil {
+			return nil, false, err
+		}
+		for key := range cfv {
+			if fieldID, err := strconv.Atoi(key); err == nil {
+				fieldValueCounts[fieldID]++
 			}
 		}
 	}
@@ -656,49 +735,35 @@ func (h *ConfigurationSetHandler) analyzeCustomFieldMigration(workspaceID, sourc
 		}
 	}
 
-	return migrations, requiresMigration
+	return migrations, requiresMigration, nil
 }
 
 // analyzePriorityMigration compares priorities between source and target config sets
-func (h *ConfigurationSetHandler) analyzePriorityMigration(workspaceID, sourceConfigSetID, targetConfigSetID int) ([]models.PriorityMigrationInfo, []models.PriorityTarget, bool) {
-	// Get priorities in source config set
-	sourcePriorities := make(map[int]string)
-	rows, err := h.db.Query(`
-		SELECT p.id, p.name
-		FROM configuration_set_priorities csp
-		JOIN priorities p ON csp.priority_id = p.id
-		WHERE csp.configuration_set_id = ?
-	`, sourceConfigSetID)
-	if err == nil {
-		defer func() { _ = rows.Close() }()
-		for rows.Next() {
-			var id int
-			var name string
-			_ = rows.Scan(&id, &name)
-			sourcePriorities[id] = name
-		}
-		_ = rows.Err()
-	}
-
+func (h *ConfigurationSetHandler) analyzePriorityMigration(workspaceID, targetConfigSetID int) ([]models.PriorityMigrationInfo, []models.PriorityTarget, bool, error) {
 	// Get priorities in target config set
 	targetPriorities := make(map[int]models.PriorityTarget)
 	var availableTargets []models.PriorityTarget
-	rows, err = h.db.Query(`
+	rows, err := h.db.Query(`
 		SELECT p.id, p.name, p.icon, p.color, p.sort_order
 		FROM configuration_set_priorities csp
 		JOIN priorities p ON csp.priority_id = p.id
 		WHERE csp.configuration_set_id = ?
 		ORDER BY p.sort_order
 	`, targetConfigSetID)
-	if err == nil {
-		defer func() { _ = rows.Close() }()
-		for rows.Next() {
-			var target models.PriorityTarget
-			_ = rows.Scan(&target.ID, &target.Name, &target.Icon, &target.Color, &target.SortOrder)
-			targetPriorities[target.ID] = target
-			availableTargets = append(availableTargets, target)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var target models.PriorityTarget
+		if err := rows.Scan(&target.ID, &target.Name, &target.Icon, &target.Color, &target.SortOrder); err != nil {
+			return nil, nil, false, err
 		}
-		_ = rows.Err()
+		targetPriorities[target.ID] = target
+		availableTargets = append(availableTargets, target)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, false, err
 	}
 
 	// If target config set has no explicit priorities, it accepts ALL priorities
@@ -708,15 +773,20 @@ func (h *ConfigurationSetHandler) analyzePriorityMigration(workspaceID, sourceCo
 			FROM priorities
 			ORDER BY sort_order
 		`)
-		if err == nil {
-			defer func() { _ = rows.Close() }()
-			for rows.Next() {
-				var target models.PriorityTarget
-				_ = rows.Scan(&target.ID, &target.Name, &target.Icon, &target.Color, &target.SortOrder)
-				targetPriorities[target.ID] = target
-				availableTargets = append(availableTargets, target)
+		if err != nil {
+			return nil, nil, false, err
+		}
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			var target models.PriorityTarget
+			if err := rows.Scan(&target.ID, &target.Name, &target.Icon, &target.Color, &target.SortOrder); err != nil {
+				return nil, nil, false, err
 			}
-			_ = rows.Err()
+			targetPriorities[target.ID] = target
+			availableTargets = append(availableTargets, target)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, nil, false, err
 		}
 	}
 
@@ -732,7 +802,7 @@ func (h *ConfigurationSetHandler) analyzePriorityMigration(workspaceID, sourceCo
 
 	priorityCounts, err := repository.NewItemRepository(h.db).ListPriorityCountsForWorkspace(workspaceID)
 	if err != nil {
-		return migrations, availableTargets, false
+		return nil, nil, false, err
 	}
 
 	for _, pc := range priorityCounts {
@@ -757,10 +827,11 @@ func (h *ConfigurationSetHandler) analyzePriorityMigration(workspaceID, sourceCo
 			migration.SuggestedPriorityName = target.Name
 			migration.RequiresMigration = false
 		} else if target, exists := targetByName[strings.ToLower(priorityName)]; exists {
-			// Match by name
+			// Matching names do not make different priority IDs interchangeable.
 			migration.SuggestedPriorityID = &target.ID
 			migration.SuggestedPriorityName = target.Name
-			migration.RequiresMigration = false
+			migration.RequiresMigration = true
+			requiresMigration = true
 		} else if priorityID == 0 {
 			// No priority set - this is ok, don't require migration
 			migration.RequiresMigration = false
@@ -773,95 +844,157 @@ func (h *ConfigurationSetHandler) analyzePriorityMigration(workspaceID, sourceCo
 		migrations = append(migrations, migration)
 	}
 
-	return migrations, availableTargets, requiresMigration
+	return migrations, availableTargets, requiresMigration, nil
 }
 
-// analyzeStatusMigration analyzes status migration for a workspace moving to a new config set
-func (h *ConfigurationSetHandler) analyzeStatusMigration(workspaceID, targetConfigSetID int) ([]models.StatusMigrationInfo, bool) {
-	// Get target workflow
-	var targetWorkflowID sql.NullInt64
-	_ = h.db.QueryRow(`
-		SELECT workflow_id FROM configuration_sets WHERE id = ?
-	`, targetConfigSetID).Scan(&targetWorkflowID)
-
-	if !targetWorkflowID.Valid {
-		// No workflow configured - no status migration needed
-		return nil, false
-	}
-
-	return h.analyzeStatusMigrationAgainstWorkflow(workspaceID, int(targetWorkflowID.Int64))
+// analyzeStatusMigration analyzes status migration using the target configuration
+// set's effective workflow for each item type, including item-type overrides
+// and the global default workflow fallback.
+func (h *ConfigurationSetHandler) analyzeStatusMigration(workspaceID, targetConfigSetID int) ([]models.StatusMigrationInfo, bool, error) {
+	return h.analyzeStatusMigrationForConfigSet([]int{workspaceID}, targetConfigSetID, nil)
 }
 
-// analyzeStatusMigrationAgainstWorkflow compares the workspace's items to a
-// specific workflow's statuses, regardless of which config set "owns" the
-// workflow. Used by Update() to detect intra-config-set workflow swaps where
-// the new workflow_id is supplied in the request body and has not been
-// persisted yet.
-func (h *ConfigurationSetHandler) analyzeStatusMigrationAgainstWorkflow(workspaceID, targetWorkflowID int) ([]models.StatusMigrationInfo, bool) {
-	// Get available statuses in target workflow
-	workflowStatuses := make(map[string]models.Status)
-	rows, err := h.db.Query(`
-		SELECT DISTINCT s.id, s.name
-		FROM workflow_transitions wt
-		JOIN statuses s ON (wt.from_status_id = s.id OR wt.to_status_id = s.id)
-		WHERE wt.workflow_id = ?
-	`, targetWorkflowID)
+// analyzeStatusMigrationForConfigSet compares item statuses with the workflows
+// they will use after the configuration change. overrideDefaultWorkflowID is
+// used by an intra-set default-workflow change that has not been persisted yet;
+// item-type workflow overrides still take precedence.
+func (h *ConfigurationSetHandler) analyzeStatusMigrationForConfigSet(
+	workspaceIDs []int,
+	targetConfigSetID int,
+	overrideDefaultWorkflowID *int,
+) ([]models.StatusMigrationInfo, bool, error) {
+	statusCounts, err := repository.NewItemRepository(h.db).ListItemTypeStatusCountsForWorkspaces(workspaceIDs)
 	if err != nil {
-		return nil, false
-	}
-	defer func() { _ = rows.Close() }()
-
-	for rows.Next() {
-		var status models.Status
-		_ = rows.Scan(&status.ID, &status.Name)
-		normalizedName := normalizeStatusName(status.Name)
-		workflowStatuses[normalizedName] = status
-	}
-	if err := rows.Err(); err != nil {
-		return nil, false
+		return nil, false, err
 	}
 
-	// Get current statuses used in workspace
-	var migrations []models.StatusMigrationInfo
+	workflowStatusesCache := make(map[int]map[string]models.Status)
+	migrations := make([]models.StatusMigrationInfo, 0, len(statusCounts))
 	requiresMigration := false
 
-	statusCounts, err := repository.NewItemRepository(h.db).ListStatusCountsForWorkspaces([]int{workspaceID})
-	if err != nil {
-		return nil, false
-	}
-
 	for _, row := range statusCounts {
+		workflowID, err := h.resolveConfigSetWorkflowID(targetConfigSetID, row.ItemTypeID, overrideDefaultWorkflowID)
+		if err != nil {
+			return nil, false, err
+		}
+
 		statusID := row.StatusID
-		statusName := row.StatusName
-		itemCount := row.ItemCount
-
 		migration := models.StatusMigrationInfo{
-			CurrentStatus: statusName,
-			ItemCount:     itemCount,
+			CurrentStatus:     row.StatusName,
+			ItemTypeID:        row.ItemTypeID,
+			ItemTypeName:      row.ItemTypeName,
+			RequiresMigration: false,
+			ItemCount:         row.ItemCount,
 		}
-		// Preserve NULL semantics for the caller: status_id == 0 in our row
-		// data indicates an item with NULL status_id (COALESCE'd in SQL),
-		// which the migration executor must treat distinctly.
 		if statusID != 0 {
-			sid := statusID
-			migration.CurrentStatusID = &sid
+			migration.CurrentStatusID = &statusID
 		}
 
-		normalizedStatus := normalizeStatusName(statusName)
+		// No workflow at any level means statuses are unrestricted.
+		if workflowID == nil {
+			migrations = append(migrations, migration)
+			continue
+		}
+
+		workflowStatuses, ok := workflowStatusesCache[*workflowID]
+		if !ok {
+			workflowStatuses, err = h.loadWorkflowStatuses(*workflowID)
+			if err != nil {
+				return nil, false, err
+			}
+			workflowStatusesCache[*workflowID] = workflowStatuses
+		}
+
+		normalizedStatus := normalizeStatusName(row.StatusName)
 		if status, exists := workflowStatuses[normalizedStatus]; exists {
 			migration.SuggestedStatusID = &status.ID
 			migration.SuggestedStatusName = status.Name
-			migration.RequiresMigration = false
+			if migration.CurrentStatusID == nil || *migration.CurrentStatusID != status.ID {
+				migration.RequiresMigration = true
+				requiresMigration = true
+			}
 		} else {
 			migration.RequiresMigration = true
 			requiresMigration = true
 			h.suggestStatusMapping(&migration, normalizedStatus, workflowStatuses)
 		}
-
 		migrations = append(migrations, migration)
 	}
 
-	return migrations, requiresMigration
+	return migrations, requiresMigration, nil
+}
+
+func (h *ConfigurationSetHandler) resolveConfigSetWorkflowID(
+	configSetID int,
+	itemTypeID *int,
+	overrideDefaultWorkflowID *int,
+) (*int, error) {
+	var configSetWorkflowID, itemTypeWorkflowID sql.NullInt64
+	if itemTypeID == nil {
+		if err := h.db.QueryRow(`
+			SELECT workflow_id FROM configuration_sets WHERE id = ?
+		`, configSetID).Scan(&configSetWorkflowID); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := h.db.QueryRow(`
+			SELECT cs.workflow_id, csit.workflow_id
+			FROM configuration_sets cs
+			LEFT JOIN configuration_set_item_types csit
+			  ON csit.configuration_set_id = cs.id AND csit.item_type_id = ?
+			WHERE cs.id = ?
+		`, *itemTypeID, configSetID).Scan(&configSetWorkflowID, &itemTypeWorkflowID); err != nil {
+			return nil, err
+		}
+	}
+
+	if itemTypeWorkflowID.Valid {
+		id := int(itemTypeWorkflowID.Int64)
+		return &id, nil
+	}
+	if overrideDefaultWorkflowID != nil {
+		id := *overrideDefaultWorkflowID
+		return &id, nil
+	}
+	if configSetWorkflowID.Valid {
+		id := int(configSetWorkflowID.Int64)
+		return &id, nil
+	}
+
+	var globalDefaultID int
+	if err := h.db.QueryRow(`SELECT id FROM workflows WHERE is_default = true ORDER BY id LIMIT 1`).Scan(&globalDefaultID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &globalDefaultID, nil
+}
+
+func (h *ConfigurationSetHandler) loadWorkflowStatuses(workflowID int) (map[string]models.Status, error) {
+	rows, err := h.db.Query(`
+		SELECT DISTINCT s.id, s.name
+		FROM workflow_transitions wt
+		JOIN statuses s ON (wt.from_status_id = s.id OR wt.to_status_id = s.id)
+		WHERE wt.workflow_id = ?
+	`, workflowID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	statuses := make(map[string]models.Status)
+	for rows.Next() {
+		var status models.Status
+		if err := rows.Scan(&status.ID, &status.Name); err != nil {
+			return nil, err
+		}
+		statuses[normalizeStatusName(status.Name)] = status
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return statuses, nil
 }
 
 // suggestStatusMapping suggests a reasonable default status based on common status mappings

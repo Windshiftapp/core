@@ -174,13 +174,17 @@ func (h *ConfigurationSetHandler) respondIntraSetWorkflowConflictIfNeeded(
 
 	// Merge per-workspace status migrations by status and item type.
 	type key struct {
-		statusID   int  // 0 means NULL
-		itemTypeID *int // nil means "no per-item-type filter"
+		statusID   int // 0 means NULL
+		itemTypeID int // 0 means NULL
 	}
 	merged := make(map[key]models.StatusMigrationInfo)
 	requires := false
 	for _, wsID := range retainedWorkspaceIDs {
-		mig, req := h.analyzeStatusMigrationAgainstWorkflow(wsID, *newWorkflowID)
+		mig, req, err := h.analyzeStatusMigrationForConfigSet([]int{wsID}, configSetID, newWorkflowID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return true
+		}
 		if req {
 			requires = true
 		}
@@ -189,7 +193,11 @@ func (h *ConfigurationSetHandler) respondIntraSetWorkflowConflictIfNeeded(
 			if m.CurrentStatusID != nil {
 				sid = *m.CurrentStatusID
 			}
-			k := key{statusID: sid, itemTypeID: m.ItemTypeID}
+			itemTypeID := 0
+			if m.ItemTypeID != nil {
+				itemTypeID = *m.ItemTypeID
+			}
+			k := key{statusID: sid, itemTypeID: itemTypeID}
 			if existing, ok := merged[k]; ok {
 				existing.ItemCount += m.ItemCount
 				merged[k] = existing
@@ -269,16 +277,34 @@ func (h *ConfigurationSetHandler) respondMigrationConflictIfNeeded(
 	workspaceID, sourceConfigSetID, targetConfigSetID int,
 	overrideTargetWorkflowID *int,
 ) bool {
-	itemTypeMigrations, _, requiresItemTypeMigration := h.analyzeItemTypeMigration(workspaceID, sourceConfigSetID, targetConfigSetID)
-	customFieldMigrations, requiresFieldMigration := h.analyzeCustomFieldMigration(workspaceID, sourceConfigSetID, targetConfigSetID)
-	priorityMigrations, _, requiresPriorityMigration := h.analyzePriorityMigration(workspaceID, sourceConfigSetID, targetConfigSetID)
+	analysisSourceConfigSetID, sourceConfigSetName, err := h.resolveMigrationSourceConfigSet(sourceConfigSetID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return true
+	}
 
-	var statusMigrations []models.StatusMigrationInfo
-	var requiresStatusMigration bool
-	if overrideTargetWorkflowID != nil {
-		statusMigrations, requiresStatusMigration = h.analyzeStatusMigrationAgainstWorkflow(workspaceID, *overrideTargetWorkflowID)
-	} else {
-		statusMigrations, requiresStatusMigration = h.analyzeStatusMigration(workspaceID, targetConfigSetID)
+	itemTypeMigrations, _, requiresItemTypeMigration, err := h.analyzeItemTypeMigration(workspaceID, targetConfigSetID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return true
+	}
+	customFieldMigrations, requiresFieldMigration, err := h.analyzeCustomFieldMigration(workspaceID, analysisSourceConfigSetID, targetConfigSetID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return true
+	}
+	priorityMigrations, _, requiresPriorityMigration, err := h.analyzePriorityMigration(workspaceID, targetConfigSetID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return true
+	}
+
+	statusMigrations, requiresStatusMigration, err := h.analyzeStatusMigrationForConfigSet(
+		[]int{workspaceID}, targetConfigSetID, overrideTargetWorkflowID,
+	)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return true
 	}
 
 	requiresMigration := requiresItemTypeMigration || requiresFieldMigration ||
@@ -287,11 +313,7 @@ func (h *ConfigurationSetHandler) respondMigrationConflictIfNeeded(
 		return false
 	}
 
-	var sourceConfigSetName, targetConfigSetName string
-	if err := h.db.QueryRow(`SELECT name FROM configuration_sets WHERE id = ?`, sourceConfigSetID).Scan(&sourceConfigSetName); err != nil {
-		respondInternalError(w, r, err)
-		return true
-	}
+	var targetConfigSetName string
 	if err := h.db.QueryRow(`SELECT name FROM configuration_sets WHERE id = ?`, targetConfigSetID).Scan(&targetConfigSetName); err != nil {
 		respondInternalError(w, r, err)
 		return true
@@ -326,6 +348,31 @@ func (h *ConfigurationSetHandler) respondMigrationConflictIfNeeded(
 		"analysis": analysis,
 	})
 	return true
+}
+
+// resolveMigrationSourceConfigSet keeps 0 as the assignment compare-and-swap
+// sentinel while using the automatically-applied default set for analysis.
+func (h *ConfigurationSetHandler) resolveMigrationSourceConfigSet(sourceConfigSetID int) (resolvedID int, resolvedName string, err error) {
+	if sourceConfigSetID != 0 {
+		if err := h.db.QueryRow(`SELECT name FROM configuration_sets WHERE id = ?`, sourceConfigSetID).Scan(&resolvedName); err != nil {
+			return 0, "", err
+		}
+		return sourceConfigSetID, resolvedName, nil
+	}
+
+	err = h.db.QueryRow(`
+		SELECT id, name FROM configuration_sets
+		WHERE is_default = true
+		ORDER BY id
+		LIMIT 1
+	`).Scan(&resolvedID, &resolvedName)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, "(No Configuration Set)", nil
+	}
+	if err != nil {
+		return 0, "", err
+	}
+	return resolvedID, resolvedName + " (automatic default)", nil
 }
 
 func nullableInt(p *int) int {
