@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/tls"
 	"embed"
 	"encoding/base64"
 	"encoding/json"
@@ -2378,7 +2379,6 @@ func (s *Server) Start() error {
 		return fmt.Errorf("failed to listen on %s: %w", addr, err)
 	}
 	s.listener = listener
-	s.databasePoolMonitor.Start()
 
 	// Get actual port (important for port 0)
 	tcpAddr := listener.Addr().(*net.TCPAddr) //nolint:errcheck // Type assertion is safe; net.Listen("tcp", ...) always returns *net.TCPAddr
@@ -2388,9 +2388,28 @@ func (s *Server) Start() error {
 	configureServerProtocols(s.httpServer, enableHTTPS, s.config.H2CEnabled)
 
 	if enableHTTPS {
+		// Load the key pair synchronously so a missing, unreadable, malformed or
+		// mismatched certificate fails startup instead of leaving the process
+		// alive without a working HTTPS listener.
+		cert, certErr := tls.LoadX509KeyPair(s.config.TLSCertPath, s.config.TLSKeyPath)
+		if certErr != nil {
+			_ = listener.Close()
+			return fmt.Errorf("load TLS certificate: %w", certErr)
+		}
+		if s.httpServer.TLSConfig == nil {
+			s.httpServer.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+		}
+		s.httpServer.TLSConfig.Certificates = append(s.httpServer.TLSConfig.Certificates, cert)
+	}
+
+	s.databasePoolMonitor.Start()
+
+	if enableHTTPS {
 		slog.Info("HTTPS server starting", "port", s.actualPort)
 		go func() {
-			if err := s.httpServer.ServeTLS(s.listener, s.config.TLSCertPath, s.config.TLSKeyPath); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			// The key pair is already loaded; empty paths make ServeTLS use the
+			// server's TLSConfig certificates.
+			if err := s.httpServer.ServeTLS(s.listener, "", ""); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				slog.Error("HTTPS server error", "error", err)
 			}
 		}()
