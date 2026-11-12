@@ -106,6 +106,9 @@ var recurringTasksSchemaPostgres string
 //go:embed schema/jira_import_postgres.sql
 var jiraImportSchemaPostgres string
 
+//go:embed schema/plane_import_postgres.sql
+var planeImportSchemaPostgres string
+
 //go:embed schema/custom_widgets_postgres.sql
 var customWidgetsSchemaPostgres string
 
@@ -608,6 +611,7 @@ func (p *PostgresDB) getPostgresSchemaFiles() []schemaFile {
 		{"asset_reports_postgres.sql", assetReportsSchemaPostgres},
 		{"recurring_tasks_postgres.sql", recurringTasksSchemaPostgres},
 		{"jira_import_postgres.sql", jiraImportSchemaPostgres},
+		{"plane_import_postgres.sql", planeImportSchemaPostgres},
 		{"custom_widgets_postgres.sql", customWidgetsSchemaPostgres},
 		{"actions_postgres.sql", actionsSchemaPostgres},
 		{"asset_actions_postgres.sql", assetActionsSchemaPostgres},
