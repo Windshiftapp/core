@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1148,13 +1149,14 @@ func (h *JiraImportHandler) resolveJiraIssueReferences(im *jiraImportContext, is
 	return refs, nil
 }
 
-// convertJiraIssueDescription renders the ADF description to markdown without
-// a media resolver (media nodes become placeholders); once attachments are
+// convertJiraIssueDescription renders the description to Markdown without a
+// media resolver (media references become placeholders); once attachments are
 // imported, the subresource stage re-renders with a resolver that links them.
+// ADF (Cloud) and wiki markup (Data Center) are dispatched by value shape.
 func convertJiraIssueDescription(issue *jira.JiraIssue, resolver jira.MentionResolver) (rawDescription any, markdown string) {
 	rawDescription = issue.Fields.Description
 	if rawDescription != nil {
-		markdown = jira.ConvertADFToMarkdown(rawDescription, resolver, nil)
+		markdown = jira.ConvertJiraRichText(rawDescription, resolver, nil)
 	}
 	return rawDescription, markdown
 }
@@ -1589,10 +1591,25 @@ func (h *JiraImportHandler) importJiraIssueSubresources(ctx context.Context, im 
 		mediaResolver = jira.NewMediaResolver(mediaRefs)
 	}
 
+	// ADF media nodes carry Media Services ids rather than Jira attachment ids,
+	// so a Cloud media reference normally cannot resolve to an imported file.
+	// Report it instead of silently rendering a broken link.
+	if unresolved := jiraUnresolvedMediaIDs(issue, rawDescription, mediaRefs); len(unresolved) > 0 {
+		_ = h.recordMapping(im.jobID, "fidelity_finding", "media:"+issue.ID,
+			"Jira media references could not be mapped to imported attachments, so the inline media was preserved as raw text instead of linked.",
+			0, map[string]any{
+				"code":             "jira_media_reference_unresolved",
+				"severity":         "warning",
+				"disposition":      "preserved_raw",
+				"unresolved_count": len(unresolved),
+				"media_ids":        unresolved,
+			})
+	}
+
 	// Re-render the description now that attachments are available so media
 	// nodes link to the imported attachments instead of placeholders.
 	if mediaResolver != nil && rawDescription != nil {
-		linked := jira.ConvertADFToMarkdown(rawDescription, mentionResolver, mediaResolver)
+		linked := jira.ConvertJiraRichText(rawDescription, mentionResolver, mediaResolver)
 		if linked != "" && linked != description {
 			if err := h.imports.UpdateItemDescription(int(itemID), linked, itemevents.Import(im.jobID)); err != nil {
 				slog.Warn("Failed to update item description with linked media",
@@ -1768,7 +1785,7 @@ func (h *JiraImportHandler) importComments(jobID string, itemID int, issue *jira
 		if progress != nil {
 			progress.TotalComments++
 		}
-		content := jira.ConvertADFToMarkdown(comment.Body, mentionResolver, mediaResolver)
+		content := jira.ConvertJiraRichText(comment.Body, mentionResolver, mediaResolver)
 		if content == "" {
 			continue
 		}
@@ -2085,7 +2102,7 @@ func (h *JiraImportHandler) importWorklogs(jobID string, itemID int, issue *jira
 		end := started.Add(time.Duration(worklog.TimeSpentSeconds) * time.Second)
 		date := time.Date(started.Year(), started.Month(), started.Day(), 0, 0, 0, 0, started.Location())
 
-		description := strings.TrimSpace(jira.ConvertADFToMarkdownWithUsers(worklog.Comment, mentionResolver))
+		description := strings.TrimSpace(jira.ConvertJiraRichText(worklog.Comment, mentionResolver, nil))
 		if description == "" {
 			description = strings.TrimSpace(worklog.TimeSpent)
 		}
@@ -2169,32 +2186,90 @@ func (h *JiraImportHandler) importWorklogs(jobID string, itemID int, issue *jira
 // Phase 7: Attachment Import
 // ================================================================
 
+// jiraUnresolvedMediaIDs returns the ADF media ids referenced by an issue's
+// bodies that have no imported attachment. Cloud media nodes carry Media
+// Services ids, not Jira attachment ids, so these normally cannot resolve;
+// recording them keeps the limitation explicit rather than inventing a match.
+func jiraUnresolvedMediaIDs(issue *jira.JiraIssue, rawDescription any, mediaRefs map[string]jira.MediaAttachment) []string {
+	if issue == nil {
+		return nil
+	}
+	referenced := jira.CollectADFMediaIDs(rawDescription)
+	if issue.Fields.Comment != nil {
+		for _, comment := range issue.Fields.Comment.Comments {
+			for id := range jira.CollectADFMediaIDs(comment.Body) {
+				referenced[id] = true
+			}
+		}
+	}
+	var unresolved []string
+	for id := range referenced {
+		if _, ok := mediaRefs[id]; !ok {
+			unresolved = append(unresolved, id)
+		}
+	}
+	sort.Strings(unresolved)
+	return unresolved
+}
+
 // jiraInternalAttachmentIDs returns the Jira attachment ids that must be
 // hidden from portal customers. JSM lets agents attach files to internal
 // notes, but the issue payload carries no visibility flag on the file itself,
 // so an attachment is treated as customer-visible only when it is referenced
 // from a body the customer can see: the request description or a public
 // comment. Non-JSM imports have no portal exposure and stay visible.
+//
+// Cloud bodies reference attachments by ADF media id; Data Center bodies are
+// wiki strings that name files, so a filename only counts when it identifies
+// exactly one attachment. Everything unresolved stays internal.
 func jiraInternalAttachmentIDs(issue *jira.JiraIssue, rawDescription any, serviceDeskImport bool) map[string]bool {
 	if !serviceDeskImport || issue == nil {
 		return nil
 	}
-	visible := jira.CollectADFMediaIDs(rawDescription)
+	visibleMediaIDs := jira.CollectADFMediaIDs(rawDescription)
+	visibleFilenames := make(map[string]bool)
+	collectVisible := func(body any) {
+		for id := range jira.CollectADFMediaIDs(body) {
+			visibleMediaIDs[id] = true
+		}
+		if text, ok := body.(string); ok {
+			for _, name := range jira.WikiReferencedFilenames(text) {
+				visibleFilenames[name] = true
+			}
+		}
+	}
+	collectVisible(rawDescription)
 	if issue.Fields.Comment != nil {
 		for _, comment := range issue.Fields.Comment.Comments {
 			if comment.ServiceDeskPublic != nil && !*comment.ServiceDeskPublic {
 				continue
 			}
-			for id := range jira.CollectADFMediaIDs(comment.Body) {
-				visible[id] = true
-			}
+			collectVisible(comment.Body)
 		}
 	}
+
+	// A filename shared by several attachments cannot identify the file a
+	// customer sees, so it must not make any of them visible.
+	filenameCounts := make(map[string]int)
+	for _, attachment := range issue.Fields.Attachment {
+		if name := strings.TrimSpace(attachment.Filename); name != "" {
+			filenameCounts[name]++
+		}
+	}
+
 	internal := make(map[string]bool)
 	for _, attachment := range issue.Fields.Attachment {
-		if attachment.ID != "" && !visible[attachment.ID] {
-			internal[attachment.ID] = true
+		if attachment.ID == "" {
+			continue
 		}
+		if visibleMediaIDs[attachment.ID] {
+			continue
+		}
+		name := strings.TrimSpace(attachment.Filename)
+		if name != "" && visibleFilenames[name] && filenameCounts[name] == 1 {
+			continue
+		}
+		internal[attachment.ID] = true
 	}
 	return internal
 }
