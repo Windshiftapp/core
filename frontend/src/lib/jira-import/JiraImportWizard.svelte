@@ -1120,12 +1120,12 @@
                 </span>
               </div>
               <p class="text-xs" style="color: var(--ds-text-subtle);">
-                Each accessible Jira Assets schema becomes a Windshift asset set. Object types, attributes, and objects are recreated inside that set.
+                Jira Assets import is opt-in. Select the schemas to import; each becomes a Windshift asset set with its object types, attributes, and objects recreated.
               </p>
               <div class="space-y-2">
                 {#each analysis.result.asset_schemas as schema}
-                  <div
-                    class="flex items-center justify-between px-3 py-2 rounded"
+                  <label
+                    class="flex items-center justify-between px-3 py-2 rounded cursor-pointer"
                     data-testid="jira-import-asset-schema"
                     data-schema-name={schema.name}
                     data-schema-key={schema.key}
@@ -1134,17 +1134,26 @@
                     data-type-count={schema.type_count}
                     style="background: var(--ds-background-neutral);"
                   >
-                    <span class="text-sm font-medium" style="color: var(--ds-text);">
-                      {schema.name}
-                      {#if schema.key}
-                        <span class="text-xs font-normal ml-1" style="color: var(--ds-text-subtle);">({schema.key})</span>
-                      {/if}
+                    <span class="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        data-testid="jira-import-asset-schema-toggle"
+                        data-schema-id={schema.id}
+                        checked={jiraImport.isAssetSchemaSelected(schema.id)}
+                        onchange={() => jiraImport.toggleAssetSchema(schema.id)}
+                      />
+                      <span class="text-sm font-medium" style="color: var(--ds-text);">
+                        {schema.name}
+                        {#if schema.key}
+                          <span class="text-xs font-normal ml-1" style="color: var(--ds-text-subtle);">({schema.key})</span>
+                        {/if}
+                      </span>
                     </span>
                     <span class="text-xs" style="color: var(--ds-text-subtle);">
                       {schema.object_count} {schema.object_count === 1 ? 'object' : 'objects'}
                       · {schema.type_count} {schema.type_count === 1 ? 'type' : 'types'}
                     </span>
-                  </div>
+                  </label>
                 {/each}
               </div>
             </div>

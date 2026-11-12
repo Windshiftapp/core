@@ -504,7 +504,7 @@ func (h *JiraImportHandler) prepareJiraGlobalModel(
 	}
 	model.itemTypeMap = itemTypeMap
 
-	h.importJiraAssets(ctx, jobID, client, createdByUserID)
+	h.importJiraAssets(ctx, jobID, client, createdByUserID, req.AssetSchemaIDs)
 	if h.failOnMappingFailure(jobID, progress) {
 		return model, true
 	}

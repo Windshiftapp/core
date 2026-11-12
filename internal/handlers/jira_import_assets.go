@@ -19,7 +19,28 @@ import (
 
 const jiraAssetsPageSize = 100
 
-func (h *JiraImportHandler) importJiraAssets(ctx context.Context, jobID string, client jira.Client, createdByUserID int) {
+// importJiraAssets imports the Jira Assets schemas the operator explicitly
+// selected. Assets import is opt-in: without a selection nothing is read, so a
+// project-scoped import cannot silently ingest unrelated inventories the Jira
+// token happens to see (WI-262).
+func (h *JiraImportHandler) importJiraAssets(ctx context.Context, jobID string, client jira.Client, createdByUserID int, selectedSchemaIDs []string) {
+	selected := make(map[string]struct{}, len(selectedSchemaIDs))
+	for _, id := range selectedSchemaIDs {
+		if trimmed := strings.TrimSpace(id); trimmed != "" {
+			selected[trimmed] = struct{}{}
+		}
+	}
+	if len(selected) == 0 {
+		_ = h.recordMapping(jobID, "fidelity_finding", "assets-capability",
+			"No Jira Assets schemas were selected for this import, so no asset inventory was read.",
+			0, map[string]any{
+				"code":        "jira_assets_not_selected",
+				"severity":    "info",
+				"disposition": "skipped",
+			})
+		return
+	}
+
 	schemas, err := client.ListObjectSchemas(ctx)
 	if err != nil {
 		if errors.Is(err, jira.ErrAssetsNotAvailable) {
@@ -40,6 +61,20 @@ func (h *JiraImportHandler) importJiraAssets(ctx context.Context, jobID string, 
 		slog.Warn("Failed to list Jira Assets schemas", slog.String("component", "jira"), slog.Any("error", err))
 		return
 	}
+
+	importable := make([]jira.AssetObjectSchema, 0, len(schemas))
+	for _, schema := range schemas {
+		if _, ok := selected[string(schema.ID)]; ok {
+			importable = append(importable, schema)
+		}
+	}
+	if len(importable) != len(selected) {
+		slog.Warn("Some selected Jira Assets schemas were not visible to the token",
+			slog.String("component", "jira"),
+			slog.Int("selected", len(selected)),
+			slog.Int("visible", len(importable)))
+	}
+	schemas = importable
 
 	setNames := jiraAssetSetNames(schemas)
 	var pendingReferences []jiraPendingAssetReference
@@ -458,6 +493,17 @@ func (h *JiraImportHandler) importJiraAssetObjectsForType(
 			return pending
 		}
 		if result == nil || len(result.ObjectEntries) == 0 {
+			// An empty page the source does not mark final cannot prove
+			// exhaustion, so report it instead of returning a partial inventory
+			// as if it were complete.
+			if result != nil && !result.IsLast {
+				slog.Warn("Jira asset object search returned an empty non-final page",
+					slog.String("component", "jira"),
+					slog.String("schemaID", schemaID),
+					slog.String("objectTypeID", objectTypeID),
+					slog.Int("startAt", startAt))
+				h.recordJiraAssetObjectPageFailure(jobID, schemaID, objectTypeID, startAt, "empty non-final page")
+			}
 			return pending
 		}
 		for _, object := range result.ObjectEntries {
@@ -497,16 +543,21 @@ func jiraNextAssetObjectOffset(startAt int, result *jira.ObjectSearchResult) (in
 	if result == nil {
 		return 0, false
 	}
+	// The response's own offset is authoritative. Clamping an earlier offset up
+	// to the requested one would treat a source that keeps replaying the same
+	// page as progress, duplicating objects and never terminating.
+	if result.StartIndex < startAt {
+		return 0, false
+	}
 	consumed := len(result.ObjectEntries)
 	if result.ToIndex > result.StartIndex {
 		consumed = result.ToIndex - result.StartIndex
 	}
-	pageStart := result.StartIndex
-	if pageStart < startAt {
-		pageStart = startAt
+	if consumed <= 0 {
+		return 0, false
 	}
-	next := pageStart + consumed
-	if consumed <= 0 || next <= startAt {
+	next := result.StartIndex + consumed
+	if next <= startAt {
 		return 0, false
 	}
 	return next, true
@@ -597,8 +648,10 @@ func (h *JiraImportHandler) importJiraAssetObject(
 		}
 		// A DateTime attribute is stored in a calendar-date field, so keep the
 		// canonical timestamp as provenance for the intentional time-of-day loss.
+		// Display text is locale-formatted, so it must not stand in for the
+		// original value.
 		if fieldType == "date" && definition.DefaultTypeID == 6 {
-			if rawValue, rawOK := jiraAssetAttributeValue(attr); rawOK {
+			if rawValue, rawOK := jiraAssetAttributeProvenanceValue(attr); rawOK {
 				customValues["_jira_asset_attribute_"+string(attr.ObjectTypeAttributeID)] = rawValue
 			}
 		}
@@ -610,8 +663,15 @@ func (h *JiraImportHandler) importJiraAssetObject(
 	// the rendering-matched policy over text/textarea-typed fields. Both
 	// passes are idempotent no-ops on plain text.
 	for key, v := range customValues {
-		if s, ok := v.(string); ok {
-			customValues[key] = sanitize.RichText.Sanitize(s)
+		switch typed := v.(type) {
+		case string:
+			customValues[key] = sanitize.RichText.Sanitize(typed)
+		case []string:
+			sanitized := make([]string, len(typed))
+			for i, value := range typed {
+				sanitized[i] = sanitize.RichText.Sanitize(value)
+			}
+			customValues[key] = sanitized
 		}
 	}
 	if err := services.NewAssetService(h.db, repository.NewAssetRepository(h.db)).SanitizeCustomFieldTextValues(assetTypeID, customValues); err != nil {
@@ -946,6 +1006,32 @@ func jiraAssetAttributeCanonicalValue(raw jira.AssetAttributeValue) string {
 		return raw.SearchValue
 	}
 	return ""
+}
+
+// jiraAssetAttributeProvenanceValue keeps the canonical source value for a
+// field Windshift cannot represent losslessly. Unlike jiraAssetAttributeValue
+// it prefers the raw `value` over locale-formatted display text, so a DateTime
+// provenance retains the exact timestamp (seconds, milliseconds, timezone)
+// rather than the importing user's rendering of it. Multiple values stay a
+// list so their cardinality is unambiguous.
+func jiraAssetAttributeProvenanceValue(attr jira.AssetObjectAttributeValue) (any, bool) {
+	if len(attr.ObjectAttributeValues) == 0 {
+		return nil, false
+	}
+	values := make([]string, 0, len(attr.ObjectAttributeValues))
+	for _, raw := range attr.ObjectAttributeValues {
+		if value := jiraAssetAttributeCanonicalValue(raw); value != "" {
+			values = append(values, value)
+		}
+	}
+	switch len(values) {
+	case 0:
+		return nil, false
+	case 1:
+		return values[0], true
+	default:
+		return values, true
+	}
 }
 
 func jiraAssetAttributeValue(attr jira.AssetObjectAttributeValue) (any, bool) {

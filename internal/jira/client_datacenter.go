@@ -7,7 +7,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -25,6 +27,10 @@ type dataCenterClient struct {
 	throttle       *jiraThrottle
 	retryWait      func(context.Context, time.Duration) error
 	retryAttempts  int
+	// assetsPage caches the page size the legacy Insight AQL endpoint reports.
+	// It is server-chosen and ignores maxResults, so the offset-to-page mapping
+	// needs the observed value rather than the requested one.
+	assetsPage atomic.Int64
 }
 
 // do performs an HTTP request with rate limiting
@@ -577,37 +583,164 @@ func (c *dataCenterClient) GetUserEmail(ctx context.Context, accountID string) (
 // Jira Assets (Insight) Methods - Limited support on Data Center
 // ================================================================
 
-// ListObjectSchemas reports Assets as unavailable on Data Center. Schema
-// discovery against the legacy Insight endpoint can succeed, but every object,
-// type, attribute, and AQL read is unimplemented. Advertising discoverable
-// inventories would create empty asset sets and clean field promises, so the
-// whole capability is reported unsupported until a version-appropriate adapter
-// is implemented. Original asset reference identifiers are preserved.
+// assetsInsightBase is the legacy Insight REST base that Data Center exposes
+// for Assets. Cloud instead uses a per-workspace gateway base
+// (…/jsm/assets/workspace/{id}/v1), which Data Center has no equivalent of.
+const assetsInsightBase = "/rest/insight/1.0"
+
+// dataCenterAssetsDefaultPageSize is the page size the legacy Insight AQL
+// endpoint applies when the schema has not reported its own. The endpoint
+// ignores maxResults and pages by page number with a server-chosen size, so the
+// adapter must page by the size the server reports.
+const dataCenterAssetsDefaultPageSize = 25
+
+func (c *dataCenterClient) assetsBase() string {
+	return jiraSiteURLFromBase(c.baseURL) + assetsInsightBase
+}
+
+// assetsGetJSON reads a legacy Insight endpoint. A missing endpoint means the
+// instance has no Assets capability, so it maps to ErrAssetsNotAvailable rather
+// than a generic failure and the importer records an explicit finding.
+func (c *dataCenterClient) assetsGetJSON(ctx context.Context, endpoint string, out any) error {
+	resp, err := c.do(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusNotFound {
+		return ErrAssetsNotAvailable
+	}
+	if resp.StatusCode != http.StatusOK {
+		return jiraErrorFromResponse(resp)
+	}
+	return json.NewDecoder(resp.Body).Decode(out)
+}
+
+// assetsPageSize returns the server page size last observed for this client,
+// falling back to the documented default before the first response.
+func (c *dataCenterClient) assetsPageSize() int {
+	if size := int(c.assetsPage.Load()); size > 0 {
+		return size
+	}
+	return dataCenterAssetsDefaultPageSize
+}
+
 func (c *dataCenterClient) ListObjectSchemas(ctx context.Context) ([]AssetObjectSchema, error) {
-	return nil, ErrAssetsNotAvailable
+	var payload struct {
+		ObjectSchemas []AssetObjectSchema `json:"objectschemas"`
+	}
+	if err := c.assetsGetJSON(ctx, c.assetsBase()+"/objectschema/list", &payload); err != nil {
+		return nil, err
+	}
+	return payload.ObjectSchemas, nil
 }
 
-// GetObjectSchema gets a single object schema by ID
 func (c *dataCenterClient) GetObjectSchema(ctx context.Context, schemaID string) (*AssetObjectSchema, error) {
-	return nil, ErrAssetsNotAvailable
+	var schema AssetObjectSchema
+	if err := c.assetsGetJSON(ctx, c.assetsBase()+"/objectschema/"+url.PathEscape(schemaID), &schema); err != nil {
+		return nil, err
+	}
+	return &schema, nil
 }
 
-// ListObjectTypes lists all object types in a schema
 func (c *dataCenterClient) ListObjectTypes(ctx context.Context, schemaID string) ([]AssetObjectType, error) {
-	return nil, ErrAssetsNotAvailable
+	var types []AssetObjectType
+	if err := c.assetsGetJSON(ctx, c.assetsBase()+"/objectschema/"+url.PathEscape(schemaID)+"/objecttypes/flat", &types); err != nil {
+		return nil, err
+	}
+	return types, nil
 }
 
-// GetObjectTypeAttributes gets all attributes for an object type
 func (c *dataCenterClient) GetObjectTypeAttributes(ctx context.Context, objectTypeID string) ([]AssetObjectAttribute, error) {
-	return nil, ErrAssetsNotAvailable
+	var attrs []AssetObjectAttribute
+	if err := c.assetsGetJSON(ctx, c.assetsBase()+"/objecttype/"+url.PathEscape(objectTypeID)+"/attributes", &attrs); err != nil {
+		return nil, err
+	}
+	normalizeAssetDefaultTypes(attrs)
+	return attrs, nil
 }
 
-// SearchObjects searches for objects in a schema
+// SearchObjects reads one window of Assets objects from the legacy Insight AQL
+// endpoint. The endpoint paginates by page number with a server-chosen page
+// size and ignores maxResults, so the adapter maps the requested offset onto
+// the page containing it and slices to the exact offset. That keeps the
+// offset contract the importer's walk relies on even when the server returns
+// fewer rows than requested.
 func (c *dataCenterClient) SearchObjects(ctx context.Context, opts ObjectSearchOptions) (*ObjectSearchResult, error) {
-	return nil, ErrAssetsNotAvailable
+	startAt := opts.StartAt
+	if opts.Page > 1 && startAt == 0 {
+		pageSize := opts.PageSize
+		if pageSize < 1 {
+			pageSize = c.assetsPageSize()
+		}
+		startAt = (opts.Page - 1) * pageSize
+	}
+	if startAt < 0 {
+		startAt = 0
+	}
+
+	clauses := []string{"objectSchemaId = " + quoteAssetsAQLID(opts.ObjectSchemaID)}
+	if opts.ObjectTypeID != "" {
+		clauses = append(clauses, "objectTypeId = "+quoteAssetsAQLID(opts.ObjectTypeID))
+	}
+	if strings.TrimSpace(opts.IQL) != "" {
+		clauses = append(clauses, "("+strings.TrimSpace(opts.IQL)+")")
+	}
+
+	serverPageSize := c.assetsPageSize()
+	page := startAt/serverPageSize + 1
+	offsetInPage := startAt % serverPageSize
+
+	query := url.Values{}
+	query.Set("qlQuery", strings.Join(clauses, " AND "))
+	query.Set("page", strconv.Itoa(page))
+	if opts.IncludeAttributes {
+		query.Set("includeAttributes", "true")
+	}
+
+	var current struct {
+		ObjectEntries        []AssetObject          `json:"objectEntries"`
+		ObjectTypeAttributes []AssetObjectAttribute `json:"objectTypeAttributes"`
+		TotalFilterCount     int                    `json:"totalFilterCount"`
+		PageObjectSize       int                    `json:"pageObjectSize"`
+	}
+	if err := c.assetsGetJSON(ctx, c.assetsBase()+"/aql/objects?"+query.Encode(), &current); err != nil {
+		return nil, err
+	}
+	if current.PageObjectSize > 0 {
+		c.assetsPage.Store(int64(current.PageObjectSize))
+	}
+	normalizeAssetDefaultTypes(current.ObjectTypeAttributes)
+
+	entries := current.ObjectEntries
+	if offsetInPage > 0 {
+		if offsetInPage >= len(entries) {
+			entries = nil
+		} else {
+			entries = entries[offsetInPage:]
+		}
+	}
+
+	// The legacy response has no isLast and reports an unreliable toIndex, so
+	// exhaustion is derived from the offset plus the rows actually returned.
+	isLast := len(entries) == 0 || (current.TotalFilterCount > 0 && startAt+len(entries) >= current.TotalFilterCount)
+
+	return &ObjectSearchResult{
+		ObjectEntries:        entries,
+		ObjectTypeAttributes: current.ObjectTypeAttributes,
+		PageNumber:           page,
+		PageSize:             serverPageSize,
+		TotalFilterCount:     current.TotalFilterCount,
+		StartIndex:           startAt,
+		ToIndex:              startAt + len(entries),
+		IsLast:               isLast,
+	}, nil
 }
 
-// GetObjectCount gets the total number of objects in a schema
 func (c *dataCenterClient) GetObjectCount(ctx context.Context, schemaID string) (int, error) {
-	return 0, ErrAssetsNotAvailable
+	schema, err := c.GetObjectSchema(ctx, schemaID)
+	if err != nil {
+		return 0, err
+	}
+	return schema.ObjectCount, nil
 }

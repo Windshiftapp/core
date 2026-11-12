@@ -114,6 +114,10 @@ let mappingsState = $state({
   issueTypes: [], // { jiraIds[], jiraName, isSubtask, hierarchyLevel, windshiftId, createNew } - deduplicated by name
   statuses: [], // { jiraIds[], jiraName, categoryKey, categoryName, color, windshiftId, createNew } - deduplicated by name
   customFields: [], // { jiraId, jiraName, windshiftType, action, windshiftId }
+  // Asset schema ids the operator explicitly selected. Empty means no Jira
+  // Assets inventory is imported, so a project-scoped import cannot ingest
+  // unrelated schemas the Jira token can see.
+  assetSchemaIDs: [],
   versions: [], // { jiraId, jiraName, projectKey, released, releaseDate, createNew }
   serviceManagement: {
     importOrganizations: false,
@@ -532,6 +536,19 @@ export const jiraImport = {
       // them always requires an explicit operator choice.
       importOrganizations: false,
     };
+    // Assets import is opt-in; nothing is selected until the operator chooses.
+    mappingsState.assetSchemaIDs = [];
+  },
+
+  toggleAssetSchema(schemaID) {
+    const id = String(schemaID);
+    mappingsState.assetSchemaIDs = mappingsState.assetSchemaIDs.includes(id)
+      ? mappingsState.assetSchemaIDs.filter((candidate) => candidate !== id)
+      : [...mappingsState.assetSchemaIDs, id];
+  },
+
+  isAssetSchemaSelected(schemaID) {
+    return mappingsState.assetSchemaIDs.includes(String(schemaID));
   },
 
   // Mapping setters
@@ -689,6 +706,7 @@ export const jiraImport = {
         project_keys: projectsState.selected,
         open_issues_only: projectsState.openIssuesOnly,
         force_reimport: forceReimport,
+        asset_schema_ids: mappingsState.assetSchemaIDs,
         mappings: mappingsState,
         xray: {
           import_tests: xrayState.available && xrayState.importTests,
@@ -805,6 +823,8 @@ export const jiraImport = {
       issueTypes: [],
       statuses: [],
       customFields: [],
+      // Assets import is opt-in; nothing is selected until the operator chooses.
+      assetSchemaIDs: [],
       versions: [],
       serviceManagement: {
         importOrganizations: false,

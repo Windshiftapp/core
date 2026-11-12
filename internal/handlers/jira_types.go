@@ -222,6 +222,11 @@ type StartImportRequest struct {
 	Mappings       ImportMappings    `json:"mappings"`
 	Xray           XrayImportOptions `json:"xray"`
 	ForceReimport  bool              `json:"force_reimport,omitempty"`
+	// AssetSchemaIDs is the operator's explicit Jira Assets selection. Assets
+	// import is opt-in: an empty selection imports no inventory, so a
+	// project-scoped import cannot silently ingest every schema the Jira token
+	// can see.
+	AssetSchemaIDs []string `json:"asset_schema_ids,omitempty"`
 }
 
 // XrayImportOptions contains the operator's conditional Xray choice. Cloud
