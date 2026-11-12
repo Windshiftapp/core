@@ -633,7 +633,7 @@ func (p *Processor) createItemFromEmail(
 	params := services.ItemCreationParams{
 		WorkspaceID:             workspaceID,
 		Title:                   sanitize.PlainTextField.Sanitize(email.GetSubjectForItem()),
-		Description:             sanitize.Comment.Sanitize(StripSignature(email.GetBodyText())),
+		Description:             sanitize.Comment.Sanitize(email.bodyMarkdown(false)),
 		ItemTypeID:              itemTypeID,
 		PriorityID:              config.EmailDefaultPriorityID,
 		RequestTypeID:           requestTypeID,
@@ -716,8 +716,7 @@ func (p *Processor) addCommentFromReply(
 	itemID int,
 	customerID int,
 ) (*ProcessingResult, error) {
-	// Extract reply content (strip quoted text)
-	content := StripSignature(ExtractReplyContent(email.GetBodyText()))
+	content := email.bodyMarkdown(true)
 
 	if strings.TrimSpace(content) == "" {
 		// No new content - skip
