@@ -280,7 +280,7 @@ func (h *JiraImportHandler) jiraConfigurationReadinessFindings(
 				Entity:     "Workflow conditions and validators",
 				Category:   "workflow_rule",
 				Severity:   jira.SeverityBlocked,
-				Reason:     "Jira transitions with exposed conditions or validators retain their topology but stay behind a generated review lock because Jira rule semantics do not safely map to the Windshift condition model.",
+				Reason:     "Jira reports conditions or validators on these transitions, but its read API does not return the full rule tree. Topology imports either way; guards that map onto the Windshift condition model are recreated, and the remainder import behind a generated review lock so an operator can review and rebuild them.",
 				UsageCount: guardedCount,
 			})
 		}
