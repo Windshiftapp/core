@@ -13,6 +13,7 @@ import (
 	"windshift/internal/itemevents"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/services"
 )
 
 // fallbackStatusID is the status used when a source state has no status row
@@ -409,7 +410,7 @@ func (l *Loader) runBatch(
 				if _, cDone := existing["comment"][c.ID]; cDone {
 					l.report.CommentsExisting++
 				} else {
-					if err := l.insertComment(tx, existing, idOf(existing, i.ID), c); err != nil {
+					if err := l.insertComment(ctx, tx, existing, idOf(existing, i.ID), c); err != nil {
 						return err
 					}
 				}
@@ -465,7 +466,7 @@ func (l *Loader) runBatch(
 			if c.DeletedAt != nil {
 				continue
 			}
-			if err := l.insertComment(tx, existing, id, c); err != nil {
+			if err := l.insertComment(ctx, tx, existing, id, c); err != nil {
 				return err
 			}
 		}
@@ -535,8 +536,10 @@ func commentContent(c *Comment) string {
 }
 
 // insertComment writes one comment row with the contract's author and
-// timestamps, records its idempotency mapping, and counts it.
-func (l *Loader) insertComment(tx database.Tx, existing map[string]map[string]int, itemID int, c *Comment) error {
+// timestamps, records its idempotency mapping, and counts it. The row is
+// written through CommentService so the comment-created domain fact is
+// recorded inside the same batch transaction.
+func (l *Loader) insertComment(ctx context.Context, tx database.Tx, existing map[string]map[string]int, itemID int, c *Comment) error {
 	if _, done := existing["comment"][c.ID]; done {
 		l.report.CommentsExisting++
 		return nil
@@ -553,21 +556,20 @@ func (l *Loader) insertComment(tx database.Tx, existing map[string]map[string]in
 		l.report.CommentsSkippedEmpty++
 		return nil
 	}
-	var authorID any
+	var authorID int
 	if id, ok := l.userID[c.CreatedByID]; ok {
 		authorID = id
 	}
-	var commentID int
-	if err := tx.QueryRow(`
-		INSERT INTO comments (item_id, author_id, content, is_private, created_at, updated_at)
-		VALUES (?, ?, ?, false, ?, ?) RETURNING id`,
-		itemID, authorID, content, c.CreatedAt, c.UpdatedAt).Scan(&commentID); err != nil {
+	commentID, err := services.NewCommentService(l.db).CreateImportedInTx(
+		ctx, tx, itemID, authorID, content, c.CreatedAt, c.UpdatedAt, itemevents.Import("plane"))
+	if err != nil {
 		return fmt.Errorf("insert plane comment %s: %w", c.ID, err)
 	}
-	if err := l.recordMapping(tx, "comment", c.ID, commentID, map[string]any{"plane_issue_present": true}); err != nil {
+	id := int(commentID)
+	if err := l.recordMapping(tx, "comment", c.ID, id, map[string]any{"plane_issue_present": true}); err != nil {
 		return err
 	}
-	existing["comment"][c.ID] = commentID
+	existing["comment"][c.ID] = id
 	l.report.CommentsImported++
 	return nil
 }
