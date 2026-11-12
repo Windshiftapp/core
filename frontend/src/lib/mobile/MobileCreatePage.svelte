@@ -71,7 +71,6 @@
   // resolution as desktop, rendered as one vertical page. Required fields are
   // always visible; optional fields live in a collapsible section.
   let allCustomFields = $state([]);
-  let customFieldsLoaded = $state(false);
   let configSetLoadedForWorkspace = $state(null);
   let screenFields = $state([]);
   // Non-reactive sync guards — see templatesInFlightKey above.
@@ -284,7 +283,7 @@
 
   // Load the effective create screen whenever workspace/type are known.
   $effect(() => {
-    if (isPersonal || !workspaceId || !itemTypeId || !customFieldsLoaded) return;
+    if (isPersonal || !workspaceId || !itemTypeId) return;
     if (configSetLoadedForWorkspace !== workspaceId) return;
     loadScreenFields(workspaceId, itemTypeId);
   });
@@ -320,7 +319,6 @@
 
   async function loadWorkspaceFieldData(wsId) {
     await Promise.all([
-      loadCustomFields(),
       loadConfigSetForWorkspace(wsId),
       loadPriorities(wsId),
       loadLabels(wsId),
@@ -380,18 +378,6 @@
   );
   const labelNames = $derived(selectedLabels.map((l) => l?.name).filter(Boolean));
 
-  async function loadCustomFields() {
-    if (customFieldsLoaded) return;
-    try {
-      allCustomFields = await customFields.getAll();
-    } catch (err) {
-      console.error('Failed to load custom fields:', err);
-      allCustomFields = [];
-    } finally {
-      customFieldsLoaded = true;
-    }
-  }
-
   async function loadConfigSetForWorkspace(wsId) {
     if (configSetLoadedForWorkspace === wsId) return;
     try {
@@ -416,31 +402,40 @@
     try {
       const config = await workspaceDataStore.screenConfig(typeId);
       const screenId = config?.screens?.create ?? 1;
-      const fields = (await screens.getFields(screenId)) || [];
+      const [fields, definitions] = await Promise.all([
+        screens.getFields(screenId),
+        customFields.getAll(),
+      ]);
       // Ignore an out-of-order response after a workspace/type change.
       if (`${workspaceId}-${itemTypeId}` !== key) return;
 
-      screenFields = fields;
-      const customIds = fields
-        .filter((field) => field.field_type === 'custom')
-        .map((field) => parseInt(field.field_identifier, 10));
+      screenFields = fields || [];
+      // Definitions load with the screen so the rendered fields and their
+      // required flags cannot disagree.
+      const customIds = new Set(
+        screenFields
+          .filter((field) => field.field_type === 'custom')
+          .map((field) => parseInt(field.field_identifier, 10))
+      );
+      allCustomFields = (definitions || []).filter((field) => customIds.has(field.id));
+
       // Preserve entered values for fields that remain configured across the
       // workspace/type change; only fields new to the screen get defaults.
       const previousValues = customFieldValues;
       customFieldValues = {};
       for (const field of allCustomFields) {
-        if (customIds.includes(field.id) && isCreateRenderableCustomFieldType(field.field_type)) {
-          const previous = previousValues[field.id];
-          customFieldValues[field.id] =
-            previous !== undefined && previous !== null && previous !== ''
-              ? previous
-              : defaultCustomFieldValue(field.field_type);
-        }
+        if (!isCreateRenderableCustomFieldType(field.field_type)) continue;
+        const previous = previousValues[field.id];
+        customFieldValues[field.id] =
+          previous !== undefined && previous !== null && previous !== ''
+            ? previous
+            : defaultCustomFieldValue(field.field_type);
       }
       screenFieldsLoadedForKey = key;
     } catch (err) {
       console.error('Failed to load screen fields:', err);
       screenFields = [];
+      allCustomFields = [];
       customFieldValues = {};
       screenFieldsLoadedForKey = key;
     } finally {
@@ -628,9 +623,9 @@
         const fieldId = parseInt(field.field_identifier, 10);
         const value = customFieldValues[fieldId];
         const fieldDef = customFieldsById.get(fieldId);
-        // Linking fields are not renderable on create; ignore a legacy
-        // required flag rather than blocking submission forever.
-        if (!isCreateRenderableCustomFieldType(fieldDef?.field_type)) continue;
+        // A linking field or a definition that did not load cannot be filled on
+        // create; a legacy required flag must not block submission forever.
+        if (!fieldDef || !isCreateRenderableCustomFieldType(fieldDef.field_type)) continue;
         if (isBooleanCustomFieldType(fieldDef?.field_type)) continue;
         if (isEmptyValue(value)) {
           error = t('mobile.create.requiredField', { field: fieldDef?.name || t('mobile.create.customField') });

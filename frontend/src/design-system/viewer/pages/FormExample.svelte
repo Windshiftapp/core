@@ -246,7 +246,6 @@
       { field_type: 'system', field_identifier: 'due_date', is_required: false },
     ],
     customFieldValues: {},
-    customFieldsLoaded: false,
     validationErrors: [],
     selectedLabels: [],
     templateOptions: [

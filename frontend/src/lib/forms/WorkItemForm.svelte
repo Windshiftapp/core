@@ -104,12 +104,12 @@
     }
   });
 
-  // Load screen fields when workspace and item type are ready
+  // Load screen fields when workspace and item type are ready. The custom
+  // field definitions load with them.
   $effect(() => {
     if (
       store.formData.workspace_id &&
       store.formData.item_type_id &&
-      store.customFieldsLoaded &&
       store.configSetLoadedForWorkspace === store.formData.workspace_id
     ) {
       const key = `${store.formData.workspace_id}-${store.formData.item_type_id}`;

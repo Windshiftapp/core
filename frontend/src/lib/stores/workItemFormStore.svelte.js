@@ -115,9 +115,7 @@ class WorkItemFormStore {
   // Deduplicates only the current template fetch.
   #templatesInFlightKey = null;
 
-  allCustomFields = $state([]);
   customFields = $state([]);
-  customFieldsLoaded = $state(false);
 
   screenFields = $state([]);
   screenSystemFields = $state([]);
@@ -295,22 +293,6 @@ class WorkItemFormStore {
       console.error('Failed to load users:', error);
       this.users = [];
       this.usersLoaded = true;
-    }
-  }
-
-  /**
-   * Load all custom fields.
-   */
-  async loadCustomFields() {
-    if (this.customFieldsLoaded) return;
-    try {
-      this.allCustomFields = await customFields.getAll();
-      this.customFieldsLoaded = true;
-    } catch (error) {
-      console.error('Failed to load custom fields:', error);
-      this.allCustomFields = [];
-      this.customFields = [];
-      this.customFieldsLoaded = true;
     }
   }
 
@@ -568,7 +550,8 @@ class WorkItemFormStore {
   }
 
   /**
-   * Load screen fields for a specific workspace/item type combination.
+   * Load the create screen and the custom field definitions it references in
+   * one pass, so the rendered fields and their required flags cannot disagree.
    */
   async loadScreenFieldsForItemType(workspaceId, itemTypeId) {
     const key = `${workspaceId}-${itemTypeId}`;
@@ -576,22 +559,27 @@ class WorkItemFormStore {
     try {
       this.loadingScreenFields = true;
       const createScreenId = await this.#resolveCreateScreenId(workspaceId, itemTypeId);
-      const fields = createScreenId ? await screens.getFields(createScreenId) : [];
+      const [fields, definitions] = await Promise.all([
+        createScreenId ? screens.getFields(createScreenId) : [],
+        customFields.getAll(),
+      ]);
       this.screenFields = fields || [];
 
       this.screenSystemFields = this.screenFields
         .filter((field) => field.field_type === 'system')
         .map((field) => field.field_identifier);
 
-      const customFieldIds = this.screenFields
-        .filter((field) => field.field_type === 'custom')
-        .map((field) => parseInt(field.field_identifier, 10));
+      const customFieldIds = new Set(
+        this.screenFields
+          .filter((field) => field.field_type === 'custom')
+          .map((field) => parseInt(field.field_identifier, 10))
+      );
 
       // Linking fields need an existing item and cannot be filled during
       // create, so keep them out of the rendered fields and the payload.
-      const filteredCustomFields = this.allCustomFields.filter(
+      this.customFields = (definitions || []).filter(
         (field) =>
-          customFieldIds.includes(field.id) && isCreateRenderableCustomFieldType(field.field_type)
+          customFieldIds.has(field.id) && isCreateRenderableCustomFieldType(field.field_type)
       );
 
       // Keep values the user already entered for fields that remain configured
@@ -600,7 +588,7 @@ class WorkItemFormStore {
       // item type changed after a field was filled.
       const previousValues = this.customFieldValues;
       this.customFieldValues = {};
-      filteredCustomFields.forEach((field) => {
+      this.customFields.forEach((field) => {
         const previous = previousValues[field.id];
         this.customFieldValues[field.id] =
           previous !== undefined && previous !== null && previous !== ''
@@ -608,7 +596,6 @@ class WorkItemFormStore {
             : defaultCustomFieldValue(field.field_type);
       });
 
-      this.customFields = filteredCustomFields;
       this.screenFieldsLoadedForKey = key;
     } catch (error) {
       console.error('Failed to load screen fields:', error);
@@ -950,14 +937,13 @@ class WorkItemFormStore {
           }
         } else if (field.field_type === 'custom') {
           const fieldId = parseInt(field.field_identifier, 10);
-          const value = this.customFieldValues[fieldId];
-          const fieldDef = this.allCustomFields.find((f) => f.id === fieldId);
-          // Linking fields are not renderable on create; ignore a legacy
-          // required flag rather than blocking submission forever.
-          if (!isCreateRenderableCustomFieldType(fieldDef?.field_type)) continue;
-          if (isBooleanCustomFieldType(fieldDef?.field_type)) continue;
-          if (this.#isEmptyValue(value)) {
-            errors.push(`${fieldDef?.name || 'Custom field'} is required`);
+          // Only renderable fields are in customFields; a linking field or a
+          // definition that did not load cannot be filled on create, so a
+          // legacy required flag must not block submission forever.
+          const fieldDef = this.customFields.find((f) => f.id === fieldId);
+          if (!fieldDef || isBooleanCustomFieldType(fieldDef.field_type)) continue;
+          if (this.#isEmptyValue(this.customFieldValues[fieldId])) {
+            errors.push(`${fieldDef.name} is required`);
           }
         }
       }
@@ -1060,10 +1046,8 @@ class WorkItemFormStore {
     this.hierarchyLevels = [];
     this.availableItemTypes = [];
     this.itemTypesLoaded = false;
-    this.allCustomFields = [];
     this.customFields = [];
     this.selectedLabels = [];
-    this.customFieldsLoaded = false;
     this.screenFields = [];
     this.screenSystemFields = [];
     this.loadingScreenFields = false;
@@ -1086,7 +1070,6 @@ class WorkItemFormStore {
       this.loadTeams(),
       this.loadMilestones(),
       this.loadItemTypes(),
-      this.loadCustomFields(),
     ]);
     this.#initialized = true;
   }
