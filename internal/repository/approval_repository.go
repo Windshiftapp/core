@@ -81,42 +81,31 @@ func (r *ApprovalRepository) findFullRequestByID(ctx context.Context, requestID 
 	}
 	defer func() { _ = stepRows.Close() }()
 
+	var steps []models.ApprovalStepInstance
 	for stepRows.Next() {
 		var si models.ApprovalStepInstance
 		if err := stepRows.Scan(
 			&si.ID, &si.ApprovalRequestID, &si.ApprovalStepID, &si.DisplayOrder, &si.Status,
 			&si.EscalationDueAt, &si.EscalationCount, &si.LastEscalatedAt, &si.StartedAt, &si.CompletedAt,
 		); err != nil {
+			_ = stepRows.Close()
 			return nil, fmt.Errorf("scan step instance: %w", err)
 		}
-
-		appRows, err := r.db.QueryContext(ctx, `
-			SELECT id, approval_step_instance_id, user_id, portal_customer_id, source_role_id, source_group_id,
-			       substituted_for_user_id, is_active, created_at
-			FROM approval_step_approvers WHERE approval_step_instance_id = ? ORDER BY id
-		`, si.ID)
-		if err != nil {
-			return nil, fmt.Errorf("query approvers: %w", err)
-		}
-		for appRows.Next() {
-			var a models.ApprovalStepApprover
-			if err := appRows.Scan(&a.ID, &a.ApprovalStepInstanceID, &a.UserID, &a.PortalCustomerID,
-				&a.SourceRoleID, &a.SourceGroupID, &a.SubstitutedForUserID, &a.IsActive, &a.CreatedAt); err != nil {
-				_ = appRows.Close()
-				return nil, fmt.Errorf("scan approver: %w", err)
-			}
-			si.Approvers = append(si.Approvers, a)
-		}
-		if err := appRows.Err(); err != nil {
-			_ = appRows.Close()
-			return nil, fmt.Errorf("iterate approvers: %w", err)
-		}
-		_ = appRows.Close()
-		req.StepInstances = append(req.StepInstances, si)
+		steps = append(steps, si)
 	}
 	if err := stepRows.Err(); err != nil {
+		_ = stepRows.Close()
 		return nil, fmt.Errorf("iterate step instances: %w", err)
 	}
+	// Release the cursor before loading approvers: holding it while the
+	// approver query runs deadlocks a one-connection read pool.
+	if err := stepRows.Close(); err != nil {
+		return nil, fmt.Errorf("close step instances: %w", err)
+	}
+	if err := r.populateStepApprovers(ctx, steps); err != nil {
+		return nil, err
+	}
+	req.StepInstances = steps
 
 	// metadata is JSONB on Postgres / TEXT on SQLite. COALESCE(...,'') was
 	// fine for TEXT but rejected by JSONB ('' isn't valid JSON), so we leave
@@ -148,6 +137,45 @@ func (r *ApprovalRepository) findFullRequestByID(ctx context.Context, requestID 
 		return nil, fmt.Errorf("iterate decisions: %w", err)
 	}
 	return req, nil
+}
+
+// populateStepApprovers attaches approvers to every step instance in one
+// query so no cursor is held across another acquisition.
+func (r *ApprovalRepository) populateStepApprovers(ctx context.Context, steps []models.ApprovalStepInstance) error {
+	if len(steps) == 0 {
+		return nil
+	}
+	ids := make([]int, len(steps))
+	byID := make(map[int]int, len(steps))
+	for i := range steps {
+		ids[i] = steps[i].ID
+		byID[steps[i].ID] = i
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, approval_step_instance_id, user_id, portal_customer_id, source_role_id, source_group_id,
+		       substituted_for_user_id, is_active, created_at
+		FROM approval_step_approvers
+		WHERE approval_step_instance_id IN (`+placeholders(len(ids))+`)
+		ORDER BY approval_step_instance_id, id
+	`, intArgs(ids)...)
+	if err != nil {
+		return fmt.Errorf("query approvers: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var a models.ApprovalStepApprover
+		if err := rows.Scan(&a.ID, &a.ApprovalStepInstanceID, &a.UserID, &a.PortalCustomerID,
+			&a.SourceRoleID, &a.SourceGroupID, &a.SubstitutedForUserID, &a.IsActive, &a.CreatedAt); err != nil {
+			return fmt.Errorf("scan approver: %w", err)
+		}
+		if i, ok := byID[a.ApprovalStepInstanceID]; ok {
+			steps[i].Approvers = append(steps[i].Approvers, a)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate approvers: %w", err)
+	}
+	return nil
 }
 
 // FindPendingRequestIDForItem returns the single pending request id for an

@@ -399,32 +399,42 @@ func (s *ConfigSetExportService) exportConditionSet(ctx context.Context, conditi
 		if err != nil {
 			return nil, err
 		}
+		type rawCondition struct {
+			c         ConfigSetTplCondition
+			configRaw string
+		}
+		var rawConditions []rawCondition
 		for condRows.Next() {
-			var c ConfigSetTplCondition
-			var configRaw string
-			if scanErr := condRows.Scan(&c.Type, &c.Mode, &c.ErrorMessage, &c.DisplayOrder, &configRaw); scanErr != nil {
+			var rc rawCondition
+			if scanErr := condRows.Scan(&rc.c.Type, &rc.c.Mode, &rc.c.ErrorMessage, &rc.c.DisplayOrder, &rc.configRaw); scanErr != nil {
 				_ = condRows.Close()
 				return nil, scanErr
 			}
-			cfg := map[string]any{}
-			if configRaw != "" {
-				if err := json.Unmarshal([]byte(configRaw), &cfg); err != nil {
-					_ = condRows.Close()
-					return nil, fmt.Errorf("invalid condition config json: %w", err)
-				}
-			}
-			if err := s.rewriteConditionConfigForExport(ctx, c.Type, cfg, customFieldNames); err != nil {
-				_ = condRows.Close()
-				return nil, err
-			}
-			c.Config = cfg
-			tc.Conditions = append(tc.Conditions, c)
+			rawConditions = append(rawConditions, rc)
 		}
 		if err := condRows.Err(); err != nil {
 			_ = condRows.Close()
 			return nil, err
 		}
-		_ = condRows.Close()
+		// Release the cursor before resolving reference names: holding it
+		// while the lookup queries run deadlocks a one-connection read pool.
+		if err := condRows.Close(); err != nil {
+			return nil, err
+		}
+		for _, rc := range rawConditions {
+			c := rc.c
+			cfg := map[string]any{}
+			if rc.configRaw != "" {
+				if err := json.Unmarshal([]byte(rc.configRaw), &cfg); err != nil {
+					return nil, fmt.Errorf("invalid condition config json: %w", err)
+				}
+			}
+			if err := s.rewriteConditionConfigForExport(ctx, c.Type, cfg, customFieldNames); err != nil {
+				return nil, err
+			}
+			c.Config = cfg
+			tc.Conditions = append(tc.Conditions, c)
+		}
 		cs.TransitionConditions = append(cs.TransitionConditions, tc)
 	}
 	return &cs, nil
@@ -570,109 +580,116 @@ func (s *ConfigSetExportService) exportApprovalSet(ctx context.Context, approval
 		if err != nil {
 			return nil, err
 		}
+		type rawStep struct {
+			stepID                                                               int
+			step                                                                 ConfigSetTplApprovalStep
+			approverFieldIdent                                                   sql.NullString
+			approverFieldID, approverRoleID, approverGroupID, approverUserID     sql.NullInt64
+			escAfterHours                                                        sql.NullInt64
+			escAction, escTargetSource, escTargetFieldIdent                      sql.NullString
+			escTargetFieldID, escTargetRoleID, escTargetGroupID, escTargetUserID sql.NullInt64
+			maxEscalations                                                       sql.NullInt64
+		}
+		var rawSteps []rawStep
 		for stepRows.Next() {
-			var (
-				stepID                                                               int
-				step                                                                 ConfigSetTplApprovalStep
-				approverFieldIdent                                                   sql.NullString
-				approverFieldID, approverRoleID, approverGroupID, approverUserID     sql.NullInt64
-				escAfterHours                                                        sql.NullInt64
-				escAction, escTargetSource, escTargetFieldIdent                      sql.NullString
-				escTargetFieldID, escTargetRoleID, escTargetGroupID, escTargetUserID sql.NullInt64
-				maxEscalations                                                       sql.NullInt64
-			)
+			var rs rawStep
 			if scanErr := stepRows.Scan(
-				&stepID, &step.DisplayOrder, &step.Name,
-				&step.QuorumMode, &step.QuorumCount, &step.QuorumPercent, &step.RejectionPolicy,
-				&step.ApproverSource, &approverFieldIdent, &approverFieldID,
-				&approverRoleID, &approverGroupID, &approverUserID, &step.AllowSelfApproval,
-				&step.OnLeaveStrategy,
-				&escAfterHours, &escAction, &escTargetSource,
-				&escTargetFieldIdent, &escTargetFieldID,
-				&escTargetRoleID, &escTargetGroupID, &escTargetUserID,
-				&maxEscalations,
+				&rs.stepID, &rs.step.DisplayOrder, &rs.step.Name,
+				&rs.step.QuorumMode, &rs.step.QuorumCount, &rs.step.QuorumPercent, &rs.step.RejectionPolicy,
+				&rs.step.ApproverSource, &rs.approverFieldIdent, &rs.approverFieldID,
+				&rs.approverRoleID, &rs.approverGroupID, &rs.approverUserID, &rs.step.AllowSelfApproval,
+				&rs.step.OnLeaveStrategy,
+				&rs.escAfterHours, &rs.escAction, &rs.escTargetSource,
+				&rs.escTargetFieldIdent, &rs.escTargetFieldID,
+				&rs.escTargetRoleID, &rs.escTargetGroupID, &rs.escTargetUserID,
+				&rs.maxEscalations,
 			); scanErr != nil {
 				_ = stepRows.Close()
 				return nil, scanErr
 			}
-			step.ApproverFieldIdentifier = approverFieldIdent.String
-			step.EscalationAction = escAction.String
-			step.EscalationTargetSource = escTargetSource.String
-			step.EscalationTargetFieldIdentifier = escTargetFieldIdent.String
-			if escAfterHours.Valid {
-				v := int(escAfterHours.Int64)
+			rawSteps = append(rawSteps, rs)
+		}
+		if err := stepRows.Err(); err != nil {
+			_ = stepRows.Close()
+			return nil, err
+		}
+		// Release the cursor before resolving reference names: holding it
+		// while the lookup queries run deadlocks a one-connection read pool.
+		if err := stepRows.Close(); err != nil {
+			return nil, err
+		}
+		for _, rs := range rawSteps {
+			step := rs.step
+			step.ApproverFieldIdentifier = rs.approverFieldIdent.String
+			step.EscalationAction = rs.escAction.String
+			step.EscalationTargetSource = rs.escTargetSource.String
+			step.EscalationTargetFieldIdentifier = rs.escTargetFieldIdent.String
+			if rs.escAfterHours.Valid {
+				v := int(rs.escAfterHours.Int64)
 				step.EscalationAfterHours = &v
 			}
-			if maxEscalations.Valid {
-				v := int(maxEscalations.Int64)
+			if rs.maxEscalations.Valid {
+				v := int(rs.maxEscalations.Int64)
 				step.MaxEscalations = &v
 			}
 
 			// Approver ref-by-name.
-			if approverFieldID.Valid {
-				name, err := s.lookupCustomFieldName(ctx, int(approverFieldID.Int64))
+			if rs.approverFieldID.Valid {
+				name, err := s.lookupCustomFieldName(ctx, int(rs.approverFieldID.Int64))
 				if err != nil {
-					_ = stepRows.Close()
 					return nil, err
 				}
 				step.ApproverCustomFieldName = name
-				customFieldNames[int(approverFieldID.Int64)] = name
+				customFieldNames[int(rs.approverFieldID.Int64)] = name
 			}
-			if approverRoleID.Valid {
-				name, err := s.lookupRoleName(ctx, int(approverRoleID.Int64))
+			if rs.approverRoleID.Valid {
+				name, err := s.lookupRoleName(ctx, int(rs.approverRoleID.Int64))
 				if err != nil {
-					_ = stepRows.Close()
 					return nil, err
 				}
 				step.ApproverRoleName = name
 			}
-			if approverGroupID.Valid {
-				name, err := s.lookupGroupName(ctx, int(approverGroupID.Int64))
+			if rs.approverGroupID.Valid {
+				name, err := s.lookupGroupName(ctx, int(rs.approverGroupID.Int64))
 				if err != nil {
-					_ = stepRows.Close()
 					return nil, err
 				}
 				step.ApproverGroupName = name
 			}
-			if approverUserID.Valid {
-				email, err := s.lookupUserEmail(ctx, int(approverUserID.Int64))
+			if rs.approverUserID.Valid {
+				email, err := s.lookupUserEmail(ctx, int(rs.approverUserID.Int64))
 				if err != nil {
-					_ = stepRows.Close()
 					return nil, err
 				}
 				step.ApproverUserEmail = email
 			}
 
 			// Escalation target ref-by-name (mirrors approver).
-			if escTargetFieldID.Valid {
-				name, err := s.lookupCustomFieldName(ctx, int(escTargetFieldID.Int64))
+			if rs.escTargetFieldID.Valid {
+				name, err := s.lookupCustomFieldName(ctx, int(rs.escTargetFieldID.Int64))
 				if err != nil {
-					_ = stepRows.Close()
 					return nil, err
 				}
 				step.EscalationTargetCustomFieldName = name
-				customFieldNames[int(escTargetFieldID.Int64)] = name
+				customFieldNames[int(rs.escTargetFieldID.Int64)] = name
 			}
-			if escTargetRoleID.Valid {
-				name, err := s.lookupRoleName(ctx, int(escTargetRoleID.Int64))
+			if rs.escTargetRoleID.Valid {
+				name, err := s.lookupRoleName(ctx, int(rs.escTargetRoleID.Int64))
 				if err != nil {
-					_ = stepRows.Close()
 					return nil, err
 				}
 				step.EscalationTargetRoleName = name
 			}
-			if escTargetGroupID.Valid {
-				name, err := s.lookupGroupName(ctx, int(escTargetGroupID.Int64))
+			if rs.escTargetGroupID.Valid {
+				name, err := s.lookupGroupName(ctx, int(rs.escTargetGroupID.Int64))
 				if err != nil {
-					_ = stepRows.Close()
 					return nil, err
 				}
 				step.EscalationTargetGroupName = name
 			}
-			if escTargetUserID.Valid {
-				email, err := s.lookupUserEmail(ctx, int(escTargetUserID.Int64))
+			if rs.escTargetUserID.Valid {
+				email, err := s.lookupUserEmail(ctx, int(rs.escTargetUserID.Int64))
 				if err != nil {
-					_ = stepRows.Close()
 					return nil, err
 				}
 				step.EscalationTargetUserEmail = email
@@ -680,11 +697,6 @@ func (s *ConfigSetExportService) exportApprovalSet(ctx context.Context, approval
 
 			setStatus.Steps = append(setStatus.Steps, step)
 		}
-		if err := stepRows.Err(); err != nil {
-			_ = stepRows.Close()
-			return nil, err
-		}
-		_ = stepRows.Close()
 		as.SetStatuses = append(as.SetStatuses, setStatus)
 	}
 	return &as, nil
@@ -789,36 +801,53 @@ func (s *ConfigSetExportService) exportScreens(ctx context.Context, screenIDs []
 		if err != nil {
 			return nil, err
 		}
+		type rawField struct {
+			ft, ident string
+			order     int
+			required  bool
+			width     string
+		}
+		var rawFields []rawField
 		for fieldRows.Next() {
-			var f ConfigSetTplScreenField
-			var ft, ident string
-			if scanErr := fieldRows.Scan(&ft, &ident, &f.DisplayOrder, &f.IsRequired, &f.FieldWidth); scanErr != nil {
+			var rf rawField
+			if scanErr := fieldRows.Scan(&rf.ft, &rf.ident, &rf.order, &rf.required, &rf.width); scanErr != nil {
 				_ = fieldRows.Close()
 				return nil, scanErr
 			}
-			f.FieldKind = ft
-			if ft == "custom" {
-				if id, ok := parseIntish(ident); ok && id > 0 {
-					name, err := s.lookupCustomFieldName(ctx, id)
-					if err != nil {
-						_ = fieldRows.Close()
-						return nil, err
-					}
-					f.CustomFieldName = name
-					customFieldNames[id] = name
-				} else {
-					f.FieldIdentifier = ident
-				}
-			} else {
-				f.FieldIdentifier = ident
-			}
-			s2.Fields = append(s2.Fields, f)
+			rawFields = append(rawFields, rf)
 		}
 		if err := fieldRows.Err(); err != nil {
 			_ = fieldRows.Close()
 			return nil, err
 		}
-		_ = fieldRows.Close()
+		// Release the cursor before resolving custom-field names: holding it
+		// while the lookup query runs deadlocks a one-connection read pool.
+		if err := fieldRows.Close(); err != nil {
+			return nil, err
+		}
+		for _, rf := range rawFields {
+			f := ConfigSetTplScreenField{
+				FieldKind:    rf.ft,
+				DisplayOrder: rf.order,
+				IsRequired:   rf.required,
+				FieldWidth:   rf.width,
+			}
+			if rf.ft == "custom" {
+				if id, ok := parseIntish(rf.ident); ok && id > 0 {
+					name, err := s.lookupCustomFieldName(ctx, id)
+					if err != nil {
+						return nil, err
+					}
+					f.CustomFieldName = name
+					customFieldNames[id] = name
+				} else {
+					f.FieldIdentifier = rf.ident
+				}
+			} else {
+				f.FieldIdentifier = rf.ident
+			}
+			s2.Fields = append(s2.Fields, f)
+		}
 
 		sysRows, err := s.db.QueryContext(ctx, `SELECT field_name FROM screen_system_fields WHERE screen_id = ? ORDER BY field_name`, sr.ID)
 		if err != nil {

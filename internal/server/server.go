@@ -3266,36 +3266,52 @@ func (r *itemPRContinuationResolver) ContinuationForItemAsUser(ctx context.Conte
 	if err != nil {
 		return nil, fmt.Errorf("query open PR links: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
+	type prLink struct {
+		externalID, repoName string
+		connectionID         int
+	}
+	var links []prLink
+	for rows.Next() {
+		var l prLink
+		if err := rows.Scan(&l.externalID, &l.repoName, &l.connectionID); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		links = append(links, l)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	// Release the cursor before credential resolution and the remote PR read:
+	// both can block while the cursor still owns a read connection.
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
 	allowed := make(map[string]bool, len(allowedRepoSlugs))
 	for _, slug := range allowedRepoSlugs {
 		allowed[slug] = true
 	}
-	for rows.Next() {
-		var externalID, repoName string
-		var connectionID int
-		if err := rows.Scan(&externalID, &repoName, &connectionID); err != nil {
-			return nil, err
-		}
-		if len(allowed) > 0 && !allowed[repoName] {
+	for _, l := range links {
+		if len(allowed) > 0 && !allowed[l.repoName] {
 			continue
 		}
-		number, err := strconv.Atoi(externalID)
+		number, err := strconv.Atoi(l.externalID)
 		if err != nil {
 			continue
 		}
-		owner, repo, ok := strings.Cut(repoName, "/")
+		owner, repo, ok := strings.Cut(l.repoName, "/")
 		if !ok || owner == "" || repo == "" {
 			continue
 		}
 		var creds *scm.ProviderCredentials
 		if userID > 0 {
-			creds, err = r.cr.GetCredentialsForUser(ctx, connectionID, userID)
+			creds, err = r.cr.GetCredentialsForUser(ctx, l.connectionID, userID)
 		} else {
-			creds, err = r.cr.GetCredentialsByConnectionID(ctx, connectionID)
+			creds, err = r.cr.GetCredentialsByConnectionID(ctx, l.connectionID)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("resolve connection %d: %w", connectionID, err)
+			return nil, fmt.Errorf("resolve connection %d: %w", l.connectionID, err)
 		}
 		provider, err := r.cr.CreateProvider(creds)
 		if err != nil {
@@ -3308,10 +3324,7 @@ func (r *itemPRContinuationResolver) ContinuationForItemAsUser(ctx context.Conte
 		if pr.IsMerged || strings.EqualFold(pr.State, "closed") || pr.HeadBranch == "" {
 			continue
 		}
-		return &services.ContinuationTarget{PRNumber: number, RepoSlug: repoName, HeadBranch: pr.HeadBranch}, nil
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
+		return &services.ContinuationTarget{PRNumber: number, RepoSlug: l.repoName, HeadBranch: pr.HeadBranch}, nil
 	}
 	return nil, nil
 }

@@ -132,18 +132,93 @@ func (r *AssetActionRepository) ListEnabledBySet(setID int) ([]*models.AssetActi
 		}
 
 		applyAssetActionNulls(action, description, triggerConfig, createdBy)
-
-		if err := r.hydrateNodesAndEdges(action); err != nil {
-			return nil, err
-		}
-
 		actions = append(actions, action)
 	}
 	if err := rows.Err(); err != nil {
+		_ = rows.Close()
 		return nil, fmt.Errorf("failed to iterate enabled asset actions: %w", err)
+	}
+	// Release the cursor before loading nodes/edges: holding it while the
+	// nested queries run deadlocks a one-connection read pool.
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := r.populateNodesAndEdges(actions); err != nil {
+		return nil, err
 	}
 
 	return actions, nil
+}
+
+// populateNodesAndEdges attaches nodes and edges to every asset action using
+// one query per relation.
+func (r *AssetActionRepository) populateNodesAndEdges(actions []*models.AssetAction) error {
+	if len(actions) == 0 {
+		return nil
+	}
+	ids := make([]int, len(actions))
+	byID := make(map[int]*models.AssetAction, len(actions))
+	for i, a := range actions {
+		ids[i] = a.ID
+		byID[a.ID] = a
+	}
+	nodeRows, err := r.db.Query(`
+		SELECT id, action_id, node_type, node_config, position_x, position_y, created_at, updated_at
+		FROM asset_action_nodes
+		WHERE action_id IN (`+placeholders(len(ids))+`)
+		ORDER BY action_id, id
+	`, intArgs(ids)...)
+	if err != nil {
+		return fmt.Errorf("failed to query asset action nodes: %w", err)
+	}
+	for nodeRows.Next() {
+		var n models.AssetActionNode
+		if err := nodeRows.Scan(&n.ID, &n.ActionID, &n.NodeType, &n.NodeConfig, &n.PositionX, &n.PositionY, &n.CreatedAt, &n.UpdatedAt); err != nil {
+			_ = nodeRows.Close()
+			return fmt.Errorf("failed to scan asset action node: %w", err)
+		}
+		if a, ok := byID[n.ActionID]; ok {
+			a.Nodes = append(a.Nodes, n)
+		}
+	}
+	if err := nodeRows.Err(); err != nil {
+		_ = nodeRows.Close()
+		return fmt.Errorf("failed to iterate asset action nodes: %w", err)
+	}
+	if err := nodeRows.Close(); err != nil {
+		return fmt.Errorf("failed to close asset action nodes: %w", err)
+	}
+
+	edgeRows, err := r.db.Query(`
+		SELECT id, action_id, source_node_id, target_node_id, edge_type, source_handle, target_handle, created_at
+		FROM asset_action_edges
+		WHERE action_id IN (`+placeholders(len(ids))+`)
+		ORDER BY action_id, id
+	`, intArgs(ids)...)
+	if err != nil {
+		return fmt.Errorf("failed to query asset action edges: %w", err)
+	}
+	defer func() { _ = edgeRows.Close() }()
+	for edgeRows.Next() {
+		var e models.AssetActionEdge
+		var sourceHandle, targetHandle sql.NullString
+		if err := edgeRows.Scan(&e.ID, &e.ActionID, &e.SourceNodeID, &e.TargetNodeID, &e.EdgeType, &sourceHandle, &targetHandle, &e.CreatedAt); err != nil {
+			return fmt.Errorf("failed to scan asset action edge: %w", err)
+		}
+		if sourceHandle.Valid {
+			e.SourceHandle = sourceHandle.String
+		}
+		if targetHandle.Valid {
+			e.TargetHandle = targetHandle.String
+		}
+		if a, ok := byID[e.ActionID]; ok {
+			a.Edges = append(a.Edges, e)
+		}
+	}
+	if err := edgeRows.Err(); err != nil {
+		return fmt.Errorf("failed to iterate asset action edges: %w", err)
+	}
+	return nil
 }
 
 // Create creates a new asset action

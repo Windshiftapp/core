@@ -484,22 +484,38 @@ func (m *ConnectionManager) ListEnabledPublic() ([]PublicConnectionInfo, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to list enabled connections: %w", err)
 	}
-	defer rows.Close()
-
-	out := make([]PublicConnectionInfo, 0)
+	type rawConnection struct {
+		info           PublicConnectionInfo
+		providerConfig string
+	}
+	var raw []rawConnection
 	for rows.Next() {
-		var c PublicConnectionInfo
+		var rc rawConnection
 		var providerType string
 		var providerConfig sql.NullString
-		if err := rows.Scan(&c.ID, &c.Name, &providerType, &c.Model, &c.IsDefault, &providerConfig); err != nil {
+		if err := rows.Scan(&rc.info.ID, &rc.info.Name, &providerType, &rc.info.Model, &rc.info.IsDefault, &providerConfig); err != nil {
+			_ = rows.Close()
 			return nil, fmt.Errorf("failed to scan connection: %w", err)
 		}
-		c.ProviderType = ProviderType(providerType)
-		c.SupportsVision = EffectiveVision(ProviderConfigVisionMode(providerConfig.String), m.resolveModelVision(c.ProviderType, c.Model))
-		out = append(out, c)
+		rc.info.ProviderType = ProviderType(providerType)
+		rc.providerConfig = providerConfig.String
+		raw = append(raw, rc)
 	}
 	if err := rows.Err(); err != nil {
+		_ = rows.Close()
 		return nil, fmt.Errorf("iterate connections: %w", err)
+	}
+	// Release the cursor before resolving vision capability: the model cache
+	// is database-backed, so holding the cursor deadlocks a one-connection
+	// read pool.
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	out := make([]PublicConnectionInfo, 0, len(raw))
+	for _, rc := range raw {
+		c := rc.info
+		c.SupportsVision = EffectiveVision(ProviderConfigVisionMode(rc.providerConfig), m.resolveModelVision(c.ProviderType, c.Model))
+		out = append(out, c)
 	}
 	return out, nil
 }

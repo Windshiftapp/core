@@ -324,18 +324,28 @@ func (s *EmailReplyService) resolveReplyToAddress(itemID, channelID int) (addres
 	if err != nil {
 		return "", ""
 	}
-	defer func() { _ = rows.Close() }()
+	var mailboxIDs []int
 	for rows.Next() {
 		var mailboxID int
 		if err := rows.Scan(&mailboxID); err != nil {
+			_ = rows.Close()
 			return "", ""
 		}
+		mailboxIDs = append(mailboxIDs, mailboxID)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return "", ""
+	}
+	// Release the cursor before resolving addresses: holding it while the
+	// mailbox query runs deadlocks a one-connection read pool.
+	if err := rows.Close(); err != nil {
+		return "", ""
+	}
+	for _, mailboxID := range mailboxIDs {
 		if address, name = s.mailboxAddress(mailboxID); address != "" {
 			return address, name
 		}
-	}
-	if err := rows.Err(); err != nil {
-		return "", ""
 	}
 	return "", ""
 }

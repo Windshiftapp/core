@@ -296,7 +296,24 @@ func (b *permissionCacheBuilder) loadPersonalWorkspacePermissions() error {
 	if err != nil {
 		return fmt.Errorf("error loading personal workspaces: %w", err)
 	}
-	defer rows.Close()
+	var workspaceIDs []int
+	for rows.Next() {
+		var workspaceID int
+		if err := rows.Scan(&workspaceID); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("scan personal workspace: %w", err)
+		}
+		workspaceIDs = append(workspaceIDs, workspaceID)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return fmt.Errorf("error iterating personal workspaces: %w", err)
+	}
+	// Release the cursor before the lazy permission-key load: holding it
+	// while that query runs deadlocks a one-connection read pool.
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("close personal workspaces: %w", err)
+	}
 	if len(b.service.allPermissionKeys) == 0 {
 		if err := b.service.loadAllPermissionKeys(); err != nil {
 			return fmt.Errorf("load permissions for personal workspace grant: %w", err)
@@ -305,19 +322,12 @@ func (b *permissionCacheBuilder) loadPersonalWorkspacePermissions() error {
 	if len(b.service.allPermissionKeys) == 0 {
 		return fmt.Errorf("load permissions for personal workspace grant: no permission keys found")
 	}
-	for rows.Next() {
-		var workspaceID int
-		if err := rows.Scan(&workspaceID); err != nil {
-			return fmt.Errorf("scan personal workspace: %w", err)
-		}
+	for _, workspaceID := range workspaceIDs {
 		permissions := b.workspacePermissions(workspaceID)
 		for _, key := range b.service.allPermissionKeys {
 			permissions[key] = true
 		}
 		b.permissionSources(workspaceID)["_source"] = "personal_owner"
-	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("error iterating personal workspaces: %w", err)
 	}
 	return nil
 }

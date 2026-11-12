@@ -305,15 +305,20 @@ func (r *ConfigurationSetRepository) List(page, limit int, search string) ([]mod
 		cs.ConditionSetID = utils.NullInt64ToPtr(conditionSetID)
 		cs.ApprovalSetID = utils.NullInt64ToPtr(approvalSetID)
 
-		// Load related data for each config set
-		if err := r.loadRelations(&cs); err != nil {
-			return nil, 0, err
-		}
-
 		configSets = append(configSets, cs)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, 0, fmt.Errorf("failed to iterate configuration sets: %w", err)
+	}
+	// Release the cursor before loading relations: holding it while the
+	// per-set queries run deadlocks a one-connection read pool.
+	if err := rows.Close(); err != nil {
+		return nil, 0, fmt.Errorf("failed to close configuration sets: %w", err)
+	}
+	for i := range configSets {
+		if err := r.loadRelations(&configSets[i]); err != nil {
+			return nil, 0, err
+		}
 	}
 
 	if configSets == nil {

@@ -165,23 +165,71 @@ func (r *PriorityRepository) List(configurationSetID *int) ([]models.Priority, e
 	if err != nil {
 		return nil, fmt.Errorf("list priorities: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
-
 	priorities := []models.Priority{}
 	for rows.Next() {
 		var priority models.Priority
 		if err := scanPriority(rows, &priority); err != nil {
+			_ = rows.Close()
 			return nil, fmt.Errorf("scan priority: %w", err)
-		}
-		if err := r.populateConfigurationSets(&priority); err != nil {
-			return nil, err
 		}
 		priorities = append(priorities, priority)
 	}
 	if err := rows.Err(); err != nil {
+		_ = rows.Close()
 		return nil, fmt.Errorf("iterate priorities: %w", err)
 	}
+	// Release the cursor before loading associations: holding it while a
+	// second query runs deadlocks a one-connection read pool.
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("close priorities: %w", err)
+	}
+	if err := r.populateConfigurationSetsBatch(priorities); err != nil {
+		return nil, err
+	}
 	return priorities, nil
+}
+
+// populateConfigurationSetsBatch attaches configuration-set associations to
+// every priority in one query.
+func (r *PriorityRepository) populateConfigurationSetsBatch(priorities []models.Priority) error {
+	if len(priorities) == 0 {
+		return nil
+	}
+	ids := make([]int, len(priorities))
+	byID := make(map[int]int, len(priorities))
+	for i := range priorities {
+		ids[i] = priorities[i].ID
+		byID[priorities[i].ID] = i
+	}
+	rows, err := r.db.Query(`
+		SELECT csp.priority_id, cs.id, cs.name, COALESCE(cs.builtin_key, '')
+		FROM configuration_set_priorities csp
+		JOIN configuration_sets cs ON csp.configuration_set_id = cs.id
+		WHERE csp.priority_id IN (`+placeholders(len(ids))+`)
+		ORDER BY csp.priority_id, cs.name
+	`, intArgs(ids)...)
+	if err != nil {
+		return fmt.Errorf("load priority configuration sets: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var priorityID, id int
+		var name, builtinKey string
+		if err := rows.Scan(&priorityID, &id, &name, &builtinKey); err != nil {
+			return fmt.Errorf("scan priority configuration set: %w", err)
+		}
+		i, ok := byID[priorityID]
+		if !ok {
+			continue
+		}
+		priorities[i].ConfigurationSetIDs = append(priorities[i].ConfigurationSetIDs, id)
+		priorities[i].ConfigurationSetNames = append(priorities[i].ConfigurationSetNames, name)
+		priorities[i].ConfigurationSetBuiltinKeys = append(priorities[i].ConfigurationSetBuiltinKeys, builtinKey)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate priority configuration sets: %w", err)
+	}
+	return nil
 }
 
 // GetByID returns a priority with its configuration-set associations.

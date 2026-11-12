@@ -406,26 +406,65 @@ func (r *OnCallRepository) GetLayersForSchedule(scheduleID int) ([]models.OnCall
 			&l.CreatedAt, &l.UpdatedAt,
 		)
 		if err != nil {
+			_ = rows.Close()
 			return nil, err
 		}
 		if endDate.Valid {
 			l.EndDate = &endDate.String
 		}
-
-		// Load members for this layer
-		members, err := r.GetLayerMembers(l.ID)
-		if err != nil {
-			return nil, err
-		}
-		l.Members = members
-
 		layers = append(layers, l)
 	}
 	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	// Release the cursor before loading members: holding it while the member
+	// query runs deadlocks a one-connection read pool.
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := r.populateLayerMembers(layers); err != nil {
 		return nil, err
 	}
 
 	return layers, nil
+}
+
+// populateLayerMembers attaches members to every layer in one query.
+func (r *OnCallRepository) populateLayerMembers(layers []models.OnCallScheduleLayer) error {
+	if len(layers) == 0 {
+		return nil
+	}
+	ids := make([]int, len(layers))
+	byID := make(map[int]int, len(layers))
+	for i := range layers {
+		ids[i] = layers[i].ID
+		byID[layers[i].ID] = i
+	}
+	rows, err := r.db.Query(`
+		SELECT m.id, m.layer_id, m.user_id, m.position, m.created_at,
+		       u.first_name || ' ' || u.last_name as user_name,
+		       u.email, COALESCE(u.avatar_url, '') as avatar_url
+		FROM on_call_schedule_layer_members m
+		JOIN users u ON u.id = m.user_id
+		WHERE m.layer_id IN (`+placeholders(len(ids))+`)
+		ORDER BY m.layer_id, m.position
+	`, intArgs(ids)...)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var m models.OnCallScheduleLayerMember
+		if err := rows.Scan(&m.ID, &m.LayerID, &m.UserID, &m.Position, &m.CreatedAt,
+			&m.UserName, &m.UserEmail, &m.UserAvatarURL); err != nil {
+			return err
+		}
+		if i, ok := byID[m.LayerID]; ok {
+			layers[i].Members = append(layers[i].Members, m)
+		}
+	}
+	return rows.Err()
 }
 
 // GetLayerByID returns a single rotation layer (without members). Used by the
@@ -778,23 +817,63 @@ func (r *OnCallRepository) GetEscalationRules(policyID int) ([]models.OnCallEsca
 		err := rows.Scan(&rule.ID, &rule.PolicyID, &rule.StepOrder,
 			&rule.EscalationDelayMinutes, &rule.TargetType, &rule.TargetID, &rule.CreatedAt)
 		if err != nil {
+			_ = rows.Close()
 			return nil, err
 		}
-
-		// Load notification rules for this escalation rule
-		notifRules, err := r.GetNotificationRulesForStep(rule.ID)
-		if err != nil {
-			return nil, err
-		}
-		rule.NotificationRules = notifRules
-
 		rules = append(rules, rule)
 	}
 	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	// Release the cursor before loading notification rules: holding it while
+	// the nested query runs deadlocks a one-connection read pool.
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := r.populateNotificationRules(rules); err != nil {
 		return nil, err
 	}
 
 	return rules, nil
+}
+
+// populateNotificationRules attaches notification rules to every escalation
+// rule in one query.
+func (r *OnCallRepository) populateNotificationRules(rules []models.OnCallEscalationRule) error {
+	if len(rules) == 0 {
+		return nil
+	}
+	ids := make([]int, len(rules))
+	byID := make(map[int]int, len(rules))
+	for i := range rules {
+		ids[i] = rules[i].ID
+		byID[rules[i].ID] = i
+	}
+	rows, err := r.db.Query(`
+		SELECT id, escalation_rule_id, notification_type, delay_minutes,
+			repeat_interval_minutes, repeat_count, created_at
+		FROM on_call_notification_rules
+		WHERE escalation_rule_id IN (`+placeholders(len(ids))+`)
+		ORDER BY escalation_rule_id, delay_minutes
+	`, intArgs(ids)...)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var nr models.OnCallNotificationRule
+		var repeatInterval sql.NullInt64
+		if err := rows.Scan(&nr.ID, &nr.EscalationRuleID, &nr.NotificationType,
+			&nr.DelayMinutes, &repeatInterval, &nr.RepeatCount, &nr.CreatedAt); err != nil {
+			return err
+		}
+		nr.RepeatIntervalMinutes = nullIntPtr(repeatInterval)
+		if i, ok := byID[nr.EscalationRuleID]; ok {
+			rules[i].NotificationRules = append(rules[i].NotificationRules, nr)
+		}
+	}
+	return rows.Err()
 }
 
 func (r *OnCallRepository) SetEscalationRules(policyID int, rules []models.EscalationRuleInput) error {

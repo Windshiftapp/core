@@ -51,23 +51,75 @@ func (r *ItemTypeRepository) List(configurationSetID *int) ([]models.ItemType, e
 	if err != nil {
 		return nil, fmt.Errorf("list item types: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
-
 	itemTypes := []models.ItemType{}
 	for rows.Next() {
 		var it models.ItemType
 		if err := scanItemType(rows, &it); err != nil {
+			_ = rows.Close()
 			return nil, fmt.Errorf("scan item type: %w", err)
-		}
-		if err := r.populateConfigurationSets(&it); err != nil {
-			return nil, err
 		}
 		itemTypes = append(itemTypes, it)
 	}
 	if err := rows.Err(); err != nil {
+		_ = rows.Close()
 		return nil, fmt.Errorf("list item types: %w", err)
 	}
+	// Release the cursor before loading associations: holding it while a
+	// second query runs deadlocks a one-connection read pool.
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("close item types: %w", err)
+	}
+	if err := r.populateConfigurationSetsBatch(itemTypes); err != nil {
+		return nil, err
+	}
 	return itemTypes, nil
+}
+
+// populateConfigurationSetsBatch attaches configuration-set associations to
+// every item type in one query.
+func (r *ItemTypeRepository) populateConfigurationSetsBatch(itemTypes []models.ItemType) error {
+	if len(itemTypes) == 0 {
+		return nil
+	}
+	ids := make([]int, len(itemTypes))
+	byID := make(map[int]int, len(itemTypes))
+	for i := range itemTypes {
+		ids[i] = itemTypes[i].ID
+		byID[itemTypes[i].ID] = i
+	}
+	rows, err := r.db.Query(`
+		SELECT csit.item_type_id, cs.id, cs.name, COALESCE(cs.builtin_key, '')
+		FROM configuration_set_item_types csit
+		JOIN configuration_sets cs ON csit.configuration_set_id = cs.id
+		WHERE csit.item_type_id IN (`+placeholders(len(ids))+`)
+		ORDER BY csit.item_type_id, cs.name
+	`, intArgs(ids)...)
+	if err != nil {
+		return fmt.Errorf("load item type configuration sets: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var itemTypeID, id int
+		var name, builtinKey string
+		if err := rows.Scan(&itemTypeID, &id, &name, &builtinKey); err != nil {
+			return fmt.Errorf("scan item type configuration set: %w", err)
+		}
+		i, ok := byID[itemTypeID]
+		if !ok {
+			continue
+		}
+		if len(itemTypes[i].ConfigurationSetIDs) == 0 {
+			itemTypes[i].ConfigurationSetID = id
+			itemTypes[i].ConfigurationSetName = name
+		}
+		itemTypes[i].ConfigurationSetIDs = append(itemTypes[i].ConfigurationSetIDs, id)
+		itemTypes[i].ConfigurationSetNames = append(itemTypes[i].ConfigurationSetNames, name)
+		itemTypes[i].ConfigurationSetBuiltinKeys = append(itemTypes[i].ConfigurationSetBuiltinKeys, builtinKey)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate item type configuration sets: %w", err)
+	}
+	return nil
 }
 
 // ListForWorkspace returns the workspace-applicable item type catalog. It

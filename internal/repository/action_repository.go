@@ -233,19 +233,21 @@ func (r *ActionRepository) ListEnabledByTrigger(triggerType models.ActionTrigger
 			return nil, fmt.Errorf("failed to scan action: %w", err)
 		}
 		applyActionNulls(action, description, triggerConfig, createdBy, actorUserID)
-		nodes, err := r.GetNodesByActionID(action.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get action nodes: %w", err)
-		}
-		action.Nodes = nodes
-		edges, err := r.GetEdgesByActionID(action.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get action edges: %w", err)
-		}
-		action.Edges = edges
 		actions = append(actions, action)
 	}
-	return actions, rows.Err()
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	// Release the cursor before loading nodes/edges: holding it while the
+	// nested queries run deadlocks a one-connection read pool.
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := r.populateNodesAndEdges(actions); err != nil {
+		return nil, err
+	}
+	return actions, nil
 }
 
 // ListEnabledByWorkspace lists all enabled actions for a workspace
@@ -279,28 +281,93 @@ func (r *ActionRepository) ListEnabledByWorkspace(workspaceID int) ([]*models.Ac
 		}
 
 		applyActionNulls(action, description, triggerConfig, createdBy, actorUserID)
-
-		// Load nodes for execution
-		nodes, err := r.GetNodesByActionID(action.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get action nodes: %w", err)
-		}
-		action.Nodes = nodes
-
-		// Load edges for execution
-		edges, err := r.GetEdgesByActionID(action.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get action edges: %w", err)
-		}
-		action.Edges = edges
-
 		actions = append(actions, action)
 	}
 	if err := rows.Err(); err != nil {
+		_ = rows.Close()
 		return nil, fmt.Errorf("failed to iterate enabled actions: %w", err)
+	}
+	// Release the cursor before loading nodes/edges: holding it while the
+	// nested queries run deadlocks a one-connection read pool.
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := r.populateNodesAndEdges(actions); err != nil {
+		return nil, err
 	}
 
 	return actions, nil
+}
+
+// populateNodesAndEdges attaches nodes and edges to every action using one
+// query per relation.
+func (r *ActionRepository) populateNodesAndEdges(actions []*models.Action) error {
+	if len(actions) == 0 {
+		return nil
+	}
+	ids := make([]int, len(actions))
+	byID := make(map[int]*models.Action, len(actions))
+	for i, a := range actions {
+		ids[i] = a.ID
+		byID[a.ID] = a
+	}
+	nodeRows, err := r.db.Query(`
+		SELECT id, action_id, node_type, node_config, position_x, position_y, created_at, updated_at
+		FROM action_nodes
+		WHERE action_id IN (`+placeholders(len(ids))+`)
+		ORDER BY action_id, id
+	`, intArgs(ids)...)
+	if err != nil {
+		return fmt.Errorf("failed to query action nodes: %w", err)
+	}
+	for nodeRows.Next() {
+		var n models.ActionNode
+		if err := nodeRows.Scan(&n.ID, &n.ActionID, &n.NodeType, &n.NodeConfig, &n.PositionX, &n.PositionY, &n.CreatedAt, &n.UpdatedAt); err != nil {
+			_ = nodeRows.Close()
+			return fmt.Errorf("failed to scan action node: %w", err)
+		}
+		if a, ok := byID[n.ActionID]; ok {
+			a.Nodes = append(a.Nodes, n)
+		}
+	}
+	if err := nodeRows.Err(); err != nil {
+		_ = nodeRows.Close()
+		return fmt.Errorf("failed to iterate action nodes: %w", err)
+	}
+	if err := nodeRows.Close(); err != nil {
+		return fmt.Errorf("failed to close action nodes: %w", err)
+	}
+
+	edgeRows, err := r.db.Query(`
+		SELECT id, action_id, source_node_id, target_node_id, edge_type, source_handle, target_handle, created_at
+		FROM action_edges
+		WHERE action_id IN (`+placeholders(len(ids))+`)
+		ORDER BY action_id, id
+	`, intArgs(ids)...)
+	if err != nil {
+		return fmt.Errorf("failed to query action edges: %w", err)
+	}
+	defer func() { _ = edgeRows.Close() }()
+	for edgeRows.Next() {
+		var e models.ActionEdge
+		var sourceHandle, targetHandle sql.NullString
+		if err := edgeRows.Scan(&e.ID, &e.ActionID, &e.SourceNodeID, &e.TargetNodeID, &e.EdgeType, &sourceHandle, &targetHandle, &e.CreatedAt); err != nil {
+			return fmt.Errorf("failed to scan action edge: %w", err)
+		}
+		if sourceHandle.Valid {
+			e.SourceHandle = sourceHandle.String
+		}
+		if targetHandle.Valid {
+			e.TargetHandle = targetHandle.String
+		}
+		if a, ok := byID[e.ActionID]; ok {
+			a.Edges = append(a.Edges, e)
+		}
+	}
+	if err := edgeRows.Err(); err != nil {
+		return fmt.Errorf("failed to iterate action edges: %w", err)
+	}
+	return nil
 }
 
 // Create creates a new action

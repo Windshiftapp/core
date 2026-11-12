@@ -473,15 +473,59 @@ func (r *ZammadRepository) scanConnections(rows *sql.Rows) ([]*models.ZammadConn
 	for rows.Next() {
 		connection, err := scanZammadConnection(rows)
 		if err != nil {
-			return nil, err
-		}
-		connection.WorkspaceIDs, err = r.connectionWorkspaceIDs(connection.ProviderID)
-		if err != nil {
+			_ = rows.Close()
 			return nil, err
 		}
 		connections = append(connections, connection)
 	}
-	return connections, rows.Err()
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	// Release the cursor before loading workspace scopes: holding it while
+	// the nested query runs deadlocks a one-connection read pool.
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := r.populateConnectionWorkspaceIDs(connections); err != nil {
+		return nil, err
+	}
+	return connections, nil
+}
+
+// populateConnectionWorkspaceIDs attaches workspace scopes to every Zammad
+// connection in one query.
+func (r *ZammadRepository) populateConnectionWorkspaceIDs(connections []*models.ZammadConnection) error {
+	if len(connections) == 0 {
+		return nil
+	}
+	args := make([]any, len(connections))
+	byID := make(map[string]*models.ZammadConnection, len(connections))
+	for i, c := range connections {
+		args[i] = c.ProviderID
+		byID[c.ProviderID] = c
+		c.WorkspaceIDs = []int{}
+	}
+	rows, err := r.db.Query(`SELECT zc.provider_id, acw.workspace_id
+		FROM zammad_connections zc
+		JOIN action_credential_workspaces acw ON acw.credential_id = zc.credential_id
+		WHERE zc.provider_id IN (`+placeholders(len(args))+`)
+		ORDER BY zc.provider_id, acw.workspace_id`, args...)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var providerID string
+		var workspaceID int
+		if err := rows.Scan(&providerID, &workspaceID); err != nil {
+			return err
+		}
+		if c, ok := byID[providerID]; ok {
+			c.WorkspaceIDs = append(c.WorkspaceIDs, workspaceID)
+		}
+	}
+	return rows.Err()
 }
 
 func scanZammadConnection(scanner interface{ Scan(...any) error }) (*models.ZammadConnection, error) {

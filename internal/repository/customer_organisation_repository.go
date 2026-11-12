@@ -38,22 +38,30 @@ func (r *CustomerOrganisationRepository) List() ([]models.CustomerOrganisation, 
 	if err != nil {
 		return nil, fmt.Errorf("list customer_organisations: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
-
 	var customers []models.CustomerOrganisation
-	fieldIndex, _ := customfields.LoadCustomFieldNameIndex(r.db, customfields.AppliesToCustomerOrganisations)
 	for rows.Next() {
 		c, scanErr := scanCustomerOrganisation(rows)
 		if scanErr != nil {
+			_ = rows.Close()
 			return nil, fmt.Errorf("scan customer_organisation: %w", scanErr)
-		}
-		if fieldIndex != nil {
-			fieldIndex.Resolve(c.CustomFieldValues)
 		}
 		customers = append(customers, c)
 	}
 	if err := rows.Err(); err != nil {
+		_ = rows.Close()
 		return nil, fmt.Errorf("iterate customer_organisations: %w", err)
+	}
+	// Release the cursor before loading the custom-field name index: holding
+	// it while the index query runs deadlocks a one-connection read pool.
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("close customer_organisations: %w", err)
+	}
+
+	fieldIndex, _ := customfields.LoadCustomFieldNameIndex(r.db, customfields.AppliesToCustomerOrganisations)
+	if fieldIndex != nil {
+		for i := range customers {
+			fieldIndex.Resolve(customers[i].CustomFieldValues)
+		}
 	}
 	return customers, nil
 }

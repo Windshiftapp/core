@@ -5062,14 +5062,31 @@ func backfillIntakesFromChannels(db Database) error {
 		channelID int
 		intakeID  int
 	}
-	var createdIntakes []created
+	type channelRow struct {
+		channelID  int
+		configJSON string
+	}
+	var channels []channelRow
 	for rows.Next() {
-		var channelID int
-		var configJSON string
-		if err := rows.Scan(&channelID, &configJSON); err != nil {
+		var cr channelRow
+		if err := rows.Scan(&cr.channelID, &cr.configJSON); err != nil {
 			_ = rows.Close()
 			return fmt.Errorf("scan email channel for intake backfill: %w", err)
 		}
+		channels = append(channels, cr)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return fmt.Errorf("iterate email channels for intake backfill: %w", err)
+	}
+	// Release the cursor before inserting intakes: holding it while the
+	// write-returning query runs deadlocks PostgreSQL's shared pool.
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("close email channels for intake backfill: %w", err)
+	}
+	var createdIntakes []created
+	for _, cr := range channels {
+		channelID, configJSON := cr.channelID, cr.configJSON
 		var cfg struct {
 			EmailConnectedPortalID     *int   `json:"email_connected_portal_id"`
 			EmailWorkspaceID           int    `json:"email_workspace_id"`
@@ -5128,11 +5145,6 @@ func backfillIntakesFromChannels(db Database) error {
 		}
 		createdIntakes = append(createdIntakes, created{channelID: channelID, intakeID: intakeID})
 	}
-	if err := rows.Err(); err != nil {
-		_ = rows.Close()
-		return fmt.Errorf("iterate email channels for intake backfill: %w", err)
-	}
-	_ = rows.Close()
 
 	for _, c := range createdIntakes {
 		if _, err := db.ExecWrite(`

@@ -184,11 +184,22 @@ func (s *Service) ListJobs() ([]JobInfo, error) {
 		if configJSON.Valid {
 			job.ProjectKeys = ProjectKeys(configJSON.String)
 		}
-		job.ImportedWorkspaceCount, job.ImportedItemCount = s.EntityCounts(job.ID)
-		job.ImportedWorkspaces = s.Workspaces(job.ID)
 		jobs = append(jobs, job)
 	}
-	return jobs, rows.Err()
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	// Release the cursor before loading per-job counts and workspaces:
+	// holding it while those queries run deadlocks a one-connection read pool.
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	for i := range jobs {
+		jobs[i].ImportedWorkspaceCount, jobs[i].ImportedItemCount = s.EntityCounts(jobs[i].ID)
+		jobs[i].ImportedWorkspaces = s.Workspaces(jobs[i].ID)
+	}
+	return jobs, nil
 }
 
 func (s *Service) EntityCounts(jobID string) (workspaceCount, itemCount int) {

@@ -921,19 +921,29 @@ func (s *ItemLinkService) AccessibleAssetSetIDs(userID int) map[int]bool {
 	if err != nil {
 		return out
 	}
-	defer func() { _ = rows.Close() }()
+	var setIDs []int
 	for rows.Next() {
 		var id int
 		if err := rows.Scan(&id); err != nil {
+			_ = rows.Close()
 			continue
 		}
+		setIDs = append(setIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return map[int]bool{}
+	}
+	// Release the cursor before checking permissions: holding it while the
+	// permission query runs deadlocks a one-connection read pool.
+	if err := rows.Close(); err != nil {
+		return out
+	}
+	for _, id := range setIDs {
 		ok, err := s.assetPerm.HasAssetSetPermission(userID, id, AssetPermissionKeyView)
 		if err == nil && ok {
 			out[id] = true
 		}
-	}
-	if err := rows.Err(); err != nil {
-		return map[int]bool{}
 	}
 	return out
 }
