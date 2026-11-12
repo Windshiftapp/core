@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime/debug"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -23,6 +25,7 @@ import (
 	"windshift/internal/config"
 	"windshift/internal/database"
 	"windshift/internal/health"
+	"windshift/internal/internalhttp"
 	"windshift/internal/logger"
 	"windshift/internal/middleware"
 	"windshift/internal/server"
@@ -59,13 +62,30 @@ func printBanner() {
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
-		target := health.DefaultProbeTarget(os.Getenv("PORT"), os.Getenv("WINDSHIFT_CONTEXT_PATH"))
+		// TLS_CERT/TLS_KEY are the supported way to tell both the server and
+		// this subcommand that the internal listener terminates TLS directly.
+		// The subcommand runs before config.Load, so it reads the environment
+		// itself.
+		tlsCert := os.Getenv("TLS_CERT")
+		directTLS := tlsCert != "" && os.Getenv("TLS_KEY") != ""
+
+		var client *http.Client
+		if directTLS {
+			c, clientErr := internalhttp.Client(tlsCert, 5*time.Second)
+			if clientErr != nil {
+				fmt.Fprintln(os.Stderr, clientErr)
+				os.Exit(1)
+			}
+			client = c
+		}
+
+		target := internalhttp.BaseURL(os.Getenv("PORT"), os.Getenv("WINDSHIFT_CONTEXT_PATH"), directTLS) + "/readyz"
 		if len(os.Args) > 2 {
 			target = os.Args[2]
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		err := health.Probe(ctx, target)
+		err := health.Probe(ctx, client, target)
 		cancel()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -136,8 +156,19 @@ func main() {
 	var sshDB database.Database // Declared at function scope to allow explicit cleanup
 	if cfg.SSH.Enabled {
 		// Use the explicit IPv4 loopback address so the TUI client reaches the
-		// same listener family on hosts where localhost resolves to IPv6 first.
-		apiURL := fmt.Sprintf("http://127.0.0.1:%d", srv.Port())
+		// same listener family on hosts where localhost resolves to IPv6 first,
+		// with the internal scheme for direct TLS and the configured context path.
+		directTLS := cfg.TLSCertPath != "" && cfg.TLSKeyPath != ""
+		apiURL := internalhttp.BaseURL(strconv.Itoa(srv.Port()), cfg.ContextPath, directTLS)
+		var tuiClient *http.Client
+		if directTLS {
+			c, clientErr := internalhttp.Client(cfg.TLSCertPath, 10*time.Second)
+			if clientErr != nil {
+				slog.Error("failed to build internal TUI client", "error", clientErr)
+			} else {
+				tuiClient = c
+			}
+		}
 
 		// Create a separate DB connection for SSH auth. This pool only services
 		// public-key auth + session/token lookups, so it gets a small fixed cap
@@ -172,7 +203,7 @@ func main() {
 				wish.WithIdleTimeout(30*time.Minute),
 				wish.WithMaxTimeout(24*time.Hour),
 				wish.WithMiddleware(
-					wishbubbletea.Middleware(tui.NewTUIHandler(apiURL, tokenManager)),
+					wishbubbletea.Middleware(tui.NewTUIHandler(apiURL, tuiClient, tokenManager)),
 					activeterm.Middleware(),
 					logging.Middleware(),
 				),

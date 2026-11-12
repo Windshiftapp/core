@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 )
@@ -150,13 +149,17 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 }
 
 // Probe performs the HTTP check used by the container's healthcheck command.
-func Probe(ctx context.Context, target string) error {
+// A nil client uses http.DefaultClient.
+func Probe(ctx context.Context, client *http.Client, target string) error {
+	if client == nil {
+		client = http.DefaultClient
+	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("create readiness request: %w", err)
 	}
 
-	response, err := http.DefaultClient.Do(request)
+	response, err := client.Do(request)
 	if err != nil {
 		return fmt.Errorf("request readiness endpoint: %w", err)
 	}
@@ -167,19 +170,4 @@ func Probe(ctx context.Context, target string) error {
 		return fmt.Errorf("readiness endpoint returned %s", response.Status)
 	}
 	return nil
-}
-
-// DefaultProbeTarget returns the in-container readiness URL for the configured
-// HTTP port and optional public context path.
-func DefaultProbeTarget(port, contextPath string) string {
-	if port == "" {
-		port = "8080"
-	}
-	contextPath = strings.TrimSpace(contextPath)
-	if contextPath == "" || contextPath == "/" {
-		contextPath = ""
-	} else {
-		contextPath = "/" + strings.Trim(contextPath, "/")
-	}
-	return "http://127.0.0.1:" + port + contextPath + "/readyz"
 }

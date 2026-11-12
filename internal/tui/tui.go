@@ -7,6 +7,7 @@ package tui
 import (
 	"fmt"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"windshift/internal/auth"
@@ -48,7 +49,7 @@ var tuiTokenScopes = []string{
 //
 // The handler mints a short-lived bearer token for each connection and revokes
 // it when the SSH context ends.
-func NewTUIHandler(apiURL string, tokenManager *auth.TokenManager) func(s ssh.Session) (tea.Model, []tea.ProgramOption) {
+func NewTUIHandler(apiURL string, httpClient *http.Client, tokenManager *auth.TokenManager) func(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	return func(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 		// Extract authenticated user information from SSH context
 		var userInfo *data.UserInfo
@@ -115,7 +116,7 @@ func NewTUIHandler(apiURL string, tokenManager *auth.TokenManager) func(s ssh.Se
 
 		// Create a new app instance for each session: a fresh client, a
 		// fresh shared context and a fresh screen stack.
-		client := data.NewClient(apiURL)
+		client := data.NewClient(apiURL, httpClient)
 		if bearerToken != "" {
 			client.SetBearerToken(bearerToken)
 		}

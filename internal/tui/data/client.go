@@ -23,13 +23,16 @@ type Client struct {
 	bearerToken string
 }
 
-// NewClient creates a new API client.
-func NewClient(baseURL string) *Client {
+// NewClient creates a new API client. A nil httpClient uses a default client
+// with a 10s timeout; the SSH TUI passes one that trusts the internal TLS
+// listener.
+func NewClient(baseURL string, httpClient *http.Client) *Client {
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 10 * time.Second}
+	}
 	return &Client{
-		baseURL: baseURL,
-		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
-		},
+		baseURL:    baseURL,
+		httpClient: httpClient,
 	}
 }
 
