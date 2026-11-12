@@ -2,6 +2,7 @@ package jiraimport
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -9,10 +10,27 @@ import (
 	"windshift/internal/repository"
 )
 
+// WorkflowGuard is one source condition or validator attached to a transition.
+// A guard with a ConditionType is recreated as a Windshift condition; a guard
+// without one is unmappable and keeps the transition locked for review.
+type WorkflowGuard struct {
+	Kind          string         // normalized source kind, for metadata
+	Mode          string         // "condition" or "validator"
+	ConditionType string         // Windshift condition type when mappable
+	Config        map[string]any // Windshift condition config when mappable
+	ErrorMessage  string
+}
+
+// Mappable reports whether the guard can be recreated faithfully.
+func (g WorkflowGuard) Mappable() bool { return g.ConditionType != "" }
+
 type WorkflowEdge struct {
 	FromStatusID *int
 	ToStatusID   int
 	ReviewLocked bool
+	// Guards carries the source conditions/validators when the importer could
+	// read them (the DC companion plugin). Empty means only counts are known.
+	Guards []WorkflowGuard
 }
 
 type WorkflowDefinition struct {
@@ -45,15 +63,19 @@ func (s *Service) CreateDetailedWorkflowConfiguration(
 			return 0, fmt.Errorf("create workflow %q: %w", definition.Name, err)
 		}
 		var conditionSetID *int
+		needsConditionSet := false
 		for _, edge := range definition.Edges {
-			if edge.ReviewLocked {
-				id, err := s.CreateWorkflowReviewConditionSet(workflowID, definition.Name)
-				if err != nil {
-					return 0, err
-				}
-				conditionSetID = &id
+			if edge.ReviewLocked || len(edge.Guards) > 0 {
+				needsConditionSet = true
 				break
 			}
+		}
+		if needsConditionSet {
+			id, err := s.CreateWorkflowReviewConditionSet(workflowID, definition.Name)
+			if err != nil {
+				return 0, err
+			}
+			conditionSetID = &id
 		}
 		for index, edge := range definition.Edges {
 			var transitionID int
@@ -62,12 +84,18 @@ func (s *Service) CreateDetailedWorkflowConfiguration(
 					(workflow_id, from_status_id, to_status_id, display_order, source_handle, target_handle, created_at)
 				VALUES (?, ?, ?, ?, '', '', CURRENT_TIMESTAMP) RETURNING id
 			`, workflowID, edge.FromStatusID, edge.ToStatusID, index+1).Scan(&transitionID); err != nil {
-				return 0, err
+				return 0, fmt.Errorf("create workflow %q transition: %w", definition.Name, err)
 			}
-			if edge.ReviewLocked {
-				if conditionSetID == nil {
-					return 0, fmt.Errorf("workflow %q has a review-locked transition without a condition set", definition.Name)
+			if conditionSetID == nil {
+				continue
+			}
+			switch {
+			case len(edge.Guards) > 0:
+				if err := s.ApplyWorkflowGuards(*conditionSetID, transitionID, edge.Guards); err != nil {
+					return 0, err
 				}
+			case edge.ReviewLocked:
+				// Counts only (no descriptors): keep the whole transition locked.
 				if err := s.LockWorkflowTransitionForReview(*conditionSetID, transitionID); err != nil {
 					return 0, err
 				}
@@ -144,6 +172,13 @@ func (s *Service) CreateWorkflowReviewConditionSet(workflowID int, workflowName 
 }
 
 func (s *Service) LockWorkflowTransitionForReview(conditionSetID, transitionID int) error {
+	return s.ApplyWorkflowGuards(conditionSetID, transitionID, []WorkflowGuard{{Kind: "unknown"}})
+}
+
+// ApplyWorkflowGuards recreates the mappable guards as Windshift conditions and,
+// when any guard is unmappable, adds a never-passing validator so the transition
+// stays locked for review instead of being silently broadened.
+func (s *Service) ApplyWorkflowGuards(conditionSetID, transitionID int, guards []WorkflowGuard) error {
 	var linkID int
 	if err := s.db.QueryRow(`
 		INSERT INTO condition_set_transitions (condition_set_id, transition_id, logic_mode, created_at)
@@ -151,13 +186,43 @@ func (s *Service) LockWorkflowTransitionForReview(conditionSetID, transitionID i
 	`, conditionSetID, transitionID).Scan(&linkID); err != nil {
 		return err
 	}
-	_, err := s.db.ExecWrite(`
-		INSERT INTO conditions
-			(condition_set_transition_id, condition_type, config, display_order, mode, error_message, created_at)
-		VALUES (?, 'field_value', ?, 1, 'validator', ?, CURRENT_TIMESTAMP)
-	`, linkID, `{"field_identifier":"title","pattern":"a\\A"}`,
-		"Imported Jira transition is locked pending review of source conditions and validators.")
-	return err
+
+	order := 1
+	hasUnmapped := false
+	for _, guard := range guards {
+		if !guard.Mappable() {
+			hasUnmapped = true
+			continue
+		}
+		configJSON, err := json.Marshal(guard.Config)
+		if err != nil {
+			return fmt.Errorf("encode workflow guard config: %w", err)
+		}
+		mode := guard.Mode
+		if mode == "" {
+			mode = models.ConditionModeCondition
+		}
+		if _, err := s.db.ExecWrite(`
+			INSERT INTO conditions
+				(condition_set_transition_id, condition_type, config, display_order, mode, error_message, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		`, linkID, guard.ConditionType, string(configJSON), order, mode, guard.ErrorMessage); err != nil {
+			return err
+		}
+		order++
+	}
+
+	if hasUnmapped {
+		if _, err := s.db.ExecWrite(`
+			INSERT INTO conditions
+				(condition_set_transition_id, condition_type, config, display_order, mode, error_message, created_at)
+			VALUES (?, 'field_value', ?, ?, 'validator', ?, CURRENT_TIMESTAMP)
+		`, linkID, `{"field_identifier":"title","pattern":"a\\A"}`, order,
+			"Imported Jira transition is locked pending review of source conditions and validators that Windshift cannot map."); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Service) ConservativeInitialStatus(statusIDs []int) (int, error) {

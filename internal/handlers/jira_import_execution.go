@@ -622,6 +622,10 @@ func (h *JiraImportHandler) setupJiraProject(
 		return nil, false
 	}
 
+	// Import Jira groups and project roles so workflow guards that reference
+	// them resolve to real Windshift principals before workflows are built.
+	h.importJiraGroupsAndRoles(ctx, im, projectKey)
+
 	// Create workflows and configuration set for this project
 	if err := h.ensureWorkflowsAndConfigSet(ctx, jobID, projectKey, workspaceID, global.statusMap, global.itemTypeMap, client); err != nil {
 		slog.Error("Failed to create workflows/config set", slog.String("component", "jira"), slog.String("project", projectKey), slog.Any("error", err))
@@ -1755,6 +1759,7 @@ type jiraImportWorkflowEdge struct {
 	fromStatusID *int
 	toStatusID   int
 	reviewLocked bool
+	guards       []jiraimport.WorkflowGuard
 }
 
 // ensureWorkflowsAndConfigSet fetches Jira's configured graph when the client
@@ -1847,6 +1852,7 @@ func (h *JiraImportHandler) ensureWorkflowsAndConfigSet(
 	}
 
 	definitions := make([]jiraimport.WorkflowDefinition, 0, len(groups))
+	principals := h.loadJiraGuardPrincipals()
 	for groupIndex := range groups {
 		group := &groups[groupIndex]
 		workflowName := group.name
@@ -1855,7 +1861,7 @@ func (h *JiraImportHandler) ensureWorkflowsAndConfigSet(
 		}
 		var edges []jiraImportWorkflowEdge
 		if group.authoritative {
-			edges = authoritativeJiraWorkflowEdges(group, statusMap)
+			edges = authoritativeJiraWorkflowEdges(group, statusMap, principals)
 		} else {
 			initialStatusID, initialErr := h.conservativeJiraInitialStatus(group.statusIDs)
 			if initialErr != nil {
@@ -1866,7 +1872,8 @@ func (h *JiraImportHandler) ensureWorkflowsAndConfigSet(
 		serviceEdges := make([]jiraimport.WorkflowEdge, 0, len(edges))
 		for _, edge := range edges {
 			serviceEdges = append(serviceEdges, jiraimport.WorkflowEdge{
-				FromStatusID: edge.fromStatusID, ToStatusID: edge.toStatusID, ReviewLocked: edge.reviewLocked,
+				FromStatusID: edge.fromStatusID, ToStatusID: edge.toStatusID,
+				ReviewLocked: edge.reviewLocked, Guards: edge.guards,
 			})
 		}
 		fidelity := "authoritative_graph"
@@ -1877,17 +1884,21 @@ func (h *JiraImportHandler) ensureWorkflowsAndConfigSet(
 		if sourceID == "" {
 			sourceID = fmt.Sprintf("fallback-%s-%d", projectKey, groupIndex)
 		}
+		metadata := map[string]any{
+			"fidelity": fidelity, "transition_count": len(edges),
+			"transition_rules_complete":       group.rulesComplete,
+			"guarded_transition_count":        group.guardedTransitions,
+			"review_locked_transition_count":  countReviewLockedJiraEdges(edges),
+			"unsupported_transition_actions":  group.unsupportedActions,
+			"unsupported_transition_triggers": group.unsupportedTriggers,
+		}
+		for key, value := range jiraGuardMetadata(serviceEdges) {
+			metadata[key] = value
+		}
 		definitions = append(definitions, jiraimport.WorkflowDefinition{
 			SourceID: sourceID, Name: workflowName, Description: group.description,
 			Edges: serviceEdges, ItemTypeIDs: group.itemTypeIDs,
-			Metadata: map[string]any{
-				"fidelity": fidelity, "transition_count": len(edges),
-				"transition_rules_complete":       group.rulesComplete,
-				"guarded_transition_count":        group.guardedTransitions,
-				"review_locked_transition_count":  countReviewLockedJiraEdges(edges),
-				"unsupported_transition_actions":  group.unsupportedActions,
-				"unsupported_transition_triggers": group.unsupportedTriggers,
-			},
+			Metadata: metadata,
 		})
 	}
 	configSetID, err := h.imports.CreateDetailedWorkflowConfiguration(ctx, jobID, projectKey, workspaceID, definitions)
@@ -2017,9 +2028,11 @@ func fallbackJiraWorkflowGroups(
 func authoritativeJiraWorkflowEdges(
 	group *jiraImportWorkflowGroup,
 	statusMap map[string]int,
+	principals jiraGuardPrincipals,
 ) []jiraImportWorkflowEdge {
 	edgesByKey := make(map[string]jiraImportWorkflowEdge)
-	addEdge := func(fromStatusID *int, toStatusID int, reviewLocked bool) {
+	seenGuards := make(map[string]map[string]bool)
+	addEdge := func(fromStatusID *int, toStatusID int, reviewLocked bool, guards []jiraimport.WorkflowGuard) {
 		key := "initial:" + strconv.Itoa(toStatusID)
 		if fromStatusID != nil {
 			// A same-status (loop) transition is valid in Windshift, so import it
@@ -2030,6 +2043,17 @@ func authoritativeJiraWorkflowEdges(
 		edge.fromStatusID = fromStatusID
 		edge.toStatusID = toStatusID
 		edge.reviewLocked = edge.reviewLocked || reviewLocked
+		if seenGuards[key] == nil {
+			seenGuards[key] = map[string]bool{}
+		}
+		for _, guard := range guards {
+			dedupe := guard.Kind + "|" + guard.Mode + "|" + guard.ConditionType
+			if seenGuards[key][dedupe] {
+				continue
+			}
+			seenGuards[key][dedupe] = true
+			edge.guards = append(edge.guards, guard)
+		}
 		edgesByKey[key] = edge
 	}
 
@@ -2043,24 +2067,27 @@ func authoritativeJiraWorkflowEdges(
 		// Do not turn incomplete source visibility into a synthetic deny rule.
 		// Only a guard that Jira explicitly reports should require review.
 		reviewLocked := explicitlyGuarded
+		guards := mapJiraWorkflowGuards(transition.Guards, principals)
 		toStatusID, ok := statusMap[transition.ToStatusID]
 		if !ok {
 			continue
 		}
 		switch transition.Type {
 		case jira.JiraWorkflowTransitionInitial:
-			addEdge(nil, toStatusID, false)
+			// The initial transition is never review-locked; that would block
+			// creating items.
+			addEdge(nil, toStatusID, false, nil)
 		case jira.JiraWorkflowTransitionDirected:
 			for _, jiraFromStatusID := range transition.FromStatusIDs {
 				if fromStatusID, exists := statusMap[jiraFromStatusID]; exists {
 					fromID := fromStatusID
-					addEdge(&fromID, toStatusID, reviewLocked)
+					addEdge(&fromID, toStatusID, reviewLocked, guards)
 				}
 			}
 		case jira.JiraWorkflowTransitionGlobal:
 			for _, fromStatusID := range group.statusIDs {
 				fromID := fromStatusID
-				addEdge(&fromID, toStatusID, reviewLocked)
+				addEdge(&fromID, toStatusID, reviewLocked, guards)
 			}
 		}
 	}
