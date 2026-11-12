@@ -27,6 +27,7 @@
   import { formatAuthenticatedDateTime as formatDateTimeLocale, formatAuthenticatedInstant } from '../../utils/authenticatedDateFormatter.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { durationToString } from '../../utils/timeUtils.js';
+  import { hasParentReference, resolveParentKey } from '../../utils/parentReference.js';
   import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import { isExternalRequest } from '../../utils/requestOrigin.js';
   import Badge from '../../components/Badge.svelte';
@@ -245,8 +246,7 @@
   }
 
   function getParentKey() {
-    const workspaceKey = workspace?.key || item?.workspace_key || 'WORK';
-    return `${workspaceKey}-${item?.parent_workspace_item_number ?? item?.parent_id}`;
+    return resolveParentKey(item);
   }
 
   function handleToggleChildItems(checked) {
@@ -470,7 +470,7 @@
                   <dt class="text-xs text-[var(--ds-text-subtle)]">{t('items.type')}</dt>
                   <dd class="min-w-0 [overflow-wrap:anywhere] text-left text-xs text-[var(--ds-text)] min-[421px]:text-right">{item.item_type_name || t('items.workItem')}</dd>
                 </div>
-                {#if item.parent_id}
+                {#if hasParentReference(item)}
                   <div class="grid gap-1 border-b border-[var(--ds-border)] py-3.5 min-[421px]:grid-cols-[minmax(7rem,0.8fr)_minmax(0,1.2fr)] min-[421px]:gap-4">
                     <dt class="text-xs text-[var(--ds-text-subtle)]">{t('items.parent')}</dt>
                     <dd class="min-w-0 [overflow-wrap:anywhere] text-left font-mono text-xs text-[var(--ds-text)] min-[421px]:text-right">{getParentKey()}</dd>
