@@ -1,12 +1,16 @@
 <script>
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import ItemKey from '../../components/ItemKey.svelte';
+  import CornerLeftUp from '@lucide/svelte/icons/corner-left-up';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
   import ItemCard from './ItemCard.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
   import { getStatusCategory } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
   import EditableField from '../../editors/EditableField.svelte';
+  import Avatar from '../../components/Avatar.svelte';
+  import Chip from '../../components/Chip.svelte';
+  import CalendarDays from '@lucide/svelte/icons/calendar-days';
 
   /**
    * Reusable list-row props. Lookup arrays enrich the item; leading and trailing
@@ -27,6 +31,10 @@
     showTimestamp = false,
     showStatus = false,
     showPriority = false,
+    showParent = false,
+    showAssignee = false,
+    showDueDate = false,
+    showMilestones = false,
     timestamp = null,
     formatTimestamp = null,
     compact = false,
@@ -92,6 +100,20 @@
   // (e.g. status_color from the homepage activity API where statuses arrays aren't loaded)
   const statusColor = $derived(item.status_color || statusCategory?.color || '#6b7280');
 
+  // List responses include a permission-checked parent_key. Keep the same-
+  // workspace fallback for callers that provide the older hydrated shape.
+  const parentKey = $derived(
+    item.parent_key ||
+      (item.parent_workspace_item_number != null && item.workspace_key
+        ? `${item.workspace_key}-${item.parent_workspace_item_number}`
+        : '')
+  );
+  const parentLabel = $derived(
+    [parentKey, item.parent_title].filter(Boolean).join(' · ')
+  );
+  const firstMilestone = $derived(item.milestones?.[0] ?? null);
+  const remainingMilestones = $derived(Math.max(0, (item.milestones?.length ?? 0) - 1));
+
   function commitStoryPoints(draft) {
     const raw = String(draft ?? '').trim();
     const parsed = raw === '' ? null : Number(raw);
@@ -124,16 +146,83 @@
         <ItemKey {item} {workspace} variant="badge" clickable={false} />
       {/if}
 
-      <!-- Priority Badge -->
+      <!-- Title -->
+      <h4 class="text-sm flex-1 min-w-0 truncate" dir="auto" style="color: var(--ds-text);" title={item.title}>{item.title}</h4>
+
+      <!-- Optional Parent -->
+      {#if showParent && item.parent_id && parentLabel}
+        <span
+          class="inline-flex min-w-0 shrink overflow-hidden"
+          style="max-width: clamp(6rem, 20%, 16rem);"
+          data-testid={`work-item-parent-container-${item.id}`}
+        >
+          <Chip
+            appearance="metadata"
+            icon={CornerLeftUp}
+            class="max-w-full min-w-0 overflow-hidden"
+            title={`${t('items.parent')}: ${parentLabel}`}
+          >
+            <span data-testid={`work-item-parent-${item.id}`} class="inline-flex min-w-0 items-center gap-1 overflow-hidden">
+              {#if parentKey}
+                <span class="shrink-0 font-mono">{parentKey}</span>
+              {/if}
+              {#if item.parent_title}
+                <span class="min-w-0 truncate">{item.parent_title}</span>
+              {/if}
+            </span>
+          </Chip>
+        </span>
+      {/if}
+
+      <!-- Optional Milestone -->
+      {#if showMilestones && firstMilestone}
+        <Chip
+          appearance="metadata"
+          dotColor={firstMilestone.category_color || null}
+          class="max-w-40 min-w-0 shrink"
+          title={(item.milestones ?? []).map((milestone) => milestone.name).join(', ')}
+        >
+          <span class="truncate" data-testid={`work-item-milestone-${item.id}`}>{firstMilestone.name}</span>
+          {#if remainingMilestones > 0}
+            <span class="shrink-0">+{remainingMilestones}</span>
+          {/if}
+        </Chip>
+      {/if}
+
+      <!-- Optional Priority -->
       {#if showPriority && priority}
-        <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-md flex-shrink-0"
-              style="background-color: {priority.color}20; color: {priority.color};">
+        <span
+          class="inline-flex flex-shrink-0 rounded-md px-2 py-0.5 text-xs font-medium"
+          style="background-color: {priority.color}20; color: {priority.color};"
+          data-testid={`work-item-priority-${item.id}`}
+        >
           {priority.name}
         </span>
       {/if}
 
-      <!-- Title -->
-      <h4 class="text-sm flex-1 min-w-0 truncate" dir="auto" style="color: var(--ds-text);">{item.title}</h4>
+      <!-- Optional Assignee -->
+      {#if showAssignee && item.assignee_name}
+        <span
+          class="inline-flex max-w-36 min-w-0 items-center gap-1.5 text-xs text-ds-text-subtle"
+          title={`${t('common.assignee')}: ${item.assignee_name}`}
+          data-testid={`work-item-assignee-${item.id}`}
+        >
+          <Avatar src={item.assignee_avatar || null} name={item.assignee_name} size="2xs" variant="neutral" />
+          <span class="truncate">{item.assignee_name}</span>
+        </span>
+      {/if}
+
+      <!-- Optional Due Date -->
+      {#if showDueDate && item.due_date}
+        <span
+          class="inline-flex flex-shrink-0 items-center gap-1 text-xs text-ds-text-subtle"
+          title={`${t('common.dueDate')}: ${formatDateSimple(item.due_date)}`}
+          data-testid={`work-item-due-date-${item.id}`}
+        >
+          <CalendarDays class="h-3 w-3" aria-hidden="true" />
+          {formatDateSimple(item.due_date)}
+        </span>
+      {/if}
 
       <!-- Optional Workspace Name -->
       {#if showWorkspace && item.workspace_name}

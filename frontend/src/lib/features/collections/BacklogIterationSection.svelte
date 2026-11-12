@@ -28,6 +28,7 @@
     sectionHighlight = false,
     assignableIterations = [],
     pendingActionItemIds = new Set(),
+    visibleFields = [],
     onToggleCollapse,
     onOpenItem,
     onMoveItemToBoundary = null,
@@ -61,6 +62,7 @@
   let canStart = $derived(iteration && !iteration.is_global && iteration.status === 'planned');
   let canComplete = $derived(iteration && !iteration.is_global && iteration.status === 'active');
   let sectionId = $derived(iteration ? iteration.id : 'unassigned');
+  let visibleFieldSet = $derived(new Set(visibleFields));
 
   let headerClass = $derived(
     `w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors select-none iteration-header` +
@@ -201,8 +203,13 @@
                     {statuses}
                     {statusCategories}
                     onclick={(e) => onOpenItem?.(item.id, e)}
-                    showStatus={true}
-                    showStoryPoints={storyPointsConfiguredForItem?.(item) ?? false}
+                    showStatus={visibleFieldSet.has('status')}
+                    showPriority={visibleFieldSet.has('priority')}
+                    showParent={visibleFieldSet.has('parent')}
+                    showAssignee={visibleFieldSet.has('assignee')}
+                    showDueDate={visibleFieldSet.has('due_date')}
+                    showMilestones={visibleFieldSet.has('milestone')}
+                    showStoryPoints={visibleFieldSet.has('story_points') && (storyPointsConfiguredForItem?.(item) ?? false)}
                     storyPointsSaving={storyPointsPendingItemIds.has(item.id)}
                     onStoryPointsChange={(value) => onUpdateStoryPoints?.(item, value)}
                   >
