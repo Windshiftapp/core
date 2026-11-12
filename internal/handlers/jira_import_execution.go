@@ -672,7 +672,7 @@ func (h *JiraImportHandler) setupJiraProject(
 	}
 	im.iterationMap = iterationMap
 
-	h.importJiraBoardsAndFilters(ctx, jobID, projectKey, workspaceID, global.statusMap, client, createdByUserID)
+	h.importJiraBoardsAndFilters(ctx, jobID, projectKey, workspaceID, jiraWorkspaceProjectKeys(req.Mappings.Workspaces, projectKey, workspaceID), global.statusMap, client, createdByUserID)
 
 	timeProjectID, err := h.ensureJiraTimeProject(jobID, workspaceID, projectKey, wsMapping.NewWorkspaceName)
 	if err != nil {

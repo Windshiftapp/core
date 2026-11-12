@@ -8,7 +8,7 @@ import (
 
 var (
 	jqlOrderByPattern      = regexp.MustCompile(`(?i)\s+ORDER\s+BY\s+.+$`)
-	jqlSimpleClausePattern = regexp.MustCompile(`(?is)^\s*([A-Za-z][A-Za-z0-9_ -]*)\s*(=|!=|<>|~|IN|NOT\s+IN)\s*(.+?)\s*$`)
+	jqlSimpleClausePattern = regexp.MustCompile(`(?is)^\s*([A-Za-z][A-Za-z0-9_ -]*?)\s*(=|!=|<>|~|NOT\s+IN|IN)\s*(.+?)\s*$`)
 	jqlOuterParensPattern  = regexp.MustCompile(`^\((.*)\)$`)
 	jqlWhitespacePattern   = regexp.MustCompile(`\s+`)
 	jqlIdentifierSafe      = regexp.MustCompile(`^[A-Za-z0-9_.:-]+$`)
@@ -78,6 +78,209 @@ func TranslateJQL(jql string, workspaceID int) JQLTranslation {
 // widening it to the whole workspace.
 func UnsupportedJQLSelector(workspaceID int) string {
 	return fmt.Sprintf("workspace_id = %d AND 1 = 0", workspaceID)
+}
+
+// JQLProjectScope summarizes the project predicate of a JQL expression. A
+// saved filter's project clause decides which workspace it belongs to, but the
+// clause itself is represented by workspace_id in the emitted QL, so callers
+// must reason about the predicate separately from translation.
+type JQLProjectScope struct {
+	// HasClause is true when the expression names at least one project.
+	HasClause bool
+	// Include holds project keys the predicate requires (project = / IN).
+	Include []string
+	// Exclude holds project keys the predicate rejects (project != / NOT IN).
+	Exclude []string
+	// Analyzed is false when the expression or a project clause could not be
+	// parsed. Callers must treat the scope as unknown rather than absent.
+	Analyzed bool
+}
+
+// AnalyzeJQLProjectScope extracts the project predicate from a JQL expression.
+func AnalyzeJQLProjectScope(jql string) JQLProjectScope {
+	scope := JQLProjectScope{Analyzed: true}
+	jql = strings.TrimSpace(jqlOrderByPattern.ReplaceAllString(strings.TrimSpace(jql), ""))
+	if jql == "" {
+		return scope
+	}
+	expr, err := parseJQLExpression(jql)
+	if err != nil {
+		scope.Analyzed = false
+		return scope
+	}
+	if !collectJQLProjectScope(expr, false, &scope) {
+		scope.Analyzed = false
+	}
+	return scope
+}
+
+func collectJQLProjectScope(expr jqlBooleanExpr, negated bool, scope *JQLProjectScope) bool {
+	switch node := expr.(type) {
+	case jqlLeafExpr:
+		keys, leafNegated, ok, isProject := parseJQLProjectLeaf(node.clause)
+		if !isProject {
+			return true
+		}
+		if !ok {
+			return false
+		}
+		scope.HasClause = true
+		if leafNegated != negated {
+			scope.Exclude = append(scope.Exclude, keys...)
+		} else {
+			scope.Include = append(scope.Include, keys...)
+		}
+		return true
+	case jqlNotExpr:
+		return collectJQLProjectScope(node.operand, !negated, scope)
+	case jqlBinaryExpr:
+		return collectJQLProjectScope(node.left, negated, scope) &&
+			collectJQLProjectScope(node.right, negated, scope)
+	default:
+		return true
+	}
+}
+
+// parseJQLProjectLeaf reports whether a leaf clause is a project predicate and,
+// when it is, which keys it requires or rejects.
+func parseJQLProjectLeaf(clause string) (keys []string, negated, ok, isProject bool) {
+	clause = strings.TrimSpace(clause)
+	if m := jqlOuterParensPattern.FindStringSubmatch(clause); len(m) == 2 {
+		clause = strings.TrimSpace(m[1])
+	}
+	m := jqlSimpleClausePattern.FindStringSubmatch(clause)
+	if len(m) != 4 {
+		// A malformed project clause must not be treated as absent, or the
+		// caller would widen the selector to the whole workspace.
+		if jqlClauseMentionsField(clause, "project") {
+			return nil, false, false, true
+		}
+		return nil, false, false, false
+	}
+	if normalizeJQLField(m[1]) != "project" {
+		return nil, false, false, false
+	}
+	op := normalizeJQLOperator(m[2])
+	rawValue := strings.TrimSpace(m[3])
+	switch op {
+	case "=", "IN":
+		negated = false
+	case "!=", "NOT IN":
+		negated = true
+	default:
+		return nil, false, false, true
+	}
+	if op == "IN" || op == "NOT IN" {
+		values, listOK := parseJQLValueList(rawValue)
+		if !listOK {
+			return nil, false, false, true
+		}
+		for _, value := range values {
+			if strings.TrimSpace(value) == "" {
+				continue
+			}
+			keys = append(keys, value)
+		}
+		return keys, negated, len(keys) > 0, true
+	}
+	value := unquoteJQLValue(rawValue)
+	if strings.TrimSpace(value) == "" {
+		return nil, false, false, true
+	}
+	return []string{value}, negated, true, true
+}
+
+// JQLProjectScopeDecision classifies a filter's project predicate against the
+// Jira project keys imported into one workspace.
+type JQLProjectScopeDecision int
+
+const (
+	// JQLScopeWorkspaceWide means the predicate does not restrict membership
+	// beyond the workspace, so a workspace-scoped selector is equivalent.
+	JQLScopeWorkspaceWide JQLProjectScopeDecision = iota
+	// JQLScopeUnrelated means the predicate names only projects that are not
+	// imported into this workspace, so the filter does not belong here.
+	JQLScopeUnrelated
+	// JQLScopeNarrowed means the predicate restricts membership to a strict
+	// subset of the workspace's projects, which workspace-scoped QL cannot
+	// express without widening or guessing.
+	JQLScopeNarrowed
+	// JQLScopeIndeterminate means the project predicate could not be analyzed.
+	JQLScopeIndeterminate
+)
+
+// DecideJQLProjectScope classifies a filter's project predicate against the
+// Jira project keys imported into one workspace. workspaceProjects must list at
+// least the current project; an empty list is treated as indeterminate.
+func DecideJQLProjectScope(scope JQLProjectScope, workspaceProjects []string) JQLProjectScopeDecision {
+	if !scope.Analyzed {
+		return JQLScopeIndeterminate
+	}
+	inWorkspace := make(map[string]struct{}, len(workspaceProjects))
+	for _, key := range workspaceProjects {
+		inWorkspace[normalizeJQLProjectKey(key)] = struct{}{}
+	}
+	if !scope.HasClause {
+		// No project predicate: the filter spans every project, so each
+		// workspace keeps its own slice.
+		return JQLScopeWorkspaceWide
+	}
+	if len(inWorkspace) == 0 {
+		return JQLScopeIndeterminate
+	}
+	for _, key := range scope.Exclude {
+		if _, ok := inWorkspace[normalizeJQLProjectKey(key)]; ok {
+			// The filter rejects a project that lives in this workspace.
+			return JQLScopeNarrowed
+		}
+	}
+	referenced := make(map[string]struct{}, len(scope.Include))
+	for _, key := range scope.Include {
+		referenced[normalizeJQLProjectKey(key)] = struct{}{}
+	}
+	if len(referenced) == 0 {
+		// Only exclusions, and none apply to this workspace.
+		return JQLScopeWorkspaceWide
+	}
+	anyIncluded := false
+	for key := range inWorkspace {
+		if _, ok := referenced[key]; ok {
+			anyIncluded = true
+			break
+		}
+	}
+	if !anyIncluded {
+		return JQLScopeUnrelated
+	}
+	for key := range inWorkspace {
+		if _, ok := referenced[key]; !ok {
+			// The workspace holds a project the filter does not name, so the
+			// workspace scope alone would widen the selector.
+			return JQLScopeNarrowed
+		}
+	}
+	return JQLScopeWorkspaceWide
+}
+
+func normalizeJQLProjectKey(key string) string {
+	return strings.ToUpper(strings.TrimSpace(key))
+}
+
+// jqlClauseMentionsField reports whether a clause begins with the given field,
+// even when the rest of the clause does not match the simple-clause grammar.
+func jqlClauseMentionsField(clause, field string) bool {
+	clause = strings.TrimSpace(clause)
+	if clause == "" {
+		return false
+	}
+	token := clause
+	for i, r := range clause {
+		if isJQLBoundary(r) || r == '=' || r == '!' || r == '<' || r == '>' || r == '~' {
+			token = clause[:i]
+			break
+		}
+	}
+	return normalizeJQLField(token) == field
 }
 
 func translateJQLClause(clause string) (string, bool) {
