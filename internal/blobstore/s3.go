@@ -19,7 +19,21 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
+
+	"windshift/internal/utils"
 )
+
+// s3HTTPDialTimeout bounds the TCP/TLS dial for S3 requests; the SDK applies
+// its own per-operation timeouts on top.
+const s3HTTPDialTimeout = 30 * time.Second
+
+// newS3HTTPClient returns the HTTP client the S3 backend uses. Routing through
+// the shared SSRF-safe transport applies the explicitly configured outbound TLS
+// policy (TLS_SKIP_VERIFY) and the shared dialer/proxy policy, so an S3 endpoint
+// behind a self-signed certificate works exactly when the operator opted in.
+func newS3HTTPClient() *http.Client {
+	return &http.Client{Transport: utils.NewSSRFSafeTransport(s3HTTPDialTimeout)}
+}
 
 // S3Config configures the S3-compatible backend. AWS is the default target:
 // leaving Endpoint empty uses the regional AWS endpoint, and ForcePathStyle
@@ -73,6 +87,8 @@ func NewS3(cfg S3Config) (*Store, error) {
 			credentials.NewStaticCredentialsProvider(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
 		))
 	}
+
+	loadOpts = append(loadOpts, awsconfig.WithHTTPClient(newS3HTTPClient()))
 
 	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(), loadOpts...)
 	if err != nil {
