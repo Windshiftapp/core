@@ -334,9 +334,12 @@ func (h *SSOHandler) StartLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Generate state with random data
 	state := generateRandomState()
+	// The nonce binds the ID token to this login: it is sent on the authorize
+	// request, stored with the state row and required again at the callback.
+	nonce := generateRandomState()
 
-	// Store state token with redirect_uri and remember_me
-	storeErr := repository.NewSSOStateRepository(h.db).Store(provider.ID, state, "", redirectAfterLogin, rememberMe, time.Now().Add(ssoStateTokenTTL))
+	// Store state token with redirect_uri, remember_me and nonce
+	storeErr := repository.NewSSOStateRepository(h.db).StoreOIDC(provider.ID, state, nonce, redirectAfterLogin, rememberMe, time.Now().Add(ssoStateTokenTTL))
 	if storeErr != nil {
 		slog.Error("failed to store OIDC state token", "error", storeErr)
 		respondInternalError(w, r, storeErr)
@@ -346,7 +349,7 @@ func (h *SSOHandler) StartLogin(w http.ResponseWriter, r *http.Request) {
 	// Get the auth URL handler and redirect
 	authHandler := h.oidcService.GetAuthURLHandler(relyingParty, func() string {
 		return state
-	})
+	}, nonce)
 	authHandler(w, r)
 }
 
@@ -390,13 +393,26 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		h.redirectWithError(w, r, "Login session expired. Please try signing in again.")
 		return
 	}
-	if _, stateErr := repository.NewSSOStateRepository(h.db).GetValid(state, provider.ID, time.Now()); stateErr != nil {
+	stateToken, stateErr := repository.NewSSOStateRepository(h.db).GetValid(state, provider.ID, time.Now())
+	if stateErr != nil {
 		slog.Warn("OIDC callback state token missing or expired",
 			slog.String("component", "sso"),
 			slog.String("provider", provider.Slug))
 		h.redirectWithError(w, r, "Login session expired. Please try signing in again.")
 		return
 	}
+	// The ID token verified during the code exchange must carry the nonce that
+	// was sent when the login started. An empty stored nonce means the state row
+	// predates the nonce wiring (or was tampered with): fail closed rather than
+	// silently accept a token that skips the nonce binding.
+	if stateToken.Nonce == "" {
+		slog.Warn("OIDC callback state token has no stored nonce",
+			slog.String("component", "sso"),
+			slog.String("provider", provider.Slug))
+		h.redirectWithError(w, r, "Login session expired. Please try signing in again.")
+		return
+	}
+	r = r.WithContext(sso.WithExpectedNonce(r.Context(), stateToken.Nonce))
 
 	// Decrypt client secret
 	clientSecret, err := h.encryption.Decrypt(provider.ClientSecretEncrypted)

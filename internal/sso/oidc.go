@@ -27,12 +27,15 @@ const oidcHTTPTimeout = 15 * time.Second
 // rebinding) and also covers the JWKS URL and token endpoint that the IdP
 // advertises via discovery — those are not validated upfront because we don't
 // see them until discovery runs.
+//
+// Outbound proxy: the shared SSRF-safe transport honors HTTP(S)_PROXY /
+// NO_PROXY, but only while local connections are allowed (the default). With
+// --allow-local-connections=false it dials directly so the post-resolution
+// blocklist still sees the real target.
 func newSSRFSafeOIDCClient(timeout time.Duration) *http.Client {
 	return &http.Client{
-		Timeout: timeout,
-		Transport: utils.ConfigureHTTPTransport(&http.Transport{
-			DialContext: utils.SafeNetDialer(timeout).DialContext,
-		}),
+		Timeout:   timeout,
+		Transport: utils.NewSSRFSafeTransport(timeout),
 	}
 }
 
@@ -80,6 +83,19 @@ func NewOIDCService(cookieKey []byte) *OIDCService {
 	}
 }
 
+type expectedNonceKey struct{}
+
+// WithExpectedNonce returns a context carrying the nonce that the ID token
+// verified during the code exchange must contain.
+func WithExpectedNonce(ctx context.Context, nonce string) context.Context {
+	return context.WithValue(ctx, expectedNonceKey{}, nonce)
+}
+
+func expectedNonce(ctx context.Context) string {
+	n, _ := ctx.Value(expectedNonceKey{}).(string)
+	return n
+}
+
 // CreateRelyingParty creates a new OIDC relying party for a provider
 func (s *OIDCService) CreateRelyingParty(ctx context.Context, provider *SSOProvider, redirectURI, clientSecret string) (rp.RelyingParty, error) {
 	if provider.ProviderType != ProviderTypeOIDC {
@@ -109,6 +125,9 @@ func (s *OIDCService) CreateRelyingParty(ctx context.Context, provider *SSOProvi
 		rp.WithHTTPClient(s.httpClient),
 		rp.WithVerifierOpts(
 			rp.WithIssuedAtOffset(5*time.Second), // Allow 5s clock skew
+			// Require the ID token to carry the nonce stored at login. With none in
+			// the context this is "", which is zitadel's default.
+			rp.WithNonce(expectedNonce),
 			// Pin accepted ID-token signing algorithms. Defense-in-depth against
 			// algorithm-confusion attacks if an IdP advertises (or is tricked
 			// into advertising) `none` or an HMAC alg via discovery. Asymmetric
@@ -139,10 +158,16 @@ func (s *OIDCService) CreateRelyingParty(ctx context.Context, provider *SSOProvi
 	return relyingParty, nil
 }
 
-// GetAuthURLHandler returns an HTTP handler that redirects to the OIDC provider
-// The state function should return a unique state string for each request
-func (s *OIDCService) GetAuthURLHandler(relyingParty rp.RelyingParty, stateFn func() string) http.HandlerFunc {
-	return rp.AuthURLHandler(stateFn, relyingParty)
+// GetAuthURLHandler returns an HTTP handler that redirects to the OIDC provider.
+// The state function should return a unique state string for each request.
+// A non-empty nonce is sent as the `nonce` authorization parameter; the ID token
+// returned at the callback must carry the same value (see WithExpectedNonce).
+func (s *OIDCService) GetAuthURLHandler(relyingParty rp.RelyingParty, stateFn func() string, nonce string) http.HandlerFunc {
+	var params []rp.URLParamOpt
+	if nonce != "" {
+		params = append(params, rp.WithURLParam("nonce", nonce))
+	}
+	return rp.AuthURLHandler(stateFn, relyingParty, params...)
 }
 
 // CodeExchangeCallback is the callback type for handling successful authentication
