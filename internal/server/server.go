@@ -2000,6 +2000,7 @@ func (s *Server) initialize() error {
 		WithWorkflow(conditionService, eventCoordinator, issueSyncService).
 		WithMutationEffects(mentionService).
 		WithComments(commentService).
+		WithAssetPermissions(services.NewAssetPermissionService(repository.NewAssetRepository(s.db), permService)).
 		WithClock(slaClock)
 	itemDetailApplication := services.NewItemDetailApplicationService(s.db, itemApplication, itemLinkService, permService).
 		WithContextReaders(screenHandler, requestTypeHandler, actionApplication).

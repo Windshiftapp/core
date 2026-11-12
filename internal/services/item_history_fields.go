@@ -79,6 +79,9 @@ func (s *ItemApplicationService) resolveCustomFieldValue(field, value string, re
 		})
 	case "asset":
 		return historyResolveRefs(value, func(ref historyRef) string {
+			if !s.assetVisible(res.userID, ref.id) {
+				return ""
+			}
 			return s.resolver.ResolveAssetName(ref.id)
 		})
 	case "select", "multiselect":
@@ -168,6 +171,23 @@ func historyCustomFieldID(field string) (int, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+// assetVisible reports whether the viewer can see an asset's set. A nil
+// checker fails closed, leaving the raw reference in place.
+func (s *ItemApplicationService) assetVisible(userID, assetID int) bool {
+	if s.assetPerm == nil {
+		return false
+	}
+	var setID int
+	if err := s.db.QueryRow(`SELECT set_id FROM assets WHERE id = ?`, assetID).Scan(&setID); err != nil {
+		return false
+	}
+	allowed, err := s.assetPerm.HasAssetSetPermission(userID, setID, AssetPermissionKeyView)
+	if err != nil {
+		return false
+	}
+	return allowed
 }
 
 // historyRef is one reference value from a custom field: an id, an already

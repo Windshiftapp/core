@@ -79,6 +79,9 @@ type ItemApplicationService struct {
 	bulk       *ItemUpdateService
 	mentions   *MentionService
 	comments   *CommentService
+	// assetPerm gates asset titles in history; nil means asset references are
+	// left unresolved rather than leaking a title the viewer cannot see.
+	assetPerm AssetPermissionChecker
 	// clock is the SLA evaluation clock. Reporting must share it so an
 	// ongoing-breach snapshot matches the engine's "now"; nil means wall time.
 	clock sla.Clock
@@ -145,6 +148,13 @@ func (s *ItemApplicationService) WithMutationEffects(mentions *MentionService) *
 // collected by a transition screen.
 func (s *ItemApplicationService) WithComments(comments *CommentService) *ItemApplicationService {
 	s.comments = comments
+	return s
+}
+
+// WithAssetPermissions lets history resolve asset references only for viewers
+// who can see the asset's set.
+func (s *ItemApplicationService) WithAssetPermissions(checker AssetPermissionChecker) *ItemApplicationService {
+	s.assetPerm = checker
 	return s
 }
 
