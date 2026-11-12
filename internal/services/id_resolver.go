@@ -84,6 +84,30 @@ func (s *IDResolverService) ResolveProjectName(id int) string {
 	return name
 }
 
+// ResolveWorkspaceName returns the name for a workspace ID
+func (s *IDResolverService) ResolveWorkspaceName(id int) string {
+	var name string
+	err := s.db.QueryRow(`SELECT name FROM workspaces WHERE id = ?`, id).Scan(&name)
+	if err != nil {
+		return ""
+	}
+	return name
+}
+
+// ResolvePortalCustomerName returns the display name for a portal customer ID,
+// falling back to the email when no name is set.
+func (s *IDResolverService) ResolvePortalCustomerName(id int) string {
+	var name string
+	err := s.db.QueryRow(
+		`SELECT COALESCE(NULLIF(TRIM(name), ''), email, '') FROM portal_customers WHERE id = ?`,
+		id,
+	).Scan(&name)
+	if err != nil {
+		return ""
+	}
+	return name
+}
+
 // ResolveItemTypeName returns the name for an item type ID
 func (s *IDResolverService) ResolveItemTypeName(id int) string {
 	var name string

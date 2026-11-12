@@ -1885,8 +1885,11 @@ func (s *ItemApplicationService) History(ctx context.Context, userID, itemID int
 		return nil, err
 	}
 	allowedProjects := s.allowedProjectIDs(userID)
+	// One cache per history read: a long feed repeats the same workspace,
+	// status, or user id across rows, and each miss is a database round trip.
+	cache := map[string]string{}
 	for i := range history {
-		s.resolveHistory(&history[i], allowedProjects)
+		s.resolveHistory(&history[i], allowedProjects, cache)
 	}
 	return history, nil
 }
@@ -2269,20 +2272,30 @@ func (s *ItemApplicationService) allowedProjectIDs(userID int) map[int]struct{} 
 	return allowed
 }
 
-func (s *ItemApplicationService) resolveHistory(entry *models.ItemHistory, allowedProjects map[int]struct{}) {
+func (s *ItemApplicationService) resolveHistory(entry *models.ItemHistory, allowedProjects map[int]struct{}, cache map[string]string) {
 	if entry.OldValue != nil && *entry.OldValue != "" {
-		if value := s.resolveHistoryValue(entry.FieldName, *entry.OldValue, allowedProjects); value != "" {
+		if value := s.resolveHistoryValue(entry.FieldName, *entry.OldValue, allowedProjects, cache); value != "" {
 			entry.ResolvedOldValue = &value
 		}
 	}
 	if entry.NewValue != nil && *entry.NewValue != "" {
-		if value := s.resolveHistoryValue(entry.FieldName, *entry.NewValue, allowedProjects); value != "" {
+		if value := s.resolveHistoryValue(entry.FieldName, *entry.NewValue, allowedProjects, cache); value != "" {
 			entry.ResolvedNewValue = &value
 		}
 	}
 }
 
-func (s *ItemApplicationService) resolveHistoryValue(field, value string, allowedProjects map[int]struct{}) string {
+func (s *ItemApplicationService) resolveHistoryValue(field, value string, allowedProjects map[int]struct{}, cache map[string]string) string {
+	cacheKey := field + "\x00" + value
+	if resolved, ok := cache[cacheKey]; ok {
+		return resolved
+	}
+	resolved := s.resolveHistoryValueUncached(field, value, allowedProjects)
+	cache[cacheKey] = resolved
+	return resolved
+}
+
+func (s *ItemApplicationService) resolveHistoryValueUncached(field, value string, allowedProjects map[int]struct{}) string {
 	if field == "milestones" {
 		names := make([]string, 0)
 		for _, part := range strings.Split(value, ",") {
@@ -2299,8 +2312,12 @@ func (s *ItemApplicationService) resolveHistoryValue(field, value string, allowe
 		return ""
 	}
 	switch field {
-	case "assignee_id":
+	case "assignee_id", "creator_id", "reporter_id":
 		return s.resolver.ResolveUserName(id)
+	case "creator_portal_customer_id":
+		return s.resolver.ResolvePortalCustomerName(id)
+	case "workspace_id":
+		return s.resolver.ResolveWorkspaceName(id)
 	case "team_id":
 		return s.resolver.ResolveTeamName(id)
 	case "priority_id":
