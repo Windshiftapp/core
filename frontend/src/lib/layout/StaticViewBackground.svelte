@@ -1,4 +1,8 @@
 <script>
+  import { getContext } from 'svelte';
+  import { VIEW_BACKGROUND_CONTEXT } from './viewBackgroundContext.js';
+
+  const sharedBackground = getContext(VIEW_BACKGROUND_CONTEXT);
   let {
     backgroundStyle = '',
     contextVars = '',
@@ -20,7 +24,7 @@
 
 <div
   class={`${fullWidth ? 'w-full' : 'w-fit min-w-full'} ${rootClass} ${className}`}
-  style={`${backgroundStyle} ${contextVars} background-attachment: fixed; ${rootStyle}`}
+  style={`${sharedBackground?.active ? '' : backgroundStyle} ${contextVars} background-attachment: fixed; ${rootStyle}`}
   data-testid={testid}
 >
   <div class={contentClass} style={contentStyle}>

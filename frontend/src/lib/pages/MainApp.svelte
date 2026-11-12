@@ -1,4 +1,5 @@
 <script>
+  import { setContext } from 'svelte';
   import Menu from '@lucide/svelte/icons/menu';
   import { useEventListener } from 'runed';
   import { auth } from '../api/auth.js';
@@ -7,6 +8,7 @@
   import EmailVerificationBanner from '../features/notifications/EmailVerificationBanner.svelte';
   import CollectionNavigation from '../features/collections/CollectionNavigation.svelte';
   import MainSidebar from '../layout/MainSidebar.svelte';
+  import { isCollectionContentView, VIEW_BACKGROUND_CONTEXT } from '../layout/viewBackgroundContext.js';
   import {
     GLOBAL_COLLECTION_VIEWS,
     currentRoute,
@@ -15,14 +17,13 @@
     navigate,
   } from '../router.js';
   import { toLogical } from '../runtime/contextPath.js';
-  import { hydrateCurrentWorkspaceFromSharedData } from '../services/authenticatedShellUI.js';
   import { authStore } from '../stores/auth.svelte.js';
   import { currentWorkspace, workspacesStore } from '../stores/workspaces.svelte.js';
   import { uiStore } from '../stores/ui.svelte.js';
   import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
   import { aiStore } from '../stores/aiStore.svelte.js';
   import { terminalStore } from '../stores/terminalStore.svelte.js';
-  import { clearWorkspaceGradient } from '../stores/workspaceGradient.svelte.js';
+  import { useGradientStyles } from '../stores/workspaceGradient.svelte.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { LazyComponentLoader } from '../utils/lazyComponentLoader.svelte.js';
   import { hasSessionExpired, reloadIfBuildChanged } from '../utils/lazyLoadRecovery.js';
@@ -31,6 +32,7 @@
   import MainAppOverlays from './MainAppOverlays.svelte';
   import MainRouteContent from './MainRouteContent.svelte';
   import { useMainAppLifecycle } from './useMainAppLifecycle.js';
+  import { useMainAppWorkspaceContext } from './useMainAppWorkspaceContext.svelte.js';
   import {
     CREATE_MODAL_WORKSPACE_VIEWS,
     MAIN_APP_COMPONENT_LOADERS,
@@ -39,12 +41,17 @@
     prefetchMainAppForView,
     resolveEffectiveMainAppView,
   } from './mainAppRoutes.js';
-  import {
-    getMainAppWorkspaceRedirect,
-    resolveMainAppWorkspaceContext,
-  } from './mainAppWorkspaceContext.js';
+  import { getMainAppWorkspaceRedirect } from './mainAppWorkspaceContext.js';
   import { getDisabledViewRedirect } from './mainAppViewGuard.js';
   import { viewSettingsStore } from '../stores/viewSettings.svelte.js';
+
+  const backgroundStyles = useGradientStyles();
+  const sharedBackgroundActive = $derived(isCollectionContentView($currentRoute.view));
+  setContext(VIEW_BACKGROUND_CONTEXT, {
+    get active() {
+      return sharedBackgroundActive;
+    },
+  });
 
   let showCommandPalette = $state(false);
   let showCreateModal = $state(false);
@@ -281,27 +288,10 @@
     previousRoutePath = routePath;
   });
 
-  $effect(() => {
-    const route = $currentRoute;
-    const context = resolveMainAppWorkspaceContext(
-      route,
-      $workspacesStore.personalWorkspace?.id
-    );
-
-    if (context.kind === 'workspace') {
-      void hydrateCurrentWorkspaceFromSharedData(context.workspaceId);
-    } else if (context.kind === 'personal-pending') {
-      void workspacesStore.loadPersonalWorkspace();
-    } else if (context.kind === 'global-collection') {
-      if ($currentWorkspace) currentWorkspace.clear();
-      workspaceDataStore.initializeGlobal();
-      clearWorkspaceGradient();
-    } else {
-      currentWorkspace.clear();
-      workspaceDataStore.reset();
-      clearWorkspaceGradient();
-    }
-  });
+  useMainAppWorkspaceContext(
+    () => $currentRoute,
+    () => $workspacesStore.personalWorkspace?.id
+  );
 
   $effect(() => {
     const redirect = getMainAppWorkspaceRedirect($currentRoute, $currentWorkspace);
@@ -424,6 +414,9 @@
           <main
             data-testid="main-content-scroll"
             class="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+            style={sharedBackgroundActive
+              ? `${backgroundStyles.backgroundStyle} ${backgroundStyles.contextVars}`
+              : ''}
           >
             <MainRouteContent view={effectiveView} route={$currentRoute} {lazyComponents} />
           </main>

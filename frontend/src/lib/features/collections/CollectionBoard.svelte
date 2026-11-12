@@ -40,6 +40,7 @@
     serializeBoardGroupBy,
   } from './boardSwimlanes.js';
   import { buildBoardConfigurationPayload } from './boardConfigPayload.js';
+  import { buildBoardColumnModel } from './boardColumnModel.js';
   import {
     milestoneAssignableToWorkspace,
     milestoneDropRemovals,
@@ -817,12 +818,6 @@
     );
   }
 
-  function getItemsByColumn(column, itemSubset = filteredItems) {
-    return itemSubset.filter(item => column.status_ids?.includes(
-      boardStatusIdForItem(item, validColumns, personalWorkspaceIds)
-    ));
-  }
-
   function parseLaneTarget(element) {
     const dimension = element?.dataset?.swimlaneDimension || '';
     if (dimension !== BOARD_GROUP_BY_ITEM_TYPE && dimension !== BOARD_GROUP_BY_MILESTONE) {
@@ -1194,43 +1189,6 @@
     new Set(statuses.filter((status) => statusIsCompleted(status)).map((status) => Number(status.id)))
   );
 
-  function itemRecencyValue(item) {
-    return new Date(item.last_active_at || item.updated_at || item.created_at || 0).getTime() || 0;
-  }
-
-  function sortByRecency(items) {
-    return items.slice().sort((a, b) => itemRecencyValue(b) - itemRecencyValue(a) || b.id - a.id);
-  }
-
-  function getDisplayItemsByColumn(column, columnIndex, columnsForBoard = validColumns, itemSubset = filteredItems) {
-    const columnItems = getItemsByColumn(column, itemSubset);
-    // Bubble Mode: most-recently-active cards rise to the top of every column.
-    return sortMode === 'bubble' ? sortByRecency(columnItems) : columnItems;
-  }
-
-  // Use the deferred partition's server total when all of its statuses belong
-  // to this column. Swimlanes and active client filters keep loaded counts.
-  function getColumnTotal(column, allColumnItems) {
-    const deferred = collectionStore.boardDeferred;
-    const columnStatusIds = new Set(column.status_ids || []);
-    const useServerTotal =
-      deferred &&
-      !boardGroupingActive &&
-      !search.query.trim() &&
-      !iterationFilterId &&
-      deferred.statusIds.every((statusId) => columnStatusIds.has(statusId));
-    if (!useServerTotal) return allColumnItems.length;
-
-    const deferredStatusIds = new Set(deferred.statusIds);
-    const loadedDeferredCount = allColumnItems.filter((item) =>
-      deferredStatusIds.has(item.status_id)
-    ).length;
-    return Math.max(
-      allColumnItems.length,
-      allColumnItems.length - loadedDeferredCount + deferred.total
-    );
-  }
-
   let selectedGroupByItemType = $derived(
     boardGroupBy?.dimension === BOARD_GROUP_BY_ITEM_TYPE
       ? itemTypes.find(type => type.id === boardGroupBy.itemTypeId) ?? null
@@ -1371,20 +1329,34 @@
     };
   }
 
-  // Rendered column model per lane, used for both navigation and the default
-  // tab stop. Collapsed columns render no cards, so they are skipped.
+  // Filtered/grouped boards count loaded cards rather than the deferred server total.
+  let deferredBoardPartition = $derived(
+    !boardGroupingActive && !search.query.trim() && !iterationFilterId
+      ? collectionStore.boardDeferred ?? null
+      : null
+  );
+  let boardColumnModel = $derived(
+    buildBoardColumnModel({
+      lanes: boardSwimlanes,
+      columns: validColumns,
+      statusIdForItem: (item) => boardStatusIdForItem(item, validColumns, personalWorkspaceIds),
+      sortMode,
+      deferred: deferredBoardPartition,
+    })
+  );
+  // Sorting updates buckets without replacing the lane/column iteration sources.
+  let boardColumnsByLane = $derived(new Map(
+    boardColumnModel.lanes.map(({ lane, columns }) => [
+      lane.id,
+      new Map(columns.map((entry) => [entry.column.id, entry])),
+    ])
+  ));
+
+  // Collapse changes navigation without rebuilding the shared partition/order.
   let keyboardNavLanes = $derived(
-    boardSwimlanes.map((lane) => ({
+    boardColumnModel.lanes.map(({ lane, columns }) => ({
       lane,
-      columns: validColumns
-        .map((column, columnIndex) => ({
-          column,
-          columnIndex,
-          items: isColumnCollapsed(column.id)
-            ? []
-            : getDisplayItemsByColumn(column, columnIndex, validColumns, lane.items),
-        }))
-        .filter((entry) => !isColumnCollapsed(entry.column.id)),
+      columns: columns.filter((entry) => !isColumnCollapsed(entry.column.id)),
     }))
   );
 
@@ -1785,14 +1757,7 @@
     }
   });
 
-  // Calculate total visible items across all display columns
-  let totalVisibleItems = $derived.by(() => {
-    return boardSwimlanes.reduce((laneTotal, lane) => {
-      return laneTotal + validColumns.reduce((columnTotal, column, columnIndex) => {
-        return columnTotal + getDisplayItemsByColumn(column, columnIndex, validColumns, lane.items).length;
-      }, 0);
-    }, 0);
-  });
+  let totalVisibleItems = $derived(boardColumnModel.totalVisibleItems);
 
   function getStatusByName(statusName) {
     const normalizedName = statusName.toLowerCase().replace('_', ' ');
@@ -2514,13 +2479,13 @@
 
               {#if !boardGroupingActive || laneExpanded}
                 <div class="grid gap-6 {boardGroupingActive ? 'p-4' : ''}" style="grid-template-columns: {boardGridTemplate()};">
-                  {#each validColumns as column, columnIndex (column.id)}
+                  {#each validColumns as column (column.id)}
+                    {@const columnModel = boardColumnsByLane.get(lane.id).get(column.id)}
                     {@const quickAddKey = `${lane.id}-${column.id}`}
-                    {@const allColumnItems = getItemsByColumn(column, lane.items)}
-                    {@const columnItems = getDisplayItemsByColumn(column, columnIndex, validColumns, lane.items)}
-                    {@const columnTotal = getColumnTotal(column, allColumnItems)}
-                    {@const hiddenColumnItemCount = columnTotal - columnItems.length}
-                    {@const isOverWip = column.wip_limit && allColumnItems.length > column.wip_limit}
+                    {@const columnItems = columnModel.items}
+                    {@const columnTotal = columnModel.total}
+                    {@const hiddenColumnItemCount = columnModel.hiddenItemCount}
+                    {@const isOverWip = columnModel.isOverWip}
                     {#if isColumnCollapsed(column.id)}
                       <!-- Collapsed column: narrow vertical strip showing the rotated
                            column name and item count. Clicking it re-expands. It keeps
@@ -2558,7 +2523,7 @@
                     <BoardColumn
                       {column}
                       itemCount={columnTotal}
-                      wipCount={allColumnItems.length}
+                      wipCount={columnModel.wipCount}
                       visibleItemCount={columnItems.length}
                       hiddenItemCount={hiddenColumnItemCount}
                       {isOverWip}

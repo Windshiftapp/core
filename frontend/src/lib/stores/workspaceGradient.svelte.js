@@ -54,7 +54,7 @@ export async function loadWorkspaceGradient(workspaceId, { force = false } = {})
 
   const generation = ++loadGeneration;
   loadPromiseKey = workspaceKey;
-  const request = loadWorkspaceLayout(workspaceId, force)
+  const request = loadWorkspaceLayout(workspaceId, force, generation)
     .then((layout) => {
       if (generation === loadGeneration) {
         cachedWorkspaceKey = workspaceKey;
@@ -79,9 +79,10 @@ export async function loadWorkspaceGradient(workspaceId, { force = false } = {})
   return request;
 }
 
-async function loadWorkspaceLayout(workspaceId, force) {
+async function loadWorkspaceLayout(workspaceId, force, generation) {
   if (force) return workspaces.getHomepageLayout(workspaceId);
   await workspaceDataStore.initialize(workspaceId);
+  if (generation !== loadGeneration) return null;
   const expectedID = Number.parseInt(String(workspaceId), 10);
   if (
     workspaceDataStore.initialized &&
