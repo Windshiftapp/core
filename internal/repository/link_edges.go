@@ -124,7 +124,7 @@ func (r *ItemRepository) ListItemAssetReferences(ctx context.Context, itemIDs []
 		chunk := itemIDs[start:end]
 
 		rows, err := r.db.QueryContext(ctx,
-			`SELECT id, COALESCE(custom_field_values, '') FROM items WHERE id IN (`+placeholders(len(chunk))+`)`,
+			`SELECT id, COALESCE(CAST(custom_field_values AS TEXT), '') FROM items WHERE id IN (`+placeholders(len(chunk))+`)`,
 			intArgs(chunk)...,
 		)
 		if err != nil {

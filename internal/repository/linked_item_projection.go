@@ -142,7 +142,7 @@ func linkedProjectionQuery(direction string, assetIDs, workspaceIDs []int) (quer
 		       COALESCE(w.key, ''), COALESCE(w.name, ''), i.workspace_item_number,
 		       COALESCE(s.name, ''),
 		       COALESCE(NULLIF(TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')), ''), ''),
-		       COALESCE(i.custom_field_values, '')
+		       COALESCE(CAST(i.custom_field_values AS TEXT), '')
 		FROM item_links il
 		JOIN items i ON i.id = ` + itemJoin + `
 		LEFT JOIN workspaces w ON i.workspace_id = w.id

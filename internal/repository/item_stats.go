@@ -387,11 +387,12 @@ func (r *ItemRepository) ListPriorityCountsForWorkspace(workspaceID int) ([]Prio
 // non-empty, and not the literal "{}". Used by the custom-field migration
 // analyzer to count how many items reference each field.
 func (r *ItemRepository) ListNonEmptyCustomFieldJSONForWorkspace(workspaceID int) ([]string, error) {
+	// The empty-string filter runs in Go: Postgres stores this column as JSONB,
+	// where comparing to '' fails with "invalid input syntax for type json".
 	rows, err := r.db.Query(`
 		SELECT custom_field_values FROM items
 		WHERE workspace_id = ?
 		  AND custom_field_values IS NOT NULL
-		  AND custom_field_values != ''
 		  AND custom_field_values != '{}'
 	`, workspaceID)
 	if err != nil {
@@ -403,6 +404,9 @@ func (r *ItemRepository) ListNonEmptyCustomFieldJSONForWorkspace(workspaceID int
 		var cfvJSON string
 		if err := rows.Scan(&cfvJSON); err != nil {
 			return nil, fmt.Errorf("scan custom field JSON: %w", err)
+		}
+		if cfvJSON == "" {
+			continue
 		}
 		out = append(out, cfvJSON)
 	}
