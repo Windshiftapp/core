@@ -1504,6 +1504,12 @@ func registerMount(mux *http.ServeMux, prefix string, routes []route, deps Deps,
 					return search(w, r)
 				}
 			}
+			// Bound the database work of ordinary routes; auth and the handlers
+			// above stay outside the deadline so a slow operation cannot be
+			// mistaken for a credential failure.
+			if deps.DBRequestTimeout > 0 && !dbTimeoutExempt(selected) {
+				handler = withDBRequestTimeout(deps.DBRequestTimeout)(handler)
+			}
 			if selected.Auth == AuthAuthenticated {
 				if deps.RateLimiter != nil {
 					handler = limitRequests(deps.RateLimiter)(handler)
@@ -1586,6 +1592,42 @@ func matchPath(pattern, path string) (map[string]string, bool) {
 		}
 	}
 	return values, true
+}
+
+// withDBRequestTimeout bounds the database work an ordinary route performs. It
+// derives a deadline from the request context so database calls observe
+// cancellation, and maps a deadline to the stable database_deadline_exceeded
+// response instead of a generic 500.
+func withDBRequestTimeout(timeout time.Duration) Middleware {
+	return func(next Handler) Handler {
+		return func(w http.ResponseWriter, r *http.Request) error {
+			ctx, cancel := context.WithTimeout(r.Context(), timeout)
+			defer cancel()
+			err := next(w, r.WithContext(ctx))
+			if errors.Is(err, context.DeadlineExceeded) {
+				return newError(http.StatusGatewayTimeout, "database_deadline_exceeded", "The database request timed out.")
+			}
+			return err
+		}
+	}
+}
+
+// dbTimeoutExempt reports whether a route manages its own deadline instead of
+// the ordinary DB-request timeout. Binary, multipart and streaming responses
+// are exempt automatically; the listed report/export jobs are intentionally
+// long-running and opt out explicitly.
+func dbTimeoutExempt(route *route) bool {
+	switch route.ResponseMediaType {
+	case "", "application/json":
+	default:
+		return true
+	}
+	switch route.Path {
+	case "/configuration-sets/{configuration_set_id}/export",
+		"/support/metrics/aggregate":
+		return true
+	}
+	return false
 }
 
 func requireCSRF(validator csrfValidator) Middleware {
