@@ -22,9 +22,11 @@
   let editorInstance = $state(null);
   let loading = $state(true);
 
-  // Start preloading immediately on mount (background, non-blocking)
+  // Start loading the editor chunk on mount. The dynamic import is async and
+  // does not block render, and requestIdleCallback can starve under load
+  // (CI, busy pages), leaving the description blank for seconds.
   onMount(() => {
-    const preload = async () => {
+    void (async () => {
       try {
         const module = await import('./MilkdownEditor.svelte');
         MilkdownEditor = module.default;
@@ -33,15 +35,7 @@
       } finally {
         loading = false;
       }
-    };
-
-    // Preload immediately but don't block render
-    if ('requestIdleCallback' in window) {
-      requestIdleCallback(preload);
-    } else {
-      // Fallback: use microtask to start loading after paint
-      queueMicrotask(preload);
-    }
+    })();
   });
 
   // Expose methods from the underlying editor
