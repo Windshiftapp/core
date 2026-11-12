@@ -37,6 +37,7 @@
   import CollectionLevelFilter from './CollectionLevelFilter.svelte';
   import CollectionHierarchyLoadMore from './CollectionHierarchyLoadMore.svelte';
   import ItemKey from '../../components/ItemKey.svelte';
+  import { resolveParentKey } from '../../utils/parentReference.js';
   import { useListColumnConfig } from './listColumnConfig.svelte.js';
   import { useCollectionHierarchy } from '../../composables/useCollectionHierarchy.svelte.js';
 
@@ -213,11 +214,16 @@
   // (parent filtered out). Replaces the old synthetic ancestor row (GH #271).
   function parentReference(item) {
     if (item.parent_id == null || loadedItemIds.has(item.parent_id)) return null;
+    // Prefer the server's permission-checked parent key; derive it only for the
+    // older hydrated shape. A masked parent has neither, so it renders nothing.
+    const itemKey = resolveParentKey(item);
+    if (!itemKey) return null;
     return {
       id: item.parent_id,
       workspace_id: item.workspace_id,
       workspace_key: item.workspace_key,
       workspace_item_number: item.parent_workspace_item_number,
+      item_key: itemKey,
       title: item.parent_title,
     };
   }

@@ -1,7 +1,7 @@
 <script>
   import CalendarDays from '@lucide/svelte/icons/calendar-days';
   import Clock from '@lucide/svelte/icons/clock';
-  import CornerLeftUp from '@lucide/svelte/icons/corner-left-up';
+  import ParentChip from '../../components/ParentChip.svelte';
   import Chip from '../../components/Chip.svelte';
   import { formatDate, formatDateOnly, formatDateShort, formatStatusAge } from '../../utils/dateFormatter.js';
   import { resolveOptionLabel, resolveOptionLabels } from '../../utils/optionUtils.js';
@@ -143,22 +143,7 @@
       </Chip>
     {/if}
   {:else if cardField.field_identifier === 'parent' && item.parent_id}
-    {@const parentKey = item.parent_workspace_item_number != null && item.workspace_key
-      ? `${item.workspace_key}-${item.parent_workspace_item_number}`
-      : null}
-    <Chip
-      appearance="metadata"
-      icon={CornerLeftUp}
-      class="max-w-[12rem]"
-      title={item.parent_title || parentKey || 'Parent'}
-    >
-      {#if parentKey}
-        <span class="font-mono flex-shrink-0">{parentKey}</span>
-      {/if}
-      {#if item.parent_title}
-        <span class="truncate">{item.parent_title}</span>
-      {/if}
-    </Chip>
+    <ParentChip {item} maxWidth="12rem" />
   {:else if cardField.field_identifier === 'time_in_status' && item.status_since}
     {@const age = formatStatusAge(item.status_since)}
     {#if age}

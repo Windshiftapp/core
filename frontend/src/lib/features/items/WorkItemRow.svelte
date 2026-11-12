@@ -1,7 +1,7 @@
 <script>
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import ItemKey from '../../components/ItemKey.svelte';
-  import CornerLeftUp from '@lucide/svelte/icons/corner-left-up';
+  import ParentChip from '../../components/ParentChip.svelte';
   import { formatDateSimple } from '../../utils/dateFormatter.js';
   import ItemCard from './ItemCard.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
@@ -100,17 +100,8 @@
   // (e.g. status_color from the homepage activity API where statuses arrays aren't loaded)
   const statusColor = $derived(item.status_color || statusCategory?.color || '#6b7280');
 
-  // List responses include a permission-checked parent_key. Keep the same-
-  // workspace fallback for callers that provide the older hydrated shape.
-  const parentKey = $derived(
-    item.parent_key ||
-      (item.parent_workspace_item_number != null && item.workspace_key
-        ? `${item.workspace_key}-${item.parent_workspace_item_number}`
-        : '')
-  );
-  const parentLabel = $derived(
-    [parentKey, item.parent_title].filter(Boolean).join(' · ')
-  );
+  // List responses include a permission-checked parent_key; ParentChip owns
+  // the parent-key fallback for callers that provide the older hydrated shape.
   const firstMilestone = $derived(item.milestones?.[0] ?? null);
   const remainingMilestones = $derived(Math.max(0, (item.milestones?.length ?? 0) - 1));
 
@@ -150,28 +141,8 @@
       <h4 class="text-sm flex-1 min-w-0 truncate" dir="auto" style="color: var(--ds-text);" title={item.title}>{item.title}</h4>
 
       <!-- Optional Parent -->
-      {#if showParent && item.parent_id && parentLabel}
-        <span
-          class="inline-flex min-w-0 shrink overflow-hidden"
-          style="max-width: clamp(6rem, 20%, 16rem);"
-          data-testid={`work-item-parent-container-${item.id}`}
-        >
-          <Chip
-            appearance="metadata"
-            icon={CornerLeftUp}
-            class="max-w-full min-w-0 overflow-hidden"
-            title={`${t('items.parent')}: ${parentLabel}`}
-          >
-            <span data-testid={`work-item-parent-${item.id}`} class="inline-flex min-w-0 items-center gap-1 overflow-hidden">
-              {#if parentKey}
-                <span class="shrink-0 font-mono">{parentKey}</span>
-              {/if}
-              {#if item.parent_title}
-                <span class="min-w-0 truncate">{item.parent_title}</span>
-              {/if}
-            </span>
-          </Chip>
-        </span>
+      {#if showParent}
+        <ParentChip {item} />
       {/if}
 
       <!-- Optional Milestone -->
