@@ -37,8 +37,12 @@ type jiraImportContext struct {
 	userMap           map[string]int
 	usernameMap       map[string]string
 	portalCustomerMap map[string]int
-	versionMap        map[string]int
-	iterationMap      map[string]int
+	// customerIdentities is the union of every selected service-desk project's
+	// customer role members, resolved once so cross-project group membership
+	// cannot reclassify a customer as an internal user.
+	customerIdentities map[string]struct{}
+	versionMap         map[string]int
+	iterationMap       map[string]int
 
 	jsmImport *jiraServiceManagementImport
 }
@@ -64,6 +68,7 @@ type jiraGlobalModel struct {
 	issueKeysByProject        map[string][]string
 	issueKeysByIDByProject    map[string]map[string]string
 	applicableFieldsByProject map[string]map[string]bool
+	customerIdentities        map[string]struct{}
 }
 
 // jiraIssueReferences holds the Windshift identities resolved from one Jira

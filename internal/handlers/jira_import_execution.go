@@ -542,6 +542,19 @@ func (h *JiraImportHandler) prepareJiraGlobalModel(
 		slog.Error("Failed to ensure Affects Version custom field", slog.String("component", "jira"), slog.Any("error", err))
 	}
 	model.affectsVersionField = affectsVersionField
+
+	// Resolve service-desk customer identities once across every selected
+	// project. Data Center group membership spans projects, so a customer
+	// referenced while importing a non-service-desk project must still be
+	// classified as a customer rather than an internal user (WI-2075).
+	customerIdentities := map[string]struct{}{}
+	for _, projectKey := range req.ProjectKeys {
+		for identity := range resolveJiraServiceDeskCustomerIdentities(ctx, projectKey, client) {
+			customerIdentities[identity] = struct{}{}
+		}
+	}
+	model.customerIdentities = customerIdentities
+
 	if h.failOnMappingFailure(jobID, progress) {
 		return model, true
 	}
@@ -603,6 +616,7 @@ func (h *JiraImportHandler) setupJiraProject(
 		userMap:             make(map[string]int),
 		usernameMap:         make(map[string]string),
 		portalCustomerMap:   make(map[string]int),
+		customerIdentities:  global.customerIdentities,
 	}
 
 	jsmImport, err := h.prepareJiraServiceManagementImport(
@@ -916,21 +930,23 @@ func (h *JiraImportHandler) ensureJiraBatchUsers(ctx context.Context, im *jiraIm
 	}
 	internalUsers := usersToProcess
 	var portalCustomers []JiraUserSummary
-	if im.jsmImport != nil {
-		internalUsers, portalCustomers = splitJiraImportUsers(usersToProcess)
+	if len(im.customerIdentities) > 0 {
+		internalUsers, portalCustomers = splitJiraImportUsers(usersToProcess, im.customerIdentities)
 	}
-	newUserMappings, newUsernameMappings, err := h.ensureUsers(ctx, im.jobID, internalUsers, im.client)
-	if err != nil {
-		slog.Error("Failed to ensure users", slog.String("component", "jira"), slog.Any("error", err))
+	if len(internalUsers) > 0 {
+		newUserMappings, newUsernameMappings, err := h.ensureUsers(ctx, im.jobID, internalUsers, im.client)
+		if err != nil {
+			slog.Error("Failed to ensure users", slog.String("component", "jira"), slog.Any("error", err))
+		}
+		// Merge new mappings into userMap and usernameMap
+		for k, v := range newUserMappings {
+			im.userMap[k] = v
+		}
+		for k, v := range newUsernameMappings {
+			im.usernameMap[k] = v
+		}
 	}
-	// Merge new mappings into userMap and usernameMap
-	for k, v := range newUserMappings {
-		im.userMap[k] = v
-	}
-	for k, v := range newUsernameMappings {
-		im.usernameMap[k] = v
-	}
-	if len(portalCustomers) > 0 {
+	if len(portalCustomers) > 0 && im.jsmImport != nil {
 		newPortalMappings, portalErr := h.ensurePortalCustomers(
 			im.jobID, im.jsmImport.ChannelID, portalCustomers, im.jsmImport.CustomerOrganizations,
 		)

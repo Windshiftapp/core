@@ -30,6 +30,10 @@ type jiraServiceManagementImport struct {
 	RequestTypes          map[string]int
 	OrganizationCustomers []JiraUserSummary
 	CustomerOrganizations map[string]int
+	// CustomerIdentities holds the Jira identities the source classifies as
+	// service-desk customers. Cloud supplies accountType, but Data Center user
+	// payloads do not, so the JSM project roles are the authoritative evidence.
+	CustomerIdentities map[string]struct{}
 }
 
 type jiraCustomerOrganizationClient interface {
@@ -77,7 +81,7 @@ func (h *JiraImportHandler) prepareJiraServiceManagementImport(
 	if err != nil {
 		return nil, fmt.Errorf("list Jira service desk request types: %w", err)
 	}
-	requestTypeMap, err := h.ensureJiraRequestTypes(jobID, channelID, workspaceID, requestTypes, itemTypeMap)
+	requestTypeMap, err := h.ensureJiraRequestTypes(jobID, channelID, workspaceID, requestTypes, itemTypeMap, deriveJiraRequestTypeIssueTypes(ctx, client, project.Key, requestTypes))
 	if err != nil {
 		return nil, err
 	}
@@ -105,6 +109,7 @@ func (h *JiraImportHandler) prepareJiraServiceManagementImport(
 		RequestTypes:          requestTypeMap,
 		OrganizationCustomers: organizationCustomers,
 		CustomerOrganizations: customerOrganizations,
+		CustomerIdentities:    resolveJiraServiceDeskCustomerIdentities(ctx, project.Key, client),
 	}, nil
 }
 
@@ -187,11 +192,22 @@ func (h *JiraImportHandler) ensureJiraRequestTypes(
 	channelID, workspaceID int,
 	requestTypes []jira.JiraServiceDeskRequestType,
 	itemTypeMap map[string]int,
+	derivedIssueTypes map[string]string,
 ) (map[string]int, error) {
 	result := make(map[string]int, len(requestTypes))
+	var unmapped []jira.JiraServiceDeskRequestType
 	for order, requestType := range requestTypes {
-		itemTypeID, ok := itemTypeMap[requestType.IssueTypeID]
+		// Data Center omits the backing issue type, so reconcile it from the
+		// requests the import can already read before giving up.
+		issueTypeID := strings.TrimSpace(requestType.IssueTypeID)
+		if issueTypeID == "" {
+			issueTypeID = strings.TrimSpace(derivedIssueTypes[requestType.ID])
+		}
+		itemTypeID, ok := itemTypeMap[issueTypeID]
 		if !ok {
+			// Never guess a type id and never drop the whole catalog silently:
+			// keep the request type out of the portal and report it explicitly.
+			unmapped = append(unmapped, requestType)
 			continue
 		}
 
@@ -227,7 +243,7 @@ func (h *JiraImportHandler) ensureJiraRequestTypes(
 		if err := h.recordMapping(jobID, "request_type", requestType.ID, requestType.Name, id, map[string]any{
 			"was_created":             created,
 			"service_desk_id":         requestType.ServiceDeskID,
-			"jira_issue_type_id":      requestType.IssueTypeID,
+			"jira_issue_type_id":      issueTypeID,
 			"jira_group_ids":          requestType.GroupIDs,
 			"restriction_status":      restriction.SourceStatus,
 			"restriction_disposition": disposition,
@@ -235,7 +251,131 @@ func (h *JiraImportHandler) ensureJiraRequestTypes(
 			return nil, fmt.Errorf("record Jira request type mapping: %w", err)
 		}
 	}
+	for _, requestType := range unmapped {
+		_ = h.recordMapping(jobID, "fidelity_finding", "request-type:"+requestType.ID,
+			fmt.Sprintf("Jira did not report the issue type backing request type %q and no imported request demonstrated it, so no native request type was created.", requestType.Name),
+			0, map[string]any{
+				"code":              "jira_request_type_unmapped",
+				"severity":          "warning",
+				"disposition":       "unavailable",
+				"request_type_id":   requestType.ID,
+				"request_type_name": requestType.Name,
+				"service_desk_id":   requestType.ServiceDeskID,
+			})
+	}
 	return result, nil
+}
+
+// jiraRequestTypeFieldName matches the JSM custom field that records an issue's
+// request type. Data Center's request-type DTO omits the backing issue type, so
+// the association is reconciled from requests the import already reads.
+const jiraRequestTypeFieldName = "customer request type"
+
+// jiraRequestTypeScanLimit bounds the reconciliation scan. The scan only runs
+// for request types whose DTO omitted the issue type (Data Center), and stops
+// as soon as every such type has been demonstrated by a request.
+const jiraRequestTypeScanLimit = 1000
+
+// deriveJiraRequestTypeIssueTypes maps request type id -> Jira issue type id by
+// joining each request's request-type field with its issue type. Types with no
+// observed request stay absent so the caller can report them instead of
+// guessing. Returns nil when the DTO already supplies every issue type or the
+// request-type field cannot be found.
+func deriveJiraRequestTypeIssueTypes(ctx context.Context, client jira.Client, projectKey string, requestTypes []jira.JiraServiceDeskRequestType) map[string]string {
+	needed := make(map[string]struct{}, len(requestTypes))
+	for _, requestType := range requestTypes {
+		if strings.TrimSpace(requestType.IssueTypeID) == "" {
+			needed[requestType.ID] = struct{}{}
+		}
+	}
+	if len(needed) == 0 {
+		return nil
+	}
+
+	fieldID := jiraRequestTypeFieldID(ctx, client, projectKey)
+	if fieldID == "" {
+		return nil
+	}
+
+	derived := make(map[string]string, len(needed))
+	const pageSize = 100
+	for startAt := 0; startAt < jiraRequestTypeScanLimit; startAt += pageSize {
+		response, err := client.SearchIssuesJQL(ctx, jira.JQLSearchRequest{
+			JQL:           fmt.Sprintf("project = %q", projectKey),
+			MaxResults:    pageSize,
+			Fields:        []string{"issuetype", fieldID},
+			NextPageToken: strconv.Itoa(startAt),
+		})
+		if err != nil {
+			slog.Warn("Failed to scan Jira requests while reconciling request types",
+				slog.String("component", "jira"),
+				slog.String("project", projectKey),
+				slog.Any("error", err))
+			return derived
+		}
+		for i := range response.Issues {
+			issue := &response.Issues[i]
+			requestTypeID := jiraIssueRequestTypeID(issue, fieldID)
+			if _, ok := needed[requestTypeID]; !ok {
+				continue
+			}
+			if issueTypeID := strings.TrimSpace(issue.Fields.IssueType.ID); issueTypeID != "" {
+				derived[requestTypeID] = issueTypeID
+			}
+		}
+		if len(derived) >= len(needed) || len(response.Issues) < pageSize {
+			break
+		}
+	}
+	return derived
+}
+
+func jiraRequestTypeFieldID(ctx context.Context, client jira.Client, projectKey string) string {
+	project, err := client.GetProject(ctx, projectKey)
+	if err != nil || project == nil {
+		return ""
+	}
+	fields, err := client.GetProjectFields(ctx, []string{project.ID})
+	if err != nil {
+		return ""
+	}
+	for _, field := range fields {
+		if strings.EqualFold(strings.TrimSpace(field.Name), jiraRequestTypeFieldName) {
+			return field.ID
+		}
+	}
+	return ""
+}
+
+// jiraIssueRequestTypeID reads the request type id out of an issue's JSM
+// request-type field, whose value nests it under a `requestType` object.
+func jiraIssueRequestTypeID(issue *jira.JiraIssue, fieldID string) string {
+	value, ok := issue.Fields.CustomFields[fieldID]
+	if !ok {
+		return ""
+	}
+	object, ok := value.(map[string]any)
+	if !ok {
+		return ""
+	}
+	requestType, ok := object["requestType"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	return jiraRequestTypeValueID(requestType["id"])
+}
+
+func jiraRequestTypeValueID(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case float64:
+		return strconv.FormatInt(int64(typed), 10)
+	case json.Number:
+		return typed.String()
+	default:
+		return ""
+	}
 }
 
 // jiraRequestTypeRestriction is the fail-closed reading of a Jira
@@ -281,9 +421,107 @@ func (h *JiraImportHandler) ensureJiraPortalRequestTypeSection(channelID int, re
 	return nil
 }
 
-func jiraIsPortalCustomer(accountID, accountType string) bool {
-	return strings.EqualFold(strings.TrimSpace(accountType), "customer") ||
-		strings.HasPrefix(strings.ToLower(strings.TrimSpace(accountID)), "qm:")
+// JSM project roles that distinguish customers from agents on Data Center.
+const (
+	jiraServiceDeskCustomerRole = "service desk customers"
+	jiraServiceDeskTeamRole     = "service desk team"
+)
+
+// resolveJiraServiceDeskCustomerIdentities returns the Jira identities the
+// source considers service-desk customers. Data Center user payloads carry no
+// accountType, so the project's JSM roles are the authoritative evidence: a
+// customer is anyone granted the customers role who is not also an agent.
+// Agents win dual-role membership, keeping genuine staff internal. Returns nil
+// when roles cannot be read, so Cloud classification is unchanged.
+func resolveJiraServiceDeskCustomerIdentities(ctx context.Context, projectKey string, client jira.Client) map[string]struct{} {
+	roleClient, ok := client.(jira.GroupRoleClient)
+	if !ok {
+		return nil
+	}
+	roles, err := roleClient.GetProjectRoles(ctx, projectKey)
+	if err != nil {
+		slog.Warn("Failed to read Jira project roles for service-desk customer classification",
+			slog.String("component", "jira"),
+			slog.String("project", projectKey),
+			slog.Any("error", err))
+		return nil
+	}
+
+	var memberClient jira.GroupMemberClient
+	if capable, ok := client.(jira.GroupMemberClient); ok {
+		memberClient = capable
+	}
+
+	customers := map[string]struct{}{}
+	agents := map[string]struct{}{}
+	for _, role := range roles {
+		switch strings.ToLower(strings.TrimSpace(role.Name)) {
+		case jiraServiceDeskCustomerRole:
+			collectJiraRoleActorIdentities(ctx, role, memberClient, customers)
+		case jiraServiceDeskTeamRole:
+			collectJiraRoleActorIdentities(ctx, role, memberClient, agents)
+		}
+	}
+	for identity := range agents {
+		delete(customers, identity)
+	}
+	slog.Debug("JSM customer identities resolved",
+		slog.String("component", "jira"),
+		slog.String("project", projectKey),
+		slog.Int("customers", len(customers)),
+		slog.Int("agents", len(agents)),
+		slog.Any("roles", len(roles)))
+	return customers
+}
+
+// collectJiraRoleActorIdentities adds a role's user actors, and the members of
+// its group actors, to out. A group actor that cannot be expanded is skipped:
+// guessing membership would risk misclassifying staff as customers.
+func collectJiraRoleActorIdentities(ctx context.Context, role jira.JiraProjectRole, memberClient jira.GroupMemberClient, out map[string]struct{}) {
+	for _, actor := range role.Actors {
+		if strings.EqualFold(strings.TrimSpace(actor.Type), "atlassian-group-role-actor") {
+			if memberClient == nil {
+				continue
+			}
+			members, err := memberClient.GetGroupMembers(ctx, actor.Name)
+			if err != nil {
+				slog.Warn("Failed to expand Jira role group for customer classification",
+					slog.String("component", "jira"),
+					slog.String("role", role.Name),
+					slog.String("group", actor.Name),
+					slog.Any("error", err))
+				continue
+			}
+			for _, member := range members {
+				addJiraRoleIdentity(out, member.Name, member.AccountID)
+			}
+			continue
+		}
+		addJiraRoleIdentity(out, actor.Name, actor.AccountID)
+	}
+}
+
+func addJiraRoleIdentity(out map[string]struct{}, identities ...string) {
+	for _, identity := range identities {
+		identity = strings.TrimSpace(identity)
+		if identity != "" {
+			out[identity] = struct{}{}
+		}
+	}
+}
+
+func jiraIsPortalCustomer(accountID, accountType string, customerIdentities map[string]struct{}) bool {
+	if strings.EqualFold(strings.TrimSpace(accountType), "customer") {
+		return true
+	}
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(accountID)), "qm:") {
+		return true
+	}
+	if len(customerIdentities) == 0 {
+		return false
+	}
+	_, ok := customerIdentities[strings.TrimSpace(accountID)]
+	return ok
 }
 
 func jiraUserIdentityMetadata(user *jira.JiraUser) map[string]any {
@@ -309,9 +547,9 @@ func jiraUserIdentityMetadata(user *jira.JiraUser) map[string]any {
 	return identity
 }
 
-func splitJiraImportUsers(users []JiraUserSummary) (internalUsers, portalCustomers []JiraUserSummary) {
+func splitJiraImportUsers(users []JiraUserSummary, customerIdentities map[string]struct{}) (internalUsers, portalCustomers []JiraUserSummary) {
 	for _, user := range users {
-		if jiraIsPortalCustomer(user.AccountID, user.AccountType) {
+		if jiraIsPortalCustomer(user.AccountID, user.AccountType, customerIdentities) {
 			portalCustomers = append(portalCustomers, user)
 		} else {
 			internalUsers = append(internalUsers, user)

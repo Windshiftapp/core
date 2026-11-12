@@ -431,10 +431,14 @@ func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 	// Collect users from a sample of issues
 	userMap := h.collectSampleUsers(ctx, client, req.ProjectKeys, req.OpenIssuesOnly)
 
+	// Classify service-desk customers the same way the import does, so the
+	// preview does not try to match them against existing internal users.
+	customerIdentities := h.resolveAnalyzerCustomerIdentities(ctx, client, req.ProjectKeys)
+
 	// Convert user map to slice and try to match with existing Windshift users
 	userRepo := repository.NewUserRepository(h.db)
 	for _, user := range userMap {
-		if jiraIsPortalCustomer(user.AccountID, user.AccountType) {
+		if jiraIsPortalCustomer(user.AccountID, user.AccountType, customerIdentities) {
 			result.Users = append(result.Users, user)
 			continue
 		}
@@ -482,6 +486,26 @@ func (h *JiraImportHandler) Analyze(w http.ResponseWriter, r *http.Request) {
 // collectSampleUsers discovers users from a sample of the newest issues in
 // each project. It searches through the enhanced JQL search API; Cloud no
 // longer serves the legacy GET /search endpoint.
+// resolveAnalyzerCustomerIdentities merges the service-desk customer roles of
+// the analyzed projects. Non-service-desk projects contribute nothing because
+// they have no Service Desk Customers role.
+func (h *JiraImportHandler) resolveAnalyzerCustomerIdentities(ctx context.Context, client jira.Client, projectKeys []string) map[string]struct{} {
+	var merged map[string]struct{}
+	for _, projectKey := range projectKeys {
+		identities := resolveJiraServiceDeskCustomerIdentities(ctx, projectKey, client)
+		if len(identities) == 0 {
+			continue
+		}
+		if merged == nil {
+			merged = make(map[string]struct{}, len(identities))
+		}
+		for identity := range identities {
+			merged[identity] = struct{}{}
+		}
+	}
+	return merged
+}
+
 func (h *JiraImportHandler) collectSampleUsers(
 	ctx context.Context,
 	client jira.Client,
