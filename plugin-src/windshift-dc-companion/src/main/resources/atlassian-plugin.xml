@@ -1,0 +1,14 @@
+<atlassian-plugin key="${atlassian.plugin.key}" name="${project.name}" plugins-version="2">
+    <plugin-info>
+        <description>${project.description}</description>
+        <version>${project.version}</version>
+        <vendor name="Windshift" url="https://windshift.app"/>
+        <param name="atlassian-data-center-status">compatible</param>
+        <param name="atlassian-data-center-compatible">true</param>
+    </plugin-info>
+
+    <!-- Base path: /rest/windshift-import/1.0 -->
+    <rest key="windshift-dc-import-rest" path="/windshift-import" version="1.0">
+        <description>Read-only import companion API. See docs/jira-dc-import-companion-plugin.md.</description>
+    </rest>
+</atlassian-plugin>

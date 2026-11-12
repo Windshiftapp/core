@@ -267,6 +267,17 @@ const (
 	JiraWorkflowTransitionGlobal   JiraConfiguredWorkflowTransitionType = "GLOBAL"
 )
 
+// JiraWorkflowGuard is one condition or validator attached to a transition.
+// Kind is the normalized view the companion plugin emits for the common
+// built-ins (user_in_group, user_in_role, permission, only_assignee, ...); the
+// raw class and args are retained so unmapped guards are reported faithfully.
+type JiraWorkflowGuard struct {
+	Kind  string
+	Mode  string // "condition" or "validator"
+	Class string
+	Args  map[string]any
+}
+
 // JiraConfiguredWorkflowTransition describes a transition returned by Jira's
 // workflow configuration API. Rule counts are retained so unsupported guarded
 // transitions can be reported and handled conservatively by the importer.
@@ -281,6 +292,9 @@ type JiraConfiguredWorkflowTransition struct {
 	ActionCount    int
 	TriggerCount   int
 	ConditionCount int
+	// Guards carries the actual condition/validator descriptors when the source
+	// exposes them (the DC companion plugin); empty when only counts are known.
+	Guards []JiraWorkflowGuard
 }
 
 // ScreenConfigurationClient is an optional Jira client capability for

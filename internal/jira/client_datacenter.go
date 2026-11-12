@@ -254,23 +254,24 @@ func (c *dataCenterClient) GetProjectWorkflowScheme(ctx context.Context, project
 	return jiraProjectWorkflowFromStatuses(projectKey, issueTypeStatuses), nil
 }
 
-// GetProjectWorkflowConfiguration reports that Jira Data Center's standard
-// REST API does not expose the configured workflow graph used by this importer.
-// Status membership remains available through GetProjectIssueTypeStatuses.
-func (c *dataCenterClient) GetProjectWorkflowConfiguration(
-	context.Context,
-	string,
-	[]string,
-) (*JiraProjectWorkflowConfiguration, error) {
-	return nil, ErrWorkflowConfigurationNotAvailable
-}
+// GetProjectWorkflowConfiguration is implemented in workflow_datacenter.go;
+// it reads the configured graph from the admin workflow designer API and
+// returns ErrWorkflowConfigurationNotAvailable when that source is unusable.
 
 func (c *dataCenterClient) GetProjectScreenConfiguration(
-	context.Context,
-	string,
-	string,
-	[]string,
+	ctx context.Context,
+	_ string,
+	projectKey string,
+	_ []string,
 ) (*JiraProjectScreenConfiguration, error) {
+	// Prefer the companion plugin: Data Center's public REST API does not expose
+	// screen schemes, so without it the importer cannot build create/edit/view
+	// screens.
+	if caps, ok := c.companionCapabilities(ctx); ok && companionSupports(caps, "screens") {
+		if config, err := c.companionScreenConfiguration(ctx, projectKey); err == nil && config != nil && len(config.Screens) > 0 {
+			return config, nil
+		}
+	}
 	return nil, ErrScreenConfigurationNotAvailable
 }
 

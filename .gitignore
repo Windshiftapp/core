@@ -6,7 +6,7 @@
 *.zip
 *.wasm
 *.dylib
-windshift
+/windshift
 .dev-windshift
 cx
 /ws
