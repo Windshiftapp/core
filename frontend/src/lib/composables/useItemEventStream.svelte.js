@@ -1,4 +1,5 @@
 import { toExternal } from '../runtime/contextPath.js';
+import { createBackgroundRefresh } from '../utils/backgroundRefresh.js';
 
 const DEBOUNCE_MS = 250;
 
@@ -22,14 +23,12 @@ export function useItemEventStream(getItemId, handlers = {}) {
     if (!itemId) return;
     if (typeof EventSource === 'undefined') return; // SSR / unsupported
 
-    let timer = null;
     // A handler that was already running when the subscription was torn down
     // must not reconcile against the next item's view.
     let active = true;
     const connectionTracker = createConnectionReconcileTracker();
 
     const reconcile = async () => {
-      timer = null;
       if (!active) return;
       try {
         await handlers.onReconcile?.();
@@ -39,9 +38,8 @@ export function useItemEventStream(getItemId, handlers = {}) {
         console.warn('Item event stream reconcile failed:', error);
       }
     };
-    const scheduleReconcile = () => {
-      if (!timer) timer = setTimeout(reconcile, DEBOUNCE_MS);
-    };
+    const refresh = createBackgroundRefresh(reconcile, { delay: DEBOUNCE_MS });
+    const scheduleReconcile = refresh.schedule;
 
     const es = new EventSource(toExternal(`/api/items/${itemId}/events`));
 
@@ -54,8 +52,8 @@ export function useItemEventStream(getItemId, handlers = {}) {
     es.addEventListener('deleted', () => {
       // Deletion is authoritative and must tear down item-bound loaders before
       // their in-flight requests start returning expected 404s.
-      if (timer) clearTimeout(timer);
-      timer = null;
+      active = false;
+      refresh.dispose();
       handlers.onDeleted?.();
     });
     // The browser auto-reconnects (honoring the server's retry hint). Until it
@@ -67,7 +65,7 @@ export function useItemEventStream(getItemId, handlers = {}) {
 
     return () => {
       active = false;
-      if (timer) clearTimeout(timer);
+      refresh.dispose();
       es.close();
       connected = false;
     };

@@ -9,6 +9,7 @@
   import PublicBoardItemDetail from './PublicBoardItemDetail.svelte';
   import { primaryMilestoneForItem, sortMilestonesForLanes, SWIMLANE_NONE_KEY } from '../features/collections/swimlanes.js';
   import { formatDateOnly } from '../utils/dateFormatter.js';
+  import { canRunBackgroundSync, onBackgroundSyncAvailable } from '../utils/backgroundSync.js';
 
   let { slug } = $props();
 
@@ -110,14 +111,21 @@
     const controller = new AbortController();
     let inFlight = false;
     let disposed = false;
+    let recoveryPending = false;
 
     board = null;
     error = null;
     loading = true;
     selectedItemKey = null;
 
-    async function load(silent) {
-      if (inFlight || disposed) return;
+    async function load(silent, recovery = false) {
+      if (silent && !canRunBackgroundSync()) return;
+      if (disposed) return;
+      if (inFlight) {
+        if (recovery) recoveryPending = true;
+        return;
+      }
+      recoveryPending = false;
       inFlight = true;
       if (!silent) loading = true;
       try {
@@ -131,17 +139,20 @@
       } finally {
         inFlight = false;
         if (!disposed && id === loadId) loading = false;
+        if (recoveryPending && !disposed) void load(true);
       }
     }
 
     load(false);
     // Auto-refresh every 60 seconds without overlapping a slow request.
     const refreshInterval = setInterval(() => load(true), 60000);
+    const stopRecovery = onBackgroundSyncAvailable(() => load(true, true));
 
     return () => {
       disposed = true;
       controller.abort();
       clearInterval(refreshInterval);
+      stopRecovery();
     };
   });
 </script>

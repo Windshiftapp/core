@@ -7,6 +7,7 @@
   import { formatInstant } from '../../utils/dateFormatter.js';
   import { onWorkItemRefresh, workItemRefreshTouchesWorkspace } from '../../stores/workItemRefresh.js';
   import { getItemSLA } from '../sla/slaState.js';
+  import { canRunBackgroundSync, onBackgroundSyncAvailable } from '../../utils/backgroundSync.js';
 
   let { itemId = null, workspaceId = null } = $props();
 
@@ -18,14 +19,23 @@
   let states = $state([]);
   let loading = $state(false);
   let requestToken = 0;
+  let backgroundDirty = false;
+  let loadInFlight = false;
+  let recoveryPending = false;
 
-  async function load() {
+  async function load(force = false) {
     if (!itemId) return;
+    if (loadInFlight) {
+      if (force) recoveryPending = true;
+      return;
+    }
+    loadInFlight = true;
+    recoveryPending = false;
     const token = ++requestToken;
     const requestedItemId = itemId;
     loading = true;
     try {
-      const result = (await getItemSLA(requestedItemId, workspaceId)) ?? [];
+      const result = (await getItemSLA(requestedItemId, workspaceId, { force })) ?? [];
       // A newer request or an item switch supersedes this response.
       if (token !== requestToken) return;
       states = result;
@@ -33,20 +43,43 @@
       // SLA state is supplementary; never break the item detail on a read error.
       if (token === requestToken) states = [];
     } finally {
-      if (token === requestToken) loading = false;
+      if (token === requestToken) {
+        loading = false;
+        loadInFlight = false;
+        if (recoveryPending && canRunBackgroundSync()) void load(true);
+      }
     }
   }
 
   $effect(() => {
     if (itemId) void load();
+    return () => {
+      requestToken++;
+      loadInFlight = false;
+      recoveryPending = false;
+      backgroundDirty = false;
+    };
   });
 
   let hasOngoing = $derived(states.some((state) => state.ongoing));
 
+  function refreshBackground(force = false) {
+    if (!canRunBackgroundSync()) {
+      backgroundDirty = true;
+      return;
+    }
+    backgroundDirty = false;
+    void load(force);
+  }
+
+  $effect(() => onBackgroundSyncAvailable(() => {
+    if (loading || hasOngoing || backgroundDirty || recoveryPending) refreshBackground(true);
+  }));
+
   $effect(() => {
     // Only poll while a timer is actually running; completed history is static.
     if (!itemId || !hasOngoing) return;
-    const timer = setInterval(() => void load(), SLA_REFRESH_MS);
+    const timer = setInterval(refreshBackground, SLA_REFRESH_MS);
     return () => clearInterval(timer);
   });
 
@@ -57,7 +90,7 @@
   $effect(() =>
     onWorkItemRefresh((detail) => {
       if (!workItemRefreshTouchesWorkspace(detail, workspaceId)) return;
-      void load();
+      refreshBackground(true);
     })
   );
 

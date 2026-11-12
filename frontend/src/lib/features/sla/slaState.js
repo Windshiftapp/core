@@ -70,8 +70,9 @@ const pendingByWorkspace = new Map();
 // this, so ids are split across requests instead of being rejected whole.
 const BATCH_ID_LIMIT = 200;
 
-export async function getItemSLA(itemId, workspaceId = null) {
+export async function getItemSLA(itemId, workspaceId = null, { force = false } = {}) {
   if (!itemId) return [];
+  if (force) stateCache.delete(itemId);
   const cached = stateCache.get(itemId);
   const now = Date.now();
   if (cached && now - cached.at < STATE_TTL_MS) return cached.value;

@@ -66,12 +66,14 @@ export function onBackgroundSyncAvailable(callback, environment = {}) {
 
   documentRef?.addEventListener('visibilitychange', markSuspended);
   documentRef?.addEventListener('visibilitychange', refreshIfAvailable);
+  windowRef?.addEventListener('offline', markSuspended);
   windowRef?.addEventListener('online', markSuspended);
   windowRef?.addEventListener('online', refreshIfAvailable);
 
   return () => {
     documentRef?.removeEventListener('visibilitychange', markSuspended);
     documentRef?.removeEventListener('visibilitychange', refreshIfAvailable);
+    windowRef?.removeEventListener('offline', markSuspended);
     windowRef?.removeEventListener('online', markSuspended);
     windowRef?.removeEventListener('online', refreshIfAvailable);
   };

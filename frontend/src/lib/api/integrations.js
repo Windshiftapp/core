@@ -81,8 +81,11 @@ export const zammadTickets = {
   forItem: (itemId) => fetchAPI(`/items/${itemId}/zammad-links`),
   history: (itemId, { limit = 6 } = {}) =>
     fetchAPI(`/items/${itemId}/zammad-history?limit=${encodeURIComponent(limit)}`),
-  workspaceOverview: (workspaceId, { limit = 5 } = {}) =>
-    fetchAPI(`/workspaces/${workspaceId}/zammad-overview?limit=${encodeURIComponent(limit)}`),
+  /** @param {number|string} workspaceId @param {{ limit?: number, signal?: AbortSignal }} [options] */
+  workspaceOverview: (workspaceId, { limit = 5, signal } = {}) =>
+    fetchAPI(`/workspaces/${workspaceId}/zammad-overview?limit=${encodeURIComponent(limit)}`, {
+      signal,
+    }),
   create: (itemId, data) =>
     fetchAPI(`/items/${itemId}/zammad-tickets`, {
       method: 'POST',

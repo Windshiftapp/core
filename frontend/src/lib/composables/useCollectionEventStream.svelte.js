@@ -1,4 +1,5 @@
 import { toExternal } from '../runtime/contextPath.js';
+import { createBackgroundRefresh } from '../utils/backgroundRefresh.js';
 import { createConnectionReconcileTracker } from './useItemEventStream.svelte.js';
 
 const DEBOUNCE_MS = 250;
@@ -9,7 +10,7 @@ const DEBOUNCE_MS = 250;
  * the stream never has to carry item-level detail.
  *
  * @param {() => ({ kind: 'collection'|'workspace', id: number|string|null }|null)} getScope
- * @param {{ onInvalidate?: () => void }} [handlers]
+ * @param {{ onInvalidate?: () => unknown, debounceMs?: number }} [handlers]
  * @returns {{ readonly connected: boolean }}
  */
 export function useCollectionEventStream(getScope, handlers = {}) {
@@ -32,19 +33,11 @@ export function useCollectionEventStream(getScope, handlers = {}) {
         ? toExternal(`/api/workspaces/${id}/events`)
         : toExternal(`/api/collections/${id}/events`);
 
-    let pending = false;
-    let timer = null;
     const connectionTracker = createConnectionReconcileTracker();
-    const schedule = () => {
-      pending = true;
-      if (timer) return;
-      timer = setTimeout(() => {
-        timer = null;
-        if (!pending) return;
-        pending = false;
-        handlers.onInvalidate?.();
-      }, DEBOUNCE_MS);
-    };
+    const refresh = createBackgroundRefresh(() => handlers.onInvalidate?.(), {
+      delay: handlers.debounceMs ?? DEBOUNCE_MS,
+    });
+    const schedule = refresh.schedule;
 
     const es = new EventSource(url);
     es.addEventListener('connected', () => {
@@ -55,15 +48,14 @@ export function useCollectionEventStream(getScope, handlers = {}) {
       if (connectionTracker.markConnected()) schedule();
     });
     es.addEventListener('changed', schedule);
-    // The browser auto-reconnects; until it does, mark disconnected so the
-    // poller resumes as the fallback.
+    // The browser reconnects automatically; reconcile after the gap.
     es.onerror = () => {
       connectionTracker.markDisconnected();
       connected = false;
     };
 
     return () => {
-      if (timer) clearTimeout(timer);
+      refresh.dispose();
       es.close();
       connected = false;
     };
