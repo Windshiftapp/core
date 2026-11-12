@@ -27,8 +27,10 @@
 
   let draftFields = $state([]);
 
+  // Seed the draft on open so an edit dismissed with outside-click or Escape
+  // does not leak into the next time the popover opens.
   $effect(() => {
-    draftFields = normalizeBacklogFields(fields);
+    if ($open) draftFields = normalizeBacklogFields(fields);
   });
 
   function setField(fieldId, checked) {
