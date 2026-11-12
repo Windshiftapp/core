@@ -234,6 +234,16 @@ Windshift supports OIDC single sign-on with any standards-compliant provider. We
 - [Release notes](https://windshift.sh/self-hosting/08-release-notes/) and [GitHub releases](https://github.com/Windshiftapp/core/releases)
 - [Product documentation](https://windshift.sh/docs)
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=windshiftapp%2Fcore&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=windshiftapp/core&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=windshiftapp/core&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=windshiftapp/core&type=date&legend=top-left" />
+ </picture>
+</a>
+
 ## License
 
 Windshift is available under the [GNU Affero General Public License v3.0](LICENSE).
