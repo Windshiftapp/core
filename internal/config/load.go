@@ -68,9 +68,16 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 	)
 	flag.Parse()
 
-	// Reconcile the shorthand flags with their long forms.
+	// Track which flags were supplied explicitly so an alias, or a boolean set to
+	// its default value, is distinguishable from an omitted one.
+	explicitFlags := map[string]bool{}
+	flag.Visit(func(f *flag.Flag) { explicitFlags[f.Name] = true })
+
+	// Reconcile the shorthand flags with their long forms. An explicitly supplied
+	// value wins even when it equals the default, and when both aliases are
+	// supplied the shorthand (-p) takes precedence.
 	port := *portFlag
-	if *portShort != "" && *portShort != "8080" {
+	if explicitFlags["p"] {
 		port = *portShort
 	}
 	pgConn := *postgresConn
@@ -129,16 +136,13 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 	resolvedSSHHost := firstNonEmpty(os.Getenv("SSH_HOST"), *sshHost)
 
 	// Proxy: track explicit (flag OR env) because downstream auto-detection
-	// treats "user said so" differently from "defaulted off".
-	useProxyExplicit := false
-	flag.Visit(func(f *flag.Flag) {
-		if f.Name == "use-proxy" {
-			useProxyExplicit = true
-		}
-	})
+	// treats "user said so" differently from "defaulted off". USE_PROXY=false is
+	// as explicit as USE_PROXY=true; only an unset variable leaves auto-detection
+	// in charge. An explicit environment value overrides the flag.
+	useProxyExplicit := explicitFlags["use-proxy"]
 	proxyVal := *useProxy
-	if parseBoolEnv("USE_PROXY") {
-		proxyVal = true
+	if raw := os.Getenv("USE_PROXY"); raw != "" {
+		proxyVal = parseBoolEnv("USE_PROXY")
 		useProxyExplicit = true
 	}
 	resolvedAdditionalProxies := firstNonEmpty(os.Getenv("ADDITIONAL_PROXIES"), *additionalProxies)
@@ -221,8 +225,8 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 		UseProxy:          proxyVal,
 		UseProxyExplicit:  useProxyExplicit,
 		AdditionalProxies: resolvedAdditionalProxies,
-		TLSCertPath:       *tlsCertPath,
-		TLSKeyPath:        *tlsKeyPath,
+		TLSCertPath:       firstNonEmpty(os.Getenv("TLS_CERT"), *tlsCertPath),
+		TLSKeyPath:        firstNonEmpty(os.Getenv("TLS_KEY"), *tlsKeyPath),
 		DisableCSRF:       *disableCSRF,
 		AllowInsecureHTTP: *allowInsecureHTTP || parseBoolEnv("ALLOW_INSECURE_HTTP"),
 

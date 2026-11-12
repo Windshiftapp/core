@@ -99,9 +99,15 @@ func ResolveSecurityConfig(cfg Config) (*ResolvedSecurityConfig, error) {
 	// 5. Auto-detect proxy mode
 	r.UseProxy = cfg.UseProxy
 	if cfg.UseProxyExplicit {
-		r.addDiag(DiagInfo, "PROXY_EXPLICIT",
-			"Proxy mode explicitly enabled via USE_PROXY.",
-			"Ensure this server is NOT directly accessible from the internet.")
+		if r.UseProxy {
+			r.addDiag(DiagInfo, "PROXY_EXPLICIT",
+				"Proxy mode explicitly enabled via USE_PROXY.",
+				"Ensure this server is NOT directly accessible from the internet.")
+		} else {
+			r.addDiag(DiagInfo, "PROXY_EXPLICIT",
+				"Proxy mode explicitly disabled via USE_PROXY.",
+				"X-Forwarded-* headers from clients will not be trusted.")
+		}
 	} else if parsedURL != nil && parsedURL.Scheme == "https" && !r.EnableHTTPS {
 		// BASE_URL is https but no TLS cert → auto-detect proxy
 		r.UseProxy = true
