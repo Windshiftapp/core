@@ -35,6 +35,8 @@
   import CompleteIterationDialog from '../../dialogs/CompleteIterationDialog.svelte';
   import { formatItemCount } from '../../utils/itemCount.js';
   import { isSystemFieldAvailableInEffectiveConfig } from '../../utils/screenFields.js';
+  import BacklogFieldSelector from './BacklogFieldSelector.svelte';
+  import { DEFAULT_BACKLOG_FIELDS, normalizeBacklogFields } from './backlogFields.js';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -64,6 +66,7 @@
   let sectionDropHighlight = $state(new Map()); // iterationId|'unassigned' -> boolean
   let pendingActionItemIds = $state(new Set());
   let pendingStoryPointsItemIds = $state(new Set());
+  let visibleFields = $state([...DEFAULT_BACKLOG_FIELDS]);
 
   // --- Complete Iteration dialog state ---
   let completeIterationShow = $state(false);
@@ -116,12 +119,27 @@
     if (typeof storedShowCompleted === 'boolean') {
       showCompletedIterations = storedShowCompleted;
     }
+
+    const storedVisibleFields = collectionPreferences.viewStateValue(
+      workspaceId,
+      collectionId,
+      'backlog',
+      'visible_fields'
+    );
+    visibleFields = normalizeBacklogFields(storedVisibleFields);
   }
 
   function setShowCompletedIterations(value) {
     showCompletedIterations = value;
     collectionPreferences.patchViewState(workspaceId, collectionId, 'backlog', {
       show_completed_iterations: value,
+    });
+  }
+
+  function setVisibleFields(fields) {
+    visibleFields = normalizeBacklogFields(fields);
+    collectionPreferences.patchViewState(workspaceId, collectionId, 'backlog', {
+      visible_fields: visibleFields,
     });
   }
 
@@ -318,11 +336,10 @@
       } catch (error) {
         console.error('Failed to load iterations:', error);
       }
-
-      restorePersistedState();
     } else {
       await workspaceDataStore.initializeGlobal();
     }
+    restorePersistedState();
     loading = false;
   });
 
@@ -703,6 +720,7 @@
       <!-- Controls Bar -->
       <div class="flex flex-wrap items-center gap-3 mb-6">
         <SubFilterBar {workspaceId} {collectionId} showCompletionToggle={false} />
+        <BacklogFieldSelector fields={visibleFields} onchange={setVisibleFields} />
         <Toggle
           checked={showCompletedIterations}
           onchange={setShowCompletedIterations}
@@ -737,6 +755,7 @@
               {backlogRowGap}
               {assignableIterations}
               {pendingActionItemIds}
+              {visibleFields}
               isGlobalAdded={addedGlobalIds.has(section.iteration.id)}
               sectionHighlight={sectionDropHighlight.get(String(section.iteration.id)) || false}
               onToggleCollapse={toggleCollapse}
@@ -768,6 +787,7 @@
             {backlogRowGap}
             {assignableIterations}
             {pendingActionItemIds}
+            {visibleFields}
             sectionHighlight={sectionDropHighlight.get('unassigned') || false}
             onToggleCollapse={toggleCollapse}
             onOpenItem={openItem}
