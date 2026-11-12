@@ -33,10 +33,10 @@
     portal: 'body',
   });
 
-  function openItem(event) {
-    event.stopPropagation();
+  function openItem(itemId, event) {
+    event?.stopPropagation();
     $open = false;
-    onopen?.(item.id);
+    onopen?.(itemId);
   }
 </script>
 
