@@ -104,6 +104,21 @@ func (h *ChannelHandler) authorizeIntakeTarget(ctx context.Context, actorID, wor
 	return nil
 }
 
+// Deleted portals must not block recovery; surviving targets still need authorization.
+func (h *ChannelHandler) authorizeExistingIntakeTarget(ctx context.Context, actorID int, intake *models.Intake) error {
+	portalChannelID := intake.PortalChannelID
+	if portalChannelID != nil {
+		portal, err := h.service.GetByID(ctx, *portalChannelID)
+		if err != nil && !errors.Is(err, repository.ErrNotFound) {
+			return err
+		}
+		if portal == nil || errors.Is(err, repository.ErrNotFound) {
+			portalChannelID = nil
+		}
+	}
+	return h.authorizeIntakeTarget(ctx, actorID, intake.WorkspaceID, portalChannelID)
+}
+
 var (
 	errIntakeTargetForbidden = errors.New("permission to manage the intake target is required")
 	errIntakeInvalid         = errors.New("invalid intake")
@@ -146,6 +161,9 @@ func (h *ChannelHandler) validateIntakeRequest(ctx context.Context, actorID, mai
 	if !allowed {
 		return nil, fmt.Errorf("%w: item type %d is not allowed in workspace %d", errIntakeInvalid, *req.ItemTypeID, req.WorkspaceID)
 	}
+	if err := h.authorizeIntakeTarget(ctx, actorID, req.WorkspaceID, req.PortalChannelID); err != nil {
+		return nil, err
+	}
 	if req.PortalChannelID != nil {
 		served, err := h.portalServesWorkspace(ctx, *req.PortalChannelID, req.WorkspaceID)
 		if err != nil {
@@ -154,10 +172,6 @@ func (h *ChannelHandler) validateIntakeRequest(ctx context.Context, actorID, mai
 		if !served {
 			return nil, fmt.Errorf("%w: portal %d does not serve workspace %d", errIntakeInvalid, *req.PortalChannelID, req.WorkspaceID)
 		}
-	}
-
-	if err := h.authorizeIntakeTarget(ctx, actorID, req.WorkspaceID, req.PortalChannelID); err != nil {
-		return nil, err
 	}
 
 	taken, err := repository.NewIntakeRepository(h.channelRepo.DB()).MailboxFolderTaken(ctx, mailboxID, folder, intakeID)
@@ -287,11 +301,8 @@ func (h *ChannelHandler) UpdateChannelIntake(w http.ResponseWriter, r *http.Requ
 		respondInternalError(w, r, err)
 		return
 	}
-	// Editing an intake writes to both the current and the replacement target,
-	// so the actor must be authorized for the existing one too. Delete already
-	// enforces this; update must match or it can divert routing away from a
-	// target the actor cannot manage.
-	if err := h.authorizeIntakeTarget(ctx, user.ID, existing.WorkspaceID, existing.PortalChannelID); err != nil {
+	// Both the current and replacement targets require authorization.
+	if err := h.authorizeExistingIntakeTarget(ctx, user.ID, existing); err != nil {
 		h.respondIntakeError(w, r, err)
 		return
 	}
@@ -353,9 +364,8 @@ func (h *ChannelHandler) DeleteChannelIntake(w http.ResponseWriter, r *http.Requ
 		respondInternalError(w, r, err)
 		return
 	}
-	// Deleting an intake is a write to its targets, so it needs the same
-	// workspace/portal permission create/update enforce.
-	if err := h.authorizeIntakeTarget(ctx, user.ID, existing.WorkspaceID, existing.PortalChannelID); err != nil {
+	// Authorize surviving targets before removing a legacy orphaned intake.
+	if err := h.authorizeExistingIntakeTarget(ctx, user.ID, existing); err != nil {
 		h.respondIntakeError(w, r, err)
 		return
 	}
