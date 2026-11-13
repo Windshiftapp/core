@@ -228,8 +228,7 @@
 {#if canConfigure}
   <button
     use:melt={$trigger}
-    class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors"
-    style="color: var(--ctx-text-subtle, var(--ds-text-subtle));"
+    class="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-[var(--ds-text)] bg-[var(--ctx-surface,var(--ds-background-neutral))] hover:bg-[var(--ctx-hover-bg,var(--ds-surface-hovered))] transition-colors"
     title="Configure columns"
     data-testid={testId}
   >

@@ -55,7 +55,7 @@
 <button
   use:melt={$trigger}
   type="button"
-  class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-ds-text-subtle transition-colors"
+  class="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-[var(--ds-text)] bg-[var(--ctx-surface,var(--ds-background-neutral))] hover:bg-[var(--ctx-hover-bg,var(--ds-surface-hovered))] transition-colors"
   title={t('fields.configureFields')}
   aria-label={t('fields.configureFields')}
   data-testid="backlog-field-selector-trigger"
