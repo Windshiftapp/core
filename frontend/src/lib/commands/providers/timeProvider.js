@@ -1,4 +1,5 @@
-import { navigate } from '../../router.js';
+import { stopTimerAndReview } from '../../features/time/stopTimerAndReview.js';
+import { timeLogStore } from '../../stores/timeLogStore.svelte.js';
 import { timerStore } from '../../stores/timerStore.svelte.js';
 import { errorToast, infoToast, warningToast } from '../../stores/toasts.svelte.js';
 import { BUCKET } from '../buckets.js';
@@ -40,10 +41,7 @@ export function timeProvider(ctx) {
       bucket: BUCKET.MODULE_ACTIONS,
       keywords: ['log', 'time', 'entry', 'hours', 'work', 'track', 'add'],
       execute: () => {
-        navigate('/time');
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('focus-time-entry-form'));
-        }, 100);
+        timeLogStore.open();
       },
     }),
   ];
@@ -76,7 +74,7 @@ export function timeProvider(ctx) {
         execute: async () => {
           if (timerStore.canStop) {
             try {
-              await timerStore.stop();
+              await stopTimerAndReview(timerStore, timeLogStore);
             } catch (err) {
               errorToast(t('dialogs.alerts.stopTimerFailed', { error: err.message }));
             }
