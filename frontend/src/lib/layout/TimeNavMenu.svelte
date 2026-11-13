@@ -2,7 +2,9 @@
   import IconClock from '@tabler/icons-svelte-runes/icons/clock';
   import IconPlayerPlay from '@tabler/icons-svelte-runes/icons/player-play';
   import IconPlayerStop from '@tabler/icons-svelte-runes/icons/player-stop';
+  import Button from '../components/Button.svelte';
   import DropdownMenu from './DropdownMenu.svelte';
+  import { getShortcutDisplay, toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { currentRoute, navigate } from '../router.js';
   import { timerStore } from '../stores/timerStore.svelte.js';
   import { resolveTimeLogContext, resolveTimerWorkspaceId, timeLogStore } from '../stores/timeLogStore.svelte.js';
@@ -83,6 +85,7 @@
         icon: IconPlayerPlay,
         title: t('items.startTimer'),
         subtitle: t('time.menu.startTimerHint'),
+        shortcut: getShortcutDisplay('global', 'startTimer'),
         onClick: () => startTimer(),
         testid: 'time-menu-start-timer',
       });
@@ -102,7 +105,6 @@
         type: 'group',
         items: projectOptions.map((project) => ({
           id: `project-${project.id}`,
-          icon: IconClock,
           title: project.name,
           onClick: () => startTimer(project),
           testid: `time-menu-project-${project.id}`,
@@ -128,8 +130,6 @@
       type: 'group',
       items: [
         { id: 'time-entry', icon: IconClock, title: t('nav.timeAndProjects'), href: '/time' },
-        { id: 'time-worklogs', title: t('commandPalette.commands.timeReports.label'), href: '/time/worklogs' },
-        { id: 'time-projects', title: t('commandPalette.commands.timeProjects.label'), href: '/time/projects' },
       ],
     });
     return out;
@@ -154,3 +154,11 @@
   onOpen={() => timeLogStore.ensurePickerData()}
   onOpenChange={(open) => onSurfaceChange(open ? 'time' : null)}
 />
+
+<!-- Global start-timer shortcut. @github/hotkey ignores keystrokes that
+     originate in form fields, so 'L' types normally while editing. -->
+<Button
+  class="sr-only"
+  onclick={() => startTimer()}
+  hotkeyConfig={{ key: toHotkeyString('global', 'startTimer'), guard: () => timerStore.canStart }}
+>{t('items.startTimer')}</Button>
