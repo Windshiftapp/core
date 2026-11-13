@@ -201,16 +201,15 @@ func (h *SSOHandler) validateCustomerProvider(w http.ResponseWriter, r *http.Req
 		respondValidationError(w, r, "Customer login currently requires a GitHub provider")
 		return false
 	}
-	if req.CustomerOrganisationID == nil || *req.CustomerOrganisationID <= 0 {
-		respondValidationError(w, r, "A customer organisation is required for customer login")
-		return false
+	if req.CustomerOrganisationID == nil {
+		return true
 	}
 	exists, err := repository.NewCustomerAccessRepository(h.db).OrganisationExists(r.Context(), *req.CustomerOrganisationID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return false
 	}
-	if !exists {
+	if *req.CustomerOrganisationID <= 0 || !exists {
 		respondValidationError(w, r, "Customer organisation does not exist")
 		return false
 	}

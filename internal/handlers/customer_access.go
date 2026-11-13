@@ -103,11 +103,11 @@ func (h *CustomerAccessHandler) resolve(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *CustomerAccessHandler) providerAllowed(ctx context.Context, p *sso.SSOProvider, surface *models.CustomerSurface) bool {
-	if surface == nil || !p.Enabled || p.ProviderType != sso.ProviderTypeGitHub || p.AccountType != "customer" || p.CustomerOrganisationID == nil {
+	if surface == nil || !p.Enabled || p.ProviderType != sso.ProviderTypeGitHub || p.AccountType != "customer" {
 		return false
 	}
 	policy, err := h.repo.Policy(ctx, surface.Kind, surface.ID)
-	if err != nil || (policy.Mode != "public" && !slices.Contains(policy.OrganisationIDs, *p.CustomerOrganisationID)) {
+	if err != nil || (policy.Mode != "public" && (p.CustomerOrganisationID == nil || !slices.Contains(policy.OrganisationIDs, *p.CustomerOrganisationID))) {
 		return false
 	}
 	return true
@@ -401,7 +401,7 @@ func (h *CustomerAccessHandler) completeGitHub(w http.ResponseWriter, r *http.Re
 	err = h.portalAdmission(r.Context(), *surface, claims.Email)
 	var id int
 	if err == nil {
-		id, err = h.repo.GitHubCustomer(r.Context(), p.ID, claims.Subject, claims.Email, claims.Name, *p.CustomerOrganisationID, p.AutoProvisionUsers)
+		id, err = h.repo.GitHubCustomer(r.Context(), p.ID, claims.Subject, claims.Email, claims.Name, p.CustomerOrganisationID, p.AutoProvisionUsers)
 	}
 	if err == nil {
 		err = h.issueSession(w, r, *surface, id)

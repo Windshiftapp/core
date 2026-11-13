@@ -35,6 +35,7 @@
   import Card from '../components/Card.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Label from '../components/Label.svelte';
+  import FormField from '../components/FormField.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import Select from '../components/Select.svelte';
   import CustomerOrganisationPicker from '../pickers/CustomerOrganisationPicker.svelte';
@@ -273,9 +274,6 @@
     }
 
     const organization = formData.github_organization.trim();
-    if (formData.account_type === 'customer' && !formData.customer_organisation_id) {
-      formErrors.customer_organisation_id = 'Select a customer organisation.';
-    }
     if (formData.provider_type === 'github' && organization &&
         (!/^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/.test(organization) || organization.includes('--'))) {
       formErrors.github_organization = t('settings.sso.githubOrganizationInvalid');
@@ -805,10 +803,9 @@
           { value: 'customer', label: 'Portal-only customers' },
         ]} />
         {#if formData.account_type === 'customer'}
-          <Label>Customer organisation</Label>
-          <CustomerOrganisationPicker id="sso-customer-organisation" disabled={showEditModal} bind:value={formData.customer_organisation_id} />
-          <DescriptionText>Creates only customer accounts in this organisation. Never grants backend access. Account type and organisation cannot be changed after creation.</DescriptionText>
-          {#if formErrors.customer_organisation_id}<p class="text-sm text-[var(--ds-text-danger)]">{formErrors.customer_organisation_id}</p>{/if}
+          <FormField id="sso-customer-organisation" label={t('settings.sso.customerOrganisationOptional')} helper={t('settings.sso.customerOrganisationHelp')}>
+            <CustomerOrganisationPicker id="sso-customer-organisation" disabled={showEditModal} showUnassigned unassignedLabel={t('settings.sso.noCustomerOrganisation')} bind:value={formData.customer_organisation_id} />
+          </FormField>
         {/if}
         <TextField
           id="github_organization"
@@ -835,8 +832,8 @@
         <Checkbox
           dataTestid="sso-provider-signup"
           bind:checked={formData.auto_provision_users}
-          label={formData.account_type === 'customer' ? 'Allow customer signup' : t('settings.sso.autoProvisionUsers')}
-          hint={formData.account_type === 'customer' ? 'Create customers in the selected organisation. Existing customers must already belong to it.' : t('settings.sso.autoProvisionUsersDesc')}
+          label={t('settings.sso.autoProvisionUsers')}
+          hint={formData.account_type === 'customer' ? t('settings.sso.customerAccountCreationHelp') : t('settings.sso.autoProvisionUsersDesc')}
           size="small"
         />
 
