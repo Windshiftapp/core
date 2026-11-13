@@ -530,7 +530,7 @@ func RegisterRoutes(deps restapi.Deps) {
 	v1.HandleWithMiddleware("GET /timer/active", activeTimerHandler.GetActiveTimer, bearerAuth.RequirePermission("time:read"))
 	v1.HandleWithMiddleware("DELETE /timer/stop", activeTimerHandler.StopTimer, bearerAuth.RequirePermission("time:write"))
 
-	adminUserHandler := handlers.NewAdminUserHandler(db, permissionService)
+	adminUserHandler := handlers.NewAdminUserHandler(db, permissionService, deps.UserDeactivationService)
 	adminGroupHandler := handlers.NewAdminGroupHandler(db, permissionService, deps.AuthorizationCacheInvalidator)
 	adminAuditLogHandler := handlers.NewAdminAuditLogHandler(db, permissionService)
 	adminAPITokenHandler := handlers.NewAdminAPITokenHandler(db, tokenManager, permissionService)

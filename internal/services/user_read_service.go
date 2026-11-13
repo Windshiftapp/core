@@ -60,12 +60,17 @@ type AdminUserUpdateResult struct {
 }
 
 // NewUserReadService creates a new user read service
-func NewUserReadService(db database.Database, lifecycle ...*UserDeactivationService) *UserReadService {
-	deactivation := NewUserDeactivationService(db, UserDeactivationInvalidators{})
-	if len(lifecycle) > 0 && lifecycle[0] != nil {
-		deactivation = lifecycle[0]
+func NewUserReadService(db database.Database) *UserReadService {
+	return &UserReadService{db: db}
+}
+
+// NewAdminUserService enables mutations with a required lifecycle dependency.
+// Read-only callers must use NewUserReadService instead.
+func NewAdminUserService(db database.Database, lifecycle *UserDeactivationService) *UserReadService {
+	if lifecycle == nil {
+		panic("admin user service requires a lifecycle service")
 	}
-	return &UserReadService{db: db, deactivation: deactivation}
+	return &UserReadService{db: db, deactivation: lifecycle}
 }
 
 // hydrateUser populates nullable fields and the computed FullName on a User.
@@ -176,6 +181,9 @@ func (s *UserReadService) ListAdmin(pagination PaginationParams) ([]models.User,
 // UpdateAdmin commits profile and lifecycle changes together, then invalidates
 // security caches. Empty strings retain existing values for compatibility.
 func (s *UserReadService) UpdateAdmin(id int, update AdminUserUpdate) (*AdminUserUpdateResult, error) {
+	if s.deactivation == nil {
+		return nil, errors.New("user mutations require NewAdminUserService with lifecycle invalidators")
+	}
 	sanitizeOptional := func(value *string, policy sanitize.Policy) {
 		if value != nil {
 			sanitize.Apply(value, policy)
@@ -200,6 +208,7 @@ func (s *UserReadService) UpdateAdmin(id int, update AdminUserUpdate) (*AdminUse
 		return nil, err
 	}
 	if before.SCIMManaged {
+		// External ownership takes precedence, including for offboarded users.
 		return nil, ErrUserManagedExternally
 	}
 	if before.Offboarded && update.IsActive != nil && *update.IsActive {
@@ -255,6 +264,7 @@ func (s *UserReadService) UpdateAdmin(id int, update AdminUserUpdate) (*AdminUse
 	}
 	var cascade AgentDeactivationResult
 	if update.IsActive != nil && !*update.IsActive {
+		// Repeat the idempotent cascade to heal partially deactivated dependants.
 		cascade, err = s.deactivation.DeactivateUserTx(tx, id)
 		if err != nil {
 			return nil, err

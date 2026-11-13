@@ -631,6 +631,8 @@ func (r *UserRepository) LockUpdateProfileSnapshot(id int, driver string) (*Upda
 	if database.IsPostgresDriver(driver) {
 		return r.getUpdateProfileSnapshot(id, " FOR UPDATE")
 	}
+	// SQLite has no row locks: acquire its writer lock before reading. This
+	// no-op UPDATE also fires any users-table UPDATE triggers.
 	if _, err := r.db.ExecWrite("UPDATE users SET id = id WHERE id = ?", id); err != nil {
 		return nil, fmt.Errorf("lock user %d update: %w", id, err)
 	}
