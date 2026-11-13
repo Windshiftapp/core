@@ -24,7 +24,7 @@ type SSOStateToken struct {
 	// RequestID is the SP-issued SAML AuthnRequest ID, used to bind the
 	// returned assertion via InResponseTo. Empty for OIDC flows.
 	RequestID string
-	// Nonce is the OIDC nonce sent on the authorization request. Empty for SAML.
+	// Nonce holds the OIDC nonce or GitHub PKCE verifier. Empty for SAML.
 	Nonce string
 }
 
@@ -42,8 +42,7 @@ func (r *SSOStateRepository) Store(providerID int, state, requestID, redirectURI
 	return err
 }
 
-// StoreOIDC persists an OIDC state token together with the nonce sent on the
-// authorization request, so the callback can require it in the ID token.
+// StoreOIDC stores state with its OIDC nonce or GitHub PKCE verifier.
 func (r *SSOStateRepository) StoreOIDC(providerID int, state, nonce, redirectURI string, rememberMe bool, expiresAt time.Time) error {
 	_, err := r.db.ExecWrite(`
 		INSERT INTO sso_state_tokens (provider_id, state, nonce, redirect_uri, remember_me, expires_at)
@@ -70,4 +69,19 @@ func (r *SSOStateRepository) GetValid(state string, providerID int, now time.Tim
 func (r *SSOStateRepository) Delete(id int) error {
 	_, err := r.db.ExecWrite("DELETE FROM sso_state_tokens WHERE id = ?", id)
 	return err
+}
+
+// Consume atomically claims a state value so concurrent callbacks cannot replay it.
+func (r *SSOStateRepository) Consume(state string, providerID int, now time.Time) (*SSOStateToken, error) {
+	var token SSOStateToken
+	var nonce sql.NullString
+	err := r.db.QueryRow(`DELETE FROM sso_state_tokens
+		WHERE state = ? AND provider_id = ? AND expires_at > ?
+		RETURNING id, nonce, redirect_uri, remember_me`, state, providerID, now).
+		Scan(&token.ID, &nonce, &token.RedirectURI, &token.RememberMe)
+	if err != nil {
+		return nil, err
+	}
+	token.Nonce = nonce.String
+	return &token, nil
 }

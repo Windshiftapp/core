@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	ProviderTypeOIDC = "oidc"
-	ProviderTypeSAML = "saml"
+	ProviderTypeOIDC   = "oidc"
+	ProviderTypeSAML   = "saml"
+	ProviderTypeGitHub = "github"
 )
 
 var (
@@ -38,6 +39,7 @@ type SSOProvider struct {
 	AutoProvisionUsers    bool   `json:"auto_provision_users"`
 	RequireVerifiedEmail  bool   `json:"require_verified_email"` // Provider is authoritative for email; skips Windshift email verification.
 	AttributeMapping      string `json:"attribute_mapping"`
+	GitHubOrganization    string `json:"github_organization,omitempty"`
 	// SAML-specific fields
 	SAMLIdPMetadataURL string    `json:"saml_idp_metadata_url,omitempty"` // IdP metadata URL for auto-configuration
 	SAMLIdPSSOURL      string    `json:"saml_idp_sso_url,omitempty"`      // IdP Single Sign-On URL
@@ -56,7 +58,7 @@ const providerColumnsWithSecret = `id, slug, name, provider_type, enabled, is_de
 	auto_provision_users, require_verified_email,
 	attribute_mapping,
 	saml_idp_metadata_url, saml_idp_sso_url, saml_idp_certificate, saml_sp_entity_id, saml_sign_requests,
-	created_at, updated_at`
+	github_organization, created_at, updated_at`
 
 // providerColumnsWithoutSecret is the SELECT column list for listing (no secret)
 //
@@ -66,7 +68,7 @@ const providerColumnsWithoutSecret = `id, slug, name, provider_type, enabled, is
 	auto_provision_users, require_verified_email,
 	attribute_mapping,
 	saml_idp_metadata_url, saml_idp_sso_url, saml_idp_certificate, saml_sp_entity_id, saml_sign_requests,
-	created_at, updated_at`
+	github_organization, created_at, updated_at`
 
 // scanProviderRow is the shared scanner for SSOProvider rows.
 // When withSecret is true, it expects the client_secret_encrypted column in the result set.
@@ -91,6 +93,7 @@ func scanProviderRow(row interface {
 		&provider.AutoProvisionUsers, &provider.RequireVerifiedEmail,
 		&attributeMapping,
 		&samlIDPMetadataURL, &samlIDPSSOURL, &samlIDPCertificate, &samlSPEntityID, &provider.SAMLSignRequests,
+		&provider.GitHubOrganization,
 		&provider.CreatedAt, &provider.UpdatedAt,
 	)
 
@@ -236,8 +239,8 @@ func (s *ProviderStore) Create(provider *SSOProvider) error {
 			auto_provision_users, require_verified_email,
 			attribute_mapping,
 			saml_idp_metadata_url, saml_idp_sso_url, saml_idp_certificate, saml_sp_entity_id, saml_sign_requests,
-			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+			github_organization, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		RETURNING id
 	`
 
@@ -260,6 +263,7 @@ func (s *ProviderStore) Create(provider *SSOProvider) error {
 		nullString(provider.SAMLIdPCertificate),
 		nullString(provider.SAMLSPEntityID),
 		provider.SAMLSignRequests,
+		provider.GitHubOrganization,
 	).Scan(&id)
 	if err != nil {
 		return err
@@ -286,7 +290,7 @@ func (s *ProviderStore) Update(provider *SSOProvider) error {
 			auto_provision_users = ?, require_verified_email = ?,
 			attribute_mapping = ?,
 			saml_idp_metadata_url = ?, saml_idp_sso_url = ?, saml_idp_certificate = ?,
-			saml_sp_entity_id = ?, saml_sign_requests = ?,
+			saml_sp_entity_id = ?, saml_sign_requests = ?, github_organization = ?,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
@@ -308,6 +312,7 @@ func (s *ProviderStore) Update(provider *SSOProvider) error {
 		nullString(provider.SAMLIdPCertificate),
 		nullString(provider.SAMLSPEntityID),
 		provider.SAMLSignRequests,
+		provider.GitHubOrganization,
 		provider.ID,
 	)
 	return err

@@ -3362,6 +3362,14 @@ CREATE TABLE IF NOT EXISTS plane_import_mappings (
 );
 CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_mappings(workspace_id, entity_type, windshift_id);`,
 	},
+	{
+		Version:       "20261113_sso_github_organization",
+		Name:          "Add optional GitHub login organization restriction",
+		CheckSQLite:   sqliteColumnCheck("sso_providers", "github_organization"),
+		CheckPostgres: pgColumnCheck("sso_providers", "github_organization"),
+		SQLite:        "ALTER TABLE sso_providers ADD COLUMN github_organization TEXT NOT NULL DEFAULT ''",
+		Postgres:      "ALTER TABLE sso_providers ADD COLUMN github_organization TEXT NOT NULL DEFAULT ''",
+	},
 }
 
 // isNumericJSONKey reports whether a custom-field value key is a numeric field

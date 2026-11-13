@@ -586,8 +586,17 @@ export default {
     // SSO Settings
     sso: {
       title: 'Single Sign-On (SSO)',
-      subtitle: 'Configure OIDC identity providers for Single Sign-On authentication',
-      oidcTab: 'OIDC',
+      subtitle: 'Configure identity providers for Single Sign-On authentication',
+      oidcTab: 'Identity providers',
+      addOidc: 'Add OIDC',
+      addGitHub: 'Add GitHub',
+      editGitHub: 'Edit GitHub',
+      githubOrganization: 'Restrict to GitHub organization',
+      githubAnyOrganization: 'No organization restriction',
+      githubOrganizationHelp: 'Optional organization login, not a URL. Active membership is checked on every GitHub sign-in, including existing linked accounts. Existing Windshift sessions are not revoked when membership changes. Organization access may require approval on GitHub.',
+      githubOrganizationInvalid: 'Enter a valid GitHub organization login, not a URL.',
+      githubSetupHelp: 'Register a dedicated GitHub OAuth App and enter its client ID and secret below. Use the callback URL shown here. This login configuration is separate from SCM access and requests no repository permissions.',
+      githubVerifiedEmailHelp: 'GitHub must verify an email address before sign-in. Existing Windshift accounts are linked by verified email. Login requests read:user and user:email, plus read:org when an organization restriction is set.',
       addProvider: 'Add Provider',
       addSsoProvider: 'Add SSO Provider',
       editSsoProvider: 'Edit SSO Provider',
@@ -596,7 +605,7 @@ export default {
       deleteProvider: 'Delete Provider',
       noProviderConfigured: 'No SSO Provider Configured',
       noProviderDescription:
-        'Add an OIDC identity provider to enable Single Sign-On for your users. Supports Keycloak, Authentik, Pocket ID, and other OIDC-compliant providers.',
+        'Add GitHub or an OIDC identity provider to enable Single Sign-On for your users.',
       slug: 'Slug',
       slugPlaceholder: 'e.g., authentik',
       slugHelp: 'Used in the SSO login URL',

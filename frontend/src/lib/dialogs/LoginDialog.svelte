@@ -11,6 +11,7 @@
   import User from '@lucide/svelte/icons/user';
   import AlertCircle from '@lucide/svelte/icons/alert-circle';
   import LogIn from '@lucide/svelte/icons/log-in';
+  import Github from '@tabler/icons-svelte-runes/icons/brand-github';
   import Key from '@lucide/svelte/icons/key';
   import { brandStore } from '../stores/brand.svelte.js';
   import Button from '../components/Button.svelte';
@@ -294,8 +295,13 @@
           onclick={handleSSOLogin}
           disabled={$authStore.loading}
           dataTestid="login-sso"
+          class={$ssoStore.providerType === 'github' ? 'github-login' : ''}
         >
-          <LogIn class="w-4 h-4 mr-2" />
+          {#if $ssoStore.providerType === 'github'}
+            <Github class="w-5 h-5 mr-2" data-testid="login-github-icon" />
+          {:else}
+            <LogIn class="w-4 h-4 mr-2" />
+          {/if}
           {t('auth.continueWith', { provider: $ssoStore.providerName || 'SSO' })}
         </Button>
       {:else}
@@ -307,8 +313,13 @@
               onclick={() => handleSSOLoginForProvider(provider)}
               disabled={$authStore.loading}
               dataTestid={`login-sso-${provider.slug}`}
+              class={provider.provider_type === 'github' ? 'github-login' : ''}
             >
-              <LogIn class="w-4 h-4 mr-2" />
+              {#if provider.provider_type === 'github'}
+                <Github class="w-5 h-5 mr-2" data-testid="login-github-icon" />
+              {:else}
+                <LogIn class="w-4 h-4 mr-2" />
+              {/if}
               {t('auth.continueWith', { provider: provider.name || 'SSO' })}
             </Button>
           {/each}
@@ -510,3 +521,15 @@
   </div>
 </div>
 {/if}
+
+<style>
+  :global(button.github-login) {
+    background-color: var(--ds-background-neutral-bold);
+    color: var(--ds-text-inverse);
+    border-color: var(--ds-background-neutral-bold);
+  }
+
+  :global(button.github-login:hover:not(:disabled)) {
+    background-color: var(--ds-background-neutral-bold-hovered);
+  }
+</style>
