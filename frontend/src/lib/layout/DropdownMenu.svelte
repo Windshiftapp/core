@@ -466,6 +466,9 @@
                 style="{itemData.badgeStyle || (itemData.badgeClass ? '' : 'color: var(--ds-text-subtlest);')}"
               >{itemData.badge}</span>
             {/if}
+            {#if itemData.shortcut}
+              <kbd class="menu-shortcut">{itemData.shortcut}</kbd>
+            {/if}
             {#if itemData.selected}
               <Check class="ml-3 w-4 h-4 flex-shrink-0" style="color: var(--ds-icon-brand);" />
             {/if}
@@ -487,6 +490,19 @@
 
   .menu-item:hover {
     background-color: var(--ds-surface-raised-hovered);
+  }
+
+  .menu-shortcut {
+    margin-left: 0.75rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    border: 1px solid var(--ds-border);
+    background-color: var(--ds-background-neutral);
+    color: var(--ds-text-subtle);
+    font-family: inherit;
+    font-size: 0.6875rem;
+    line-height: 1.25;
+    flex-shrink: 0;
   }
 
   /* A selected radio row keeps a subtle tint instead of the neutral hover so

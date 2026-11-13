@@ -33,7 +33,12 @@ func registerTimeRoutes(builder *routeBuilder, deps Deps) {
 	builder.Command(http.MethodDelete, "/time/projects/{project_id}/members/{assignment_id}", AuthAuthenticated, []string{"time:write"}, removeTimeProjectMember(projects))
 	builder.JSON(http.MethodPost, "/time/timers", http.StatusCreated, false, AuthAuthenticated, []string{"time:write"}, startTimer(deps.Timers))
 	builder.Read("/time/timers/active", AuthAuthenticated, []string{"time:read"}, getActiveTimer(deps.Timers))
-	builder.Action(http.MethodPost, "/time/timers/active/stop", http.StatusOK, AuthAuthenticated, []string{"time:write"}, stopTimer(deps.Timers))
+	builder.JSON(http.MethodPost, "/time/timers/active/stop", http.StatusOK, false, AuthAuthenticated, []string{"time:write"}, stopTimer(deps.Timers))
+	builder.Read("/time/worklog-drafts", AuthAuthenticated, []string{"time:read"}, listDrafts(deps.Timers))
+	builder.Read("/time/worklog-drafts/{draft_id}", AuthAuthenticated, []string{"time:read"}, getDraft(deps.Timers))
+	builder.JSON(http.MethodPatch, "/time/worklog-drafts/{draft_id}", http.StatusOK, true, AuthAuthenticated, []string{"time:write"}, updateDraft(deps.Timers))
+	builder.Command(http.MethodDelete, "/time/worklog-drafts/{draft_id}", AuthAuthenticated, []string{"time:write"}, deleteDraft(deps.Timers))
+	builder.JSON(http.MethodPost, "/time/worklog-drafts/{draft_id}/book", http.StatusOK, false, AuthAuthenticated, []string{"time:write"}, bookDraft(deps.Timers))
 }
 
 type timeProjectApplication interface {
@@ -58,9 +63,14 @@ type timeProjectApplication interface {
 }
 
 type timerApplication interface {
-	StartTimer(int, int, int, *int, string) (*models.ActiveTimer, error)
+	StartTimer(int, int, *int, *int, string) (*models.ActiveTimer, error)
 	GetActiveForUser(int) (*models.ActiveTimer, error)
-	StopActiveForUser(int) (*services.StopResult, error)
+	StopActiveTimer(int, *int) (*services.StopResult, error)
+	ListDrafts(int) ([]models.TimeWorklogDraft, error)
+	GetDraft(int, int) (*models.TimeWorklogDraft, error)
+	UpdateDraft(int, int, int, services.WorklogMutationInput) (*models.TimeWorklogDraft, error)
+	DeleteDraft(int, int) error
+	BookDraft(int, int, int, string, services.WorklogMutationInput) (*models.Worklog, error)
 }
 
 type timeProjectDTO struct {
@@ -164,7 +174,7 @@ type timePrincipalRequest struct {
 
 type startTimerRequest struct {
 	WorkspaceID int    `json:"workspace_id"`
-	ProjectID   int    `json:"project_id"`
+	ProjectID   *int   `json:"project_id"`
 	ItemID      *int   `json:"item_id"`
 	Description string `json:"description"`
 }
@@ -175,7 +185,9 @@ type stoppedTimerDTO struct {
 	Description     string `json:"description"`
 	DurationSeconds int64  `json:"duration_seconds"`
 	DurationMinutes int    `json:"duration_minutes"`
-	WorklogCreated  bool   `json:"worklog_created"`
+	Booked          bool   `json:"booked"`
+	WorklogID       *int   `json:"worklog_id"`
+	DraftID         *int   `json:"draft_id"`
 }
 
 func listTimeProjects(projects timeProjectApplication) readOperation[[]timeProjectDTO] {
@@ -514,22 +526,26 @@ func getActiveTimer(timers timerApplication) readOperation[*models.ActiveTimer] 
 	}
 }
 
-func stopTimer(timers timerApplication) actionOperation[stoppedTimerDTO] {
-	return func(r *http.Request) (stoppedTimerDTO, error) {
+func stopTimer(timers timerApplication) jsonOperation[stopTimerRequest, stoppedTimerDTO] {
+	return func(r *http.Request, input stopTimerRequest) (stoppedTimerDTO, error) {
 		user, err := principal(r)
 		if err != nil {
 			return stoppedTimerDTO{}, err
 		}
-		result, err := timers.StopActiveForUser(user.ID)
+		result, err := timers.StopActiveTimer(user.ID, input.TimerID)
 		if err != nil {
 			return stoppedTimerDTO{}, timerError(err)
 		}
 		return stoppedTimerDTO{
 			Stopped: true, TimerID: result.TimerID, Description: result.Description,
 			DurationSeconds: result.DurationSeconds, DurationMinutes: result.DurationMinutes,
-			WorklogCreated: result.WorklogCreated,
+			Booked: result.Booked, WorklogID: result.WorklogID, DraftID: result.DraftID,
 		}, nil
 	}
+}
+
+type stopTimerRequest struct {
+	TimerID *int `json:"timer_id"`
 }
 
 func timeProjectFromRepository(project repository.TimeProjectDetail) timeProjectDTO {

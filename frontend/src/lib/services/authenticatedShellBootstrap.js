@@ -2,6 +2,7 @@ import { collectionEditorOptions } from '../stores/collectionEditorOptions.svelt
 import { collectionFieldLinks } from '../stores/collectionFieldLinks.svelte.js';
 import { beginPermissionProfileGeneration } from '../stores/permissionProfile.js';
 import { referenceDisplayCache } from '../stores/referenceDisplayCache.svelte.js';
+import { timeLogStore } from '../stores/timeLogStore.svelte.js';
 
 export const AUTHENTICATED_SHELL_BOOTSTRAP_BUDGET_MS = 2500;
 
@@ -18,6 +19,7 @@ export function resetAuthenticatedShellState() {
   collectionEditorOptions.reset();
   collectionFieldLinks.reset();
   referenceDisplayCache.reset();
+  timeLogStore.reset();
 }
 
 /**

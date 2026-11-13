@@ -2,6 +2,8 @@
   import { onDestroy } from 'svelte';
   import { useEventListener } from 'runed';
   import { timerStore } from '../../stores/timerStore.svelte.js';
+  import { timeLogStore } from '../../stores/timeLogStore.svelte.js';
+  import { stopTimerAndReview } from './stopTimerAndReview.js';
   import Clock from '@lucide/svelte/icons/clock';
   import Square from '@lucide/svelte/icons/square';
   import Maximize2 from '@lucide/svelte/icons/maximize-2';
@@ -133,7 +135,7 @@
 
   async function handleStopTimer() {
     try {
-      await timerStore.stop();
+      await stopTimerAndReview(timerStore, timeLogStore);
     } catch (error) {
       console.error('Failed to stop timer:', error);
       // Error is already handled in the store

@@ -119,8 +119,9 @@ func RegisterRoutes(deps restapi.Deps) {
 	timeProjectHandler := handlers.NewTimeProjectHandler(handlers.NewBaseHandler(db, permissionService), timePermService)
 	timeWorklogHandler := handlers.NewTimeWorklogHandler(handlers.NewBaseHandler(db, permissionService), timePermService)
 	timerRepo := repository.NewActiveTimerRepository(db)
+	draftRepo := repository.NewTimeWorklogDraftRepository(db)
 	itemRepo := repository.NewItemRepository(db)
-	timerService := services.NewTimerService(timerRepo, itemRepo, timePermService, permissionService)
+	timerService := services.NewTimerService(timerRepo, draftRepo, itemRepo, services.NewTimeWorklogService(db), timePermService, permissionService)
 	activeTimerHandler := handlers.NewActiveTimerHandler(handlers.NewBaseHandler(db, permissionService), timerRepo, timerService)
 
 	// Public discovery routes (no bearer auth). Mounted on a sibling group

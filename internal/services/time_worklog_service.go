@@ -300,16 +300,66 @@ type preparedWorklog struct {
 	warnings        []string
 }
 
-func (s *TimeWorklogService) prepare(userID int, input WorklogMutationInput) (preparedWorklog, error) {
-	project, err := s.projects.GetBookingInfo(input.ProjectID)
-	if errors.Is(err, repository.ErrNotFound) {
-		return preparedWorklog{}, ErrWorklogProjectNotFound
-	}
+// PreparedWorklog is the normalized interval produced by worklog validation,
+// before persistence. It is exposed so the draft-book path reuses the exact
+// same validation and civil-time parsing as a direct worklog create.
+type PreparedWorklog struct {
+	Description     string
+	DateUnix        int64
+	StartUnix       int64
+	EndUnix         int64
+	DurationMinutes int
+	Timezone        string
+	Location        *time.Location
+	Warnings        []string
+}
+
+// Prepare validates a complete worklog mutation and returns its normalized
+// interval. It requires an active, bookable project.
+func (s *TimeWorklogService) Prepare(userID int, input WorklogMutationInput) (*PreparedWorklog, error) {
+	return s.prepareExported(userID, input, true, true)
+}
+
+// PrepareDraft validates a draft mutation. Project may be absent, an inactive
+// project does not block saving, and a preserved interval may round to zero
+// minutes (a sub-minute timer) because booking supplies the final duration.
+func (s *TimeWorklogService) PrepareDraft(userID int, input WorklogMutationInput) (*PreparedWorklog, error) {
+	return s.prepareExported(userID, input, false, false)
+}
+
+func (s *TimeWorklogService) prepareExported(userID int, input WorklogMutationInput, requireProject, requirePositiveDuration bool) (*PreparedWorklog, error) {
+	prepared, err := s.prepareWithProject(userID, input, requireProject, requirePositiveDuration)
 	if err != nil {
-		return preparedWorklog{}, err
+		return nil, err
 	}
-	if project.Status != "Active" {
-		return preparedWorklog{}, fmt.Errorf("%w: %s", ErrWorklogProjectInactive, project.Status)
+	return &PreparedWorklog{
+		Description:     prepared.description,
+		DateUnix:        WorklogDateUnix(prepared.date),
+		StartUnix:       prepared.startUnix,
+		EndUnix:         prepared.endUnix,
+		DurationMinutes: prepared.durationMinutes,
+		Timezone:        prepared.timezone,
+		Location:        prepared.location,
+		Warnings:        prepared.warnings,
+	}, nil
+}
+
+func (s *TimeWorklogService) prepare(userID int, input WorklogMutationInput) (preparedWorklog, error) {
+	return s.prepareWithProject(userID, input, true, true)
+}
+
+func (s *TimeWorklogService) prepareWithProject(userID int, input WorklogMutationInput, requireProject, requirePositiveDuration bool) (preparedWorklog, error) {
+	if requireProject {
+		project, err := s.projects.GetBookingInfo(input.ProjectID)
+		if errors.Is(err, repository.ErrNotFound) {
+			return preparedWorklog{}, ErrWorklogProjectNotFound
+		}
+		if err != nil {
+			return preparedWorklog{}, err
+		}
+		if project.Status != "Active" {
+			return preparedWorklog{}, fmt.Errorf("%w: %s", ErrWorklogProjectInactive, project.Status)
+		}
 	}
 
 	timezone := input.Timezone
@@ -317,10 +367,11 @@ func (s *TimeWorklogService) prepare(userID int, input WorklogMutationInput) (pr
 		timezone = input.UserTimezone
 	}
 	if timezone == "" {
-		timezone, err = LookupUserTimezone(s.db, userID)
+		resolved, err := LookupUserTimezone(s.db, userID)
 		if err != nil {
 			return preparedWorklog{}, err
 		}
+		timezone = resolved
 	}
 	resolvedTimezone, location, err := ResolveTimezone(timezone)
 	if err != nil {
@@ -334,10 +385,14 @@ func (s *TimeWorklogService) prepare(userID int, input WorklogMutationInput) (pr
 	startUnix := input.StoredStartUnix
 	endUnix := input.StoredEndUnix
 	if input.PreserveStored {
-		if _, err := ValidateWorklogDurationMinutes(durationMinutes); err != nil {
-			return preparedWorklog{}, worklogInputError{err}
+		if requirePositiveDuration {
+			if _, err := ValidateWorklogDurationMinutes(durationMinutes); err != nil {
+				return preparedWorklog{}, worklogInputError{err}
+			}
+		} else if durationMinutes < 0 {
+			return preparedWorklog{}, worklogInputError{fmt.Errorf("duration must not be negative")}
 		}
-		if startUnix <= 0 || endUnix <= startUnix {
+		if startUnix <= 0 || endUnix < startUnix || (requirePositiveDuration && endUnix == startUnix) {
 			return preparedWorklog{}, worklogInputError{fmt.Errorf("stored worklog interval is invalid")}
 		}
 	} else {

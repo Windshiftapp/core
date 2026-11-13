@@ -770,7 +770,8 @@ func (s *Server) initialize() error {
 	timeProjectHandler := handlers.NewTimeProjectHandler(s.db, timePermissionService, customerOrgPermissionService)
 	timeWorklogService := services.NewTimeWorklogService(s.db)
 	activeTimerRepo := repository.NewActiveTimerRepository(s.db)
-	timerService := services.NewTimerService(activeTimerRepo, repository.NewItemRepository(s.db), timePermissionService, permService)
+	draftRepo := repository.NewTimeWorklogDraftRepository(s.db)
+	timerService := services.NewTimerService(activeTimerRepo, draftRepo, repository.NewItemRepository(s.db), timeWorklogService, timePermissionService, permService)
 	customerOrgPermissionHandler := handlers.NewCustomerOrganisationPermissionHandler(logger.NewAuditor(s.db), customerOrgPermissionService)
 
 	itemLinkService := services.NewItemLinkService(s.db).
