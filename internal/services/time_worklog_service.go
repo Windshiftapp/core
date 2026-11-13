@@ -317,17 +317,18 @@ type PreparedWorklog struct {
 // Prepare validates a complete worklog mutation and returns its normalized
 // interval. It requires an active, bookable project.
 func (s *TimeWorklogService) Prepare(userID int, input WorklogMutationInput) (*PreparedWorklog, error) {
-	return s.prepareExported(userID, input, true)
+	return s.prepareExported(userID, input, true, true)
 }
 
-// PrepareDraft validates a draft mutation. Project may be absent, and an
-// inactive project does not block saving an incomplete entry.
+// PrepareDraft validates a draft mutation. Project may be absent, an inactive
+// project does not block saving, and a preserved interval may round to zero
+// minutes (a sub-minute timer) because booking supplies the final duration.
 func (s *TimeWorklogService) PrepareDraft(userID int, input WorklogMutationInput) (*PreparedWorklog, error) {
-	return s.prepareExported(userID, input, false)
+	return s.prepareExported(userID, input, false, false)
 }
 
-func (s *TimeWorklogService) prepareExported(userID int, input WorklogMutationInput, requireProject bool) (*PreparedWorklog, error) {
-	prepared, err := s.prepareWithProject(userID, input, requireProject)
+func (s *TimeWorklogService) prepareExported(userID int, input WorklogMutationInput, requireProject, requirePositiveDuration bool) (*PreparedWorklog, error) {
+	prepared, err := s.prepareWithProject(userID, input, requireProject, requirePositiveDuration)
 	if err != nil {
 		return nil, err
 	}
@@ -344,10 +345,10 @@ func (s *TimeWorklogService) prepareExported(userID int, input WorklogMutationIn
 }
 
 func (s *TimeWorklogService) prepare(userID int, input WorklogMutationInput) (preparedWorklog, error) {
-	return s.prepareWithProject(userID, input, true)
+	return s.prepareWithProject(userID, input, true, true)
 }
 
-func (s *TimeWorklogService) prepareWithProject(userID int, input WorklogMutationInput, requireProject bool) (preparedWorklog, error) {
+func (s *TimeWorklogService) prepareWithProject(userID int, input WorklogMutationInput, requireProject, requirePositiveDuration bool) (preparedWorklog, error) {
 	if requireProject {
 		project, err := s.projects.GetBookingInfo(input.ProjectID)
 		if errors.Is(err, repository.ErrNotFound) {
@@ -384,8 +385,12 @@ func (s *TimeWorklogService) prepareWithProject(userID int, input WorklogMutatio
 	startUnix := input.StoredStartUnix
 	endUnix := input.StoredEndUnix
 	if input.PreserveStored {
-		if _, err := ValidateWorklogDurationMinutes(durationMinutes); err != nil {
-			return preparedWorklog{}, worklogInputError{err}
+		if requirePositiveDuration {
+			if _, err := ValidateWorklogDurationMinutes(durationMinutes); err != nil {
+				return preparedWorklog{}, worklogInputError{err}
+			}
+		} else if durationMinutes < 0 {
+			return preparedWorklog{}, worklogInputError{fmt.Errorf("duration must not be negative")}
 		}
 		if startUnix <= 0 || endUnix <= startUnix {
 			return preparedWorklog{}, worklogInputError{fmt.Errorf("stored worklog interval is invalid")}

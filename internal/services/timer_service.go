@@ -620,6 +620,18 @@ func (s *TimerService) BookDraft(userID, id, expectedVersion int, idempotencyKey
 	if err != nil {
 		return nil, err
 	}
+	// Prepare validates project status; booking additionally requires the
+	// caller's booking permission on the project. Without this a nonmember
+	// could book a draft into a project they cannot post a worklog to.
+	if s.timePerm != nil {
+		canBook, err := s.timePerm.CanBookTimeOnProject(userID, input.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		if !canBook {
+			return nil, ErrTimerForbidden
+		}
+	}
 	worklogID, err := s.draftRepo.BookDraft(id, userID, expectedVersion, repository.CreateWorklogInput{
 		ProjectID:       input.ProjectID,
 		UserID:          userID,

@@ -3,6 +3,7 @@ package v2
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"windshift/internal/models"
 	"windshift/internal/services"
@@ -34,10 +35,22 @@ type draftDTO struct {
 	WorkspaceName      string `json:"workspace_name"`
 }
 
-// draftWriteRequest carries the completion form for a draft. It is used for
-// both PATCH (save progress) and book (finalize). version is the optimistic
-// concurrency token returned by the draft DTO.
-type draftWriteRequest struct {
+// draftPatchRequest is a merge patch: omitted fields keep their stored value.
+type draftPatchRequest struct {
+	Version         int              `json:"version"`
+	ProjectID       Optional[int]    `json:"project_id"`
+	ItemID          Optional[int]    `json:"item_id"`
+	Description     Optional[string] `json:"description"`
+	Date            Optional[string] `json:"date"`
+	Duration        Optional[string] `json:"duration"`
+	DurationMinutes Optional[int]    `json:"duration_minutes"`
+	StartTime       Optional[string] `json:"start_time"`
+	EndTime         Optional[string] `json:"end_time"`
+	Timezone        Optional[string] `json:"timezone"`
+}
+
+// draftBookRequest carries the completion form for booking a draft.
+type draftBookRequest struct {
 	Version         int    `json:"version"`
 	ProjectID       *int   `json:"project_id"`
 	ItemID          *int   `json:"item_id"`
@@ -83,8 +96,8 @@ func getDraft(timers timerApplication) readOperation[draftDTO] {
 	}
 }
 
-func updateDraft(timers timerApplication) jsonOperation[draftWriteRequest, draftDTO] {
-	return func(r *http.Request, input draftWriteRequest) (draftDTO, error) {
+func updateDraft(timers timerApplication) jsonOperation[draftPatchRequest, draftDTO] {
+	return func(r *http.Request, patch draftPatchRequest) (draftDTO, error) {
 		user, err := principal(r)
 		if err != nil {
 			return draftDTO{}, err
@@ -93,7 +106,12 @@ func updateDraft(timers timerApplication) jsonOperation[draftWriteRequest, draft
 		if err != nil {
 			return draftDTO{}, err
 		}
-		draft, err := timers.UpdateDraft(user.ID, id, input.Version, draftMutationInput(input, user.Timezone))
+		current, err := timers.GetDraft(user.ID, id)
+		if err != nil {
+			return draftDTO{}, draftError(err)
+		}
+		input := mergeDraftPatch(current, patch, user.Timezone)
+		draft, err := timers.UpdateDraft(user.ID, id, patch.Version, input)
 		if err != nil {
 			return draftDTO{}, draftError(err)
 		}
@@ -115,8 +133,8 @@ func deleteDraft(timers timerApplication) commandOperation {
 	}
 }
 
-func bookDraft(timers timerApplication) jsonOperation[draftWriteRequest, worklogDTO] {
-	return func(r *http.Request, input draftWriteRequest) (worklogDTO, error) {
+func bookDraft(timers timerApplication) jsonOperation[draftBookRequest, worklogDTO] {
+	return func(r *http.Request, input draftBookRequest) (worklogDTO, error) {
 		user, err := principal(r)
 		if err != nil {
 			return worklogDTO{}, err
@@ -125,7 +143,7 @@ func bookDraft(timers timerApplication) jsonOperation[draftWriteRequest, worklog
 		if err != nil {
 			return worklogDTO{}, err
 		}
-		worklog, err := timers.BookDraft(user.ID, id, input.Version, input.IdempotencyKey, draftMutationInput(input, user.Timezone))
+		worklog, err := timers.BookDraft(user.ID, id, input.Version, input.IdempotencyKey, draftBookInput(input, user.Timezone))
 		if err != nil {
 			return worklogDTO{}, draftError(err)
 		}
@@ -133,7 +151,7 @@ func bookDraft(timers timerApplication) jsonOperation[draftWriteRequest, worklog
 	}
 }
 
-func draftMutationInput(input draftWriteRequest, userTimezone string) services.WorklogMutationInput {
+func draftBookInput(input draftBookRequest, userTimezone string) services.WorklogMutationInput {
 	projectID := 0
 	if input.ProjectID != nil {
 		projectID = *input.ProjectID
@@ -144,6 +162,74 @@ func draftMutationInput(input draftWriteRequest, userTimezone string) services.W
 		StartTime: input.StartTime, EndTime: input.EndTime, Timezone: input.Timezone,
 		UserTimezone: userTimezone,
 	}
+}
+
+// mergeDraftPatch overlays the supplied patch fields on the stored draft so an
+// omitted field keeps its value. It mirrors the worklog PATCH merge: a supplied
+// duration restarts the interval from the date, a supplied clock or date
+// reconstructs it, and an untouched interval is preserved exactly.
+func mergeDraftPatch(current *models.TimeWorklogDraft, patch draftPatchRequest, userTimezone string) services.WorklogMutationInput {
+	input := services.WorklogMutationInput{
+		ItemID:       current.ItemID,
+		Description:  current.Description,
+		UserTimezone: userTimezone,
+	}
+	if current.ProjectID != nil {
+		input.ProjectID = *current.ProjectID
+	}
+	if current.Date != nil {
+		input.Date = time.Unix(*current.Date, 0).UTC().Format("2006-01-02")
+	}
+	if current.StartTime != nil {
+		input.StoredStartUnix = *current.StartTime
+	}
+	if current.EndTime != nil {
+		input.StoredEndUnix = *current.EndTime
+	}
+	if current.DurationMins != nil {
+		input.DurationMinutes = *current.DurationMins
+	}
+
+	if patch.ProjectID.Set {
+		input.ProjectID = patch.ProjectID.Value
+	}
+	if patch.ItemID.Set {
+		input.ItemID = optionalNullableValue(patch.ItemID)
+	}
+	if patch.Description.Set {
+		input.Description = patch.Description.Value
+	}
+	if patch.Date.Set {
+		input.Date = patch.Date.Value
+	}
+	if patch.Timezone.Set {
+		input.Timezone = patch.Timezone.Value
+	}
+	if patch.StartTime.Set {
+		input.StartTime = patch.StartTime.Value
+	}
+	if patch.EndTime.Set {
+		input.EndTime = patch.EndTime.Value
+	}
+	switch {
+	case patch.Duration.Set || patch.DurationMinutes.Set:
+		// A duration-only edit restarts from local midnight on the entry date.
+		if !patch.StartTime.Set && !patch.EndTime.Set {
+			input.StoredStartUnix = 0
+			input.StoredEndUnix = 0
+		}
+		input.DurationMinutes = 0
+		if patch.Duration.Set {
+			input.Duration = patch.Duration.Value
+		} else {
+			input.DurationMinutes = patch.DurationMinutes.Value
+		}
+	case patch.Date.Set || patch.StartTime.Set || patch.EndTime.Set:
+		input.DurationMinutes = 0
+	default:
+		input.PreserveStored = true
+	}
+	return input
 }
 
 func mapDrafts(drafts []models.TimeWorklogDraft) []draftDTO {
@@ -175,7 +261,8 @@ func draftError(err error) error {
 		return newError(http.StatusNotFound, "not_found", "Draft was not found")
 	case errors.Is(err, services.ErrTimerDraftConflict):
 		return newError(http.StatusConflict, "conflict", "Draft was modified; reload and try again")
-	case errors.Is(err, services.ErrWorklogProjectNotFound):
+	case errors.Is(err, services.ErrTimerForbidden),
+		errors.Is(err, services.ErrWorklogProjectNotFound):
 		return newError(http.StatusNotFound, "not_found", "Time project was not found")
 	case errors.Is(err, services.ErrWorklogProjectInactive),
 		errors.Is(err, services.ErrWorklogInvalidInput):

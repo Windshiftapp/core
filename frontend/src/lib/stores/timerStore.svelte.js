@@ -152,7 +152,10 @@ class TimerStore {
       this.error = null;
       this.#stateVersion += 1;
 
-      const result = await timerApi.stop();
+      // Identify the timer being stopped so a stale tab cannot end a newer
+      // timer started elsewhere; the server replays the original result on a
+      // retry for the same timer.
+      const result = await timerApi.stop(this.activeTimer?.id ?? null);
 
       // Clear active timer
       this.#stateVersion += 1;

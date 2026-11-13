@@ -34,6 +34,9 @@ class TimeLogStore {
   revision = $state(0);
 
   #pickerPromise = null;
+  // Incremented on identity reset so an in-flight request from a previous
+  // account cannot repopulate the picker or draft list.
+  #generation = 0;
 
   get draftCount() {
     return this.drafts.length;
@@ -41,6 +44,7 @@ class TimeLogStore {
 
   async #loadPickerData() {
     if (this.#pickerPromise) return this.#pickerPromise;
+    const generation = this.#generation;
     const fallback = (promise, label) =>
       promise.catch((err) => {
         surfaceError(err, { context: `loadTimeLogPicker:${label}`, silent: true });
@@ -52,6 +56,7 @@ class TimeLogStore {
       fallback(items.getAll({ limit: 100 }), 'work items'),
       fallback(workspacesStore.load(), 'workspaces'),
     ]).then(([projects, customers, workItems, workspaces]) => {
+      if (generation !== this.#generation) return;
       this.projects = projects || [];
       this.customers = customers || [];
       this.workItems = workItems?.data ?? [];
@@ -97,11 +102,31 @@ class TimeLogStore {
     this.#pickerPromise = null;
   }
 
+  /** Clear identity-scoped state on logout or account change. */
+  reset() {
+    this.#generation += 1;
+    this.#pickerPromise = null;
+    this.show = false;
+    this.editingWorklog = null;
+    this.editingDraft = null;
+    this.prefill = {};
+    this.projects = [];
+    this.customers = [];
+    this.workItems = [];
+    this.workspaces = [];
+    this.drafts = [];
+    this.draftsLoaded = false;
+  }
+
   async refreshDrafts() {
+    const generation = this.#generation;
     try {
-      this.drafts = (await time.worklogDrafts.getAll()) || [];
+      const drafts = (await time.worklogDrafts.getAll()) || [];
+      if (generation !== this.#generation) return;
+      this.drafts = drafts;
       this.draftsLoaded = true;
     } catch (err) {
+      if (generation !== this.#generation) return;
       surfaceError(err, { context: 'refreshTimeLogDrafts', silent: true });
       this.drafts = [];
       this.draftsLoaded = true;

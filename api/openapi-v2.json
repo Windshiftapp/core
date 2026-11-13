@@ -59773,26 +59773,27 @@
         "properties": {
           "date": {
             "description": "The date value.",
+            "nullable": true,
             "type": "string"
           },
           "description": {
             "description": "The description value.",
+            "nullable": true,
             "type": "string"
           },
           "duration": {
             "description": "The duration value.",
+            "nullable": true,
             "type": "string"
           },
           "duration_minutes": {
             "description": "The duration minutes value.",
+            "nullable": true,
             "type": "integer"
           },
           "end_time": {
             "description": "The end time value.",
-            "type": "string"
-          },
-          "idempotency_key": {
-            "description": "The idempotency key value.",
+            "nullable": true,
             "type": "string"
           },
           "item_id": {
@@ -59807,10 +59808,12 @@
           },
           "start_time": {
             "description": "The start time value.",
+            "nullable": true,
             "type": "string"
           },
           "timezone": {
             "description": "The timezone value.",
+            "nullable": true,
             "type": "string"
           },
           "version": {
@@ -59819,14 +59822,6 @@
           }
         },
         "required": [
-          "date",
-          "description",
-          "duration",
-          "duration_minutes",
-          "end_time",
-          "idempotency_key",
-          "start_time",
-          "timezone",
           "version"
         ],
         "type": "object"
