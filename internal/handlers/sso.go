@@ -62,6 +62,8 @@ type SSOHandler struct {
 	providerStore            *sso.ProviderStore
 	userStore                *sso.UserStore
 	oidcService              *sso.OIDCService
+	githubService            githubAuthenticator
+	customerAccess           *CustomerAccessHandler
 	encryption               *sso.SecretEncryption
 	baseURL                  string             // Base URL of the application (e.g., https://app.example.com)
 	allowedHosts             []string           // Allowed hosts for redirect URI validation (from --allowed-hosts)
@@ -88,19 +90,22 @@ type SSOStatusResponse struct {
 
 // SSOProviderResponse represents a provider for API responses (without secrets)
 type SSOProviderResponse struct {
-	ID                   int    `json:"id"`
-	Slug                 string `json:"slug"`
-	Name                 string `json:"name"`
-	ProviderType         string `json:"provider_type"`
-	Enabled              bool   `json:"enabled"`
-	IsDefault            bool   `json:"is_default"`
-	IssuerURL            string `json:"issuer_url,omitempty"`
-	ClientID             string `json:"client_id,omitempty"`
-	HasClientSecret      bool   `json:"has_client_secret"`
-	Scopes               string `json:"scopes"`
-	AutoProvisionUsers   bool   `json:"auto_provision_users"`
-	RequireVerifiedEmail bool   `json:"require_verified_email"` // Provider is authoritative for email; skips Windshift email verification.
-	AttributeMapping     string `json:"attribute_mapping"`
+	ID                     int    `json:"id"`
+	Slug                   string `json:"slug"`
+	Name                   string `json:"name"`
+	ProviderType           string `json:"provider_type"`
+	Enabled                bool   `json:"enabled"`
+	IsDefault              bool   `json:"is_default"`
+	IssuerURL              string `json:"issuer_url,omitempty"`
+	ClientID               string `json:"client_id,omitempty"`
+	HasClientSecret        bool   `json:"has_client_secret"`
+	Scopes                 string `json:"scopes"`
+	AutoProvisionUsers     bool   `json:"auto_provision_users"`
+	RequireVerifiedEmail   bool   `json:"require_verified_email"` // Provider is authoritative for email; skips Windshift email verification.
+	AttributeMapping       string `json:"attribute_mapping"`
+	GitHubOrganization     string `json:"github_organization,omitempty"`
+	AccountType            string `json:"account_type"`
+	CustomerOrganisationID *int   `json:"customer_organisation_id,omitempty"`
 	// SAML-specific fields
 	SAMLIdPMetadataURL string    `json:"saml_idp_metadata_url,omitempty"`
 	SAMLIdPSSOURL      string    `json:"saml_idp_sso_url,omitempty"`
@@ -116,18 +121,21 @@ type SSOProviderResponse struct {
 // stored value alone) from an explicit false (clear it). Create treats nil as
 // the field's default.
 type SSOProviderRequest struct {
-	Slug                 string `json:"slug"`
-	Name                 string `json:"name"`
-	ProviderType         string `json:"provider_type"`
-	Enabled              *bool  `json:"enabled,omitempty"`
-	IsDefault            *bool  `json:"is_default,omitempty"`
-	IssuerURL            string `json:"issuer_url"`
-	ClientID             string `json:"client_id"`
-	ClientSecret         string `json:"client_secret,omitempty"`
-	Scopes               string `json:"scopes"`
-	AutoProvisionUsers   *bool  `json:"auto_provision_users,omitempty"`
-	RequireVerifiedEmail *bool  `json:"require_verified_email"` // Pointer distinguishes false from an omitted trust setting.
-	AttributeMapping     string `json:"attribute_mapping"`
+	Slug                   string  `json:"slug"`
+	Name                   string  `json:"name"`
+	ProviderType           string  `json:"provider_type"`
+	Enabled                *bool   `json:"enabled,omitempty"`
+	IsDefault              *bool   `json:"is_default,omitempty"`
+	IssuerURL              string  `json:"issuer_url"`
+	ClientID               string  `json:"client_id"`
+	ClientSecret           string  `json:"client_secret,omitempty"`
+	Scopes                 string  `json:"scopes"`
+	AutoProvisionUsers     *bool   `json:"auto_provision_users,omitempty"`
+	RequireVerifiedEmail   *bool   `json:"require_verified_email"` // Pointer distinguishes false from an omitted trust setting.
+	AttributeMapping       string  `json:"attribute_mapping"`
+	GitHubOrganization     *string `json:"github_organization,omitempty"`
+	AccountType            string  `json:"account_type,omitempty"`
+	CustomerOrganisationID *int    `json:"customer_organisation_id,omitempty"`
 	// SAML-specific fields
 	SAMLIdPMetadataURL string `json:"saml_idp_metadata_url,omitempty"`
 	SAMLIdPSSOURL      string `json:"saml_idp_sso_url,omitempty"`
@@ -226,6 +234,7 @@ func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, pe
 		providerStore:            sso.NewProviderStore(db),
 		userStore:                sso.NewUserStore(db),
 		oidcService:              sso.NewOIDCService(cookieKey),
+		githubService:            sso.NewGitHubService(),
 		encryption:               sso.NewSecretEncryption(serverSecret),
 		baseURL:                  baseURL,
 		allowedHosts:             allowedHosts,
@@ -251,6 +260,17 @@ func (h *SSOHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	internalProviders := providers[:0]
+	for _, p := range providers {
+		if p.AccountType != "customer" {
+			internalProviders = append(internalProviders, p)
+		}
+	}
+	providers = internalProviders
+	if len(providers) == 0 {
+		respondJSONOK(w, SSOStatusResponse{Enabled: false})
+		return
+	}
 	// Build providers list for the response
 	providerInfos := make([]SSOStatusProviderInfo, len(providers))
 	for i, p := range providers {
@@ -287,6 +307,10 @@ func (h *SSOHandler) StartLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if provider.ProviderType == sso.ProviderTypeGitHub {
+		h.startGitHubLogin(w, r, provider)
+		return
+	}
 	if provider.ProviderType != sso.ProviderTypeOIDC {
 		respondBadRequest(w, r, "Provider type not supported")
 		return
@@ -365,6 +389,11 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	if !provider.Enabled {
 		h.redirectWithError(w, r, "SSO provider is disabled")
+		return
+	}
+
+	if provider.ProviderType == sso.ProviderTypeGitHub {
+		h.githubCallback(w, r, provider)
 		return
 	}
 
@@ -484,91 +513,68 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Find or create user
-		result, err := h.userStore.FindOrCreateUser(provider, claims)
-		if err != nil {
-			slog.Error("failed to find/create user", slog.String("component", "sso"), slog.Any("error", err))
-			switch {
-			case err == sso.ErrAutoProvisionDisabled:
-				h.redirectWithError(w, r, "User account not found. Contact your administrator.")
-			case errors.Is(err, sso.ErrAccountLinkingRequiresVerification):
-				h.redirectWithError(w, r, "Cannot link to existing account: your identity provider must verify your email address first")
-			default:
-				h.redirectWithError(w, r, "Failed to process user account")
-			}
-			return
-		}
-
-		user := result.User
-
-		// SSO authentication is itself evidence of account ownership: keep the
-		// verification column aligned so informational UI reflects the login.
-		if !user.EmailVerified && h.emailVerificationService != nil {
-			if err := h.emailVerificationService.SetEmailVerified(user.ID, true); err != nil {
-				slog.Warn("failed to mark SSO user email verified", slog.String("component", "sso"), slog.Int("user_id", user.ID), slog.Any("error", err))
-			} else {
-				user.EmailVerified = true
-			}
-		}
-
-		// Check if user is active
-		if !user.IsActive {
-			h.redirectWithError(w, r, "Account is disabled")
-			return
-		}
-
-		// Get client IP for session
-		ipAddress := h.ipExtractor.GetClientIP(r)
-
-		// Create session
-		slog.Info("creating OIDC session",
-			slog.String("component", "sso"),
-			slog.String("provider", provider.Slug),
-			slog.Int("user_id", user.ID),
-			slog.Bool("remember_me", rememberMe),
-		)
-		session, err := h.sessionManager.CreateSession(user.ID, ipAddress, r.UserAgent(), rememberMe)
-		if err != nil {
-			slog.Error("failed to create session", slog.String("component", "sso"), slog.Any("error", err))
-			h.redirectWithError(w, r, "Failed to create session")
-			return
-		}
-		slog.Debug("session created", slog.String("component", "sso"))
-
-		// Native clients can't receive an HttpOnly cookie through a custom-scheme
-		// redirect, so hand back a short-lived one-time code instead and let the
-		// app redeem it for the encoded session cookie at /api/auth/native/exchange
-		// (mirrors the ws-init browser→CLI handoff). No session token ever rides in
-		// the URL — only the opaque code.
-		if nativeFlow {
-			code, codeErr := h.issueNativeAuthCode(session.Token, session.ExpiresAt)
-			if codeErr != nil {
-				slog.Error("failed to issue native auth code", slog.String("component", "sso"), slog.Any("error", codeErr))
-				h.redirectWithError(w, r, "Failed to complete sign-in")
-				return
-			}
-			target := nativeRedirectURI + "?code=" + url.QueryEscape(code)
-			slog.Debug("redirecting to native callback", slog.String("component", "sso"))
-			http.Redirect(w, r, target, http.StatusFound) // #nosec G710 -- fixed custom-scheme target; code is opaque + single-use
-			return
-		}
-
-		// Set a browser session cookie and redirect only to a validated relative
-		// path. Do not return session tokens in redirect fragments; the v1 REST API
-		// accepts only scoped crw_* API tokens, not web session tokens.
-		slog.Debug("setting session cookie", slog.String("component", "sso"))
-		if err := h.sessionManager.SetSessionCookie(w, r, session.Token, rememberMe); err != nil {
-			slog.Error("failed to set session cookie", slog.String("component", "sso"), slog.Any("error", err))
-			h.redirectWithError(w, r, "Failed to set session")
-			return
-		}
-		slog.Debug("session cookie set, redirecting", slog.String("component", "sso"))
-
-		// storedRedirectURI is validated above by isValidRedirectURI (relative path only).
-		http.Redirect(w, r, storedRedirectURI, http.StatusFound) // #nosec G710
+		h.completeSSOLogin(w, r, provider, claims, storedRedirectURI, rememberMe)
 	})
 
 	callbackHandler(w, r)
+}
+
+// completeSSOLogin shares account resolution and session handling across OAuth providers.
+func (h *SSOHandler) completeSSOLogin(w http.ResponseWriter, r *http.Request, provider *sso.SSOProvider, claims *sso.OIDCClaims, redirectURI string, rememberMe bool) {
+	if provider.AccountType == "customer" {
+		respondForbidden(w, r)
+		return
+	}
+	loginLogger := slog.With("component", "sso", "provider", provider.Slug)
+	result, err := h.userStore.FindOrCreateUser(provider, claims)
+	if err != nil {
+		loginLogger.Error("failed to find/create SSO user", "error", err)
+		switch {
+		case errors.Is(err, sso.ErrAutoProvisionDisabled):
+			h.redirectWithError(w, r, "User account not found. Contact your administrator.")
+		case errors.Is(err, sso.ErrAccountLinkingRequiresVerification):
+			h.redirectWithError(w, r, "Cannot link to existing account: your identity provider must verify your email address first")
+		default:
+			h.redirectWithError(w, r, "Failed to process user account")
+		}
+		return
+	}
+	user := result.User
+	if !user.IsActive {
+		h.redirectWithError(w, r, "Account is disabled")
+		return
+	}
+	if !user.EmailVerified && h.emailVerificationService != nil {
+		if err := h.emailVerificationService.SetEmailVerified(user.ID, true); err != nil {
+			loginLogger.Warn("failed to mark SSO user email verified", "user_id", user.ID, "error", err)
+		}
+	}
+	loginLogger.Info("creating SSO session", "user_id", user.ID, "remember_me", rememberMe)
+	session, err := h.sessionManager.CreateSession(user.ID, h.ipExtractor.GetClientIP(r), r.UserAgent(), rememberMe)
+	if err != nil {
+		loginLogger.Error("failed to create SSO session", "error", err)
+		h.redirectWithError(w, r, "Failed to create session")
+		return
+	}
+	if isValidNativeRedirectURI(redirectURI) {
+		code, err := h.issueNativeAuthCode(session.Token, session.ExpiresAt)
+		if err != nil {
+			loginLogger.Error("failed to issue native auth code", "error", err)
+			h.redirectWithError(w, r, "Failed to complete sign-in")
+			return
+		}
+		http.Redirect(w, r, nativeRedirectURI+"?code="+url.QueryEscape(code), http.StatusFound) // #nosec G710 -- fixed scheme and opaque code
+		return
+	}
+	if !isValidRedirectURI(redirectURI) {
+		redirectURI = "/"
+	}
+	if err := h.sessionManager.SetSessionCookie(w, r, session.Token, rememberMe); err != nil {
+		loginLogger.Error("failed to set SSO session cookie", "error", err)
+		h.redirectWithError(w, r, "Failed to set session")
+		return
+	}
+	http.Redirect(w, r, redirectURI, http.StatusFound) // #nosec G710 -- validated relative path
 }
 
 // nativeAuthCodeTTL bounds how long a native-client one-time code can sit
@@ -702,14 +708,28 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 	if req.ProviderType == "" {
 		req.ProviderType = sso.ProviderTypeOIDC
 	}
-	if req.ProviderType != sso.ProviderTypeOIDC && req.ProviderType != sso.ProviderTypeSAML {
-		respondValidationError(w, r, "Provider type must be 'oidc' or 'saml'")
+	if req.ProviderType != sso.ProviderTypeOIDC && req.ProviderType != sso.ProviderTypeSAML && req.ProviderType != sso.ProviderTypeGitHub {
+		respondValidationError(w, r, "Provider type must be 'oidc', 'saml', or 'github'")
+		return
+	}
+	if !validateGitHubProviderRequest(w, r, &req) {
+		return
+	}
+	if req.AccountType == "" {
+		req.AccountType = "internal"
+	}
+	if !h.validateCustomerProvider(w, r, &req) {
 		return
 	}
 
 	// Validate type-specific fields
 	var encryptedSecret string
 	switch req.ProviderType {
+	case sso.ProviderTypeGitHub:
+		if req.ClientID == "" || req.ClientSecret == "" {
+			respondValidationError(w, r, "Client ID and client secret are required for GitHub providers")
+			return
+		}
 	case sso.ProviderTypeOIDC:
 		if req.IssuerURL == "" {
 			respondValidationError(w, r, "Issuer URL is required for OIDC providers")
@@ -777,25 +797,31 @@ func (h *SSOHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
 	if req.RequireVerifiedEmail != nil {
 		trustProviderEmail = *req.RequireVerifiedEmail
 	}
+	if req.ProviderType == sso.ProviderTypeGitHub {
+		trustProviderEmail = false
+	}
 
 	provider := &sso.SSOProvider{
-		Slug:                  req.Slug,
-		Name:                  req.Name,
-		ProviderType:          req.ProviderType,
-		Enabled:               boolValue(req.Enabled),
-		IsDefault:             isDefault,
-		IssuerURL:             req.IssuerURL,
-		ClientID:              req.ClientID,
-		ClientSecretEncrypted: encryptedSecret,
-		Scopes:                req.Scopes,
-		AutoProvisionUsers:    boolValue(req.AutoProvisionUsers),
-		RequireVerifiedEmail:  trustProviderEmail,
-		AttributeMapping:      req.AttributeMapping,
-		SAMLIdPMetadataURL:    req.SAMLIdPMetadataURL,
-		SAMLIdPSSOURL:         req.SAMLIdPSSOURL,
-		SAMLIdPCertificate:    req.SAMLIdPCertificate,
-		SAMLSPEntityID:        req.SAMLSPEntityID,
-		SAMLSignRequests:      boolValue(req.SAMLSignRequests),
+		Slug:                   req.Slug,
+		Name:                   req.Name,
+		ProviderType:           req.ProviderType,
+		Enabled:                boolValue(req.Enabled),
+		IsDefault:              isDefault,
+		IssuerURL:              req.IssuerURL,
+		ClientID:               req.ClientID,
+		ClientSecretEncrypted:  encryptedSecret,
+		Scopes:                 req.Scopes,
+		AutoProvisionUsers:     boolValue(req.AutoProvisionUsers),
+		RequireVerifiedEmail:   trustProviderEmail,
+		AttributeMapping:       req.AttributeMapping,
+		GitHubOrganization:     githubOrganizationValue(req.GitHubOrganization),
+		AccountType:            req.AccountType,
+		CustomerOrganisationID: req.CustomerOrganisationID,
+		SAMLIdPMetadataURL:     req.SAMLIdPMetadataURL,
+		SAMLIdPSSOURL:          req.SAMLIdPSSOURL,
+		SAMLIdPCertificate:     req.SAMLIdPCertificate,
+		SAMLSPEntityID:         req.SAMLSPEntityID,
+		SAMLSignRequests:       boolValue(req.SAMLSignRequests),
 	}
 
 	if err := h.providerStore.Create(provider); err != nil {
@@ -859,6 +885,21 @@ func (h *SSOHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update fields
+	if (req.AccountType != "" && req.AccountType != existing.AccountType) || (req.CustomerOrganisationID != nil && (existing.CustomerOrganisationID == nil || *req.CustomerOrganisationID != *existing.CustomerOrganisationID)) {
+		respondValidationError(w, r, "Account type and customer organisation cannot be changed; create a new provider")
+		return
+	}
+	if req.ProviderType != "" && req.ProviderType != existing.ProviderType {
+		respondValidationError(w, r, "Provider type cannot be changed")
+		return
+	}
+	req.ProviderType = existing.ProviderType
+	if !validateGitHubProviderRequest(w, r, &req) {
+		return
+	}
+	if req.GitHubOrganization != nil {
+		existing.GitHubOrganization = *req.GitHubOrganization
+	}
 	if req.Slug != "" {
 		existing.Slug = req.Slug
 	}
@@ -894,6 +935,12 @@ func (h *SSOHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.AttributeMapping != "" {
 		existing.AttributeMapping = req.AttributeMapping
+	}
+	if existing.ProviderType == sso.ProviderTypeGitHub {
+		existing.RequireVerifiedEmail = false
+		existing.IssuerURL = ""
+		existing.AttributeMapping = "{}"
+		existing.Scopes = strings.Join(sso.GitHubScopes(existing.GitHubOrganization), " ")
 	}
 	// Update SAML-specific fields
 	if req.SAMLIdPMetadataURL != "" {
@@ -1011,6 +1058,11 @@ func (h *SSOHandler) TestProvider(w http.ResponseWriter, r *http.Request) {
 		} else {
 			respondInternalError(w, r, err)
 		}
+		return
+	}
+
+	if provider.ProviderType == sso.ProviderTypeGitHub {
+		respondBadRequest(w, r, "GitHub credentials must be verified through a browser sign-in")
 		return
 	}
 
@@ -1202,26 +1254,29 @@ func (h *SSOHandler) redirectWithError(w http.ResponseWriter, r *http.Request, m
 
 func (h *SSOHandler) providerToResponse(p *sso.SSOProvider) *SSOProviderResponse {
 	return &SSOProviderResponse{
-		ID:                   p.ID,
-		Slug:                 p.Slug,
-		Name:                 p.Name,
-		ProviderType:         p.ProviderType,
-		Enabled:              p.Enabled,
-		IsDefault:            p.IsDefault,
-		IssuerURL:            p.IssuerURL,
-		ClientID:             p.ClientID,
-		HasClientSecret:      p.ClientSecretEncrypted != "",
-		Scopes:               p.Scopes,
-		AutoProvisionUsers:   p.AutoProvisionUsers,
-		RequireVerifiedEmail: p.RequireVerifiedEmail,
-		AttributeMapping:     p.AttributeMapping,
-		SAMLIdPMetadataURL:   p.SAMLIdPMetadataURL,
-		SAMLIdPSSOURL:        p.SAMLIdPSSOURL,
-		HasSAMLIdPCert:       p.SAMLIdPCertificate != "",
-		SAMLSPEntityID:       p.SAMLSPEntityID,
-		SAMLSignRequests:     p.SAMLSignRequests,
-		CreatedAt:            p.CreatedAt,
-		UpdatedAt:            p.UpdatedAt,
+		ID:                     p.ID,
+		Slug:                   p.Slug,
+		Name:                   p.Name,
+		ProviderType:           p.ProviderType,
+		Enabled:                p.Enabled,
+		IsDefault:              p.IsDefault,
+		IssuerURL:              p.IssuerURL,
+		ClientID:               p.ClientID,
+		HasClientSecret:        p.ClientSecretEncrypted != "",
+		Scopes:                 p.Scopes,
+		AutoProvisionUsers:     p.AutoProvisionUsers,
+		RequireVerifiedEmail:   p.RequireVerifiedEmail,
+		AttributeMapping:       p.AttributeMapping,
+		GitHubOrganization:     p.GitHubOrganization,
+		AccountType:            p.AccountType,
+		CustomerOrganisationID: p.CustomerOrganisationID,
+		SAMLIdPMetadataURL:     p.SAMLIdPMetadataURL,
+		SAMLIdPSSOURL:          p.SAMLIdPSSOURL,
+		HasSAMLIdPCert:         p.SAMLIdPCertificate != "",
+		SAMLSPEntityID:         p.SAMLSPEntityID,
+		SAMLSignRequests:       p.SAMLSignRequests,
+		CreatedAt:              p.CreatedAt,
+		UpdatedAt:              p.UpdatedAt,
 	}
 }
 

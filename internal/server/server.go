@@ -203,6 +203,7 @@ type Server struct {
 	setupLimiter          *ratelimit.Limiter
 	ssoRateLimiter        *ratelimit.Limiter
 	portalAuthLimiter     *ratelimit.Limiter
+	customerAccessLimiter *ratelimit.Limiter
 	oauthTokenLimiter     *ratelimit.Limiter
 	aiRateLimiter         *ratelimit.Limiter
 	widgetGenerateLimiter *ratelimit.Limiter
@@ -432,6 +433,8 @@ func (s *Server) initialize() error {
 	s.setupLimiter = ratelimit.New(20.0/60.0, 30, ipKey)
 	s.ssoRateLimiter = ratelimit.New(10.0/60.0, 5, ipKey)
 	s.portalAuthLimiter = ratelimit.New(3.0/60.0, 3, ipKey)
+	// Customer passkey and email flows each require multiple login requests.
+	s.customerAccessLimiter = ratelimit.New(5.0/60.0, 10, ipKey)
 	s.calendarFeedLimiter = ratelimit.New(10.0/60.0, 15, ipKey)
 	s.publicBoardLimiter = ratelimit.New(30.0/60.0, 60, ipKey)
 	s.pluginPublicLimiter = ratelimit.New(30.0/60.0, 60, ipKey)
@@ -1420,6 +1423,19 @@ func (s *Server) initialize() error {
 			ipExtractor,
 		)
 	}
+	customerAccessHandler := handlers.NewCustomerAccessHandler(handlers.CustomerAccessDependencies{
+		Access:         repository.NewCustomerAccessRepository(s.db),
+		Providers:      sso.NewProviderStore(s.db),
+		Customers:      repository.NewPortalCustomerRepository(s.db),
+		Channels:       repository.NewChannelRepository(s.db),
+		Collections:    repository.NewCollectionRepository(s.db),
+		Permissions:    permService,
+		Scope:          services.NewPublicBoardScopeService(s.db, permService),
+		PortalSessions: portalSessionManager, PortalAuth: portalAuthHandler, Passkeys: portalWebAuthnHandler,
+		MagicLinks: magicLinkService, IP: ipExtractor, Secure: enableHTTPS || strings.HasPrefix(baseURL, "https://"),
+	})
+	customerAccessHandler.SetLimiter(s.customerAccessLimiter)
+	ssoHandler.SetCustomerAccess(customerAccessHandler)
 	portalCustomersHandler := handlers.NewPortalCustomersHandler(s.db, permService, customerOrgPermissionService)
 	contactRoleConfig := services.NewContactRoleConfig()
 	contactRoleConfig.AuditEmit = enumAuditEmit
@@ -1620,6 +1636,7 @@ func (s *Server) initialize() error {
 	apiMiddleware := router.MiddlewareChain{
 		apiCORSMiddleware,
 		authMiddleware.OptionalAuth,
+		customerAccessHandler.Guard,
 		middleware.LimitJSONRequestBody(
 			restapi.DefaultJSONRequestBodyLimit,
 			"/api/llm-proxy/",
@@ -2017,6 +2034,7 @@ func (s *Server) initialize() error {
 	catalogMutations := services.NewCatalogMutationService(s.db, permService, workflowService)
 	governanceApplication := services.NewGovernanceApplicationService(s.db, permService, approvalSetService, approvalService)
 	if err := v2.RegisterRoutes(v2.Deps{
+		CustomerAccess:     customerAccessHandler,
 		Mux:                mux,
 		Tokens:             tokenManager,
 		SLA:                s.slaEngine,
@@ -2671,6 +2689,9 @@ func (s *Server) cleanup() {
 	}
 	if s.portalAuthLimiter != nil {
 		s.portalAuthLimiter.Stop()
+	}
+	if s.customerAccessLimiter != nil {
+		s.customerAccessLimiter.Stop()
 	}
 	if s.oauthTokenLimiter != nil {
 		s.oauthTokenLimiter.Stop()

@@ -8,6 +8,13 @@ package v2
 // request middleware flushes it. AuditService: the application service emits the
 // central audit event with the request actor. AuditExempt: reviewed exemption.
 var auditSpecRegistry = map[string]AuditKind{
+	"putCustomerAccessKindIdPolicy": AuditRecorder,
+	// Customer login creates/revokes isolated customer credentials, not backend mutations.
+	"postCustomerAccessKindSlugAuthRequest":                                          AuditExempt,
+	"postCustomerAccessKindSlugAuthVerify":                                           AuditExempt,
+	"postCustomerAccessKindSlugAuthPasskeyStart":                                     AuditExempt,
+	"postCustomerAccessKindSlugAuthPasskeyComplete":                                  AuditExempt,
+	"postCustomerAccessKindSlugAuthLogout":                                           AuditExempt,
 	"deleteAdminApiTokensTokenId":                                                    AuditRecorder,
 	"deleteAdminGroupsGroupId":                                                       AuditRecorder,
 	"deleteAdminObjectTranslationsObjectTypeObjectIdFieldLocale":                     AuditRecorder,

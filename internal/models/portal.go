@@ -270,6 +270,7 @@ const (
 	CustomerCreatedViaAgent        = "agent"
 	CustomerCreatedViaEmailIntake  = "email-intake"
 	CustomerCreatedViaMagicLink    = "magic-link"
+	CustomerCreatedViaGitHub       = "github"
 	CustomerCreatedViaTicketImport = "ticket-import"
 	CustomerCreatedViaUnknown      = "unknown"
 )
@@ -280,6 +281,7 @@ var CustomerCreatedViaValues = []string{
 	CustomerCreatedViaAgent,
 	CustomerCreatedViaEmailIntake,
 	CustomerCreatedViaMagicLink,
+	CustomerCreatedViaGitHub,
 	CustomerCreatedViaTicketImport,
 	CustomerCreatedViaUnknown,
 }

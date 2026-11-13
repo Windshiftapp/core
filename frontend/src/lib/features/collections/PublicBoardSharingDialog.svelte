@@ -9,11 +9,13 @@
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
+  import CustomerPolicyEditor from '../../customer/CustomerPolicyEditor.svelte';
   import { publicBaseURL } from '../../runtime/contextPath.js';
   import { t } from '../../stores/i18n.svelte.js';
 
   let {
     isOpen = false,
+    collectionId = null,
     isPublic = false,
     publicSlug = null,
     publicMilestoneSwimlanes = false,
@@ -175,6 +177,7 @@
       {t('collections.publicBoardSharing.scopeNote')}
     </div>
 
+    {#if collectionId}<CustomerPolicyEditor kind="board" resourceId={collectionId} />{/if}
     {#if saveError}
       <div
         data-testid="public-board-error"

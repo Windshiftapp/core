@@ -449,6 +449,9 @@ func (pam *PortalAuthMiddleware) getClientIP(r *http.Request) string {
 // or portal cookie) and returns a context populated with the matching context keys.
 // Returns (nil, false) when no session can be resolved.
 func (pam *PortalAuthMiddleware) tryPortalAuthenticate(r *http.Request) (context.Context, bool) {
+	if session, ok := r.Context().Value(ContextKeyPortalSession).(*auth.PortalSession); ok && session != nil && session.PortalCustomerID > 0 {
+		return r.Context(), true
+	}
 	clientIP := pam.getClientIP(r)
 
 	if sessionToken := r.Header.Get("X-Session-Token"); sessionToken != "" {

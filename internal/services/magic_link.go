@@ -303,6 +303,20 @@ func (s *MagicLinkService) FindOrCreatePortalCustomer(email, name string, channe
 	}
 
 	repo := repository.NewPortalCustomerRepository(s.db)
+	access := repository.NewCustomerAccessRepository(s.db)
+	policy, err := access.Policy(context.Background(), "portal", channelID)
+	if err != nil {
+		return 0, err
+	}
+	if policy.Mode == "organisations" {
+		id, err := repo.FindIDByEmail(email)
+		if err != nil {
+			return 0, repository.ErrCustomerAccessDenied
+		}
+		if err := access.PortalLoginAllowed(context.Background(), id, channelID); err != nil {
+			return 0, err
+		}
+	}
 	customerID, created, err := repo.FindOrCreateByEmail(context.Background(), name, email, models.CustomerCreatedViaMagicLink)
 	if err != nil {
 		return 0, err
@@ -315,6 +329,21 @@ func (s *MagicLinkService) FindOrCreatePortalCustomer(email, name string, channe
 		slog.Info("portal customer created", slog.String("component", "magic_link"), slog.Int("portal_customer_id", customerID), slog.String("email", email))
 	}
 	return customerID, nil
+}
+
+// SendBoardMagicLinkEmail keeps board sign-in tokens out of server URLs and referrers.
+func (s *MagicLinkService) SendBoardMagicLinkEmail(email, name, token, slug, locale string) error {
+	if s.smtpSender == nil {
+		return errors.New("email delivery is not configured")
+	}
+	if name == "" {
+		name = "there"
+	}
+	return s.smtpSender.SendTransactional(email, i18n.Normalize(locale), emailutil.TemplateMagicLink, struct {
+		FirstName    string
+		MagicLinkURL string
+		ExpiresIn    string
+	}{name, fmt.Sprintf("%s/board/%s#customer_token=%s", s.baseURL, slug, token), i18n.HumanizeDuration(locale, MagicLinkExpiry)})
 }
 
 // GetPortalCustomerByEmail finds a portal customer by email
@@ -337,5 +366,5 @@ func (s *MagicLinkService) CleanupExpiredMagicLinks() error {
 	if err != nil {
 		return fmt.Errorf("failed to cleanup expired magic links: %w", err)
 	}
-	return nil
+	return repository.NewCustomerAccessRepository(s.db).CleanupExpired(context.Background(), time.Now())
 }

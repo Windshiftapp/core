@@ -11,6 +11,7 @@
   import ChannelAdminShell from './ChannelAdminShell.svelte';
   import ChannelAdminSettings from './ChannelAdminSettings.svelte';
   import ChannelPortalConfig from './ChannelPortalConfig.svelte';
+  import CustomerPolicyEditor from '../../customer/CustomerPolicyEditor.svelte';
   import ChannelManagersTab from '../../settings/ChannelManagersTab.svelte';
   import {
     channelBasicFormData,
@@ -161,6 +162,7 @@
           bind:formData={portalFormData}
           {connectedMailboxes}
         />
+        <CustomerPolicyEditor kind="portal" resourceId={channelId} />
       </ChannelAdminSettings>
     {:else if tabId === 'managers' && $isSystemAdmin}
       <div class="px-16 py-8">

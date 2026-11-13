@@ -43,3 +43,36 @@ CREATE INDEX IF NOT EXISTS idx_portal_sessions_expires_at ON portal_customer_ses
 CREATE INDEX IF NOT EXISTS idx_portal_sessions_channel_id ON portal_customer_sessions(channel_id);
 
 -- migration: 0000_baseline
+
+-- Customer identity and resource admission. Loaded after portal customers and SSO providers.
+CREATE TABLE IF NOT EXISTS customer_resource_access (
+	resource_kind TEXT NOT NULL CHECK(resource_kind IN ('portal', 'board')),
+	resource_id INTEGER NOT NULL,
+	mode TEXT NOT NULL CHECK(mode IN ('public', 'organisations')),
+	organisation_ids TEXT NOT NULL DEFAULT '[]',
+	PRIMARY KEY(resource_kind, resource_id)
+);
+CREATE TABLE IF NOT EXISTS customer_external_accounts (
+	provider_id INTEGER NOT NULL REFERENCES sso_providers(id) ON DELETE CASCADE,
+	external_id TEXT NOT NULL,
+	customer_id INTEGER NOT NULL REFERENCES portal_customers(id) ON DELETE CASCADE,
+	PRIMARY KEY(provider_id, external_id)
+);
+CREATE TABLE IF NOT EXISTS customer_resource_sessions (
+	token TEXT PRIMARY KEY,
+	resource_kind TEXT NOT NULL,
+	resource_id INTEGER NOT NULL,
+	customer_id INTEGER NOT NULL REFERENCES portal_customers(id) ON DELETE CASCADE,
+	expires_at DATETIME NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_customer_resource_sessions_expires ON customer_resource_sessions(expires_at);
+CREATE TABLE IF NOT EXISTS customer_resource_tokens (
+	token TEXT PRIMARY KEY,
+	purpose TEXT NOT NULL,
+	payload TEXT NOT NULL DEFAULT '',
+	resource_kind TEXT NOT NULL,
+	resource_id INTEGER NOT NULL,
+	customer_id INTEGER REFERENCES portal_customers(id) ON DELETE CASCADE,
+	expires_at DATETIME NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_customer_resource_tokens_expires ON customer_resource_tokens(expires_at);

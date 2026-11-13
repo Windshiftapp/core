@@ -7,6 +7,7 @@
   import { onDestroy, onMount } from 'svelte';
 
   let {
+    id = undefined,
     value = $bindable(null),
     placeholder = 'Select organisation',
     showUnassigned = false,
@@ -43,6 +44,8 @@
 {/snippet}
 
 <BasePicker
+  {id}
+  optionTestid={id ? option => `${id}-option-${option.value}` : null}
   bind:value
   items={organisationOptions}
   loading={providedOrganisations === null ? organisations.loading : loading}
