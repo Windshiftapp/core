@@ -23,6 +23,7 @@
   import TestTube from '@lucide/svelte/icons/test-tube';
   import CheckCircle from '@lucide/svelte/icons/check-circle';
   import XCircle from '@lucide/svelte/icons/x-circle';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import Button from '../components/Button.svelte';
   import CopyButton from '../components/CopyButton.svelte';
   import Modal from '../dialogs/Modal.svelte';
@@ -536,13 +537,15 @@
     isOpen={true}
     onclose={closeModals}
     maxWidth="max-w-2xl"
+    maxHeight="calc(100vh - 4rem)"
   >
     <ModalHeader
       title={formData.provider_type === 'github' ? (showCreateModal ? t('settings.sso.addGitHub') : t('settings.sso.editGitHub')) : (showCreateModal ? t('settings.sso.addSsoProvider') : t('settings.sso.editSsoProvider'))}
       icon={formData.provider_type === 'github' ? Github : KeyRound}
       onClose={closeModals}
     />
-    <form data-testid="sso-provider-form" onsubmit={(e) => { e.preventDefault(); showCreateModal ? handleCreate() : handleUpdate(); }} class="p-6 space-y-4">
+    <form data-testid="sso-provider-form" onsubmit={(e) => { e.preventDefault(); showCreateModal ? handleCreate() : handleUpdate(); }} class="flex min-h-0 flex-1 flex-col">
+      <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
       {#if formData.provider_type === 'github'}
         <AlertBox type="info">{t('settings.sso.githubSetupHelp')}</AlertBox>
       {/if}
@@ -714,12 +717,16 @@
       </AlertBox>
 
       <!-- Attribute mapping (advanced) -->
-      <div class="pt-4 border-t" style="border-color: var(--ds-border);">
-        <h3 class="text-sm font-semibold mb-1" style="color: var(--ds-text);">
+      <details class="rounded-lg border border-ds-border" data-testid="sso-attribute-mapping">
+        <summary
+          class="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium text-ds-text"
+        >
           {t('settings.sso.attributeMapping')}
-        </h3>
-        <DescriptionText class="mb-3">{t('settings.sso.attributeMappingHelp')}</DescriptionText>
-        <div class="grid grid-cols-2 gap-4">
+          <ChevronDown class="h-4 w-4" />
+        </summary>
+        <div class="space-y-4 border-t border-ds-border p-4">
+          <DescriptionText>{t('settings.sso.attributeMappingHelp')}</DescriptionText>
+          <div class="grid grid-cols-2 gap-4">
           <TextField
             label={t('settings.sso.attributeEmail')}
             id="attr_email"
@@ -787,7 +794,8 @@
             bind:value={attributeMapping.family_name}
           />
         </div>
-      </div>
+        </div>
+      </details>
 
       <!-- Checkboxes -->
       {:else if formData.provider_type === 'github'}
@@ -882,9 +890,10 @@
           </div>
         </div>
       {/if}
+      </div>
 
       <!-- Modal Actions -->
-      <div class="flex justify-end gap-3 pt-4 border-t" style="border-color: var(--ds-border);">
+      <div class="flex justify-end gap-3 border-t px-6 py-4" style="border-color: var(--ds-border);">
         <Button variant="default" onclick={closeModals} disabled={saving}>
           {t('common.cancel')}
         </Button>
