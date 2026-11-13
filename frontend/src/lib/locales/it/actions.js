@@ -258,6 +258,7 @@ export default {
       completed: 'Completata',
       failed: 'Non riuscita',
       skipped: 'Saltata',
+      reconciliationRequired: 'Riconciliazione richiesta',
       startedAt: 'Avviata il',
       completedAt: 'Completata il',
       error: 'Errore',

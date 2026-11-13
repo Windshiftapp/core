@@ -1203,7 +1203,7 @@ func (s *ItemApplicationService) transitionItem(ctx context.Context, actor Audit
 		}
 	}
 	s.syncStatus(ctx, result.Item.ID, result.NewStatusID, result.NoOp)
-	s.recordTransitionComment(itemID, actor.UserID, fields)
+	s.recordTransitionComment(ctx, itemID, actor.UserID, fields)
 	return &ItemTransitionResult{
 		Item: result.Item, OldStatusID: result.OldStatusID, NewStatusID: result.NewStatusID, NoOp: result.NoOp,
 	}, nil
@@ -1247,9 +1247,11 @@ func (s *ItemApplicationService) applyTransitionLabels(ctx context.Context, tx d
 }
 
 // recordTransitionComment persists the optional comment collected by a
-// transition screen. The move already committed, so a comment failure is
-// logged rather than reported as a failed transition.
-func (s *ItemApplicationService) recordTransitionComment(itemID, authorID int, fields map[string]any) {
+// transition screen. It forwards the request context so script provenance
+// (private-trigger protection and comment-trigger suppression) reaches the
+// comment service. The move already committed, so a comment failure is logged
+// rather than reported as a failed transition.
+func (s *ItemApplicationService) recordTransitionComment(ctx context.Context, itemID, authorID int, fields map[string]any) {
 	if s.comments == nil {
 		return
 	}
@@ -1257,7 +1259,7 @@ func (s *ItemApplicationService) recordTransitionComment(itemID, authorID int, f
 	if !ok || strings.TrimSpace(content) == "" {
 		return
 	}
-	if _, err := s.comments.Create(CreateCommentParams{
+	if _, err := s.comments.CreateContext(ctx, CreateCommentParams{
 		ItemID: itemID, AuthorID: authorID, ActorUserID: authorID, Content: content,
 	}); err != nil {
 		slog.Error("failed to persist transition comment",

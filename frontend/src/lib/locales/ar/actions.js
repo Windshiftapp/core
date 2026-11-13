@@ -166,6 +166,7 @@ export default {
       completed: 'مكتمل',
       failed: 'فشل',
       skipped: 'تم تخطيه',
+      reconciliationRequired: 'مطلوب تسوية',
       startedAt: 'بدأ في',
       completedAt: 'اكتمل في',
       error: 'خطأ',

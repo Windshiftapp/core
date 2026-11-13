@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -87,20 +88,21 @@ func (e *ExecuteScriptExecutor) NodeType() models.ActionNodeType {
 // Execute call and never shared across executions, so scripts cannot observe
 // each other's state.
 type scriptRun struct {
-	vm           *sobek.Runtime
-	runCtx       context.Context
-	tokens       ActionScriptTokenManager
-	dispatcher   ScriptAPIDispatcher
-	actorUserID  int
-	maxAPICalls  int
-	apiCalls     int
-	console      []string
-	consoleBytes int
-	consoleCut   bool
-	fatal        error
-	cred         *ActionScriptCredential
-	credOnce     sync.Once
-	credErr      error
+	vm             *sobek.Runtime
+	runCtx         context.Context
+	tokens         ActionScriptTokenManager
+	dispatcher     ScriptAPIDispatcher
+	actorUserID    int
+	maxAPICalls    int
+	apiCalls       int
+	console        []string
+	consoleBytes   int
+	consoleCut     bool
+	fatal          error
+	reconciliation *bool
+	cred           *ActionScriptCredential
+	credOnce       sync.Once
+	credErr        error
 }
 
 // Execute runs the configured function body exactly once. There is no
@@ -160,11 +162,12 @@ func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.Exe
 	defer cancel()
 
 	run := &scriptRun{
-		tokens:      e.tokens,
-		dispatcher:  e.dispatcher,
-		actorUserID: ctx.EffectiveActorID,
-		maxAPICalls: maxCalls,
-		runCtx:      WithActionScriptProvenance(timeoutCtx, provenanceFromExecution(ctx, node.ID)),
+		tokens:         e.tokens,
+		dispatcher:     e.dispatcher,
+		actorUserID:    ctx.EffectiveActorID,
+		maxAPICalls:    maxCalls,
+		runCtx:         WithActionScriptProvenance(timeoutCtx, provenanceFromExecution(ctx, node.ID)),
+		reconciliation: &ctx.ReconciliationRequired,
 	}
 
 	vm := sobek.New()
@@ -173,9 +176,13 @@ func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.Exe
 		return fmt.Errorf("execute_script: bind runtime: %w", err)
 	}
 
-	result, runErr := runScriptProgram(vm, program, timeoutCtx)
-
-	if run.cred != nil {
+	// Revocation is deferred so it runs even if result conversion panics. A
+	// getter evaluated while converting the return value is still script code
+	// and must not outlive the credential.
+	defer func() {
+		if run.cred == nil {
+			return
+		}
 		if revokeErr := RevokeActionScriptCredential(e.tokens, run.cred, ctx.EffectiveActorID); revokeErr != nil {
 			actionID := 0
 			if ctx.Action != nil {
@@ -187,7 +194,9 @@ func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.Exe
 				slog.Any("error", revokeErr),
 			)
 		}
-	}
+	}()
+
+	output, runErr := runScriptProgram(vm, program, timeoutCtx)
 
 	if run.fatal != nil {
 		return run.fatal
@@ -198,11 +207,6 @@ func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.Exe
 			return fmt.Errorf("execute_script: timed out after %dms", timeoutMs)
 		}
 		return fmt.Errorf("execute_script: %w", runErr)
-	}
-
-	output, err := strictScriptOutput(result)
-	if err != nil {
-		return fmt.Errorf("execute_script: %w", err)
 	}
 
 	ctx.Variables[outputVar] = output
@@ -345,7 +349,23 @@ func (r *scriptRun) apiRequest(call sobek.FunctionCall) sobek.Value {
 		}
 		panic(r.vm.NewGoError(fmt.Errorf("windshift.api.request failed: %w", err)))
 	}
+	// A committed mutation makes the execution non-replayable: durable replay
+	// after a later failure must not repeat an already-applied write.
+	if r.reconciliation != nil && response.Status >= 200 && response.Status < 300 && isMutatingScriptMethod(method) {
+		*r.reconciliation = true
+	}
 	return r.responseValue(response)
+}
+
+// isMutatingScriptMethod reports whether a permitted bridge method changes
+// state. DELETE is rejected by the path policy, so it is not listed.
+func isMutatingScriptMethod(method string) bool {
+	switch strings.ToUpper(strings.TrimSpace(method)) {
+	case http.MethodPost, http.MethodPut, http.MethodPatch:
+		return true
+	default:
+		return false
+	}
 }
 
 // ensureCredential mints at most one credential per node execution, lazily so a
@@ -423,10 +443,11 @@ func scriptValueString(value sobek.Value) string {
 	return value.String()
 }
 
-// runScriptProgram executes the compiled program with a watchdog that
-// interrupts a runaway script. The runtime is discarded afterwards, so the
-// watchdog goroutine is always joined.
-func runScriptProgram(vm *sobek.Runtime, program *sobek.Program, timeoutCtx context.Context) (sobek.Value, error) {
+// runScriptProgram executes the compiled program and converts its return value
+// while the watchdog is still armed. Returned getters are evaluated by sobek's
+// export, so conversion is script execution too: it must stay inside the
+// timeout budget and inside the credential window.
+func runScriptProgram(vm *sobek.Runtime, program *sobek.Program, timeoutCtx context.Context) (output any, err error) {
 	done := make(chan struct{})
 	exited := make(chan struct{})
 	go func() {
@@ -437,10 +458,27 @@ func runScriptProgram(vm *sobek.Runtime, program *sobek.Program, timeoutCtx cont
 		case <-done:
 		}
 	}()
-	result, err := vm.RunProgram(program)
-	close(done)
-	<-exited
-	return result, err
+	defer func() {
+		close(done)
+		<-exited
+		if r := recover(); r != nil {
+			switch value := r.(type) {
+			case *sobek.InterruptedError:
+				err = value
+			case error:
+				err = fmt.Errorf("script result conversion failed: %w", value)
+			case *sobek.Object:
+				err = fmt.Errorf("script result conversion failed: %s", value.String())
+			default:
+				err = fmt.Errorf("script result conversion failed: %v", value)
+			}
+		}
+	}()
+	result, runErr := vm.RunProgram(program)
+	if runErr != nil {
+		return nil, runErr
+	}
+	return strictScriptOutput(result)
 }
 
 // strictScriptOutput converts a script's return value into detached JSON,

@@ -192,6 +192,7 @@ export default {
       "completed": "완료",
       "failed": "실패",
       "skipped": "건너뜀",
+      "reconciliationRequired": "조정 필요",
       "startedAt": "시작 시각",
       "completedAt": "완료 시각",
       "error": "오류",

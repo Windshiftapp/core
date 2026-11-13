@@ -148,6 +148,7 @@ export default {
       completed: '已完成',
       failed: '失败',
       skipped: '已跳过',
+      reconciliationRequired: '需要核对',
       startedAt: '开始时间',
       completedAt: '完成时间',
       error: '错误',

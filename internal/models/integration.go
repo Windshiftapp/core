@@ -916,6 +916,10 @@ const (
 	ActionStatusCompleted ActionExecutionStatus = "completed"
 	ActionStatusFailed    ActionExecutionStatus = "failed"
 	ActionStatusSkipped   ActionExecutionStatus = "skipped"
+	// ActionStatusReconciliationRequired marks an execution that committed a
+	// partial side effect (an execute_script write) and then failed. Durable
+	// replay must not rerun it; an operator reconciles the partial write.
+	ActionStatusReconciliationRequired ActionExecutionStatus = "reconciliation_required"
 )
 
 // Action represents a workspace-scoped automation definition
@@ -1140,6 +1144,10 @@ type ExecutionContext struct {
 	// DefinitionRevisionID is the immutable definition revision this execution
 	// is bound to, when known. Script REST calls carry it as trusted provenance.
 	DefinitionRevisionID *int `json:"-"`
+	// ReconciliationRequired is set when an execute_script node committed a
+	// mutating REST call and the flow later failed. Durable replay must not
+	// rerun the flow, because the committed write would be repeated.
+	ReconciliationRequired bool `json:"-"`
 }
 
 // StepResult holds the result of executing a single node

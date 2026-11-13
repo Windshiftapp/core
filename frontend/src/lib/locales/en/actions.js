@@ -267,6 +267,7 @@ export default {
       completed: 'Completed',
       failed: 'Failed',
       skipped: 'Skipped',
+      reconciliationRequired: 'Reconciliation required',
       startedAt: 'Started At',
       completedAt: 'Completed At',
       error: 'Error',

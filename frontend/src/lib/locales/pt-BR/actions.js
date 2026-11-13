@@ -168,6 +168,7 @@ export default {
       completed: 'Concluído',
       failed: 'Falhou',
       skipped: 'Ignorado',
+      reconciliationRequired: 'Reconciliação necessária',
       startedAt: 'Iniciado em',
       completedAt: 'Concluído em',
       error: 'Erro',

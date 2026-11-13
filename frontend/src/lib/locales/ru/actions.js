@@ -253,6 +253,7 @@ export default {
       completed: 'Завершено',
       failed: 'Ошибка',
       skipped: 'Пропущено',
+      reconciliationRequired: 'Требуется сверка',
       startedAt: 'Начало',
       completedAt: 'Окончание',
       error: 'Ошибка',

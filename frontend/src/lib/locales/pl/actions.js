@@ -267,6 +267,7 @@ export default {
       completed: 'Zakończone',
       failed: 'Niepowodzenie',
       skipped: 'Pominięte',
+      reconciliationRequired: 'Wymagane uzgodnienie',
       startedAt: 'Rozpoczęto',
       completedAt: 'Zakończono',
       error: 'Błąd',

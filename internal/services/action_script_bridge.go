@@ -89,6 +89,17 @@ var actionScriptAllowedMethods = map[string]bool{
 	http.MethodPatch: true,
 }
 
+// actionScriptDeniedPaths lists v2 routes whose mutation path does not preserve
+// the action cascade (bulk item writes emit update events without an
+// ActionContext), so they are excluded from the initial bridge even though
+// their top-level resource is allowed. Bulk transition is not listed: it flows
+// through the same per-item transition path that carries provenance.
+var actionScriptDeniedPaths = []string{
+	"/items/bulk-update",
+	"/items/bulk-patch",
+	"/items/bulk-delete",
+}
+
 // ValidateScriptAPIRequest enforces the bridge policy on a script-supplied
 // method and path and returns the normalized path (leading slash, optional
 // query preserved) ready to prefix with the v2 REST root.
@@ -139,6 +150,11 @@ func ValidateScriptAPIRequest(method, path string) (string, error) {
 	}
 	if !actionScriptAllowedResources[resource] {
 		return "", scriptAPIPolicyErrorf("resource %q is not available to scripts", resource)
+	}
+	for _, denied := range actionScriptDeniedPaths {
+		if parsed.Path == denied || strings.HasPrefix(parsed.Path, denied+"/") {
+			return "", scriptAPIPolicyErrorf("route %q is not available to scripts", parsed.Path)
+		}
 	}
 	if parsed.RawQuery != "" {
 		return parsed.Path + "?" + parsed.RawQuery, nil
