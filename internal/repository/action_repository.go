@@ -733,21 +733,29 @@ func (r *ActionRepository) UpdateExecutionLog(log *models.ActionExecutionLog) er
 	return nil
 }
 
-// MarkExecutionReconciliationRequired persists the write-ahead marker for a
-// running execution whose script may have committed a side effect. A crash
-// after this marker leaves the log reconciliation_required, so durable recovery
-// blocks replay instead of repeating the write. It never overwrites a terminal
-// status.
+// MarkExecutionReconciliationRequired persists the write-ahead marker for an
+// execution whose script may commit a side effect. It promotes a running or
+// previously failed attempt to reconciliation_required, so a crash after the
+// commit leaves the log non-replayable. A no-op update is an error: the caller
+// must not dispatch a write whose marker was not persisted. It never overwrites
+// a terminal completed/reconciliation_required/skipped status.
 func (r *ActionRepository) MarkExecutionReconciliationRequired(logID int) error {
-	_, err := r.db.ExecWrite(`
+	result, err := r.db.ExecWrite(`
 		UPDATE action_execution_logs
 		SET status = ?, error_message = ?
-		WHERE id = ? AND status = ?
+		WHERE id = ? AND status IN (?, ?)
 	`, models.ActionStatusReconciliationRequired,
 		"requires reconciliation: a script write was in flight",
-		logID, models.ActionStatusRunning)
+		logID, models.ActionStatusRunning, models.ActionStatusFailed)
 	if err != nil {
 		return fmt.Errorf("failed to mark execution reconciliation required: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check execution marker rows affected: %w", err)
+	}
+	if affected == 0 {
+		return fmt.Errorf("execution log %d is not in a markable state", logID)
 	}
 	return nil
 }

@@ -357,13 +357,17 @@ func (r *scriptRun) apiRequest(call sobek.FunctionCall) sobek.Value {
 		return sobek.Undefined()
 	}
 
-	// Persist the write-ahead marker before a mutating dispatch so a crash
-	// between the commit and the terminal log update is recoverable as
-	// reconciliation-required instead of replaying the write.
+	// Persist the write-ahead marker and mark the execution non-replayable
+	// before a mutating dispatch. A mutating call can commit a side effect even
+	// when it returns an error or the worker dies mid-call, so replay must be
+	// blocked from this point unless the flow later completes successfully.
 	if isMutatingScriptMethod(method) {
 		if err := r.markWritePending(); err != nil {
 			r.fail(fmt.Errorf("execute_script: persist write marker: %w", err))
 			return sobek.Undefined()
+		}
+		if r.reconciliation != nil {
+			*r.reconciliation = true
 		}
 	}
 
@@ -381,11 +385,6 @@ func (r *scriptRun) apiRequest(call sobek.FunctionCall) sobek.Value {
 			return sobek.Undefined()
 		}
 		panic(r.vm.NewGoError(fmt.Errorf("windshift.api.request failed: %w", err)))
-	}
-	// A committed mutation makes the execution non-replayable: durable replay
-	// after a later failure must not repeat an already-applied write.
-	if r.reconciliation != nil && response.Status >= 200 && response.Status < 300 && isMutatingScriptMethod(method) {
-		*r.reconciliation = true
 	}
 	return r.responseValue(response)
 }
