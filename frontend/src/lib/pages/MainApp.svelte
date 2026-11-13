@@ -44,6 +44,7 @@
   import { getMainAppWorkspaceRedirect } from './mainAppWorkspaceContext.js';
   import { getDisabledViewRedirect } from './mainAppViewGuard.js';
   import { viewSettingsStore } from '../stores/viewSettings.svelte.js';
+  import { VIRTUAL_SCROLL_CONTEXT } from '../virtualization/types';
 
   const backgroundStyles = useGradientStyles();
   const sharedBackgroundActive = $derived(isCollectionContentView($currentRoute.view));
@@ -63,6 +64,13 @@
   let createModalParentContext = $state(null);
   let showEmailVerificationBanner = $state(false);
   let mobileWorkspaceNavOpen = $state(false);
+  let mainScrollElement = $state(null);
+  setContext(VIRTUAL_SCROLL_CONTEXT, {
+    get element() { return mainScrollElement; },
+    get revision() {
+      return `${showEmailVerificationBanner}|${mobileWorkspaceNavOpen}|${$uiStore.reviewFullscreen}|${$currentRoute.view}`;
+    },
+  });
 
   let terminalState = $derived($terminalStore);
   let TerminalPanelComponent = $state(null);
@@ -412,6 +420,7 @@
             : 'flex: 1;'}
         >
           <main
+            bind:this={mainScrollElement}
             data-testid="main-content-scroll"
             class="flex-1 min-h-0 overflow-y-auto overscroll-contain"
             style={sharedBackgroundActive

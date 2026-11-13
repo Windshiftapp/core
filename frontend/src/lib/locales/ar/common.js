@@ -6,6 +6,8 @@
 export default {
   // Common UI elements
   common: {
+    virtualizeRows: 'عرض الصفوف افتراضيًا',
+    virtualizeRowsHint: 'عطّل هذا الخيار لعرض جميع الصفوف المحمّلة لتسهيل الوصول أو البحث في المتصفح أو النسخ.',
     save: 'حفظ',
     saveChanges: 'حفظ التغييرات',
     cancel: 'إلغاء',

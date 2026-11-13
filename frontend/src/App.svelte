@@ -21,6 +21,7 @@
   import Button from './lib/components/Button.svelte';
   import LazyRootDialog from './lib/components/LazyRootDialog.svelte';
   import LazyRootView from './lib/components/LazyRootView.svelte';
+  import { activateVirtualAudience } from './lib/virtualization/scrollRestoration';
 
   // Root surfaces are intentionally loaded only after startup has resolved the
   // route/auth boundary. Keep these as direct import() calls so Vite can split
@@ -212,6 +213,10 @@
   });
 
   // Handle authentication state changes
+  $effect(() => {
+    activateVirtualAudience($authStore.isAuthenticated ? `user:${$authStore.user?.id}` : 'public');
+  });
+
   $effect(() => {
     if ($authStore.isAuthenticated && setupCompleted) {
       showLoginDialog = false;

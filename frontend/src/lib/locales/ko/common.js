@@ -1,6 +1,8 @@
 /** Korean (ko) translations. */
 export default {
   "common": {
+    "virtualizeRows": "행 가상화",
+    "virtualizeRowsHint": "접근성, 브라우저 검색 또는 복사를 위해 로드된 모든 행을 표시하려면 끄세요.",
     "save": "저장",
     "saveChanges": "변경 사항 저장",
     "cancel": "취소",

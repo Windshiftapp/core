@@ -35,8 +35,14 @@
   import ColumnSelector from './ColumnSelector.svelte';
   import SubFilterBar from './SubFilterBar.svelte';
   import { useListColumnConfig } from './listColumnConfig.svelte.js';
+  import VirtualRows from '../../components/VirtualRows.svelte';
+  import { collectionItemRowKey } from './collectionVirtualRows';
+  import { useCollectionVirtualization } from './useCollectionVirtualization.svelte.js';
+  import CollectionVirtualizationToggle from './CollectionVirtualizationToggle.svelte';
 
   let { workspaceId, collectionId = null } = $props();
+  let listElement = $state(null);
+  const virtualization = useCollectionVirtualization(() => ({ workspaceId, collectionId, view: 'list' }));
 
   // Reference data from shared workspace store
   let workspace = $derived(workspaceDataStore.workspace);
@@ -301,9 +307,16 @@
           </TableHeaderBar>
 
           <!-- Table Body -->
-          <div>
-            {#each filteredItems as item (item.id)}
+          <div bind:this={listElement} style="overflow-anchor: none;">
+            <VirtualRows items={filteredItems} getKey={collectionItemRowKey} {listElement}
+              dragSources
+              enabled={virtualization.enabled} layoutRevision={gridTemplateColumns}
+              identity={`list:${workspaceId ?? ''}:${collectionId ?? ''}:${collectionStore.effectiveSubFilterQL}:${search.query}:${sortKey}:${sortDirection}:${currentPage}`}
+            >
+            {#snippet row(item, virtual)}
               <WorkItemListRow
+                virtualRow={virtual}
+                deferred={false}
                 {item}
                 columns={listColumns}
                 {gridTemplateColumns}
@@ -325,10 +338,12 @@
                 draggable
                 rowTestid={`workspace-item-row-${item.id}`}
               />
-            {/each}
+            {/snippet}
+            </VirtualRows>
           </div>
         </div>
 
+        <CollectionVirtualizationToggle preference={virtualization} />
         <!-- Search results page on the server, so they use load-more instead of
              the page control that drives the unfiltered list. -->
         {#if search.active}

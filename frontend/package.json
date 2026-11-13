@@ -75,6 +75,7 @@
     "@milkdown/theme-nord": "^7.18.0",
     "@openuidev/svelte-lang": "^0.4.2",
     "@tabler/icons-svelte-runes": "^3.40.0",
+    "@tanstack/virtual-core": "3.19.9",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "^2.2.0",
     "@tauri-apps/plugin-fs": "^2.2.0",

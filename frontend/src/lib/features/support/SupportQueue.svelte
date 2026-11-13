@@ -48,11 +48,18 @@
   import TableHeaderBar from '../../components/TableHeaderBar.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import WorkItemListRow from '../collections/WorkItemListRow.svelte';
+  import VirtualRows from '../../components/VirtualRows.svelte';
+  import { collectionItemRowKey } from '../collections/collectionVirtualRows';
+  import { useCollectionVirtualization } from '../collections/useCollectionVirtualization.svelte.js';
+  import CollectionVirtualizationToggle from '../collections/CollectionVirtualizationToggle.svelte';
   import WorkItemListFooter from '../collections/WorkItemListFooter.svelte';
   import ColumnSelector from '../collections/ColumnSelector.svelte';
   import QlFilterBuilder from '../shared/QlFilterBuilder.svelte';
 
   let { workspaceId, collectionId = null, queue = null } = $props();
+  let queueScrollElement = $state(null);
+  let queueListElement = $state(null);
+  const virtualization = useCollectionVirtualization(() => ({ workspaceId, collectionId, view: `queue-${activeRef}` }));
 
   // Resolved queue catalog for the current scope (built-ins + custom).
   let queues = $state([]);
@@ -67,6 +74,7 @@
   let loadingItems = $state(false);
   let itemsPagination = $state(null);
   let itemsLoadId = 0;
+  let loadedQueryScope = $state('');
   let currentPage = $state(1);
   let itemsPerPage = $state(QUEUE_PAGE_SIZE);
 
@@ -277,6 +285,7 @@
       return;
     }
     const loadId = ++itemsLoadId;
+    const queryScope = JSON.stringify([workspaceId, collectionId, activeRef, activeQueue.ql, search]);
     loadingItems = true;
     try {
       const response = await itemsApi.getAll({
@@ -290,6 +299,7 @@
         ...(search ? { search } : {}),
       });
       if (loadId !== itemsLoadId) return;
+      loadedQueryScope = queryScope;
       items = response?.data ?? [];
       // The v2 document names the effective size page_size; the shared
       // Pagination component reads limit.
@@ -839,6 +849,7 @@
   </div>
 
   <div
+    bind:this={queueScrollElement}
     class="min-h-0 min-w-0 max-w-full flex-1 w-full overflow-auto overscroll-contain"
     data-testid="support-queue-canvas"
   >
@@ -870,9 +881,15 @@
             <div>{t('common.actions')}</div>
           </TableHeaderBar>
 
-          <div>
-            {#each items as item (item.id)}
+          <div bind:this={queueListElement} style="overflow-anchor: none;">
+            <VirtualRows {items} getKey={collectionItemRowKey} listElement={queueListElement}
+              scrollElement={queueScrollElement} enabled={virtualization.enabled} layoutRevision={gridTemplateColumns}
+              identity={`queue:${loadedQueryScope}:${currentPage}:${itemsPerPage}`}
+            >
+            {#snippet row(item, virtual)}
               <WorkItemListRow
+                virtualRow={virtual}
+                deferred={false}
                 {item}
                 columns={listColumns}
                 {gridTemplateColumns}
@@ -903,10 +920,12 @@
                   />
                 {/snippet}
               </WorkItemListRow>
-            {/each}
+            {/snippet}
+            </VirtualRows>
           </div>
         </div>
 
+        <CollectionVirtualizationToggle preference={virtualization} />
         {#if itemsPagination && itemsPagination.total_items > 0 && items.length > 0}
           <WorkItemListFooter
             pagination={itemsPagination}

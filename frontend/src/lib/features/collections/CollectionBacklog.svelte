@@ -1,4 +1,10 @@
 <script>
+  import VirtualRows from '../../components/VirtualRows.svelte';
+  import BacklogItemRow from './BacklogItemRow.svelte';
+  import { projectBacklogRows } from './backlogVirtualRows';
+  import { useCollectionVirtualization } from './useCollectionVirtualization.svelte.js';
+  import CollectionVirtualizationToggle from './CollectionVirtualizationToggle.svelte';
+  import { claimVirtualDrop, virtualDropAllowed } from '../../virtualization/virtualDragSession';
   import { onMount } from 'svelte';
   import { items } from '../../api/items.js';
   import { iterations } from '../../api/milestones.js';
@@ -39,6 +45,8 @@
   import { DEFAULT_BACKLOG_FIELDS, normalizeBacklogFields } from './backlogFields.js';
 
   let { workspaceId, collectionId = null } = $props();
+  let backlogListElement = $state(null);
+  const virtualization = useCollectionVirtualization(() => ({ workspaceId, collectionId, view: 'backlog' }));
 
   // Reference data from shared workspace store
   let workspace = $derived(workspaceDataStore.workspace);
@@ -199,6 +207,10 @@
   let unassignedItems = $derived(
     backlogItems.filter(i => !i.iteration_id || !visibleIterationIds.has(i.iteration_id))
   );
+  const virtualBacklogRows = $derived(projectBacklogRows(
+    [...iterationSections, { iteration: null, items: unassignedItems }], collapsedSections,
+  ));
+  const backlogDragRevision = $derived(backlogItems.map((item) => `${item.id}:${item.iteration_id}:${item.frac_index}`).join('|'));
 
   // Global iterations available to add (not already visible, not completed/cancelled, deduplicated)
   let availableGlobalIterations = $derived.by(() => {
@@ -525,7 +537,7 @@
       getDropData: () => ({ sectionId: element.dataset.sectionId || 'unassigned' }),
       canDrop: ({ source }) => {
         const data = /** @type {any} */ (source.data);
-        return data.type === 'work-item' && data.item?.id !== itemId &&
+        return virtualDropAllowed(data) && data.type === 'work-item' && data.item?.id !== itemId &&
           !isSectionClosed(element.dataset.sectionId || 'unassigned');
       },
       onDragStart: () => {
@@ -551,14 +563,13 @@
       onDrop: ({ source, closestEdge }) => {
         const data = /** @type {any} */ (source.data);
         const item = backlogItemsById.get(itemId);
-        if (item && data.type === 'work-item' && closestEdge) {
+        if (item && data.type === 'work-item' && closestEdge && claimVirtualDrop(data)) {
           handleEdgeBasedDrop(data.item, item, closestEdge, {
             sectionId: element.dataset.sectionId || 'unassigned',
           });
         }
       },
       onCleanup: () => {
-        document.body.classList.remove('is-dragging');
         dragState.delete(itemId);
       },
     });
@@ -571,7 +582,7 @@
     const cleanup = dropTargetForElements({
       element,
       canDrop: ({ source }) =>
-        (/** @type {any} */ (source.data)).type === 'work-item' && !isSectionClosed(key),
+        virtualDropAllowed(source.data) && (/** @type {any} */ (source.data)).type === 'work-item' && !isSectionClosed(key),
       getData: () => ({ type: 'section-drop', iterationId: key }),
       onDragEnter: ({ source }) => {
         if ((/** @type {any} */ (source.data)).type !== 'work-item') return;
@@ -584,9 +595,10 @@
         next.delete(key);
         sectionDropHighlight = next;
       },
-      onDrop: ({ source }) => {
+      onDrop: ({ source, location }) => {
         const data = /** @type {any} */ (source.data);
-        if (data.type === 'work-item' && !isSectionClosed(key)) handleSectionDrop(data.item, key);
+        const itemTarget = location.current.dropTargets.some((target) => target.element.hasAttribute('data-item-card'));
+        if (!itemTarget && data.type === 'work-item' && !isSectionClosed(key) && claimVirtualDrop(data)) handleSectionDrop(data.item, key);
         sectionDropHighlight = new Map();
       },
     });
@@ -739,71 +751,53 @@
         />
       {:else}
         <!-- Backlog items grouped by iteration sections -->
-        <div class="w-full">
-
-          {#each iterationSections as section (section.iteration.id)}
-            <BacklogIterationSection
-              iteration={section.iteration}
-              items={section.items}
-              collapsed={collapsedSections.has(section.iteration.id)}
-              {workspace}
-              {itemTypes}
-              {statuses}
-              {statusCategories}
-              {styles}
-              {dragState}
-              {backlogRowGap}
-              {assignableIterations}
-              {pendingActionItemIds}
-              {visibleFields}
-              isGlobalAdded={addedGlobalIds.has(section.iteration.id)}
-              sectionHighlight={sectionDropHighlight.get(String(section.iteration.id)) || false}
-              onToggleCollapse={toggleCollapse}
-              onOpenItem={openItem}
-              onMoveItemToBoundary={moveItemToBoundary}
-              onAssignItemToIteration={assignItemToIteration}
-              onStartIteration={startIteration}
-              onCompleteIteration={completeIteration}
-              onRemoveGlobal={removeGlobalIteration}
-              storyPointsConfiguredForItem={storyPointsConfiguredForItem}
-              storyPointsPendingItemIds={pendingStoryPointsItemIds}
-              onUpdateStoryPoints={updateStoryPoints}
-              itemDndAction={registerBacklogItem}
-              sectionDndAction={registerBacklogSection}
-            />
-          {/each}
-
-          <!-- Unassigned / Backlog section -->
-          <BacklogIterationSection
-            iteration={null}
-            items={unassignedItems}
-            collapsed={collapsedSections.has('unassigned')}
-            {workspace}
-            {itemTypes}
-            {statuses}
-            {statusCategories}
-            {styles}
-            {dragState}
-            {backlogRowGap}
-            {assignableIterations}
-            {pendingActionItemIds}
-            {visibleFields}
-            sectionHighlight={sectionDropHighlight.get('unassigned') || false}
-            onToggleCollapse={toggleCollapse}
-            onOpenItem={openItem}
-            onMoveItemToBoundary={moveItemToBoundary}
-            onAssignItemToIteration={assignItemToIteration}
-            storyPointsConfiguredForItem={storyPointsConfiguredForItem}
-            storyPointsPendingItemIds={pendingStoryPointsItemIds}
-            onUpdateStoryPoints={updateStoryPoints}
-            itemDndAction={registerBacklogItem}
-            sectionDndAction={registerBacklogSection}
-          />
+        <div class="w-full" bind:this={backlogListElement} style="overflow-anchor: none;">
+          <VirtualRows items={virtualBacklogRows} getKey={(row) => row.key}
+            listElement={backlogListElement} enabled={virtualization.enabled}
+            estimateSize={(row) => row.kind === 'item' ? 56 : 64}
+            identity={`backlog:${workspaceId ?? ''}:${collectionId ?? ''}:${collectionStore.effectiveBacklogSubFilterQL}`}
+            layoutRevision={visibleFields.join('|')}
+            dragSources dragRevision={backlogDragRevision}
+          >
+            {#snippet row(entry, virtual)}
+              {#if entry.kind === 'header'}
+                <BacklogIterationSection
+                  headerOnly virtualRow={virtual}
+                  iteration={entry.section.iteration} items={entry.section.items}
+                  collapsed={collapsedSections.has(entry.sectionId)}
+                  {workspace} {itemTypes} {statuses} {statusCategories} {styles} {dragState}
+                  isGlobalAdded={addedGlobalIds.has(entry.sectionId)}
+                  sectionHighlight={sectionDropHighlight.get(String(entry.sectionId)) || false}
+                  onToggleCollapse={toggleCollapse} onStartIteration={startIteration}
+                  onCompleteIteration={completeIteration} onRemoveGlobal={removeGlobalIteration}
+                  sectionDndAction={registerBacklogSection}
+                />
+              {:else if entry.kind === 'empty'}
+                <div use:virtual.attach use:registerBacklogSection={entry.sectionId}
+                  class="flex items-center justify-center py-6 px-4 rounded-lg border-2 border-dashed text-[color:var(--ctx-text-subtle,var(--ds-text-subtle))] border-[color:var(--ctx-border,var(--ds-border))]"
+                  data-section-drop-zone data-iteration-id={entry.sectionId}
+                  data-testid={`backlog-empty-section-${entry.sectionId}`}
+                >{t('collections.dragItemsHere')}</div>
+              {:else}
+                <BacklogItemRow virtualRow={virtual} deferred={false}
+                  item={entry.item} sectionId={entry.sectionId}
+                  {workspace} {itemTypes} {statuses} {statusCategories} {styles} {dragState}
+                  {backlogRowGap} {assignableIterations} {pendingActionItemIds} {visibleFields}
+                  onOpenItem={openItem} onMoveItemToBoundary={moveItemToBoundary}
+                  onAssignItemToIteration={assignItemToIteration}
+                  {storyPointsConfiguredForItem} storyPointsPendingItemIds={pendingStoryPointsItemIds}
+                  onUpdateStoryPoints={updateStoryPoints} itemDndAction={registerBacklogItem}
+                />
+              {/if}
+            {/snippet}
+          </VirtualRows>
+          <CollectionVirtualizationToggle preference={virtualization} />
 
           <!-- Load More -->
           {#if collectionStore.backlogHasMore}
             <div class="mt-6 text-center">
               <button
+                data-testid="backlog-load-more"
                 onclick={() => collectionStore.loadMoreBacklog()}
                 disabled={collectionStore.backlogLoadingMore}
                 class="px-4 py-2 text-sm font-medium rounded-lg border transition-colors"
