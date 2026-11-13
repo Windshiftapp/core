@@ -61,6 +61,12 @@ type completionAuthorization struct {
 	workspaceResults map[int]bool
 	globalChecked    bool
 	globalAllowed    bool
+	sealed           bool
+}
+
+type iterationCompletionReader interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+	QueryRowContext(context.Context, string, ...any) *sql.Row
 }
 
 type IterationCompletionService struct {
@@ -84,7 +90,11 @@ func (s *IterationCompletionService) Complete(ctx context.Context, req CompleteI
 		Status:            "completed",
 		Items:             []*models.Item{},
 	}
-	authorization := completionAuthorization{req: req, workspaceResults: map[int]bool{}}
+	authorization, preflightQueries, err := s.prepareCompletionAuthorization(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	result.SQLStatements = preflightQueries
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("start iteration completion: %w", err)
@@ -254,13 +264,17 @@ func (s *IterationCompletionService) Complete(ctx context.Context, req CompleteI
 }
 
 func (s *IterationCompletionService) loadScopeForUpdate(ctx context.Context, tx database.Tx, id int) (*iterationCompletionScope, error) {
+	return s.loadCompletionScope(ctx, tx, id, true)
+}
+
+func (s *IterationCompletionService) loadCompletionScope(ctx context.Context, q iterationCompletionReader, id int, lock bool) (*iterationCompletionScope, error) {
 	query := `SELECT id, status, is_global, workspace_id FROM iterations WHERE id = ?`
-	if s.db.GetDriverName() == "postgres" {
+	if lock && s.db.GetDriverName() == "postgres" {
 		query += " FOR UPDATE"
 	}
 	var scope iterationCompletionScope
 	var workspaceID sql.NullInt64
-	if err := tx.QueryRowContext(ctx, query, id).Scan(&scope.id, &scope.status, &scope.isGlobal, &workspaceID); err != nil {
+	if err := q.QueryRowContext(ctx, query, id).Scan(&scope.id, &scope.status, &scope.isGlobal, &workspaceID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrIterationCompletionNotFound
 		}
@@ -273,6 +287,10 @@ func (s *IterationCompletionService) loadScopeForUpdate(ctx context.Context, tx 
 }
 
 func (s *IterationCompletionService) loadIncompleteItemsForUpdate(ctx context.Context, tx database.Tx, iterationID int) ([]incompleteIterationItem, error) {
+	return s.loadIncompleteItems(ctx, tx, iterationID, true)
+}
+
+func (s *IterationCompletionService) loadIncompleteItems(ctx context.Context, q iterationCompletionReader, iterationID int, lock bool) ([]incompleteIterationItem, error) {
 	query := `
 		SELECT i.id, i.workspace_id
 		FROM items i
@@ -281,10 +299,10 @@ func (s *IterationCompletionService) loadIncompleteItemsForUpdate(ctx context.Co
 		WHERE i.iteration_id = ? AND COALESCE(sc.is_completed, false) = false
 		ORDER BY i.id
 		LIMIT ?`
-	if s.db.GetDriverName() == "postgres" {
+	if lock && s.db.GetDriverName() == "postgres" {
 		query += " FOR UPDATE OF i"
 	}
-	rows, err := tx.QueryContext(ctx, query, iterationID, MaxBulkItemUpdates+1)
+	rows, err := q.QueryContext(ctx, query, iterationID, MaxBulkItemUpdates+1)
 	if err != nil {
 		return nil, fmt.Errorf("load incomplete iteration items: %w", err)
 	}
@@ -303,6 +321,64 @@ func (s *IterationCompletionService) loadIncompleteItemsForUpdate(ctx context.Co
 	return items, nil
 }
 
+// Resolve callback-backed permissions without owning a transaction. The locked
+// reads below may use only these decisions; newly observed scopes fail closed.
+func (s *IterationCompletionService) prepareCompletionAuthorization(ctx context.Context, req CompleteIterationRequest) (*completionAuthorization, int, error) {
+	a := &completionAuthorization{req: req, workspaceResults: map[int]bool{}}
+	source, err := s.loadCompletionScope(ctx, s.db, req.IterationID, false)
+	queries := 1
+	if err != nil {
+		return nil, queries, err
+	}
+	if err := a.authorizeIterationScope(source); err != nil {
+		return nil, queries, err
+	}
+	if source.status == "completed" {
+		a.sealed = true
+		return a, queries, nil
+	}
+	if source.status == iterationStatusCancelled {
+		return nil, queries, fmt.Errorf("%w: canceled iterations cannot be completed", ErrIterationCompletionConflict)
+	}
+	var target *iterationCompletionScope
+	if req.TargetIterationID != nil {
+		if *req.TargetIterationID == req.IterationID {
+			return nil, queries, fmt.Errorf("%w: target iteration must differ from source", ErrIterationCompletionConflict)
+		}
+		target, err = s.loadCompletionScope(ctx, s.db, *req.TargetIterationID, false)
+		queries++
+		if err != nil {
+			return nil, queries, err
+		}
+		if target.status == "completed" || target.status == iterationStatusCancelled {
+			return nil, queries, fmt.Errorf("%w: target iteration is not open", ErrIterationCompletionConflict)
+		}
+		if err := a.authorizeTargetScope(target); err != nil {
+			return nil, queries, err
+		}
+	}
+	items, err := s.loadIncompleteItems(ctx, s.db, req.IterationID, false)
+	queries++
+	if err != nil {
+		return nil, queries, err
+	}
+	if len(items) > MaxBulkItemUpdates {
+		return nil, queries, ErrIterationCompletionLimit
+	}
+	for _, item := range items {
+		if target != nil && !target.isGlobal && (target.workspaceID == nil || *target.workspaceID != item.workspaceID) {
+			return nil, queries, fmt.Errorf("%w: target iteration does not belong to every item workspace", ErrIterationCompletionConflict)
+		}
+	}
+	for _, item := range items {
+		if err := a.authorizeWorkspace(item.workspaceID); err != nil {
+			return nil, queries, err
+		}
+	}
+	a.sealed = true
+	return a, queries, nil
+}
+
 func (a *completionAuthorization) authorizeIterationScope(scope *iterationCompletionScope) error {
 	if scope.isGlobal {
 		if a.globalChecked {
@@ -310,6 +386,9 @@ func (a *completionAuthorization) authorizeIterationScope(scope *iterationComple
 				return ErrIterationCompletionForbidden
 			}
 			return nil
+		}
+		if a.sealed {
+			return ErrIterationCompletionForbidden
 		}
 		a.globalChecked = true
 		if a.req.AuthorizeGlobal == nil {
@@ -350,6 +429,9 @@ func (a *completionAuthorization) authorizeWorkspace(workspaceID int) error {
 			return ErrIterationCompletionForbidden
 		}
 		return nil
+	}
+	if a.sealed {
+		return ErrIterationCompletionForbidden
 	}
 	if a.req.AuthorizeWorkspace == nil {
 		return ErrIterationCompletionForbidden

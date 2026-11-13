@@ -19,8 +19,9 @@ import (
 
 // ItemUpdateService handles item update operations with validation, history tracking, and event emission
 type ItemUpdateService struct {
-	db        database.Database
-	validator *validation.ItemFieldValidator
+	db          database.Database
+	validator   *validation.ItemFieldValidator
+	permissions *PermissionService
 }
 
 // NewItemUpdateService creates a new item update service. The validator is
@@ -38,6 +39,7 @@ func NewItemUpdateService(db database.Database) *ItemUpdateService {
 // parent assignments. User-facing callers must set this; internal callers
 // that don't touch parent_id may omit it.
 func (s *ItemUpdateService) WithPermissionService(permService *PermissionService) *ItemUpdateService {
+	s.permissions = permService
 	s.validator = s.validator.WithPermissionChecker(permService)
 	// Also enforce that the caller may assign the project_id / time_project_id
 	// they pass. CanViewProject is pure-SQL plus the global-admin check on the

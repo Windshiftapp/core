@@ -61,7 +61,12 @@ func (u *itemUpdateOperation) apply() error {
 	}
 	u.original = original
 	u.updated = *original
-	if err := u.service.validator.ValidateAndApplyUpdates(&u.updated, u.req.UpdateData, u.req.UserID); err != nil {
+	validator, closeValidator, err := u.service.transactionValidator(u.ctx, u.tx, u.req.UpdateData)
+	if err != nil {
+		return err
+	}
+	defer closeValidator()
+	if err := validator.ValidateAndApplyUpdates(&u.updated, u.req.UpdateData, u.req.UserID); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
 	}
 	if err := u.validatePlanningAssignments(); err != nil {

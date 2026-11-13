@@ -125,7 +125,7 @@ func (h *WorkspaceHandler) GetOrCreatePersonalWorkspace(w http.ResponseWriter, r
 				workspace.UpdatedAt = now
 				changed = true
 				created = true
-				if err := h.repo.CreateItemSequence(int64(workspace.ID)); err != nil {
+				if err := h.repo.CreateItemSequenceTx(tx, int64(workspace.ID)); err != nil {
 					slog.Warn("failed to create item sequence for personal workspace", slog.String("component", "workspaces"), slog.Int64("workspace_id", int64(workspace.ID)), slog.Any("error", err))
 				}
 				return nil

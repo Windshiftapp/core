@@ -537,13 +537,18 @@ func (r *ItemRepository) GetWorkspaceIDCtx(ctx context.Context, itemID int) (int
 // Items that do not exist are absent from the returned map, so callers can
 // treat a missing entry as "not found".
 func (r *ItemRepository) GetWorkspaceIDs(itemIDs []int) (map[int]int, error) {
+	return r.GetWorkspaceIDsContext(context.Background(), itemIDs)
+}
+
+// GetWorkspaceIDsContext resolves item ownership before mutation authorization.
+func (r *ItemRepository) GetWorkspaceIDsContext(ctx context.Context, itemIDs []int) (map[int]int, error) {
 	resolved := make(map[int]int, len(itemIDs))
 	if len(itemIDs) == 0 {
 		return resolved, nil
 	}
 
 	clause, args := inPlaceholders(itemIDs)
-	rows, err := r.db.Query("SELECT id, workspace_id FROM items WHERE id IN ("+clause+")", args...)
+	rows, err := r.db.QueryContext(ctx, "SELECT id, workspace_id FROM items WHERE id IN ("+clause+")", args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query item workspace ids: %w", err)
 	}
@@ -1365,12 +1370,17 @@ func (r *ItemRepository) GetParentID(itemID int) (*int, error) {
 
 // GetParentIDTx locks and reads the parent inside the supplied transaction.
 func (r *ItemRepository) GetParentIDTx(tx database.Tx, itemID int) (*int, error) {
+	return r.GetParentIDTxContext(context.Background(), tx, itemID)
+}
+
+// GetParentIDTxContext keeps hierarchy-lock waits within the request lifetime.
+func (r *ItemRepository) GetParentIDTxContext(ctx context.Context, tx database.Tx, itemID int) (*int, error) {
 	query := `SELECT parent_id FROM items WHERE id = ?`
 	if r.db.GetDriverName() == "postgres" {
 		query += " FOR UPDATE"
 	}
 	var parentID sql.NullInt64
-	if err := tx.QueryRow(query, itemID).Scan(&parentID); err != nil {
+	if err := tx.QueryRowContext(ctx, query, itemID).Scan(&parentID); err != nil {
 		return nil, mapItemErr(err, "get parent id")
 	}
 	return nullIntPtr(parentID), nil

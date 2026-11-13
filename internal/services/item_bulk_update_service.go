@@ -114,6 +114,7 @@ func (s *ItemUpdateService) BulkPatchItems(ctx context.Context, req BulkPatchIte
 	}
 
 	fieldsByID := make(map[int]map[string]any, len(req.Patches))
+	validationFields := make([]map[string]any, 0, len(req.Patches))
 	requestedIDs := make([]int, 0, len(req.Patches))
 	for _, patch := range req.Patches {
 		if patch.ItemID <= 0 {
@@ -134,31 +135,23 @@ func (s *ItemUpdateService) BulkPatchItems(ctx context.Context, req BulkPatchIte
 			return nil, err
 		}
 		fieldsByID[patch.ItemID] = patch.Fields
+		validationFields = append(validationFields, patch.Fields)
 		requestedIDs = append(requestedIDs, patch.ItemID)
 	}
 	ids := uniquePositiveSortedIDs(requestedIDs)
-
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("start bulk item patch: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
 	repo := repository.NewItemRepository(s.db)
-	originals, err := repo.FindByIDsForUpdateContext(ctx, tx, ids)
-	sqlStatements := 1
+	itemWorkspaces, err := repo.GetWorkspaceIDsContext(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
-	if len(originals) != len(ids) {
+	if len(itemWorkspaces) != len(ids) {
 		return nil, ErrBulkItemNotFound
 	}
-
-	workspaceIDs := map[int]struct{}{}
-	for _, item := range originals {
-		workspaceIDs[item.WorkspaceID] = struct{}{}
-	}
-	for workspaceID := range workspaceIDs {
+	authorizedWorkspaces := map[int]bool{}
+	for _, workspaceID := range itemWorkspaces {
+		if authorizedWorkspaces[workspaceID] {
+			continue
+		}
 		if req.AuthorizeWorkspace == nil {
 			return nil, ErrBulkItemForbidden
 		}
@@ -169,13 +162,42 @@ func (s *ItemUpdateService) BulkPatchItems(ctx context.Context, req BulkPatchIte
 		if !allowed {
 			return nil, ErrBulkItemForbidden
 		}
+		authorizedWorkspaces[workspaceID] = true
 	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("start bulk item patch: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	originals, err := repo.FindByIDsForUpdateContext(ctx, tx, ids)
+	sqlStatements := 2 // ownership lookup and locked item read
+	if err != nil {
+		return nil, err
+	}
+	if len(originals) != len(ids) {
+		return nil, ErrBulkItemNotFound
+	}
+
+	// Authorization callbacks may read the pool, so run them before BeginTx
+	// and reject an item whose workspace changed before its row was locked.
+	for _, item := range originals {
+		if item.WorkspaceID != itemWorkspaces[item.ID] {
+			return nil, ErrBulkItemForbidden
+		}
+	}
+	validator, closeValidator, err := s.transactionValidator(ctx, tx, validationFields...)
+	if err != nil {
+		return nil, err
+	}
+	defer closeValidator()
 
 	pending := make([]UpdateItemResult, 0, len(originals))
 	eventRecords := make([]itemevents.UpdateRecord, 0, len(originals))
 	for _, original := range originals {
 		updated := *original
-		if err := s.validator.ValidateAndApplyUpdates(&updated, fieldsByID[original.ID], req.UserID); err != nil {
+		if err := validator.ValidateAndApplyUpdates(&updated, fieldsByID[original.ID], req.UserID); err != nil {
 			return nil, fmt.Errorf("item %d validation failed: %w", original.ID, err)
 		}
 		history := s.compareAndGenerateHistory(original, &updated, req.UserID)

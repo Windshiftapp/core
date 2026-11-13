@@ -167,7 +167,7 @@ func (r *BoardConfigurationRepository) Update(configID int, req *models.BoardCon
 	}
 
 	// Get existing columns
-	existingColumns, err := r.GetColumns(configID)
+	existingColumns, err := getBoardColumns(tx, configID)
 	if err != nil {
 		return err
 	}
@@ -297,7 +297,13 @@ func (r *BoardConfigurationRepository) Delete(configID int) error {
 // GetColumns returns the columns of a board configuration in display order
 // (without status mappings).
 func (r *BoardConfigurationRepository) GetColumns(configID int) ([]models.BoardColumn, error) {
-	rows, err := r.db.Query(`
+	return getBoardColumns(r.db, configID)
+}
+
+func getBoardColumns(q interface {
+	Query(string, ...any) (*sql.Rows, error)
+}, configID int) ([]models.BoardColumn, error) {
+	rows, err := q.Query(`
 		SELECT id, board_configuration_id, name, display_order, wip_limit, color, created_at, updated_at
 		FROM board_columns
 		WHERE board_configuration_id = ?

@@ -555,8 +555,8 @@ func (r *AssetRepository) CreateSetAndInitialize(set *models.AssetManagementSet,
 			return fmt.Errorf("failed to create asset set: %w", err)
 		}
 
-		adminRoleID, err := r.GetAssetRoleIDByName(assetRoleAdministrator)
-		if err != nil {
+		var adminRoleID int
+		if err := tx.QueryRow("SELECT id FROM asset_roles WHERE name = ?", assetRoleAdministrator).Scan(&adminRoleID); err != nil {
 			return fmt.Errorf("failed to get administrator role: %w", err)
 		}
 		if _, err := tx.ExecWrite(`

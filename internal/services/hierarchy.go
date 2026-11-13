@@ -62,9 +62,14 @@ func (h *HierarchyService) WouldCreateCycle(ancestorCandidateID, newParentID int
 // where two concurrent reparents could each pass their cycle check and
 // together create a cycle.
 func (h *HierarchyService) WouldCreateCycleTx(tx database.Tx, ancestorCandidateID, newParentID int) (bool, error) {
+	return h.WouldCreateCycleTxContext(context.Background(), tx, ancestorCandidateID, newParentID)
+}
+
+// WouldCreateCycleTxContext cancels transaction-scoped hierarchy reads with the request.
+func (h *HierarchyService) WouldCreateCycleTxContext(ctx context.Context, tx database.Tx, ancestorCandidateID, newParentID int) (bool, error) {
 	itemRepo := h.repo
 	return walkForCycle(ancestorCandidateID, newParentID, func(id int) (*int, error) {
-		return itemRepo.GetParentIDTx(tx, id)
+		return itemRepo.GetParentIDTxContext(ctx, tx, id)
 	})
 }
 

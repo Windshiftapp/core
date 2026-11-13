@@ -73,6 +73,13 @@ func NewItemFieldValidator(db database.Database) *ItemFieldValidator {
 	return &ItemFieldValidator{db: db}
 }
 
+// WithDatabase returns an independent validator using the supplied connection.
+func (v *ItemFieldValidator) WithDatabase(db database.Database) *ItemFieldValidator {
+	cloned := *v
+	cloned.db = db
+	return &cloned
+}
+
 // WithPermissionChecker attaches a workspace permission checker for item
 // relationships that may cross workspace boundaries. Returns the receiver for
 // chaining.
