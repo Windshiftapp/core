@@ -7003,6 +7003,16 @@
             },
             "description": "User not found"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/handlers.ErrorResponse"
+                }
+              }
+            },
+            "description": "Offboarded user, self-deactivation, or duplicate identity"
+          },
           "500": {
             "content": {
               "application/json": {

@@ -17,11 +17,19 @@ import (
 // scattered user-metadata lookups elsewhere (leave-period substitute check,
 // channel-manager audit details, etc.) route through here.
 type UserRepository struct {
-	db database.Database
+	db userExecutor
+}
+
+type userExecutor interface {
+	Query(string, ...any) (*sql.Rows, error)
+	QueryRow(string, ...any) *sql.Row
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+	ExecWrite(string, ...any) (sql.Result, error)
 }
 
 // NewUserRepository creates a UserRepository.
-func NewUserRepository(db database.Database) *UserRepository {
+func NewUserRepository(db userExecutor) *UserRepository {
 	return &UserRepository{db: db}
 }
 
@@ -608,18 +616,37 @@ type UpdateProfileSnapshot struct {
 	Timezone    sql.NullString
 	Language    sql.NullString
 	SCIMManaged bool
+	Offboarded  bool
 }
 
 // GetUpdateProfileSnapshot reads the columns the Update audit + SCIM gate
 // need. Returns ErrNotFound when missing.
 func (r *UserRepository) GetUpdateProfileSnapshot(id int) (*UpdateProfileSnapshot, error) {
+	return r.getUpdateProfileSnapshot(id, "")
+}
+
+// LockUpdateProfileSnapshot serializes lifecycle changes on the caller's
+// transaction before reading the policy guards and audit pre-image.
+func (r *UserRepository) LockUpdateProfileSnapshot(id int, driver string) (*UpdateProfileSnapshot, error) {
+	if database.IsPostgresDriver(driver) {
+		return r.getUpdateProfileSnapshot(id, " FOR UPDATE")
+	}
+	// SQLite has no row locks: acquire its writer lock before reading. This
+	// no-op UPDATE also fires any users-table UPDATE triggers.
+	if _, err := r.db.ExecWrite("UPDATE users SET id = id WHERE id = ?", id); err != nil {
+		return nil, fmt.Errorf("lock user %d update: %w", id, err)
+	}
+	return r.GetUpdateProfileSnapshot(id)
+}
+
+func (r *UserRepository) getUpdateProfileSnapshot(id int, suffix string) (*UpdateProfileSnapshot, error) {
 	var s UpdateProfileSnapshot
 	err := r.db.QueryRow(`
 		SELECT email, username, first_name, last_name, is_active, avatar_url, timezone, language,
-		       COALESCE(scim_managed, false)
+		       COALESCE(scim_managed, false), offboarded_at IS NOT NULL
 		FROM users WHERE id = ?
-	`, id).Scan(&s.Email, &s.Username, &s.FirstName, &s.LastName, &s.IsActive,
-		&s.AvatarURL, &s.Timezone, &s.Language, &s.SCIMManaged)
+	`+suffix, id).Scan(&s.Email, &s.Username, &s.FirstName, &s.LastName, &s.IsActive,
+		&s.AvatarURL, &s.Timezone, &s.Language, &s.SCIMManaged, &s.Offboarded)
 	if err != nil {
 		return nil, notFoundOrWrap(err, fmt.Sprintf("get user %d update snapshot", id))
 	}

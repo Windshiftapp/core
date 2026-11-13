@@ -18,10 +18,10 @@ type AdminUserHandler struct {
 }
 
 // NewAdminUserHandler creates a new admin user handler.
-func NewAdminUserHandler(db database.Database, permissionService *services.PermissionService) *AdminUserHandler {
+func NewAdminUserHandler(db database.Database, permissionService *services.PermissionService, lifecycle *services.UserDeactivationService) *AdminUserHandler {
 	return &AdminUserHandler{
 		BaseHandler: NewBaseHandler(db, permissionService),
-		userSvc:     services.NewUserReadService(db),
+		userSvc:     services.NewAdminUserService(db, lifecycle),
 	}
 }
 
@@ -122,6 +122,7 @@ func (h *AdminUserHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Failure      401   {object}  handlers.ErrorResponse
 // @Failure      403   {object}  handlers.ErrorResponse  "Caller is not a system admin or token lacks the admin:users:write scope"
 // @Failure      404   {object}  handlers.ErrorResponse  "User not found"
+// @Failure      409   {object}  handlers.ErrorResponse  "Offboarded user, self-deactivation, or duplicate identity"
 // @Failure      500   {object}  handlers.ErrorResponse
 // @Router       /admin/users/{id} [put]
 func (h *AdminUserHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -158,6 +159,10 @@ func (h *AdminUserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "No fields to update"))
 		return
 	}
+	if id == actor.ID && req.IsActive != nil && !*req.IsActive {
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeConflict, "You cannot deactivate your own account"))
+		return
+	}
 	result, err := h.userSvc.UpdateAdmin(id, update)
 	if err != nil {
 		switch {
@@ -165,6 +170,8 @@ func (h *AdminUserHandler) Update(w http.ResponseWriter, r *http.Request) {
 			h.RespondError(w, r, restapi.ErrUserNotFound)
 		case errors.Is(err, services.ErrUserManagedExternally):
 			h.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, restapi.ErrCodeForbidden, "User is managed externally"))
+		case errors.Is(err, services.ErrUserOffboarded):
+			h.RespondError(w, r, restapi.NewAPIError(http.StatusConflict, restapi.ErrCodeConflict, "User has been offboarded and cannot be reactivated"))
 		case errors.Is(err, services.ErrUserEmailInvalid):
 			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Invalid email"))
 		case errors.Is(err, services.ErrUserEmailExists), errors.Is(err, services.ErrUserUsernameExists):
@@ -193,6 +200,26 @@ func (h *AdminUserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		changes["is_active"] = map[string]bool{"old": before.IsActive, "new": u.IsActive}
 	}
 	h.Auditor.LogWithDetails(r, actor, logger.ActionUserUpdate, logger.ResourceUser, &u.ID, u.Username, changes)
+	if before.IsActive != u.IsActive {
+		action := logger.ActionUserActivate
+		if !u.IsActive {
+			action = logger.ActionUserDeactivate
+		}
+		h.Auditor.LogWithDetails(r, actor, action, logger.ResourceUser, &u.ID, u.Username, map[string]any{
+			"previous_state": before.IsActive, "new_state": u.IsActive,
+			"cascaded_agents": result.Cascade.AgentIDs, "revoked_api_tokens": len(result.Cascade.RevokedAPITokens),
+		})
+	}
+	for _, agentID := range result.Cascade.AgentIDs {
+		h.Auditor.LogWithDetails(r, actor, logger.ActionAgentDeactivate, logger.ResourceAgent, &agentID, "", map[string]any{
+			"reason": "owner_deactivated", "owner_id": u.ID,
+		})
+	}
+	for _, tokenID := range result.Cascade.RevokedAPITokens {
+		h.Auditor.LogWithDetails(r, actor, logger.ActionAPITokenAutoRevoke, logger.ResourceAPIToken, &tokenID, "", map[string]any{
+			"reason": "owner_deactivated", "owner_id": u.ID, "table": "api_tokens",
+		})
+	}
 	h.RespondOK(w, resp)
 }
 

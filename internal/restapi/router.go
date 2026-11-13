@@ -12,8 +12,8 @@ import (
 )
 
 // Deps carries the dependencies v1 (and future versions) need so we can add
-// services without churning every call site. New fields go at the end with
-// nil-safe defaults so unrelated callers compile unchanged.
+// services without churning every call site. Optional fields have nil-safe
+// defaults; security-critical dependencies are documented as required.
 type Deps struct {
 	Mux               *http.ServeMux
 	DB                database.Database
@@ -97,6 +97,9 @@ type Deps struct {
 	// fallback with trusted-proxy handling. Optional: nil ignores forwarded
 	// headers and uses RemoteAddr.
 	IPExtractor *utils.IPExtractor
+	// UserDeactivationService is required for admin user mutations; production
+	// shares its token/session/permission invalidators with every transport.
+	UserDeactivationService *services.UserDeactivationService
 }
 
 // AIHandler is the subset of the AI tier the bearer surface exposes.

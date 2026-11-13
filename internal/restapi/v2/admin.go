@@ -347,8 +347,20 @@ func auditAdminUserUpdate(r *http.Request, result *services.AdminUserUpdateResul
 			action = logger.ActionUserDeactivate
 		}
 		logger.Record(r, action, logger.ResourceUser, &userID, after.Username, map[string]any{
-			"previous_state": before.IsActive,
-			"new_state":      after.IsActive,
+			"previous_state":     before.IsActive,
+			"new_state":          after.IsActive,
+			"cascaded_agents":    result.Cascade.AgentIDs,
+			"revoked_api_tokens": len(result.Cascade.RevokedAPITokens),
+		})
+	}
+	for _, agentID := range result.Cascade.AgentIDs {
+		logger.Record(r, logger.ActionAgentDeactivate, logger.ResourceAgent, &agentID, "", map[string]any{
+			"reason": "owner_deactivated", "owner_id": userID,
+		})
+	}
+	for _, tokenID := range result.Cascade.RevokedAPITokens {
+		logger.Record(r, logger.ActionAPITokenAutoRevoke, logger.ResourceAPIToken, &tokenID, "", map[string]any{
+			"reason": "owner_deactivated", "owner_id": userID, "table": "api_tokens",
 		})
 	}
 }
@@ -440,6 +452,8 @@ func adminUserError(err error) error {
 		return newError(http.StatusNotFound, "not_found", "User was not found")
 	case errors.Is(err, services.ErrUserManagedExternally):
 		return newError(http.StatusForbidden, "insufficient_permission", err.Error())
+	case errors.Is(err, services.ErrUserOffboarded):
+		return newError(http.StatusConflict, "conflict", "User has been offboarded and cannot be reactivated")
 	case errors.Is(err, services.ErrUserEmailInvalid):
 		return newError(http.StatusBadRequest, "invalid_request", err.Error())
 	case errors.Is(err, services.ErrUserEmailExists), errors.Is(err, services.ErrUserUsernameExists):

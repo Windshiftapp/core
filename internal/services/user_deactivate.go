@@ -44,7 +44,9 @@ func NewUserDeactivationService(
 // all API tokens belonging to either, then invalidates security caches after
 // the transaction commits. Repeated calls are safe.
 func (s *UserDeactivationService) DeactivateUser(ownerID int) (AgentDeactivationResult, error) {
-	result, err := deactivateUserAndOwnedAgentsAndTokens(s.db, ownerID, true)
+	result, err := database.WithTxResult(s.db, func(tx database.Tx) (AgentDeactivationResult, error) {
+		return s.DeactivateUserTx(tx, ownerID)
+	})
 	if err != nil {
 		return result, err
 	}
@@ -103,23 +105,12 @@ func ActiveSystemAdminIDs(db database.Database) ([]int, error) {
 	return ids, nil
 }
 
-func deactivateUserAndOwnedAgentsAndTokens(
-	db database.Database,
-	ownerID int,
-	deactivateOwner bool,
-) (AgentDeactivationResult, error) {
+// DeactivateUserTx applies the shared cascade within a larger mutation.
+// The caller commits and then calls InvalidateDeprovisionCaches.
+func (s *UserDeactivationService) DeactivateUserTx(tx database.Tx, ownerID int) (AgentDeactivationResult, error) {
 	var result AgentDeactivationResult
-
-	tx, err := db.Begin()
-	if err != nil {
-		return result, fmt.Errorf("failed to begin cascade transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if deactivateOwner {
-		if _, err = tx.Exec(`UPDATE users SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ownerID); err != nil {
-			return result, fmt.Errorf("failed to deactivate user: %w", err)
-		}
+	if _, err := tx.Exec(`UPDATE users SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, ownerID); err != nil {
+		return result, fmt.Errorf("failed to deactivate user: %w", err)
 	}
 
 	cascade, err := repository.DeactivateOwnedAgentsAndTokensTx(tx, ownerID)
@@ -129,10 +120,6 @@ func deactivateUserAndOwnedAgentsAndTokens(
 	result.AgentIDs = cascade.DeactivatedAgentIDs
 	result.OwnedAgentIDs = cascade.OwnedAgentIDs
 	result.RevokedAPITokens = cascade.RevokedAPITokenIDs
-
-	if err = tx.Commit(); err != nil {
-		return result, fmt.Errorf("failed to commit cascade: %w", err)
-	}
 
 	return result, nil
 }

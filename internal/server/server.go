@@ -1932,6 +1932,7 @@ func (s *Server) initialize() error {
 		AI:                             aiHandler,
 		AIRateLimiter:                  s.aiRateLimiter,
 		IPExtractor:                    ipExtractor,
+		UserDeactivationService:        userDeactivationService,
 	}, v1.RegisterRoutes)
 	v2CSRF := middleware.NewDisabledCSRFValidator()
 	if !cfg.DisableCSRF {
@@ -2070,7 +2071,7 @@ func (s *Server) initialize() error {
 		SystemAdmins:                 permService,
 		GlobalPermission:             permService,
 		Groups:                       groupHandler.Application(),
-		AdminUsers:                   services.NewUserReadService(s.db),
+		AdminUsers:                   services.NewAdminUserService(s.db, userDeactivationService),
 		AuditLogs:                    repository.NewAuditLogRepository(s.db),
 		AdminTokens:                  tokenManager,
 		AdminAuditor:                 logger.NewAuditor(s.db),
