@@ -87,7 +87,11 @@ class TimeLogStore {
 
   /** Open a persisted draft by id (recovery surface). */
   async openDraft(draftId) {
+    const generation = this.#generation;
     const draft = await time.worklogDrafts.get(draftId);
+    // A reset (logout/login) during the request must not reopen the modal with
+    // the previous account's draft.
+    if (generation !== this.#generation) return;
     await this.open({ editingDraft: draft });
   }
 

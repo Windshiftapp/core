@@ -392,7 +392,7 @@ func (s *TimeWorklogService) prepareWithProject(userID int, input WorklogMutatio
 		} else if durationMinutes < 0 {
 			return preparedWorklog{}, worklogInputError{fmt.Errorf("duration must not be negative")}
 		}
-		if startUnix <= 0 || endUnix <= startUnix {
+		if startUnix <= 0 || endUnix < startUnix || (requirePositiveDuration && endUnix == startUnix) {
 			return preparedWorklog{}, worklogInputError{fmt.Errorf("stored worklog interval is invalid")}
 		}
 	} else {
