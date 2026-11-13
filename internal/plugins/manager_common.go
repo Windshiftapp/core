@@ -62,7 +62,8 @@ type ManagerOptions struct {
 	MaxHTTPFetchResponseBytes int64
 	// LicenseVerifier, when set, enables license enforcement: a plugin only
 	// contributes capabilities when its stored license verifies. Nil keeps the
-	// legacy behavior where every loaded plugin's capabilities count.
+	// legacy behavior where every loaded plugin's capabilities count, so it is
+	// only correct when enforcement is intentionally unconfigured.
 	LicenseVerifier LicenseVerifier
 	// AllowPublicRoutes permits plugin routes that declare auth "none". Off by
 	// default so a public route requires a deliberate operator opt-in.
@@ -101,7 +102,8 @@ func WithAdditionalPluginDirs(dirs ...string) Option {
 
 // WithLicenseVerifier enables license enforcement. A nil verifier (the zero
 // case) keeps the legacy behavior where every loaded plugin's capabilities
-// count regardless of licensing.
+// count regardless of licensing; a configured but unusable key must fail
+// startup instead of falling back to that behavior.
 func WithLicenseVerifier(verifier LicenseVerifier) Option {
 	return func(o *ManagerOptions) {
 		o.LicenseVerifier = verifier

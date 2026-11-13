@@ -202,7 +202,10 @@ type PluginsConfig struct {
 	Dir       string
 	ExtraDirs []string // from PLUGIN_DIRS (comma-separated)
 	// LicensePubKey is the base64 Ed25519 public key that plugin license
-	// tokens must verify against. Empty disables license enforcement.
+	// tokens must verify against. Empty disables license enforcement. A
+	// non-empty value that is malformed, the wrong size, or cannot be bound to
+	// this install's instance identity is a startup error, never a silent
+	// downgrade to enforcement-off.
 	LicensePubKey string
 	// AllowPublicRoutes permits plugin routes that declare auth "none". Off by
 	// default: a public route is a deliberate operator opt-in.
