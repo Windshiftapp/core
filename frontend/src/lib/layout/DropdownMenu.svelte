@@ -380,7 +380,7 @@
                 {:else}
                   {@const GroupItemIcon = groupItem.icon}
                   <div class="w-6 h-6 mr-3 rounded flex items-center justify-center">
-                    <GroupItemIcon class="w-4 h-4 {groupItem.iconClass || 'transition-colors'}" style="color: var(--ds-icon-subtle);" />
+                    <GroupItemIcon class="w-4 h-4 {groupItem.iconClass || 'transition-colors'}" />
                   </div>
                 {/if}
               {/if}
