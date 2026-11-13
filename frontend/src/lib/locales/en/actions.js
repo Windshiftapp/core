@@ -82,6 +82,7 @@ export default {
       notifyCustomer: 'Notify customer',
       insertCannedResponse: 'Insert canned response',
       adjustLabels: 'Adjust labels',
+      executeScript: 'Run script',
     },
 
     // Toast shown when the AI chat updates the open action via update_action.

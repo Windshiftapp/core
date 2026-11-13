@@ -62,6 +62,7 @@ export default {
       transitionItem: 'Transicionar elemento',
       roundRobinAssign: 'Asignar por turno rotativo',
       createMilestone: 'Crear hito',
+      executeScript: 'Ejecutar script',
     },
 
     aiUpdated: 'Acción actualizada por IA',

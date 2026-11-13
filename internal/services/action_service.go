@@ -712,14 +712,16 @@ func (as *ActionService) executeActionForEvent(executionCtx context.Context, act
 	}
 
 	ctx := &models.ExecutionContext{
-		Context:          executionCtx,
-		DurableEventKey:  durableEventKey,
-		Action:           action,
-		Event:            event,
-		EffectiveActorID: effectiveActorID,
-		Variables:        make(map[string]any),
-		StepResults:      []models.StepResult{},
-		ChainID:          chainID,
+		Context:              executionCtx,
+		DurableEventKey:      durableEventKey,
+		Action:               action,
+		Event:                event,
+		EffectiveActorID:     effectiveActorID,
+		Variables:            make(map[string]any),
+		StepResults:          []models.StepResult{},
+		ChainID:              chainID,
+		ExecutionLogID:       log.ID,
+		DefinitionRevisionID: log.DefinitionRevisionID,
 	}
 
 	// Expose the effective actor to template expansion.

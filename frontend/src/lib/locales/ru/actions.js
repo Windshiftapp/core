@@ -76,6 +76,7 @@ export default {
       transitionItem: 'Изменить статус элемента',
       roundRobinAssign: 'Назначить по очереди',
       createMilestone: 'Создать этап',
+      executeScript: 'Запустить скрипт',
       notifyCustomer: 'Уведомить клиента',
       insertCannedResponse: 'Вставить шаблон ответа',
       adjustLabels: 'Изменить метки',

@@ -2127,6 +2127,14 @@ func (s *Server) initialize() error {
 		return fmt.Errorf("register REST API v2: %w", err)
 	}
 
+	// execute_script runs author-supplied JavaScript as the effective action
+	// executor. REST calls from the script go through the mounted v2 handler
+	// with a short-lived token minted for that executor, so bearer auth, token
+	// scopes, and every handler-level authorization check still apply.
+	s.actionService.RegisterNodeExecutor(
+		services.NewExecuteScriptExecutor(tokenManager, services.NewInProcessV2Dispatcher(mux, 0)),
+	)
+
 	// MCP Server (Model Context Protocol) — opt-in via --mcp or MCP_ENABLED=true
 	if cfg.MCPEnabled {
 		mcpServer := mcpserver.NewMCPServer(mcpserver.Deps{

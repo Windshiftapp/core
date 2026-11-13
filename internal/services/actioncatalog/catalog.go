@@ -354,6 +354,14 @@ func Build() (*Catalog, error) {
 	}); err != nil {
 		return nil, err
 	}
+	if err := registerNode[models.ExecuteScriptNodeConfig](c, nodeSpec{
+		Type:        models.ActionNodeExecuteScript,
+		Label:       "Run script",
+		Description: "Run a JavaScript function body with the effective executor's identity. The script can call the v2 REST API through a server-minted, short-lived token; the return value is stored in the configured output variable.",
+		Category:    CategoryIntegration,
+	}); err != nil {
+		return nil, err
+	}
 
 	// Drift detector: every ActionNodeType constant must be registered.
 	// AllActionNodeTypes is the authoritative list (kept next to the
@@ -502,6 +510,7 @@ var AllActionNodeTypes = []models.ActionNodeType{
 	models.ActionNodeTransitionItem,
 	models.ActionNodeRelatedItems,
 	models.ActionNodeCreateMilestone,
+	models.ActionNodeExecuteScript,
 }
 
 // AllActionTriggerTypes is the trigger counterpart of AllActionNodeTypes.

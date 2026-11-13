@@ -114,6 +114,16 @@ func (s *ItemUpdateApplicationService) CanUserEditItem(userID, itemID int) (bool
 // presence/null distinction here means every HTTP surface uses the same
 // coercion rules before reaching the transactional update service.
 func (s *ItemUpdateApplicationService) UpdateJSONFields(actorUserID int, actorUsername string, itemID int, fields map[string]json.RawMessage) (*UpdateItemResult, error) {
+	return s.updateJSONFields(actorUserID, actorUsername, itemID, fields, nil)
+}
+
+// UpdateJSONFieldsWithContext applies the same patch format while preserving
+// the automation chain that caused the mutation (execute_script REST calls).
+func (s *ItemUpdateApplicationService) UpdateJSONFieldsWithContext(actorUserID int, actorUsername string, itemID int, fields map[string]json.RawMessage, actionContext ActionContext) (*UpdateItemResult, error) {
+	return s.updateJSONFields(actorUserID, actorUsername, itemID, fields, &actionContext)
+}
+
+func (s *ItemUpdateApplicationService) updateJSONFields(actorUserID int, actorUsername string, itemID int, fields map[string]json.RawMessage, actionContext *ActionContext) (*UpdateItemResult, error) {
 	if _, ok := fields["status_id"]; ok {
 		return nil, &validation.ValidationError{
 			Field:   "status_id",
@@ -125,7 +135,7 @@ func (s *ItemUpdateApplicationService) UpdateJSONFields(actorUserID int, actorUs
 	if err != nil {
 		return nil, err
 	}
-	return s.Update(actorUserID, actorUsername, itemID, updateData)
+	return s.updateItem(actorUserID, actorUsername, itemID, updateData, actionContext)
 }
 
 func itemUpdateData(fields map[string]json.RawMessage) (map[string]any, error) {

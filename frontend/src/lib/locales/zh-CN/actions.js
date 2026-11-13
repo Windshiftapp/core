@@ -57,6 +57,7 @@ export default {
       transitionItem: '过渡项目',
       roundRobinAssign: '轮询分配',
       createMilestone: '创建里程碑',
+      executeScript: '运行脚本',
     },
     aiUpdated: 'AI 已更新动作',
     addNodes: '添加节点',

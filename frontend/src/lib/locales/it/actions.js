@@ -71,6 +71,7 @@ export default {
       transitionItem: 'Transizione elemento',
       roundRobinAssign: 'Assegnazione a rotazione',
       createMilestone: 'Crea milestone',
+      executeScript: 'Esegui script',
       notifyCustomer: 'Notifica cliente',
       insertCannedResponse: 'Inserisci risposta predefinita',
       adjustLabels: 'Modifica etichette',

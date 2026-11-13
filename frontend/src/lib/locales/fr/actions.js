@@ -73,6 +73,7 @@ export default {
       transitionItem: 'Faire évoluer l’élément',
       roundRobinAssign: 'Attribution à tour de rôle',
       createMilestone: 'Créer un jalon',
+      executeScript: 'Exécuter le script',
     },
 
     // Toast shown when the AI chat updates the open action via update_action.

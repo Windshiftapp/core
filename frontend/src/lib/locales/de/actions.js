@@ -67,6 +67,7 @@ export default {
       transitionItem: 'Vorgang überführen',
       roundRobinAssign: 'Round-Robin zuweisen',
       createMilestone: 'Meilenstein erstellen',
+      executeScript: 'Skript ausführen',
     },
 
     aiUpdated: 'Aktion durch KI aktualisiert',

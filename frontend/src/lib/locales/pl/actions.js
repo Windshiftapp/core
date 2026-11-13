@@ -77,6 +77,7 @@ export default {
       transitionItem: 'Przejście elementu',
       roundRobinAssign: 'Przypisanie rotacyjne',
       createMilestone: 'Utwórz kamień milowy',
+      executeScript: 'Uruchom skrypt',
       notifyCustomer: 'Powiadom klienta',
       insertCannedResponse: 'Wstaw gotową odpowiedź',
       adjustLabels: 'Dostosuj etykiety',

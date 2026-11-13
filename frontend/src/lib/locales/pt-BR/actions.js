@@ -62,6 +62,7 @@ export default {
       transitionItem: 'Transicionar item',
       roundRobinAssign: 'Atribuir em rodízio',
       createMilestone: 'Criar marco',
+      executeScript: 'Executar script',
     },
 
     aiUpdated: 'Ação atualizada pela IA',
