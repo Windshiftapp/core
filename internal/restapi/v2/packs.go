@@ -130,6 +130,10 @@ func registerPackRoutes(b *routeBuilder, deps Deps) {
 		if err != nil {
 			return err
 		}
+		// The archive is fully received and parsed; bound the database work
+		// that follows instead of charging its transfer time to the budget.
+		ctx, cancel := startDBBudget(r.Context())
+		defer cancel()
 		actor := auditActorFromRequest(r)
 		req := services.PackApplyRequest{
 			Archive: archive,
@@ -138,9 +142,9 @@ func registerPackRoutes(b *routeBuilder, deps Deps) {
 		}
 		var report *services.PackApplyReport
 		if dryRun {
-			report, err = deps.PackApply.Verify(r.Context(), req)
+			report, err = deps.PackApply.Verify(ctx, req)
 		} else {
-			report, err = deps.PackApply.Apply(r.Context(), req)
+			report, err = deps.PackApply.Apply(ctx, req)
 		}
 		if err != nil {
 			return internalError(err)

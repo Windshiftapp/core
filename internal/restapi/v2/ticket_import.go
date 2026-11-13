@@ -39,7 +39,10 @@ func registerTicketImportRoutes(builder *routeBuilder, tickets *services.TicketI
 			return err
 		}
 		// Authorize before touching the body so denials mask existence.
-		if err := tickets.Authorize(r.Context(), user.ID, workspaceID, models.PermissionItemCreate); err != nil {
+		authzCtx, cancelAuthz := startDBBudget(r.Context())
+		err = tickets.Authorize(authzCtx, user.ID, workspaceID, models.PermissionItemCreate)
+		cancelAuthz()
+		if err != nil {
 			return ticketImportError(err)
 		}
 		const maxBody = (50 << 20) + (1 << 20)
@@ -54,7 +57,11 @@ func registerTicketImportRoutes(builder *routeBuilder, tickets *services.TicketI
 			return newError(http.StatusBadRequest, "invalid_request", "file is required")
 		}
 		defer func() { _ = file.Close() }()
-		staged, err := tickets.Upload(r.Context(), user.ID, workspaceID, header.Filename, r.FormValue("has_header") != "false", r.FormValue("delimiter"), io.LimitReader(file, maxBody))
+		// The file is fully received; bound the staging database work that
+		// follows instead of charging its transfer time to the budget.
+		ctx, cancel := startDBBudget(r.Context())
+		defer cancel()
+		staged, err := tickets.Upload(ctx, user.ID, workspaceID, header.Filename, r.FormValue("has_header") != "false", r.FormValue("delimiter"), io.LimitReader(file, maxBody))
 		if err != nil {
 			return ticketImportError(err)
 		}
@@ -111,5 +118,9 @@ func ticketImportError(err error) error {
 	if errors.As(err, &validationErr) {
 		return newError(http.StatusBadRequest, "validation_failed", err.Error())
 	}
-	return newError(http.StatusBadRequest, "invalid_request", err.Error())
+	// Keep the cause so an expired database budget still maps to the stable 504
+	// contract instead of being flattened into a client error.
+	apiErr := newError(http.StatusBadRequest, "invalid_request", err.Error())
+	apiErr.cause = err
+	return apiErr
 }

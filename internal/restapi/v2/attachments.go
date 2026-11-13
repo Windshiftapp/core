@@ -52,7 +52,11 @@ func uploadPageAttachment(deps Deps) Handler {
 		if err != nil {
 			return internalError(err)
 		}
-		result, err := deps.PageAttachments.UploadPageAttachment(r.Context(), services.PageAttachmentUploadInput{
+		// The file is fully received; bound the storage and database work that
+		// follows instead of charging its transfer time to the budget.
+		ctx, cancel := startDBBudget(r.Context())
+		defer cancel()
+		result, err := deps.PageAttachments.UploadPageAttachment(ctx, services.PageAttachmentUploadInput{
 			PageID: pageID, UploaderID: user.ID, OriginalFilename: header.Filename,
 			FileData: data, FileSize: int64(len(data)),
 		})
@@ -136,7 +140,11 @@ func uploadItemAttachment(attachments attachmentApplication) Handler {
 		if int64(len(data)) > policy.MaxFileSize {
 			return newError(http.StatusRequestEntityTooLarge, "payload_too_large", "Attachment exceeds the configured size limit")
 		}
-		result, err := attachments.UploadItemAttachment(r.Context(), services.ItemAttachmentUploadInput{ItemID: itemID, UploaderID: user.ID, OriginalFilename: header.Filename, FileData: data, FileSize: int64(len(data))})
+		// The file is fully received; bound the storage and database work that
+		// follows instead of charging its transfer time to the budget.
+		ctx, cancel := startDBBudget(r.Context())
+		defer cancel()
+		result, err := attachments.UploadItemAttachment(ctx, services.ItemAttachmentUploadInput{ItemID: itemID, UploaderID: user.ID, OriginalFilename: header.Filename, FileData: data, FileSize: int64(len(data))})
 		if err != nil {
 			return attachmentError(err)
 		}
