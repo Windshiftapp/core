@@ -669,61 +669,6 @@ func (r *ItemRepository) GetTitles(itemIDs []int) (map[int]string, error) {
 	return out, rows.Err()
 }
 
-// ItemRefByCustomField identifies an item referencing an asset in custom fields.
-type ItemRefByCustomField struct {
-	ID          int
-	Title       string
-	WorkspaceID int
-}
-
-// ListItemsReferencingAssetInCustomField scans scalar, object, and array asset
-// references for a field key. Callers provide stringified values.
-func (r *ItemRepository) ListItemsReferencingAssetInCustomField(fieldKey, assetIDStr string) ([]ItemRefByCustomField, error) {
-	var query string
-	if r.db.GetDriverName() == "postgres" {
-		directExpr := fmt.Sprintf("i.custom_field_values->>'%s'", fieldKey)
-		nestedExpr := fmt.Sprintf("i.custom_field_values->'%s'->>'id'", fieldKey)
-		arrayExpr := fmt.Sprintf(`EXISTS (
-			SELECT 1 FROM jsonb_array_elements(CASE
-				WHEN jsonb_typeof(i.custom_field_values->'%s') = 'array' THEN i.custom_field_values->'%s'
-				ELSE '[]'::jsonb
-			END) AS elem
-			WHERE elem #>> '{}' = ? OR elem->>'id' = ?
-		)`, fieldKey, fieldKey)
-		query = fmt.Sprintf(`
-			SELECT i.id, i.title, i.workspace_id
-			FROM items i
-			WHERE (%s = ? OR %s = ? OR %s)
-		`, directExpr, nestedExpr, arrayExpr)
-	} else {
-		directExpr := fmt.Sprintf(`NULLIF(i.custom_field_values,'') ->> '$."%s"'`, fieldKey)    //nolint:gocritic // SQL JSON path, not Go quoting
-		nestedExpr := fmt.Sprintf(`NULLIF(i.custom_field_values,'') ->> '$."%s".id'`, fieldKey) //nolint:gocritic // SQL JSON path, not Go quoting
-		arrayExpr := fmt.Sprintf(`EXISTS (
-			SELECT 1 FROM json_each(NULLIF(i.custom_field_values,'') -> '$."%s"') AS elem
-			WHERE CAST(elem.value AS TEXT) = ? OR elem.value ->> '$.id' = ?
-		)`, fieldKey) //nolint:gocritic // SQL JSON path, not Go quoting
-		query = fmt.Sprintf(`
-			SELECT i.id, i.title, i.workspace_id
-			FROM items i
-			WHERE (%s = ? OR %s = ? OR %s)
-		`, directExpr, nestedExpr, arrayExpr)
-	}
-	rows, err := r.db.Query(query, assetIDStr, assetIDStr, assetIDStr, assetIDStr)
-	if err != nil {
-		return nil, fmt.Errorf("list items referencing asset in custom field: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-	var out []ItemRefByCustomField
-	for rows.Next() {
-		var ref ItemRefByCustomField
-		if err := rows.Scan(&ref.ID, &ref.Title, &ref.WorkspaceID); err != nil {
-			return nil, fmt.Errorf("scan item ref: %w", err)
-		}
-		out = append(out, ref)
-	}
-	return out, rows.Err()
-}
-
 // ItemGraphMetadata contains display, permission, and status data for a graph node.
 type ItemGraphMetadata struct {
 	WorkspaceKey        string
