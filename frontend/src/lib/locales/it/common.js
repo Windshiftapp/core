@@ -5,8 +5,6 @@
 export default {
   // Common UI elements
   common: {
-    virtualizeRows: 'Virtualizza righe',
-    virtualizeRowsHint: 'Disattiva per visualizzare tutte le righe caricate per accessibilità, ricerca nel browser o copia.',
     save: 'Salva',
     saveChanges: 'Salva modifiche',
     cancel: 'Annulla',

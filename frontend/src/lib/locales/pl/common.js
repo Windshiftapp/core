@@ -5,8 +5,6 @@
 export default {
   // Wspólne elementy interfejsu
   common: {
-    virtualizeRows: 'Wirtualizuj wiersze',
-    virtualizeRowsHint: 'Wyłącz, aby wyświetlić wszystkie załadowane wiersze na potrzeby dostępności, wyszukiwania w przeglądarce lub kopiowania.',
     save: 'Zapisz',
     saveChanges: 'Zapisz zmiany',
     cancel: 'Anuluj',

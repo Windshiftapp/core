@@ -6,7 +6,6 @@ export function useRoadmapVirtualRows(options: {
   getRoot: () => HTMLElement | null;
   getList: () => HTMLElement | null;
   getIdentity: () => string;
-  getEnabled: () => boolean;
 }) {
   const rows = $derived(
     options
@@ -18,7 +17,6 @@ export function useRoadmapVirtualRows(options: {
     getScrollElement: options.getRoot,
     getListElement: options.getList,
     getIdentity: options.getIdentity,
-    getEnabled: options.getEnabled,
     getFixedSize: () => 40,
   });
 }
