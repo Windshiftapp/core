@@ -110,7 +110,7 @@ type logTimeOut struct {
 // ----------------------------------------------------------------------------
 
 type startTimerArgs struct {
-	ProjectID   int    `json:"project_id" jsonschema:"Time project ID"`
+	ProjectID   *int   `json:"project_id,omitempty" jsonschema:"Optional time project ID; when omitted the timer stops into a recoverable draft"`
 	WorkspaceID int    `json:"workspace_id" jsonschema:"Workspace ID"`
 	Description string `json:"description" jsonschema:"Timer description"`
 	ItemID      *int   `json:"item_id,omitempty" jsonschema:"Optional linked work item ID (alternative: item_key)"`
@@ -132,7 +132,9 @@ type stopTimerOut struct {
 	Description     string `json:"description"`
 	DurationSeconds int64  `json:"duration_seconds"`
 	DurationMinutes int    `json:"duration_minutes"`
-	WorklogCreated  bool   `json:"worklog_created"`
+	Booked          bool   `json:"booked"`
+	WorklogID       *int   `json:"worklog_id,omitempty"`
+	DraftID         *int   `json:"draft_id,omitempty"`
 }
 
 func init() {
@@ -329,7 +331,7 @@ func init() {
 		Group:       CapabilityTime,
 		Access:      AccessWrite,
 		Risk:        RiskMedium,
-		Description: "Start a time tracking timer. Only one timer can be active at a time. An optional work item can be linked by numeric ID or key (e.g. PROJ-42).",
+		Description: "Start a time tracking timer. Only one timer can be active at a time. Project is optional; a timer without a project stops into a recoverable draft. An optional work item can be linked by numeric ID or key (e.g. PROJ-42).",
 		Scopes:      []string{auth.ScopeTimeWrite},
 		Run: func(_ context.Context, env *Env, args startTimerArgs) (any, error) {
 			itemID, toolErr := resolveOptionalItemRef(env, args.ItemID, args.ItemKey)
@@ -358,10 +360,10 @@ func init() {
 		Group:       CapabilityTime,
 		Access:      AccessWrite,
 		Risk:        RiskMedium,
-		Description: "Stop the user's currently running timer and create a worklog entry.",
+		Description: "Stop the user's currently running timer. When booking information is complete the time is booked; otherwise a recoverable draft is created.",
 		Scopes:      []string{auth.ScopeTimeWrite},
 		Run: func(_ context.Context, env *Env, _ stopTimerArgs) (any, error) {
-			res, err := env.TimerService.StopActiveForUser(env.UserID)
+			res, err := env.TimerService.StopActiveTimer(env.UserID, nil)
 			if err != nil {
 				if errors.Is(err, services.ErrTimerNotFound) {
 					return map[string]string{"error": "no active timer running"}, nil
@@ -378,7 +380,9 @@ func init() {
 				Description:     res.Description,
 				DurationSeconds: res.DurationSeconds,
 				DurationMinutes: res.DurationMinutes,
-				WorklogCreated:  res.WorklogCreated,
+				Booked:          res.Booked,
+				WorklogID:       res.WorklogID,
+				DraftID:         res.DraftID,
 			}, nil
 		},
 	})

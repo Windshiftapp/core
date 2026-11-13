@@ -6,6 +6,7 @@
   import GlobalConfirmDialog from '../dialogs/GlobalConfirmDialog.svelte';
   import ToastContainer from '../features/notifications/ToastContainer.svelte';
   import FloatingTimer from '../features/time/FloatingTimer.svelte';
+  import TimeLogHost from '../features/time/TimeLogHost.svelte';
   import { aiStore } from '../stores/aiStore.svelte.js';
   import { itemModalStore } from '../stores/itemModalStore.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -170,6 +171,7 @@
 {/if}
 
 <FloatingTimer />
+<TimeLogHost />
 
 {#if itemModalStore.isOpen}
   {#if ItemDetailModalComponent}

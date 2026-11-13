@@ -13,6 +13,7 @@
   import { registerMobileServiceWorker } from './pushClient.js';
   import MobileNav from './MobileNav.svelte';
   import GlobalConfirmDialog from '../dialogs/GlobalConfirmDialog.svelte';
+  import TimeLogHost from '../features/time/TimeLogHost.svelte';
   import MyWorkView from './MyWorkView.svelte';
   import PersonalView from './PersonalView.svelte';
   import TimerView from './TimerView.svelte';
@@ -123,6 +124,10 @@
 <!-- Global confirm host (the mobile shell bypasses MainApp, which normally
      mounts this) so confirm() dialogs render on the mobile surface. -->
 <GlobalConfirmDialog />
+
+<!-- Shared time-logging host. The mobile shell bypasses MainAppOverlays, so the
+     same modal renders here; the two shells are mutually exclusive. -->
+<TimeLogHost />
 
 <!-- iOS "Add to Home Screen" instructions (opened from the user menu via the
      install helper's store; no-op until triggered). -->

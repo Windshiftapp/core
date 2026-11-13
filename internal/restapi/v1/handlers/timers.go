@@ -63,7 +63,7 @@ func (h *ActiveTimerHandler) StartTimer(w http.ResponseWriter, r *http.Request) 
 	}
 	sanitize.Apply(&req.Description, sanitize.RichText)
 
-	timer, err := h.timer.StartTimer(user.ID, req.WorkspaceID, req.ProjectID, req.ItemID, req.Description)
+	timer, err := h.timer.StartTimerLegacy(user.ID, req.WorkspaceID, req.ProjectID, req.ItemID, req.Description)
 	if err != nil {
 		writeTimerV1Error(w, r, err)
 		return
@@ -139,7 +139,7 @@ func (h *ActiveTimerHandler) StopTimer(w http.ResponseWriter, r *http.Request) {
 		"description":      res.Description,
 		"duration_seconds": res.DurationSeconds,
 		"duration_minutes": res.DurationMinutes,
-		"worklog_created":  res.WorklogCreated,
+		"worklog_created":  res.Booked,
 	})
 }
 

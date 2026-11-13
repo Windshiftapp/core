@@ -17,6 +17,7 @@
   import { publicBaseURL } from '../../runtime/contextPath.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { itemDetailStore } from '../../stores/itemDetailStore.svelte.js';
+  import { timeLogStore } from '../../stores/timeLogStore.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { getShortcut, matchesShortcut, isTypingInField } from '../../utils/keyboardShortcuts.js';
   import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -58,7 +59,6 @@ import ItemSplitDialog from './ItemSplitDialog.svelte';
 
   // Import the shared content component
   import ItemDetailContent from '../items/ItemDetailContent.svelte';
-import TimeLogModal from '../../dialogs/TimeLogModal.svelte';
 import TestCaseViewModal from '../../dialogs/TestCaseViewModal.svelte';
 import RecurrenceEditor from '../../editors/RecurrenceEditor.svelte';
 import Button from '../../components/Button.svelte';
@@ -643,13 +643,20 @@ import NativeSelect from '../../components/NativeSelect.svelte';
   }
 
   async function handleLogTime() {
-    await itemDetailStore.loadTimeModalData();
-    itemDetailStore.openTimeLogModal();
+    await timeLogStore.open({
+      itemId: parseInt(itemId),
+      defaultProjectId: getDefaultProjectForTimeLogging(),
+      showWorkItemField: false,
+    });
   }
 
   async function handleEditWorklog(detail) {
-    await itemDetailStore.loadTimeModalData();
-    itemDetailStore.openTimeLogModal(detail);
+    await timeLogStore.open({
+      itemId: parseInt(itemId),
+      defaultProjectId: getDefaultProjectForTimeLogging(),
+      showWorkItemField: false,
+      editingWorklog: detail,
+    });
   }
 
   async function handleDeleteWorklog(detail) {
@@ -662,28 +669,6 @@ import NativeSelect from '../../components/NativeSelect.svelte';
       console.error('Failed to delete worklog:', error);
       showError(t('items.failedToDeleteTimeEntry'), error.message || t('errors.UNKNOWN'));
     }
-  }
-
-  async function handleModalSave(event) {
-    try {
-      const data = event.detail;
-      if (itemDetailStore.editingWorklog) {
-        await time.worklogs.update(itemDetailStore.editingWorklog.id, data);
-      } else {
-        await time.worklogs.create(data);
-      }
-
-      // Reload worklogs
-      await itemDetailStore.reloadWorklogs();
-      itemDetailStore.closeTimeLogModal();
-    } catch (error) {
-      console.error('Failed to save worklog:', error);
-      showError(t('items.failedToSaveTimeEntry'), error.message || t('errors.UNKNOWN'));
-    }
-  }
-
-  function handleModalCancel() {
-    itemDetailStore.closeTimeLogModal();
   }
 
   // Get default project for time logging
@@ -1182,16 +1167,12 @@ import NativeSelect from '../../components/NativeSelect.svelte';
         description: 'Add a time entry for this work item',
         keywords: ['log', 'time', 'hours', 'work', 'track', 'entry'],
         action: () => {
-          // Trigger the time entry form in the tabs component
-          if (tab !== 'time') {
-            tab = 'time';
-          }
-          // Use a small delay to ensure tab is switched
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('item-detail-show-time-entry', {
-              detail: { itemId: item.id }
-            }));
-          }, 100);
+          // Open the shared time-log surface prefilled with this item.
+          void timeLogStore.open({
+            itemId: item.id,
+            defaultProjectId: getDefaultProjectForTimeLogging(),
+            showWorkItemField: false,
+          });
         },
         priority: COMMAND_PRIORITIES.HIGH,
         category: 'time'
@@ -1261,6 +1242,18 @@ import NativeSelect from '../../components/NativeSelect.svelte';
   $effect(() => {
     itemDetailStore.isWatching;
     itemDetailStore.item && populateDropdownItems();
+  });
+
+  // Reload worklogs after the shared time-log host saves or books an entry.
+  let lastTimeLogRevision = 0;
+  $effect(() => {
+    const revision = timeLogStore.revision;
+    if (revision !== lastTimeLogRevision) {
+      lastTimeLogRevision = revision;
+      itemDetailStore.reloadWorklogs().catch((err) => {
+        surfaceError(err, { context: 'reloadWorklogsAfterTimeLog' });
+      });
+    }
   });
 
   // Reload worklogs when timer stops (activeTimer becomes null from non-null)
@@ -1592,23 +1585,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
 {/if}
 {/if}
 
-<!-- Time Log Modal: rendered outside the isModal branch so logging time
-     works from both the item detail modal and the full-page view. -->
-{#if itemDetailStore.showTimeLogModal}
-  <TimeLogModal
-    defaultProjectId={getDefaultProjectForTimeLogging()}
-    defaultItemId={parseInt(itemId)}
-    projects={itemDetailStore.timeProjects}
-    customers={itemDetailStore.customers}
-    workItems={itemDetailStore.workItems}
-    workspaces={itemDetailStore.workspaces}
-    editingWorklog={itemDetailStore.editingWorklog}
-    showProjectField={true}
-    showWorkItemField={false}
-    onsave={handleModalSave}
-    oncancel={handleModalCancel}
-  />
-{/if}
+<!-- Time Log Modal is mounted by the shared TimeLogHost in the shell. -->
 
 <ItemMoveWorkspaceDialog
   bind:isOpen={showWorkspaceMoveDialog}

@@ -90,6 +90,25 @@ export const time = {
     getByItem: (itemId, requestOptions = {}) =>
       fetchAllV2Pages(`/items/${itemId}/worklogs`, requestOptions),
   },
+
+  // Draft worklogs: incomplete, user-owned entries produced when a timer stops
+  // without booking information. Booked entries leave this list.
+  worklogDrafts: {
+    getAll: (requestOptions = {}) => fetchV2Data('/time/worklog-drafts', requestOptions),
+    get: (id, requestOptions = {}) => fetchV2Data(`/time/worklog-drafts/${id}`, requestOptions),
+    update: (id, data) =>
+      fetchV2Data(`/time/worklog-drafts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/merge-patch+json' },
+        body: JSON.stringify(data),
+      }),
+    book: (id, data) =>
+      fetchV2Data(`/time/worklog-drafts/${id}/book`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    delete: (id) => fetchV2Data(`/time/worklog-drafts/${id}`, { method: 'DELETE' }),
+  },
 };
 
 export const timer = {
@@ -99,8 +118,9 @@ export const timer = {
       body: JSON.stringify(data),
     }),
   getActive: () => fetchV2Data('/time/timers/active'),
-  stop: () =>
+  stop: (timerId = null) =>
     fetchV2Data('/time/timers/active/stop', {
       method: 'POST',
+      body: JSON.stringify(timerId ? { timer_id: timerId } : {}),
     }),
 };
