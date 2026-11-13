@@ -316,7 +316,7 @@
               class={provider.provider_type === 'github' ? 'github-login' : ''}
             >
               {#if provider.provider_type === 'github'}
-                <Github class="w-5 h-5 mr-2" data-testid="login-github-icon" />
+                <Github class="w-5 h-5 mr-2" data-testid={`login-github-icon-${provider.slug}`} />
               {:else}
                 <LogIn class="w-4 h-4 mr-2" />
               {/if}

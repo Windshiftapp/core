@@ -17,10 +17,30 @@ import (
 )
 
 var (
-	ErrGitHubVerifiedEmail    = errors.New("GitHub account must have a verified email address")
-	ErrGitHubOrganization     = errors.New("GitHub organization membership could not be verified")
-	githubOrganizationPattern = regexp.MustCompile(`^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$`)
+	ErrGitHubVerifiedEmail           = errors.New("GitHub account must have a verified email address")
+	ErrGitHubOrganization            = errors.New("GitHub organization membership could not be verified")
+	ErrGitHubOrganizationUnavailable = errors.New("GitHub organization verification is unavailable")
+	githubOrganizationPattern        = regexp.MustCompile(`^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$`)
 )
+
+// GitHubAPIError exposes safe diagnostics while retaining the underlying cause.
+type GitHubAPIError struct {
+	Operation  string
+	StatusCode int
+	cause      error
+}
+
+func (e *GitHubAPIError) Error() string {
+	if e.StatusCode == 0 {
+		return fmt.Sprintf("GitHub %s API request failed", e.Operation)
+	}
+	if e.StatusCode == http.StatusOK {
+		return fmt.Sprintf("GitHub %s API returned an invalid response", e.Operation)
+	}
+	return fmt.Sprintf("GitHub %s API returned status %d", e.Operation, e.StatusCode)
+}
+
+func (e *GitHubAPIError) Unwrap() error { return e.cause }
 
 // ValidateGitHubOrganization accepts a login name, not a URL or API path.
 func ValidateGitHubOrganization(organization string) bool {
@@ -78,7 +98,7 @@ func (s *GitHubService) fetchIdentity(ctx context.Context, token, organization s
 		Name      string `json:"name"`
 		AvatarURL string `json:"avatar_url"`
 	}
-	if err := s.get(ctx, token, "/user", &profile); err != nil {
+	if err := s.get(ctx, token, "profile", "/user", &profile); err != nil {
 		return nil, err
 	}
 	if profile.ID <= 0 || profile.Login == "" {
@@ -96,8 +116,12 @@ func (s *GitHubService) fetchIdentity(ctx context.Context, token, organization s
 				Login string `json:"login"`
 			} `json:"organization"`
 		}
-		if err := s.get(ctx, token, "/user/memberships/orgs/"+url.PathEscape(organization), &membership); err != nil {
-			return nil, ErrGitHubOrganization
+		if err := s.get(ctx, token, "membership", "/user/memberships/orgs/"+url.PathEscape(organization), &membership); err != nil {
+			var apiError *GitHubAPIError
+			if errors.As(err, &apiError) && apiError.StatusCode == http.StatusNotFound {
+				return nil, fmt.Errorf("%w: %w", ErrGitHubOrganization, err)
+			}
+			return nil, fmt.Errorf("%w: %w", ErrGitHubOrganizationUnavailable, err)
 		}
 		if membership.State != "active" || !strings.EqualFold(membership.Organization.Login, organization) {
 			return nil, ErrGitHubOrganization
@@ -110,7 +134,7 @@ func (s *GitHubService) fetchIdentity(ctx context.Context, token, organization s
 		Verified bool   `json:"verified"`
 	}
 	// Ask for up to 100 addresses; never trust the public profile's email field.
-	if err := s.get(ctx, token, "/user/emails?per_page=100", &emails); err != nil {
+	if err := s.get(ctx, token, "emails", "/user/emails?per_page=100", &emails); err != nil {
 		return nil, err
 	}
 	email := ""
@@ -135,10 +159,10 @@ func (s *GitHubService) fetchIdentity(ctx context.Context, token, organization s
 	}, nil
 }
 
-func (s *GitHubService) get(ctx context.Context, token, path string, result any) error {
+func (s *GitHubService) get(ctx context.Context, token, operation, path string, result any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com"+path, http.NoBody)
 	if err != nil {
-		return err
+		return &GitHubAPIError{Operation: operation, cause: err}
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/vnd.github+json")
@@ -146,14 +170,14 @@ func (s *GitHubService) get(ctx context.Context, token, path string, result any)
 	req.Header.Set("User-Agent", "Windshift")
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("GitHub API request failed: %w", err)
+		return &GitHubAPIError{Operation: operation, cause: err}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+		return &GitHubAPIError{Operation: operation, StatusCode: resp.StatusCode}
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(result); err != nil {
-		return fmt.Errorf("invalid GitHub response: %w", err)
+		return &GitHubAPIError{Operation: operation, StatusCode: resp.StatusCode, cause: err}
 	}
 	return nil
 }

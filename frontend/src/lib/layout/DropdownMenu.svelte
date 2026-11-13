@@ -39,6 +39,7 @@
     triggerTestid = '',
     triggerLabel = '',
     hotkeyConfig = null,
+    keyboardHint = null,
     isOpen = $bindable(false),
     onOpenChange = null,
     children = undefined
@@ -256,6 +257,9 @@
       {#if showChevron && !isDisabled}
         <ChevronDown class="w-3 h-3 flex-shrink-0" />
       {/if}
+    {/if}
+    {#if keyboardHint}
+      <kbd aria-hidden="true" class="ml-1 px-1.5 text-xs rounded border border-current opacity-75">{keyboardHint}</kbd>
     {/if}
   </button>
 </div>

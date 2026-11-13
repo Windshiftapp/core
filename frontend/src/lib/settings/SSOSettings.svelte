@@ -247,8 +247,9 @@
       formErrors.client_secret = t('settings.sso.clientSecretRequired');
     }
 
-    if (formData.provider_type === 'github' && formData.github_organization &&
-        (!/^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/.test(formData.github_organization) || formData.github_organization.includes('--'))) {
+    const organization = formData.github_organization.trim();
+    if (formData.provider_type === 'github' && organization &&
+        (!/^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/.test(organization) || organization.includes('--'))) {
       formErrors.github_organization = t('settings.sso.githubOrganizationInvalid');
     }
 
@@ -352,6 +353,7 @@
     triggerText={t('settings.sso.addProvider')}
     triggerIcon={Plus}
     triggerTestid={testid}
+    keyboardHint={testid === 'sso-add-provider' ? 'A' : null}
     hotkeyConfig={testid === 'sso-add-provider' ? { key: toHotkeyString('sso', 'addProvider'), guard: () => !showCreateModal && !showEditModal } : null}
     triggerClass="px-4 py-2 bg-[var(--ds-interactive)] text-white"
     placement="bottom-end"

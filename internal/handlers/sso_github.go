@@ -106,9 +106,16 @@ func (h *SSOHandler) githubCallback(w http.ResponseWriter, r *http.Request, prov
 	}
 	claims, err := h.githubService.Authenticate(r.Context(), provider, secret, h.getRedirectURI(r, provider.Slug), code, stored.Nonce)
 	if err != nil {
-		// Token-exchange errors may contain response bodies; never log credentials.
-		slog.Warn("GitHub sign-in failed", "component", "sso", "provider", provider.Slug)
+		// Log only API operation/status; raw OAuth errors can contain credentials.
+		attributes := []any{"component", "sso", "provider", provider.Slug}
+		var apiError *sso.GitHubAPIError
+		if errors.As(err, &apiError) {
+			attributes = append(attributes, "operation", apiError.Operation, "status_code", apiError.StatusCode)
+		}
+		slog.Warn("GitHub sign-in failed", attributes...)
 		switch {
+		case errors.Is(err, sso.ErrGitHubOrganizationUnavailable):
+			h.redirectWithError(w, r, "GitHub organization membership could not be checked. Please try again or ask your administrator to check GitHub application access.")
 		case errors.Is(err, sso.ErrGitHubOrganization):
 			h.redirectWithError(w, r, "Access requires active membership in the configured GitHub organization")
 		case errors.Is(err, sso.ErrGitHubVerifiedEmail):
