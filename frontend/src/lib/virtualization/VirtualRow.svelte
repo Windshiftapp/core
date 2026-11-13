@@ -10,7 +10,7 @@
     position: RowPosition;
     controller: VirtualRowsController<any>;
     pane?: string;
-    row: Snippet<[any, { attach: (node: HTMLElement) => { destroy(): void } }]>;
+    row: Snippet<[any, { index: number; attach: (node: HTMLElement) => { destroy(): void } }]>;
   }>();
 
   // The keyed renderer remounts on identity/key changes, not snapshot updates.
@@ -30,6 +30,7 @@
     node.addEventListener('focusin', focus);
     node.addEventListener('focusout', blur);
     node.addEventListener('keydown', keydown);
+    // Svelte owns this effect with the action, including conditional node removal.
     $effect(() => { registration.update({ key: descriptor.key, index: position.index }); });
     return {
       destroy() {
@@ -43,4 +44,4 @@
   }
 </script>
 
-{@render row(descriptor.value, { attach })}
+{@render row(descriptor.value, { attach, index: position.index })}

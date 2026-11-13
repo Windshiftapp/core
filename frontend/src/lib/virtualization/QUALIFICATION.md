@@ -42,7 +42,11 @@ From core:
 VITEST_RUNTIME=bun ../core-tests/run-overlay-script.sh . scripts/run-frontend-tests.sh src/lib/virtualization src/lib/components/VirtualRows.test.ts src/lib/features/collections src/lib/features/support src/lib/editors/EditableField.test.js src/lib/pickers
 ```
 
-Latest focused run: **62 files / 405 tests passed**.
+Initial focused run: **62 files / 405 tests passed**.
+Review follow-up focused run: **63 files / 414 tests passed** using the same command.
+The nine-spec combined Chromium rerun also passed **21 tests** including setup,
+with zero retries/skips (artifacts `test-results-76593-1794564652`). The earlier
+full-suite baseline comparison was not repeated for this review-only follow-up.
 
 ```sh
 VITEST_RUNTIME=bun ../core-tests/run-overlay-script.sh . scripts/run-frontend-tests.sh
@@ -112,6 +116,10 @@ Biome was run on changed non-Svelte modules. No Go production code changed.
 - Extend large paired-roadmap alignment coverage to zoom/panel resizing and
   offscreen-crossing dependency geometry, permission/date-edit invalidation
   and pointer cancellation.
+- Roadmap's horizontal header is a JS mirror of native scroll and may lag during
+  momentum scrolling. Its horizontal-scrollbar compensation first arrives via
+  ResizeObserver. Explicitly check first paint and momentum scroll in Safari/
+  WebKit; settled <=1px alignment alone does not qualify those visual risks.
 - Finish the remaining named browser matrix from attachment 916; existing
   board/map samples are not the entire regression matrix.
 - Capture identical baseline/candidate five-paired-run performance evidence,
@@ -122,3 +130,34 @@ Biome was run on changed non-Svelte modules. No Go production code changed.
 
 These remain on WI-2147; no completion or shipping approval is implied by the
 draft PRs or by passing sampled tests.
+
+## PR review follow-up
+
+Findings on core PR #502 are addressed as follows; the release blockers above
+remain unchanged:
+
+1. Duplicate/empty keys are repaired with collision-safe positional keys at the
+   controller boundary, with one warning per controller. Strict `indexRows`
+   validation remains available; malformed occurrences cannot claim stable
+   identity through reorder. A rendered malformed-response regression passes.
+2. DOM registration uses only pane-qualified storage. Nonvirtual anchor and
+   scroll geometry uses the canonical list, not whichever pane attached last.
+   Tests attach panes in the adverse order and remove one independently.
+3. Drag outcome flags reset on every new gesture. Stable reused drag-data objects
+   can commit/cancel then start another gesture; one drop still has one claim.
+   Drag source ownership checks the exact registered pane node, not just a key.
+4. Restoration identities are caller-supplied surface namespaces. README now
+   requires distinct prefixes for independent roots displaying the same query.
+5. The first logical tree row again suppresses its top border. Shared row snippet
+   metadata exposes its logical index; down/back scrolling tests the boundary.
+6. Eager normal/full/print mounting is intentional, not a deferred-render mode.
+   Reintroducing LazyRender would defeat Find/copy/accessibility/print. Its cost
+   and outstanding 50-row performance qualification are explicit in README.
+7. Queue scope now includes accepted search/QL, collection, workspace, page and
+   size. Backlog uses its actual effective backlog sub-filter. Tree has no
+   free-text search; collapse/expansion deliberately retain a surviving anchor.
+8. First-paint scrollbar compensation and JS horizontal-header momentum lag are
+   explicitly tracked as visual risks, not declared qualified by settled tests.
+9. The viewport registry itself tolerates missing ResizeObserver. A rendered
+   conditional-node test confirms attachment effects are disposed even while
+   their keyed VirtualRow survives and is reordered.

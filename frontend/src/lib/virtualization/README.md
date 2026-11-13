@@ -16,6 +16,11 @@ by pinned `@tanstack/virtual-core`. The base has no domain stores or fetching.
 - Use an identity containing audience-independent workspace/collection/view,
   query, sort and page scope. Keep the identity stable for patches and expansion.
   Changing it remounts row-local state and resets/restores that query's anchor.
+- Identities are also the restoration namespace across remounts. Two independent
+  scroll surfaces must use distinct prefixes (for example `primary:records:...`
+  and `secondary:records:...`), even when they show the same query. Root DOM
+  objects are deliberately not the restoration key, since they change on remount.
+  The 20-entry LRU is audience-scoped, not automatically root-scoped.
 - Pass a `layoutRevision` when columns or other row geometry inputs change.
 - Keep selection, permissions, actions, pagination, rank logic and data caches
   in the consumer. Virtualization never loads additional data.
@@ -44,6 +49,17 @@ The Svelte adapter owns controller teardown and print/input listeners. The
 viewport registry shares one scroll listener/resize observation per root.
 Normal rendering applies through 100 rows, or when `enabled` is false. Print
 temporarily renders all loaded rows and returns to the previous anchor.
+Full loaded-row mounting is intentional in normal/disabled/print mode, including
+consumer cells: restoring `LazyRender` there would prevent browser Find, copying
+and accessible/print output from seeing those rows. The 50-row performance gate
+remains unqualified; the full-render escape hatch has a synchronous O(N) mount.
+
+The queue identity includes the accepted search, effective queue QL, collection,
+workspace and page/size. It changes only when results arrive, not on each draft
+keystroke. Tree has no free-text search input; its hierarchy level and effective
+sub-filter define its query scope. Backlog uses its effective backlog sub-filter.
+Collapse/expansion intentionally preserve identity and a surviving row anchor;
+they are structural changes, not new queries.
 
 `useRowRetention(() => active, reason)` retains an editor, picker or portalled
 preview's row while active, with idempotent reference-counted releases. It is a
@@ -56,10 +72,19 @@ logical neighbor. Pins add distant rows sparsely, not the intervening range.
 the source, increases overscan from 8 to 16, and owns root auto-scroll. A
 `dragRevision` invalidates the gesture when relevant domain data changes.
 Consumers still enforce domain permissions, drop eligibility and mutations.
+Drop outcomes survive the complete native drop dispatch but are reset at every
+new drag start; returning a stable drag-data object is supported.
 
 Paired surfaces construct one `useVirtualRows` model and pass `sharedModel` to
 both renderers, with distinct `pane` names. Model ownership is fixed for the
 renderer lifetime. Roadmap uses one 40px fixed-size model, not two engines.
+DOM registrations are pane-qualified; nonvirtual anchor/scroll geometry uses the
+node inside the model's canonical list, regardless of pane attachment order.
+
+Duplicate/empty occurrence keys are repaired at the controller boundary with
+collision-safe positional keys and one warning per controller. This keeps a
+malformed response visible, but cannot provide reorder-stable editor identity
+for those malformed occurrences. `indexRows` remains a strict validation utility.
 
 Mounted row DOM is bounded by viewport/overscan plus live pins. Loaded records,
 indexes and engine measurements remain O(N); this is not an O(viewport) heap

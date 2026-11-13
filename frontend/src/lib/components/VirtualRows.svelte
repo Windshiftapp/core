@@ -20,7 +20,7 @@
     fixedSize?: number;
     scrollElement?: ScrollRoot | null;
     listElement?: HTMLElement | null;
-    row: Snippet<[any, { attach: (node: HTMLElement) => { destroy(): void } }]>;
+    row: Snippet<[any, { index: number; attach: (node: HTMLElement) => { destroy(): void } }]>;
     spacer?: Snippet<[number]> | null;
     onrangechange?: ((keys: string[]) => void) | null;
     dragSources?: boolean;

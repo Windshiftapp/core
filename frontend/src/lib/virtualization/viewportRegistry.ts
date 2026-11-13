@@ -45,8 +45,8 @@ export function subscribeViewport(root: ScrollRoot, callback: (snapshot: Snapsho
       settled = setTimeout(() => notify(false), 150);
     };
     const resize = () => notify();
-    const observer = new ResizeObserver(resize);
-    observer.observe(isWindow(root) ? root.document.documentElement : root);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(resize);
+    observer?.observe(isWindow(root) ? root.document.documentElement : root);
     root.addEventListener('scroll', scroll, { passive: true });
     const targetWindow = isWindow(root) ? root : root.ownerDocument.defaultView;
     targetWindow?.addEventListener('resize', resize);
@@ -56,7 +56,7 @@ export function subscribeViewport(root: ScrollRoot, callback: (snapshot: Snapsho
       notify,
       destroy() {
         clearTimeout(settled);
-        observer.disconnect();
+        observer?.disconnect();
         root.removeEventListener('scroll', scroll);
         targetWindow?.removeEventListener('resize', resize);
       },

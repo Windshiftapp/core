@@ -4,6 +4,22 @@ export const VIRTUAL_ROW_THRESHOLD = 100;
 export const ROW_OVERSCAN = 8;
 export const DRAG_OVERSCAN = 16;
 
+export function repairRowKeys<T>(rows: readonly VirtualRow<T>[]) {
+  const counts = new Map<string, number>();
+  for (const row of rows) counts.set(row.key, (counts.get(row.key) ?? 0) + 1);
+  if (rows.every((row) => row.key && counts.get(row.key) === 1)) return rows;
+  const reserved = new Set(rows.map((row) => row.key));
+  return rows.map((row, index) => {
+    if (row.key && counts.get(row.key) === 1) return row;
+    // Malformed occurrences have no stable identity. Isolate their local state
+    // by position without colliding with legitimate caller-supplied keys.
+    let key = `fallback:${index}`;
+    while (reserved.has(key)) key = `fallback:${key}`;
+    reserved.add(key);
+    return { ...row, key };
+  });
+}
+
 export function indexRows(rows: readonly VirtualRow[]) {
   const index = new Map<string, number>();
   rows.forEach((row, position) => {

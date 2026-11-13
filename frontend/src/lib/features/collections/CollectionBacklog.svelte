@@ -755,7 +755,7 @@
           <VirtualRows items={virtualBacklogRows} getKey={(row) => row.key}
             listElement={backlogListElement} enabled={virtualization.enabled}
             estimateSize={(row) => row.kind === 'item' ? 56 : 64}
-            identity={`backlog:${workspaceId ?? ''}:${collectionId ?? ''}:${collectionStore.effectiveSubFilterQL}`}
+            identity={`backlog:${workspaceId ?? ''}:${collectionId ?? ''}:${collectionStore.effectiveBacklogSubFilterQL}`}
             layoutRevision={visibleFields.join('|')}
             dragSources dragRevision={backlogDragRevision}
           >

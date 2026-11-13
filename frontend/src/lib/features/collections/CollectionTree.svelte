@@ -639,7 +639,7 @@
                 use:virtual.attach
                 data-testid={`tree-row-${item.id}`}
                 class="grid gap-4 items-center px-4 py-3 transition-colors group tree-row"
-                style="grid-template-columns: {gridTemplateColumns}; min-width: {gridMinWidth}; border-top: 1px solid var(--ctx-border, var(--ds-border));"
+                style="grid-template-columns: {gridTemplateColumns}; min-width: {gridMinWidth}; border-top: 1px solid var(--ctx-border, var(--ds-border));{virtual.index === 0 ? 'border-top-width: 0;' : ''}"
               >
                 {#each listColumns as column (column.field_identifier)}
                   <div

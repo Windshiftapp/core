@@ -4,6 +4,7 @@ import {
   indexRows,
   ROW_OVERSCAN,
   renderTokens,
+  repairRowKeys,
   sparseIndexes,
   VIRTUAL_ROW_THRESHOLD,
 } from './rowProjection';
@@ -22,7 +23,6 @@ export interface ControllerOptions {
 export class VirtualRowsController<T = unknown> {
   rows: readonly VirtualRow<T>[] = [];
   indexes = new Map<string, number>();
-  nodes = new Map<string, HTMLElement>();
   private paneNodes = new Map<string, Map<string, HTMLElement>>();
   private pins = new Map<string, Set<symbol>>();
   private root: ScrollRoot | null = null;
@@ -44,6 +44,7 @@ export class VirtualRowsController<T = unknown> {
   private unmount: (() => void) | null = null;
   private destroyed = false;
   private changing = false;
+  private warnedBadKeys = false;
   private change: () => void;
   readonly engine: Virtualizer<ScrollRoot, HTMLElement>;
 
@@ -171,6 +172,15 @@ export class VirtualRowsController<T = unknown> {
     layout?: string;
     overscan?: number;
   }) {
+    const repaired = repairRowKeys(rows);
+    if (repaired !== rows && !this.warnedBadKeys) {
+      this.warnedBadKeys = true;
+      console.warn(
+        'VirtualRows: duplicate or empty occurrence keys; using positional fallback keys for malformed rows.'
+      );
+    }
+    rows = repaired;
+    const indexes = indexRows(rows);
     const changedIdentity = this.identity !== identity;
     const changedLayout = layout !== this.layout || fixedSize !== this.fixedSize;
     const wasVirtual = this.virtual;
@@ -181,7 +191,7 @@ export class VirtualRowsController<T = unknown> {
     this.changing = true;
     try {
       this.rows = rows;
-      this.indexes = indexRows(rows);
+      this.indexes = indexes;
       this.getKey = (index) => rows[index].key;
       this.enabled = enabled;
       this.fixedSize = fixedSize;
@@ -256,7 +266,7 @@ export class VirtualRowsController<T = unknown> {
       const rootTop =
         'clientTop' in this.root ? this.root.getBoundingClientRect().top + this.root.clientTop : 0;
       for (const [index, row] of this.rows.entries()) {
-        const rect = this.nodes.get(row.key)?.getBoundingClientRect();
+        const rect = this.getNode(row.key)?.getBoundingClientRect();
         if (rect && rect.height > 0 && rect.bottom > rootTop)
           return { key: row.key, index, offset: rootTop - rect.top };
       }
@@ -287,7 +297,7 @@ export class VirtualRowsController<T = unknown> {
     const index = this.indexes.get(anchor.key);
     if (index === undefined) return;
     if (!this.virtual) {
-      const node = this.nodes.get(anchor.key);
+      const node = this.getNode(anchor.key);
       if (!node || !this.root) return;
       const rootTop =
         'clientTop' in this.root ? this.root.getBoundingClientRect().top + this.root.clientTop : 0;
@@ -328,11 +338,28 @@ export class VirtualRowsController<T = unknown> {
     this.updateRange();
   }
 
+  getNode(key: string, pane?: string): HTMLElement | undefined {
+    const panes = this.paneNodes.get(key);
+    if (!panes) return;
+    if (pane !== undefined) return panes.get(pane);
+    for (const node of panes.values()) {
+      if (this.list?.contains(node)) return node;
+    }
+    // A single-pane consumer can attach before its root/list is connected.
+    // Never choose an arbitrary pane when a paired surface is ambiguous.
+    if (!this.list && panes.size === 1) return panes.values().next().value;
+  }
+
+  ownsNode(node: HTMLElement) {
+    const key = node.dataset.virtualKey;
+    const pane = node.dataset.virtualPane;
+    return key !== undefined && pane !== undefined && this.getNode(key, pane) === node;
+  }
+
   attach(node: HTMLElement, key: string, index: number, pane = 'main') {
     node.dataset.virtualKey = key;
     node.dataset.virtualPane = pane;
     node.dataset.index = String(index);
-    this.nodes.set(key, node);
     const panes = this.paneNodes.get(key) ?? new Map();
     panes.set(pane, node);
     this.paneNodes.set(key, panes);
@@ -343,7 +370,6 @@ export class VirtualRowsController<T = unknown> {
         if (this.virtual && !this.fixedSize) this.engine.measureElement(node);
       },
       destroy: () => {
-        if (this.nodes.get(key) === node) this.nodes.delete(key);
         if (panes.get(pane) === node) panes.delete(pane);
         if (!panes.size) this.paneNodes.delete(key);
         queueMicrotask(() => {
@@ -374,7 +400,8 @@ export class VirtualRowsController<T = unknown> {
     if (index < 0 || index >= this.rows.length) return;
     event.preventDefault();
     const target = this.rows[index].key;
-    if ((await this.scrollToKey(target)) !== 'scrolled') return;
+    if ((await this.scrollToKey(target, { pane: node?.dataset.virtualPane })) !== 'scrolled')
+      return;
     const next = this.paneNodes.get(target)?.get(node?.dataset.virtualPane ?? 'main');
     const nextControls = next ? focusableElements(next) : [];
     (event.shiftKey ? nextControls.at(-1) : nextControls[0])?.focus({ preventScroll: true });
@@ -385,7 +412,8 @@ export class VirtualRowsController<T = unknown> {
     {
       align = 'auto',
       signal,
-    }: { align?: 'start' | 'end' | 'center' | 'auto'; signal?: AbortSignal } = {}
+      pane,
+    }: { align?: 'start' | 'end' | 'center' | 'auto'; signal?: AbortSignal; pane?: string } = {}
   ) {
     const generation = this.generation;
     const index = this.indexes.get(key);
@@ -396,10 +424,10 @@ export class VirtualRowsController<T = unknown> {
         if (signal?.aborted || this.destroyed || generation !== this.generation)
           return 'cancelled' as const;
         if (this.virtual) this.engine.scrollToIndex(index, { align, behavior: 'instant' });
-        else this.nodes.get(key)?.scrollIntoView?.({ block: 'nearest' });
+        else this.getNode(key)?.scrollIntoView?.({ block: 'nearest' });
         await tick();
       }
-      return this.nodes.has(key) ? ('scrolled' as const) : ('missing' as const);
+      return this.getNode(key, pane) ? ('scrolled' as const) : ('missing' as const);
     } finally {
       release();
     }
@@ -433,7 +461,6 @@ export class VirtualRowsController<T = unknown> {
     this.listObserver?.disconnect();
     this.unmount?.();
     this.pins.clear();
-    this.nodes.clear();
     this.paneNodes.clear();
     this.engine.elementsCache.clear();
     this.engine.itemSizeCache.clear();

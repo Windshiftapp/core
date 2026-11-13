@@ -74,6 +74,7 @@
   let loadingItems = $state(false);
   let itemsPagination = $state(null);
   let itemsLoadId = 0;
+  let loadedQueryScope = $state('');
   let currentPage = $state(1);
   let itemsPerPage = $state(QUEUE_PAGE_SIZE);
 
@@ -284,6 +285,7 @@
       return;
     }
     const loadId = ++itemsLoadId;
+    const queryScope = JSON.stringify([workspaceId, collectionId, activeRef, activeQueue.ql, search]);
     loadingItems = true;
     try {
       const response = await itemsApi.getAll({
@@ -297,6 +299,7 @@
         ...(search ? { search } : {}),
       });
       if (loadId !== itemsLoadId) return;
+      loadedQueryScope = queryScope;
       items = response?.data ?? [];
       // The v2 document names the effective size page_size; the shared
       // Pagination component reads limit.
@@ -881,7 +884,7 @@
           <div bind:this={queueListElement} style="overflow-anchor: none;">
             <VirtualRows {items} getKey={collectionItemRowKey} listElement={queueListElement}
               scrollElement={queueScrollElement} enabled={virtualization.enabled} layoutRevision={gridTemplateColumns}
-              identity={`queue:${workspaceId}:${activeRef}:${currentPage}`}
+              identity={`queue:${loadedQueryScope}:${currentPage}:${itemsPerPage}`}
             >
             {#snippet row(item, virtual)}
               <WorkItemListRow

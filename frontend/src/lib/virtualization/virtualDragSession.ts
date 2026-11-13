@@ -5,6 +5,8 @@ import type { VirtualRowsController } from './virtualRowsController';
 
 const cancelledSources = new WeakSet<object>();
 const committedSources = new WeakSet<object>();
+// Keep the outcome through all target/monitor callbacks for one native drop.
+// Reset on each new gesture: consumers may reuse their drag-data object.
 
 export function claimVirtualDrop(source: object) {
   if (cancelledSources.has(source) || committedSources.has(source)) return false;
@@ -21,6 +23,7 @@ export function createVirtualDragSession(
   root: HTMLElement
 ) {
   let active: { data: object; release: () => void } | null = null;
+  let disposed = false;
   let stopScroll: (() => void) | null = null;
   const end = (cancelled = false) => {
     if (!active) return;
@@ -34,12 +37,14 @@ export function createVirtualDragSession(
   };
   const stopMonitor = monitorForElements({
     canMonitor: ({ source }) => {
-      const key = source.element.closest<HTMLElement>('[data-virtual-key]')?.dataset.virtualKey;
-      return key !== undefined && controller.nodes.has(key);
+      const node = source.element.closest<HTMLElement>('[data-virtual-key]');
+      return node !== null && controller.ownsNode(node);
     },
     onDragStart: ({ source }) => {
       const key = source.element.closest<HTMLElement>('[data-virtual-key]')?.dataset.virtualKey;
       if (!key) return;
+      cancelledSources.delete(source.data);
+      committedSources.delete(source.data);
       active = { data: source.data, release: controller.acquirePin(key, 'drag') };
       controller.setOverscan(DRAG_OVERSCAN);
       root.ownerDocument.body.classList.add('is-dragging');
@@ -56,6 +61,8 @@ export function createVirtualDragSession(
       end(true);
     },
     destroy() {
+      if (disposed) return;
+      disposed = true;
       end(true);
       stopMonitor();
       root.ownerDocument.removeEventListener('keydown', handleEscape, true);
