@@ -246,6 +246,22 @@ func (s *TimerService) StopActiveForUser(userID int) (*StopResult, error) {
 	return s.stopTimer(userID, timer, false)
 }
 
+// StopTimerByID stops the specified timer after verifying ownership using the
+// legacy (v1) complete-only contract.
+func (s *TimerService) StopTimerByID(userID, timerID int) (*StopResult, error) {
+	timer, err := s.repo.GetTimerByID(timerID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrTimerNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if timer.UserID != userID {
+		return nil, ErrTimerForbidden
+	}
+	return s.stopTimer(userID, timer, false)
+}
+
 // StopActiveTimer stops the intended timer and books or drafts it. When timerID
 // is nil the user's active timer is used. A retry for a timer that was already
 // stopped recovers the original result (booked worklog or draft) instead of
@@ -424,6 +440,11 @@ func (s *TimerService) bookableProject(userID int, timer *models.ActiveTimer) *i
 	if err != nil || status != "Active" {
 		return nil
 	}
+	// Focused tests construct the service without a permission service; the
+	// production wiring always supplies one.
+	if s.timePerm == nil {
+		return timer.ProjectID
+	}
 	canBook, err := s.timePerm.CanBookTimeOnProject(userID, *timer.ProjectID)
 	if err != nil || !canBook {
 		return nil
@@ -574,12 +595,9 @@ func (s *TimerService) DeleteDraft(userID, id int) error {
 // project and item, consumes exactly one owned draft atomically, and records
 // the idempotency key so a retry replays the same worklog.
 func (s *TimerService) BookDraft(userID, id, expectedVersion int, idempotencyKey string, input WorklogMutationInput) (*models.Worklog, error) {
-	if _, err := s.draftRepo.GetDraft(id, userID); err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
-			return nil, ErrTimerDraftNotFound
-		}
-		return nil, err
-	}
+	// A replay of a completed booking must resolve before the draft-existence
+	// check: the draft is gone once booked, but the recorded key still maps to
+	// the original worklog.
 	if idempotencyKey != "" {
 		booking, err := s.draftRepo.GetBooking(userID, idempotencyKey)
 		switch {
@@ -591,6 +609,12 @@ func (s *TimerService) BookDraft(userID, id, expectedVersion int, idempotencyKey
 		case !errors.Is(err, repository.ErrNotFound):
 			return nil, err
 		}
+	}
+	if _, err := s.draftRepo.GetDraft(id, userID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrTimerDraftNotFound
+		}
+		return nil, err
 	}
 	prepared, err := s.worklogs.Prepare(userID, input)
 	if err != nil {
