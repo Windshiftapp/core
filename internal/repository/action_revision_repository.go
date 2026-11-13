@@ -108,14 +108,15 @@ func (r *ActionRevisionRepository) GetByActionAndNumber(actionID, revisionNumber
 }
 
 // GetByIDForAction returns a revision by primary key, but only when it belongs
-// to the given action, so a workspace cannot read another action's revision.
-func (r *ActionRevisionRepository) GetByIDForAction(id, actionID int) (*models.ActionDefinitionRevision, error) {
+// to the given action and workspace. The workspace predicate keeps retained
+// history of a deleted action readable without trusting a surviving row.
+func (r *ActionRevisionRepository) GetByIDForAction(id, actionID, workspaceID int) (*models.ActionDefinitionRevision, error) {
 	row := r.db.QueryRow(`
 		SELECT id, action_id, workspace_id, revision_number, source, editor_user_id,
 		       editor_username, editor_source, change_summary, changed_fields, snapshot, created_at
 		FROM action_definition_revisions
-		WHERE id = ? AND action_id = ?
-	`, id, actionID)
+		WHERE id = ? AND action_id = ? AND workspace_id = ?
+	`, id, actionID, workspaceID)
 	revision, err := scanActionDefinitionRevision(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -160,20 +161,21 @@ func (r *ActionRevisionRepository) latestByAction(query interface {
 }
 
 // ListSummariesByAction returns a page of revision metadata, newest first,
-// plus the total count for the action.
-func (r *ActionRevisionRepository) ListSummariesByAction(actionID, limit, offset int) ([]models.ActionDefinitionRevisionSummary, int, error) {
+// plus the total count for the action within the workspace. Filtering by
+// workspace keeps the history readable after the action row is deleted.
+func (r *ActionRevisionRepository) ListSummariesByAction(actionID, workspaceID, limit, offset int) ([]models.ActionDefinitionRevisionSummary, int, error) {
 	var total int
-	if err := r.db.QueryRow(`SELECT COUNT(*) FROM action_definition_revisions WHERE action_id = ?`, actionID).Scan(&total); err != nil {
+	if err := r.db.QueryRow(`SELECT COUNT(*) FROM action_definition_revisions WHERE action_id = ? AND workspace_id = ?`, actionID, workspaceID).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("count action definition revisions: %w", err)
 	}
 	rows, err := r.db.Query(`
 		SELECT id, action_id, workspace_id, revision_number, source, editor_user_id,
 		       editor_username, editor_source, change_summary, changed_fields, created_at
 		FROM action_definition_revisions
-		WHERE action_id = ?
+		WHERE action_id = ? AND workspace_id = ?
 		ORDER BY revision_number DESC
 		LIMIT ? OFFSET ?
-	`, actionID, limit, offset)
+	`, actionID, workspaceID, limit, offset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list action definition revisions: %w", err)
 	}

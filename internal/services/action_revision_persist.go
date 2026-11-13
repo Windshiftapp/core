@@ -27,6 +27,25 @@ type ActionWriteMeta struct {
 	PrimaryActionType string
 	PrimaryDetails    map[string]any
 	ExtraAudits       []PendingAudit
+	// AuthorizeActor, when set, runs inside the write transaction after the
+	// action row is locked. currentActor is the row's actor at lock time and
+	// effectiveActor is what the revision will record; actorChanging reports
+	// whether the patch actually moves the actor. Returning a
+	// *PrivilegedActionEditDenied aborts the mutation and writes a safe denied
+	// audit row; any other error aborts without an audit.
+	AuthorizeActor func(currentActor, effectiveActor *int, actorChanging bool) error
+}
+
+// PrivilegedActionEditDenied reports a rejected attempt to change the
+// executable configuration of an action with a configured actor without
+// action.set_actor. It carries only safe metadata.
+type PrivilegedActionEditDenied struct {
+	AttemptedFields    []string
+	RequiredPermission string
+}
+
+func (e *PrivilegedActionEditDenied) Error() string {
+	return "action.set_actor required to edit executable configuration of a privileged action"
 }
 
 // editorSource resolves the stored editor source label for a revision.

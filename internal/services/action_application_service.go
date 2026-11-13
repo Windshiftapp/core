@@ -199,6 +199,10 @@ func (s *ActionApplicationService) Create(userID, workspaceID int, actor AuditAc
 	}
 	if input.ActorUserID != nil {
 		if err := s.requireSetActor(userID); err != nil {
+			s.definitions.auditDeniedPrivilegedEdit(actor, &models.Action{WorkspaceID: workspaceID, Name: input.Name}, &PrivilegedActionEditDenied{
+				AttemptedFields:    []string{"actor_user_id"},
+				RequiredPermission: models.PermissionActionSetActor,
+			})
 			return nil, err
 		}
 	}
@@ -254,29 +258,6 @@ func (s *ActionApplicationService) Update(userID, workspaceID, actionID int, act
 	if err != nil {
 		return nil, err
 	}
-	previousActor := action.ActorUserID
-	actorChanging := input.ActorUserID.Present && !sameIntPointer(input.ActorUserID.Value, previousActor)
-
-	// Editing execution-affecting configuration on an action that runs under a
-	// configured (privileged) actor is delegated code execution even when the
-	// actor itself is unchanged. action.manage alone is not enough.
-	executionAffecting := input.TriggerType != nil || input.TriggerConfig != nil || input.Nodes != nil ||
-		input.IsEnabled != nil || input.AllowedRoleIDs != nil
-	hasSetActor := false
-	if action.ActorUserID != nil || actorChanging {
-		hasSetActor, err = s.permissions.HasGlobalPermission(userID, models.PermissionActionSetActor)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if actorChanging && !hasSetActor {
-		return nil, ErrActionNotVisible
-	}
-	if action.ActorUserID != nil && executionAffecting && !hasSetActor {
-		s.auditDeniedPrivilegedEdit(actor, action, input)
-		return nil, ErrActionNotVisible
-	}
-
 	if input.Name != nil {
 		*input.Name = sanitize.PlainTextField.Sanitize(*input.Name)
 		action.Name = *input.Name
@@ -303,9 +284,6 @@ func (s *ActionApplicationService) Update(userID, workspaceID, actionID int, act
 	if err != nil {
 		return nil, err
 	}
-	if input.ActorUserID.Present {
-		action.ActorUserID = input.ActorUserID.Value
-	}
 	nodes, edges := action.Nodes, action.Edges
 	if input.Nodes != nil {
 		nodes, edges = input.Nodes, input.Edges
@@ -315,70 +293,69 @@ func (s *ActionApplicationService) Update(userID, workspaceID, actionID int, act
 		Actor:             actor,
 		Source:            models.ActionRevisionSourceUpdate,
 		PrimaryActionType: logger.ActionAutomationUpdate,
+		AuthorizeActor:    s.privilegedEditAuthorizer(userID, privilegedEditFields(input)),
 	}
-	if actorChanging {
-		oldActor := 0
-		if previousActor != nil {
-			oldActor = *previousActor
-		}
-		newActor := 0
-		if input.ActorUserID.Value != nil {
-			newActor = *input.ActorUserID.Value
-		}
-		meta.ExtraAudits = append(meta.ExtraAudits, PendingAudit{
-			ActionType: logger.ActionAutomationSetActor,
-			Details:    map[string]any{"old_actor_user_id": oldActor, "new_actor_user_id": newActor},
-		})
-	}
-	updated, validation, err := s.definitions.Save(action, nodes, edges, input.Nodes != nil, definitionTouched, actorChanging, meta)
+	updated, validation, err := s.definitions.Save(action, nodes, edges, input.Nodes != nil, definitionTouched, input.ActorUserID, meta)
 	if len(validation) > 0 {
 		return nil, &ActionValidationError{Errors: validation}
 	}
 	if err != nil {
+		var denied *PrivilegedActionEditDenied
+		if errors.As(err, &denied) {
+			return nil, ErrActionNotVisible
+		}
 		return nil, err
 	}
 	return updated, nil
 }
 
-// auditDeniedPrivilegedEdit records a rejected attempt to change the executable
-// configuration of a privileged action without action.set_actor. It stores only
-// safe metadata: which fields were attempted, never the definition itself.
-func (s *ActionApplicationService) auditDeniedPrivilegedEdit(actor AuditActor, action *models.Action, input models.UpdateActionRequest) {
-	attempted := make([]string, 0, 4)
+// privilegedEditAuthorizer returns the in-transaction authorizer that enforces
+// action.set_actor for execution-affecting edits of an actor-configured action.
+// It runs after the action row is locked, so a concurrent actor change cannot
+// be raced past with a stale read.
+func (s *ActionApplicationService) privilegedEditAuthorizer(userID int, attempted []string) func(currentActor, effectiveActor *int, actorChanging bool) error {
+	return func(_ *int, effectiveActor *int, actorChanging bool) error {
+		if !actorChanging && (effectiveActor == nil || len(attempted) == 0) {
+			return nil
+		}
+		allowed, err := s.permissions.HasGlobalPermission(userID, models.PermissionActionSetActor)
+		if err != nil {
+			return err
+		}
+		if allowed {
+			return nil
+		}
+		deniedFields := attempted
+		if actorChanging {
+			deniedFields = append(append([]string{}, attempted...), "actor_user_id")
+		}
+		return &PrivilegedActionEditDenied{
+			AttemptedFields:    deniedFields,
+			RequiredPermission: models.PermissionActionSetActor,
+		}
+	}
+}
+
+// privilegedEditFields lists the execution-affecting fields an update attempts
+// to change. It is the safe metadata recorded when the edit is denied.
+func privilegedEditFields(input models.UpdateActionRequest) []string {
+	fields := make([]string, 0, 5)
 	if input.TriggerType != nil {
-		attempted = append(attempted, "trigger_type")
+		fields = append(fields, "trigger_type")
 	}
 	if input.TriggerConfig != nil {
-		attempted = append(attempted, "trigger_config")
+		fields = append(fields, "trigger_config")
 	}
 	if input.Nodes != nil {
-		attempted = append(attempted, "nodes")
+		fields = append(fields, "nodes")
 	}
 	if input.IsEnabled != nil {
-		attempted = append(attempted, "is_enabled")
+		fields = append(fields, "is_enabled")
 	}
 	if input.AllowedRoleIDs != nil {
-		attempted = append(attempted, "allowed_role_ids")
+		fields = append(fields, "allowed_role_ids")
 	}
-	_ = logger.LogAudit(s.db, logger.AuditEvent{
-		UserID:       actor.UserID,
-		Username:     actor.Username,
-		IPAddress:    actor.IPAddress,
-		UserAgent:    actor.UserAgent,
-		Source:       actor.Source,
-		ActionType:   logger.ActionAccessDenied,
-		ResourceType: logger.ResourceAutomation,
-		ResourceID:   &action.ID,
-		ResourceName: action.Name,
-		Success:      false,
-		ErrorMessage: "action.set_actor required to edit executable configuration of a privileged action",
-		Details: mergeAuditDetails(map[string]any{
-			"workspace_id":        action.WorkspaceID,
-			"required_permission": models.PermissionActionSetActor,
-			"attempted_fields":    attempted,
-			"actor_user_id":       action.ActorUserID,
-		}, actor),
-	})
+	return fields
 }
 
 func (s *ActionApplicationService) Delete(userID, workspaceID, actionID int, actor AuditActor) error {
@@ -416,28 +393,23 @@ func (s *ActionApplicationService) Logs(userID, workspaceID, actionID, limit, of
 }
 
 // ListRevisions returns the immutable definition history for an action. Access
-// is gated on the same action.manage check as reading the action itself, so a
-// viewer cannot reconstruct privileged executable configuration.
+// is gated on action.manage for the workspace, and the query is scoped by
+// workspace, so retained history stays readable after the action is deleted
+// without requiring a surviving action row.
 func (s *ActionApplicationService) ListRevisions(userID, workspaceID, actionID, limit, offset int) ([]models.ActionDefinitionRevisionSummary, int, error) {
-	if _, err := s.Get(userID, workspaceID, actionID); err != nil {
+	if err := s.requireManage(userID, workspaceID); err != nil {
 		return nil, 0, err
 	}
-	return s.revisions.ListSummariesByAction(actionID, limit, offset)
+	return s.revisions.ListSummariesByAction(actionID, workspaceID, limit, offset)
 }
 
-// GetRevision returns one revision with its full executable snapshot.
+// GetRevision returns one revision with its full executable snapshot, scoped to
+// the workspace so retained history remains accessible after deletion.
 func (s *ActionApplicationService) GetRevision(userID, workspaceID, actionID, revisionID int) (*models.ActionDefinitionRevision, error) {
-	if _, err := s.Get(userID, workspaceID, actionID); err != nil {
+	if err := s.requireManage(userID, workspaceID); err != nil {
 		return nil, err
 	}
-	revision, err := s.revisions.GetByIDForAction(revisionID, actionID)
-	if err != nil {
-		return nil, err
-	}
-	if revision.WorkspaceID != workspaceID {
-		return nil, ErrActionNotVisible
-	}
-	return revision, nil
+	return s.revisions.GetByIDForAction(revisionID, actionID, workspaceID)
 }
 
 func (s *ActionApplicationService) Execute(userID, workspaceID, actionID, itemID int) (models.ActionExecutionStatus, error) {

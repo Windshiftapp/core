@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -532,28 +533,40 @@ func init() {
 
 			// Replacing the executable configuration of an action that runs under
 			// a configured actor is delegated code execution: action.manage alone
-			// is not enough on any adapter.
-			if existing.ActorUserID != nil {
-				setActor, permErr := env.PermService.HasGlobalPermission(env.UserID, models.PermissionActionSetActor)
-				if permErr != nil {
-					return nil, permErr
-				}
-				if !setActor {
-					return map[string]string{"error": "action.set_actor permission required to edit a privileged action"}, nil
-				}
-			}
-
+			// is not enough on any adapter. The authorizer runs inside the write
+			// transaction against the locked actor.
 			existing.Name = def.Name
 			existing.Description = def.Description
 			existing.TriggerType = def.TriggerType
 			existing.TriggerConfig = def.TriggerConfig
 
 			definitions := services.NewActionDefinitionService(env.DB, repo, env.ActionService)
-			updated, validation, err := definitions.Save(existing, def.Nodes, def.Edges, true, true, false, env.actionWriteMeta(logger.ActionAutomationUpdate, map[string]any{"workspace_id": args.WorkspaceID}))
+			meta := env.actionWriteMeta(logger.ActionAutomationUpdate, map[string]any{"workspace_id": args.WorkspaceID})
+			meta.AuthorizeActor = func(_ *int, effectiveActor *int, actorChanging bool) error {
+				if !actorChanging && effectiveActor == nil {
+					return nil
+				}
+				setActor, permErr := env.PermService.HasGlobalPermission(env.UserID, models.PermissionActionSetActor)
+				if permErr != nil {
+					return permErr
+				}
+				if setActor {
+					return nil
+				}
+				return &services.PrivilegedActionEditDenied{
+					AttemptedFields:    []string{"definition"},
+					RequiredPermission: models.PermissionActionSetActor,
+				}
+			}
+			updated, validation, err := definitions.Save(existing, def.Nodes, def.Edges, true, true, models.ActionActorUpdate{}, meta)
 			if len(validation) > 0 {
 				return map[string]any{"error": validation[0].Message, "validation_errors": validation}, nil
 			}
 			if err != nil {
+				var denied *services.PrivilegedActionEditDenied
+				if errors.As(err, &denied) {
+					return map[string]string{"error": "action.set_actor permission required to edit a privileged action"}, nil
+				}
 				return nil, fmt.Errorf("save action: %w", err)
 			}
 			return createActionOut{

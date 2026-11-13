@@ -379,16 +379,24 @@ func (h *ActionHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 
 	// Replacing the definition of an action that runs under a configured
 	// (privileged) actor is delegated code execution; action.manage alone is
-	// not sufficient on any adapter.
-	if existing.ActorUserID != nil {
+	// not sufficient on any adapter. The authorizer runs inside the write
+	// transaction against the locked actor so a concurrent actor change cannot
+	// be raced past.
+	meta := h.actionAuditMeta(r, logger.ActionAutomationUpdate, map[string]any{"workspace_id": workspaceID})
+	meta.AuthorizeActor = func(_ *int, effectiveActor *int, actorChanging bool) error {
+		if !actorChanging && effectiveActor == nil {
+			return nil
+		}
 		allowed, permErr := h.PermissionService.HasGlobalPermission(userID, models.PermissionActionSetActor)
 		if permErr != nil {
-			h.RespondInternalError(w, r)
-			return
+			return permErr
 		}
-		if !allowed {
-			h.RespondError(w, r, restapi.ErrForbidden)
-			return
+		if allowed {
+			return nil
+		}
+		return &services.PrivilegedActionEditDenied{
+			AttemptedFields:    []string{"definition"},
+			RequiredPermission: models.PermissionActionSetActor,
 		}
 	}
 
@@ -406,15 +414,19 @@ func (h *ActionHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 	existing.TriggerType = req.TriggerType
 	existing.TriggerConfig = req.TriggerConfig
 
-	updated, validationErrors, err := h.definitions.Save(existing, req.Nodes, req.Edges, true, true, false, h.actionAuditMeta(r, logger.ActionAutomationUpdate, map[string]any{"workspace_id": workspaceID}))
+	updated, validationErrors, err := h.definitions.Save(existing, req.Nodes, req.Edges, true, true, models.ActionActorUpdate{}, meta)
 	if len(validationErrors) > 0 {
 		h.respondValidationErrors(w, r, validationErrors)
 		return
 	}
 	if err != nil {
-		if errors.Is(err, services.ErrActionDefinitionInvalid) {
+		var denied *services.PrivilegedActionEditDenied
+		switch {
+		case errors.As(err, &denied):
+			h.RespondError(w, r, restapi.ErrForbidden)
+		case errors.Is(err, services.ErrActionDefinitionInvalid):
 			h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeValidationFailed, err.Error()))
-		} else {
+		default:
 			h.RespondInternalError(w, r)
 		}
 		return

@@ -171,6 +171,26 @@ func (r *ActionRepository) GetCurrentRevisionID(actionID int) (*int, error) {
 	return &value, nil
 }
 
+// GetActorUserIDTx reads the action's effective actor override inside the
+// caller's transaction, after the row has been locked by an UPDATE. Reading
+// the locked value is what keeps a concurrent actor change from being
+// overwritten by a stale in-memory copy.
+func (r *ActionRepository) GetActorUserIDTx(tx database.Tx, actionID int) (*int, error) {
+	var actorUserID sql.NullInt64
+	err := tx.QueryRow(`SELECT actor_user_id FROM actions WHERE id = ?`, actionID).Scan(&actorUserID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("load locked action actor: %w", err)
+	}
+	if !actorUserID.Valid {
+		return nil, nil
+	}
+	value := int(actorUserID.Int64)
+	return &value, nil
+}
+
 // LoadDefinitionSnapshot returns the executable snapshot for a revision. It is
 // used by the runtime to execute the immutable definition rather than the
 // mutable action row.

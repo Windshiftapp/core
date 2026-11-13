@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services/actioncatalog"
@@ -115,9 +116,10 @@ func (s *ActionDefinitionService) Create(action *models.Action, nodes []models.A
 
 // Save validates the effective definition and persists either a graph
 // replacement or a metadata-only update, together with a new revision and the
-// caller's audit events, in one transaction. actorChanged applies the actor
-// override inside the same transaction.
-func (s *ActionDefinitionService) Save(action *models.Action, nodes []models.ActionNode, edges []models.ActionEdge, replaceGraph, validate, actorChanged bool, meta ActionWriteMeta) (*models.Action, actioncatalog.ValidationErrors, error) {
+// caller's audit events, in one transaction. The actor patch and its
+// authorization are resolved against the locked action row so a concurrent
+// actor change cannot be overwritten by a stale in-memory copy.
+func (s *ActionDefinitionService) Save(action *models.Action, nodes []models.ActionNode, edges []models.ActionEdge, replaceGraph, validate bool, actorPatch models.ActionActorUpdate, meta ActionWriteMeta) (*models.Action, actioncatalog.ValidationErrors, error) {
 	definition := actioncatalog.ActionDefinition{
 		Name: action.Name, Description: action.Description, TriggerType: action.TriggerType,
 		TriggerConfig: action.TriggerConfig, Nodes: nodes, Edges: edges,
@@ -132,13 +134,42 @@ func (s *ActionDefinitionService) Save(action *models.Action, nodes []models.Act
 	}
 
 	updated, err := database.WithTxResult(s.db, func(tx database.Tx) (*models.Action, error) {
+		// The UPDATE locks the row (PostgreSQL) or holds the single write
+		// connection (SQLite), so the actor read below is authoritative.
 		if err := s.repo.UpdateTx(tx, action); err != nil {
 			return nil, err
 		}
-		if actorChanged {
-			if err := s.repo.SetActorTx(tx, action.ID, action.ActorUserID); err != nil {
+		currentActor, err := s.repo.GetActorUserIDTx(tx, action.ID)
+		if err != nil {
+			return nil, err
+		}
+		effectiveActor := currentActor
+		if actorPatch.Present {
+			effectiveActor = actorPatch.Value
+		}
+		actorChanging := !sameIntPointer(effectiveActor, currentActor)
+		action.ActorUserID = effectiveActor
+		if meta.AuthorizeActor != nil {
+			if err := meta.AuthorizeActor(currentActor, effectiveActor, actorChanging); err != nil {
 				return nil, err
 			}
+		}
+		if actorChanging {
+			if err := s.repo.SetActorTx(tx, action.ID, effectiveActor); err != nil {
+				return nil, err
+			}
+			oldActor := 0
+			if currentActor != nil {
+				oldActor = *currentActor
+			}
+			newActor := 0
+			if effectiveActor != nil {
+				newActor = *effectiveActor
+			}
+			meta.ExtraAudits = append(meta.ExtraAudits, PendingAudit{
+				ActionType: logger.ActionAutomationSetActor,
+				Details:    map[string]any{"old_actor_user_id": oldActor, "new_actor_user_id": newActor},
+			})
 		}
 		if replaceGraph {
 			if err := s.repo.SaveGraphTx(tx, action.ID, nodes, edges); err != nil {
@@ -161,10 +192,47 @@ func (s *ActionDefinitionService) Save(action *models.Action, nodes []models.Act
 		return action, nil
 	})
 	if err != nil {
+		// The denied-audit write must happen after the mutation transaction has
+		// rolled back: LogAudit uses the write connection that the rolled-back
+		// transaction still holds on SQLite.
+		var denied *PrivilegedActionEditDenied
+		if errors.As(err, &denied) {
+			s.auditDeniedPrivilegedEdit(meta.Actor, action, denied)
+		}
 		return nil, nil, err
 	}
 	s.invalidate(action.WorkspaceID)
 	return updated, nil, nil
+}
+
+// auditDeniedPrivilegedEdit records a rejected attempt to change the executable
+// configuration of a privileged action without action.set_actor. It stores only
+// safe metadata: which fields were attempted, never the definition itself. The
+// write is independent of the rolled-back mutation transaction.
+func (s *ActionDefinitionService) auditDeniedPrivilegedEdit(actor AuditActor, action *models.Action, denied *PrivilegedActionEditDenied) {
+	required := denied.RequiredPermission
+	if required == "" {
+		required = models.PermissionActionSetActor
+	}
+	_ = logger.LogAudit(s.db, logger.AuditEvent{
+		UserID:       actor.UserID,
+		Username:     actor.Username,
+		IPAddress:    actor.IPAddress,
+		UserAgent:    actor.UserAgent,
+		Source:       actor.Source,
+		ActionType:   logger.ActionAccessDenied,
+		ResourceType: logger.ResourceAutomation,
+		ResourceID:   &action.ID,
+		ResourceName: action.Name,
+		Success:      false,
+		ErrorMessage: denied.Error(),
+		Details: mergeAuditDetails(map[string]any{
+			"workspace_id":        action.WorkspaceID,
+			"required_permission": required,
+			"attempted_fields":    denied.AttemptedFields,
+			"actor_user_id":       action.ActorUserID,
+		}, actor),
+	})
 }
 
 // Delete removes an action and writes the delete audit row in one transaction.
