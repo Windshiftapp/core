@@ -1,4 +1,5 @@
 import { timer as timerApi } from '../api/time.js';
+import { canRunBackgroundSync, onBackgroundSyncAvailable } from '../utils/backgroundSync.js';
 
 class TimerStore {
   // === State ===
@@ -86,6 +87,9 @@ class TimerStore {
     if (this.#syncInterval) return; // Already running
 
     this.#syncInterval = setInterval(() => {
+      // Hidden/offline tabs do not need to poll; the page syncs once when it
+      // becomes usable again (see the recovery listener below).
+      if (!canRunBackgroundSync()) return;
       this.sync();
     }, 30000);
   }
@@ -248,5 +252,11 @@ export const timerStore = new TimerStore();
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
     timerStore.cleanup();
+  });
+
+  // Catch up once the tab is visible/online again instead of polling while
+  // hidden. Only fires after an actual suspension.
+  onBackgroundSyncAvailable(() => {
+    if (timerStore.activeTimer) void timerStore.sync();
   });
 }
