@@ -17,6 +17,14 @@ export default {
     confirmDelete: 'Are you sure you want to delete the action "{name}"?',
     failedToSave: 'Failed to save action',
     newAction: 'New Action',
+    moreActions: 'More actions',
+    rename: 'Rename action',
+    duplicate: 'Duplicate action',
+    copyName: 'Copy of {name}',
+    duplicateHint:
+      'The copy starts disabled and keeps the original trigger, steps, and access settings.',
+    duplicateActorDenied:
+      'Duplicating this action requires the Set Action Actor permission because it runs as another user.',
 
     // Action templates (shipped automation blueprints)
     templates: {

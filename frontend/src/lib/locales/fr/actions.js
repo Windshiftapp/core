@@ -17,6 +17,12 @@ export default {
     confirmDelete: 'Voulez-vous vraiment supprimer l’action « {name} » ?',
     failedToSave: 'Échec de l’enregistrement de l’action',
     newAction: 'Nouvelle action',
+    moreActions: 'Autres actions',
+    rename: 'Renommer l’action',
+    duplicate: 'Dupliquer l’action',
+    copyName: 'Copie de {name}',
+    duplicateHint: 'La copie est initialement désactivée et conserve le déclencheur, les étapes et les paramètres d’accès de l’original.',
+    duplicateActorDenied: 'La duplication de cette action nécessite l’autorisation de définir l’acteur de l’action, car elle s’exécute au nom d’un autre utilisateur.',
 
     // Action templates (shipped automation blueprints)
     templates: {

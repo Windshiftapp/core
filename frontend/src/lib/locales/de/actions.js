@@ -18,6 +18,12 @@ export default {
     confirmDelete: 'Sind Sie sicher, dass Sie die Aktion "{name}" löschen möchten?',
     failedToSave: 'Aktion konnte nicht gespeichert werden',
     newAction: 'Neue Aktion',
+    moreActions: 'Weitere Aktionen',
+    rename: 'Aktion umbenennen',
+    duplicate: 'Aktion duplizieren',
+    copyName: 'Kopie von {name}',
+    duplicateHint: 'Die Kopie ist zunächst deaktiviert und übernimmt Auslöser, Schritte und Zugriffseinstellungen des Originals.',
+    duplicateActorDenied: 'Zum Duplizieren dieser Aktion ist die Berechtigung zum Festlegen des Aktionsakteurs erforderlich, da sie als anderer Benutzer ausgeführt wird.',
 
     templates: {
       pickTitle: 'Aktionsvorlage auswählen',

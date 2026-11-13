@@ -14,6 +14,12 @@ export default {
     confirmDelete: '确定要删除操作「{name}」吗？',
     failedToSave: '保存操作失败',
     newAction: '新建操作',
+    moreActions: '更多操作',
+    rename: '重命名操作',
+    duplicate: '复制操作',
+    copyName: '{name} 的副本',
+    duplicateHint: '副本创建后默认禁用，并保留原操作的触发器、步骤和访问设置。',
+    duplicateActorDenied: '此操作以其他用户身份运行，因此复制它需要设置操作执行者的权限。',
     templates: {
       pickTitle: '选择操作模板',
       fromTemplate: '使用模板',

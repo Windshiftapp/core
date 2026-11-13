@@ -17,6 +17,12 @@ export default {
     confirmDelete: 'Czy na pewno chcesz usunąć akcję „{name}”?',
     failedToSave: 'Nie udało się zapisać akcji',
     newAction: 'Nowa akcja',
+    moreActions: 'Więcej akcji',
+    rename: 'Zmień nazwę akcji',
+    duplicate: 'Duplikuj akcję',
+    copyName: 'Kopia {name}',
+    duplicateHint: 'Kopia jest początkowo wyłączona i zachowuje wyzwalacz, kroki oraz ustawienia dostępu oryginału.',
+    duplicateActorDenied: 'Duplikowanie tej akcji wymaga uprawnienia do ustawiania wykonawcy akcji, ponieważ jest uruchamiana jako inny użytkownik.',
 
     // Szablony akcji (gotowe schematy automatyzacji)
     templates: {
