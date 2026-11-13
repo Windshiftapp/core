@@ -100,6 +100,45 @@ var actionScriptDeniedPaths = []string{
 	"/items/bulk-delete",
 }
 
+// scriptMutationRule is one audited mutating route. A script may only change
+// state through routes whose persistence and emitted action events carry the
+// action cascade provenance. Every other mutation is denied: an unaudited
+// mutation would emit a fresh user-origin event and reset the chain, depth, and
+// private-trigger flag, which is the unbounded-loop vector WI-2174 closes.
+//
+// "*" matches one non-empty path segment. Reads are not governed by this list.
+type scriptMutationRule struct {
+	method   string
+	segments []string
+}
+
+var actionScriptAllowedMutations = []scriptMutationRule{
+	{http.MethodPost, []string{"items"}},                    // create item
+	{http.MethodPatch, []string{"items", "*"}},              // update item
+	{http.MethodPost, []string{"items", "*", "transition"}}, // workflow transition
+	{http.MethodPost, []string{"items", "*", "comments"}},   // comment on item
+	{http.MethodPost, []string{"items", "bulk-transition"}}, // per-item transition
+}
+
+func scriptMutationAllowed(method string, segments []string) bool {
+	for _, rule := range actionScriptAllowedMutations {
+		if rule.method != method || len(rule.segments) != len(segments) {
+			continue
+		}
+		matched := true
+		for i, segment := range rule.segments {
+			if segment != "*" && segment != segments[i] {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
+}
+
 // ValidateScriptAPIRequest enforces the bridge policy on a script-supplied
 // method and path and returns the normalized path (leading slash, optional
 // query preserved) ready to prefix with the v2 REST root.
@@ -155,6 +194,11 @@ func ValidateScriptAPIRequest(method, path string) (string, error) {
 		if parsed.Path == denied || strings.HasPrefix(parsed.Path, denied+"/") {
 			return "", scriptAPIPolicyErrorf("route %q is not available to scripts", parsed.Path)
 		}
+	}
+	// Mutations are restricted to the audited provenance-preserving routes;
+	// reads are not, because they cannot reset the cascade.
+	if method != http.MethodGet && method != http.MethodHead && !scriptMutationAllowed(method, segments) {
+		return "", scriptAPIPolicyErrorf("mutation route %s %q is not available to scripts", method, parsed.Path)
 	}
 	if parsed.RawQuery != "" {
 		return parsed.Path + "?" + parsed.RawQuery, nil

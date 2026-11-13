@@ -733,6 +733,25 @@ func (r *ActionRepository) UpdateExecutionLog(log *models.ActionExecutionLog) er
 	return nil
 }
 
+// MarkExecutionReconciliationRequired persists the write-ahead marker for a
+// running execution whose script may have committed a side effect. A crash
+// after this marker leaves the log reconciliation_required, so durable recovery
+// blocks replay instead of repeating the write. It never overwrites a terminal
+// status.
+func (r *ActionRepository) MarkExecutionReconciliationRequired(logID int) error {
+	_, err := r.db.ExecWrite(`
+		UPDATE action_execution_logs
+		SET status = ?, error_message = ?
+		WHERE id = ? AND status = ?
+	`, models.ActionStatusReconciliationRequired,
+		"requires reconciliation: a script write was in flight",
+		logID, models.ActionStatusRunning)
+	if err != nil {
+		return fmt.Errorf("failed to mark execution reconciliation required: %w", err)
+	}
+	return nil
+}
+
 // GetExecutionLogsByActionID retrieves execution logs for an action
 func (r *ActionRepository) GetExecutionLogsByActionID(actionID, limit, offset int) ([]*models.ActionExecutionLog, error) {
 	rows, err := r.db.Query(`

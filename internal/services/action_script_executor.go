@@ -45,6 +45,15 @@ var reservedScriptGlobals = map[string]bool{
 	"trigger_user_id": true,
 }
 
+// ActionScriptWriteMarker persists a write-ahead marker before a potentially
+// mutating script request is dispatched. If the worker dies between the commit
+// and the terminal execution-log update, the durable log then reads
+// reconciliation_required instead of running, so recovery blocks automatic
+// replay of an already-applied write.
+type ActionScriptWriteMarker interface {
+	MarkScriptWritePending(executionLogID int) error
+}
+
 // ExecuteScriptExecutor implements the execute_script node type. Each run gets
 // a fresh Sobek runtime bound to the effective action executor; REST calls go
 // through a short-lived bearer token minted for that executor and revoked in
@@ -65,6 +74,7 @@ var reservedScriptGlobals = map[string]bool{
 type ExecuteScriptExecutor struct {
 	tokens     ActionScriptTokenManager
 	dispatcher ScriptAPIDispatcher
+	marker     ActionScriptWriteMarker
 	logger     *slog.Logger
 }
 
@@ -77,6 +87,14 @@ func NewExecuteScriptExecutor(tokens ActionScriptTokenManager, dispatcher Script
 		dispatcher: dispatcher,
 		logger:     slog.Default(),
 	}
+}
+
+// WithWriteMarker wires the write-ahead reconciliation marker. Without one,
+// crash recovery cannot distinguish an in-flight write from an untouched
+// running execution, so mutating scripts fail closed.
+func (e *ExecuteScriptExecutor) WithWriteMarker(marker ActionScriptWriteMarker) *ExecuteScriptExecutor {
+	e.marker = marker
+	return e
 }
 
 // NodeType pins the dispatch key.
@@ -92,6 +110,8 @@ type scriptRun struct {
 	runCtx         context.Context
 	tokens         ActionScriptTokenManager
 	dispatcher     ScriptAPIDispatcher
+	marker         ActionScriptWriteMarker
+	executionLogID int
 	actorUserID    int
 	maxAPICalls    int
 	apiCalls       int
@@ -100,6 +120,7 @@ type scriptRun struct {
 	consoleCut     bool
 	fatal          error
 	reconciliation *bool
+	writeMarked    bool
 	cred           *ActionScriptCredential
 	credOnce       sync.Once
 	credErr        error
@@ -164,6 +185,8 @@ func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.Exe
 	run := &scriptRun{
 		tokens:         e.tokens,
 		dispatcher:     e.dispatcher,
+		marker:         e.marker,
+		executionLogID: ctx.ExecutionLogID,
 		actorUserID:    ctx.EffectiveActorID,
 		maxAPICalls:    maxCalls,
 		runCtx:         WithActionScriptProvenance(timeoutCtx, provenanceFromExecution(ctx, node.ID)),
@@ -334,6 +357,16 @@ func (r *scriptRun) apiRequest(call sobek.FunctionCall) sobek.Value {
 		return sobek.Undefined()
 	}
 
+	// Persist the write-ahead marker before a mutating dispatch so a crash
+	// between the commit and the terminal log update is recoverable as
+	// reconciliation-required instead of replaying the write.
+	if isMutatingScriptMethod(method) {
+		if err := r.markWritePending(); err != nil {
+			r.fail(fmt.Errorf("execute_script: persist write marker: %w", err))
+			return sobek.Undefined()
+		}
+	}
+
 	cred, err := r.ensureCredential()
 	if err != nil {
 		r.fail(err)
@@ -375,6 +408,19 @@ func (r *scriptRun) ensureCredential() (*ActionScriptCredential, error) {
 		r.cred, r.credErr = MintActionScriptCredential(r.runCtx, r.tokens, r.actorUserID)
 	})
 	return r.cred, r.credErr
+}
+
+// markWritePending persists the reconciliation marker once per execution. It is
+// a no-op when there is no durable execution log to recover.
+func (r *scriptRun) markWritePending() error {
+	if r.marker == nil || r.executionLogID <= 0 || r.writeMarked {
+		return nil
+	}
+	if err := r.marker.MarkScriptWritePending(r.executionLogID); err != nil {
+		return err
+	}
+	r.writeMarked = true
+	return nil
 }
 
 // fail records the first fatal policy error and interrupts the VM. Interrupts
@@ -459,26 +505,74 @@ func runScriptProgram(vm *sobek.Runtime, program *sobek.Program, timeoutCtx cont
 		}
 	}()
 	defer func() {
+		// Convert panics and runtime errors to inert Go text while the watchdog
+		// is still armed: formatting a Sobek exception can invoke a script
+		// toString, which is itself script code and must stay under the budget.
+		if r := recover(); r != nil {
+			err = inertScriptPanic(r)
+		}
 		close(done)
 		<-exited
-		if r := recover(); r != nil {
-			switch value := r.(type) {
-			case *sobek.InterruptedError:
-				err = value
-			case error:
-				err = fmt.Errorf("script result conversion failed: %w", value)
-			case *sobek.Object:
-				err = fmt.Errorf("script result conversion failed: %s", value.String())
-			default:
-				err = fmt.Errorf("script result conversion failed: %v", value)
-			}
-		}
 	}()
 	result, runErr := vm.RunProgram(program)
 	if runErr != nil {
-		return nil, runErr
+		return nil, inertScriptError(runErr)
 	}
 	return strictScriptOutput(result)
+}
+
+// maxScriptErrorBytes bounds the inert error text a script can influence.
+const maxScriptErrorBytes = 1024
+
+// inertScriptError converts a runtime error to a plain Go error without
+// retaining any script-backed value whose later formatting could evaluate
+// script code. It must be called while the watchdog is armed.
+func inertScriptError(runErr error) (err error) {
+	var interrupted *sobek.InterruptedError
+	if errors.As(runErr, &interrupted) {
+		return interrupted
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			if ie, ok := r.(*sobek.InterruptedError); ok {
+				err = ie
+				return
+			}
+			err = errors.New("script execution error")
+		}
+	}()
+	return errors.New(boundedScriptText(runErr.Error()))
+}
+
+// inertScriptPanic converts a recovered panic value to a plain Go error. It
+// must be called while the watchdog is armed.
+func inertScriptPanic(recovered any) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if ie, ok := r.(*sobek.InterruptedError); ok {
+				err = ie
+				return
+			}
+			err = errors.New("script result conversion failed")
+		}
+	}()
+	switch value := recovered.(type) {
+	case *sobek.InterruptedError:
+		return value
+	case *sobek.Object:
+		return errors.New(boundedScriptText(value.String()))
+	case error:
+		return errors.New(boundedScriptText(value.Error()))
+	default:
+		return fmt.Errorf("script result conversion failed: %v", value)
+	}
+}
+
+func boundedScriptText(text string) string {
+	if len(text) > maxScriptErrorBytes {
+		return text[:maxScriptErrorBytes] + "…[truncated]"
+	}
+	return text
 }
 
 // strictScriptOutput converts a script's return value into detached JSON,

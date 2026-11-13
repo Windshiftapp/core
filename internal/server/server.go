@@ -2132,7 +2132,8 @@ func (s *Server) initialize() error {
 	// with a short-lived token minted for that executor, so bearer auth, token
 	// scopes, and every handler-level authorization check still apply.
 	s.actionService.RegisterNodeExecutor(
-		services.NewExecuteScriptExecutor(tokenManager, services.NewInProcessV2Dispatcher(mux, 0)),
+		services.NewExecuteScriptExecutor(tokenManager, services.NewInProcessV2Dispatcher(mux, 0)).
+			WithWriteMarker(s.actionService),
 	)
 
 	// MCP Server (Model Context Protocol) — opt-in via --mcp or MCP_ENABLED=true

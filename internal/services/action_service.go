@@ -257,6 +257,16 @@ func (as *ActionService) EmitActionEventInTx(ctx context.Context, tx database.Tx
 	return as.durableIngress.EmitInTx(ctx, tx, event)
 }
 
+// MarkScriptWritePending implements ActionScriptWriteMarker. It persists the
+// write-ahead reconciliation marker on the execution log before a mutating
+// script call is dispatched, so a crash after the commit is not replayed.
+func (as *ActionService) MarkScriptWritePending(executionLogID int) error {
+	if executionLogID <= 0 {
+		return nil
+	}
+	return as.repo.MarkExecutionReconciliationRequired(executionLogID)
+}
+
 // Stop gracefully shuts down the action service
 func (as *ActionService) Stop() {
 	close(as.stopChan)
