@@ -4,8 +4,6 @@
  */
 export default {
   common: {
-    virtualizeRows: 'Zeilen virtualisieren',
-    virtualizeRowsHint: 'Deaktivieren, um alle geladenen Zeilen für Barrierefreiheit, Browsersuche oder Kopieren anzuzeigen.',
     save: 'Speichern',
     saveChanges: 'Änderungen speichern',
     cancel: 'Abbrechen',

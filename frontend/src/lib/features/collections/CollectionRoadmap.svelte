@@ -48,14 +48,11 @@
   import VirtualRows from '../../components/VirtualRows.svelte';
   import { useRoadmapVirtualRows } from './useRoadmapVirtualRows.svelte';
   import { collectionItemRowKey } from './collectionVirtualRows';
-  import { useCollectionVirtualization } from './useCollectionVirtualization.svelte.js';
-  import CollectionVirtualizationToggle from './CollectionVirtualizationToggle.svelte';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { useEventListener, useResizeObserver } from 'runed';
 
   // Props
   let { workspaceId, collectionId = null } = $props();
-  const virtualization = useCollectionVirtualization(() => ({ workspaceId, collectionId, view: 'roadmap' }));
 
   // Reference data from shared workspace store
   let workspace = $derived(workspaceDataStore.workspace);
@@ -236,7 +233,6 @@
     getRoot: () => timelineScrollContainer,
     getList: () => timelineListElement,
     getIdentity: () => `roadmap:${workspaceId ?? ''}:${collectionId ?? ''}:${collectionStore.effectiveSubFilterQL}:${collectionStore.hierarchyLevel ?? ''}`,
-    getEnabled: () => virtualization.enabled,
   });
   $effect(() => {
     const id = dragInfo?.itemId;
@@ -1709,7 +1705,6 @@
       {/if}
 
       {#if roadmapConfig.start_field_id}
-        <CollectionVirtualizationToggle preference={virtualization} />
         <CollectionHierarchyLoadMore testid="roadmap-load-more" />
       {/if}
   </StaticViewBackground>

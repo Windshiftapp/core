@@ -2,8 +2,6 @@
   import VirtualRows from '../../components/VirtualRows.svelte';
   import BacklogItemRow from './BacklogItemRow.svelte';
   import { projectBacklogRows } from './backlogVirtualRows';
-  import { useCollectionVirtualization } from './useCollectionVirtualization.svelte.js';
-  import CollectionVirtualizationToggle from './CollectionVirtualizationToggle.svelte';
   import { claimVirtualDrop, virtualDropAllowed } from '../../virtualization/virtualDragSession';
   import { onMount } from 'svelte';
   import { items } from '../../api/items.js';
@@ -46,7 +44,6 @@
 
   let { workspaceId, collectionId = null } = $props();
   let backlogListElement = $state(null);
-  const virtualization = useCollectionVirtualization(() => ({ workspaceId, collectionId, view: 'backlog' }));
 
   // Reference data from shared workspace store
   let workspace = $derived(workspaceDataStore.workspace);
@@ -753,7 +750,7 @@
         <!-- Backlog items grouped by iteration sections -->
         <div class="w-full" bind:this={backlogListElement} style="overflow-anchor: none;">
           <VirtualRows items={virtualBacklogRows} getKey={(row) => row.key}
-            listElement={backlogListElement} enabled={virtualization.enabled}
+            listElement={backlogListElement}
             estimateSize={(row) => row.kind === 'item' ? 56 : 64}
             identity={`backlog:${workspaceId ?? ''}:${collectionId ?? ''}:${collectionStore.effectiveBacklogSubFilterQL}`}
             layoutRevision={visibleFields.join('|')}
@@ -791,7 +788,6 @@
               {/if}
             {/snippet}
           </VirtualRows>
-          <CollectionVirtualizationToggle preference={virtualization} />
 
           <!-- Load More -->
           {#if collectionStore.backlogHasMore}

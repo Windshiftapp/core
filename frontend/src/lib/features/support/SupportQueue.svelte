@@ -50,8 +50,6 @@
   import WorkItemListRow from '../collections/WorkItemListRow.svelte';
   import VirtualRows from '../../components/VirtualRows.svelte';
   import { collectionItemRowKey } from '../collections/collectionVirtualRows';
-  import { useCollectionVirtualization } from '../collections/useCollectionVirtualization.svelte.js';
-  import CollectionVirtualizationToggle from '../collections/CollectionVirtualizationToggle.svelte';
   import WorkItemListFooter from '../collections/WorkItemListFooter.svelte';
   import ColumnSelector from '../collections/ColumnSelector.svelte';
   import QlFilterBuilder from '../shared/QlFilterBuilder.svelte';
@@ -59,7 +57,6 @@
   let { workspaceId, collectionId = null, queue = null } = $props();
   let queueScrollElement = $state(null);
   let queueListElement = $state(null);
-  const virtualization = useCollectionVirtualization(() => ({ workspaceId, collectionId, view: `queue-${activeRef}` }));
 
   // Resolved queue catalog for the current scope (built-ins + custom).
   let queues = $state([]);
@@ -883,7 +880,7 @@
 
           <div bind:this={queueListElement} style="overflow-anchor: none;">
             <VirtualRows {items} getKey={collectionItemRowKey} listElement={queueListElement}
-              scrollElement={queueScrollElement} enabled={virtualization.enabled} layoutRevision={gridTemplateColumns}
+              scrollElement={queueScrollElement} layoutRevision={gridTemplateColumns}
               identity={`queue:${loadedQueryScope}:${currentPage}:${itemsPerPage}`}
             >
             {#snippet row(item, virtual)}
@@ -925,7 +922,6 @@
           </div>
         </div>
 
-        <CollectionVirtualizationToggle preference={virtualization} />
         {#if itemsPagination && itemsPagination.total_items > 0 && items.length > 0}
           <WorkItemListFooter
             pagination={itemsPagination}

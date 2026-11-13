@@ -42,8 +42,6 @@
   import { useCollectionHierarchy } from '../../composables/useCollectionHierarchy.svelte.js';
   import VirtualRows from '../../components/VirtualRows.svelte';
   import { collectionTreeRowKey } from './collectionVirtualRows';
-  import { useCollectionVirtualization } from './useCollectionVirtualization.svelte.js';
-  import CollectionVirtualizationToggle from './CollectionVirtualizationToggle.svelte';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -76,7 +74,6 @@
 
   let loading = $state(true);
   let treeListElement = $state(null);
-  const virtualization = useCollectionVirtualization(() => ({ workspaceId, collectionId, view: 'tree' }));
   let currentCollectionName = $state('Default');
   // Filter-scoped item total from the server: everything the tree contains
   // across all pages, independent of expansion state or the loaded page.
@@ -564,7 +561,6 @@
           <!-- Tree Items -->
           <div bind:this={treeListElement} style="--divide-color: var(--ds-border); overflow-anchor: none;">
             <VirtualRows items={treeData} getKey={collectionTreeRowKey}
-              enabled={virtualization.enabled}
               listElement={treeListElement}
               identity={`tree:${workspaceId ?? ''}:${collectionId ?? ''}:${collectionStore.effectiveSubFilterQL}:${collectionStore.hierarchyLevel ?? ''}`}
               layoutRevision={gridTemplateColumns}
@@ -701,7 +697,6 @@
         </div>
       </div>
 
-        <CollectionVirtualizationToggle preference={virtualization} />
         <CollectionHierarchyLoadMore testid="tree-load-more" />
       {/if}
   </StaticViewBackground>
