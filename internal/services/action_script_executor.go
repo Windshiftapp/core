@@ -120,7 +120,7 @@ type scriptRun struct {
 	consoleCut     bool
 	fatal          error
 	reconciliation *bool
-	writeMarked    bool
+	writeMarked    *bool
 	cred           *ActionScriptCredential
 	credOnce       sync.Once
 	credErr        error
@@ -191,6 +191,7 @@ func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.Exe
 		maxAPICalls:    maxCalls,
 		runCtx:         WithActionScriptProvenance(timeoutCtx, provenanceFromExecution(ctx, node.ID)),
 		reconciliation: &ctx.ReconciliationRequired,
+		writeMarked:    &ctx.ScriptWriteMarked,
 	}
 
 	vm := sobek.New()
@@ -409,16 +410,24 @@ func (r *scriptRun) ensureCredential() (*ActionScriptCredential, error) {
 	return r.cred, r.credErr
 }
 
-// markWritePending persists the reconciliation marker once per execution. It is
-// a no-op when there is no durable execution log to recover.
+// markWritePending persists the reconciliation marker once per execution. The
+// marker is shared across every script node and iterator pass, so the second
+// mutating node in a flow reuses the first node's persisted marker instead of
+// re-updating a log that is already reconciliation_required. It is a no-op when
+// there is no durable execution log to recover.
 func (r *scriptRun) markWritePending() error {
-	if r.marker == nil || r.executionLogID <= 0 || r.writeMarked {
+	if r.marker == nil || r.executionLogID <= 0 {
+		return nil
+	}
+	if r.writeMarked != nil && *r.writeMarked {
 		return nil
 	}
 	if err := r.marker.MarkScriptWritePending(r.executionLogID); err != nil {
 		return err
 	}
-	r.writeMarked = true
+	if r.writeMarked != nil {
+		*r.writeMarked = true
+	}
 	return nil
 }
 

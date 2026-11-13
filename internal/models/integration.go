@@ -1148,6 +1148,11 @@ type ExecutionContext struct {
 	// mutating REST call and the flow later failed. Durable replay must not
 	// rerun the flow, because the committed write would be repeated.
 	ReconciliationRequired bool `json:"-"`
+	// ScriptWriteMarked records that the write-ahead reconciliation marker has
+	// already been persisted for this execution. It is shared across every
+	// script node and iterator pass in the flow so repeated marking of the same
+	// log is a no-op rather than an invalid-state failure.
+	ScriptWriteMarked bool `json:"-"`
 }
 
 // StepResult holds the result of executing a single node
