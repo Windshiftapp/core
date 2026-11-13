@@ -1,5 +1,6 @@
 <script>
   import IconClock from '@tabler/icons-svelte-runes/icons/clock';
+  import IconClockPlus from '@tabler/icons-svelte-runes/icons/clock-plus';
   import IconPlayerPlay from '@tabler/icons-svelte-runes/icons/player-play';
   import IconPlayerStop from '@tabler/icons-svelte-runes/icons/player-stop';
   import Button from '../components/Button.svelte';
@@ -32,7 +33,7 @@
       .slice(0, 8)
   );
 
-  async function startTimer(project = null) {
+  async function startTimer() {
     const workspaceId = resolveTimerWorkspaceId();
     if (!workspaceId) {
       errorToast(t('time.entry.needWorkspace'));
@@ -47,15 +48,21 @@
     try {
       await timerStore.start({
         workspace_id: workspaceId,
-        project_id: project?.id ?? null,
+        project_id: null,
         item_id: context.itemId ?? null,
-        description: project?.name ?? '',
+        description: '',
       });
     } catch (err) {
       if (!err.message?.includes('already running')) {
         errorToast(t('items.failedToStartTimer'), err.message);
       }
     }
+  }
+
+  async function openLogWork(project = null) {
+    await timeLogStore.open({
+      defaultProjectId: project?.id ?? null,
+    });
   }
 
   async function stopTimer() {
@@ -92,6 +99,17 @@
     }
 
     out.push({
+      id: 'log-work',
+      type: 'regular',
+      icon: IconClockPlus,
+      title: t('time.menu.logWork'),
+      subtitle: t('time.menu.logWorkHint'),
+      shortcut: getShortcutDisplay('global', 'logWork'),
+      onClick: () => openLogWork(),
+      testid: 'time-menu-log-work',
+    });
+
+    out.push({
       type: 'search',
       id: 'project-search',
       testid: 'time-menu-project-search',
@@ -106,7 +124,7 @@
         items: projectOptions.map((project) => ({
           id: `project-${project.id}`,
           title: project.name,
-          onClick: () => startTimer(project),
+          onClick: () => openLogWork(project),
           testid: `time-menu-project-${project.id}`,
         })),
       });
@@ -155,10 +173,15 @@
   onOpenChange={(open) => onSurfaceChange(open ? 'time' : null)}
 />
 
-<!-- Global start-timer shortcut. @github/hotkey ignores keystrokes that
-     originate in form fields, so 'L' types normally while editing. -->
+<!-- Global shortcuts. @github/hotkey ignores keystrokes that originate in form
+     fields, so 'T' and 'L' type normally while editing. -->
 <Button
   class="sr-only"
   onclick={() => startTimer()}
   hotkeyConfig={{ key: toHotkeyString('global', 'startTimer'), guard: () => timerStore.canStart }}
 >{t('items.startTimer')}</Button>
+<Button
+  class="sr-only"
+  onclick={() => openLogWork()}
+  hotkeyConfig={{ key: toHotkeyString('global', 'logWork') }}
+>{t('time.menu.logWork')}</Button>

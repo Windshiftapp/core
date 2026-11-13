@@ -19,6 +19,8 @@ export default {
     'discardFailed': 'Не удалось удалить черновик.',
     'menu': {
       'startTimerHint': 'Использует открытый рабочий элемент, если он есть',
+      'logWork': 'Учесть работу',
+      'logWorkHint': 'Учесть время вручную',
     },
     timeSpent: 'Затрачено времени',
     remaining: 'Осталось',

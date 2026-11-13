@@ -15,6 +15,8 @@ export default {
     drafts: 'Drafts',
     menu: {
       startTimerHint: 'Uses the open work item when available',
+      logWork: 'Log Work',
+      logWorkHint: 'Record time manually',
     },
     draftSaved: 'Saved as draft — complete it later from the Time & Projects menu.',
     timeBooked: 'Time logged.',

@@ -20,6 +20,8 @@ export default {
     'discardFailed': 'Nie udało się odrzucić szkicu.',
     'menu': {
       'startTimerHint': 'Używa otwartego elementu pracy, jeśli jest dostępny',
+      'logWork': 'Zarejestruj pracę',
+      'logWorkHint': 'Ręcznie zarejestruj czas',
     },
     timeSpent: 'Spędzony czas',
     remaining: 'Pozostało',

@@ -19,6 +19,8 @@ export default {
     'discardFailed': 'Der Entwurf konnte nicht verworfen werden.',
     'menu': {
       'startTimerHint': 'Verwendet das geöffnete Arbeitselement, falls vorhanden',
+      'logWork': 'Arbeit erfassen',
+      'logWorkHint': 'Arbeitszeit manuell erfassen',
     },
     timeSpent: 'Aufgewendete Zeit',
     remaining: 'Verbleibend',
