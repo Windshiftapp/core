@@ -60,6 +60,7 @@ type ActionTemplateSummary struct {
 type ActionApplicationService struct {
 	db          database.Database
 	repo        *repository.ActionRepository
+	revisions   *repository.ActionRevisionRepository
 	items       *repository.ItemRepository
 	permissions *PermissionService
 	definitions *ActionDefinitionService
@@ -68,9 +69,9 @@ type ActionApplicationService struct {
 }
 
 func NewActionApplicationService(db database.Database, repo *repository.ActionRepository, items *repository.ItemRepository, permissions *PermissionService, runtime *ActionService, assets *AssetService) *ActionApplicationService {
-	definitions := NewActionDefinitionService(repo, runtime)
+	definitions := NewActionDefinitionService(db, repo, runtime)
 	definitions.SetAssetService(assets)
-	return &ActionApplicationService{db: db, repo: repo, items: items, permissions: permissions, definitions: definitions, runtime: runtime, templates: NewActionTemplateService(db)}
+	return &ActionApplicationService{db: db, repo: repo, revisions: repository.NewActionRevisionRepository(db), items: items, permissions: permissions, definitions: definitions, runtime: runtime, templates: NewActionTemplateService(db, repo)}
 }
 
 func (s *ActionApplicationService) ListTemplates() []ActionTemplateSummary {
@@ -92,16 +93,19 @@ func (s *ActionApplicationService) ApplyTemplate(ctx context.Context, userID, wo
 	if _, ok := actiontemplates.Get(key); !ok {
 		return nil, repository.ErrNotFound
 	}
-	result, err := s.templates.ApplyToWorkspace(ctx, key, workspaceID, userID)
+	meta := ActionWriteMeta{
+		Actor:             actor,
+		Source:            models.ActionRevisionSourceTemplate,
+		PrimaryActionType: logger.ActionAutomationCreate,
+		PrimaryDetails:    map[string]any{"template_key": key, "context": "from_template"},
+	}
+	result, err := s.templates.ApplyToWorkspace(ctx, key, workspaceID, userID, meta)
 	if err != nil {
 		return nil, err
 	}
 	if s.runtime != nil {
 		s.runtime.InvalidateWorkspaceCache(workspaceID)
 	}
-	emitServiceAudit(s.db, actor, logger.ActionAutomationCreate, logger.ResourceAutomation, &result.ActionID, result.Name, map[string]any{
-		"template_key": result.TemplateKey, "context": "from_template",
-	})
 	return result, nil
 }
 
@@ -195,6 +199,10 @@ func (s *ActionApplicationService) Create(userID, workspaceID int, actor AuditAc
 	}
 	if input.ActorUserID != nil {
 		if err := s.requireSetActor(userID); err != nil {
+			s.definitions.auditDeniedPrivilegedEdit(actor, &models.Action{WorkspaceID: workspaceID, Name: input.Name}, &PrivilegedActionEditDenied{
+				AttemptedFields:    []string{"actor_user_id"},
+				RequiredPermission: models.PermissionActionSetActor,
+			})
 			return nil, err
 		}
 	}
@@ -213,17 +221,20 @@ func (s *ActionApplicationService) Create(userID, workspaceID int, actor AuditAc
 		TriggerType: input.TriggerType, TriggerConfig: input.TriggerConfig, CreatedBy: &userID,
 		ActorUserID: input.ActorUserID, AllowedRoleIDs: roles,
 	}
-	created, validation, err := s.definitions.Create(action, input.Nodes, input.Edges)
+	meta := ActionWriteMeta{
+		Actor:             actor,
+		Source:            models.ActionRevisionSourceCreate,
+		PrimaryActionType: logger.ActionAutomationCreate,
+	}
+	if input.ActorUserID != nil {
+		meta.ExtraAudits = append(meta.ExtraAudits, PendingAudit{
+			ActionType: logger.ActionAutomationSetActor,
+			Details:    map[string]any{"new_actor_user_id": *input.ActorUserID},
+		})
+	}
+	created, validation, err := s.definitions.Create(action, input.Nodes, input.Edges, meta)
 	if len(validation) > 0 {
 		return nil, &ActionValidationError{Errors: validation}
-	}
-	if err == nil {
-		emitServiceAudit(s.db, actor, logger.ActionAutomationCreate, logger.ResourceAutomation, &created.ID, created.Name, nil)
-		if input.ActorUserID != nil {
-			emitServiceAudit(s.db, actor, logger.ActionAutomationSetActor, logger.ResourceAutomation, &created.ID, created.Name, map[string]any{
-				"new_actor_user_id": *input.ActorUserID,
-			})
-		}
 	}
 	return created, err
 }
@@ -246,13 +257,6 @@ func (s *ActionApplicationService) Update(userID, workspaceID, actionID int, act
 	action, err := s.actionInWorkspace(actionID, workspaceID)
 	if err != nil {
 		return nil, err
-	}
-	previousActor := action.ActorUserID
-	actorChanging := input.ActorUserID.Present && !sameIntPointer(input.ActorUserID.Value, previousActor)
-	if actorChanging {
-		if err := s.requireSetActor(userID); err != nil {
-			return nil, err
-		}
 	}
 	if input.Name != nil {
 		*input.Name = sanitize.PlainTextField.Sanitize(*input.Name)
@@ -285,38 +289,73 @@ func (s *ActionApplicationService) Update(userID, workspaceID, actionID int, act
 		nodes, edges = input.Nodes, input.Edges
 	}
 	definitionTouched := input.Name != nil || input.TriggerType != nil || input.TriggerConfig != nil || input.Nodes != nil || (input.IsEnabled != nil && *input.IsEnabled)
-	updated, validation, err := s.definitions.Save(action, nodes, edges, input.Nodes != nil, definitionTouched)
+	meta := ActionWriteMeta{
+		Actor:             actor,
+		Source:            models.ActionRevisionSourceUpdate,
+		PrimaryActionType: logger.ActionAutomationUpdate,
+		AuthorizeActor:    s.privilegedEditAuthorizer(userID, privilegedEditFields(input)),
+	}
+	updated, validation, err := s.definitions.Save(action, nodes, edges, input.Nodes != nil, definitionTouched, input.ActorUserID, meta)
 	if len(validation) > 0 {
 		return nil, &ActionValidationError{Errors: validation}
 	}
 	if err != nil {
+		var denied *PrivilegedActionEditDenied
+		if errors.As(err, &denied) {
+			return nil, ErrActionNotVisible
+		}
 		return nil, err
 	}
-	if actorChanging {
-		if err := s.repo.SetActor(actionID, input.ActorUserID.Value); err != nil {
-			return nil, err
-		}
-		updated, err = s.repo.GetByID(actionID)
-		if err != nil {
-			return nil, err
-		}
-	}
-	emitServiceAudit(s.db, actor, logger.ActionAutomationUpdate, logger.ResourceAutomation, &updated.ID, updated.Name, nil)
-	if actorChanging {
-		oldActor := 0
-		if previousActor != nil {
-			oldActor = *previousActor
-		}
-		newActor := 0
-		if input.ActorUserID.Value != nil {
-			newActor = *input.ActorUserID.Value
-		}
-		emitServiceAudit(s.db, actor, logger.ActionAutomationSetActor, logger.ResourceAutomation, &updated.ID, updated.Name, map[string]any{
-			"old_actor_user_id": oldActor,
-			"new_actor_user_id": newActor,
-		})
-	}
 	return updated, nil
+}
+
+// privilegedEditAuthorizer returns the in-transaction authorizer that enforces
+// action.set_actor for execution-affecting edits of an actor-configured action.
+// It runs after the action row is locked, so a concurrent actor change cannot
+// be raced past with a stale read.
+func (s *ActionApplicationService) privilegedEditAuthorizer(userID int, attempted []string) func(currentActor, effectiveActor *int, actorChanging bool) error {
+	return func(_ *int, effectiveActor *int, actorChanging bool) error {
+		if !actorChanging && (effectiveActor == nil || len(attempted) == 0) {
+			return nil
+		}
+		allowed, err := s.permissions.HasGlobalPermission(userID, models.PermissionActionSetActor)
+		if err != nil {
+			return err
+		}
+		if allowed {
+			return nil
+		}
+		deniedFields := attempted
+		if actorChanging {
+			deniedFields = append(append([]string{}, attempted...), "actor_user_id")
+		}
+		return &PrivilegedActionEditDenied{
+			AttemptedFields:    deniedFields,
+			RequiredPermission: models.PermissionActionSetActor,
+		}
+	}
+}
+
+// privilegedEditFields lists the execution-affecting fields an update attempts
+// to change. It is the safe metadata recorded when the edit is denied.
+func privilegedEditFields(input models.UpdateActionRequest) []string {
+	fields := make([]string, 0, 5)
+	if input.TriggerType != nil {
+		fields = append(fields, "trigger_type")
+	}
+	if input.TriggerConfig != nil {
+		fields = append(fields, "trigger_config")
+	}
+	if input.Nodes != nil {
+		fields = append(fields, "nodes")
+	}
+	if input.IsEnabled != nil {
+		fields = append(fields, "is_enabled")
+	}
+	if input.AllowedRoleIDs != nil {
+		fields = append(fields, "allowed_role_ids")
+	}
+	return fields
 }
 
 func (s *ActionApplicationService) Delete(userID, workspaceID, actionID int, actor AuditActor) error {
@@ -327,11 +366,12 @@ func (s *ActionApplicationService) Delete(userID, workspaceID, actionID int, act
 	if err != nil {
 		return err
 	}
-	if err := s.definitions.Delete(action.ID, workspaceID); err != nil {
-		return err
+	meta := ActionWriteMeta{
+		Actor:             actor,
+		Source:            "delete",
+		PrimaryActionType: logger.ActionAutomationDelete,
 	}
-	emitServiceAudit(s.db, actor, logger.ActionAutomationDelete, logger.ResourceAutomation, &action.ID, action.Name, nil)
-	return nil
+	return s.definitions.Delete(action, meta)
 }
 
 func (s *ActionApplicationService) Logs(userID, workspaceID, actionID, limit, offset int) ([]*models.ActionExecutionLog, int, error) {
@@ -350,6 +390,26 @@ func (s *ActionApplicationService) Logs(userID, workspaceID, actionID, limit, of
 		result = []*models.ActionExecutionLog{}
 	}
 	return result, total, nil
+}
+
+// ListRevisions returns the immutable definition history for an action. Access
+// is gated on action.manage for the workspace, and the query is scoped by
+// workspace, so retained history stays readable after the action is deleted
+// without requiring a surviving action row.
+func (s *ActionApplicationService) ListRevisions(userID, workspaceID, actionID, limit, offset int) ([]models.ActionDefinitionRevisionSummary, int, error) {
+	if err := s.requireManage(userID, workspaceID); err != nil {
+		return nil, 0, err
+	}
+	return s.revisions.ListSummariesByAction(actionID, workspaceID, limit, offset)
+}
+
+// GetRevision returns one revision with its full executable snapshot, scoped to
+// the workspace so retained history remains accessible after deletion.
+func (s *ActionApplicationService) GetRevision(userID, workspaceID, actionID, revisionID int) (*models.ActionDefinitionRevision, error) {
+	if err := s.requireManage(userID, workspaceID); err != nil {
+		return nil, err
+	}
+	return s.revisions.GetByIDForAction(revisionID, actionID, workspaceID)
 }
 
 func (s *ActionApplicationService) Execute(userID, workspaceID, actionID, itemID int) (models.ActionExecutionStatus, error) {

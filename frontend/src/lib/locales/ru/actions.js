@@ -259,6 +259,25 @@ export default {
       viewDetails: 'Подробнее',
     },
 
+    history: {
+      title: 'История определения',
+      noRevisions: 'Нет версий определения',
+      revision: 'Версия',
+      source: 'Источник',
+      editor: 'Изменил',
+      changedFields: 'Изменённые поля',
+      changeSummary: 'Сводка',
+      createdAt: 'Записано',
+      viewDetails: 'Просмотреть версию',
+      detailTitle: 'Версия определения',
+      snapshot: 'Исполняемое определение',
+      nodes: 'Узлы',
+      edges: 'Связи',
+      noChangedFields: 'Нет исполняемых изменений',
+      system: 'Система (базовая)',
+      triggerType: 'Триггер',
+    },
+
     trace: {
       title: 'Сведения о выполнении',
       noSteps: 'Шаги выполнения не записаны',

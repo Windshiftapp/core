@@ -928,9 +928,13 @@ type Action struct {
 	ActorUserID *int `json:"actor_user_id,omitempty"`
 	// AllowedRoleIDs restricts a manual action to members of these workspace
 	// roles. An empty list means every workspace editor may trigger it.
-	AllowedRoleIDs []int     `json:"allowed_role_ids"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	AllowedRoleIDs []int `json:"allowed_role_ids"`
+	// CurrentRevisionID points at the immutable definition revision that the
+	// runtime executes. It is set on every successful definition write and is
+	// captured on each execution log so an operator can reconstruct what ran.
+	CurrentRevisionID *int      `json:"current_revision_id,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 	// Joined fields for API responses
 	CreatorName string       `json:"creator_name,omitempty"`
 	ActorName   string       `json:"actor_name,omitempty"`
@@ -1057,6 +1061,9 @@ type ActionExecutionLog struct {
 	CompletedAt          *time.Time            `json:"completed_at,omitempty"`
 	ErrorMessage         string                `json:"error_message,omitempty"`
 	ExecutionTrace       string                `json:"execution_trace,omitempty"` // JSON step log
+	// DefinitionRevisionID is the immutable definition revision this execution
+	// actually ran. Nil for executions recorded before revisions existed.
+	DefinitionRevisionID *int `json:"definition_revision_id,omitempty"`
 	// Joined fields for API responses
 	ActionName      string `json:"action_name,omitempty"`
 	ItemTitle       string `json:"item_title,omitempty"`

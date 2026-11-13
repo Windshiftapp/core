@@ -107,6 +107,11 @@ type ActionService struct {
 	// Shared execution chain store for cross-application cascade loop prevention
 	chainStore *ExecutionChainStore
 
+	// revisions resolves the immutable definition snapshot an execution runs,
+	// so a concurrent edit cannot make the recorded revision disagree with the
+	// executed definition.
+	revisions *repository.ActionRevisionRepository
+
 	// Pluggable node-executor registry. New ActionNodeTypes register their
 	// implementations here at startup; executeNode consults the registry
 	// before falling through to the legacy switch. See action_node_executor.go.
@@ -127,6 +132,7 @@ func NewActionService(db database.Database, config ActionServiceConfig, chainSto
 	service := &ActionService{
 		db:             db,
 		repo:           repository.NewActionRepository(db),
+		revisions:      repository.NewActionRevisionRepository(db),
 		itemRepo:       repository.NewItemRepository(db),
 		config:         config,
 		actionCache:    make(map[int][]*models.Action),
@@ -659,10 +665,20 @@ func (as *ActionService) executeActionForEvent(executionCtx context.Context, act
 				return nil
 			}
 			log.ID = existing.ID
+			// A retry must run the definition the first attempt was bound to,
+			// not whatever the action points at now.
+			if existing.DefinitionRevisionID != nil {
+				log.DefinitionRevisionID = existing.DefinitionRevisionID
+			}
 		} else if !errors.Is(loadErr, sql.ErrNoRows) {
 			return fmt.Errorf("load durable action execution: %w", loadErr)
 		}
 	}
+	boundAction, err := as.bindExecutionRevision(action, log)
+	if err != nil {
+		return err
+	}
+	action = boundAction
 	if log.ID == 0 {
 		logID, err := as.repo.CreateExecutionLog(log)
 		if err != nil {
@@ -839,6 +855,44 @@ func actionRequestContext(ctx *models.ExecutionContext) context.Context {
 		return ctx.Context
 	}
 	return context.Background()
+}
+
+// bindExecutionRevision returns a copy of the action carrying the immutable
+// definition revision it is currently bound to, and records that revision on
+// the execution log. A durable retry reuses the revision from its first
+// attempt so worker recovery cannot silently run a newer definition. The
+// cached action is never mutated, so concurrent executions stay isolated.
+func (as *ActionService) bindExecutionRevision(action *models.Action, log *models.ActionExecutionLog) (*models.Action, error) {
+	revisionID := log.DefinitionRevisionID
+	if revisionID == nil {
+		revisionID = action.CurrentRevisionID
+	}
+	if revisionID == nil {
+		return action, nil
+	}
+	if as.revisions == nil {
+		as.revisions = repository.NewActionRevisionRepository(as.db)
+	}
+	snapshot, err := as.revisions.LoadDefinitionSnapshot(*revisionID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			// A missing revision (pre-revision action) falls back to the live row.
+			return action, nil
+		}
+		return nil, fmt.Errorf("load action definition revision %d: %w", *revisionID, err)
+	}
+	execution := *action
+	execution.Name = snapshot.Name
+	execution.Description = snapshot.Description
+	execution.IsEnabled = snapshot.IsEnabled
+	execution.TriggerType = snapshot.TriggerType
+	execution.TriggerConfig = snapshot.TriggerConfig
+	execution.ActorUserID = snapshot.ActorUserID
+	execution.AllowedRoleIDs = snapshot.AllowedRoleIDs
+	execution.Nodes = snapshot.Nodes
+	execution.Edges = snapshot.Edges
+	log.DefinitionRevisionID = revisionID
+	return &execution, nil
 }
 
 // topologicalSort sorts nodes in execution order using Kahn's algorithm

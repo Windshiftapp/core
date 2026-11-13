@@ -618,6 +618,8 @@ type actionApplication interface {
 	Update(int, int, int, services.AuditActor, models.UpdateActionRequest) (*models.Action, error)
 	Delete(int, int, int, services.AuditActor) error
 	Logs(int, int, int, int, int) ([]*models.ActionExecutionLog, int, error)
+	ListRevisions(int, int, int, int, int) ([]models.ActionDefinitionRevisionSummary, int, error)
+	GetRevision(int, int, int, int) (*models.ActionDefinitionRevision, error)
 	Execute(int, int, int, int) (models.ActionExecutionStatus, error)
 }
 

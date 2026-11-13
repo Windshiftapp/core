@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -12,16 +13,27 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
-	"windshift/internal/repository/actionutil"
+	"windshift/internal/services"
 	"windshift/internal/services/actioncatalog"
 	"windshift/internal/services/actiontemplates"
 )
 
-// emitActionAudit records agent-driven action mutations through Env.audit.
-func emitActionAudit(env *Env, actionType string, workspaceID, actionID int, actionName string) {
-	env.audit(actionType, logger.ResourceAutomation, actionID, actionName, map[string]any{
-		"workspace_id": workspaceID,
-	})
+// actionWriteMeta builds the transaction-coupled audit metadata for an
+// agent-driven definition write. AuditDetails carry adapter correlation ids;
+// the definition service persists them with the revision.
+func (e *Env) actionWriteMeta(actionType string, details map[string]any) services.ActionWriteMeta {
+	merged := make(map[string]any, len(e.AuditDetails)+len(details))
+	for key, value := range e.AuditDetails {
+		merged[key] = value
+	}
+	for key, value := range details {
+		merged[key] = value
+	}
+	return services.ActionWriteMeta{
+		Actor:             services.AuditActor{UserID: e.UserID, Username: e.Username, Source: e.Source},
+		PrimaryActionType: actionType,
+		PrimaryDetails:    merged,
+	}
 }
 
 // catalogNodeDTO exposes each node's JSON Schema directly to the LLM.
@@ -409,46 +421,13 @@ func init() {
 				TriggerConfig: def.TriggerConfig,
 				CreatedBy:     &env.UserID,
 			}
-			actionID, err := repo.Create(action)
+			definitions := services.NewActionDefinitionService(env.DB, repo, env.ActionService)
+			created, validation, err := definitions.Create(action, def.Nodes, def.Edges, env.actionWriteMeta(logger.ActionAutomationCreate, map[string]any{"workspace_id": args.WorkspaceID}))
+			if len(validation) > 0 {
+				return map[string]any{"error": validation[0].Message, "validation_errors": validation}, nil
+			}
 			if err != nil {
 				return nil, fmt.Errorf("create action: %w", err)
-			}
-			action.ID = actionID
-
-			if flowErr := actionutil.CreateFlowNodesAndEdges[
-				models.ActionNode, *models.ActionNode,
-				models.ActionEdge, *models.ActionEdge,
-			](
-				actionID, def.Nodes, def.Edges,
-				func(n *models.ActionNode) (int, error) { return repo.CreateNode(n) },
-				func(e *models.ActionEdge) (int, error) { return repo.CreateEdge(e) },
-				func() { _ = repo.Delete(actionID) },
-			); flowErr != nil {
-				return nil, fmt.Errorf("persist nodes/edges: %w", flowErr)
-			}
-
-			if env.ActionService != nil {
-				env.ActionService.InvalidateWorkspaceCache(args.WorkspaceID)
-			}
-
-			emitActionAudit(env, logger.ActionAutomationCreate, args.WorkspaceID, actionID, def.Name)
-
-			created, err := repo.GetByID(actionID)
-			if err != nil {
-				// Action was created but we can't refetch — return the bare summary
-				// instead of erroring, since the side effect (DB write) already
-				// happened and re-running would create a duplicate.
-				return createActionOut{ //nolint:nilerr // intentional: action exists; refetch is best-effort
-					ID:            actionID,
-					WorkspaceID:   args.WorkspaceID,
-					Name:          def.Name,
-					Description:   def.Description,
-					IsEnabled:     true,
-					TriggerType:   def.TriggerType,
-					TriggerConfig: def.TriggerConfig,
-					NodeCount:     len(def.Nodes),
-					EdgeCount:     len(def.Edges),
-				}, nil
 			}
 			return createActionOut{
 				ID:            created.ID,
@@ -552,34 +531,43 @@ func init() {
 				return map[string]any{"error": errs[0].Message, "validation_errors": errs}, nil
 			}
 
+			// Replacing the executable configuration of an action that runs under
+			// a configured actor is delegated code execution: action.manage alone
+			// is not enough on any adapter. The authorizer runs inside the write
+			// transaction against the locked actor.
 			existing.Name = def.Name
 			existing.Description = def.Description
 			existing.TriggerType = def.TriggerType
 			existing.TriggerConfig = def.TriggerConfig
 
-			if err := repo.SaveActionWithNodesAndEdges(existing, def.Nodes, def.Edges); err != nil {
-				return nil, fmt.Errorf("save action: %w", err)
+			definitions := services.NewActionDefinitionService(env.DB, repo, env.ActionService)
+			meta := env.actionWriteMeta(logger.ActionAutomationUpdate, map[string]any{"workspace_id": args.WorkspaceID})
+			meta.AuthorizeActor = func(_ *int, effectiveActor *int, actorChanging bool) error {
+				if !actorChanging && effectiveActor == nil {
+					return nil
+				}
+				setActor, permErr := env.PermService.HasGlobalPermission(env.UserID, models.PermissionActionSetActor)
+				if permErr != nil {
+					return permErr
+				}
+				if setActor {
+					return nil
+				}
+				return &services.PrivilegedActionEditDenied{
+					AttemptedFields:    []string{"definition"},
+					RequiredPermission: models.PermissionActionSetActor,
+				}
 			}
-
-			if env.ActionService != nil {
-				env.ActionService.InvalidateWorkspaceCache(args.WorkspaceID)
+			updated, validation, err := definitions.Save(existing, def.Nodes, def.Edges, true, true, models.ActionActorUpdate{}, meta)
+			if len(validation) > 0 {
+				return map[string]any{"error": validation[0].Message, "validation_errors": validation}, nil
 			}
-
-			emitActionAudit(env, logger.ActionAutomationUpdate, args.WorkspaceID, args.ActionID, def.Name)
-
-			updated, err := repo.GetByID(args.ActionID)
 			if err != nil {
-				return createActionOut{ //nolint:nilerr // intentional: write succeeded; refetch is best-effort
-					ID:            args.ActionID,
-					WorkspaceID:   args.WorkspaceID,
-					Name:          def.Name,
-					Description:   def.Description,
-					IsEnabled:     existing.IsEnabled,
-					TriggerType:   def.TriggerType,
-					TriggerConfig: def.TriggerConfig,
-					NodeCount:     len(def.Nodes),
-					EdgeCount:     len(def.Edges),
-				}, nil
+				var denied *services.PrivilegedActionEditDenied
+				if errors.As(err, &denied) {
+					return map[string]string{"error": "action.set_actor permission required to edit a privileged action"}, nil
+				}
+				return nil, fmt.Errorf("save action: %w", err)
 			}
 			return createActionOut{
 				ID:            updated.ID,

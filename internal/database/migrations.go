@@ -15,6 +15,8 @@ import (
 	"strings"
 
 	"github.com/lib/pq"
+
+	"windshift/internal/models"
 )
 
 // pgJSONBColumnsCheck reports whether every named column already has the
@@ -3379,6 +3381,24 @@ CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_m
 		Postgres:      strings.ReplaceAll(customerAccessMigration, "DATETIME", "TIMESTAMPTZ"),
 	},
 	{
+		Version: "20261123_action_definition_revisions",
+		Name:    "Persist immutable action definition revisions and bind executions",
+		CheckSQLite: `SELECT CASE WHEN
+			EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='action_definition_revisions')
+			AND EXISTS (SELECT 1 FROM pragma_table_info('actions') WHERE name='current_revision_id')
+			AND EXISTS (SELECT 1 FROM pragma_table_info('action_execution_logs') WHERE name='definition_revision_id')
+		THEN 1 ELSE 0 END`,
+		CheckPostgres: `SELECT CASE WHEN
+			EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='action_definition_revisions')
+			AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='actions' AND column_name='current_revision_id')
+			AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='action_execution_logs' AND column_name='definition_revision_id')
+		THEN 1 ELSE 0 END`,
+		SQLite:        "applyActionDefinitionRevisionsSQLite:v1",
+		Postgres:      "applyActionDefinitionRevisionsPostgres:v1",
+		ApplySQLite:   applyActionDefinitionRevisions,
+		ApplyPostgres: applyActionDefinitionRevisions,
+	},
+	{
 		Version: "20261123_active_timer_nullable_project",
 		Name:    "Allow a running timer without a project for seamless time tracking",
 		// Effect present when project_id is nullable. SQLite cannot drop a NOT
@@ -5537,6 +5557,246 @@ func applySQLiteQueuesCollectionScope(db Database) (retErr error) {
 		return fmt.Errorf("commit queues scope rebuild: %w", err)
 	}
 	return nil
+}
+
+// actionDefinitionRevisionTableSQL returns the backend-specific DDL that adds
+// immutable action definition revisions, the live-revision pointer on actions,
+// and the executed-revision pointer on execution logs.
+func actionDefinitionRevisionTableSQL(driver string) []string {
+	postgres := driver == driverPostgres
+	timestamp := "DATETIME"
+	if postgres {
+		timestamp = "TIMESTAMPTZ"
+	}
+	serial := "INTEGER PRIMARY KEY AUTOINCREMENT"
+	if postgres {
+		serial = "SERIAL PRIMARY KEY"
+	}
+	createTable := `
+		CREATE TABLE IF NOT EXISTS action_definition_revisions (
+			id ` + serial + `,
+			action_id INTEGER NOT NULL,
+			workspace_id INTEGER NOT NULL,
+			revision_number INTEGER NOT NULL,
+			source TEXT NOT NULL,
+			editor_user_id INTEGER,
+			editor_username TEXT NOT NULL DEFAULT '',
+			editor_source TEXT NOT NULL DEFAULT '',
+			change_summary TEXT NOT NULL DEFAULT '',
+			changed_fields TEXT NOT NULL DEFAULT '[]',
+			snapshot TEXT NOT NULL,
+			created_at ` + timestamp + ` DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE (action_id, revision_number),
+			FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+			FOREIGN KEY (editor_user_id) REFERENCES users(id) ON DELETE SET NULL
+		)`
+	addRevisionColumn := "ALTER TABLE actions ADD COLUMN current_revision_id INTEGER"
+	addExecutionColumn := "ALTER TABLE action_execution_logs ADD COLUMN definition_revision_id INTEGER"
+	if postgres {
+		addRevisionColumn = "ALTER TABLE actions ADD COLUMN IF NOT EXISTS current_revision_id INTEGER"
+		addExecutionColumn = "ALTER TABLE action_execution_logs ADD COLUMN IF NOT EXISTS definition_revision_id INTEGER"
+	}
+	return []string{
+		createTable,
+		addRevisionColumn,
+		addExecutionColumn,
+		`CREATE INDEX IF NOT EXISTS idx_action_definition_revisions_action_id
+			ON action_definition_revisions(action_id, revision_number DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_action_definition_revisions_workspace_id
+			ON action_definition_revisions(workspace_id, created_at DESC)`,
+	}
+}
+
+// applyActionDefinitionRevisions adds the revision tables/columns and writes a
+// clearly marked baseline revision for every existing action, so an upgraded
+// install has a reconstructable definition without inventing authorship.
+func applyActionDefinitionRevisions(db Database) error {
+	return WithTx(db, func(tx Tx) error {
+		for _, statement := range actionDefinitionRevisionTableSQL(db.GetDriverName()) {
+			if _, err := tx.Exec(statement); err != nil {
+				return fmt.Errorf("apply action definition revision schema: %w", err)
+			}
+		}
+		return backfillActionDefinitionRevisions(tx)
+	})
+}
+
+type baselineActionRow struct {
+	id            int
+	workspaceID   int
+	name          string
+	description   sql.NullString
+	isEnabled     bool
+	triggerType   string
+	triggerConfig sql.NullString
+	actorUserID   sql.NullInt64
+}
+
+func backfillActionDefinitionRevisions(tx Tx) error {
+	rows, err := tx.Query(`
+		SELECT id, workspace_id, name, description, is_enabled, trigger_type, trigger_config, actor_user_id
+		FROM actions
+		WHERE current_revision_id IS NULL
+		ORDER BY id
+	`)
+	if err != nil {
+		return fmt.Errorf("load actions for revision backfill: %w", err)
+	}
+	var actions []baselineActionRow
+	for rows.Next() {
+		var row baselineActionRow
+		if err := rows.Scan(
+			&row.id, &row.workspaceID, &row.name, &row.description, &row.isEnabled,
+			&row.triggerType, &row.triggerConfig, &row.actorUserID,
+		); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("scan action for revision backfill: %w", err)
+		}
+		actions = append(actions, row)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return fmt.Errorf("iterate actions for revision backfill: %w", err)
+	}
+	// Release the cursor before the nested per-action reads: a one-connection
+	// read pool deadlocks if a query is held open while another runs.
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("close action backfill cursor: %w", err)
+	}
+
+	for _, row := range actions {
+		nodes, err := baselineNodes(tx, row.id)
+		if err != nil {
+			return err
+		}
+		edges, err := baselineEdges(tx, row.id)
+		if err != nil {
+			return err
+		}
+		roles, err := baselineAllowedRoleIDs(tx, row.id)
+		if err != nil {
+			return err
+		}
+		action := &models.Action{
+			ID:             row.id,
+			WorkspaceID:    row.workspaceID,
+			Name:           row.name,
+			IsEnabled:      row.isEnabled,
+			TriggerType:    models.ActionTriggerType(row.triggerType),
+			AllowedRoleIDs: roles,
+		}
+		if row.description.Valid {
+			action.Description = row.description.String
+		}
+		if row.triggerConfig.Valid {
+			action.TriggerConfig = row.triggerConfig.String
+		}
+		if row.actorUserID.Valid {
+			actor := int(row.actorUserID.Int64)
+			action.ActorUserID = &actor
+		}
+		snapshot := models.NewActionDefinitionSnapshot(action, nodes, edges)
+		encoded, err := json.Marshal(snapshot)
+		if err != nil {
+			return fmt.Errorf("encode baseline revision for action %d: %w", row.id, err)
+		}
+		var revisionID int
+		if err := tx.QueryRow(`
+			INSERT INTO action_definition_revisions (
+				action_id, workspace_id, revision_number, source, editor_user_id,
+				editor_username, editor_source, change_summary, changed_fields, snapshot, created_at
+			) VALUES (?, ?, 1, 'baseline', NULL, '', 'system', ?, '[]', ?, CURRENT_TIMESTAMP)
+			RETURNING id
+		`, row.id, row.workspaceID, "baseline snapshot for pre-existing definition", string(encoded)).Scan(&revisionID); err != nil {
+			return fmt.Errorf("insert baseline revision for action %d: %w", row.id, err)
+		}
+		if _, err := tx.Exec(`UPDATE actions SET current_revision_id = ? WHERE id = ?`, revisionID, row.id); err != nil {
+			return fmt.Errorf("bind baseline revision for action %d: %w", row.id, err)
+		}
+	}
+	return nil
+}
+
+func baselineNodes(tx Tx, actionID int) ([]models.ActionNode, error) {
+	rows, err := tx.Query(`
+		SELECT id, action_id, node_type, node_config, position_x, position_y
+		FROM action_nodes
+		WHERE action_id = ?
+		ORDER BY id
+	`, actionID)
+	if err != nil {
+		return nil, fmt.Errorf("load nodes for revision backfill: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var nodes []models.ActionNode
+	for rows.Next() {
+		var node models.ActionNode
+		var nodeType string
+		if err := rows.Scan(&node.ID, &node.ActionID, &nodeType, &node.NodeConfig, &node.PositionX, &node.PositionY); err != nil {
+			return nil, fmt.Errorf("scan node for revision backfill: %w", err)
+		}
+		node.NodeType = models.ActionNodeType(nodeType)
+		nodes = append(nodes, node)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate nodes for revision backfill: %w", err)
+	}
+	return nodes, nil
+}
+
+func baselineEdges(tx Tx, actionID int) ([]models.ActionEdge, error) {
+	rows, err := tx.Query(`
+		SELECT id, action_id, source_node_id, target_node_id, edge_type, source_handle, target_handle
+		FROM action_edges
+		WHERE action_id = ?
+		ORDER BY id
+	`, actionID)
+	if err != nil {
+		return nil, fmt.Errorf("load edges for revision backfill: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var edges []models.ActionEdge
+	for rows.Next() {
+		var edge models.ActionEdge
+		var sourceHandle, targetHandle sql.NullString
+		if err := rows.Scan(
+			&edge.ID, &edge.ActionID, &edge.SourceNodeID, &edge.TargetNodeID,
+			&edge.EdgeType, &sourceHandle, &targetHandle,
+		); err != nil {
+			return nil, fmt.Errorf("scan edge for revision backfill: %w", err)
+		}
+		if sourceHandle.Valid {
+			edge.SourceHandle = sourceHandle.String
+		}
+		if targetHandle.Valid {
+			edge.TargetHandle = targetHandle.String
+		}
+		edges = append(edges, edge)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate edges for revision backfill: %w", err)
+	}
+	return edges, nil
+}
+
+func baselineAllowedRoleIDs(tx Tx, actionID int) ([]int, error) {
+	rows, err := tx.Query(`SELECT role_id FROM action_allowed_roles WHERE action_id = ? ORDER BY role_id`, actionID)
+	if err != nil {
+		return nil, fmt.Errorf("load allowed roles for revision backfill: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	roleIDs := []int{}
+	for rows.Next() {
+		var roleID int
+		if err := rows.Scan(&roleID); err != nil {
+			return nil, fmt.Errorf("scan allowed role for revision backfill: %w", err)
+		}
+		roleIDs = append(roleIDs, roleID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate allowed roles for revision backfill: %w", err)
+	}
+	return roleIDs, nil
 }
 
 // applySQLiteActiveTimerNullableProject rebuilds active_timers with a nullable

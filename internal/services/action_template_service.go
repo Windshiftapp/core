@@ -8,6 +8,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/repository"
 	"windshift/internal/services/actiontemplates"
 )
 
@@ -16,14 +17,18 @@ import (
 // itself is read-only and shipped with the binary; this service is the
 // only place that writes derived rows.
 type ActionTemplateService struct {
-	db database.Database
+	db        database.Database
+	repo      *repository.ActionRepository
+	revisions *repository.ActionRevisionRepository
 }
 
 // NewActionTemplateService constructs a template service backed by the
 // shared action repository.
-func NewActionTemplateService(db database.Database) *ActionTemplateService {
+func NewActionTemplateService(db database.Database, repo *repository.ActionRepository) *ActionTemplateService {
 	return &ActionTemplateService{
-		db: db,
+		db:        db,
+		repo:      repo,
+		revisions: repository.NewActionRevisionRepository(db),
 	}
 }
 
@@ -50,6 +55,7 @@ func (s *ActionTemplateService) ApplyToWorkspace(
 	templateKey string,
 	workspaceID int,
 	creatorUserID int,
+	meta ActionWriteMeta,
 ) (*ApplyToWorkspaceResult, error) {
 	tmpl, ok := actiontemplates.Get(templateKey)
 	if !ok {
@@ -147,6 +153,28 @@ func (s *ActionTemplateService) ApplyToWorkspace(
 			`, actionID, nodeIDByYAML[edge.SourceNodeID], nodeIDByYAML[edge.TargetNodeID], edgeType, now); err != nil {
 				return fmt.Errorf("create edge %s→%s: %w", edge.SourceNodeID, edge.TargetNodeID, err)
 			}
+		}
+
+		// Snapshot the materialized definition and record its audit row in the
+		// same transaction as the template instantiation.
+		action := &models.Action{
+			ID: actionID, WorkspaceID: workspaceID, Name: tmpl.Name, Description: tmpl.Description,
+			IsEnabled: true, TriggerType: tmpl.TriggerType, TriggerConfig: string(triggerConfigJSON),
+			CreatedBy: creator,
+		}
+		materializedNodes, err := s.repo.GetNodesByActionIDTx(tx, actionID)
+		if err != nil {
+			return err
+		}
+		materializedEdges, err := s.repo.GetEdgesByActionIDTx(tx, actionID)
+		if err != nil {
+			return err
+		}
+		if meta.Source == "" {
+			meta.Source = models.ActionRevisionSourceTemplate
+		}
+		if err := persistActionRevisionTx(ctx, tx, s.revisions, action, materializedNodes, materializedEdges, meta.Source, meta); err != nil {
+			return err
 		}
 		return nil
 	})

@@ -242,6 +242,25 @@ export default {
       viewDetails: 'Afficher les détails',
     },
 
+    history: {
+      title: 'Historique de la définition',
+      noRevisions: 'Aucune révision de définition',
+      revision: 'Révision',
+      source: 'Source',
+      editor: 'Modifié par',
+      changedFields: 'Champs modifiés',
+      changeSummary: 'Résumé',
+      createdAt: 'Enregistré le',
+      viewDetails: 'Voir la révision',
+      detailTitle: 'Révision de la définition',
+      snapshot: 'Définition exécutable',
+      nodes: 'Nœuds',
+      edges: 'Liens',
+      noChangedFields: 'Aucun changement exécutable',
+      system: 'Système (base)',
+      triggerType: 'Déclencheur',
+    },
+
     // Execution trace
     trace: {
       title: 'Détails de l’exécution',
