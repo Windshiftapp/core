@@ -89,6 +89,7 @@
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
   import { useCollectionEventStream } from '../../composables/useCollectionEventStream.svelte.js';
+  import { canRunBackgroundSync, onBackgroundSyncAvailable } from '../../utils/backgroundSync.js';
   import { useCollectionDragDrop } from '../../composables/useCollectionDragDrop.js';
   import { createDependencyLoader } from './dependencyLoader.svelte.js';
   import { loadedVisibleItemIDs, visibleAssigneeIDs } from './boardHydration.js';
@@ -746,7 +747,7 @@
     const jitter = base * 0.1;
     let timer = null;
     const tick = () => {
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      if (!canRunBackgroundSync()) return;
       invalidateSLAState();
       slaRefreshToken += 1;
     };
@@ -756,14 +757,11 @@
         schedule();
       }, base + (Math.random() * 2 - 1) * jitter);
     };
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') tick();
-    };
     schedule();
-    document.addEventListener('visibilitychange', onVisibility);
+    const stopRecovery = onBackgroundSyncAvailable(tick);
     return () => {
       if (timer) clearTimeout(timer);
-      document.removeEventListener('visibilitychange', onVisibility);
+      stopRecovery();
     };
   });
 

@@ -17,6 +17,7 @@
   } from '../utils/zammadObservations.js';
   import Lozenge from '../components/Lozenge.svelte';
   import WidgetState from './WidgetState.svelte';
+  import { canRunBackgroundSync, onBackgroundSyncAvailable } from '../utils/backgroundSync.js';
 
   let { workspaceId = null } = $props();
 
@@ -24,7 +25,9 @@
   let loading = $state(false);
   let error = $state(null);
   let requestVersion = 0;
-  let loadedWorkspaceId = $state(undefined);
+  let overviewController = null;
+  let overviewInFlight = null;
+  let recoveryPending = false;
   let timezone = $derived(getUserTimezone(authStore.currentUser));
   let hasOverviewData = $derived(
     Boolean(
@@ -48,17 +51,28 @@
   const overviewRefreshIntervalMs = 120_000;
 
   $effect(() => {
-    if (workspaceId === loadedWorkspaceId) return;
-    loadedWorkspaceId = workspaceId;
     void loadOverview(workspaceId);
+    return () => {
+      requestVersion++;
+      overviewController?.abort();
+      overviewInFlight = null;
+      recoveryPending = false;
+    };
   });
 
   onMount(() => {
-    const interval = window.setInterval(() => {
-      if (workspaceId) void loadOverview(workspaceId);
-    }, overviewRefreshIntervalMs);
+    const refresh = (recovery = false) => {
+      if (!workspaceId || !canRunBackgroundSync()) return;
+      if (recovery && overviewInFlight) recoveryPending = true;
+      else void loadOverview(workspaceId);
+    };
+    const interval = window.setInterval(refresh, overviewRefreshIntervalMs);
+    const stopRecovery = onBackgroundSyncAvailable(() => refresh(true));
 
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearInterval(interval);
+      stopRecovery();
+    };
   });
 
   function fieldLabel(field) {
@@ -93,7 +107,9 @@
   }
 
   async function loadOverview(targetWorkspaceId = workspaceId) {
+    if (overviewInFlight?.workspaceId === targetWorkspaceId) return;
     const version = ++requestVersion;
+    recoveryPending = false;
     const isCurrentRequest = () =>
       isCurrentZammadWorkspaceOverviewRequest(
         version,
@@ -110,8 +126,12 @@
 
     loading = true;
     error = null;
+    overviewController = new AbortController();
+    const controller = overviewController;
     try {
-      const response = await zammadTickets.workspaceOverview(targetWorkspaceId, { limit: 5 });
+      const promise = zammadTickets.workspaceOverview(targetWorkspaceId, { limit: 5, signal: controller.signal });
+      overviewInFlight = { workspaceId: targetWorkspaceId, promise };
+      const response = await promise;
       if (!isCurrentRequest()) return;
       overview = {
         total: 0,
@@ -131,13 +151,15 @@
           : [],
       };
     } catch (err) {
-      if (!isCurrentRequest()) return;
+      if (!isCurrentRequest() || err?.name === 'AbortError') return;
       console.error('Failed to load Zammad support overview:', err);
       overview = null;
       error = t('zammad.overview.loadFailed');
     } finally {
       if (isCurrentRequest()) {
         loading = false;
+        overviewInFlight = null;
+        if (recoveryPending && canRunBackgroundSync()) void loadOverview(workspaceId);
       }
     }
   }

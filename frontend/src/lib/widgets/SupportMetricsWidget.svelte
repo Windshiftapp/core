@@ -2,6 +2,7 @@
   import Download from '@lucide/svelte/icons/download';
   import { support } from '../api/support.js';
   import { useCollectionEventStream } from '../composables/useCollectionEventStream.svelte.js';
+  import { canRunBackgroundSync } from '../utils/backgroundSync.js';
   import { t } from '../stores/i18n.svelte.js';
   import { downloadSupportMetricsCSV } from '../features/support/metricColumns.js';
   import Chart from './Chart.svelte';
@@ -71,36 +72,27 @@
     }
   }
 
-  // Live refresh: the workspace/collection SSE stream fires coarse item
-  // invalidations; debounce them so bursts collapse into one refetch.
-  let refreshTimer = null;
+  // Keep the metrics cadence at the read boundary so hiding during the delay
+  // defers the request too.
   const stream = useCollectionEventStream(
     () => {
       if (collectionId) return { kind: 'collection', id: collectionId };
       return { kind: 'workspace', id: workspaceId };
     },
     {
-      onInvalidate: () => {
-        if (refreshTimer) return;
-        refreshTimer = setTimeout(() => {
-          refreshTimer = null;
-          load();
-        }, 5000);
-      },
+      debounceMs: 5000,
+      onInvalidate: () => load(),
     }
   );
 
   $effect(() => {
     const onFocus = () => {
-      if (loadKey) load();
+      if (loadKey && canRunBackgroundSync()) load();
     };
     window.addEventListener('focus', onFocus);
     return () => {
       window.removeEventListener('focus', onFocus);
-      if (refreshTimer) {
-        clearTimeout(refreshTimer);
-        refreshTimer = null;
-      }
+      version++;
     };
   });
 

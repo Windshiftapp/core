@@ -16,7 +16,11 @@ import {
   defaultHierarchyLevel,
 } from '../features/collections/hierarchyLevels.js';
 import { currentRoute, GLOBAL_COLLECTION_VIEWS } from '../router.js';
-import { isExpectedBackgroundSyncError } from '../utils/backgroundSync.js';
+import {
+  canRunBackgroundSync,
+  isExpectedBackgroundSyncError,
+  onBackgroundSyncAvailable,
+} from '../utils/backgroundSync.js';
 import { calcHasMore } from '../utils/paginationUtils.js';
 import { collectionPreferences } from './collectionPreferences.svelte.js';
 import { surfaceError } from './toasts.svelte.js';
@@ -333,6 +337,7 @@ class CollectionStore {
   #searchId = 0;
   #searchQuery = '';
   #reconcileTimer = null;
+  #stopReconcileRecovery = null;
   #reconcileInFlight = null;
   #reconcilePending = false;
   #levelCountsScope = null;
@@ -364,6 +369,7 @@ class CollectionStore {
         // Navigated away from a collection view — clear the route key
         // so that returning to the same collection triggers a fresh load.
         this.#previousRouteKey = null;
+        this.#clearScheduledReconciliation();
         return;
       }
 
@@ -379,6 +385,7 @@ class CollectionStore {
    * Initial load: fetches page 1 of items and backlog, resets all pagination state.
    */
   async load(wsId, colId, view = this.#currentView) {
+    this.#clearScheduledReconciliation();
     const sameCollection = wsId === this.#wsId && colId === this.#colId;
     const viewChanged = view !== this.#currentView;
     const targetInitialLimit = initialItemsPageSize(view);
@@ -1482,6 +1489,10 @@ class CollectionStore {
    * once after it settles.
    */
   refreshDeltas() {
+    if (!canRunBackgroundSync()) {
+      this.scheduleLocalReconciliation();
+      return Promise.resolve(false);
+    }
     if (this.loading || this.#reconcileInFlight) {
       this.#reconcilePending = true;
       return this.#reconcileInFlight ?? Promise.resolve(false);
@@ -1586,11 +1597,28 @@ class CollectionStore {
    * runs and retains a trailing run.
    */
   scheduleLocalReconciliation() {
-    if (this.#reconcileTimer) clearTimeout(this.#reconcileTimer);
+    this.#clearScheduledReconciliation();
+    if (!canRunBackgroundSync()) {
+      this.#stopReconcileRecovery = onBackgroundSyncAvailable(() =>
+        this.scheduleLocalReconciliation()
+      );
+      return;
+    }
     this.#reconcileTimer = setTimeout(() => {
       this.#reconcileTimer = null;
+      if (!canRunBackgroundSync()) {
+        this.scheduleLocalReconciliation();
+        return;
+      }
       void this.refreshDeltas();
     }, LOCAL_RECONCILE_DEBOUNCE_MS);
+  }
+
+  #clearScheduledReconciliation() {
+    if (this.#reconcileTimer) clearTimeout(this.#reconcileTimer);
+    this.#reconcileTimer = null;
+    this.#stopReconcileRecovery?.();
+    this.#stopReconcileRecovery = null;
   }
 
   async #primeChangesWatermark() {
@@ -1712,10 +1740,7 @@ class CollectionStore {
     if (this.#unsubscribe) {
       this.#unsubscribe();
     }
-    if (this.#reconcileTimer) {
-      clearTimeout(this.#reconcileTimer);
-      this.#reconcileTimer = null;
-    }
+    this.#clearScheduledReconciliation();
   }
 }
 
