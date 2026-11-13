@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/repository"
 )
 
 const (
@@ -107,6 +109,9 @@ func (sm *PortalSessionManager) CreatePortalSession(portalCustomerID, channelID 
 	if deactivatedAt.Valid {
 		return nil, ErrPortalCustomerDeactivated
 	}
+	if err := repository.NewCustomerAccessRepository(sm.db).PortalLoginAllowed(context.Background(), portalCustomerID, channelID); err != nil {
+		return nil, err
+	}
 
 	slog.Debug("creating portal session", slog.String("component", "portal_auth"), slog.Int("portal_customer_id", portalCustomerID), slog.Int("channel_id", channelID), slog.String("ip_address", ipAddress))
 
@@ -192,6 +197,11 @@ func (sm *PortalSessionManager) ValidatePortalSession(token, ipAddress string) (
 		// Clean up expired session
 		_ = sm.DeletePortalSession(token)
 		return nil, ErrPortalSessionExpired
+	}
+	if channelID.Valid {
+		if err := repository.NewCustomerAccessRepository(sm.db).PortalLoginAllowed(context.Background(), session.PortalCustomerID, int(channelID.Int64)); err != nil {
+			return nil, err
+		}
 	}
 
 	// Validate IP address for security. Portal sessions store the client IP at

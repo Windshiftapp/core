@@ -623,6 +623,7 @@ type actionApplication interface {
 
 // Deps lists every required v2 dependency. Construction has no fallbacks.
 type Deps struct {
+	CustomerAccess               customerAccessHTTP
 	Mux                          *http.ServeMux
 	Tokens                       tokenAuthenticator
 	Users                        userReader
@@ -955,6 +956,7 @@ func buildRoutes(deps Deps) []route {
 	registerCommentRoutes(&builder, deps)
 	registerAttachmentRoutes(&builder, deps)
 	registerCollectionRoutes(&builder, deps.Collections)
+	registerCustomerAccessRoutes(&builder, deps)
 	registerPlanningRoutes(&builder, deps.Planning)
 	registerMilestoneCommentRoutes(&builder, deps)
 	registerMilestonePageLinkRoutes(&builder, deps)

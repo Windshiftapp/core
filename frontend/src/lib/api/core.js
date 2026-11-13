@@ -306,6 +306,9 @@ async function performFetchAPI(base, endpoint, options = {}) {
       }
       if (
         response.status === 401 &&
+        !endpoint.startsWith('/customer-access/') &&
+        !endpoint.startsWith('/portal/') &&
+        !endpoint.startsWith('/public/board/') &&
         /** @type {any} */ (apiError).code !== 'AUTHENTICATION_PENDING'
       ) {
         apiEventHandlers.onAuthExpired?.();

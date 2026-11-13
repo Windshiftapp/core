@@ -3370,7 +3370,43 @@ CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_m
 		SQLite:        "ALTER TABLE sso_providers ADD COLUMN github_organization TEXT NOT NULL DEFAULT ''",
 		Postgres:      "ALTER TABLE sso_providers ADD COLUMN github_organization TEXT NOT NULL DEFAULT ''",
 	},
+	{
+		Version:       "20261113_customer_resource_access",
+		Name:          "Add customer-only identity providers and resource-scoped customer access",
+		CheckSQLite:   sqliteColumnCheck("sso_providers", "account_type"),
+		CheckPostgres: pgColumnCheck("sso_providers", "account_type"),
+		SQLite:        customerAccessMigration,
+		Postgres:      strings.ReplaceAll(customerAccessMigration, "DATETIME", "TIMESTAMPTZ"),
+	},
 }
+
+const customerAccessMigration = `
+ALTER TABLE sso_providers ADD COLUMN account_type TEXT NOT NULL DEFAULT 'internal';
+ALTER TABLE sso_providers ADD COLUMN customer_organisation_id INTEGER REFERENCES customer_organisations(id) ON DELETE RESTRICT;
+ALTER TABLE sso_state_tokens ADD COLUMN resource_kind TEXT NOT NULL DEFAULT '';
+ALTER TABLE sso_state_tokens ADD COLUMN resource_id INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS customer_resource_access (
+ resource_kind TEXT NOT NULL CHECK(resource_kind IN ('portal', 'board')),
+ resource_id INTEGER NOT NULL, mode TEXT NOT NULL CHECK(mode IN ('public', 'organisations')),
+ organisation_ids TEXT NOT NULL DEFAULT '[]', PRIMARY KEY(resource_kind, resource_id)
+);
+CREATE TABLE IF NOT EXISTS customer_external_accounts (
+ provider_id INTEGER NOT NULL REFERENCES sso_providers(id) ON DELETE CASCADE,
+ external_id TEXT NOT NULL, customer_id INTEGER NOT NULL REFERENCES portal_customers(id) ON DELETE CASCADE,
+ PRIMARY KEY(provider_id, external_id)
+);
+CREATE TABLE IF NOT EXISTS customer_resource_sessions (
+ token TEXT PRIMARY KEY, resource_kind TEXT NOT NULL, resource_id INTEGER NOT NULL,
+ customer_id INTEGER NOT NULL REFERENCES portal_customers(id) ON DELETE CASCADE,
+ expires_at DATETIME NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_customer_resource_sessions_expires ON customer_resource_sessions(expires_at);
+CREATE TABLE IF NOT EXISTS customer_resource_tokens (
+ token TEXT PRIMARY KEY, purpose TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '', resource_kind TEXT NOT NULL, resource_id INTEGER NOT NULL,
+ customer_id INTEGER REFERENCES portal_customers(id) ON DELETE CASCADE, expires_at DATETIME NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_customer_resource_tokens_expires ON customer_resource_tokens(expires_at);
+`
 
 // isNumericJSONKey reports whether a custom-field value key is a numeric field
 // id (the canonical form) rather than a legacy name key.

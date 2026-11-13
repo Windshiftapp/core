@@ -823,6 +823,10 @@ func (h *PortalCustomersHandler) DeactivatePortalCustomer(w http.ResponseWriter,
 		respondInternalError(w, r, err)
 		return
 	}
+	if err := repository.NewCustomerAccessRepository(h.db).RevokeCustomerCredentials(r.Context(), id); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 
 	if currentUser != nil {
 		logAuditWithDetails(h.db, r, currentUser, logger.ActionPortalCustomerDeactivate, logger.ResourcePortalCustomer, &id, name, map[string]any{

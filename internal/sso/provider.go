@@ -25,21 +25,23 @@ var (
 
 // SSOProvider represents an SSO identity provider configuration
 type SSOProvider struct {
-	ID                    int    `json:"id"`
-	Slug                  string `json:"slug"`
-	Name                  string `json:"name"`
-	ProviderType          string `json:"provider_type"`
-	Enabled               bool   `json:"enabled"`
-	IsDefault             bool   `json:"is_default"`
-	IssuerURL             string `json:"issuer_url,omitempty"`
-	ClientID              string `json:"client_id,omitempty"`
-	ClientSecretEncrypted string `json:"-"`                       // Never send to client
-	ClientSecret          string `json:"client_secret,omitempty"` // Only used for input, never stored
-	Scopes                string `json:"scopes"`
-	AutoProvisionUsers    bool   `json:"auto_provision_users"`
-	RequireVerifiedEmail  bool   `json:"require_verified_email"` // Provider is authoritative for email; skips Windshift email verification.
-	AttributeMapping      string `json:"attribute_mapping"`
-	GitHubOrganization    string `json:"github_organization,omitempty"`
+	ID                     int    `json:"id"`
+	Slug                   string `json:"slug"`
+	Name                   string `json:"name"`
+	ProviderType           string `json:"provider_type"`
+	Enabled                bool   `json:"enabled"`
+	IsDefault              bool   `json:"is_default"`
+	IssuerURL              string `json:"issuer_url,omitempty"`
+	ClientID               string `json:"client_id,omitempty"`
+	ClientSecretEncrypted  string `json:"-"`                       // Never send to client
+	ClientSecret           string `json:"client_secret,omitempty"` // Only used for input, never stored
+	Scopes                 string `json:"scopes"`
+	AutoProvisionUsers     bool   `json:"auto_provision_users"`
+	RequireVerifiedEmail   bool   `json:"require_verified_email"` // Provider is authoritative for email; skips Windshift email verification.
+	AttributeMapping       string `json:"attribute_mapping"`
+	GitHubOrganization     string `json:"github_organization,omitempty"`
+	AccountType            string `json:"account_type"`
+	CustomerOrganisationID *int   `json:"customer_organisation_id,omitempty"`
 	// SAML-specific fields
 	SAMLIdPMetadataURL string    `json:"saml_idp_metadata_url,omitempty"` // IdP metadata URL for auto-configuration
 	SAMLIdPSSOURL      string    `json:"saml_idp_sso_url,omitempty"`      // IdP Single Sign-On URL
@@ -58,7 +60,7 @@ const providerColumnsWithSecret = `id, slug, name, provider_type, enabled, is_de
 	auto_provision_users, require_verified_email,
 	attribute_mapping,
 	saml_idp_metadata_url, saml_idp_sso_url, saml_idp_certificate, saml_sp_entity_id, saml_sign_requests,
-	github_organization, created_at, updated_at`
+	github_organization, account_type, customer_organisation_id, created_at, updated_at`
 
 // providerColumnsWithoutSecret is the SELECT column list for listing (no secret)
 //
@@ -68,7 +70,7 @@ const providerColumnsWithoutSecret = `id, slug, name, provider_type, enabled, is
 	auto_provision_users, require_verified_email,
 	attribute_mapping,
 	saml_idp_metadata_url, saml_idp_sso_url, saml_idp_certificate, saml_sp_entity_id, saml_sign_requests,
-	github_organization, created_at, updated_at`
+	github_organization, account_type, customer_organisation_id, created_at, updated_at`
 
 // scanProviderRow is the shared scanner for SSOProvider rows.
 // When withSecret is true, it expects the client_secret_encrypted column in the result set.
@@ -94,6 +96,7 @@ func scanProviderRow(row interface {
 		&attributeMapping,
 		&samlIDPMetadataURL, &samlIDPSSOURL, &samlIDPCertificate, &samlSPEntityID, &provider.SAMLSignRequests,
 		&provider.GitHubOrganization,
+		&provider.AccountType, &provider.CustomerOrganisationID,
 		&provider.CreatedAt, &provider.UpdatedAt,
 	)
 
@@ -218,6 +221,9 @@ func (s *ProviderStore) List() ([]*SSOProvider, error) {
 
 // Create creates a new provider
 func (s *ProviderStore) Create(provider *SSOProvider) error {
+	if provider.AccountType == "" {
+		provider.AccountType = "internal"
+	}
 	// Check if slug already exists
 	existing, err := s.GetBySlug(provider.Slug)
 	if err == nil && existing != nil {
@@ -239,8 +245,8 @@ func (s *ProviderStore) Create(provider *SSOProvider) error {
 			auto_provision_users, require_verified_email,
 			attribute_mapping,
 			saml_idp_metadata_url, saml_idp_sso_url, saml_idp_certificate, saml_sp_entity_id, saml_sign_requests,
-			github_organization, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+			github_organization, account_type, customer_organisation_id, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		RETURNING id
 	`
 
@@ -264,6 +270,7 @@ func (s *ProviderStore) Create(provider *SSOProvider) error {
 		nullString(provider.SAMLSPEntityID),
 		provider.SAMLSignRequests,
 		provider.GitHubOrganization,
+		provider.AccountType, provider.CustomerOrganisationID,
 	).Scan(&id)
 	if err != nil {
 		return err
@@ -290,7 +297,7 @@ func (s *ProviderStore) Update(provider *SSOProvider) error {
 			auto_provision_users = ?, require_verified_email = ?,
 			attribute_mapping = ?,
 			saml_idp_metadata_url = ?, saml_idp_sso_url = ?, saml_idp_certificate = ?,
-			saml_sp_entity_id = ?, saml_sign_requests = ?, github_organization = ?,
+			saml_sp_entity_id = ?, saml_sign_requests = ?, github_organization = ?, account_type = ?, customer_organisation_id = ?,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
@@ -313,6 +320,7 @@ func (s *ProviderStore) Update(provider *SSOProvider) error {
 		nullString(provider.SAMLSPEntityID),
 		provider.SAMLSignRequests,
 		provider.GitHubOrganization,
+		provider.AccountType, provider.CustomerOrganisationID,
 		provider.ID,
 	)
 	return err

@@ -25,7 +25,9 @@ type SSOStateToken struct {
 	// returned assertion via InResponseTo. Empty for OIDC flows.
 	RequestID string
 	// Nonce holds the OIDC nonce or GitHub PKCE verifier. Empty for SAML.
-	Nonce string
+	Nonce        string
+	ResourceKind string
+	ResourceID   int
 }
 
 // Store persists an SSO state token. requestID is the SAML SP-issued
@@ -55,9 +57,9 @@ func (r *SSOStateRepository) GetValid(state string, providerID int, now time.Tim
 	var token SSOStateToken
 	var requestID, nonce sql.NullString
 	err := r.db.QueryRow(`
-		SELECT id, request_id, nonce, redirect_uri, remember_me FROM sso_state_tokens
+		SELECT id, request_id, nonce, redirect_uri, remember_me, resource_kind, resource_id FROM sso_state_tokens
 		WHERE state = ? AND provider_id = ? AND expires_at > ?
-	`, state, providerID, now).Scan(&token.ID, &requestID, &nonce, &token.RedirectURI, &token.RememberMe)
+	`, state, providerID, now).Scan(&token.ID, &requestID, &nonce, &token.RedirectURI, &token.RememberMe, &token.ResourceKind, &token.ResourceID)
 	if err != nil {
 		return nil, err
 	}
@@ -77,11 +79,16 @@ func (r *SSOStateRepository) Consume(state string, providerID int, now time.Time
 	var nonce sql.NullString
 	err := r.db.QueryRow(`DELETE FROM sso_state_tokens
 		WHERE state = ? AND provider_id = ? AND expires_at > ?
-		RETURNING id, nonce, redirect_uri, remember_me`, state, providerID, now).
-		Scan(&token.ID, &nonce, &token.RedirectURI, &token.RememberMe)
+		RETURNING id, nonce, redirect_uri, remember_me, resource_kind, resource_id`, state, providerID, now).
+		Scan(&token.ID, &nonce, &token.RedirectURI, &token.RememberMe, &token.ResourceKind, &token.ResourceID)
 	if err != nil {
 		return nil, err
 	}
 	token.Nonce = nonce.String
 	return &token, nil
+}
+
+func (r *SSOStateRepository) BindCustomerResource(state string, providerID int, kind string, id int) error {
+	_, err := r.db.ExecWrite(`UPDATE sso_state_tokens SET resource_kind = ?, resource_id = ? WHERE state = ? AND provider_id = ?`, kind, id, state, providerID)
+	return err
 }

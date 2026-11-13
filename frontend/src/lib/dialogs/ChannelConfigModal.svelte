@@ -23,6 +23,7 @@
 
   // Import channel config components
   import ChannelPortalConfig from '../features/channels/ChannelPortalConfig.svelte';
+  import CustomerPolicyEditor from '../customer/CustomerPolicyEditor.svelte';
   import ChannelWebhookConfig from '../features/channels/ChannelWebhookConfig.svelte';
   import ChannelEmailConfig from '../features/channels/ChannelEmailConfig.svelte';
   import ChannelSMTPConfig from '../features/channels/ChannelSMTPConfig.svelte';
@@ -634,6 +635,7 @@
               bind:formData={portalFormData}
               {connectedMailboxes}
             />
+            <CustomerPolicyEditor kind="portal" resourceId={channel.id} />
           {:else if channel.type === 'webhook'}
             <ChannelWebhookConfig
               bind:this={webhookConfigRef}

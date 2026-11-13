@@ -4557,6 +4557,149 @@
         ]
       }
     },
+    "/customer-access/{kind}/{id}/policy": {
+      "get": {
+        "description": "Read customer admission policy. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Read customer admission policy",
+        "tags": [
+          "Customer access"
+        ]
+      },
+      "put": {
+        "description": "Replace customer admission policy. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Replace customer admission policy",
+        "tags": [
+          "Customer access"
+        ]
+      }
+    },
+    "/customer-access/{kind}/{slug}/auth/logout": {
+      "post": {
+        "description": "Sign out of customer access. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Sign out of customer access",
+        "tags": [
+          "Customer access"
+        ]
+      }
+    },
+    "/customer-access/{kind}/{slug}/auth/passkey/complete": {
+      "post": {
+        "description": "Complete customer passkey login. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Complete customer passkey login",
+        "tags": [
+          "Customer access"
+        ]
+      }
+    },
+    "/customer-access/{kind}/{slug}/auth/passkey/start": {
+      "post": {
+        "description": "Start customer passkey login. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Start customer passkey login",
+        "tags": [
+          "Customer access"
+        ]
+      }
+    },
+    "/customer-access/{kind}/{slug}/auth/request": {
+      "post": {
+        "description": "Request a customer sign-in email. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Request a customer sign-in email",
+        "tags": [
+          "Customer access"
+        ]
+      }
+    },
+    "/customer-access/{kind}/{slug}/auth/verify": {
+      "post": {
+        "description": "Redeem a board customer sign-in token. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Redeem a board customer sign-in token",
+        "tags": [
+          "Customer access"
+        ]
+      }
+    },
+    "/customer-access/{kind}/{slug}/status": {
+      "get": {
+        "description": "Read customer login options and admission status. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [],
+        "responses": {
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Read customer login options and admission status",
+        "tags": [
+          "Customer access"
+        ]
+      }
+    },
     "/hierarchy-levels": {
       "get": {
         "description": "List hierarchy levels. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",

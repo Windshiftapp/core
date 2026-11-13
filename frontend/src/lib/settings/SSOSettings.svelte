@@ -36,6 +36,8 @@
   import EmptyState from '../components/EmptyState.svelte';
   import Label from '../components/Label.svelte';
   import Checkbox from '../components/Checkbox.svelte';
+  import Select from '../components/Select.svelte';
+  import CustomerOrganisationPicker from '../pickers/CustomerOrganisationPicker.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { surfaceError } from '../stores/toasts.svelte.js';
   import PageHeader from '../layout/PageHeader.svelte';
@@ -71,7 +73,9 @@
     scopes: 'openid email profile',
     auto_provision_users: false,
     require_verified_email: true,
-    github_organization: ''
+    github_organization: '',
+    account_type: 'internal',
+    customer_organisation_id: null,
   });
 
   let canAddProvider = $derived(providers.length === 0 || capabilitiesStore.has('sso.multi-provider'));
@@ -138,6 +142,8 @@
         client_secret: formData.client_secret,
         auto_provision_users: formData.auto_provision_users,
         github_organization: formData.github_organization.trim(),
+        account_type: formData.account_type,
+        customer_organisation_id: formData.account_type === 'customer' ? formData.customer_organisation_id : undefined,
       };
     }
     return { ...formData, attribute_mapping: serializeAttributeMapping() };
@@ -178,7 +184,9 @@
       scopes: 'openid email profile',
       auto_provision_users: false,
       require_verified_email: providerType !== 'github',
-      github_organization: ''
+      github_organization: '',
+      account_type: 'internal',
+      customer_organisation_id: null,
     };
     formErrors = {};
     attributeMapping = emptyAttributeMapping();
@@ -201,6 +209,8 @@
       auto_provision_users: provider.auto_provision_users,
       require_verified_email: provider.require_verified_email !== false, // Default to true
       github_organization: provider.github_organization || '',
+      account_type: provider.account_type || 'internal',
+      customer_organisation_id: provider.customer_organisation_id || null,
     };
     formErrors = {};
     attributeMapping = parseAttributeMapping(provider.attribute_mapping);
@@ -248,6 +258,9 @@
     }
 
     const organization = formData.github_organization.trim();
+    if (formData.account_type === 'customer' && !formData.customer_organisation_id) {
+      formErrors.customer_organisation_id = 'Select a customer organisation.';
+    }
     if (formData.provider_type === 'github' && organization &&
         (!/^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/.test(organization) || organization.includes('--'))) {
       formErrors.github_organization = t('settings.sso.githubOrganizationInvalid');
@@ -433,6 +446,7 @@
                   {t('settings.sso.disabled')}
                 </Lozenge>
               {/if}
+              {#if provider.account_type === 'customer'}<Lozenge color="blue" size="md">Customer-only</Lozenge>{/if}
             </div>
             <div class="flex items-center gap-2">
               <Button variant="default" size="sm" dataTestid={`sso-edit-${provider.slug}`} onclick={() => openEditModal(provider)}>
@@ -750,6 +764,17 @@
 
       <!-- Checkboxes -->
       {:else if formData.provider_type === 'github'}
+        <Label for="sso-account-type">Account type</Label>
+        <Select id="sso-account-type" disabled={showEditModal} bind:value={formData.account_type} options={[
+          { value: 'internal', label: 'Internal users' },
+          { value: 'customer', label: 'Portal-only customers' },
+        ]} />
+        {#if formData.account_type === 'customer'}
+          <Label>Customer organisation</Label>
+          <CustomerOrganisationPicker id="sso-customer-organisation" disabled={showEditModal} bind:value={formData.customer_organisation_id} />
+          <DescriptionText>Creates only customer accounts in this organisation. Never grants backend access. Account type and organisation cannot be changed after creation.</DescriptionText>
+          {#if formErrors.customer_organisation_id}<p class="text-sm text-[var(--ds-text-danger)]">{formErrors.customer_organisation_id}</p>{/if}
+        {/if}
         <TextField
           id="github_organization"
           label={t('settings.sso.githubOrganization')}
@@ -775,8 +800,8 @@
         <Checkbox
           dataTestid="sso-provider-signup"
           bind:checked={formData.auto_provision_users}
-          label={t('settings.sso.autoProvisionUsers')}
-          hint={t('settings.sso.autoProvisionUsersDesc')}
+          label={formData.account_type === 'customer' ? 'Allow customer signup' : t('settings.sso.autoProvisionUsers')}
+          hint={formData.account_type === 'customer' ? 'Create customers in the selected organisation. Existing customers must already belong to it.' : t('settings.sso.autoProvisionUsersDesc')}
           size="small"
         />
 

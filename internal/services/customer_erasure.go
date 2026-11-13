@@ -197,6 +197,9 @@ func EraseCustomerWithOptions(db database.Database, customerID int, actor AuditA
 		desc  string
 	}{
 		{`DELETE FROM portal_customer_sessions WHERE portal_customer_id = ?`, "portal sessions"},
+		{`DELETE FROM customer_resource_sessions WHERE customer_id = ?`, "customer resource sessions"},
+		{`DELETE FROM customer_resource_tokens WHERE customer_id = ?`, "customer resource tokens"},
+		{`DELETE FROM customer_external_accounts WHERE customer_id = ?`, "customer external identities"},
 		{`DELETE FROM portal_customer_magic_links WHERE portal_customer_id = ?`, "magic links"},
 		{`DELETE FROM portal_webauthn_credentials WHERE portal_customer_id = ?`, "portal passkey credentials"},
 		{`DELETE FROM portal_webauthn_sessions WHERE portal_customer_id = ?`, "portal passkey sessions"},

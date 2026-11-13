@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS sso_providers (
 	scopes TEXT DEFAULT 'openid email profile', -- Space-separated scopes
 	-- Common settings
 	github_organization TEXT NOT NULL DEFAULT '',
+	account_type TEXT NOT NULL DEFAULT 'internal',
+	customer_organisation_id INTEGER REFERENCES customer_organisations(id) ON DELETE RESTRICT,
 	auto_provision_users BOOLEAN DEFAULT FALSE, -- Create users on first SSO login
 	require_verified_email BOOLEAN DEFAULT TRUE, -- Trust provider-managed email when verification status is absent
 	-- Claim/attribute mappings (JSON for flexibility)
@@ -44,6 +46,8 @@ CREATE TABLE IF NOT EXISTS sso_state_tokens (
 	provider_id INTEGER NOT NULL,
 	state TEXT UNIQUE NOT NULL, -- Cryptographically random state parameter
 	nonce TEXT, -- OIDC nonce or GitHub PKCE verifier (NULL for SAML)
+	resource_kind TEXT NOT NULL DEFAULT '',
+	resource_id INTEGER NOT NULL DEFAULT 0,
 	request_id TEXT, -- SAML SP-issued AuthnRequest ID for InResponseTo binding (NULL for OIDC)
 	redirect_uri TEXT NOT NULL, -- Callback URL
 	remember_me BOOLEAN DEFAULT FALSE, -- Extended session flag

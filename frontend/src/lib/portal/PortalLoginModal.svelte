@@ -14,10 +14,21 @@
   import Input from '../components/Input.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
+  import { customerAccess } from '../api/customerAccess.js';
+  import CustomerGitHubButtons from '../customer/CustomerGitHubButtons.svelte';
 
   let { onloginsuccess } = $props();
 
   let email = $state('');
+  let customerProviders = $state([]);
+  $effect(() => {
+    const slug = $currentRoute.params?.slug;
+    if (!portalStore.showLoginDialog || !slug) return;
+    let active = true;
+    customerAccess.status('portal', slug).then(status => { if (active) customerProviders = status.providers; })
+      .catch(() => { if (active) customerProviders = []; });
+    return () => { active = false; };
+  });
   let password = $state('');
   let loginMode = $state('magic'); // 'magic' or 'internal'
   let internalError = $state('');
@@ -217,6 +228,7 @@
             <AlertBox variant="error" message={$portalAuthStore.error} class="mb-4" />
           {/if}
 
+          <div class="space-y-3 mb-4"><CustomerGitHubButtons kind="portal" slug={$currentRoute.params.slug} providers={customerProviders} /></div>
           <form onsubmit={handleMagicLinkSubmit} class="space-y-4">
             <div>
               <label for="email" class="block text-sm font-medium mb-2" style="color: var(--ds-text);">

@@ -244,6 +244,7 @@
 </div>
 
 <PublicBoardSharingDialog
+  collectionId={collection?.id}
   isOpen={showPublicDialog}
   {isPublic}
   {publicSlug}
