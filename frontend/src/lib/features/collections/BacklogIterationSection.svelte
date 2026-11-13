@@ -1,17 +1,13 @@
 <script>
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
-  import GripVertical from '@lucide/svelte/icons/grip-vertical';
   import Play from '@lucide/svelte/icons/play';
   import CheckCircle from '@lucide/svelte/icons/check-circle';
   import X from '@lucide/svelte/icons/x';
   import { t } from '../../stores/i18n.svelte.js';
   import { formatDateShort } from '../../utils/dateFormatter.js';
   import Lozenge from '../../components/Lozenge.svelte';
-  import WorkItemRow from '../items/WorkItemRow.svelte';
-  import DropIndicator from '../../layout/DropIndicator.svelte';
-  import LazyRender from '../../components/LazyRender.svelte';
-  import BacklogItemActions from './BacklogItemActions.svelte';
+  import BacklogItemRow from './BacklogItemRow.svelte';
 
   let {
     iteration = null,
@@ -30,7 +26,7 @@
     pendingActionItemIds = new Set(),
     visibleFields = [],
     onToggleCollapse,
-    onOpenItem,
+    onOpenItem = null,
     onMoveItemToBoundary = null,
     onAssignItemToIteration = null,
     onStartIteration = null,
@@ -41,6 +37,8 @@
     onUpdateStoryPoints = null,
     itemDndAction = () => {},
     sectionDndAction = () => {},
+    headerOnly = false,
+    virtualRow = null,
   } = $props();
 
   const statusColors = {
@@ -62,7 +60,7 @@
   let canStart = $derived(iteration && !iteration.is_global && iteration.status === 'planned');
   let canComplete = $derived(iteration && !iteration.is_global && iteration.status === 'active');
   let sectionId = $derived(iteration ? iteration.id : 'unassigned');
-  let visibleFieldSet = $derived(new Set(visibleFields));
+  function virtualAttachment(node) { return virtualRow?.attach(node); }
 
   let headerClass = $derived(
     `w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors select-none iteration-header` +
@@ -76,7 +74,8 @@
 </script>
 
 <div
-  class="mb-4"
+  use:virtualAttachment
+  class={headerOnly ? 'pt-4 pb-1' : 'mb-4'}
   data-testid={`backlog-iteration-section-${sectionId}`}
   data-iteration-section
   data-iteration-id={sectionId}
@@ -165,7 +164,7 @@
   </div>
 
   <!-- Section Body -->
-  {#if !collapsed}
+  {#if !headerOnly && !collapsed}
     <div class="mt-1">
       {#if items.length === 0}
         <div
@@ -182,55 +181,11 @@
       {:else}
         <div class="flex flex-col" style={`row-gap: ${backlogRowGap}px;`}>
           {#each items as item (item.id)}
-            <div
-              use:itemDndAction={item.id}
-              class="relative"
-              data-testid="backlog-item"
-              data-item-card
-              data-item-id={item.id}
-              data-section-id={sectionId}
-            >
-              <LazyRender height={36}>
-                {#snippet children()}
-                  {#if dragState.get(item.id)?.closestEdge}
-                    <DropIndicator edge={dragState.get(item.id)?.closestEdge} gap={backlogRowGap} />
-                  {/if}
-
-                  <WorkItemRow
-                    {item}
-                    {workspace}
-                    {itemTypes}
-                    {statuses}
-                    {statusCategories}
-                    onclick={(e) => onOpenItem?.(item.id, e)}
-                    showStatus={visibleFieldSet.has('status')}
-                    showPriority={visibleFieldSet.has('priority')}
-                    showParent={visibleFieldSet.has('parent')}
-                    showAssignee={visibleFieldSet.has('assignee')}
-                    showDueDate={visibleFieldSet.has('due_date')}
-                    showMilestones={visibleFieldSet.has('milestone')}
-                    showStoryPoints={visibleFieldSet.has('story_points') && (storyPointsConfiguredForItem?.(item) ?? false)}
-                    storyPointsSaving={storyPointsPendingItemIds.has(item.id)}
-                    onStoryPointsChange={(value) => onUpdateStoryPoints?.(item, value)}
-                  >
-                    {#snippet leading()}
-                      <div class="cursor-grab active:cursor-grabbing" style="{styles.dragHandleStyle}">
-                        <GripVertical class="w-4 h-4" />
-                      </div>
-                    {/snippet}
-                    {#snippet trailing()}
-                      <BacklogItemActions
-                        {item}
-                        iterations={assignableIterations}
-                        disabled={pendingActionItemIds.has(item.id)}
-                        onMoveToBoundary={onMoveItemToBoundary}
-                        onAssignIteration={onAssignItemToIteration}
-                      />
-                    {/snippet}
-                  </WorkItemRow>
-                {/snippet}
-              </LazyRender>
-            </div>
+            <BacklogItemRow {item} {sectionId} {workspace} {itemTypes} {statuses}
+              {statusCategories} {styles} {dragState} {backlogRowGap} {assignableIterations}
+              {pendingActionItemIds} {visibleFields} {onOpenItem} {onMoveItemToBoundary}
+              {onAssignItemToIteration} {storyPointsConfiguredForItem} {storyPointsPendingItemIds}
+              {onUpdateStoryPoints} {itemDndAction} />
           {/each}
         </div>
       {/if}

@@ -1,5 +1,7 @@
 export default {
   common: {
+    virtualizeRows: '虚拟化行',
+    virtualizeRowsHint: '关闭后显示所有已加载的行，以便使用辅助功能、浏览器查找或复制。',
     save: '保存',
     saveChanges: '保存更改',
     cancel: '取消',

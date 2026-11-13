@@ -10,6 +10,7 @@
   import Checkbox from '../components/Checkbox.svelte';
   import Input from '../components/Input.svelte';
   import ItemTypeIcon from '../components/ItemTypeIcon.svelte';
+  import { useRowRetention } from '../virtualization/useRowRetention.svelte';
 
   let {
     triggerText = '',
@@ -74,6 +75,7 @@
 
   // Watch for open state changes
   let previousOpen = $state(false);
+  useRowRetention(() => $open, 'menu');
   let triggerElement = $state(null);
   let searchInputElement = $state(null);
 

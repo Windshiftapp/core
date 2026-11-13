@@ -8,6 +8,7 @@
   import Spinner from '../components/Spinner.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { controlSizeClasses } from '../utils/controlSizes.js';
+  import { useRowRetention } from '../virtualization/useRowRetention.svelte';
 
   let {
     // Core props
@@ -138,6 +139,7 @@
   });
 
   // In popover mode we maintain our own search term inside the dropdown.
+  useRowRetention(() => $open, 'picker');
   let popoverSearchTerm = $state('');
 
   // Debounced server-side search notifications. Providing onSearchChange

@@ -5,6 +5,8 @@
 export default {
   // Common UI elements
   common: {
+    virtualizeRows: 'Virtualiser les lignes',
+    virtualizeRowsHint: 'Désactivez cette option pour afficher toutes les lignes chargées pour l’accessibilité, la recherche du navigateur ou la copie.',
     save: 'Enregistrer',
     saveChanges: 'Enregistrer les modifications',
     cancel: 'Annuler',

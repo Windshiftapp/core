@@ -40,6 +40,10 @@
   import { resolveParentKey } from '../../utils/parentReference.js';
   import { useListColumnConfig } from './listColumnConfig.svelte.js';
   import { useCollectionHierarchy } from '../../composables/useCollectionHierarchy.svelte.js';
+  import VirtualRows from '../../components/VirtualRows.svelte';
+  import { collectionTreeRowKey } from './collectionVirtualRows';
+  import { useCollectionVirtualization } from './useCollectionVirtualization.svelte.js';
+  import CollectionVirtualizationToggle from './CollectionVirtualizationToggle.svelte';
 
   let { workspaceId, collectionId = null } = $props();
 
@@ -71,6 +75,8 @@
   let loadedItemIds = $derived(new Set(allItems.map((item) => item.id)));
 
   let loading = $state(true);
+  let treeListElement = $state(null);
+  const virtualization = useCollectionVirtualization(() => ({ workspaceId, collectionId, view: 'tree' }));
   let currentCollectionName = $state('Default');
   // Filter-scoped item total from the server: everything the tree contains
   // across all pages, independent of expansion state or the loaded page.
@@ -340,6 +346,7 @@
             level: level + 1,
             hasChildren: false,
             isTestCase: true,
+            ownerItemId: item.id,
             testCaseData: testCase
           });
         });
@@ -555,11 +562,18 @@
           </TableHeaderBar>
 
           <!-- Tree Items -->
-          <div style="--divide-color: var(--ds-border);">
-            {#each treeData as item, idx (item.isLoadMore ? item.id : item.isTestCase ? `tc-${item.id}` : `item-${item.id}`)}
+          <div bind:this={treeListElement} style="--divide-color: var(--ds-border); overflow-anchor: none;">
+            <VirtualRows items={treeData} getKey={collectionTreeRowKey}
+              enabled={virtualization.enabled}
+              listElement={treeListElement}
+              identity={`tree:${workspaceId ?? ''}:${collectionId ?? ''}:${collectionStore.effectiveSubFilterQL}:${collectionStore.hierarchyLevel ?? ''}`}
+              layoutRevision={gridTemplateColumns}
+            >
+            {#snippet row(item, virtual)}
             {#if item.isLoadMore}
               <!-- Per-root continuation when a subtree exceeded the cap -->
               <div
+                use:virtual.attach
                 class="grid gap-4 items-center px-4 py-2.5"
                 style="grid-template-columns: {gridTemplateColumns}; min-width: {gridMinWidth};"
                 data-testid={`tree-load-more-${item.loadMoreFor}`}
@@ -591,6 +605,7 @@
             {:else if item.isTestCase}
               <!-- Test Case Row -->
               <div
+                use:virtual.attach
                 class="grid gap-4 items-center px-4 py-2.5 transition-colors group bg-ds-success-subtle/30 hover:bg-ds-success-subtle/50"
                 style="grid-template-columns: {gridTemplateColumns}; min-width: {gridMinWidth};"
               >
@@ -621,9 +636,10 @@
               <!-- Regular Work Item Row -->
               {@const testCaseCount = (showTestCases && itemTestCaseLinksStore.get(item.id)) ? itemTestCaseLinksStore.get(item.id).length : 0}
               <div
+                use:virtual.attach
                 data-testid={`tree-row-${item.id}`}
                 class="grid gap-4 items-center px-4 py-3 transition-colors group tree-row"
-                style="grid-template-columns: {gridTemplateColumns}; min-width: {gridMinWidth}; border-top: 1px solid var(--ctx-border, var(--ds-border));{idx === 0 ? 'border-top: none;' : ''}"
+                style="grid-template-columns: {gridTemplateColumns}; min-width: {gridMinWidth}; border-top: 1px solid var(--ctx-border, var(--ds-border));"
               >
                 {#each listColumns as column (column.field_identifier)}
                   <div
@@ -680,10 +696,12 @@
                 <div></div>
               </div>
             {/if}
-          {/each}
+            {/snippet}
+            </VirtualRows>
         </div>
       </div>
 
+        <CollectionVirtualizationToggle preference={virtualization} />
         <CollectionHierarchyLoadMore testid="tree-load-more" />
       {/if}
   </StaticViewBackground>

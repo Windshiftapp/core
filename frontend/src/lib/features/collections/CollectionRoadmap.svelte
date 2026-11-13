@@ -45,12 +45,17 @@
   import ItemKey from '../../components/ItemKey.svelte';
   import { SYSTEM_FIELDS } from '../../stores/fieldConfig.js';
   import Button from '../../components/Button.svelte';
-  import LazyRender from '../../components/LazyRender.svelte';
+  import VirtualRows from '../../components/VirtualRows.svelte';
+  import { useRoadmapVirtualRows } from './useRoadmapVirtualRows.svelte';
+  import { collectionItemRowKey } from './collectionVirtualRows';
+  import { useCollectionVirtualization } from './useCollectionVirtualization.svelte.js';
+  import CollectionVirtualizationToggle from './CollectionVirtualizationToggle.svelte';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { useEventListener, useResizeObserver } from 'runed';
 
   // Props
   let { workspaceId, collectionId = null } = $props();
+  const virtualization = useCollectionVirtualization(() => ({ workspaceId, collectionId, view: 'roadmap' }));
 
   // Reference data from shared workspace store
   let workspace = $derived(workspaceDataStore.workspace);
@@ -222,10 +227,33 @@
   let schedulingItemIds = $state(new Set());
   let treeScrollContainer = $state(null);
   let timelineScrollContainer = $state(null);
+  let timelineListElement = $state(null);
+  let timelineScrollTop = $state(0);
+  let timelineBodyHeight = $state(0);
+  let horizontalScrollbarHeight = $state(0);
+  const roadmapVirtual = useRoadmapVirtualRows({
+    getItems: () => treeData,
+    getRoot: () => timelineScrollContainer,
+    getList: () => timelineListElement,
+    getIdentity: () => `roadmap:${workspaceId ?? ''}:${collectionId ?? ''}:${collectionStore.effectiveSubFilterQL}:${collectionStore.hierarchyLevel ?? ''}`,
+    getEnabled: () => virtualization.enabled,
+  });
+  $effect(() => {
+    const id = dragInfo?.itemId;
+    if (!id) return;
+    const item = treeData.find((row) => row.id === id);
+    if (!item) { dragInfo = null; return; }
+    return roadmapVirtual.controller.acquirePin(collectionItemRowKey(item), 'date-edit');
+  });
 
   // Drag listeners (attached only while their respective drag state is active)
   useEventListener(() => (dragInfo ? window : null), 'pointermove', onDragMove);
   useEventListener(() => (dragInfo ? window : null), 'pointerup', onDragEnd);
+  useEventListener(() => (dragInfo ? window : null), 'pointercancel', () => { dragInfo = null; });
+  useEventListener(() => (dragInfo ? window : null), 'blur', () => { dragInfo = null; });
+  useEventListener(() => (dragInfo ? window : null), 'keydown', (event) => {
+    if (event.key === 'Escape') { event.preventDefault(); dragInfo = null; }
+  });
   useEventListener(() => (isResizingPanel ? window : null), 'pointermove', onPanelResizeMove);
   useEventListener(() => (isResizingPanel ? window : null), 'pointerup', onPanelResizeEnd);
 
@@ -788,7 +816,8 @@
 
   // --- Bar drag handlers (existing move/resize) ---
   function onBarPointerDown(e, item, mode) {
-    if (e.button !== 0 || (hierarchyMode === 'rollup' && item.isSummary)) return;
+    if (e.button !== 0 || !workspacePermissions.canEdit(item.workspace_id ?? workspaceId) ||
+      (hierarchyMode === 'rollup' && item.isSummary)) return;
     e.preventDefault();
     e.stopPropagation();
 
@@ -929,8 +958,28 @@
       head: forward
         ? `${x2},${y2} ${x2 - 6},${y2 - 4} ${x2 - 6},${y2 + 4}`
         : `${x2},${y2} ${x2 + 6},${y2 - 4} ${x2 + 6},${y2 + 4}`,
+      bounds: { left: Math.min(x1, x2, midX) - 8, right: Math.max(x1, x2, midX) + 8,
+        top: Math.min(y1, y2) - 8, bottom: Math.max(y1, y2) + 8 },
     };
   }
+
+  const roadmapRowIndexes = $derived(new Map(treeData.map((item, index) => [item.id, index])));
+  const arrowGeometries = $derived.by(() => {
+    const seen = new Set();
+    return dependencyArrows.flatMap((arrow) => {
+      const blocker = roadmapRowIndexes.get(arrow.blocker.id);
+      const dependent = roadmapRowIndexes.get(arrow.dependent.id);
+      const key = `${arrow.blocker.id}:${arrow.dependent.id}`;
+      if (blocker === undefined || dependent === undefined || seen.has(key)) return [];
+      seen.add(key);
+      return [{ key, ...getArrowGeometry(arrow.blocker, arrow.dependent, blocker, dependent) }];
+    });
+  });
+  const visibleArrowGeometries = $derived(arrowGeometries.filter(({ bounds }) =>
+    !roadmapVirtual.virtual || (bounds.bottom >= timelineScrollTop - 320 &&
+      bounds.top <= timelineScrollTop + timelineBodyHeight + 320 &&
+      bounds.right >= timelineScrollLeft && bounds.left <= timelineScrollLeft + containerWidth)
+  ));
 
   // --- Panel resize handlers ---
   function onPanelResizeStart(e) {
@@ -995,7 +1044,7 @@
   }
 
   async function scheduleItem(item, range) {
-    if (itemHasDate(item) || schedulingItemIds.has(item.id)) return;
+    if (!workspacePermissions.canEdit(item.workspace_id ?? workspaceId) || itemHasDate(item) || schedulingItemIds.has(item.id)) return;
 
     const updateData = {};
     setDateUpdate(updateData, roadmapConfig.start_field_id, range.start);
@@ -1033,12 +1082,14 @@
 
   // --- Scroll sync ---
   function syncTreeScroll(e) {
+    timelineScrollTop = e.target.scrollTop;
     if (timelineScrollContainer && timelineScrollContainer.scrollTop !== e.target.scrollTop) {
       timelineScrollContainer.scrollTop = e.target.scrollTop;
     }
   }
 
   function syncTimelineScroll(e) {
+    timelineScrollTop = e.target.scrollTop;
     timelineScrollLeft = e.target.scrollLeft;
     if (treeScrollContainer && treeScrollContainer.scrollTop !== e.target.scrollTop) {
       treeScrollContainer.scrollTop = e.target.scrollTop;
@@ -1054,7 +1105,11 @@
 
   useResizeObserver(() => timelineScrollContainer, (entries) => {
     const entry = entries[0];
-    if (entry) containerWidth = entry.contentRect.width;
+    if (entry) {
+      containerWidth = entry.contentRect.width;
+      timelineBodyHeight = timelineScrollContainer.clientHeight;
+      horizontalScrollbarHeight = timelineScrollContainer.offsetHeight - timelineScrollContainer.clientHeight;
+    }
   });
 
   onMount(async () => {
@@ -1346,20 +1401,22 @@
             <!-- Tree body (scrollable, synced) -->
             <div
               class="flex-1 overflow-y-auto overflow-x-hidden tree-scroll"
+              data-testid="roadmap-tree-scroll"
+              style={`margin-bottom: ${horizontalScrollbarHeight}px; overflow-anchor: none;`}
               bind:this={treeScrollContainer}
               onscroll={syncTreeScroll}
             >
-              {#each treeData as item (item.id)}
+              <VirtualRows items={treeData} getKey={collectionItemRowKey} sharedModel={roadmapVirtual} pane="tree">
+              {#snippet row(item, virtual)}
                 {@const typeInfo = getItemTypeInfo(item)}
                 {@const scheduled = itemHasDate(item)}
                 <button
+                  use:virtual.attach
                   data-testid="roadmap-item-{item.id}"
                   class="flex items-center gap-1.5 w-full text-left group/tree-row"
                   style="height: {ROW_HEIGHT}px; padding-left: calc(8px + {getIndentLevel(item.treeLevel)}); padding-right: 8px; border-bottom: 1px solid var(--ds-border-subtle, var(--ds-border));"
                   onclick={() => openItem(item.id)}
                 >
-                  <LazyRender height={ROW_HEIGHT} class="flex items-center gap-1.5 w-full">
-                    {#snippet children()}
                       <!-- Expand/collapse chevron -->
                       {#if item.hasChildren}
                         <span
@@ -1400,10 +1457,9 @@
                       {#if scheduled}
                         <span class="shrink-0 w-2 h-2 rounded-full" style="background-color: var(--ds-accent-blue);"></span>
                       {/if}
-                    {/snippet}
-                  </LazyRender>
                 </button>
-              {/each}
+              {/snippet}
+              </VirtualRows>
             </div>
           </div>
 
@@ -1418,14 +1474,8 @@
 
           <!-- Right: Timeline -->
           <div class="flex-1 flex flex-col min-w-0">
-            <div
-              class="flex-1 overflow-x-auto overflow-y-auto timeline-scroll"
-              style="touch-action: pan-x pan-y;"
-              data-testid="roadmap-timeline-scroll"
-              bind:this={timelineScrollContainer}
-              onscroll={syncTimelineScroll}
-            >
-              <div data-testid="roadmap-timeline-content" style="min-width: {totalWidth}px;">
+            <div class="shrink-0 overflow-hidden" style="height: 58px;">
+              <div style={`width: ${totalWidth}px; transform: translateX(${-timelineScrollLeft}px);`}>
                 <!-- Header row: month/quarter groups -->
                 <div class="relative sticky top-0 z-30" style="height: 29px; border-bottom: 1px solid var(--ctx-border, var(--ds-border)); background-color: var(--ctx-surface, var(--ds-surface));">
                   {#each monthGroups as group}
@@ -1456,15 +1506,23 @@
                 </div>
 
                 <!-- Body: rows aligned 1:1 with treeData -->
-                <div class="relative">
-                  {#each treeData as item, rowIndex (item.id)}
+              </div>
+            </div>
+            <div class="flex-1 overflow-x-auto overflow-y-auto timeline-scroll"
+              style="touch-action: pan-x pan-y; overflow-anchor: none;"
+              data-testid="roadmap-timeline-scroll" bind:this={timelineScrollContainer} onscroll={syncTimelineScroll}
+            >
+              <div data-testid="roadmap-timeline-content" style="min-width: {totalWidth}px;">
+                <div class="relative" bind:this={timelineListElement}>
+                  <VirtualRows items={treeData} getKey={collectionItemRowKey} sharedModel={roadmapVirtual} pane="timeline">
+                  {#snippet row(item, virtual)}
                     {@const roadmapItem = roadmapItemMap.get(item.id)}
                     <div
+                      use:virtual.attach
+                      data-testid={`roadmap-timeline-row-${item.id}`}
                       class="relative"
                       style="height: {ROW_HEIGHT}px; border-bottom: 1px solid var(--ds-border-subtle, var(--ds-border));"
                     >
-                      <LazyRender height={ROW_HEIGHT}>
-                        {#snippet children()}
                           <!-- Grid lines -->
                           {#each columns as _, ci}
                             <div
@@ -1616,22 +1674,17 @@
                               title={previewEnd ? `${previewStart} – ${previewEnd}` : previewStart}
                             ></div>
                           {/if}
-                        {/snippet}
-                      </LazyRender>
                     </div>
-                  {/each}
+                  {/snippet}
+                  </VirtualRows>
 
                   <!-- SVG overlay for dependency arrows -->
-                  {#if dependencyArrows.length > 0}
+                  {#if visibleArrowGeometries.length > 0}
                     <svg
                       class="absolute pointer-events-none"
                       style="left: 0; top: 0; width: {totalWidth}px; height: {treeData.length * ROW_HEIGHT}px; z-index: 20;"
                     >
-                      {#each dependencyArrows as arrow}
-                        {@const blockerIdx = treeData.findIndex(i => i.id === arrow.blocker.id)}
-                        {@const dependentIdx = treeData.findIndex(i => i.id === arrow.dependent.id)}
-                        {@const geometry = getArrowGeometry(arrow.blocker, arrow.dependent, blockerIdx, dependentIdx)}
-                        {#if blockerIdx !== -1 && dependentIdx !== -1}
+                      {#each visibleArrowGeometries as geometry (geometry.key)}
                           <path
                             d={geometry.path}
                             fill="none"
@@ -1645,7 +1698,6 @@
                             fill="var(--ds-text-subtle)"
                             opacity="0.6"
                           />
-                        {/if}
                       {/each}
                     </svg>
                   {/if}
@@ -1657,6 +1709,7 @@
       {/if}
 
       {#if roadmapConfig.start_field_id}
+        <CollectionVirtualizationToggle preference={virtualization} />
         <CollectionHierarchyLoadMore testid="roadmap-load-more" />
       {/if}
   </StaticViewBackground>

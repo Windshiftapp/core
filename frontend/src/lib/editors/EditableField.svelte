@@ -1,5 +1,6 @@
 <script>
   import InlineEditorActions from './InlineEditorActions.svelte';
+  import { useRowRetention } from '../virtualization/useRowRetention.svelte';
 
   // Single inline-edit primitive. It owns the edit state machine and the
   // commit/cancel outcome rule; callers own parsing, validation and the
@@ -37,6 +38,7 @@
   let suppressCommit = false;
   let container = $state(null);
   let clickTimeout = null;
+  useRowRetention(() => editing, 'edit');
 
   export function isEditing() {
     return editing;

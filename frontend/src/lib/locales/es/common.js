@@ -5,6 +5,8 @@
 export default {
   // Common UI elements
   common: {
+    virtualizeRows: 'Virtualizar filas',
+    virtualizeRowsHint: 'Desactiva esta opción para mostrar todas las filas cargadas para accesibilidad, búsqueda del navegador o copia.',
     save: 'Guardar',
     saveChanges: 'Guardar cambios',
     cancel: 'Cancelar',

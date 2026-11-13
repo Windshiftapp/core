@@ -1,6 +1,7 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
   import BoardItemCard from './BoardItemCard.svelte';
+  import { useRowRetention } from '../../virtualization/useRowRetention.svelte';
 
   let {
     item,
@@ -32,6 +33,7 @@
     },
     portal: 'body',
   });
+  useRowRetention(() => $open, 'preview');
 
   function openItem(itemId, event) {
     event?.stopPropagation();

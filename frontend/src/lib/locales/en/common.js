@@ -5,6 +5,8 @@
 export default {
   // Common UI elements
   common: {
+    virtualizeRows: 'Virtualize rows',
+    virtualizeRowsHint: 'Turn off to render all loaded rows for accessibility, browser Find or copying.',
     save: 'Save',
     saveChanges: 'Save Changes',
     cancel: 'Cancel',

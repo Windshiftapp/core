@@ -4,6 +4,8 @@
  */
 export default {
   common: {
+    virtualizeRows: 'Virtualizar linhas',
+    virtualizeRowsHint: 'Desative para mostrar todas as linhas carregadas para acessibilidade, pesquisa no navegador ou cópia.',
     save: 'Salvar',
     saveChanges: 'Salvar Alterações',
     cancel: 'Cancelar',

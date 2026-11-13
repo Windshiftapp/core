@@ -27,7 +27,13 @@
     draggable = false,
     rowTestid = undefined,
     leading = undefined,
+    deferred = true,
+    virtualRow = null,
   } = $props();
+
+  function virtualAttachment(node) {
+    return virtualRow?.attach(node);
+  }
 
   // Only the collection list wires drag sources; the queue has no drop
   // targets. The row itself is the draggable element either way.
@@ -52,16 +58,7 @@
   }
 </script>
 
-<div
-  use:dragRow
-  class="px-4 py-3 list-row transition-colors"
-  style="border-top: 1px solid var(--ds-border);"
-  data-item-row
-  data-item-id={item.id}
-  data-testid={rowTestid}
->
-  <LazyRender>
-    {#snippet children()}
+{#snippet cells()}
       <div
         class="grid gap-4 items-center"
         style="grid-template-columns: {gridTemplateColumns}; min-width: {gridMinWidth};"
@@ -70,37 +67,33 @@
         {#each columns as column (column.field_identifier)}
           <div class="min-w-0 overflow-hidden">
             <ListCellRenderer
-              {item}
-              {column}
-              {workspace}
-              {canEdit}
-              {statuses}
-              {statusCategories}
-              {priorities}
-              {milestones}
-              {iterations}
-              {users}
-              {projects}
-              {itemTypes}
-              {customFieldDefinitions}
-              {onitemUpdated}
-              {onupdateError}
+              {item} {column} {workspace} {canEdit} {statuses} {statusCategories}
+              {priorities} {milestones} {iterations} {users} {projects} {itemTypes}
+              {customFieldDefinitions} {onitemUpdated} {onupdateError}
             />
           </div>
         {/each}
-
-        <!-- Actions -->
         <div>
-          <DropdownMenu
-            triggerText=""
-            triggerIcon={MoreHorizontal}
-            triggerClass="p-2 rounded action-btn transition-colors"
-            items={actions}
-          />
+          <DropdownMenu triggerText="" triggerIcon={MoreHorizontal}
+            triggerClass="p-2 rounded action-btn transition-colors" items={actions} />
         </div>
       </div>
-    {/snippet}
-  </LazyRender>
+{/snippet}
+
+<div
+  use:virtualAttachment
+  use:dragRow
+  class="px-4 py-3 list-row transition-colors"
+  style="border-top: 1px solid var(--ds-border);"
+  data-item-row
+  data-item-id={item.id}
+  data-testid={rowTestid}
+>
+  {#if deferred}
+    <LazyRender>{@render cells()}</LazyRender>
+  {:else}
+    {@render cells()}
+  {/if}
 </div>
 
 <style>
