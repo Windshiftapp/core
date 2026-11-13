@@ -2070,7 +2070,7 @@ func (s *Server) initialize() error {
 		SystemAdmins:                 permService,
 		GlobalPermission:             permService,
 		Groups:                       groupHandler.Application(),
-		AdminUsers:                   services.NewUserReadService(s.db),
+		AdminUsers:                   services.NewUserReadService(s.db, userDeactivationService),
 		AuditLogs:                    repository.NewAuditLogRepository(s.db),
 		AdminTokens:                  tokenManager,
 		AdminAuditor:                 logger.NewAuditor(s.db),
