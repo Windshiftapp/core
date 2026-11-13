@@ -170,7 +170,7 @@ func (r *CustomerAccessRepository) PortalLoginAllowed(ctx context.Context, custo
 }
 
 // GitHubCustomer links only customer identities and never reassigns an existing organisation.
-func (r *CustomerAccessRepository) GitHubCustomer(ctx context.Context, providerID int, externalID, email, name string, orgID int, signup bool) (int, error) {
+func (r *CustomerAccessRepository) GitHubCustomer(ctx context.Context, providerID int, externalID, email, name string, orgID *int, signup bool) (int, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
@@ -198,7 +198,7 @@ func (r *CustomerAccessRepository) GitHubCustomer(ctx context.Context, providerI
 		if err := tx.QueryRow(`SELECT customer_organisation_id,deactivated_at FROM portal_customers WHERE id = ?`, id).Scan(&existingOrg, &deactivated); err != nil {
 			return 0, err
 		}
-		if !existingOrg.Valid || int(existingOrg.Int64) != orgID || deactivated.Valid {
+		if deactivated.Valid || (orgID != nil && (!existingOrg.Valid || int(existingOrg.Int64) != *orgID)) {
 			return 0, ErrCustomerAccessDenied
 		}
 		if _, err := tx.Exec(`INSERT INTO customer_external_accounts (provider_id,external_id,customer_id) VALUES (?,?,?) ON CONFLICT DO NOTHING`, providerID, externalID, id); err != nil {
@@ -215,7 +215,7 @@ func (r *CustomerAccessRepository) GitHubCustomer(ctx context.Context, providerI
 		return 0, err
 	}
 	var valid bool
-	if err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM portal_customers WHERE id = ? AND customer_organisation_id = ? AND deactivated_at IS NULL)`, id, orgID).Scan(&valid); err != nil {
+	if err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM portal_customers WHERE id = ? AND (? OR customer_organisation_id = ?) AND deactivated_at IS NULL)`, id, orgID == nil, orgID).Scan(&valid); err != nil {
 		return 0, err
 	}
 	if !valid {
