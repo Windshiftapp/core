@@ -6,10 +6,8 @@ package server
 import (
 	"bytes"
 	"context"
-	"crypto/ed25519"
 	"crypto/tls"
 	"embed"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,7 +36,6 @@ import (
 	"windshift/internal/integrations/docmost"
 	"windshift/internal/itemevents"
 	"windshift/internal/ldap"
-	"windshift/internal/licensing"
 	"windshift/internal/llm"
 	"windshift/internal/logger"
 	mcpserver "windshift/internal/mcp"
@@ -1486,18 +1483,17 @@ func (s *Server) initialize() error {
 			instanceService = nil
 		}
 
-		// License enforcement: when a license public key is configured, a
-		// plugin only contributes capabilities if its license verifies against
-		// this install's instance ID.
-		if cfg.Plugins.LicensePubKey != "" {
-			licensePubKey, err := base64.StdEncoding.DecodeString(cfg.Plugins.LicensePubKey)
-			if err != nil || len(licensePubKey) != ed25519.PublicKeySize {
-				slog.Error("invalid PLUGIN_LICENSE_PUBKEY; license enforcement disabled", "error", err)
-			} else if instanceService != nil {
-				pluginLicenseVerifier = licensing.MakeVerifier(ed25519.PublicKey(licensePubKey), instanceID)
-				pluginOpts = append(pluginOpts, plugins.WithLicenseVerifier(pluginLicenseVerifier))
-				slog.Info("plugin license enforcement enabled", "instance_id", instanceID)
-			}
+		// License enforcement: a configured public key must produce a working
+		// verifier bound to this install's instance ID. A malformed key or a
+		// missing identity is a startup failure, not a silent downgrade to
+		// enforcement-off (which grants every plugin its capabilities).
+		pluginLicenseVerifier, err = resolvePluginLicenseVerifier(cfg.Plugins.LicensePubKey, instanceID, instanceErr)
+		if err != nil {
+			return fmt.Errorf("plugin license enforcement: %w", err)
+		}
+		if pluginLicenseVerifier != nil {
+			pluginOpts = append(pluginOpts, plugins.WithLicenseVerifier(pluginLicenseVerifier))
+			slog.Info("plugin license enforcement enabled", "instance_id", instanceID)
 		}
 
 		pluginDir := cfg.Plugins.Dir
