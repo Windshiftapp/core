@@ -6,8 +6,6 @@
   import { t } from '../stores/i18n.svelte.js';
   import { sanitizeHtml } from '../utils/sanitize.ts';
   import { tick } from 'svelte';
-  import { install, uninstall } from '@github/hotkey';
-  import { useEventListener } from 'runed';
   import { toStore } from 'svelte/store';
   import Checkbox from '../components/Checkbox.svelte';
   import Input from '../components/Input.svelte';
@@ -39,8 +37,6 @@
     triggerActive = false,
     triggerTestid = '',
     triggerLabel = '',
-    hotkeyConfig = null,
-    keyboardHint = null,
     isOpen = $bindable(false),
     onOpenChange = null,
     children = undefined
@@ -82,19 +78,6 @@
   useRowRetention(() => $open, 'menu');
   let triggerElement = $state(null);
   let searchInputElement = $state(null);
-
-  $effect(() => {
-    if (!triggerElement || !hotkeyConfig?.key) return;
-    install(triggerElement, hotkeyConfig.key);
-    return () => uninstall(triggerElement);
-  });
-
-  useEventListener(() => triggerElement, 'hotkey-fire', (event) => {
-    const modal = document.querySelector('[role="dialog"][aria-modal="true"]');
-    if ((modal && !modal.contains(triggerElement)) || (hotkeyConfig?.guard && !hotkeyConfig.guard())) {
-      event.preventDefault();
-    }
-  });
 
   let hasSearchInput = $derived(items.some(i => i.type === 'search'));
 
@@ -259,9 +242,6 @@
       {#if showChevron && !isDisabled}
         <ChevronDown class="w-3 h-3 flex-shrink-0" />
       {/if}
-    {/if}
-    {#if keyboardHint}
-      <kbd aria-hidden="true" class="ml-1 px-1.5 text-xs rounded border border-current opacity-75">{keyboardHint}</kbd>
     {/if}
   </button>
 </div>

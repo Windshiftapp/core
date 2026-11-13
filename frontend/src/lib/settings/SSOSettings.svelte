@@ -4,7 +4,6 @@
   import { ssoStore } from '../stores/sso.svelte.js';
   import { capabilitiesStore } from '../stores/capabilities.svelte.js';
 
-  import DropdownMenu from '../layout/DropdownMenu.svelte';
   import Github from '@tabler/icons-svelte-runes/icons/brand-github';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import KeyRound from '@lucide/svelte/icons/key-round';
@@ -171,11 +170,11 @@
     }
   }
 
-  function openCreateModal(providerType = 'oidc') {
+  function openCreateModal() {
     formData = {
-      slug: providerType === 'github' ? 'github' : '',
-      name: providerType === 'github' ? 'GitHub' : '',
-      provider_type: providerType,
+      slug: '',
+      name: '',
+      provider_type: 'oidc',
       enabled: true,
       is_default: providers.length === 0,
       issuer_url: '',
@@ -183,7 +182,7 @@
       client_secret: '',
       scopes: 'openid email profile',
       auto_provision_users: false,
-      require_verified_email: providerType !== 'github',
+      require_verified_email: true,
       github_organization: '',
       account_type: 'internal',
       customer_organisation_id: null,
@@ -192,6 +191,21 @@
     attributeMapping = emptyAttributeMapping();
     testResult = null;
     showCreateModal = true;
+  }
+
+  // The provider type picker lives in the modal. Fill the name and slug with
+  // GitHub defaults only while they are untouched, and keep email-verification
+  // trust off for GitHub (it verifies the address itself).
+  function handleProviderTypeChange(providerType) {
+    if (providerType === 'github') {
+      if (!formData.name) formData.name = 'GitHub';
+      if (!formData.slug) formData.slug = 'github';
+    } else if (providerType === 'oidc') {
+      if (formData.name === 'GitHub') formData.name = '';
+      if (formData.slug === 'github') formData.slug = '';
+    }
+    formData.require_verified_email = providerType !== 'github';
+    formErrors = {};
   }
 
   function openEditModal(provider) {
@@ -361,20 +375,17 @@
   }
 </script>
 
-{#snippet addProviderMenu(testid)}
-  <DropdownMenu
-    triggerText={t('settings.sso.addProvider')}
-    triggerIcon={Plus}
-    triggerTestid={testid}
+{#snippet addProviderButton(testid)}
+  <Button
+    variant="primary"
+    dataTestid={testid}
     keyboardHint={testid === 'sso-add-provider' ? 'A' : null}
     hotkeyConfig={testid === 'sso-add-provider' ? { key: toHotkeyString('sso', 'addProvider'), guard: () => !showCreateModal && !showEditModal } : null}
-    triggerClass="px-4 py-2 bg-[var(--ds-interactive)] text-white"
-    placement="bottom-end"
-    items={[
-      { id: 'oidc', title: t('settings.sso.addOidc'), icon: KeyRound, testid: `${testid}-oidc`, onClick: () => openCreateModal('oidc') },
-      { id: 'github', title: t('settings.sso.addGitHub'), icon: Github, testid: `${testid}-github`, onClick: () => openCreateModal('github') },
-    ]}
-  />
+    onclick={() => openCreateModal()}
+  >
+    <Plus class="w-4 h-4 mr-2" />
+    {t('settings.sso.addProvider')}
+  </Button>
 {/snippet}
 
 <div class="space-y-6">
@@ -382,7 +393,7 @@
   <PageHeader title={t('settings.sso.title')} subtitle={t('settings.sso.subtitle')} icon={KeyRound}>
     {#snippet actions()}
       {#if canAddProvider}
-        {@render addProviderMenu('sso-add-provider')}
+        {@render addProviderButton('sso-add-provider')}
       {/if}
     {/snippet}
   </PageHeader>
@@ -413,7 +424,7 @@
         description={t('settings.sso.noProviderDescription')}
       >
         {#snippet action()}
-          {@render addProviderMenu('sso-empty-add-provider')}
+          {@render addProviderButton('sso-empty-add-provider')}
         {/snippet}
       </EmptyState>
     </Card>
@@ -537,6 +548,22 @@
       {/if}
       {#if formErrors.submit}
         <AlertBox type="error">{formErrors.submit}</AlertBox>
+      {/if}
+
+      {#if showCreateModal}
+        <!-- Provider Type -->
+        <div>
+          <Label for="sso-provider-type" color="default" class="mb-1">{t('settings.sso.providerType')}</Label>
+          <Select
+            id="sso-provider-type"
+            bind:value={formData.provider_type}
+            options={[
+              { value: 'oidc', label: t('settings.sso.oidc') },
+              { value: 'github', label: 'GitHub' },
+            ]}
+            onchange={handleProviderTypeChange}
+          />
+        </div>
       {/if}
 
       <div class="grid grid-cols-2 gap-4">
