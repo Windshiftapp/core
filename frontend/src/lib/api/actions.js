@@ -57,6 +57,13 @@ export const actions = {
     }),
   getLogs: (workspaceId, actionId) =>
     fetchAllV2Pages(`/workspaces/${workspaceId}/actions/${actionId}/logs`),
+  // Definition history: immutable, attributable revisions of the executable
+  // configuration. Listing returns metadata; getRevision returns the full
+  // snapshot so an operator can reconstruct what actually ran.
+  getRevisions: (workspaceId, actionId) =>
+    fetchAllV2Pages(`/workspaces/${workspaceId}/actions/${actionId}/revisions`),
+  getRevision: (workspaceId, actionId, revisionId) =>
+    fetchV2Data(`/workspaces/${workspaceId}/actions/${actionId}/revisions/${revisionId}`),
 };
 
 // Action templates: read-only registry shipped with the binary, plus

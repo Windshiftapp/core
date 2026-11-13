@@ -273,6 +273,25 @@ export default {
       viewDetails: 'Zobacz szczegóły',
     },
 
+    history: {
+      title: 'Historia definicji',
+      noRevisions: 'Brak wersji definicji',
+      revision: 'Wersja',
+      source: 'Źródło',
+      editor: 'Edytowane przez',
+      changedFields: 'Zmienione pola',
+      changeSummary: 'Podsumowanie',
+      createdAt: 'Zapisano o',
+      viewDetails: 'Zobacz wersję',
+      detailTitle: 'Wersja definicji',
+      snapshot: 'Definicja wykonywalna',
+      nodes: 'Węzły',
+      edges: 'Krawędzie',
+      noChangedFields: 'Brak zmian wykonywalnych',
+      system: 'System (baza)',
+      triggerType: 'Wyzwalacz',
+    },
+
     // Ślad wykonania
     trace: {
       title: 'Szczegóły wykonania',

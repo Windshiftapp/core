@@ -10,6 +10,7 @@
   import ActionsManager from './ActionsManager.svelte';
   import ActionFlowEditor from './ActionFlowEditor.svelte';
   import ActionLogs from './ActionLogs.svelte';
+  import ActionHistory from './ActionHistory.svelte';
   import ActionTemplatePicker from './ActionTemplatePicker.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import Button from '../../components/Button.svelte';
@@ -32,6 +33,7 @@
   let loading = $state(true);
   let editingAction = $state(null);
   let viewingLogsAction = $state(null);
+  let viewingHistoryAction = $state(null);
   let showCreateModal = $state(false);
   let showTemplatePicker = $state(false);
   let detailsAction = $state(null);
@@ -237,6 +239,14 @@
     viewingLogsAction = null;
   }
 
+  function handleViewHistory(action) {
+    viewingHistoryAction = action;
+  }
+
+  function handleBackFromHistory() {
+    viewingHistoryAction = null;
+  }
+
   async function handleSaveAction(updatedAction) {
     try {
       await actionsApi.update(workspaceId, updatedAction.id, updatedAction);
@@ -274,6 +284,14 @@
       onBack={handleBackFromLogs}
     />
   </div>
+{:else if viewingHistoryAction}
+  <div class="h-full">
+    <ActionHistory
+      {workspaceId}
+      action={viewingHistoryAction}
+      onBack={handleBackFromHistory}
+    />
+  </div>
 {:else}
   <ActionsManager
     {workspaceId}
@@ -287,6 +305,7 @@
     ontoggle={handleToggle}
     ondelete={handleDelete}
     onviewlogs={handleViewLogs}
+    onviewhistory={handleViewHistory}
   />
 {/if}
 

@@ -12032,6 +12032,115 @@
         ]
       }
     },
+    "/workspaces/{workspace_id}/actions/{action_id}/revisions": {
+      "get": {
+        "description": "List action definition revisions. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "action_id",
+            "In": "path",
+            "Description": "The action identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "page",
+            "In": "query",
+            "Description": "One-based page number.",
+            "Required": false,
+            "Schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "page_size",
+            "In": "query",
+            "Description": "Maximum number of resources to return.",
+            "Required": false,
+            "Schema": {
+              "default": 50,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List action definition revisions",
+        "tags": [
+          "Automation"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/actions/{action_id}/revisions/{revision_id}": {
+      "get": {
+        "description": "Get an action definition revision. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "action_id",
+            "In": "path",
+            "Description": "The action identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "revision_id",
+            "In": "path",
+            "Description": "The definition revision identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Get an action definition revision",
+        "tags": [
+          "Automation"
+        ]
+      }
+    },
     "/workspaces/{workspace_id}/agent-runs": {
       "get": {
         "description": "Returns at most 200 visible agent runs in stable newest-first ID order. next_cursor resumes exclusively before the final returned run; private verification runs and unauthorized runs are omitted.",

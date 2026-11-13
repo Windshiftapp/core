@@ -175,6 +175,25 @@ export default {
       viewDetails: 'Details anzeigen',
     },
 
+    history: {
+      title: 'Definitionsverlauf',
+      noRevisions: 'Keine Definitionsrevisionen',
+      revision: 'Revision',
+      source: 'Quelle',
+      editor: 'Bearbeitet von',
+      changedFields: 'Geänderte Felder',
+      changeSummary: 'Zusammenfassung',
+      createdAt: 'Aufgezeichnet am',
+      viewDetails: 'Revision anzeigen',
+      detailTitle: 'Definitionsrevision',
+      snapshot: 'Ausführbare Definition',
+      nodes: 'Knoten',
+      edges: 'Kanten',
+      noChangedFields: 'Keine ausführbare Änderung',
+      system: 'System (Basis)',
+      triggerType: 'Auslöser',
+    },
+
     trace: {
       title: 'Ausführungsdetails',
       noSteps: 'Keine Ausführungsschritte aufgezeichnet',

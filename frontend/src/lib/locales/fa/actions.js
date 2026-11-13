@@ -231,6 +231,24 @@ export default {
       "details": "جزئیات",
       "viewDetails": "مشاهده جزئیات"
     },
+    "history": {
+      "title": "تاریخچه تعریف",
+      "noRevisions": "بدون نسخه تعریف",
+      "revision": "نسخه",
+      "source": "منبع",
+      "editor": "ویرایش شده توسط",
+      "changedFields": "فیلدهای تغییر یافته",
+      "changeSummary": "خلاصه",
+      "createdAt": "ثبت شده در",
+      "viewDetails": "مشاهده نسخه",
+      "detailTitle": "نسخه تعریف",
+      "snapshot": "تعریف اجرایی",
+      "nodes": "گره‌ها",
+      "edges": "یال‌ها",
+      "noChangedFields": "تغییر اجرایی وجود ندارد",
+      "system": "سیستم (پایه)",
+      "triggerType": "محرک"
+    },
     "trace": {
       "title": "جزئیات اجرا",
       "noSteps": "هیچ مرحله اجرایی ثبت نشده است",

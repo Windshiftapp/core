@@ -38,6 +38,14 @@ func applyActionNulls(a *models.Action, description, triggerConfig sql.NullStrin
 	}
 }
 
+// applyCurrentRevision sets the live revision pointer from a scanned NULL-or-int.
+func applyCurrentRevision(a *models.Action, currentRevisionID sql.NullInt64) {
+	if currentRevisionID.Valid {
+		v := int(currentRevisionID.Int64)
+		a.CurrentRevisionID = &v
+	}
+}
+
 func (r *ActionRepository) loadAllowedRoleIDs(actionID int) ([]int, error) {
 	rows, err := r.db.Query(`
 		SELECT role_id
@@ -83,13 +91,13 @@ func replaceAllowedRoleIDs(tx database.Tx, actionID int, roleIDs []int) error {
 func (r *ActionRepository) GetByID(id int) (*models.Action, error) {
 	var action models.Action
 	var description, triggerConfig sql.NullString
-	var createdBy, actorUserID sql.NullInt64
+	var createdBy, actorUserID, currentRevisionID sql.NullInt64
 	var creatorName, actorName sql.NullString
 
 	err := r.db.QueryRow(`
 		SELECT a.id, a.workspace_id, a.name, a.description, a.is_enabled,
 		       a.trigger_type, a.trigger_config, a.created_by, a.actor_user_id,
-		       a.created_at, a.updated_at,
+		       a.current_revision_id, a.created_at, a.updated_at,
 		       u.first_name || ' ' || u.last_name,
 		       actor.first_name || ' ' || actor.last_name
 		FROM actions a
@@ -99,7 +107,7 @@ func (r *ActionRepository) GetByID(id int) (*models.Action, error) {
 	`, id).Scan(
 		&action.ID, &action.WorkspaceID, &action.Name, &description, &action.IsEnabled,
 		&action.TriggerType, &triggerConfig, &createdBy, &actorUserID,
-		&action.CreatedAt, &action.UpdatedAt,
+		&currentRevisionID, &action.CreatedAt, &action.UpdatedAt,
 		&creatorName, &actorName,
 	)
 
@@ -111,6 +119,7 @@ func (r *ActionRepository) GetByID(id int) (*models.Action, error) {
 	}
 
 	applyActionNulls(&action, description, triggerConfig, createdBy, actorUserID)
+	applyCurrentRevision(&action, currentRevisionID)
 	if creatorName.Valid {
 		action.CreatorName = creatorName.String
 	}
@@ -144,7 +153,7 @@ func (r *ActionRepository) ListByWorkspace(workspaceID int) ([]*models.Action, e
 	rows, err := r.db.Query(`
 		SELECT a.id, a.workspace_id, a.name, a.description, a.is_enabled,
 		       a.trigger_type, a.trigger_config, a.created_by, a.actor_user_id,
-		       a.created_at, a.updated_at,
+		       a.current_revision_id, a.created_at, a.updated_at,
 		       u.first_name || ' ' || u.last_name,
 		       actor.first_name || ' ' || actor.last_name
 		FROM actions a
@@ -162,13 +171,13 @@ func (r *ActionRepository) ListByWorkspace(workspaceID int) ([]*models.Action, e
 	for rows.Next() {
 		action := &models.Action{}
 		var description, triggerConfig sql.NullString
-		var createdBy, actorUserID sql.NullInt64
+		var createdBy, actorUserID, currentRevisionID sql.NullInt64
 		var creatorName, actorName sql.NullString
 
 		err := rows.Scan(
 			&action.ID, &action.WorkspaceID, &action.Name, &description, &action.IsEnabled,
 			&action.TriggerType, &triggerConfig, &createdBy, &actorUserID,
-			&action.CreatedAt, &action.UpdatedAt,
+			&currentRevisionID, &action.CreatedAt, &action.UpdatedAt,
 			&creatorName, &actorName,
 		)
 		if err != nil {
@@ -176,6 +185,7 @@ func (r *ActionRepository) ListByWorkspace(workspaceID int) ([]*models.Action, e
 		}
 
 		applyActionNulls(action, description, triggerConfig, createdBy, actorUserID)
+		applyCurrentRevision(action, currentRevisionID)
 		if creatorName.Valid {
 			action.CreatorName = creatorName.String
 		}
@@ -210,7 +220,7 @@ func (r *ActionRepository) ListEnabledByTrigger(triggerType models.ActionTrigger
 	rows, err := r.db.Query(`
 		SELECT a.id, a.workspace_id, a.name, a.description, a.is_enabled,
 		       a.trigger_type, a.trigger_config, a.created_by, a.actor_user_id,
-		       a.created_at, a.updated_at
+		       a.current_revision_id, a.created_at, a.updated_at
 		FROM actions a
 		WHERE a.is_enabled = true AND a.trigger_type = ?
 		ORDER BY a.id ASC
@@ -224,15 +234,16 @@ func (r *ActionRepository) ListEnabledByTrigger(triggerType models.ActionTrigger
 	for rows.Next() {
 		action := &models.Action{}
 		var description, triggerConfig sql.NullString
-		var createdBy, actorUserID sql.NullInt64
+		var createdBy, actorUserID, currentRevisionID sql.NullInt64
 		if err := rows.Scan(
 			&action.ID, &action.WorkspaceID, &action.Name, &description, &action.IsEnabled,
 			&action.TriggerType, &triggerConfig, &createdBy, &actorUserID,
-			&action.CreatedAt, &action.UpdatedAt,
+			&currentRevisionID, &action.CreatedAt, &action.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan action: %w", err)
 		}
 		applyActionNulls(action, description, triggerConfig, createdBy, actorUserID)
+		applyCurrentRevision(action, currentRevisionID)
 		actions = append(actions, action)
 	}
 	if err := rows.Err(); err != nil {
@@ -255,7 +266,7 @@ func (r *ActionRepository) ListEnabledByWorkspace(workspaceID int) ([]*models.Ac
 	rows, err := r.db.Query(`
 		SELECT a.id, a.workspace_id, a.name, a.description, a.is_enabled,
 		       a.trigger_type, a.trigger_config, a.created_by, a.actor_user_id,
-		       a.created_at, a.updated_at
+		       a.current_revision_id, a.created_at, a.updated_at
 		FROM actions a
 		WHERE a.workspace_id = ? AND a.is_enabled = true
 		ORDER BY a.created_at DESC
@@ -269,18 +280,19 @@ func (r *ActionRepository) ListEnabledByWorkspace(workspaceID int) ([]*models.Ac
 	for rows.Next() {
 		action := &models.Action{}
 		var description, triggerConfig sql.NullString
-		var createdBy, actorUserID sql.NullInt64
+		var createdBy, actorUserID, currentRevisionID sql.NullInt64
 
 		err := rows.Scan(
 			&action.ID, &action.WorkspaceID, &action.Name, &description, &action.IsEnabled,
 			&action.TriggerType, &triggerConfig, &createdBy, &actorUserID,
-			&action.CreatedAt, &action.UpdatedAt,
+			&currentRevisionID, &action.CreatedAt, &action.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan action: %w", err)
 		}
 
 		applyActionNulls(action, description, triggerConfig, createdBy, actorUserID)
+		applyCurrentRevision(action, currentRevisionID)
 		actions = append(actions, action)
 	}
 	if err := rows.Err(); err != nil {
@@ -632,12 +644,12 @@ func (r *ActionRepository) CreateExecutionLog(log *models.ActionExecutionLog) (i
 	err := r.db.QueryRow(`
 		INSERT INTO action_execution_logs (
 			action_id, item_id, trigger_event, status,
-			trigger_user_id, effective_actor_user_id, started_at, durable_event_key
+			trigger_user_id, effective_actor_user_id, started_at, durable_event_key, definition_revision_id
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
 		log.ActionID, log.ItemID, log.TriggerEvent, log.Status,
-		log.TriggerUserID, log.EffectiveActorUserID, time.Now(), durableEventKeyValue(log.DurableEventKey),
+		log.TriggerUserID, log.EffectiveActorUserID, time.Now(), durableEventKeyValue(log.DurableEventKey), log.DefinitionRevisionID,
 	).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create execution log: %w", err)
@@ -657,22 +669,28 @@ func durableEventKeyValue(key string) any {
 // event/action pair. Manual and legacy logs have no durable key.
 func (r *ActionRepository) GetExecutionLogByDurableTarget(eventKey string, actionID int) (*models.ActionExecutionLog, error) {
 	log := &models.ActionExecutionLog{}
-	var itemID, triggerUserID, effectiveActorUserID sql.NullInt64
+	var itemID, triggerUserID, effectiveActorUserID, definitionRevisionID sql.NullInt64
 	var completedAt sql.NullTime
 	var errorMessage, executionTrace sql.NullString
 	err := r.db.QueryRow(`
 		SELECT id, action_id, item_id, trigger_event, status,
 		       trigger_user_id, effective_actor_user_id, started_at,
-		       completed_at, error_message, execution_trace, durable_event_key
+		       completed_at, error_message, execution_trace, durable_event_key,
+		       definition_revision_id
 		FROM action_execution_logs
 		WHERE durable_event_key = ? AND action_id = ?
 	`, eventKey, actionID).Scan(
 		&log.ID, &log.ActionID, &itemID, &log.TriggerEvent, &log.Status,
 		&triggerUserID, &effectiveActorUserID, &log.StartedAt,
 		&completedAt, &errorMessage, &executionTrace, &log.DurableEventKey,
+		&definitionRevisionID,
 	)
 	if err != nil {
 		return nil, err
+	}
+	if definitionRevisionID.Valid {
+		value := int(definitionRevisionID.Int64)
+		log.DefinitionRevisionID = &value
 	}
 	if itemID.Valid {
 		value := int(itemID.Int64)
@@ -702,10 +720,12 @@ func (r *ActionRepository) GetExecutionLogByDurableTarget(eventKey string, actio
 func (r *ActionRepository) UpdateExecutionLog(log *models.ActionExecutionLog) error {
 	_, err := r.db.ExecWrite(`
 		UPDATE action_execution_logs SET
-			status = ?, completed_at = ?, error_message = ?, execution_trace = ?
+			status = ?, completed_at = ?, error_message = ?, execution_trace = ?,
+			definition_revision_id = ?
 		WHERE id = ?
 	`,
-		log.Status, log.CompletedAt, log.ErrorMessage, log.ExecutionTrace, log.ID,
+		log.Status, log.CompletedAt, log.ErrorMessage, log.ExecutionTrace,
+		log.DefinitionRevisionID, log.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update execution log: %w", err)
@@ -719,6 +739,7 @@ func (r *ActionRepository) GetExecutionLogsByActionID(actionID, limit, offset in
 		SELECT l.id, l.action_id, l.item_id, l.trigger_event, l.status,
 		       l.trigger_user_id, l.effective_actor_user_id,
 		       l.started_at, l.completed_at, l.error_message, l.execution_trace,
+		       l.definition_revision_id,
 		       a.name, i.title
 		FROM action_execution_logs l
 		LEFT JOIN actions a ON l.action_id = a.id
@@ -741,6 +762,7 @@ func (r *ActionRepository) GetExecutionLogsByWorkspaceID(workspaceID, limit, off
 		SELECT l.id, l.action_id, l.item_id, l.trigger_event, l.status,
 		       l.trigger_user_id, l.effective_actor_user_id,
 		       l.started_at, l.completed_at, l.error_message, l.execution_trace,
+		       l.definition_revision_id,
 		       a.name, i.title
 		FROM action_execution_logs l
 		LEFT JOIN actions a ON l.action_id = a.id
@@ -807,6 +829,7 @@ func (r *ActionRepository) GetRecentExecutionLogs(opts RecentExecutionLogsOpts) 
 		SELECT l.id, l.action_id, l.item_id, l.trigger_event, l.status,
 		       l.trigger_user_id, l.effective_actor_user_id,
 		       l.started_at, l.completed_at, l.error_message, l.execution_trace,
+		       l.definition_revision_id,
 		       a.name, i.title, w.id, w.name
 		FROM action_execution_logs l
 		LEFT JOIN actions a ON l.action_id = a.id
@@ -827,7 +850,7 @@ func (r *ActionRepository) GetRecentExecutionLogs(opts RecentExecutionLogsOpts) 
 	var logs []*models.ActionExecutionLog
 	for rows.Next() {
 		log := &models.ActionExecutionLog{}
-		var itemID, triggerUserID, effectiveActorUserID, workspaceID sql.NullInt64
+		var itemID, triggerUserID, effectiveActorUserID, workspaceID, definitionRevisionID sql.NullInt64
 		var completedAt sql.NullTime
 		var errorMessage, executionTrace, actionName, itemTitle, workspaceName sql.NullString
 
@@ -835,9 +858,15 @@ func (r *ActionRepository) GetRecentExecutionLogs(opts RecentExecutionLogsOpts) 
 			&log.ID, &log.ActionID, &itemID, &log.TriggerEvent, &log.Status,
 			&triggerUserID, &effectiveActorUserID,
 			&log.StartedAt, &completedAt, &errorMessage, &executionTrace,
+			&definitionRevisionID,
 			&actionName, &itemTitle, &workspaceID, &workspaceName,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan recent execution log: %w", err)
+		}
+
+		if definitionRevisionID.Valid {
+			v := int(definitionRevisionID.Int64)
+			log.DefinitionRevisionID = &v
 		}
 
 		if itemID.Valid {
@@ -890,7 +919,7 @@ func (r *ActionRepository) scanExecutionLogs(rows *sql.Rows) ([]*models.ActionEx
 	var logs []*models.ActionExecutionLog
 	for rows.Next() {
 		log := &models.ActionExecutionLog{}
-		var itemID, triggerUserID, effectiveActorUserID sql.NullInt64
+		var itemID, triggerUserID, effectiveActorUserID, definitionRevisionID sql.NullInt64
 		var completedAt sql.NullTime
 		var errorMessage, executionTrace, actionName, itemTitle sql.NullString
 
@@ -898,10 +927,16 @@ func (r *ActionRepository) scanExecutionLogs(rows *sql.Rows) ([]*models.ActionEx
 			&log.ID, &log.ActionID, &itemID, &log.TriggerEvent, &log.Status,
 			&triggerUserID, &effectiveActorUserID,
 			&log.StartedAt, &completedAt, &errorMessage, &executionTrace,
+			&definitionRevisionID,
 			&actionName, &itemTitle,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan execution log: %w", err)
+		}
+
+		if definitionRevisionID.Valid {
+			v := int(definitionRevisionID.Int64)
+			log.DefinitionRevisionID = &v
 		}
 
 		if itemID.Valid {
@@ -955,13 +990,13 @@ func (r *ActionRepository) BatchInsertExecutionLogs(logs []models.ActionExecutio
 			INSERT INTO action_execution_logs (
 				action_id, item_id, trigger_event, status,
 				trigger_user_id, effective_actor_user_id,
-				started_at, completed_at, error_message, execution_trace
+				started_at, completed_at, error_message, execution_trace, definition_revision_id
 			)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`,
 			log.ActionID, log.ItemID, log.TriggerEvent, log.Status,
 			log.TriggerUserID, log.EffectiveActorUserID,
-			log.StartedAt, log.CompletedAt, log.ErrorMessage, log.ExecutionTrace,
+			log.StartedAt, log.CompletedAt, log.ErrorMessage, log.ExecutionTrace, log.DefinitionRevisionID,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to insert execution log: %w", err)

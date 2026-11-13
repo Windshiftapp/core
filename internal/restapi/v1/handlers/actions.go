@@ -33,11 +33,22 @@ type ActionHandler struct {
 // low-volume admin tooling, slower than the cookie path).
 func NewActionHandler(db database.Database, permissionService *services.PermissionService, actionService *services.ActionService) *ActionHandler {
 	repo := repository.NewActionRepository(db)
-	definitions := services.NewActionDefinitionService(repo, actionService)
+	definitions := services.NewActionDefinitionService(db, repo, actionService)
 	return &ActionHandler{
 		BaseHandler: NewBaseHandler(db, permissionService),
 		repo:        repo,
 		definitions: definitions,
+	}
+}
+
+// actionAuditMeta builds the transaction-coupled audit metadata for a v1
+// definition write. The service persists these rows with the revision, so the
+// handler must not also log them after the fact.
+func (h *ActionHandler) actionAuditMeta(r *http.Request, actionType string, details map[string]any) services.ActionWriteMeta {
+	return services.ActionWriteMeta{
+		Actor:             services.NewAuditActorFromRequest(r, middleware.GetUser(r.Context()), nil, ""),
+		PrimaryActionType: actionType,
+		PrimaryDetails:    details,
 	}
 }
 
@@ -316,7 +327,7 @@ func (h *ActionHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 		TriggerConfig: req.TriggerConfig,
 		CreatedBy:     &userID,
 	}
-	created, validationErrors, err := h.definitions.Create(action, req.Nodes, req.Edges)
+	created, validationErrors, err := h.definitions.Create(action, req.Nodes, req.Edges, h.actionAuditMeta(r, logger.ActionAutomationCreate, map[string]any{"workspace_id": workspaceID}))
 	if len(validationErrors) > 0 {
 		h.respondValidationErrors(w, r, validationErrors)
 		return
@@ -328,9 +339,6 @@ func (h *ActionHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 			h.RespondInternalError(w, r)
 		}
 		return
-	}
-	if user := middleware.GetUser(r.Context()); user != nil {
-		h.Auditor.LogWithDetails(r, user, logger.ActionAutomationCreate, logger.ResourceAutomation, &created.ID, created.Name, map[string]any{"workspace_id": workspaceID})
 	}
 	h.RespondCreated(w, actionResponse{Action: created, Warnings: warnings})
 }
@@ -351,7 +359,7 @@ func (h *ActionHandler) CreateAction(w http.ResponseWriter, r *http.Request) {
 // @Failure      404       {object}  handlers.ErrorResponse
 // @Router       /workspaces/{id}/actions/{actionId} [put]
 func (h *ActionHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
-	_, workspaceID, ok := h.requireActionManage(w, r)
+	userID, workspaceID, ok := h.requireActionManage(w, r)
 	if !ok {
 		return
 	}
@@ -369,6 +377,21 @@ func (h *ActionHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Replacing the definition of an action that runs under a configured
+	// (privileged) actor is delegated code execution; action.manage alone is
+	// not sufficient on any adapter.
+	if existing.ActorUserID != nil {
+		allowed, permErr := h.PermissionService.HasGlobalPermission(userID, models.PermissionActionSetActor)
+		if permErr != nil {
+			h.RespondInternalError(w, r)
+			return
+		}
+		if !allowed {
+			h.RespondError(w, r, restapi.ErrForbidden)
+			return
+		}
+	}
+
 	var req actionDefinitionRequest
 	if !h.DecodeBodyOrRespond(w, r, &req) {
 		return
@@ -383,7 +406,7 @@ func (h *ActionHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 	existing.TriggerType = req.TriggerType
 	existing.TriggerConfig = req.TriggerConfig
 
-	updated, validationErrors, err := h.definitions.Save(existing, req.Nodes, req.Edges, true, true)
+	updated, validationErrors, err := h.definitions.Save(existing, req.Nodes, req.Edges, true, true, false, h.actionAuditMeta(r, logger.ActionAutomationUpdate, map[string]any{"workspace_id": workspaceID}))
 	if len(validationErrors) > 0 {
 		h.respondValidationErrors(w, r, validationErrors)
 		return
@@ -395,9 +418,6 @@ func (h *ActionHandler) UpdateAction(w http.ResponseWriter, r *http.Request) {
 			h.RespondInternalError(w, r)
 		}
 		return
-	}
-	if user := middleware.GetUser(r.Context()); user != nil {
-		h.Auditor.LogWithDetails(r, user, logger.ActionAutomationUpdate, logger.ResourceAutomation, &updated.ID, updated.Name, map[string]any{"workspace_id": workspaceID})
 	}
 	h.RespondOK(w, actionResponse{Action: updated, Warnings: warnings})
 }
@@ -430,12 +450,9 @@ func (h *ActionHandler) DeleteAction(w http.ResponseWriter, r *http.Request) {
 		h.RespondInternalError(w, r)
 		return
 	}
-	if err := h.definitions.Delete(actionID, workspaceID); err != nil {
+	if err := h.definitions.Delete(action, h.actionAuditMeta(r, logger.ActionAutomationDelete, map[string]any{"workspace_id": workspaceID})); err != nil {
 		h.RespondInternalError(w, r)
 		return
-	}
-	if user := middleware.GetUser(r.Context()); user != nil {
-		h.Auditor.LogWithDetails(r, user, logger.ActionAutomationDelete, logger.ResourceAutomation, &actionID, action.Name, map[string]any{"workspace_id": workspaceID})
 	}
 	h.RespondNoContent(w)
 }

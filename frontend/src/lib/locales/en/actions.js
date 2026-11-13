@@ -273,6 +273,26 @@ export default {
       viewDetails: 'View Details',
     },
 
+    // Definition history (immutable revisions)
+    history: {
+      title: 'Definition History',
+      noRevisions: 'No definition revisions',
+      revision: 'Revision',
+      source: 'Source',
+      editor: 'Edited By',
+      changedFields: 'Changed Fields',
+      changeSummary: 'Summary',
+      createdAt: 'Recorded At',
+      viewDetails: 'View Revision',
+      detailTitle: 'Definition Revision',
+      snapshot: 'Executable Definition',
+      nodes: 'Nodes',
+      edges: 'Edges',
+      noChangedFields: 'No executable change',
+      system: 'System (baseline)',
+      triggerType: 'Trigger',
+    },
+
     // Execution trace
     trace: {
       title: 'Execution Details',
