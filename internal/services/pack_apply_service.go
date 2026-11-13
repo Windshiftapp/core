@@ -11,6 +11,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 )
 
@@ -129,6 +130,9 @@ func (s *PackApplyService) Verify(ctx context.Context, req PackApplyRequest) (*P
 // Apply provisions a new workspace from the pack. Framework packs only apply
 // to new workspaces: the target name must not already exist.
 func (s *PackApplyService) Apply(ctx context.Context, req PackApplyRequest) (*PackApplyReport, error) {
+	if err := operatorcontrols.From(s.db).CheckImport(ctx, "pack"); err != nil {
+		return nil, err
+	}
 	report, err := s.newReport(req)
 	if err != nil {
 		return nil, err
@@ -160,6 +164,9 @@ func (s *PackApplyService) Apply(ctx context.Context, req PackApplyRequest) (*Pa
 // already-existing workspace. The caller owns workspace creation and plugin
 // verification; this is the shared tail of Apply and create-from-template-pack.
 func (s *PackApplyService) ApplyToWorkspace(ctx context.Context, actor AuditActor, workspaceID int, archive *PackArchive) (*PackApplyReport, error) {
+	if err := operatorcontrols.From(s.db).CheckImport(ctx, "pack"); err != nil {
+		return nil, err
+	}
 	req := PackApplyRequest{Archive: archive, Actor: actor}
 	report, err := s.newReport(req)
 	if err != nil {

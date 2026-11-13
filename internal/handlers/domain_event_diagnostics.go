@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"windshift/internal/events"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/utils"
 )
 
@@ -68,6 +69,10 @@ type domainEventFailureDiagnostic struct {
 //
 // GET /api/admin/diagnostics/domain-events
 func (h *DiagnosticsHandler) GetDomainEvents(w http.ResponseWriter, r *http.Request) {
+	if err := h.controls.Check(operatorcontrols.RuntimeDiagnostics); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	if h.eventStore == nil {
 		respondInternalError(w, r, errors.New("domain event store not configured"))
 		return
@@ -191,6 +196,10 @@ func (h *DiagnosticsHandler) SkipDomainEvent(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *DiagnosticsHandler) changeDomainEventDelivery(w http.ResponseWriter, r *http.Request, action string) {
+	if err := h.controls.Check(operatorcontrols.Maintenance); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	if h.eventStore == nil {
 		respondInternalError(w, r, errors.New("domain event store not configured"))
 		return

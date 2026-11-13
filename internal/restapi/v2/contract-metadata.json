@@ -9101,6 +9101,23 @@
         ]
       }
     },
+    "/operator-controls": {
+      "get": {
+        "description": "Read effective operator restrictions, current instance usage and blocked script definitions. Requires system administrator permission and admin:operator-controls:read for bearer tokens. Credentials and deployment paths are never returned. This read-only operation cannot modify operator policy.",
+        "parameters": [],
+        "responses": {
+          "401": {},
+          "403": {},
+          "429": {},
+          "500": {},
+          "503": {}
+        },
+        "summary": "Read operator controls",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
     "/packs": {
       "get": {
         "description": "List built-in framework packs. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",

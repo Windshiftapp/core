@@ -12,6 +12,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 )
 
@@ -45,6 +46,22 @@ func NewConfigSetImportService(db database.Database, repo *repository.Configurat
 // ErrDefaultEntityConflict the transaction has not been started; on any
 // other error it has been rolled back.
 func (s *ConfigSetImportService) Import(ctx context.Context, tpl *ConfigSetTemplate) (configSetID int, warnings []string, err error) {
+	if err := operatorcontrols.From(s.db).CheckImport(ctx, "configuration_set"); err != nil {
+		return 0, nil, err
+	}
+	if tpl != nil {
+		for _, set := range tpl.Payload.ConditionSets {
+			for _, transition := range set.TransitionConditions {
+				for _, condition := range transition.Conditions {
+					if condition.Type == models.ConditionTypeScript {
+						if err := operatorcontrols.From(s.db).Check(operatorcontrols.Scripts); err != nil {
+							return 0, nil, err
+						}
+					}
+				}
+			}
+		}
+	}
 	if err := s.validateEnvelope(tpl); err != nil {
 		return 0, nil, err
 	}

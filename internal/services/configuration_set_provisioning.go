@@ -10,6 +10,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 )
@@ -212,6 +213,16 @@ func (s *ConfigurationSetProvisioningService) ValidateGovernanceRefs(cs *models.
 }
 
 func (s *ConfigurationSetProvisioningService) validateConditionSetWorkflow(conditionSetID int, workflowID *int, field string) error {
+	controls := operatorcontrols.From(s.db)
+	if !controls.Allowed(operatorcontrols.Scripts) {
+		var scripts bool
+		if err := s.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM condition_set_transitions cst JOIN conditions c ON c.condition_set_transition_id=cst.id WHERE cst.condition_set_id=? AND c.condition_type='script')`, conditionSetID).Scan(&scripts); err != nil {
+			return err
+		}
+		if scripts {
+			return controls.Check(operatorcontrols.Scripts)
+		}
+	}
 	var conditionSetWorkflowID int
 	err := s.db.QueryRow(`SELECT workflow_id FROM condition_sets WHERE id = ?`, conditionSetID).Scan(&conditionSetWorkflowID)
 	if errors.Is(err, sql.ErrNoRows) {

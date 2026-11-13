@@ -13,6 +13,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 )
 
@@ -131,6 +132,9 @@ func (s *WorkspaceBundleImportService) Import(ctx context.Context, actor AuditAc
 
 // ImportWithOptions applies the bundle with optional idempotent resolution.
 func (s *WorkspaceBundleImportService) ImportWithOptions(ctx context.Context, actor AuditActor, workspaceID int, bundle *WorkspaceBundle, opts *WorkspaceBundleImportOptions) (*WorkspaceBundleImportResult, error) {
+	if err := operatorcontrols.From(s.db).CheckImport(ctx, "workspace_bundle"); err != nil {
+		return nil, err
+	}
 	if bundle == nil || bundle.Payload.Pages == nil && bundle.Payload.Items == nil &&
 		bundle.Payload.PageLabels == nil && bundle.Payload.Labels == nil && bundle.Payload.ItemLinks == nil &&
 		bundle.Payload.ViewSettings == nil && bundle.Payload.SLAs == nil &&

@@ -15,6 +15,7 @@ import (
 	"windshift/internal/jira"
 	"windshift/internal/jiraimport"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/xray"
@@ -42,6 +43,43 @@ func (h *JiraImportHandler) executeImport(jobID string, req StartImportRequest) 
 	}
 	h.setJobToken(jobID, token)
 	defer h.clearJobToken(jobID)
+	controls := operatorcontrols.From(h.db)
+	if err := controls.Check(operatorcontrols.Imports); err != nil {
+		h.updateJobStatus(jobID, "failed", "operator_restricted", nil, err.Error())
+		return
+	}
+	if admission, wait := controls.ImportAdmission(); admission != nil {
+		if h.importAdmission != nil {
+			admission = h.importAdmission
+		}
+		h.updateJobStatus(jobID, "running", "admission_waiting", nil, "")
+		waitCtx, stopWaiting := context.WithTimeout(ctx, wait)
+		waitCtx = operatorcontrols.WithImportEstimate(waitCtx, operatorcontrols.ImportEstimate{JobID: jobID, Projects: len(req.ProjectKeys), AssetSchemas: len(req.AssetSchemaIDs), WorkerCeiling: h.importConcurrency, AttachmentCeilingBytes: controls.Limits().AttachmentBytes, BlobAllowanceBytes: controls.Limits().BlobBytes})
+		heartbeatCtx, stopHeartbeat := context.WithCancel(waitCtx)
+		heartbeatDone := make(chan struct{})
+		go func() { defer close(heartbeatDone); h.renewJiraImportLease(heartbeatCtx, jobID, stopWaiting) }()
+		release, err := admission.Acquire(waitCtx)
+		if err == nil && waitCtx.Err() != nil {
+			release()
+			err = waitCtx.Err()
+		}
+		stopHeartbeat()
+		<-heartbeatDone
+		stopWaiting()
+		if err != nil {
+			h.updateJobStatus(jobID, "failed", "admission_denied", nil, "Operator import admission was unavailable, canceled or exceeded its wait bound.")
+			return
+		}
+		defer release()
+		ctx = controls.WithImportPermit(ctx)
+		if owned, err := h.imports.RenewLease(jobID, token); err != nil || !owned {
+			return
+		}
+		if err := controls.Check(operatorcontrols.Imports); err != nil {
+			h.updateJobStatus(jobID, "failed", "operator_restricted", nil, err.Error())
+			return
+		}
+	}
 
 	// Look up the user who initiated this job so imported workspaces can grant
 	// them admin access. Without this the importer would create workspaces with
@@ -215,6 +253,10 @@ func (h *JiraImportHandler) renewJiraImportLease(ctx context.Context, jobID stri
 					slog.String("component", "jira"),
 					slog.String("job_id", jobID),
 					slog.Any("error", err))
+				if admission, _ := operatorcontrols.From(h.db).ImportAdmission(); admission != nil {
+					onLost()
+					return
+				}
 				continue
 			}
 			if !renewed {

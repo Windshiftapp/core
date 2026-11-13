@@ -16,6 +16,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 	"windshift/internal/repository/actionutil"
 	"windshift/internal/sanitize"
@@ -385,6 +386,11 @@ func (as *AssetActionService) executeActionWithResultForEvent(executionCtx conte
 	if event == nil {
 		return nil, fmt.Errorf("asset action event is required")
 	}
+	steps := 0
+	maxSteps := 0
+	if operatorcontrols.From(as.db).Limits().AutomationStepsPerDay > 0 {
+		maxSteps = maxStepsPerFlow
+	}
 	startTime := time.Now()
 
 	// Get or create execution chain
@@ -455,8 +461,12 @@ func (as *AssetActionService) executeActionWithResultForEvent(executionCtx conte
 
 	// Execute nodes
 	_, err := actionutil.RunFlow(executionCtx, action.Nodes, action.Edges, actionutil.FlowOptions{
-		TriggerNodeType: string(models.AssetNodeTrigger),
-		OnStep:          func(step *models.StepResult) { ctx.StepResults = append(ctx.StepResults, *step) },
+		TriggerNodeType:   string(models.AssetNodeTrigger),
+		MaxSteps:          maxSteps,
+		BudgetExceededErr: errStepBudgetExceeded,
+		TotalSteps:        &steps,
+		AdmitStep:         automationStepAdmission(as.db),
+		OnStep:            func(step *models.StepResult) { ctx.StepResults = append(ctx.StepResults, *step) },
 	}, func(node *models.AssetActionNode, step *models.StepResult, _ func(int)) error {
 		if err := as.executeNode(node, ctx, step); err != nil {
 			slog.Warn("asset action node execution failed",
@@ -555,6 +565,11 @@ func (as *AssetActionService) loadAssetVariables(ctx *models.AssetActionExecutio
 }
 
 func (as *AssetActionService) executeNode(node *models.AssetActionNode, ctx *models.AssetActionExecutionContext, stepResult *models.StepResult) error {
+	if string(node.NodeType) == "execute_script" {
+		if err := operatorcontrols.From(as.db).Check(operatorcontrols.Scripts); err != nil {
+			return err
+		}
+	}
 	switch node.NodeType {
 	case models.AssetNodeCreateItem:
 		return as.executeCreateItem(node, ctx, stepResult)

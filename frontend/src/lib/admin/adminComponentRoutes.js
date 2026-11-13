@@ -2,6 +2,7 @@
 // when its route is active.
 export const ADMIN_COMPONENT_LOADERS = {
   general: () => import('../settings/GeneralSettings.svelte'),
+  'operator-controls': () => import('../settings/OperatorControls.svelte'),
   'custom-fields': () => import('../settings/CustomFields.svelte'),
   workspaces: () => import('../workspaces/Workspaces.svelte'),
   screens: () => import('../pages/Screens.svelte'),
