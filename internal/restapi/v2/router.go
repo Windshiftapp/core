@@ -1201,6 +1201,23 @@ func applyParameterCorrections(route *Route) {
 		upsertParameter(route, dateQuery("from", "Includes worklogs on or after this civil date."))
 		upsertParameter(route, dateQuery("to", "Includes worklogs on or before this civil date."))
 		upsertParameter(route, stringQuery("timezone", "IANA timezone that from/to are interpreted in; defaults to the caller's profile timezone."))
+	case "GET /time/worklog-drafts",
+		"GET /time/worklog-drafts/{draft_id}",
+		"PATCH /time/worklog-drafts/{draft_id}",
+		"DELETE /time/worklog-drafts/{draft_id}",
+		"POST /time/worklog-drafts/{draft_id}/book":
+		route.Tag = "Time tracking"
+		route.Summary = map[string]string{
+			"GET /time/worklog-drafts":                  "List draft worklogs",
+			"GET /time/worklog-drafts/{draft_id}":       "Get a draft worklog",
+			"PATCH /time/worklog-drafts/{draft_id}":     "Update a draft worklog",
+			"DELETE /time/worklog-drafts/{draft_id}":    "Delete a draft worklog",
+			"POST /time/worklog-drafts/{draft_id}/book": "Book a draft worklog",
+		}[route.Method+" "+route.Path]
+		route.Description = semanticRouteDescription(route.Method, route.Summary)
+		if strings.Contains(route.Path, "{draft_id}") {
+			upsertParameter(route, ParameterMetadata{Name: "draft_id", In: "path", Required: true, Description: "The draft worklog identifier.", Schema: map[string]any{"type": "integer", "minimum": 1}})
+		}
 	case "GET /asset-sets/{asset_set_id}/assets":
 		for _, name := range []string{"type_id", "category_id", "status_id"} {
 			upsertParameter(route, stringQuery(name, "Restricts assets by "+strings.ReplaceAll(name, "_", " ")+"."))

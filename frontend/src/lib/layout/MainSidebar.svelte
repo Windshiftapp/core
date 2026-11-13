@@ -5,6 +5,7 @@
   import { uiStore } from '../stores/ui.svelte.js';
   import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { homepageStore } from '../stores/homepageStore.svelte.js';
+  import { timeLogStore } from '../stores/timeLogStore.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { themeStore } from '../stores/theme.svelte.js';
   import { brandStore, resolveBrandLockup } from '../stores/brand.svelte.js';
@@ -13,6 +14,7 @@
   import { workspaceMenuItems } from '../navigation/workspaceMenu.js';
   import { isTauri as getIsTauri } from '../utils/isTauri.js';
   import DropdownMenu from './DropdownMenu.svelte';
+  import TimeNavMenu from './TimeNavMenu.svelte';
   import Tooltip from '../components/Tooltip.svelte';
   import NavLink from './NavLink.svelte';
   import UserAvatar from '../components/UserAvatar.svelte';
@@ -86,6 +88,7 @@
   // recency order. onOpen still refreshes it so recent navigation is reflected.
   onMount(() => {
     void loadRecentWorkspaceOrder();
+    void timeLogStore.refreshDrafts();
   });
 
   function onWorkspaceSearchInput(value) {
@@ -220,15 +223,19 @@
 
     <!-- Main Nav Links -->
     {#each filteredMainNav as item (item.id)}
-      <NavLink
-        id="nav-{item.id}"
-        icon={item.icon}
-        label={t(item.labelKey)}
-        href={item.href}
-        isActive={item.activeViews.includes($currentRoute.view)}
-        expanded={$uiStore.navExpanded}
-        onclick={closePopoverSurface}
-      />
+      {#if item.id === 'time'}
+        <TimeNavMenu {activeSurface} {onSurfaceChange} />
+      {:else}
+        <NavLink
+          id="nav-{item.id}"
+          icon={item.icon}
+          label={t(item.labelKey)}
+          href={item.href}
+          isActive={item.activeViews.includes($currentRoute.view)}
+          expanded={$uiStore.navExpanded}
+          onclick={closePopoverSurface}
+        />
+      {/if}
     {/each}
 
     <!-- Global actions share the same rhythm as navigation, but remain a

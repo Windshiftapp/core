@@ -9,11 +9,13 @@
   import CommandIcon from '@lucide/svelte/icons/command';
   import { timerStore } from '../stores/timerStore.svelte.js';
   import { timeEntryStore } from '../stores/timeEntryStore.svelte.js';
+  import { timeLogStore } from '../stores/timeLogStore.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { t } from '../stores/i18n.svelte.js';
   import { formatItemKey } from '../utils/itemKey.js';
   import MobileHeader from './MobileHeader.svelte';
-  import TimeLogModal from '../dialogs/TimeLogModal.svelte';
+  import TimeDraftsCard from '../features/time/TimeDraftsCard.svelte';
+  import { stopTimerAndReview } from '../features/time/stopTimerAndReview.js';
   import { formatAuthenticatedInstant } from '../utils/authenticatedDateFormatter.js';
   import { mobilePalette } from './mobilePalette.svelte.js';
 
@@ -31,7 +33,7 @@
 
   async function stopTimer() {
     try {
-      await timerStore.stop();
+      await stopTimerAndReview(timerStore, timeLogStore);
       await timeEntryStore.loadWorklogs();
     } catch (err) {
       console.error('Failed to stop timer:', err);
@@ -52,6 +54,7 @@
 
   onMount(() => {
     timeEntryStore.init();
+    void timeLogStore.refreshDrafts();
   });
 </script>
 
@@ -97,7 +100,7 @@
   <section class="block">
     <div class="block-head">
       <h2>{t('mobile.timer.recentWorklogs')}</h2>
-      <button class="btn-log" onclick={() => timeEntryStore.openTimeLogModal()} data-testid="quick-log-open" type="button">
+      <button class="btn-log" onclick={() => timeLogStore.open()} data-testid="quick-log-open" type="button">
         <Plus size={16} /> {t('items.logTime')}
       </button>
     </div>
@@ -110,7 +113,7 @@
       <ul class="worklogs" data-testid="worklogs-list">
         {#each worklogs as w (w.id)}
           <li class="wl">
-            <button class="wl-main" onclick={() => timeEntryStore.editWorklog(w)} data-testid="worklog-edit" type="button">
+            <button class="wl-main" onclick={() => timeLogStore.open({ editingWorklog: w })} data-testid="worklog-edit" type="button">
               <span class="wl-desc">{w.description || w.project_name || t('mobile.timer.worklog')}</span>
               <span class="wl-sub">
                 {#if formatItemKey(w)}<span class="wl-key">{formatItemKey(w)}</span>{/if}
@@ -126,21 +129,10 @@
       </ul>
     {/if}
   </section>
-</div>
 
-<!-- Full worklog dialog — identical to the desktop Time view (project/item/
-     date/start/end/duration with sync, create + edit). -->
-{#if timeEntryStore.showTimeLogModal}
-  <TimeLogModal
-    projects={timeEntryStore.projects}
-    customers={timeEntryStore.customers}
-    workItems={timeEntryStore.workItems}
-    workspaces={timeEntryStore.workspaces}
-    editingWorklog={timeEntryStore.editingWorklog}
-    onsave={(e) => timeEntryStore.saveWorklog(e.detail)}
-    oncancel={() => timeEntryStore.closeTimeLogModal()}
-  />
-{/if}
+  <!-- Drafts: recovery must not depend on the desktop sidebar or /time. -->
+  <TimeDraftsCard class="mobile-drafts" />
+</div>
 
 <style>
   .hdr-palette {

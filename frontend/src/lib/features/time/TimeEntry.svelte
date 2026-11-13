@@ -7,6 +7,7 @@
   import AlertBox from '../../components/AlertBox.svelte';
   import { navigate } from '../../router.js';
   import { timeEntryStore } from '../../stores/timeEntryStore.svelte.js';
+  import { timeLogStore } from '../../stores/timeLogStore.svelte.js';
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import Button from '../../components/Button.svelte';
   import Input from '../../components/Input.svelte';
@@ -14,11 +15,10 @@
   import DataTable from '../../components/DataTable.svelte';
   import Card from '../../components/Card.svelte';
   import TimeTrackingOnboarding from './TimeTrackingOnboarding.svelte';
-  import TimeLogModal from '../../dialogs/TimeLogModal.svelte';
+  import TimeDraftsCard from './TimeDraftsCard.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { customerOrganisationName, realCustomers } from '../../utils/customerLabel.js';
-  import { errorToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { formatDateOnly, getUserTimezone } from '../../utils/dateFormatter.js';
   import { dateKeyInZone } from '../../utils/worklogTimezone.js';
@@ -28,12 +28,7 @@
   // Bind to store values
   let worklogs = $derived(timeEntryStore.worklogs);
   let customers = $derived(timeEntryStore.customers);
-  let projects = $derived(timeEntryStore.projects);
-  let workItems = $derived(timeEntryStore.workItems);
-  let workspaces = $derived(timeEntryStore.workspaces);
-  let editingWorklog = $derived(timeEntryStore.editingWorklog);
   let showOnboarding = $derived(timeEntryStore.showOnboarding);
-  let showTimeLogModal = $derived(timeEntryStore.showTimeLogModal);
   let filters = $derived(timeEntryStore.filters);
   let activeProjects = $derived(timeEntryStore.activeProjects);
   let filteredProjects = $derived(timeEntryStore.filteredProjects);
@@ -51,6 +46,7 @@
 
   onMount(async () => {
     await timeEntryStore.init();
+    void timeLogStore.refreshDrafts();
   });
 
   function buildWorklogDropdownItems(worklog) {
@@ -62,7 +58,7 @@
         title: t('common.edit'),
         testid: 'worklog-edit',
         hoverClass: 'hover-bg',
-        onClick: () => timeEntryStore.editWorklog(worklog)
+        onClick: () => timeLogStore.open({ editingWorklog: worklog })
       },
       {
         id: 'delete',
@@ -76,23 +72,19 @@
     ];
   }
 
-  async function handleModalSave(event) {
-    try {
-      const data = event.detail;
-      await timeEntryStore.saveWorklog(data);
-    } catch (error) {
-      console.error('Failed to save worklog:', error);
-      errorToast(t('time.entry.failedToSave'));
-    }
-  }
-
-  function handleModalCancel() {
-    timeEntryStore.closeTimeLogModal();
-  }
-
   function openLogTimeModal() {
-    timeEntryStore.openTimeLogModal();
+    timeLogStore.open();
   }
+
+  // Reload the page list after the shared host saves or books an entry.
+  let lastTimeLogRevision = 0;
+  $effect(() => {
+    const revision = timeLogStore.revision;
+    if (revision !== lastTimeLogRevision) {
+      lastTimeLogRevision = revision;
+      timeEntryStore.loadWorklogs();
+    }
+  });
 
   async function deleteWorklog(worklog) {
     const confirmed = await confirm({
@@ -162,7 +154,7 @@
       icon={Plus}
       onclick={openLogTimeModal}
       keyboardHint="A"
-      hotkeyConfig={{ key: toHotkeyString('timeEntry', 'openLog'), guard: () => !showTimeLogModal }}
+      hotkeyConfig={{ key: toHotkeyString('timeEntry', 'openLog'), guard: () => !timeLogStore.show }}
       title={t('time.entry.addTimeEntry')}
       dataTestid="time-log-open"
     >
@@ -301,15 +293,6 @@
   <TimeTrackingOnboarding oncompleted={handleOnboardingCompleted} oncancel={handleOnboardingCancel} />
 {/if}
 
-<!-- Time Log Modal -->
-{#if showTimeLogModal}
-  <TimeLogModal
-    projects={projects}
-    {customers}
-    {workItems}
-    {workspaces}
-    {editingWorklog}
-    onsave={handleModalSave}
-    oncancel={handleModalCancel}
-  />
-{/if}
+<!-- Drafts: incomplete entries recovered here or from the Time & Projects menu. -->
+<TimeDraftsCard />
+

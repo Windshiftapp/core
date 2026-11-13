@@ -134,9 +134,16 @@ func (h *OAuthHandler) RegisterDynamicClient(w http.ResponseWriter, r *http.Requ
 	scopesJSON, _ := json.Marshal(allowedScopes)
 
 	err = repository.NewOAuthClientRepository(h.db).CreateDynamicPublicClient(
-		slug, displayName, clientID, string(redirectsJSON), string(scopesJSON), "",
+		r.Context(), slug, displayName, clientID, string(redirectsJSON), string(scopesJSON), "",
 	)
 	if err != nil {
+		if errors.Is(err, repository.ErrOAuthClientRegistrationCapacity) {
+			writeOAuthJSON(w, http.StatusTooManyRequests, map[string]string{
+				"error":             "temporarily_unavailable",
+				"error_description": "OAuth client registration capacity reached; contact an administrator",
+			})
+			return
+		}
 		if errors.Is(err, repository.ErrDuplicateEntry) {
 			writeDynamicRegistrationError(w, http.StatusConflict, "client identifier collision")
 			return

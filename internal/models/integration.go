@@ -345,7 +345,34 @@ type TimeProject struct {
 	IsManager          bool     `json:"is_manager,omitempty"`  // Whether current user is a manager of this project
 }
 
-// Worklog represents a time tracking entry
+// TimeWorklogDraft is a persisted, user-owned incomplete time entry. It is
+// produced when a timer stops without complete booking information, or when a
+// user starts a manual entry and saves it incomplete. Booking a draft creates a
+// time_worklogs row and deletes the draft atomically.
+type TimeWorklogDraft struct {
+	ID              int    `json:"id"`
+	UserID          int    `json:"user_id"`
+	ProjectID       *int   `json:"project_id,omitempty"`
+	ItemID          *int   `json:"item_id,omitempty"`
+	WorkspaceID     *int   `json:"workspace_id,omitempty"`
+	Description     string `json:"description"`
+	Date            *int64 `json:"date,omitempty"`
+	StartTime       *int64 `json:"start_time,omitempty"`
+	EndTime         *int64 `json:"end_time,omitempty"`
+	DurationMins    *int   `json:"duration_minutes,omitempty"`
+	Source          string `json:"source"`
+	SourceTimerID   *int   `json:"source_timer_id,omitempty"`
+	CreatedAt       int64  `json:"created_at"`
+	UpdatedAt       int64  `json:"updated_at"`
+	Version         int    `json:"version"`
+	ProjectName     string `json:"project_name,omitempty"`
+	ItemTitle       string `json:"item_title,omitempty"`
+	WorkspaceKey    string `json:"workspace_key,omitempty"`
+	WorkspaceName   string `json:"workspace_name,omitempty"`
+	CustomerName    string `json:"customer_name,omitempty"`
+	CustomerBuiltin string `json:"customer_builtin_key,omitempty"`
+}
+
 type Worklog struct {
 	ID                  int      `json:"id"`
 	ProjectID           int      `json:"project_id"`
@@ -372,11 +399,13 @@ type Worklog struct {
 }
 
 // ActiveTimer represents a running timer
+//
+// ProjectID is nullable: a timer may run before booking information is known.
 type ActiveTimer struct {
 	ID                  int     `json:"id"`
 	WorkspaceID         int     `json:"workspace_id"`
 	ItemID              *int    `json:"item_id,omitempty"` // Optional link to work item
-	ProjectID           int     `json:"project_id"`
+	ProjectID           *int    `json:"project_id,omitempty"`
 	UserID              int     `json:"user_id"`
 	Description         string  `json:"description"`
 	StartTimeUTC        int64   `json:"start_time_utc"` // Unix timestamp in UTC

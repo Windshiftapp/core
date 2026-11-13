@@ -1,4 +1,5 @@
 import { timer as timerApi } from '../api/time.js';
+import { canRunBackgroundSync, onBackgroundSyncAvailable } from '../utils/backgroundSync.js';
 
 class TimerStore {
   // === State ===
@@ -86,6 +87,9 @@ class TimerStore {
     if (this.#syncInterval) return; // Already running
 
     this.#syncInterval = setInterval(() => {
+      // Hidden/offline tabs do not need to poll; the page syncs once when it
+      // becomes usable again (see the recovery listener below).
+      if (!canRunBackgroundSync()) return;
       this.sync();
     }, 30000);
   }
@@ -152,7 +156,10 @@ class TimerStore {
       this.error = null;
       this.#stateVersion += 1;
 
-      const result = await timerApi.stop();
+      // Identify the timer being stopped so a stale tab cannot end a newer
+      // timer started elsewhere; the server replays the original result on a
+      // retry for the same timer.
+      const result = await timerApi.stop(this.activeTimer?.id ?? null);
 
       // Clear active timer
       this.#stateVersion += 1;
@@ -245,5 +252,11 @@ export const timerStore = new TimerStore();
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
     timerStore.cleanup();
+  });
+
+  // Catch up once the tab is visible/online again instead of polling while
+  // hidden. Only fires after an actual suspension.
+  onBackgroundSyncAvailable(() => {
+    if (timerStore.activeTimer) void timerStore.sync();
   });
 }

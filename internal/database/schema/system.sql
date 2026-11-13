@@ -212,7 +212,8 @@ CREATE TABLE IF NOT EXISTS active_timers (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	workspace_id INTEGER NOT NULL,
 	item_id INTEGER,
-	project_id INTEGER NOT NULL,
+	-- Nullable: a timer may run before booking information (project) is known.
+	project_id INTEGER,
 	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 	description TEXT NOT NULL,
 	start_time_utc INTEGER NOT NULL,
