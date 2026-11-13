@@ -1506,9 +1506,18 @@ func registerMount(mux *http.ServeMux, prefix string, routes []route, deps Deps,
 			}
 			// Bound the database work of ordinary routes; auth and the handlers
 			// above stay outside the deadline so a slow operation cannot be
-			// mistaken for a credential failure.
-			if deps.DBRequestTimeout > 0 && !dbTimeoutExempt(selected) {
-				handler = withDBRequestTimeout(deps.DBRequestTimeout)(handler)
+			// mistaken for a credential failure. Routes that receive their
+			// request body before doing database work start the budget
+			// themselves after parsing (startDBBudget), so transfer time is
+			// not charged to it.
+			if deps.DBRequestTimeout > 0 {
+				switch {
+				case dbTimeoutDeferred(selected):
+					r = r.WithContext(withDBBudgetDefault(r.Context(), deps.DBRequestTimeout))
+					handler = mapDBDeadline(handler)
+				case !dbTimeoutExempt(selected):
+					handler = withDBRequestTimeout(deps.DBRequestTimeout)(handler)
+				}
 			}
 			if selected.Auth == AuthAuthenticated {
 				if deps.RateLimiter != nil {
@@ -1594,6 +1603,42 @@ func matchPath(pattern, path string) (map[string]string, bool) {
 	return values, true
 }
 
+// dbBudgetKey carries the configured default database-work budget. Handlers on
+// routes that receive their request body first read it when they start their
+// own budget after parsing.
+type dbBudgetKey struct{}
+
+// withDBBudgetDefault records the configured database-work budget for a
+// deferred route's handler. It installs no deadline: the handler decides when
+// the database work starts.
+func withDBBudgetDefault(ctx context.Context, timeout time.Duration) context.Context {
+	return context.WithValue(ctx, dbBudgetKey{}, timeout)
+}
+
+// startDBBudget bounds the database work that follows request-body reception.
+// The configured DB_REQUEST_TIMEOUT is the default; handlers on routes with a
+// different request size or shape use startDBBudgetFor to override it. Routes
+// that are not deferred have no configured budget, so this is a no-op there.
+// Callers must cancel the returned context.
+func startDBBudget(ctx context.Context) (context.Context, context.CancelFunc) {
+	return startDBBudgetFor(ctx, 0)
+}
+
+// startDBBudgetFor is startDBBudget with a per-handler override. A positive
+// override replaces the configured default for this request; zero or negative
+// uses the default. Overrides should stay below the server's write timeout so
+// the database call is canceled before the connection is severed.
+func startDBBudgetFor(ctx context.Context, override time.Duration) (context.Context, context.CancelFunc) {
+	timeout, _ := ctx.Value(dbBudgetKey{}).(time.Duration)
+	if override > 0 {
+		timeout = override
+	}
+	if timeout <= 0 {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, timeout)
+}
+
 // withDBRequestTimeout bounds the database work an ordinary route performs. It
 // derives a deadline from the request context so database calls observe
 // cancellation, and maps a deadline to the stable database_deadline_exceeded
@@ -1603,19 +1648,35 @@ func withDBRequestTimeout(timeout time.Duration) Middleware {
 		return func(w http.ResponseWriter, r *http.Request) error {
 			ctx, cancel := context.WithTimeout(r.Context(), timeout)
 			defer cancel()
-			err := next(w, r.WithContext(ctx))
-			if errors.Is(err, context.DeadlineExceeded) {
-				return newError(http.StatusGatewayTimeout, "database_deadline_exceeded", "The database request timed out.")
-			}
-			return err
+			return mapDBDeadline(next)(w, r.WithContext(ctx))
 		}
 	}
 }
 
+// mapDBDeadline maps an expired database budget to the stable 504 contract.
+// Deferred handlers start the budget themselves after receiving the body, so
+// this middleware only maps the outcome.
+func mapDBDeadline(next Handler) Handler {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		err := next(w, r)
+		if errors.Is(err, context.DeadlineExceeded) {
+			return newError(http.StatusGatewayTimeout, "database_deadline_exceeded", "The database request timed out.")
+		}
+		return err
+	}
+}
+
+// dbTimeoutDeferred reports whether a route receives its request body before
+// doing database work. Multipart handlers start the budget themselves once the
+// body is parsed, so receiving the body does not consume it.
+func dbTimeoutDeferred(route *route) bool {
+	return strings.HasPrefix(route.RequestMediaType, "multipart/")
+}
+
 // dbTimeoutExempt reports whether a route manages its own deadline instead of
-// the ordinary DB-request timeout. Binary, multipart and streaming responses
-// are exempt automatically; the listed report/export jobs are intentionally
-// long-running and opt out explicitly.
+// the ordinary DB-request timeout. Binary and streaming responses are exempt
+// automatically; the listed report/export jobs are intentionally long-running
+// and opt out explicitly.
 func dbTimeoutExempt(route *route) bool {
 	switch route.ResponseMediaType {
 	case "", "application/json":
