@@ -376,13 +376,8 @@ func postgresEnv() database.PostgresEnv {
 	}
 }
 
-// postgresSSLMode resolves POSTGRES_SSLMODE for the split-variable Postgres
-// path. Validated here rather than left to the driver: a typo like "required"
-// otherwise surfaces only as an opaque `pq: unsupported sslmode` at first
-// connect, which reads like a server problem rather than a config one.
-//
-// Deployments using POSTGRES_CONNECTION_STRING put sslmode in the URL instead
-// and never reach this.
+// postgresSSLMode validates split-variable configuration against lib/pq's SSL
+// modes. Direct connection strings bypass this and keep their own sslmode.
 func postgresSSLMode() string {
 	raw := os.Getenv("POSTGRES_SSLMODE")
 	mode := strings.ToLower(strings.TrimSpace(raw))

@@ -23,7 +23,7 @@ type PostgresEnv struct {
 	User     string
 	Password string
 	Database string
-	// SSLMode is the libpq sslmode. Empty means DefaultPostgresSSLMode;
+	// SSLMode is the lib/pq sslmode. Empty means DefaultPostgresSSLMode;
 	// internal/config validates the value before it gets here.
 	SSLMode string
 }
