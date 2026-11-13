@@ -67,7 +67,7 @@ func (r *ActiveTimerRepository) HasActiveTimerForUser(userID int) (bool, error) 
 type CreateTimerInput struct {
 	WorkspaceID  int
 	ItemID       *int
-	ProjectID    int
+	ProjectID    *int
 	UserID       int
 	Description  string
 	StartTimeUTC int64
@@ -100,7 +100,9 @@ func (r *ActiveTimerRepository) DeleteTimer(id int) error {
 
 // FinalizeTimer atomically materializes a timer as a worklog and removes the
 // active timer. Keeping both writes in one transaction prevents a failed timer
-// delete from leaving behind a worklog that would be duplicated on retry.
+// delete from leaving behind a worklog that would be duplicated on retry. It is
+// retained for callers that do not need booking-idempotency; the timer stop path
+// uses FinalizeTimerBooking.
 func (r *ActiveTimerRepository) FinalizeTimer(timerID int, in CreateWorklogInput) error {
 	return database.WithTx(r.db, func(tx database.Tx) error {
 		if _, err := tx.ExecWrite(createWorklogQuery,

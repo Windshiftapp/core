@@ -30809,6 +30809,7 @@
               },
               "project_id": {
                 "description": "The project id value.",
+                "nullable": true,
                 "type": "integer"
               },
               "project_name": {
@@ -30848,12 +30849,256 @@
               "created_at",
               "description",
               "id",
-              "project_id",
               "start_time_utc",
               "user_id",
               "workspace_id"
             ],
             "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetTimeWorklogDraftsDraftIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "description": "The created at value.",
+                "type": "integer"
+              },
+              "customer_builtin_key": {
+                "description": "The customer builtin key value.",
+                "type": "string"
+              },
+              "customer_name": {
+                "description": "The customer name value.",
+                "type": "string"
+              },
+              "date": {
+                "description": "The date value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "description": {
+                "description": "The description value.",
+                "type": "string"
+              },
+              "duration_minutes": {
+                "description": "The duration minutes value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "end_time": {
+                "description": "The end time value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "item_id": {
+                "description": "The item id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "item_title": {
+                "description": "The item title value.",
+                "type": "string"
+              },
+              "project_id": {
+                "description": "The project id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "project_name": {
+                "description": "The project name value.",
+                "type": "string"
+              },
+              "source": {
+                "description": "The source value.",
+                "type": "string"
+              },
+              "source_timer_id": {
+                "description": "The source timer id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "start_time": {
+                "description": "The start time value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "type": "integer"
+              },
+              "user_id": {
+                "description": "The user id value.",
+                "type": "integer"
+              },
+              "version": {
+                "description": "The version value.",
+                "type": "integer"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "workspace_key": {
+                "description": "The workspace key value.",
+                "type": "string"
+              },
+              "workspace_name": {
+                "description": "The workspace name value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "created_at",
+              "customer_name",
+              "description",
+              "id",
+              "item_title",
+              "project_name",
+              "source",
+              "updated_at",
+              "user_id",
+              "version",
+              "workspace_key",
+              "workspace_name"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetTimeWorklogDraftsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "created_at": {
+                  "description": "The created at value.",
+                  "type": "integer"
+                },
+                "customer_builtin_key": {
+                  "description": "The customer builtin key value.",
+                  "type": "string"
+                },
+                "customer_name": {
+                  "description": "The customer name value.",
+                  "type": "string"
+                },
+                "date": {
+                  "description": "The date value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "description": {
+                  "description": "The description value.",
+                  "type": "string"
+                },
+                "duration_minutes": {
+                  "description": "The duration minutes value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "end_time": {
+                  "description": "The end time value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "id": {
+                  "description": "The id value.",
+                  "type": "integer"
+                },
+                "item_id": {
+                  "description": "The item id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "item_title": {
+                  "description": "The item title value.",
+                  "type": "string"
+                },
+                "project_id": {
+                  "description": "The project id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "project_name": {
+                  "description": "The project name value.",
+                  "type": "string"
+                },
+                "source": {
+                  "description": "The source value.",
+                  "type": "string"
+                },
+                "source_timer_id": {
+                  "description": "The source timer id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "start_time": {
+                  "description": "The start time value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "updated_at": {
+                  "description": "The updated at value.",
+                  "type": "integer"
+                },
+                "user_id": {
+                  "description": "The user id value.",
+                  "type": "integer"
+                },
+                "version": {
+                  "description": "The version value.",
+                  "type": "integer"
+                },
+                "workspace_id": {
+                  "description": "The workspace id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "workspace_key": {
+                  "description": "The workspace key value.",
+                  "type": "string"
+                },
+                "workspace_name": {
+                  "description": "The workspace name value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "created_at",
+                "customer_name",
+                "description",
+                "id",
+                "item_title",
+                "project_name",
+                "source",
+                "updated_at",
+                "user_id",
+                "version",
+                "workspace_key",
+                "workspace_name"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -59514,6 +59759,190 @@
               "settings",
               "status",
               "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PatchTimeWorklogDraftsDraftIdPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "description": "The date value.",
+            "type": "string"
+          },
+          "description": {
+            "description": "The description value.",
+            "type": "string"
+          },
+          "duration": {
+            "description": "The duration value.",
+            "type": "string"
+          },
+          "duration_minutes": {
+            "description": "The duration minutes value.",
+            "type": "integer"
+          },
+          "end_time": {
+            "description": "The end time value.",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "description": "The idempotency key value.",
+            "type": "string"
+          },
+          "item_id": {
+            "description": "The item id value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "project_id": {
+            "description": "The project id value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "start_time": {
+            "description": "The start time value.",
+            "type": "string"
+          },
+          "timezone": {
+            "description": "The timezone value.",
+            "type": "string"
+          },
+          "version": {
+            "description": "The version value.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "description",
+          "duration",
+          "duration_minutes",
+          "end_time",
+          "idempotency_key",
+          "start_time",
+          "timezone",
+          "version"
+        ],
+        "type": "object"
+      },
+      "PatchTimeWorklogDraftsDraftIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "description": "The created at value.",
+                "type": "integer"
+              },
+              "customer_builtin_key": {
+                "description": "The customer builtin key value.",
+                "type": "string"
+              },
+              "customer_name": {
+                "description": "The customer name value.",
+                "type": "string"
+              },
+              "date": {
+                "description": "The date value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "description": {
+                "description": "The description value.",
+                "type": "string"
+              },
+              "duration_minutes": {
+                "description": "The duration minutes value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "end_time": {
+                "description": "The end time value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "item_id": {
+                "description": "The item id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "item_title": {
+                "description": "The item title value.",
+                "type": "string"
+              },
+              "project_id": {
+                "description": "The project id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "project_name": {
+                "description": "The project name value.",
+                "type": "string"
+              },
+              "source": {
+                "description": "The source value.",
+                "type": "string"
+              },
+              "source_timer_id": {
+                "description": "The source timer id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "start_time": {
+                "description": "The start time value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "type": "integer"
+              },
+              "user_id": {
+                "description": "The user id value.",
+                "type": "integer"
+              },
+              "version": {
+                "description": "The version value.",
+                "type": "integer"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "workspace_key": {
+                "description": "The workspace key value.",
+                "type": "string"
+              },
+              "workspace_name": {
+                "description": "The workspace name value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "created_at",
+              "customer_name",
+              "description",
+              "id",
+              "item_title",
+              "project_name",
+              "source",
+              "updated_at",
+              "user_id",
+              "version",
+              "workspace_key",
+              "workspace_name"
             ],
             "type": "object"
           }
@@ -89531,15 +89960,35 @@
         ],
         "type": "object"
       },
+      "PostTimeTimersActiveStopPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "timer_id": {
+            "description": "The timer id value.",
+            "nullable": true,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "PostTimeTimersActiveStopResult": {
         "additionalProperties": false,
         "properties": {
           "data": {
             "additionalProperties": false,
             "properties": {
+              "booked": {
+                "description": "The booked value.",
+                "type": "boolean"
+              },
               "description": {
                 "description": "The description value.",
                 "type": "string"
+              },
+              "draft_id": {
+                "description": "The draft id value.",
+                "nullable": true,
+                "type": "integer"
               },
               "duration_minutes": {
                 "description": "The duration minutes value.",
@@ -89557,18 +90006,19 @@
                 "description": "The timer id value.",
                 "type": "integer"
               },
-              "worklog_created": {
-                "description": "The worklog created value.",
-                "type": "boolean"
+              "worklog_id": {
+                "description": "The worklog id value.",
+                "nullable": true,
+                "type": "integer"
               }
             },
             "required": [
+              "booked",
               "description",
               "duration_minutes",
               "duration_seconds",
               "stopped",
-              "timer_id",
-              "worklog_created"
+              "timer_id"
             ],
             "type": "object"
           }
@@ -89592,6 +90042,7 @@
           },
           "project_id": {
             "description": "The project id value.",
+            "nullable": true,
             "type": "integer"
           },
           "workspace_id": {
@@ -89601,7 +90052,6 @@
         },
         "required": [
           "description",
-          "project_id",
           "workspace_id"
         ],
         "type": "object"
@@ -89647,6 +90097,7 @@
               },
               "project_id": {
                 "description": "The project id value.",
+                "nullable": true,
                 "type": "integer"
               },
               "project_name": {
@@ -89686,10 +90137,205 @@
               "created_at",
               "description",
               "id",
-              "project_id",
               "start_time_utc",
               "user_id",
               "workspace_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PostTimeWorklogDraftsDraftIdBookPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "description": "The date value.",
+            "type": "string"
+          },
+          "description": {
+            "description": "The description value.",
+            "type": "string"
+          },
+          "duration": {
+            "description": "The duration value.",
+            "type": "string"
+          },
+          "duration_minutes": {
+            "description": "The duration minutes value.",
+            "type": "integer"
+          },
+          "end_time": {
+            "description": "The end time value.",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "description": "The idempotency key value.",
+            "type": "string"
+          },
+          "item_id": {
+            "description": "The item id value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "project_id": {
+            "description": "The project id value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "start_time": {
+            "description": "The start time value.",
+            "type": "string"
+          },
+          "timezone": {
+            "description": "The timezone value.",
+            "type": "string"
+          },
+          "version": {
+            "description": "The version value.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "description",
+          "duration",
+          "duration_minutes",
+          "end_time",
+          "idempotency_key",
+          "start_time",
+          "timezone",
+          "version"
+        ],
+        "type": "object"
+      },
+      "PostTimeWorklogDraftsDraftIdBookResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "description": "The created at value.",
+                "type": "integer"
+              },
+              "customer_builtin_key": {
+                "description": "The customer builtin key value.",
+                "type": "string"
+              },
+              "customer_id": {
+                "description": "The customer id value.",
+                "type": "integer"
+              },
+              "customer_name": {
+                "description": "The customer name value.",
+                "type": "string"
+              },
+              "date": {
+                "description": "The date value.",
+                "type": "integer"
+              },
+              "description": {
+                "description": "The description value.",
+                "type": "string"
+              },
+              "duration_minutes": {
+                "description": "The duration minutes value.",
+                "type": "integer"
+              },
+              "end_time": {
+                "description": "The end time value.",
+                "type": "integer"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "item_id": {
+                "description": "The item id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "item_title": {
+                "description": "The item title value.",
+                "type": "string"
+              },
+              "project_id": {
+                "description": "The project id value.",
+                "type": "integer"
+              },
+              "project_max_hours": {
+                "description": "The project max hours value.",
+                "nullable": true,
+                "type": "number"
+              },
+              "project_name": {
+                "description": "The project name value.",
+                "type": "string"
+              },
+              "project_total_hours": {
+                "description": "The project total hours value.",
+                "nullable": true,
+                "type": "number"
+              },
+              "start_time": {
+                "description": "The start time value.",
+                "type": "integer"
+              },
+              "updated_at": {
+                "description": "The updated at value.",
+                "type": "integer"
+              },
+              "user_id": {
+                "description": "The user id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "user_name": {
+                "description": "The user name value.",
+                "type": "string"
+              },
+              "warnings": {
+                "description": "The warnings value.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "workspace_item_number": {
+                "description": "The workspace item number value.",
+                "type": "integer"
+              },
+              "workspace_key": {
+                "description": "The workspace key value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "created_at",
+              "customer_id",
+              "customer_name",
+              "date",
+              "description",
+              "duration_minutes",
+              "end_time",
+              "id",
+              "item_title",
+              "project_id",
+              "project_name",
+              "start_time",
+              "updated_at",
+              "user_name",
+              "workspace_item_number",
+              "workspace_key"
             ],
             "type": "object"
           }
@@ -120913,6 +121559,16 @@
         "description": "Stop timer. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
         "operationId": "postTimeTimersActiveStop",
         "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostTimeTimersActiveStopPayload"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -120923,6 +121579,108 @@
               }
             },
             "description": "Stop timer response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Stop timer",
+        "tags": [
+          "Time tracking"
+        ],
+        "x-required-scopes": [
+          "time:write"
+        ]
+      }
+    },
+    "/time/worklog-drafts": {
+      "get": {
+        "description": "List draft worklogs. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getTimeWorklogDrafts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetTimeWorklogDraftsResult"
+                }
+              }
+            },
+            "description": "List draft worklogs response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List draft worklogs",
+        "tags": [
+          "Time tracking"
+        ],
+        "x-required-scopes": [
+          "time:read"
+        ]
+      }
+    },
+    "/time/worklog-drafts/{draft_id}": {
+      "delete": {
+        "description": "Delete a draft worklog. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "operationId": "deleteTimeWorklogDraftsDraftId",
+        "parameters": [
+          {
+            "description": "The draft worklog identifier.",
+            "in": "path",
+            "name": "draft_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Request completed successfully with no response body."
           },
           "401": {
             "$ref": "#/components/responses/AuthenticationError"
@@ -120945,7 +121703,212 @@
             "BearerAuth": []
           }
         ],
-        "summary": "Stop timer",
+        "summary": "Delete a draft worklog",
+        "tags": [
+          "Time tracking"
+        ],
+        "x-required-scopes": [
+          "time:write"
+        ]
+      },
+      "get": {
+        "description": "Get a draft worklog. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getTimeWorklogDraftsDraftId",
+        "parameters": [
+          {
+            "description": "The draft worklog identifier.",
+            "in": "path",
+            "name": "draft_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetTimeWorklogDraftsDraftIdResult"
+                }
+              }
+            },
+            "description": "Get a draft worklog response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get a draft worklog",
+        "tags": [
+          "Time tracking"
+        ],
+        "x-required-scopes": [
+          "time:read"
+        ]
+      },
+      "patch": {
+        "description": "Update a draft worklog. The operation uses JSON Merge Patch: omitted fields remain unchanged and documented nullable fields accept null. Unknown fields are rejected.",
+        "operationId": "patchTimeWorklogDraftsDraftId",
+        "parameters": [
+          {
+            "description": "The draft worklog identifier.",
+            "in": "path",
+            "name": "draft_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchTimeWorklogDraftsDraftIdPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchTimeWorklogDraftsDraftIdResult"
+                }
+              }
+            },
+            "description": "Update a draft worklog response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Update a draft worklog",
+        "tags": [
+          "Time tracking"
+        ],
+        "x-required-scopes": [
+          "time:write"
+        ]
+      }
+    },
+    "/time/worklog-drafts/{draft_id}/book": {
+      "post": {
+        "description": "Book a draft worklog. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "operationId": "postTimeWorklogDraftsDraftIdBook",
+        "parameters": [
+          {
+            "description": "The draft worklog identifier.",
+            "in": "path",
+            "name": "draft_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostTimeWorklogDraftsDraftIdBookPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostTimeWorklogDraftsDraftIdBookResult"
+                }
+              }
+            },
+            "description": "Book a draft worklog response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Book a draft worklog",
         "tags": [
           "Time tracking"
         ],

@@ -3378,7 +3378,101 @@ CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_m
 		SQLite:        customerAccessMigration,
 		Postgres:      strings.ReplaceAll(customerAccessMigration, "DATETIME", "TIMESTAMPTZ"),
 	},
+	{
+		Version: "20261123_active_timer_nullable_project",
+		Name:    "Allow a running timer without a project for seamless time tracking",
+		// Effect present when project_id is nullable. SQLite cannot drop a NOT
+		// NULL constraint in place, so ApplySQLite rebuilds the table; the SQL
+		// field is the checksum marker.
+		CheckSQLite:   `SELECT CASE WHEN (SELECT "notnull" FROM pragma_table_info('active_timers') WHERE name='project_id') = 0 THEN 1 ELSE 0 END`,
+		CheckPostgres: `SELECT CASE WHEN (SELECT is_nullable FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='active_timers' AND column_name='project_id') = 'YES' THEN 1 ELSE 0 END`,
+		SQLite:        "active-timer-nullable-project:v1",
+		ApplySQLite:   applySQLiteActiveTimerNullableProject,
+		Postgres:      `ALTER TABLE active_timers ALTER COLUMN project_id DROP NOT NULL;`,
+	},
+	{
+		Version:       "20261124_time_worklog_drafts",
+		Name:          "Persist incomplete time entries as user-owned draft worklogs",
+		CheckSQLite:   `SELECT CASE WHEN (SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('time_worklog_drafts','time_worklog_bookings')) = 2 THEN 1 ELSE 0 END`,
+		CheckPostgres: `SELECT CASE WHEN (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_name IN ('time_worklog_drafts','time_worklog_bookings')) = 2 THEN 1 ELSE 0 END`,
+		SQLite:        timeWorklogDraftsMigrationSQLite,
+		Postgres:      timeWorklogDraftsMigrationPostgres,
+	},
 }
+
+const timeWorklogDraftsMigrationSQLite = `
+CREATE TABLE IF NOT EXISTS time_worklog_drafts (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id INTEGER NOT NULL,
+	project_id INTEGER,
+	item_id INTEGER,
+	workspace_id INTEGER,
+	description TEXT,
+	date INTEGER,
+	start_time INTEGER,
+	end_time INTEGER,
+	duration_minutes INTEGER,
+	source TEXT NOT NULL DEFAULT 'manual',
+	source_timer_id INTEGER,
+	created_at INTEGER NOT NULL,
+	updated_at INTEGER NOT NULL,
+	version INTEGER NOT NULL DEFAULT 1,
+	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+	FOREIGN KEY (project_id) REFERENCES time_projects(id) ON DELETE SET NULL,
+	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,
+	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_time_worklog_drafts_user_id ON time_worklog_drafts(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_time_worklog_drafts_source_timer ON time_worklog_drafts(user_id, source_timer_id) WHERE source_timer_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS time_worklog_bookings (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id INTEGER NOT NULL,
+	idempotency_key TEXT NOT NULL,
+	worklog_id INTEGER NOT NULL,
+	draft_id INTEGER,
+	created_at INTEGER NOT NULL,
+	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+	FOREIGN KEY (worklog_id) REFERENCES time_worklogs(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_time_worklog_bookings_user_key ON time_worklog_bookings(user_id, idempotency_key);
+`
+
+const timeWorklogDraftsMigrationPostgres = `
+CREATE TABLE IF NOT EXISTS time_worklog_drafts (
+	id SERIAL PRIMARY KEY,
+	user_id INTEGER NOT NULL,
+	project_id INTEGER,
+	item_id INTEGER,
+	workspace_id INTEGER,
+	description TEXT,
+	date INTEGER,
+	start_time INTEGER,
+	end_time INTEGER,
+	duration_minutes INTEGER,
+	source TEXT NOT NULL DEFAULT 'manual',
+	source_timer_id INTEGER,
+	created_at INTEGER NOT NULL,
+	updated_at INTEGER NOT NULL,
+	version INTEGER NOT NULL DEFAULT 1,
+	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+	FOREIGN KEY (project_id) REFERENCES time_projects(id) ON DELETE SET NULL,
+	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,
+	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_time_worklog_drafts_user_id ON time_worklog_drafts(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_time_worklog_drafts_source_timer ON time_worklog_drafts(user_id, source_timer_id) WHERE source_timer_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS time_worklog_bookings (
+	id SERIAL PRIMARY KEY,
+	user_id INTEGER NOT NULL,
+	idempotency_key TEXT NOT NULL,
+	worklog_id INTEGER NOT NULL,
+	draft_id INTEGER,
+	created_at INTEGER NOT NULL,
+	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+	FOREIGN KEY (worklog_id) REFERENCES time_worklogs(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_time_worklog_bookings_user_key ON time_worklog_bookings(user_id, idempotency_key);
+`
 
 const customerAccessMigration = `
 ALTER TABLE sso_providers ADD COLUMN account_type TEXT NOT NULL DEFAULT 'internal';
@@ -5441,6 +5535,78 @@ func applySQLiteQueuesCollectionScope(db Database) (retErr error) {
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit queues scope rebuild: %w", err)
+	}
+	return nil
+}
+
+// applySQLiteActiveTimerNullableProject rebuilds active_timers with a nullable
+// project_id so a timer can run before booking information is known. SQLite
+// cannot drop a NOT NULL constraint in place, so the rows are copied into a
+// fresh table and swapped. The unique timer-per-user index is recreated.
+func applySQLiteActiveTimerNullableProject(db Database) (retErr error) {
+	sqliteDB, ok := db.(*SQLiteDB)
+	if !ok {
+		return fmt.Errorf("expected SQLite database, got %T", db)
+	}
+
+	ctx := context.Background()
+	conn, err := sqliteDB.writeConn.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire SQLite write connection: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	var foreignKeysEnabled bool
+	if err := conn.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&foreignKeysEnabled); err != nil {
+		return fmt.Errorf("read foreign_keys pragma: %w", err)
+	}
+	if foreignKeysEnabled {
+		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=OFF"); err != nil {
+			return fmt.Errorf("disable foreign keys: %w", err)
+		}
+		defer func() {
+			if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=ON"); retErr == nil && err != nil {
+				retErr = fmt.Errorf("restore foreign keys: %w", err)
+			}
+		}()
+	}
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin active_timers rebuild: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	statements := []string{
+		`CREATE TABLE active_timers_migration (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			workspace_id INTEGER NOT NULL,
+			item_id INTEGER,
+			project_id INTEGER,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			description TEXT NOT NULL,
+			start_time_utc INTEGER NOT NULL,
+			created_at INTEGER NOT NULL,
+			FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+			FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,
+			FOREIGN KEY (project_id) REFERENCES time_projects(id) ON DELETE CASCADE
+		)`,
+		`INSERT INTO active_timers_migration (id, workspace_id, item_id, project_id, user_id, description, start_time_utc, created_at)
+			SELECT id, workspace_id, item_id, project_id, user_id, description, start_time_utc, created_at FROM active_timers`,
+		`DROP TABLE active_timers`,
+		`ALTER TABLE active_timers_migration RENAME TO active_timers`,
+		`CREATE INDEX IF NOT EXISTS idx_active_timers_workspace_id ON active_timers(workspace_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_active_timers_item_id ON active_timers(item_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_active_timers_project_id ON active_timers(project_id)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_active_timers_user_id ON active_timers(user_id)`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("rebuild active_timers: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit active_timers rebuild: %w", err)
 	}
 	return nil
 }
