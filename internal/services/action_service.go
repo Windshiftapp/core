@@ -47,6 +47,11 @@ type AssetSetPermissionChecker interface {
 // contains the actionable failure details.
 var ErrActionCompletedWithFailedSteps = errors.New("action completed with failed steps")
 
+// ErrActionReconciliationRequired means execution committed a partial side
+// effect (an execute_script write) and then failed. Durable replay must not
+// rerun the flow; an operator reconciles the committed write.
+var ErrActionReconciliationRequired = errors.New("action execution requires reconciliation")
+
 // ActionServiceConfig represents configuration for the action service
 type ActionServiceConfig struct {
 	RefreshInterval time.Duration // How often to refresh action cache
@@ -250,6 +255,16 @@ func (as *ActionService) EmitActionEvent(event *models.ActionEvent) {
 // EmitActionEventInTx admits an SCM observation with its source ledger row.
 func (as *ActionService) EmitActionEventInTx(ctx context.Context, tx database.Tx, event *models.ActionEvent) error {
 	return as.durableIngress.EmitInTx(ctx, tx, event)
+}
+
+// MarkScriptWritePending implements ActionScriptWriteMarker. It persists the
+// write-ahead reconciliation marker on the execution log before a mutating
+// script call is dispatched, so a crash after the commit is not replayed.
+func (as *ActionService) MarkScriptWritePending(executionLogID int) error {
+	if executionLogID <= 0 {
+		return nil
+	}
+	return as.repo.MarkExecutionReconciliationRequired(executionLogID)
 }
 
 // Stop gracefully shuts down the action service
@@ -661,7 +676,7 @@ func (as *ActionService) executeActionForEvent(executionCtx context.Context, act
 	if durableEventKey != "" {
 		existing, loadErr := as.repo.GetExecutionLogByDurableTarget(durableEventKey, action.ID)
 		if loadErr == nil {
-			if existing.Status == models.ActionStatusCompleted {
+			if existing.Status == models.ActionStatusCompleted || existing.Status == models.ActionStatusReconciliationRequired {
 				return nil
 			}
 			log.ID = existing.ID
@@ -712,14 +727,16 @@ func (as *ActionService) executeActionForEvent(executionCtx context.Context, act
 	}
 
 	ctx := &models.ExecutionContext{
-		Context:          executionCtx,
-		DurableEventKey:  durableEventKey,
-		Action:           action,
-		Event:            event,
-		EffectiveActorID: effectiveActorID,
-		Variables:        make(map[string]any),
-		StepResults:      []models.StepResult{},
-		ChainID:          chainID,
+		Context:              executionCtx,
+		DurableEventKey:      durableEventKey,
+		Action:               action,
+		Event:                event,
+		EffectiveActorID:     effectiveActorID,
+		Variables:            make(map[string]any),
+		StepResults:          []models.StepResult{},
+		ChainID:              chainID,
+		ExecutionLogID:       log.ID,
+		DefinitionRevisionID: log.DefinitionRevisionID,
 	}
 
 	// Expose the effective actor to template expansion.
@@ -784,12 +801,21 @@ func (as *ActionService) executeActionForEvent(executionCtx context.Context, act
 		as.cleanupActionContainers(ctx.StepResults)
 		log.Status = models.ActionStatusFailed
 		log.ErrorMessage = err.Error()
+		if ctx.ReconciliationRequired {
+			// A script already committed a write; rerunning the flow would
+			// repeat it, so block durable replay and surface reconciliation.
+			log.Status = models.ActionStatusReconciliationRequired
+			log.ErrorMessage = "requires reconciliation: " + err.Error()
+		}
 		log.CompletedAt = &completedAt
 		if trace, marshalErr := json.Marshal(ctx.StepResults); marshalErr == nil {
 			log.ExecutionTrace = string(trace)
 		}
 		if logErr := as.repo.UpdateExecutionLog(log); logErr != nil {
 			slog.Error("failed to cancel action execution log", slog.Any("error", logErr), slog.Int("action_id", action.ID))
+		}
+		if log.Status == models.ActionStatusReconciliationRequired {
+			return fmt.Errorf("%w: %w: action %d", ErrActionCompletedWithFailedSteps, ErrActionReconciliationRequired, action.ID)
 		}
 		return err
 	}
@@ -812,6 +838,14 @@ func (as *ActionService) executeActionForEvent(executionCtx context.Context, act
 		if result.Status == models.ActionStatusFailed {
 			log.Status = models.ActionStatusFailed
 			break
+		}
+	}
+	if log.Status == models.ActionStatusFailed && ctx.ReconciliationRequired {
+		// A script committed a write before a later step failed: the trace is
+		// final, but durable replay must not repeat the committed write.
+		log.Status = models.ActionStatusReconciliationRequired
+		if log.ErrorMessage == "" {
+			log.ErrorMessage = "requires reconciliation: a script step committed a write before the action failed"
 		}
 	}
 
@@ -846,6 +880,9 @@ func (as *ActionService) executeActionForEvent(executionCtx context.Context, act
 
 	if log.Status == models.ActionStatusFailed {
 		return fmt.Errorf("%w: action %d", ErrActionCompletedWithFailedSteps, action.ID)
+	}
+	if log.Status == models.ActionStatusReconciliationRequired {
+		return fmt.Errorf("%w: %w: action %d", ErrActionCompletedWithFailedSteps, ErrActionReconciliationRequired, action.ID)
 	}
 	return nil
 }

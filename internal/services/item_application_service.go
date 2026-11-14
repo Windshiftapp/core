@@ -864,7 +864,7 @@ func (s *ItemApplicationService) Create(ctx context.Context, actor AuditActor, i
 	if err := s.require(actor.UserID, input.WorkspaceID, models.PermissionItemCreate); err != nil {
 		return nil, err
 	}
-	result, err := s.create.Create(actor.UserID, actor.Username, input)
+	result, err := s.createItem(ctx, actor, input)
 	if err != nil {
 		return nil, err
 	}
@@ -887,7 +887,7 @@ func (s *ItemApplicationService) Patch(ctx context.Context, actor AuditActor, it
 	if !allowed {
 		return nil, ErrItemForbidden
 	}
-	result, err := s.update.UpdateJSONFields(actor.UserID, actor.Username, itemID, fields)
+	result, err := s.patchItem(ctx, actor, itemID, fields)
 	if err != nil {
 		return nil, err
 	}
@@ -900,6 +900,23 @@ func (s *ItemApplicationService) Patch(ctx context.Context, actor AuditActor, it
 		return nil, fmt.Errorf("render item description: %w", err)
 	}
 	return &items[0], nil
+}
+
+// createItem preserves execute_script cascade provenance when the call arrived
+// through the script REST bridge, so a script-created item stays inside the
+// action cascade budget instead of looking like a fresh user action.
+func (s *ItemApplicationService) createItem(ctx context.Context, actor AuditActor, input ItemCreateInput) (*ItemCreateResult, error) {
+	if prov, ok := ActionScriptProvenanceFrom(ctx); ok {
+		return s.create.CreateWithContext(actor.UserID, actor.Username, input, prov.ActionContext())
+	}
+	return s.create.Create(actor.UserID, actor.Username, input)
+}
+
+func (s *ItemApplicationService) patchItem(ctx context.Context, actor AuditActor, itemID int, fields map[string]json.RawMessage) (*UpdateItemResult, error) {
+	if prov, ok := ActionScriptProvenanceFrom(ctx); ok {
+		return s.update.UpdateJSONFieldsWithContext(actor.UserID, actor.Username, itemID, fields, prov.ActionContext())
+	}
+	return s.update.UpdateJSONFields(actor.UserID, actor.Username, itemID, fields)
 }
 
 func (s *ItemApplicationService) Delete(actor AuditActor, itemID int) error {
@@ -1179,10 +1196,14 @@ func (s *ItemApplicationService) transitionItem(ctx context.Context, actor Audit
 		return nil, err
 	}
 	if (!result.NoOp || result.Loop) && s.events != nil {
-		s.events.EmitStatusChanged(result.Item, result.OldStatusID, result.NewStatusID, actor.UserID, actor.Username)
+		if prov, ok := ActionScriptProvenanceFrom(ctx); ok {
+			s.events.EmitStatusChangedWithContext(result.Item, result.OldStatusID, result.NewStatusID, actor.UserID, prov.ActionContext(), actor.Username)
+		} else {
+			s.events.EmitStatusChanged(result.Item, result.OldStatusID, result.NewStatusID, actor.UserID, actor.Username)
+		}
 	}
 	s.syncStatus(ctx, result.Item.ID, result.NewStatusID, result.NoOp)
-	s.recordTransitionComment(itemID, actor.UserID, fields)
+	s.recordTransitionComment(ctx, itemID, actor.UserID, fields)
 	return &ItemTransitionResult{
 		Item: result.Item, OldStatusID: result.OldStatusID, NewStatusID: result.NewStatusID, NoOp: result.NoOp,
 	}, nil
@@ -1226,9 +1247,11 @@ func (s *ItemApplicationService) applyTransitionLabels(ctx context.Context, tx d
 }
 
 // recordTransitionComment persists the optional comment collected by a
-// transition screen. The move already committed, so a comment failure is
-// logged rather than reported as a failed transition.
-func (s *ItemApplicationService) recordTransitionComment(itemID, authorID int, fields map[string]any) {
+// transition screen. It forwards the request context so script provenance
+// (private-trigger protection and comment-trigger suppression) reaches the
+// comment service. The move already committed, so a comment failure is logged
+// rather than reported as a failed transition.
+func (s *ItemApplicationService) recordTransitionComment(ctx context.Context, itemID, authorID int, fields map[string]any) {
 	if s.comments == nil {
 		return
 	}
@@ -1236,7 +1259,7 @@ func (s *ItemApplicationService) recordTransitionComment(itemID, authorID int, f
 	if !ok || strings.TrimSpace(content) == "" {
 		return
 	}
-	if _, err := s.comments.Create(CreateCommentParams{
+	if _, err := s.comments.CreateContext(ctx, CreateCommentParams{
 		ItemID: itemID, AuthorID: authorID, ActorUserID: authorID, Content: content,
 	}); err != nil {
 		slog.Error("failed to persist transition comment",

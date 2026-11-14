@@ -195,7 +195,7 @@ func (c *DurableActionConsumer) Handle(ctx context.Context, event events.Event) 
 			return actionevents.Callbacks{
 				Completed: func(actionID int) (bool, error) {
 					existing, err := c.actions.repo.GetExecutionLogByDurableTarget(event.Key, actionID)
-					return err == nil && existing.Status == models.ActionStatusCompleted, err
+					return err == nil && (existing.Status == models.ActionStatusCompleted || existing.Status == models.ActionStatusReconciliationRequired), err
 				},
 				Execute: func(actionID int) (bool, error) {
 					action, err := c.actions.repo.GetByID(actionID)
@@ -203,6 +203,12 @@ func (c *DurableActionConsumer) Handle(ctx context.Context, event events.Event) 
 						return errors.Is(err, sql.ErrNoRows), fmt.Errorf("load frozen action %d: %w", actionID, err)
 					}
 					if err := c.actions.executeActionForEvent(ctx, action, actionEvent, nil, event.Key); err != nil {
+						// A reconciliation-required failure already committed a partial
+						// write, so automatic replay would repeat it. Report it as
+						// permanent so the event is not redelivered.
+						if errors.Is(err, ErrActionReconciliationRequired) {
+							return true, fmt.Errorf("execute frozen action %d: %w", actionID, err)
+						}
 						return false, fmt.Errorf("execute frozen action %d: %w", actionID, err)
 					}
 					return false, nil

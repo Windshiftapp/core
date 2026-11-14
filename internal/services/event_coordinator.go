@@ -250,6 +250,17 @@ func (ec *EventCoordinator) EmitItemDeleted(item *models.Item, actorUserID, desc
 
 // EmitStatusChanged emits events specifically for status changes.
 func (ec *EventCoordinator) EmitStatusChanged(item *models.Item, oldStatusID, newStatusID *int, actorUserID int, actorUsername ...string) {
+	ec.emitStatusChanged(item, oldStatusID, newStatusID, actorUserID, nil, actorUsername...)
+}
+
+// EmitStatusChangedWithContext preserves automation cascade provenance for a
+// status change caused by an execute_script REST call, so a script-driven
+// transition stays inside the action cascade budget.
+func (ec *EventCoordinator) EmitStatusChangedWithContext(item *models.Item, oldStatusID, newStatusID *int, actorUserID int, actionContext ActionContext, actorUsername ...string) {
+	ec.emitStatusChanged(item, oldStatusID, newStatusID, actorUserID, &actionContext, actorUsername...)
+}
+
+func (ec *EventCoordinator) emitStatusChanged(item *models.Item, oldStatusID, newStatusID *int, actorUserID int, actionContext *ActionContext, actorUsername ...string) {
 	actorName := resolveActorName(actorUserID, actorUsername)
 	var newStatusName string
 	if newStatusID != nil {
@@ -285,7 +296,7 @@ func (ec *EventCoordinator) EmitStatusChanged(item *models.Item, oldStatusID, ne
 		if oldStatusID != nil && newStatusID != nil && *oldStatusID == *newStatusID {
 			eventType = models.ActionTriggerStatusLoop
 		}
-		ec.actionService.EmitActionEvent(&models.ActionEvent{
+		event := &models.ActionEvent{
 			EventType:   eventType,
 			WorkspaceID: item.WorkspaceID,
 			ItemID:      item.ID,
@@ -301,7 +312,9 @@ func (ec *EventCoordinator) EmitStatusChanged(item *models.Item, oldStatusID, ne
 				"team_id":      item.TeamID,
 				"creator_id":   item.CreatorID,
 			},
-		})
+		}
+		applyActionContext(event, actionContext)
+		ec.actionService.EmitActionEvent(event)
 	}
 
 	// Dispatch webhook event

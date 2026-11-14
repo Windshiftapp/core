@@ -894,6 +894,12 @@ const (
 	// ActionNodeAdjustLabels adds and removes item labels on the trigger
 	// item (WI-1132).
 	ActionNodeAdjustLabels ActionNodeType = "adjust_labels"
+	// ActionNodeExecuteScript runs an author-supplied JavaScript function body
+	// through Sobek with the effective action executor's identity (WI-2174).
+	// The script may call the canonical v2 REST API through a server-minted,
+	// short-lived bearer token scoped to that executor; it never chooses its
+	// own identity or credentials.
+	ActionNodeExecuteScript ActionNodeType = "execute_script"
 )
 
 // IsIterator reports whether this node type fans out — i.e. the engine must
@@ -910,6 +916,10 @@ const (
 	ActionStatusCompleted ActionExecutionStatus = "completed"
 	ActionStatusFailed    ActionExecutionStatus = "failed"
 	ActionStatusSkipped   ActionExecutionStatus = "skipped"
+	// ActionStatusReconciliationRequired marks an execution that committed a
+	// partial side effect (an execute_script write) and then failed. Durable
+	// replay must not rerun it; an operator reconciles the partial write.
+	ActionStatusReconciliationRequired ActionExecutionStatus = "reconciliation_required"
 )
 
 // Action represents a workspace-scoped automation definition
@@ -1128,6 +1138,21 @@ type ExecutionContext struct {
 	// engine's per-flow step budget so a misconfigured nested iterator can't
 	// fan out into millions of executions before the cascade-depth guard fires.
 	TotalSteps int `json:"-"`
+	// ExecutionLogID is the persisted action_execution_logs row for this run,
+	// when one exists. Script REST calls carry it as trusted provenance.
+	ExecutionLogID int `json:"-"`
+	// DefinitionRevisionID is the immutable definition revision this execution
+	// is bound to, when known. Script REST calls carry it as trusted provenance.
+	DefinitionRevisionID *int `json:"-"`
+	// ReconciliationRequired is set when an execute_script node committed a
+	// mutating REST call and the flow later failed. Durable replay must not
+	// rerun the flow, because the committed write would be repeated.
+	ReconciliationRequired bool `json:"-"`
+	// ScriptWriteMarked records that the write-ahead reconciliation marker has
+	// already been persisted for this execution. It is shared across every
+	// script node and iterator pass in the flow so repeated marking of the same
+	// log is a no-op rather than an invalid-state failure.
+	ScriptWriteMarked bool `json:"-"`
 }
 
 // StepResult holds the result of executing a single node
@@ -1280,6 +1305,19 @@ type NotifyCustomerNodeConfig struct {
 type AdjustLabelsNodeConfig struct {
 	AddLabelIDs    []int `json:"add_label_ids,omitempty"`
 	RemoveLabelIDs []int `json:"remove_label_ids,omitempty"`
+}
+
+// ExecuteScriptNodeConfig configures an execute_script node (WI-2174). Source
+// is a JavaScript function body; an explicit return value becomes the node's
+// JSON output. OutputVariable names the execution-context variable that
+// downstream nodes read; it may not shadow reserved actor/context variables.
+// TimeoutMs and MaxAPICalls narrow the server-enforced budgets and are clamped
+// to the hard caps so a definition can never widen them.
+type ExecuteScriptNodeConfig struct {
+	Source         string `json:"source"`
+	OutputVariable string `json:"output_variable,omitempty"`
+	TimeoutMs      int    `json:"timeout_ms,omitempty"`
+	MaxAPICalls    int    `json:"max_api_calls,omitempty"`
 }
 
 // NotifyUserNodeConfig configures a notify_user node

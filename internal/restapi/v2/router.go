@@ -500,6 +500,7 @@ type commentApplication interface {
 	CountFeedByItemID(int) (int, error)
 	UserCanReadItemAsApprover(context.Context, int, int) (bool, error)
 	Create(services.CreateCommentParams) (*services.CreateCommentResult, error)
+	CreateContext(context.Context, services.CreateCommentParams) (*services.CreateCommentResult, error)
 	UpdateWithEffects(services.UpdateCommentParams) (*models.Comment, error)
 	DeleteWithEffects(services.DeleteCommentParams) error
 	AttachReactions([]models.Comment) error

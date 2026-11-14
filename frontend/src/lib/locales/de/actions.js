@@ -67,6 +67,7 @@ export default {
       transitionItem: 'Vorgang überführen',
       roundRobinAssign: 'Round-Robin zuweisen',
       createMilestone: 'Meilenstein erstellen',
+      executeScript: 'Skript ausführen',
     },
 
     aiUpdated: 'Aktion durch KI aktualisiert',
@@ -168,6 +169,7 @@ export default {
       completed: 'Abgeschlossen',
       failed: 'Fehlgeschlagen',
       skipped: 'Übersprungen',
+      reconciliationRequired: 'Abgleich erforderlich',
       startedAt: 'Gestartet um',
       completedAt: 'Abgeschlossen um',
       error: 'Fehler',

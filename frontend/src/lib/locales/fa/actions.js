@@ -64,6 +64,7 @@ export default {
       "transitionItem": "مورد انتقال",
       "roundRobinAssign": "تخصیص نوبتی",
       "createMilestone": "نقطه عطف ایجاد کنید",
+      "executeScript": "اجرای اسکریپت",
       "notifyCustomer": "به مشتری اطلاع دهید",
       "insertCannedResponse": "درج پاسخ آماده",
       "adjustLabels": "برچسب ها را تنظیم کنید"
@@ -225,6 +226,7 @@ export default {
       "completed": "تکمیل شد",
       "failed": "شکست خورد",
       "skipped": "رد شد",
+      "reconciliationRequired": "نیاز به تطبیق",
       "startedAt": "شروع شده در",
       "completedAt": "تکمیل شده در",
       "error": "خطا",
