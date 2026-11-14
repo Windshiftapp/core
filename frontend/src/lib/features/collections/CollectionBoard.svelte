@@ -4,11 +4,8 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { onWorkItemRefresh } from '../../stores/workItemRefresh.js';
   import { items as itemsApi } from '../../api/items.js';
-  import { getAssignableUsers } from '../../api/users.js';
-  import { labels as labelsApi } from '../../api/misc.js';
   import TransitionScreenModal from '../../dialogs/TransitionScreenModal.svelte';
   import { resolveTransitionScreen } from '../../utils/transitionScreens.js';
-  import { runBulkTransitionWithScreenRetry } from '../../utils/bulkActions.js';
   import { collections as collectionsApi } from '../../api/collections.js';
   import { workspaces as workspacesApi } from '../../api/workspaces.js';
   import { iterations as iterationsApi } from '../../api/milestones.js';
@@ -78,10 +75,8 @@
   import CollectionViewSwitcher from './CollectionViewSwitcher.svelte';
   import MilestoneSwimlaneConfigDialog from './MilestoneSwimlaneConfigDialog.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
-  import Modal from '../../dialogs/Modal.svelte';
-  import ModalHeader from '../../dialogs/ModalHeader.svelte';
-  import DialogFooter from '../../dialogs/DialogFooter.svelte';
-  import WorkspaceLabelCombobox from '../../pickers/WorkspaceLabelCombobox.svelte';
+  import BulkActionToolbar from './BulkActionToolbar.svelte';
+  import { useItemBulkSelection } from '../../composables/useItemBulkSelection.svelte.js';
   import { backlogStore } from '../../stores/backlogStore.svelte.js';
   import { workspaceDataStore } from '../../stores/workspaceDataStore.svelte.js';
   import { collectionPreferences } from '../../stores/collectionPreferences.svelte.js';
@@ -1430,7 +1425,7 @@
     }
     if (event.key === ' ') {
       event.preventDefault();
-      toggleSelected(itemId);
+      selection.toggleSelected(itemId);
       return;
     }
     if (event.key === 'c' || event.key === 'C') {
@@ -1453,9 +1448,9 @@
       target instanceof HTMLElement &&
       (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
 
-    if (event.key === 'Escape' && selectionMode && !inEditable && !showItemModal) {
+    if (event.key === 'Escape' && selection.selectionMode && !inEditable && !showItemModal) {
       event.preventDefault();
-      exitSelectionMode();
+      selection.exitSelectionMode();
       return;
     }
 
@@ -1473,58 +1468,20 @@
   useEventListener(() => window, 'keydown', handleBoardGlobalKeydown);
 
   // --- Multi-select and bulk actions (WI-98) ------------------------------
-  let selectedIds = $state([]);
-  // Selection mode is explicit: checkboxes and bulk actions only appear once
-  // the user opts in, so the board at rest stays free of selection chrome.
-  let selectionMode = $state(false);
-  let selectionAnchorId = $state(null);
-  let bulkBusy = $state(false);
-  let assignableUsers = $state([]);
-  let assignableUsersLoaded = $state(false);
-  let assignableUsersLoading = $state(false);
-
-  let selectedIdSet = $derived(new Set(selectedIds));
-  let selectedCount = $derived(selectedIds.length);
-  let selectedItems = $derived(items.filter((item) => selectedIdSet.has(item.id)));
-  let selectedItemsEditable = $derived(
-    selectedItems.length > 0 &&
-      selectedItems.every((item) => workspacePermissions.canEdit(item.workspace_id))
-  );
-
-  // Drop ids that leave the loaded set so the toolbar never acts on stale rows.
-  $effect(() => {
-    const present = new Set(items.map((item) => item.id));
-    const pruned = selectedIds.filter((id) => present.has(id));
-    if (pruned.length !== selectedIds.length) selectedIds = pruned;
+  // State and bulk operations live in the shared composable so the list view
+  // behaves identically; the board owns only its column-aware range selection.
+  const selection = useItemBulkSelection({
+    items: () => items,
+    scopeWorkspaceId: () => workspaceId,
+    reload: reloadCollection,
+    labelNameLookup: () => wdsLabels,
   });
-
-  function enterSelectionMode() {
-    selectionMode = true;
-  }
-
-  function exitSelectionMode() {
-    selectionMode = false;
-    clearSelection();
-  }
-
-  function toggleSelectionMode() {
-    if (selectionMode) exitSelectionMode();
-    else enterSelectionMode();
-  }
-
-  function toggleSelected(itemId) {
-    selectionMode = true;
-    selectedIds = selectedIdSet.has(itemId)
-      ? selectedIds.filter((id) => id !== itemId)
-      : [...selectedIds, itemId];
-    selectionAnchorId = itemId;
-  }
 
   // Shift selection extends from the anchor within the focused card's column.
   function selectRangeTo(itemId) {
-    selectionMode = true;
+    selection.selectionMode = true;
     const target = locateFocusedCard(itemId);
-    const anchor = selectionAnchorId ?? focusedItemId;
+    const anchor = selection.selectionAnchorId ?? focusedItemId;
     const origin = anchor != null ? locateFocusedCard(anchor) : null;
     if (
       !target ||
@@ -1532,207 +1489,24 @@
       target.lane.lane.id !== origin.lane.lane.id ||
       target.columnIndex !== origin.columnIndex
     ) {
-      toggleSelected(itemId);
+      selection.toggleSelected(itemId);
       return;
     }
     const columnItems = target.lane.columns[target.columnIndex].items;
     const from = Math.min(origin.itemIndex, target.itemIndex);
     const to = Math.max(origin.itemIndex, target.itemIndex);
     const rangeIds = columnItems.slice(from, to + 1).map((item) => item.id);
-    selectedIds = [...new Set([...selectedIds, ...rangeIds])];
+    selection.selectedIds = [...new Set([...selection.selectedIds, ...rangeIds])];
   }
 
-  function clearSelection() {
-    selectedIds = [];
-    selectionAnchorId = null;
-  }
-
-  function itemLabelIds(item) {
-    if (Array.isArray(item.label_ids)) return item.label_ids;
-    return (item.labels || []).map((label) => label.id);
-  }
-
-  function bulkSelectionIds() {
-    return selectedItems.map((item) => item.id);
-  }
-
-  async function bulkMoveToColumn(column) {
-    const targetStatusId = column.status_ids?.[0];
-    if (targetStatusId == null || bulkBusy) return;
-    const ids = bulkSelectionIds();
-    bulkBusy = true;
-    try {
-      const result = await runBulkTransitionWithScreenRetry(
-        itemsApi.bulkTransition,
-        ids,
-        targetStatusId
-      );
-      // The user declined the retry; nothing moved and the selection stays.
-      if (result === null) return;
-      const failed = result?.failed_count ?? 0;
-      if (failed > 0) {
-        warningToast(t('collections.bulkStatusPartial', {
-          count: result?.transitioned_count ?? 0,
-          failed,
-        }));
-      } else {
-        successToast(t('collections.bulkStatusSuccess', { count: result?.transitioned_count ?? ids.length }));
-      }
-      clearSelection();
-      reloadCollection();
-    } catch (error) {
-      console.error('Bulk transition failed:', error);
-      warningToast(error?.message || t('collections.bulkUpdateFailed'));
-    } finally {
-      bulkBusy = false;
-    }
-  }
-
-  async function bulkUpdateFields(fields) {
-    if (bulkBusy) return;
-    const ids = bulkSelectionIds();
-    if (ids.length === 0) return;
-    bulkBusy = true;
-    try {
-      const result = await itemsApi.bulkUpdate(ids, fields);
-      successToast(t('collections.bulkUpdateSuccess', { count: result?.updated_count ?? ids.length }));
-      clearSelection();
-      reloadCollection();
-    } catch (error) {
-      console.error('Bulk update failed:', error);
-      warningToast(error?.message || t('collections.bulkUpdateFailed'));
-    } finally {
-      bulkBusy = false;
-    }
-  }
-
-  let bulkLabelsModalOpen = $state(false);
-  // Names drive the picker; ids are the resolved target set it reports back.
-  let bulkLabelNames = $state([]);
-  let bulkLabelIds = $state([]);
-
-  let bulkLabelsWorkspaceId = $derived(
-    workspaceId ?? selectedItems[0]?.workspace_id ?? null
-  );
-
-  // Labels present on every selected item are the modal's starting point; the
-  // apply step only propagates the user's additions and removals so labels
-  // that belong to just some items are left alone.
-  function commonLabelIds() {
-    const targets = selectedItems;
-    if (targets.length === 0) return [];
-    return itemLabelIds(targets[0]).filter((id) =>
-      targets.every((item) => itemLabelIds(item).includes(id))
-    );
-  }
-
-  function labelNameById(labelId) {
-    for (const item of selectedItems) {
-      const label = (item.labels || []).find((candidate) => candidate.id === labelId);
-      if (label) return label.name;
-    }
-    return wdsLabels.find((label) => label.id === labelId)?.name ?? null;
-  }
-
-  function openBulkLabelsModal() {
-    if (bulkBusy || !selectedItemsEditable) return;
-    const ids = commonLabelIds();
-    bulkLabelIds = ids;
-    bulkLabelNames = ids.map(labelNameById).filter(Boolean);
-    bulkLabelsModalOpen = true;
-  }
-
-  // Labels are a join table, so the board sends the add/remove delta for the
-  // whole selection in one request instead of one PUT per item.
-  async function applyBulkLabels() {
-    if (bulkBusy) return;
-    const targets = selectedItems;
-    if (targets.length === 0) return;
-    const commonIds = commonLabelIds();
-    const added = bulkLabelIds.filter((id) => !commonIds.includes(id));
-    const removed = commonIds.filter((id) => !bulkLabelIds.includes(id));
-    bulkLabelsModalOpen = false;
-    if (added.length === 0 && removed.length === 0) return;
-    bulkBusy = true;
-    try {
-      const result = await labelsApi.bulkSetLabels(
-        targets.map((item) => item.id),
-        { add: added, remove: removed }
-      );
-      const updated = result?.updated_count ?? 0;
-      const failed = result?.failed_count ?? 0;
-      if (failed > 0) {
-        warningToast(t('collections.bulkLabelPartial', { count: updated, failed }));
-      } else {
-        successToast(t('collections.bulkLabelSuccess', { count: updated }));
-      }
-    } catch (error) {
-      console.error('Bulk label update failed:', error);
-      warningToast(error?.message || t('collections.bulkUpdateFailed'));
-    } finally {
-      bulkBusy = false;
-      clearSelection();
-      reloadCollection();
-    }
-  }
-
-  async function ensureAssignableUsers() {
-    if (assignableUsersLoaded || assignableUsersLoading) return;
-    const scopeWorkspaceId = workspaceId ?? selectedItems[0]?.workspace_id;
-    if (!scopeWorkspaceId) return;
-    assignableUsersLoading = true;
-    try {
-      assignableUsers = (await getAssignableUsers(scopeWorkspaceId)) || [];
-      assignableUsersLoaded = true;
-    } catch (error) {
-      console.error('Failed to load assignable users:', error);
-    } finally {
-      assignableUsersLoading = false;
-    }
-  }
-
-  let bulkStatusMenuItems = $derived(
+  let bulkMoveTargets = $derived(
     validColumns.map((column) => ({
-      id: `bulk-status-${column.id}`,
-      testid: `bulk-status-${column.status_ids[0]}`,
+      id: column.id,
+      statusId: column.status_ids[0],
       title: objectDisplayName(column, 'status'),
-      iconDot: true,
-      iconColor: column.color || 'var(--ds-text-subtle)',
-      onClick: () => bulkMoveToColumn(column),
+      color: column.color,
     }))
   );
-
-  let bulkAssigneeMenuItems = $derived([
-    {
-      id: 'bulk-assignee-none',
-      testid: 'bulk-assignee-none',
-      title: t('common.unassigned'),
-      onClick: () => bulkUpdateFields({ assignee_id: null }),
-    },
-    ...assignableUsers.map((user) => ({
-      id: `bulk-assignee-${user.id}`,
-      testid: `bulk-assignee-${user.id}`,
-      title: `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim() || user.username,
-      onClick: () => bulkUpdateFields({ assignee_id: user.id }),
-    })),
-  ]);
-
-  let bulkPriorityMenuItems = $derived([
-    {
-      id: 'bulk-priority-none',
-      testid: 'bulk-priority-none',
-      title: t('pickers.noPriority'),
-      onClick: () => bulkUpdateFields({ priority_id: null }),
-    },
-    ...priorities.map((priority) => ({
-      id: `bulk-priority-${priority.id}`,
-      testid: `bulk-priority-${priority.id}`,
-      title: priority.name,
-      iconDot: true,
-      iconColor: priority.color || 'var(--ds-text-subtle)',
-      onClick: () => bulkUpdateFields({ priority_id: priority.id }),
-    })),
-  ]);
 
   // Card keydown lives on the scrolling canvas so it never fires for the
   // chrome above it; bound programmatically to keep the layout div role-free.
@@ -2315,10 +2089,10 @@
                   <button
                     type="button"
                     class={segment}
-                    data-active={selectionMode}
-                    aria-pressed={selectionMode}
+                    data-active={selection.selectionMode}
+                    aria-pressed={selection.selectionMode}
                     title={t('collections.selectItems')}
-                    onclick={toggleSelectionMode}
+                    onclick={selection.toggleSelectionMode}
                     data-testid="board-select-mode-toggle"
                   >
                     <CheckSquare class="w-4 h-4" />
@@ -2589,11 +2363,11 @@
                                 canDrag={canDragCard}
                                 refreshToken={slaRefreshToken}
                                 focused={tabbableItemId === item.id}
-                                selected={selectedIdSet.has(item.id)}
-                                selectionMode={selectionMode}
+                                selected={selection.selectedIdSet.has(item.id)}
+                                selectionMode={selection.selectionMode}
                                 visible={visibleBoardItemIds.has(item.id)}
                                 onvisibilitychange={handleCardVisibility}
-                                onselect={toggleSelected}
+                                onselect={selection.toggleSelected}
                                 onshiftselect={selectRangeTo}
                                 onopen={openItem}
                                 registerElement={registerBoardCardElement}
@@ -2641,121 +2415,12 @@
       </div>
     </StaticViewBackground>
 
-    {#if selectionMode}
-      <div
-        class="fixed bottom-4 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border px-4 py-2.5"
-        style="background-color: var(--ds-surface-overlay); border-color: var(--ds-border-bold); box-shadow: 0 12px 32px rgba(9, 30, 66, 0.32), 0 0 0 1px var(--ds-border-bold);"
-        data-testid="board-bulk-toolbar"
-      >
-        {#if selectedCount > 0}
-          <span
-            class="mr-1 inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold text-white"
-            style="background-color: var(--ds-interactive);"
-            data-testid="board-bulk-count"
-          >
-            {t('collections.bulkSelected', { count: selectedCount })}
-          </span>
-        {:else}
-          <span
-            class="mr-1 text-sm font-medium"
-            style="color: var(--ds-text-subtle);"
-            data-testid="board-bulk-hint"
-          >
-            {t('collections.bulkSelectHint')}
-          </span>
-        {/if}
-        <DropdownMenu
-          items={bulkStatusMenuItems}
-          triggerText={t('collections.bulkSetStatus')}
-          placement="top-start"
-          maxWidth="max-w-xs"
-          disabled={bulkBusy || !selectedItemsEditable}
-          triggerClass="px-3 py-1.5 rounded text-sm font-medium"
-          triggerStyle="color: var(--ds-text); background-color: var(--ds-background-neutral);"
-          triggerTestid="board-bulk-status"
-        />
-        <DropdownMenu
-          items={bulkAssigneeMenuItems}
-          triggerText={t('collections.bulkSetAssignee')}
-          placement="top-start"
-          maxWidth="max-w-xs"
-          disabled={bulkBusy || !selectedItemsEditable}
-          triggerClass="px-3 py-1.5 rounded text-sm font-medium"
-          triggerStyle="color: var(--ds-text); background-color: var(--ds-background-neutral);"
-          triggerTestid="board-bulk-assignee"
-          onOpen={ensureAssignableUsers}
-        />
-        <DropdownMenu
-          items={bulkPriorityMenuItems}
-          triggerText={t('collections.bulkSetPriority')}
-          placement="top-start"
-          maxWidth="max-w-xs"
-          disabled={bulkBusy || !selectedItemsEditable}
-          triggerClass="px-3 py-1.5 rounded text-sm font-medium"
-          triggerStyle="color: var(--ds-text); background-color: var(--ds-background-neutral);"
-          triggerTestid="board-bulk-priority"
-        />
-        <Button
-          variant="secondary"
-          size="sm"
-          onclick={openBulkLabelsModal}
-          disabled={bulkBusy || !selectedItemsEditable}
-          dataTestid="board-bulk-labels"
-        >
-          {t('collections.bulkLabels')}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onclick={clearSelection}
-          disabled={bulkBusy || selectedCount === 0}
-          dataTestid="board-bulk-clear"
-        >
-          {t('collections.bulkClear')}
-        </Button>
-        <Button
-          variant="primary"
-          size="sm"
-          onclick={exitSelectionMode}
-          disabled={bulkBusy}
-          dataTestid="board-bulk-done"
-        >
-          {t('collections.bulkDone')}
-        </Button>
-      </div>
-
-      <Modal
-        bind:isOpen={bulkLabelsModalOpen}
-        maxWidth="max-w-lg"
-        closeOnBackdropClick={false}
-        onclose={() => (bulkLabelsModalOpen = false)}
-        dataTestid="board-bulk-labels-modal"
-      >
-        <ModalHeader
-          title={t('collections.bulkLabels')}
-          subtitle={t('collections.bulkLabelsHint', { count: selectedCount })}
-          onclose={() => (bulkLabelsModalOpen = false)}
-        />
-        <div class="p-6">
-          <WorkspaceLabelCombobox
-            id="board-bulk-label-picker-input"
-            workspaceId={bulkLabelsWorkspaceId}
-            testidPrefix="board-bulk-label-picker"
-            bind:value={bulkLabelNames}
-            placeholder={t('items.selectOrCreateLabels')}
-            onSelect={(result) => (bulkLabelIds = (result?.labels || []).map((label) => label.id))}
-          />
-        </div>
-        <DialogFooter
-          onCancel={() => (bulkLabelsModalOpen = false)}
-          onConfirm={applyBulkLabels}
-          confirmLabel={t('collections.bulkLabelsApply')}
-          loading={bulkBusy}
-          confirmTestid="board-bulk-labels-apply"
-          cancelTestid="board-bulk-labels-cancel"
-        />
-      </Modal>
-    {/if}
+    <BulkActionToolbar
+      {selection}
+      moveTargets={bulkMoveTargets}
+      {priorities}
+      testidPrefix="board"
+    />
 {:else}
   <div class="p-6">
     <div class="text-center" style="color: var(--ds-text-subtle);">
