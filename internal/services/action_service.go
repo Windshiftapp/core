@@ -2270,15 +2270,15 @@ func (as *ActionService) substituteVariables(template string, ctx *models.Execut
 	})
 }
 
-// cleanupActionContainers stops any containers started by container_run
-// nodes during this action's execution. ContainerService keeps an internal
-// registry, so a double-stop (auto-teardown racing with this cleanup) is
-// harmless — StopContainer becomes a no-op for unknown IDs.
+// cleanupActionContainers stops containers from the flow and nested iterations.
 func (as *ActionService) cleanupActionContainers(results []models.StepResult) {
 	if as.containerService == nil {
 		return
 	}
 	for _, r := range results {
+		for _, iteration := range r.Iterations {
+			as.cleanupActionContainers(iteration.Steps)
+		}
 		if r.NodeType != models.ActionNodeContainerRun {
 			continue
 		}
