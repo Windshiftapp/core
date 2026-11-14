@@ -42,6 +42,9 @@ export default {
   },
 
   users: {
+    weekStart: 'Primo giorno della settimana',
+    weekStartHint: 'Si applica ai calendari di tutta l’app. Automatico segue la lingua e la regione.',
+    calendarPreferencesSaveFailed: 'Lingua e fuso orario salvati, ma non è stato possibile salvare le preferenze del calendario.',
     title: 'Utenti',
     subtitle: 'Gestisci account utente e permessi',
     user: 'Utente',

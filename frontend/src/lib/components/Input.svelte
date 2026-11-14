@@ -2,6 +2,7 @@
   import { cn } from '../utils/cn.js';
   import { controlSizeClasses } from '../utils/controlSizes.js';
   import DatePicker from '../pickers/DatePicker.svelte';
+  import DateTimePicker from '../pickers/DateTimePicker.svelte';
 
   /**
    * @type {{
@@ -137,6 +138,17 @@
       const synthetic = event || { target: { value: next }, currentTarget: { value: next } };
       oninput?.(synthetic);
       onchange?.(synthetic);
+    }}
+  />
+{:else if type === 'datetime-local'}
+  <DateTimePicker
+    bind:value bind:inputRef {id} {name} {min} {max} {step} {disabled} {required}
+    {autofocus} {readonly} {placeholder} {size} class={className} {dataTestid}
+    {ariaLabel} {ariaDescribedby} {style} {title} {onclick} {onkeyup} {onkeydown} {onblur} {onfocus}
+    onchange={(next) => {
+      const event = { target: { value: next }, currentTarget: { value: next } };
+      oninput?.(event);
+      onchange?.(event);
     }}
   />
 {:else}

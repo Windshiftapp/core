@@ -380,6 +380,7 @@ ${t('personal.placeholderImprovements')}`;
           </button>
           <Input
             type="date"
+            dataTestid="personal-review-date"
             bind:value={currentDate}
             class="w-auto border-0 bg-transparent cursor-pointer px-2 py-1"
           />

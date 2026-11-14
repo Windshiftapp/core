@@ -47,6 +47,9 @@ export default {
     invitationLink: 'Enlace de invitación',
   },
   users: {
+    weekStart: 'Primer día de la semana',
+    weekStartHint: 'Se aplica a los calendarios de toda la aplicación. Automático sigue tu idioma y región.',
+    calendarPreferencesSaveFailed: 'Se guardaron el idioma y la zona horaria, pero no las preferencias del calendario.',
     title: 'Usuarios',
     subtitle: 'Administrar cuentas de usuario y permisos',
     user: 'Usuario',

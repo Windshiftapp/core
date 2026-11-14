@@ -11,12 +11,14 @@
   import { authStore } from '../stores/auth.svelte.js';
   import { i18n, SUPPORTED_LOCALES, t } from '../stores/i18n.svelte.js';
   import { getCalendarPreference, setCalendarPreference } from '../stores/calendar.svelte.js';
+  import { getWeekStartPreference, setWeekStartPreference, WEEKDAYS } from '../stores/calendar.svelte.js';
 
   let { user = $bindable(null), userId = null } = $props();
 
   let selectedTimezone = $state('UTC');
   let selectedLanguage = $state('en');
   let selectedCalendar = $state('auto');
+  let selectedWeekStart = $state('auto');
   let calendarHydrated = null;
   let saving = $state(false);
   let saved = $state(false);
@@ -36,6 +38,7 @@
   $effect(() => {
     if (user?.id && collectionPreferences.loaded && calendarHydrated !== user.id) {
       selectedCalendar = getCalendarPreference();
+      selectedWeekStart = getWeekStartPreference();
       calendarHydrated = user.id;
     }
   });
@@ -61,17 +64,18 @@
         language: savedLanguage,
         timezone: updatedUser?.timezone || selectedTimezone,
       });
-      if (collectionPreferences.loaded && selectedCalendar !== getCalendarPreference()) {
+      if (collectionPreferences.loaded && (selectedCalendar !== getCalendarPreference() || selectedWeekStart !== getWeekStartPreference())) {
         try {
-          const prefs = await userPreferences.update({ calendar: selectedCalendar });
+          const prefs = await userPreferences.update({ calendar: selectedCalendar, week_start: selectedWeekStart });
           if (authStore.currentUser?.id !== savingUserId) return;
           setCalendarPreference(prefs.calendar);
+          setWeekStartPreference(prefs.week_start);
         } catch (err) {
           if (authStore.currentUser?.id !== savingUserId) return;
           await i18n.setLocale(savedLanguage);
           if (authStore.currentUser?.id !== savingUserId) return;
           user = updatedUser || { ...user, timezone: selectedTimezone, language: savedLanguage };
-          throw new Error(t('users.calendarSaveFailed'));
+          throw new Error(t('users.calendarPreferencesSaveFailed'));
         }
       }
       await i18n.setLocale(savedLanguage);
@@ -93,6 +97,13 @@
     { value: 'auto', label: t('users.calendarAutomatic') },
     { value: 'gregory', label: t('users.gregorian') },
     { value: 'persian', label: t('users.persian') },
+  ]);
+  const weekStarts = $derived([
+    { value: 'auto', label: t('users.calendarAutomatic') },
+    ...WEEKDAYS.map((day, index) => ({
+      value: day,
+      label: new Intl.DateTimeFormat(selectedLanguage, { weekday: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2025, 0, 5 + index))),
+    })),
   ]);
 
 
@@ -150,10 +161,23 @@
       getLabel={(item) => item.label}
     />
   </FormField>
+  <FormField label={t('users.weekStart')} id="week-start" helper={t('users.weekStartHint')}>
+    <BasePicker
+      id="week-start"
+      inputTestid="regional-week-start"
+      optionTestid={(item) => `regional-week-start-${item.value}`}
+      menuTestid="regional-week-start-menu"
+      bind:value={selectedWeekStart}
+      items={weekStarts}
+      disabled={!user || saving || !collectionPreferences.loaded}
+      getValue={(item) => item.value}
+      getLabel={(item) => item.label}
+    />
+  </FormField>
 </div>
 
 <div class="mt-6 flex items-center gap-4">
-  <Button variant="primary" onclick={save} disabled={!user || saving} size="medium">
+  <Button variant="primary" onclick={save} disabled={!user || saving} size="medium" dataTestid="regional-settings-save">
     {saving ? t('common.saving') : t('users.saveSettings')}
   </Button>
   {#if saved}

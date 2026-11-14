@@ -34,7 +34,7 @@
 		...(attachmentStatus.enabled
 			? [{ id: 'avatar', label: t('users.avatar'), icon: Camera }]
 			: []),
-		{ id: 'regional-settings', label: t('users.regionalSettings'), icon: Globe },
+		{ id: 'regional-settings', label: t('users.regionalSettings'), icon: Globe, testid: 'profile-tab-regional-settings' },
 		{
 			id: 'notifications',
 			label: t('users.notificationsTab'),

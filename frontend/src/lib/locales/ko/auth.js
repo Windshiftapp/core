@@ -38,6 +38,9 @@ export default {
     "invitationLink": "초대 링크"
   },
   "users": {
+    "weekStart": "한 주의 시작일",
+    "weekStartHint": "앱 전체의 캘린더에 적용됩니다. 자동은 언어와 지역 설정을 따릅니다.",
+    "calendarPreferencesSaveFailed": "언어와 시간대는 저장되었지만 캘린더 환경설정을 저장하지 못했습니다.",
     "title": "사용자",
     "subtitle": "사용자 계정 및 권한 관리",
     "user": "사용자",

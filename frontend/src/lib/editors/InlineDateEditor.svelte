@@ -53,6 +53,7 @@
       <div class="flex-1 relative">
         <Input
           type="date"
+          dataTestid="inline-date-input"
           value={draft ?? ''}
           class="w-full px-2 py-1 text-sm border rounded {editingClass} {className} {error ? 'border-ds-border-danger' : ''}"
           oninput={(e) => setDraft(e.currentTarget.value)}

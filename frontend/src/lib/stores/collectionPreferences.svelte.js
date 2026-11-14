@@ -1,5 +1,5 @@
 import { userPreferences } from '../api/users.js';
-import { setCalendarPreference } from './calendar.svelte.js';
+import { setCalendarPreference, setWeekStartPreference } from './calendar.svelte.js';
 
 // Per-user collection view configuration and other top-level user
 // preferences, stored in user_preferences so they follow the user across
@@ -55,6 +55,7 @@ class CollectionPreferencesStore {
         this.viewState = prefs?.view_state ?? {};
         this.savedFilters = prefs?.saved_filters ?? {};
         setCalendarPreference(prefs?.calendar);
+        setWeekStartPreference(prefs?.week_start);
         this.commentSortOrder = prefs?.comment_sort_order === 'newest' ? 'newest' : 'oldest';
         this.loaded = true;
       })
@@ -74,6 +75,7 @@ class CollectionPreferencesStore {
   reset() {
     this.#generation += 1;
     setCalendarPreference('auto');
+    setWeekStartPreference('auto');
     this.viewState = {};
     this.savedFilters = {};
     this.commentSortOrder = 'oldest';

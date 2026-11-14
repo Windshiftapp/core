@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { useEventListener } from 'runed';
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -19,6 +19,8 @@
   import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import { getStatusStyleFromStatuses } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { getAppLocale } from '../../stores/appLocale.svelte.js';
+  import { startOfPreferredWeek } from '../../stores/calendar.svelte.js';
   import { infoToast, surfaceError } from '../../stores/toasts.svelte.js';
   import { navigate } from '../../router.js';
   import { publicBaseURL } from '../../runtime/contextPath.js';
@@ -30,7 +32,9 @@
 
   // Get current date and week
   let currentDate = $state(new Date());
-  let currentWeekStart = $state(new Date());
+  let currentWeekStart = $derived(startOfPreferredWeek(currentDate, getAppLocale()));
+  let ready = $state(false);
+  let scheduledRequest = 0;
   let weekDays = $derived(generateWeekDays(currentWeekStart));
   let workItems = $state({}); // Store scheduled work items for each day
   let showTasksSidebar = $state(false);
@@ -287,14 +291,6 @@
     return tasks.sort((a, b) => a.date - b.date);
   })());
 
-  // Calculate week start (Monday)
-  function getWeekStart(date) {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Monday start
-    return new Date(d.setDate(diff));
-  }
-
   // Generate week days array
   function generateWeekDays(weekStart) {
     const days = [];
@@ -342,15 +338,11 @@
   function navigateWeek(direction) {
     const newWeekStart = new Date(currentWeekStart);
     newWeekStart.setDate(currentWeekStart.getDate() + (direction * 7));
-    currentWeekStart = newWeekStart;
-    loadScheduledItems();
+    currentDate = newWeekStart;
   }
 
   function goToToday() {
     currentDate = new Date();
-    currentWeekStart = getWeekStart(currentDate);
-    weekDays = generateWeekDays(currentWeekStart);
-    loadScheduledItems();
   }
 
   // Create a new task in the calendar
@@ -510,6 +502,7 @@
   }
 
   async function loadScheduledItems() {
+    const request = ++scheduledRequest;
     try {
       const user = authStore.currentUser;
       if (!user || !user.id) {
@@ -518,9 +511,12 @@
       }
 
       const startDate = formatDateKey(new Date(currentWeekStart));
-      const endDate = formatDateKey(new Date(currentWeekStart.getTime() + 6 * 24 * 60 * 60 * 1000));
+      const end = new Date(currentWeekStart);
+      end.setDate(end.getDate() + 6);
+      const endDate = formatDateKey(end);
 
       const scheduledData = await fetchAPI(`/calendar/scheduled-items?user_id=${user.id}&start_date=${startDate}&end_date=${endDate}`);
+      if (request !== scheduledRequest || authStore.currentUser?.id !== user.id || startDate !== formatDateKey(currentWeekStart)) return;
 
       // Transform scheduled data back into workItems format
       workItems = {};
@@ -701,17 +697,19 @@
   }
 
   onMount(async () => {
-    currentWeekStart = getWeekStart(currentDate);
-    weekDays = generateWeekDays(currentWeekStart);
-
     // Load personal workspace for task creation
     await workspacesStore.loadPersonalWorkspace();
 
     // Load real work items first
     await loadAssignedWorkItems();
 
-    // Load scheduled items from database
-    await loadScheduledItems();
+    ready = true;
+  });
+
+  $effect(() => {
+    if (!ready) return;
+    void currentWeekStart;
+    untrack(() => loadScheduledItems());
   });
 </script>
 
@@ -938,7 +936,7 @@
           {#each weekDays as day}
             <div class="flex flex-col">
               <!-- Day Header -->
-              <div class="p-2 text-center border-b mb-2" style="border-color: var(--ds-border);">
+              <div class="p-2 text-center border-b mb-2" data-testid="calendar-day-header" data-date={day.dateKey} style="border-color: var(--ds-border);">
                 <span class="text-xs font-medium" style="color: var(--ds-text-subtle);">{day.dayName}</span>
                 <span class="block text-lg font-bold" style="color: {day.isToday ? 'var(--ds-accent-orange)' : 'var(--ds-text)'};">
                   {day.dayNumber}

@@ -1,10 +1,7 @@
 <script>
   /**
-   * Non-Gregorian calendar field: a trigger plus the Jalali `CalendarGrid`,
-   * or the grid rendered inline. Loaded lazily by `DatePicker` so locales that
-   * keep the native picker never download the calendar code.
-   *
-   * Emits Gregorian `YYYY-MM-DD` strings.
+   * Calendar trigger and popover, or an inline grid, for any calendar system.
+   * Emits Gregorian YYYY-MM-DD strings.
    */
   import { createPopover, melt } from '@melt-ui/svelte';
   import { DateFormatter, parseDate } from '@internationalized/date';
@@ -17,6 +14,7 @@
   import { cn } from '../utils/cn.js';
   import { controlSizeClasses } from '../utils/controlSizes.js';
   import CalendarGrid from './CalendarGrid.svelte';
+  import { useRowRetention } from '../virtualization/useRowRetention.svelte';
 
   let {
     value = $bindable(''),
@@ -29,6 +27,7 @@
     readonly = false,
     required = false,
     autofocus = false,
+    autoOpen = false,
     style = '',
     title = undefined,
     ariaDescribedby = undefined,
@@ -76,11 +75,13 @@
   const {
     elements: { trigger, content },
     states: { open }
-  } = createPopover({
+  } = untrack(() => createPopover({
+    defaultOpen: autoOpen && !disabled && !readonly && !inline,
     positioning: { placement: 'bottom-start', gutter: 4 },
     portal: 'body',
     forceVisible: true
-  });
+  }));
+  useRowRetention(() => $open, 'picker');
 
   const controlClass = $derived(
     cn(
@@ -116,13 +117,35 @@
   }
 </script>
 
+{#snippet footer()}
+  <div class="date-picker-footer border-t border-ds-border">
+    <button
+      type="button"
+      class="date-picker-footer-button"
+      disabled={!canCommit(formatDate(serverNow()))}
+      onclick={() => commit(parseDate(formatDate(serverNow())).toString())}
+      data-testid={dataTestid ? `${dataTestid}-today` : undefined}
+    >
+      {t('common.today')}
+    </button>
+    {#if clearable && value && !readonly && !disabled}
+      <button
+        type="button"
+        class="date-picker-footer-button"
+        onclick={handleClear}
+        data-testid={dataTestid ? `${dataTestid}-footer-clear` : undefined}
+      >
+        {t('common.clear')}
+      </button>
+    {/if}
+  </div>
+{/snippet}
+
 <div class="date-picker" data-testid={dataTestid ? `${dataTestid}-root` : undefined}>
   {#if label}
     <span class="date-picker-label text-ds-text">{label}</span>
   {/if}
-  {#if name || required}
-    <input type="date" {name} {required} {min} {max} {step} {disabled} {readonly} value={value} tabindex="-1" aria-hidden="true" style="position:absolute; width:1px; height:1px; opacity:0;" oninvalid={(event) => { event.preventDefault(); validationMessage = event.currentTarget.validationMessage; inputRef?.focus(); }} />
-  {/if}
+  <input type="date" {name} {required} {min} {max} {step} {disabled} {readonly} value={value} tabindex="-1" aria-hidden="true" style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;" oninvalid={(event) => { event.preventDefault(); validationMessage = event.currentTarget.validationMessage; inputRef?.focus(); }} />
   {#if required}
     <span id="{descriptionId}-required" class="sr-only">{t('validation.required')}</span>
   {/if}
@@ -140,11 +163,13 @@
           {value}
           {min}
           {max}
+          {step}
           {readonly}
           {disabled}
           onselect={commit}
           dataTestid={dataTestid ? `${dataTestid}-calendar` : undefined}
         />
+        {@render footer()}
       </div>
     {:else}
       <!-- svelte-ignore a11y_autofocus -->
@@ -159,7 +184,10 @@
         bind:this={inputRef}
         {onfocus}
         onkeydown={(event) => {
-          if ($open && (event.key === 'Enter' || event.key === 'Escape')) return;
+          if (event.key === 'Enter' || event.key === ' ' || ($open && event.key === 'Escape')) {
+            event.stopPropagation();
+            return;
+          }
           onkeydown?.(event);
         }}
         {onclick}
@@ -201,32 +229,13 @@
         {value}
         {min}
         {max}
+        {step}
         {readonly}
         {disabled}
         onselect={commit}
         dataTestid={dataTestid ? `${dataTestid}-calendar` : undefined}
       />
-      <div class="date-picker-footer border-t border-ds-border">
-        <button
-          type="button"
-          class="date-picker-footer-button"
-          disabled={!canCommit(formatDate(serverNow()))}
-          onclick={() => commit(parseDate(formatDate(serverNow())).toString())}
-          data-testid={dataTestid ? `${dataTestid}-today` : undefined}
-        >
-          {t('common.today')}
-        </button>
-        {#if clearable && value && !readonly && !disabled}
-          <button
-            type="button"
-            class="date-picker-footer-button"
-            onclick={handleClear}
-            data-testid={dataTestid ? `${dataTestid}-footer-clear` : undefined}
-          >
-            {t('common.clear')}
-          </button>
-        {/if}
-      </div>
+      {@render footer()}
     </div>
   {/if}
 </div>
@@ -234,6 +243,7 @@
 <style>
   .date-picker {
     display: inline-flex;
+    width: 100%;
     flex-direction: column;
     gap: 0.25rem;
   }
@@ -247,6 +257,10 @@
     position: relative;
     display: inline-flex;
     align-items: center;
+    width: 100%;
+  }
+
+  .date-picker-control > button:first-child {
     width: 100%;
   }
 

@@ -14,6 +14,7 @@ import (
 // ErrInvalidColorMode is returned when a preference update contains an unsupported color mode.
 var ErrInvalidColorMode = errors.New("invalid color mode")
 var ErrInvalidCalendar = errors.New("calendar must be auto, gregory, or persian")
+var ErrInvalidWeekStart = errors.New("week_start must be auto or a lowercase weekday name")
 
 // ErrPreferencesTooLarge is returned when a preferences update would store more
 // than the bounded per-user JSON blob.
@@ -45,6 +46,7 @@ const (
 const maxPreferencesBytes = 1 << 20 // 1 MiB
 
 type UserPreferencesSnapshot struct {
+	WeekStart    string
 	Calendar     string
 	ColorMode    string
 	ThemeID      *int
@@ -62,6 +64,8 @@ type UserPreferencesSnapshot struct {
 }
 
 type UserPreferencesPatch struct {
+	WeekStartSet       bool
+	WeekStart          string
 	CalendarSet        bool
 	Calendar           string
 	ColorModeSet       bool
@@ -169,6 +173,22 @@ func normalizeCalendar(value string) string {
 	return "auto"
 }
 
+func validWeekStart(value string) bool {
+	switch value {
+	case "auto", "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday":
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeWeekStart(value string) string {
+	if validWeekStart(value) {
+		return value
+	}
+	return "auto"
+}
+
 func (s *UserPreferencesService) GetSnapshot(userID int) (UserPreferencesSnapshot, error) {
 	prefs, err := s.loadData(userID)
 	if err != nil {
@@ -195,7 +215,8 @@ func (s *UserPreferencesService) GetSnapshot(userID int) (UserPreferencesSnapsho
 		return UserPreferencesSnapshot{}, err
 	}
 	return UserPreferencesSnapshot{
-		Calendar: normalizeCalendar(prefs.Calendar), ColorMode: colorMode, ThemeID: prefs.ThemeID,
+		WeekStart: normalizeWeekStart(prefs.WeekStart),
+		Calendar:  normalizeCalendar(prefs.Calendar), ColorMode: colorMode, ThemeID: prefs.ThemeID,
 		Theme: theme, TUI: tui,
 		ViewState:               prefs.ViewState,
 		SavedFilters:            prefs.SavedFilters,
@@ -213,10 +234,16 @@ func normalizeCommentSortOrder(order string) string {
 }
 
 func (s *UserPreferencesService) UpdateSnapshot(userID int, patch UserPreferencesPatch) (UserPreferencesSnapshot, error) {
+	if patch.WeekStartSet && !validWeekStart(patch.WeekStart) {
+		return UserPreferencesSnapshot{}, ErrInvalidWeekStart
+	}
 	if patch.CalendarSet && patch.Calendar != "auto" && patch.Calendar != "gregory" && patch.Calendar != "persian" {
 		return UserPreferencesSnapshot{}, ErrInvalidCalendar
 	}
 	err := s.updateData(userID, func(prefs *models.UserPreferencesData) error {
+		if patch.WeekStartSet {
+			prefs.WeekStart = patch.WeekStart
+		}
 		if patch.CalendarSet {
 			prefs.Calendar = patch.Calendar
 		}

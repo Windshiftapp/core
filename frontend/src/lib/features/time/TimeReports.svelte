@@ -613,7 +613,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
       <div>
         <label for="report-date-from" class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.fromDate')}</label>
-        <Input id="report-date-from" type="date" bind:value={filters.date_from} size="small" />
+        <Input id="report-date-from" type="date" bind:value={filters.date_from} size="small" dataTestid="time-report-date-from" />
       </div>
       <div>
         <label for="report-date-to" class="block text-xs font-medium mb-2" style="color: var(--ds-text-subtle);">{t('time.reports.toDate')}</label>

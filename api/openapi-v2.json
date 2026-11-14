@@ -31808,6 +31808,10 @@
                 },
                 "description": "The view state value.",
                 "type": "object"
+              },
+              "week_start": {
+                "description": "The week start value.",
+                "type": "string"
               }
             },
             "required": [
@@ -31818,7 +31822,8 @@
               "due_date_reminders_enabled",
               "saved_filters",
               "tui",
-              "view_state"
+              "view_state",
+              "week_start"
             ],
             "type": "object"
           }
@@ -60537,6 +60542,11 @@
             "description": "The view state value.",
             "nullable": true,
             "type": "object"
+          },
+          "week_start": {
+            "description": "The week start value.",
+            "nullable": true,
+            "type": "string"
           }
         },
         "type": "object"
@@ -60710,6 +60720,10 @@
                 },
                 "description": "The view state value.",
                 "type": "object"
+              },
+              "week_start": {
+                "description": "The week start value.",
+                "type": "string"
               }
             },
             "required": [
@@ -60720,7 +60734,8 @@
               "due_date_reminders_enabled",
               "saved_filters",
               "tui",
-              "view_state"
+              "view_state",
+              "week_start"
             ],
             "type": "object"
           }

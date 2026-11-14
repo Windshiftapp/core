@@ -37,6 +37,9 @@ export default {
     invitationLink: 'Link de convite',
   },
   users: {
+    weekStart: 'Primeiro dia da semana',
+    weekStartHint: 'Aplica-se aos calendários de todo o aplicativo. Automático segue seu idioma e região.',
+    calendarPreferencesSaveFailed: 'O idioma e o fuso horário foram salvos, mas não foi possível salvar as preferências do calendário.',
     title: 'Usuários',
     subtitle: 'Gerenciar contas de usuário e permissões',
     user: 'Usuário',

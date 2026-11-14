@@ -41,6 +41,7 @@
   import { calendarDate as toCalendarDate, calendarMonthStart, calendarMonthPosition, calendarDateAtPosition, civilDays } from './roadmapCalendar.js';
   import { getAppLocale } from '../../stores/appLocale.svelte.js';
   import { resolveCalendar } from '../../stores/calendar.svelte.js';
+  import { startOfPreferredWeek } from '../../stores/calendar.svelte.js';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import ItemKey from '../../components/ItemKey.svelte';
   import { SYSTEM_FIELDS } from '../../stores/fieldConfig.js';
@@ -311,9 +312,7 @@
     }
     d.setDate(d.getDate() + scrollOffset * zoomConfig.columnDays);
     if (zoom === 'week' || zoom === 'month') {
-      const day = d.getDay();
-      const diff = day === 0 ? -6 : 1 - day;
-      d.setDate(d.getDate() + diff);
+      return startOfPreferredWeek(d, getAppLocale());
     }
     return d;
   });
