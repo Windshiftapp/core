@@ -261,6 +261,9 @@ function createWorkspacesStore() {
     // Update an existing workspace in the store
     updateWorkspace(id, updates) {
       const workspaceId = String(id);
+      personalWorkspace.update((workspace) =>
+        workspace && String(workspace.id) === workspaceId ? { ...workspace, ...updates } : workspace
+      );
       workspaces.update((ws) =>
         ws.map((w) => (String(w.id) === workspaceId ? { ...w, ...updates } : w))
       );

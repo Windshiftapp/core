@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, untrack } from 'svelte';
   import { reviews as reviewsApi } from '../../api/misc.js';
   import { itemTypes as itemTypesApi } from '../../api/configuration.js';
   import { authStore } from '../../stores/auth.svelte.js';
@@ -33,10 +33,13 @@
   let reviewContent = $state('');
   let completedItems = $state([]);
   let itemTypes = $state([]);
-  let existingReview = $state(null);
   let loading = $state(false);
   let saving = $state(false);
-  let autoSaveTimeout = $state(null);
+  let reviewReady = $state(false);
+  let autoSaveTimeout = null;
+  let pendingSave = null;
+  let activeReview = null;
+  const reviewTargets = new Map();
   let reviewHistory = $state([]);
   let showHistory = $state(false);
   let previousContent = $state('');
@@ -134,31 +137,41 @@ ${t('personal.placeholderImprovements')}`;
     }
   }
 
-  // Load existing review for the current date and type. A request-generation
-  // guard discards stale responses when the user navigates faster than the
-  // network resolves (WI-1386): without it, reviewContent/existingReview could
-  // end up belonging to an older date while autosave stamps the current one.
+  // Flush the previous draft before loading a new date. Each target retains
+  // its save queue so revisiting it waits for its latest write.
   let reviewGeneration = 0;
   async function loadReview() {
+    flushAutoSave();
     const generation = ++reviewGeneration;
+    const date = currentDate;
+    const type = reviewType;
+    const key = `${type}:${date}`;
+    let target = reviewTargets.get(key);
+    if (!target) {
+      target = { review: null, pending: Promise.resolve(), pendingCount: 0 };
+      reviewTargets.set(key, target);
+    }
+    activeReview = target;
     loading = true;
+    reviewReady = false;
+    saving = target.pendingCount > 0;
     try {
-      await loadCompletedItems(generation);
+      await Promise.all([loadCompletedItems(generation), target.pending]);
       if (generation !== reviewGeneration) return;
 
       const reviews = await reviewsApi.getAll({
-        type: reviewType,
-        start_date: currentDate,
-        end_date: currentDate,
+        type,
+        start_date: date,
+        end_date: date,
         limit: 1
       });
 
       if (generation !== reviewGeneration) return;
 
       if (reviews && reviews.length > 0) {
-        existingReview = reviews[0];
+        target.review = reviews[0];
         try {
-          const data = JSON.parse(existingReview.review_data);
+          const data = JSON.parse(target.review.review_data);
           // Support both old format (separate fields) and new format (single content)
           if (data.content) {
             reviewContent = data.content;
@@ -171,10 +184,11 @@ ${t('personal.placeholderImprovements')}`;
           reviewContent = getDefaultTemplate();
         }
       } else {
-        existingReview = null;
+        target.review = null;
         reviewContent = getDefaultTemplate();
       }
       previousContent = reviewContent;
+      reviewReady = true;
     } catch (error) {
       if (generation === reviewGeneration) {
         console.error('Failed to load review:', error);
@@ -200,23 +214,18 @@ ${t('personal.placeholderImprovements')}`;
     }
   }
 
-  // Auto-save functionality
+  // Capture the draft now; timers and responses must not read another date's state.
   function scheduleAutoSave() {
-    if (autoSaveTimeout) {
-      clearTimeout(autoSaveTimeout);
-    }
-    autoSaveTimeout = setTimeout(() => {
-      saveReview(true);
-    }, 2000);
+    clearTimeout(autoSaveTimeout);
+    pendingSave = captureDraft();
+    autoSaveTimeout = setTimeout(flushAutoSave, 2000);
   }
 
-  // Save review
-  async function saveReview(isAutoSave = false) {
-    if (saving) return;
-
-    saving = true;
-    try {
-      const payload = {
+  function captureDraft() {
+    if (loading || !reviewReady || !activeReview) return null;
+    return {
+      target: activeReview,
+      payload: {
         review_date: currentDate,
         review_type: reviewType,
         review_data: JSON.stringify({
@@ -225,21 +234,42 @@ ${t('personal.placeholderImprovements')}`;
           date: currentDate,
           week_start: reviewType === 'weekly' ? getWeekDates(currentDate).start : null
         })
-      };
-
-      if (existingReview) {
-        const updated = await reviewsApi.update(existingReview.id, {
-          review_data: payload.review_data
-        });
-        existingReview = updated;
-      } else {
-        existingReview = await reviewsApi.create(payload);
       }
-    } catch (error) {
-      console.error('Failed to save review:', error);
-    } finally {
-      saving = false;
-    }
+    };
+  }
+
+  function flushAutoSave() {
+    clearTimeout(autoSaveTimeout);
+    autoSaveTimeout = null;
+    const draft = pendingSave;
+    pendingSave = null;
+    if (draft) return persistDraft(draft);
+  }
+
+  function saveReview() {
+    clearTimeout(autoSaveTimeout);
+    autoSaveTimeout = null;
+    pendingSave = null;
+    const draft = captureDraft();
+    if (draft) return persistDraft(draft);
+  }
+
+  function persistDraft({ target, payload }) {
+    target.pendingCount += 1;
+    if (target === activeReview) saving = true;
+    target.pending = target.pending.then(async () => {
+      try {
+        target.review = target.review
+          ? await reviewsApi.update(target.review.id, { review_data: payload.review_data })
+          : await reviewsApi.create(payload);
+      } catch (error) {
+        console.error('Failed to save review:', error);
+      } finally {
+        target.pendingCount -= 1;
+        if (target === activeReview) saving = target.pendingCount > 0;
+      }
+    });
+    return target.pending;
   }
 
   // Handle review type change
@@ -286,7 +316,7 @@ ${t('personal.placeholderImprovements')}`;
   function handleKeydown(event) {
     if (matchesShortcut(event, saveShortcut)) {
       event.preventDefault();
-      saveReview(false);
+      saveReview();
     }
   }
 
@@ -298,15 +328,15 @@ ${t('personal.placeholderImprovements')}`;
     // Track dependencies and reload when they change
     const type = reviewType;
     const date = currentDate;
-    loadReview();
+    untrack(loadReview);
   });
 
   // Track content changes for auto-save
   $effect(() => {
     const content = reviewContent;
-    if (initialLoadDone && content !== previousContent && !loading) {
+    if (initialLoadDone && reviewReady && content !== previousContent && !loading) {
       previousContent = content;
-      scheduleAutoSave();
+      untrack(scheduleAutoSave);
     }
   });
 
@@ -320,7 +350,12 @@ ${t('personal.placeholderImprovements')}`;
     loadReviewHistory();
     initialLoadDone = true;
   });
-  onDestroy(() => unsubscribeAuth?.());
+  onDestroy(() => {
+    flushAutoSave();
+    reviewGeneration += 1;
+    activeReview = null;
+    unsubscribeAuth?.();
+  });
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -503,6 +538,7 @@ ${t('personal.placeholderImprovements')}`;
         <div onkeydown={handleKeydown} class="review-editor-container">
           <MilkdownEditor
             bind:content={reviewContent}
+            readonly={loading || !reviewReady}
             placeholder={t('personal.startWriting')}
             showToolbar={true}
           />
@@ -510,8 +546,8 @@ ${t('personal.placeholderImprovements')}`;
 
         <div class="flex justify-end pt-6">
           <Button
-            onclick={() => saveReview(false)}
-            disabled={saving}
+            onclick={saveReview}
+            disabled={saving || loading || !reviewReady}
             variant="primary"
             hotkeyConfig={{ key: toHotkeyString('description', 'save') }}
           >

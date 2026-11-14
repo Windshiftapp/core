@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import Badge from '../../components/Badge.svelte';
   import { workspaces } from '../../api/workspaces.js';
   import { statusCategories as statusCategoriesApi } from '../../api/workflows.js';
@@ -179,22 +179,50 @@
     }
   }
 
+  let personalLoadGeneration = 0;
+  let assignedLoadGeneration = 0;
+
+  onDestroy(() => {
+    personalLoadGeneration += 1;
+    assignedLoadGeneration += 1;
+  });
+
+  // Both sections show the full filtered list, including rows beyond page one.
+  async function loadTaskPages(filters, isCurrent) {
+    const rows = new Map();
+    let page = 1;
+    let totalPages = 1;
+    do {
+      const response = await items.getAll({ ...filters, page });
+      if (!isCurrent()) return [];
+      for (const item of response?.data ?? []) rows.set(item.id, item);
+      totalPages = response?.pagination?.total_pages ?? 1;
+      page += 1;
+    } while (page <= totalPages);
+    return [...rows.values()];
+  }
+
   async function loadPersonalTodos() {
+    const generation = ++personalLoadGeneration;
+    const isCurrent = () => generation === personalLoadGeneration;
     try {
       const filters = {
         workspace_id: workspaceId,
         limit: 100
       };
       if (completedSince) filters.completed_since = completedSince;
-      const response = await items.getAll(filters);
-      personalTodos = response?.data ?? [];
+      const tasks = await loadTaskPages(filters, isCurrent);
+      if (isCurrent()) personalTodos = tasks;
     } catch (error) {
+      if (!isCurrent()) return;
       surfaceError(error, { context: 'loadPersonalTodos' });
       personalTodos = [];
     }
   }
 
   async function loadAssignedWork() {
+    const generation = ++assignedLoadGeneration;
+    const isCurrent = () => generation === assignedLoadGeneration;
     try {
       const user = authStore.currentUser;
       if (!user || !user.id) {
@@ -207,10 +235,12 @@
         limit: 100
       };
       if (completedSince) filters.completed_since = completedSince;
-      const response = await items.getAll(filters);
-      let allAssigned = response?.data ?? [];
-      assignedWork = allAssigned.filter(item => item.workspace_id !== parseInt(workspaceId));
+      const allAssigned = await loadTaskPages(filters, isCurrent);
+      if (isCurrent()) {
+        assignedWork = allAssigned.filter(item => item.workspace_id !== parseInt(workspaceId));
+      }
     } catch (error) {
+      if (!isCurrent()) return;
       surfaceError(error, { context: 'loadAssignedWork' });
       assignedWork = [];
     }

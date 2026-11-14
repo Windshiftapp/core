@@ -424,14 +424,14 @@ func (h *ReviewHandler) GetCompletedItems(w http.ResponseWriter, r *http.Request
 		FROM completion_events ce
 		JOIN items i ON i.id = ce.item_id
 		JOIN workspaces w ON i.workspace_id = w.id
-		WHERE i.assignee_id = ?
+		WHERE (i.assignee_id = ? OR (w.is_personal = true AND w.owner_id = ?))
 		  AND i.workspace_id IN (%s)
 		  AND DATE(ce.completed_at) >= ?
 		  AND DATE(ce.completed_at) <= ?
 		ORDER BY ce.completed_at DESC`, workspacePlaceholders)
 
-	args := make([]any, 0, len(workspaceIDs)+3)
-	args = append(args, userID)
+	args := make([]any, 0, len(workspaceIDs)+4)
+	args = append(args, userID, userID)
 	for _, workspaceID := range workspaceIDs {
 		args = append(args, workspaceID)
 	}
@@ -458,11 +458,8 @@ func (h *ReviewHandler) GetCompletedItems(w http.ResponseWriter, r *http.Request
 		}
 
 		if completedAtStr.Valid && completedAtStr.String != "" {
-			var t time.Time
-			if t, err = time.Parse("2006-01-02 15:04:05", completedAtStr.String); err == nil {
-				item.CompletedAt = &t
-			} else if t, err = time.Parse(time.RFC3339, completedAtStr.String); err == nil {
-				item.CompletedAt = &t
+			if completedAt := services.ParseTimestamp(completedAtStr.String); !completedAt.IsZero() {
+				item.CompletedAt = &completedAt
 			}
 		}
 
