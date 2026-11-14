@@ -4,6 +4,7 @@ package auth
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -170,12 +171,12 @@ func (sm *SessionManager) CreateSession(userID int, ipAddress, userAgent string,
 	// the caller once and lives in the secure cookie. Validation keeps a legacy
 	// plaintext fallback so existing sessions survive the upgrade.
 	query := `
-		INSERT INTO user_sessions (user_id, session_token, expires_at, ip_address, user_agent, is_active, created_at)
-		VALUES (?, ?, ?, ?, ?, true, ?)
+		INSERT INTO user_sessions (user_id, session_token, expires_at, ip_address, user_agent, is_active, created_at, remember_me)
+		VALUES (?, ?, ?, ?, ?, true, ?, ?)
 		RETURNING id
 	`
 	var sessionID int64
-	err = sm.db.QueryRow(query, userID, hashSessionToken(token), expiresAt, ipAddress, userAgent, time.Now()).Scan(&sessionID)
+	err = sm.db.QueryRow(query, userID, hashSessionToken(token), expiresAt, ipAddress, userAgent, time.Now(), rememberMe).Scan(&sessionID)
 	if err != nil {
 		slog.Error("session db insert failed", slog.String("component", "sso"), slog.Any("error", err))
 		return nil, fmt.Errorf("failed to create session: %w", err)
@@ -332,14 +333,55 @@ func (sm *SessionManager) SetEnrollmentRequired(sessionID int, required bool) er
 	return sm.ClearEnrollmentRequired(sessionID)
 }
 
-// ClearEnrollmentRequired elevates a pending session after its required WebAuthn ceremony.
+// ClearEnrollmentRequired completes one live ceremony and revokes other first-enrollment sessions.
 func (sm *SessionManager) ClearEnrollmentRequired(sessionID int) error {
-	query := `UPDATE user_sessions SET enrollment_required = false, auth_pending_type = NULL, expires_at = ? WHERE id = ?`
-	_, err := sm.db.ExecWrite(query, time.Now().Add(DefaultSessionDuration), sessionID)
+	var userID int
+	err := database.WithTx(sm.db, func(tx database.Tx) error {
+		var pendingType string
+		var rememberMe bool
+		err := tx.QueryRow(`SELECT user_id, COALESCE(auth_pending_type, ?), remember_me FROM user_sessions
+			WHERE id = ? AND is_active = true AND enrollment_required = true AND expires_at > ?`,
+			AuthPendingEnrollment, sessionID, time.Now()).Scan(&userID, &pendingType, &rememberMe)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrInvalidSession
+		}
+		if err != nil {
+			return err
+		}
+		if pendingType != AuthPendingEnrollment && pendingType != AuthPendingPasskeyVerification {
+			return ErrInvalidSession
+		}
+		now := time.Now()
+		duration := DefaultSessionDuration
+		if rememberMe {
+			duration = ExtendedSessionDuration
+		}
+		result, err := tx.ExecWrite(`UPDATE user_sessions
+			SET enrollment_required = false, auth_pending_type = NULL,
+				expires_at = ?
+			WHERE id = ? AND is_active = true AND enrollment_required = true AND expires_at > ?`,
+			now.Add(duration), sessionID, now)
+		if err != nil {
+			return err
+		}
+		count, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if count != 1 {
+			return ErrInvalidSession
+		}
+		if pendingType == AuthPendingEnrollment {
+			_, err = tx.ExecWrite(`UPDATE user_sessions SET is_active = false
+				WHERE user_id = ? AND id <> ? AND enrollment_required = true
+				AND (auth_pending_type = ? OR auth_pending_type IS NULL)`, userID, sessionID, AuthPendingEnrollment)
+		}
+		return err
+	})
 	if err != nil {
 		return fmt.Errorf("failed to clear auth pending state: %w", err)
 	}
-	sm.invalidateSessionValidationID(sessionID)
+	sm.InvalidateUserSessionValidation(userID)
 	return nil
 }
 
@@ -352,21 +394,4 @@ func (sm *SessionManager) IsEnrollmentRequired(sessionID int) (bool, error) {
 		return false, fmt.Errorf("failed to check enrollment required: %w", err)
 	}
 	return required, nil
-}
-
-// ClearEnrollmentRequiredByUserID elevates enrollment-only sessions after a
-// successful first-passkey registration. It deliberately does not elevate
-// password+passkey verification sessions, which still require an assertion.
-func (sm *SessionManager) ClearEnrollmentRequiredByUserID(userID int) error {
-	query := `
-		UPDATE user_sessions SET enrollment_required = false, auth_pending_type = NULL, expires_at = ?
-		WHERE user_id = ? AND is_active = true
-		AND (auth_pending_type = ? OR (auth_pending_type IS NULL AND enrollment_required = true))
-	`
-	_, err := sm.db.ExecWrite(query, time.Now().Add(DefaultSessionDuration), userID, AuthPendingEnrollment)
-	if err != nil {
-		return fmt.Errorf("failed to clear enrollment required: %w", err)
-	}
-	sm.InvalidateUserSessionValidation(userID)
-	return nil
 }

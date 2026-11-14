@@ -298,6 +298,9 @@ function createAuthStore() {
       error.set(null);
       try {
         const response = await auth.getCurrentUser();
+        if (response.session?.enrollment_required) {
+          throw new Error('Passkey authentication is still required. Please sign in again.');
+        }
         user.set(response.user || fallbackUser);
         session.set(response.session);
         isAuthenticated.set(true);

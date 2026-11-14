@@ -3418,6 +3418,14 @@ CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_m
 		SQLite:        timeWorklogDraftsMigrationSQLite,
 		Postgres:      timeWorklogDraftsMigrationPostgres,
 	},
+	{
+		Version:       "20261125_session_remember_me",
+		Name:          "Preserve the session lifetime choice through passkey authentication",
+		CheckSQLite:   sqliteColumnCheck("user_sessions", "remember_me"),
+		CheckPostgres: pgColumnCheck("user_sessions", "remember_me"),
+		SQLite:        "ALTER TABLE user_sessions ADD COLUMN remember_me BOOLEAN NOT NULL DEFAULT false",
+		Postgres:      "ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS remember_me BOOLEAN NOT NULL DEFAULT false",
+	},
 }
 
 const timeWorklogDraftsMigrationSQLite = `

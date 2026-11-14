@@ -52,7 +52,8 @@
   let policyStatus = $state({
     hide_password_form: false,
     sso_enabled: false,
-    passkey_required: false
+    passkey_required: false,
+    password_first_required: false
   });
 
   // Focus the first input when dialog opens
@@ -79,19 +80,17 @@
     } catch (err) {
       console.warn('Failed to load auth policy status:', err);
       // Default to showing password form on error
-      policyStatus = { hide_password_form: false, sso_enabled: false, passkey_required: false };
+      policyStatus = { hide_password_form: false, sso_enabled: false, passkey_required: false, password_first_required: false };
     }
   }
 
   $effect(() => {
     if (isOpen && emailInput) {
-      setTimeout(() => {
-        try {
-          emailInput?.focus();
-        } catch (error) {
-          console.warn('Failed to focus email input:', error);
-        }
-      }, 100);
+      try {
+        emailInput.focus();
+      } catch (error) {
+        console.warn('Failed to focus email input:', error);
+      }
     }
   });
 
@@ -129,6 +128,11 @@
 
   // Check if FIDO authentication is available when user enters email
   async function checkFidoAvailability() {
+    if (policyStatus.password_first_required) {
+      fidoAvailable = false;
+      showFidoOption = false;
+      return;
+    }
     const { available, showOption } = await evaluateFidoAvailability(emailOrUsername);
     fidoAvailable = available;
     showFidoOption = showOption;
@@ -152,7 +156,7 @@
       validationError = '';
       authStore.clearError();
 
-      const loginResult = await performFidoLogin(emailOrUsername);
+      const loginResult = await performFidoLogin(emailOrUsername, rememberMe);
 
       if (loginResult.success || loginResult.status === 'success') {
         // Verify the browser session was issued/elevated and load canonical
@@ -476,7 +480,7 @@
       {/if}
 
       <!-- FIDO Authentication Option -->
-      {#if showFidoOption && fidoAvailable}
+      {#if showFidoOption && fidoAvailable && !policyStatus.password_first_required}
         <div class="relative">
           <div class="absolute inset-0 flex items-center">
             <div class="w-full border-t border-[var(--ds-border)]"></div>

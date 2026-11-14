@@ -15,6 +15,7 @@ import (
 	"windshift/internal/auth"
 	"windshift/internal/database"
 	"windshift/internal/logger"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/sanitize"
 	"windshift/internal/services"
@@ -198,7 +199,8 @@ func (h *WebAuthnHandler) StartFIDORegistrationNew(w http.ResponseWriter, r *htt
 	webAuthnUser.SetCredentials(existingCreds)
 
 	// Begin registration with go-webauthn
-	options, sessionData, err := h.config.WebAuthn().BeginRegistration(webAuthnUser)
+	options, sessionData, err := h.config.WebAuthn().BeginRegistration(webAuthnUser,
+		webauthnlib.WithExclusions(webAuthnUser.CredentialExcludeList()))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -319,11 +321,13 @@ func (h *WebAuthnHandler) CompleteFIDORegistrationNew(w http.ResponseWriter, r *
 		return
 	}
 
-	// Clear enrollment required flag for this user's sessions
-	// This allows the user to continue without being redirected to enrollment again
-	if err := h.sessionManager.ClearEnrollmentRequiredByUserID(userID); err != nil {
-		slog.Warn("failed to clear enrollment required flag", slog.String("component", "webauthn"), slog.Int("user_id", userID), slog.Any("error", err))
-		// Non-fatal, continue
+	// A credential added by another browser or administrator is not proof for this session.
+	if session, ok := r.Context().Value(middleware.ContextKeySession).(*auth.Session); ok &&
+		session.UserID == userID && session.EnrollmentRequired && session.AuthPendingType == auth.AuthPendingEnrollment {
+		if err := h.sessionManager.ClearEnrollmentRequired(session.ID); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
 	}
 
 	currentUser := utils.GetCurrentUser(r)
@@ -454,8 +458,9 @@ type FIDOLoginRequestNew struct {
 
 // FIDOCompleteLoginRequest represents the login completion request
 type FIDOCompleteLoginRequest struct {
-	SessionID string `json:"sessionId"`
-	Response  any    `json:"response"`
+	SessionID  string `json:"sessionId"`
+	Response   any    `json:"response"`
+	RememberMe bool   `json:"remember_me"`
 }
 
 // StartFIDOLoginNew initiates FIDO authentication with proper verification.
@@ -714,13 +719,13 @@ func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Re
 		}
 	} else {
 		clientIP := h.ipExtractor.GetClientIP(r)
-		session, err := h.sessionManager.CreateSession(user.ID, clientIP, r.UserAgent(), false)
+		session, err := h.sessionManager.CreateSession(user.ID, clientIP, r.UserAgent(), req.RememberMe)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
 
-		if err := h.sessionManager.SetSessionCookie(w, r, session.Token, false); err != nil {
+		if err := h.sessionManager.SetSessionCookie(w, r, session.Token, req.RememberMe); err != nil {
 			if delErr := h.sessionManager.DeleteSession(session.Token); delErr != nil {
 				slog.Warn("failed to revoke session after cookie error", slog.Any("error", delErr))
 			}

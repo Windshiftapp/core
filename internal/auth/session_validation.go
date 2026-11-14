@@ -27,12 +27,13 @@ const (
 )
 
 type cachedSessionValidation struct {
-	LoadedAt       time.Time `json:"loaded_at"`
-	Epoch          uint64    `json:"epoch"`
-	TokenVersion   uint64    `json:"token_version"`
-	SessionVersion uint64    `json:"session_version"`
-	UserVersion    uint64    `json:"user_version"`
-	Session        Session   `json:"session"`
+	LoadedAt        time.Time `json:"loaded_at"`
+	Epoch           uint64    `json:"epoch"`
+	TokenVersion    uint64    `json:"token_version"`
+	SessionVersion  uint64    `json:"session_version"`
+	UserVersion     uint64    `json:"user_version"`
+	Session         Session   `json:"session"`
+	AuthPendingType string    `json:"auth_pending_type"`
 }
 
 type sessionValidationLoad struct {
@@ -461,6 +462,7 @@ func (validator *sessionValidator) get(key string) (*Session, bool) {
 		_ = validator.cache.Delete(key)
 		return nil, false
 	}
+	entry.Session.AuthPendingType = entry.AuthPendingType
 	return cloneSession(&entry.Session), true
 }
 
@@ -478,12 +480,13 @@ func (validator *sessionValidator) setIfCurrent(key string, session *Session, ep
 	}
 
 	value, err := json.Marshal(cachedSessionValidation{
-		LoadedAt:       time.Now(),
-		Epoch:          epoch,
-		TokenVersion:   tokenVersion,
-		SessionVersion: sessionVersion,
-		UserVersion:    userVersion,
-		Session:        *cloneSession(session),
+		LoadedAt:        time.Now(),
+		Epoch:           epoch,
+		TokenVersion:    tokenVersion,
+		SessionVersion:  sessionVersion,
+		UserVersion:     userVersion,
+		Session:         *cloneSession(session),
+		AuthPendingType: session.AuthPendingType,
 	})
 	if err != nil {
 		validator.cacheDecodeFailures.Add(1)

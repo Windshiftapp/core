@@ -16,6 +16,7 @@ import {
   revokeApiToken,
   startFIDORegistration,
 } from '../api/users.js';
+import { authStore } from './auth.svelte.js';
 import { capabilitiesStore } from './capabilities.svelte.js';
 import { scopeCatalogStore } from './scopeCatalog.svelte.js';
 
@@ -98,11 +99,11 @@ class SecurityStore {
     if (userId && !this.initialized) {
       this.currentUserId = userId;
       this.initialized = true;
-      this.loadFeatures();
       // A restricted enrollment session may call only /auth/me and WebAuthn
       // registration endpoints. Avoid unrelated profile/token requests until
       // registration elevates the session.
       if (!enrollmentOnly) {
+        this.loadFeatures();
         this.loadUserProfile();
         this.loadCredentials();
         this.loadApiTokens();
@@ -234,6 +235,7 @@ class SecurityStore {
 
       const wasEnrollmentRequired = this.enrollmentOnly;
       if (wasEnrollmentRequired) {
+        await authStore.completePasskeyLogin();
         this.enrollmentOnly = false;
         this.showEnrollmentBanner = false;
         this.enrollmentType = '';
@@ -242,6 +244,8 @@ class SecurityStore {
 
       if (wasEnrollmentRequired) {
         await Promise.allSettled([
+          this.loadFeatures(),
+          this.loadScopeCatalog(),
           this.loadUserProfile(),
           this.loadCredentials(),
           this.loadApiTokens(),

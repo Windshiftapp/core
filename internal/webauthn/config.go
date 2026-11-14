@@ -144,10 +144,9 @@ func NewConfig(opts Options) (*Config, error) {
 		// Set reasonable defaults
 		AttestationPreference: protocol.PreferNoAttestation, // Don't require attestation by default
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
-			AuthenticatorAttachment: protocol.Platform,                        // Prefer platform authenticators (passkeys)
-			RequireResidentKey:      &[]bool{false}[0],                        // Don't require resident key
-			ResidentKey:             protocol.ResidentKeyRequirementPreferred, // Prefer resident keys for passkeys
-			UserVerification:        protocol.VerificationPreferred,           // Prefer user verification
+			RequireResidentKey: &[]bool{false}[0],                        // Don't require resident key
+			ResidentKey:        protocol.ResidentKeyRequirementPreferred, // Prefer resident keys for passkeys
+			UserVerification:   protocol.VerificationPreferred,           // Prefer user verification
 		},
 		Debug: c.Debug,
 	}

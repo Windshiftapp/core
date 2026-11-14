@@ -31,7 +31,7 @@ export async function evaluateFidoAvailability(emailOrUsername) {
   }
 }
 
-export async function performFidoLogin(emailOrUsername) {
+export async function performFidoLogin(emailOrUsername, rememberMe = false) {
   if (!emailOrUsername?.trim()) {
     throw new Error('Email or username is required');
   }
@@ -48,7 +48,9 @@ export async function performFidoLogin(emailOrUsername) {
 
   const credentialResponse = await authenticateWithCredential(publicKeyOptions);
 
-  const loginData = sessionId ? { sessionId, response: credentialResponse } : credentialResponse;
+  const loginData = sessionId
+    ? { sessionId, response: credentialResponse, remember_me: rememberMe }
+    : credentialResponse;
 
   return auth.completeFIDOLogin(loginData);
 }
