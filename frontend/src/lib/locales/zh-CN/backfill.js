@@ -652,7 +652,6 @@ export default {
       "latestFiftyRightmost": "最右侧列仅显示最新 50 个事项",
       "latestFiftyRightmostHint": "适用于内容较多的“已完成”列，而不会限制看板的其余部分。",
       "recentActivityWindow": "最近活动时间窗口",
-      "resetViews": "重置为工作区默认值",
       "retentionRangeError": "请输入 1 到 3650 之间的整数。",
       "completedVisibility": "已完成工作",
       "completedVisibilityCustom": "自定义（使用下方选项）",
@@ -678,9 +677,6 @@ export default {
         "time_in_status": "状态停留时间",
       },
       "views": "视图",
-      "viewsHelp": "选择此处可用的集合视图。已禁用的视图会从导航中消失，直接链接会回退到已启用的视图。",
-      "viewsInheritedHint": "此集合遵循工作区默认视图。",
-      "viewsOverrideHint": "此集合覆盖工作区默认视图。",
     },
     "connectedAccounts": {
       "oauthConnected": "账户已连接",

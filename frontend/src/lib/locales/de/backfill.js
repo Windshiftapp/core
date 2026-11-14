@@ -655,7 +655,6 @@ export default {
       "latestFiftyRightmost": "Nur die neuesten 50 Vorgänge in der rechten Spalte anzeigen",
       "latestFiftyRightmostHint": "Nützlich für gut gefüllte „Erledigt“-Spalten, ohne den Rest des Boards einzuschränken.",
       "recentActivityWindow": "Zeitfenster für letzte Aktivität",
-      "resetViews": "Auf Arbeitsbereich-Standard zurücksetzen",
       "retentionRangeError": "Geben Sie eine ganze Zahl von 1 bis 3650 ein.",
       "completedVisibility": "Abgeschlossene Arbeit",
       "completedVisibilityCustom": "Benutzerdefiniert (Optionen unten verwenden)",
@@ -681,9 +680,6 @@ export default {
         "time_in_status": "Zeit im Status",
       },
       "views": "Ansichten",
-      "viewsHelp": "Wählen Sie, welche Sammlungsansichten hier verfügbar sind. Deaktivierte Ansichten verschwinden aus der Navigation und direkte Links fallen auf eine aktivierte Ansicht zurück.",
-      "viewsInheritedHint": "Diese Sammlung folgt den Standardansichten des Arbeitsbereichs.",
-      "viewsOverrideHint": "Diese Sammlung überschreibt die Standardansichten des Arbeitsbereichs.",
     },
     "connectedAccounts": {
       "oauthConnected": "Konto verbunden",
