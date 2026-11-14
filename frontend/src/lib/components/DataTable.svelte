@@ -9,6 +9,7 @@
   import EmptyState from './EmptyState.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { sanitizeHtml } from '../utils/sanitize.ts';
+  import { isMenuTriggerEvent } from '../utils/menuTrigger.js';
   import { activeColumnSort, nextColumnSort } from './dataTableSort.js';
 
   let {
@@ -154,7 +155,7 @@
   }
   
   function handleRowClick(item, event) {
-    if (onRowClick && !event.target.closest('.dropdown-trigger')) {
+    if (onRowClick && !isMenuTriggerEvent(event)) {
       onRowClick(item);
     }
   }

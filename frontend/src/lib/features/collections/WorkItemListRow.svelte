@@ -4,6 +4,7 @@
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import LazyRender from '../../components/LazyRender.svelte';
   import ListCellRenderer from './ListCellRenderer.svelte';
+  import { isMenuTriggerEvent } from '../../utils/menuTrigger.js';
 
   let {
     item,
@@ -39,6 +40,8 @@
   // shift-click extends the view's selection and a plain click is left to the
   // cell editors. Mirrors BoardItemCard.
   function handleRowClick(event) {
+    // The row owns the click, but a menu trigger inside it does not.
+    if (isMenuTriggerEvent(event)) return;
     if (selectionMode && onselect) {
       event.preventDefault();
       onselect(item.id, event);

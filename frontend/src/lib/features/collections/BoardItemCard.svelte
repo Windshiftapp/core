@@ -7,6 +7,7 @@
   import DropIndicator from '../../layout/DropIndicator.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import { formatDateOnly } from '../../utils/dateFormatter.js';
+  import { isMenuTriggerEvent } from '../../utils/menuTrigger.js';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import ItemKey from '../../components/ItemKey.svelte';
   import { t } from '../../stores/i18n.svelte.js';
@@ -146,6 +147,8 @@
   // In selection mode the whole card toggles its selection; otherwise
   // shift-click extends the board selection and a plain click opens the card.
   function handleCardClick(event) {
+    // The card owns the click, but a menu trigger inside it does not.
+    if (isMenuTriggerEvent(event)) return;
     if (selectionMode && onselect) {
       event.preventDefault();
       onselect(item.id, event);

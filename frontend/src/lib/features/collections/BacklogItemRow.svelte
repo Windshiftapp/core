@@ -7,6 +7,7 @@
   import WorkItemRow from '../items/WorkItemRow.svelte';
   import BacklogItemActions from './BacklogItemActions.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { isMenuTriggerEvent } from '../../utils/menuTrigger.js';
 
   let {
     item, sectionId, workspace, itemTypes, statuses, statusCategories, styles, dragState,
@@ -23,6 +24,8 @@
   // shift-click extends the backlog selection and a plain click opens the item.
   // Mirrors BoardItemCard and WorkItemListRow.
   function handleRowClick(event) {
+    // The row owns the click, but the action menu trigger inside it does not.
+    if (isMenuTriggerEvent(event)) return;
     if (selectionMode && onSelect) {
       event.preventDefault();
       onSelect(item.id, event);

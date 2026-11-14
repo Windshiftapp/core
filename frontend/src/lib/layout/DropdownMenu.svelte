@@ -192,9 +192,9 @@
     data-testid={triggerTestid || undefined}
     data-active={triggerActive ? 'true' : undefined}
     data-open={$open ? 'true' : undefined}
+    data-menu-trigger
     aria-label={triggerLabel || triggerText || undefined}
     title={triggerText || undefined}
-    onclick={(e) => e.stopPropagation()}
     onkeydown={(e) => e.stopPropagation()}
     class="menu-trigger {triggerAvatar ? 'p-0' : iconOnly ? '' : triggerClass ? '' : 'px-4 py-2'} rounded text-sm font-medium transition flex items-center {alignmentClass} {triggerGap} flex-shrink-0 {triggerBgColor ? getTextColorForBackground(triggerBgColor) : ''} {triggerClass} {isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}"
     style={triggerBgColor ? `background-color: ${triggerBgColor}; ${triggerStyle}` : triggerStyle}
