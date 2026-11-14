@@ -11,6 +11,7 @@ import (
 	ldapPkg "windshift/internal/ldap"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/sanitize"
 	"windshift/internal/sso"
 	"windshift/internal/utils"
@@ -180,6 +181,10 @@ func (h *LDAPHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 
 // CreateConfig handles POST /api/admin/ldap/configs
 func (h *LDAPHandler) CreateConfig(w http.ResponseWriter, r *http.Request) {
+	if err := operatorcontrols.From(h.db).Check(operatorcontrols.LDAP); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	req, ok := decodeJSON[LDAPConfigRequest](w, r)
 	if !ok {
 		return
@@ -283,6 +288,10 @@ func (h *LDAPHandler) CreateConfig(w http.ResponseWriter, r *http.Request) {
 
 // UpdateConfig handles PUT /api/admin/ldap/configs/{id}
 func (h *LDAPHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
+	if err := operatorcontrols.From(h.db).Check(operatorcontrols.LDAP); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -435,6 +444,10 @@ func (h *LDAPHandler) DeleteConfig(w http.ResponseWriter, r *http.Request) {
 
 // TestConnection handles POST /api/admin/ldap/configs/{id}/test
 func (h *LDAPHandler) TestConnection(w http.ResponseWriter, r *http.Request) {
+	if err := operatorcontrols.From(h.db).Check(operatorcontrols.LDAP); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return
@@ -487,6 +500,10 @@ func (h *LDAPHandler) TestConnection(w http.ResponseWriter, r *http.Request) {
 
 // TriggerSync handles POST /api/admin/ldap/configs/{id}/sync
 func (h *LDAPHandler) TriggerSync(w http.ResponseWriter, r *http.Request) {
+	if err := operatorcontrols.From(h.db).Check(operatorcontrols.LDAP); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	id, ok := requireIDParam(w, r, "id")
 	if !ok {
 		return

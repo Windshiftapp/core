@@ -36,6 +36,8 @@ type FlowOptions struct {
 	// TotalSteps is a shared counter across nested flows — an iterator body
 	// shares the outer flow's budget. Nil means the runner keeps its own.
 	TotalSteps *int
+	// AdmitStep reserves aggregate capacity before dispatch, including iterators.
+	AdmitStep func(context.Context) error
 	// OnStep is invoked for every recorded step, in order. Engines use it to
 	// mirror steps into their execution context while the flow runs, since
 	// condition edges and iterators read earlier results mid-flow.
@@ -113,6 +115,13 @@ func RunFlow[N RunnerNode, E ActionEdge](execCtx context.Context, nodes []N, edg
 			continue
 		}
 
+		if opts.AdmitStep != nil && (opts.MaxSteps == 0 || *total < opts.MaxSteps) {
+			if err := opts.AdmitStep(execCtx); err != nil {
+				now := time.Now()
+				record(models.StepResult{NodeID: node.GetID(), NodeType: models.ActionNodeType(node.GetNodeType()), Status: models.ActionStatusFailed, StartedAt: now, CompletedAt: &now, ErrorMessage: err.Error()})
+				return run, err
+			}
+		}
 		*total++
 		if opts.MaxSteps > 0 && *total > opts.MaxSteps {
 			now := time.Now()

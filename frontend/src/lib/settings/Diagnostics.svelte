@@ -17,6 +17,10 @@
   import SCMHealthSection from './diagnostics/SCMHealthSection.svelte';
   import EmailIntakeSection from './diagnostics/EmailIntakeSection.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { capabilitiesStore } from '../stores/capabilities.svelte.js';
+  import AlertBox from '../components/AlertBox.svelte';
+
+  const runtimeTabs = new Set(['schedulers', 'domain-events', 'frac-index', 'runner-pools', 'database-pools', 'cache-memory']);
 
   let diagnosticGroups = $derived([
     { label: t('diagnostics.groups.overview'), tabs: [{ id: 'clock', label: t('diagnostics.tabs.clock') }] },
@@ -51,6 +55,7 @@
   })));
 
   const subtab = $derived($currentRoute.query?.subtab || 'clock');
+  const runtimeRestricted = $derived(runtimeTabs.has(subtab) && !capabilitiesStore.operatorAllows('runtime_diagnostics'));
   const activeGroup = $derived(
     diagnosticGroups.find((group) => group.tabs.some((tab) => tab.id === subtab)) ?? diagnosticGroups[0]
   );
@@ -70,7 +75,9 @@
     {/if}
 
     <div>
-      {#if subtab === 'clock'}
+      {#if runtimeRestricted}
+        <div data-testid="operator-controls-diagnostics-restricted"><AlertBox variant="info" message={t('operatorControls.restricted')} /></div>
+      {:else if subtab === 'clock'}
         <ServerClockSection />
       {:else if subtab === 'actions'}
         <ActionLogsSection />

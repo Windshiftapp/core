@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/operatorcontrols"
 )
 
 // Load parses CLI flags (via the default flag.CommandLine), reads env vars,
@@ -25,6 +26,7 @@ import (
 func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 	// Flag definitions mirror the historic main.go flags verbatim.
 	var (
+		operatorPolicyPath    = flag.String("operator-policy", "", "Path to an operator-owned JSON controls file (changes require restart)")
 		portFlag              = flag.String("port", "8080", "Port to run the HTTP server on")
 		portShort             = flag.String("p", "8080", "Port to run the HTTP server on (shorthand)")
 		dbPath                = flag.String("db", "windshift.db", "Database file path (SQLite)")
@@ -67,6 +69,12 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 		memoryLimitMB         = flag.Int("memory-limit-mb", DefaultMemoryLimitMB, "Total Windshift process memory budget in MiB")
 	)
 	flag.Parse()
+	policyPath := firstNonEmpty(os.Getenv("WINDSHIFT_OPERATOR_POLICY"), *operatorPolicyPath)
+	operatorPolicy, policyErr := operatorcontrols.Load(policyPath)
+	if policyErr != nil {
+		slog.Error("FATAL: invalid operator policy", "error", policyErr)
+		os.Exit(1)
+	}
 
 	// Track which flags were supplied explicitly so an alias, or a boolean set to
 	// its default value, is distinguishable from an omitted one.
@@ -216,6 +224,7 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 	}
 
 	return Config{
+		OperatorPolicy:    operatorPolicy,
 		Port:              port,
 		BaseURL:           resolvedBaseURL,
 		ContextPath:       resolvedContextPath,

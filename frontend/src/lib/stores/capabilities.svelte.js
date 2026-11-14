@@ -1,12 +1,10 @@
-/**
- * Store for tracking plugin capabilities.
- * Capabilities are loaded from /api/features and used to gate UI features.
- */
+/** Effective plugin capabilities and read-only deployment restrictions. */
 
 class CapabilitiesStore {
   /** @type {Set<string>} */
   capabilities = $state(new Set());
   sshAvailable = $state(false);
+  operatorControls = $state(null);
   loaded = $state(false);
   #loadPromise = null;
   #hydrationPromise = null;
@@ -16,6 +14,7 @@ class CapabilitiesStore {
     if (!data) return;
     this.capabilities = new Set(data.capabilities || []);
     this.sshAvailable = data.ssh_available === true;
+    this.operatorControls = data.operator_controls || null;
     this.loaded = true;
     this.#finishHydration(true);
   }
@@ -75,6 +74,7 @@ class CapabilitiesStore {
   reset() {
     this.capabilities = new Set();
     this.sshAvailable = false;
+    this.operatorControls = null;
     this.loaded = false;
     this.#loadPromise = null;
     this.#finishHydration(false);
@@ -87,6 +87,14 @@ class CapabilitiesStore {
    */
   has(name) {
     return this.capabilities.has(name);
+  }
+
+  operatorAllows(name) {
+    if (name === 'mail' && this.operatorControls?.mail_suspended) return false;
+    if (name === 'mail' && this.operatorControls?.mail_mode === 'disabled') return false;
+    if (name === 'mail_transport_management' && this.operatorControls?.mail_mode === 'managed')
+      return false;
+    return !this.operatorControls?.deny?.includes(name);
   }
 }
 

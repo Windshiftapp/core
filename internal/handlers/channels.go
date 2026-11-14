@@ -785,6 +785,15 @@ func (h *ChannelHandler) TestChannelConfig(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	channelType := channel.Type
+	configBytes, marshalErr := json.Marshal(testData.Config)
+	if marshalErr != nil {
+		respondInternalError(w, r, marshalErr)
+		return
+	}
+	if err := h.service.CheckTransportConfig(ctx, id, string(configBytes)); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	if channelType == "smtp" && testData.Config.SMTPPassword == "" {
 		rawConfig, configErr := h.service.GetConfig(ctx, id)
 		if configErr != nil {

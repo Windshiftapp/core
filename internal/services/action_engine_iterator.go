@@ -138,6 +138,7 @@ func (as *ActionService) runBodyOnce(
 		MaxSteps:          maxStepsPerFlow,
 		BudgetExceededErr: errStepBudgetExceeded,
 		TotalSteps:        &ctx.TotalSteps,
+		AdmitStep:         automationStepAdmission(as.db),
 	}, func(node *models.ActionNode, step *models.StepResult, markExecuted func(int)) error {
 		// Iterators inside iterator bodies are valid — recurse.
 		if node.NodeType.IsIterator() {

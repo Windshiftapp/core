@@ -19,6 +19,7 @@ import (
 	"windshift/internal/llm"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 	"windshift/internal/scheduler"
 	"windshift/internal/services"
@@ -32,6 +33,7 @@ import (
 // webhook_deliveries, scheduler_runs) and is read-only except for the manual
 // purge endpoints, which delete old rows on demand.
 type DiagnosticsHandler struct {
+	controls            *operatorcontrols.Controls
 	sessionManager      *auth.SessionManager
 	databaseDiagRepo    *repository.DatabaseDiagnosticsRepository
 	actionRepo          *repository.ActionRepository
@@ -82,6 +84,7 @@ func NewDiagnosticsHandler(
 	channelRepo *repository.ChannelRepository,
 ) *DiagnosticsHandler {
 	return &DiagnosticsHandler{
+		controls:            operatorcontrols.From(settingsRepo),
 		sessionManager:      sessionManager,
 		databaseDiagRepo:    databaseDiagRepo,
 		actionRepo:          actionRepo,
@@ -175,7 +178,11 @@ func (h *DiagnosticsHandler) GetEmailIntakeDiagnostics(w http.ResponseWriter, r 
 // cache allocation/traffic counters for this replica.
 //
 // GET /api/admin/diagnostics/cache-memory
-func (h *DiagnosticsHandler) GetCacheMemory(w http.ResponseWriter, _ *http.Request) {
+func (h *DiagnosticsHandler) GetCacheMemory(w http.ResponseWriter, r *http.Request) {
+	if err := h.controls.Check(operatorcontrols.RuntimeDiagnostics); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	var memory runtime.MemStats
 	runtime.ReadMemStats(&memory)
 	caches := cacheutil.Snapshots()
@@ -456,7 +463,11 @@ func (h *DiagnosticsHandler) UpdateRecurrenceVolumeSettings(w http.ResponseWrite
 // cardinality, SQL, latency, pool, failure, and side-effect counters.
 //
 // GET /api/admin/diagnostics/bulk-operations
-func (h *DiagnosticsHandler) GetBulkOperations(w http.ResponseWriter, _ *http.Request) {
+func (h *DiagnosticsHandler) GetBulkOperations(w http.ResponseWriter, r *http.Request) {
+	if err := h.controls.Check(operatorcontrols.RuntimeDiagnostics); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	if h.bulkOperations == nil {
 		respondJSONOK(w, services.BulkOperationStats{Operations: map[string]services.BulkOperationKindStats{}})
 		return
@@ -468,7 +479,11 @@ func (h *DiagnosticsHandler) GetBulkOperations(w http.ResponseWriter, _ *http.Re
 // lifetime counters. Delivery history remains on the persisted endpoints.
 //
 // GET /api/admin/diagnostics/webhook-dispatch
-func (h *DiagnosticsHandler) GetWebhookDispatch(w http.ResponseWriter, _ *http.Request) {
+func (h *DiagnosticsHandler) GetWebhookDispatch(w http.ResponseWriter, r *http.Request) {
+	if err := h.controls.Check(operatorcontrols.RuntimeDiagnostics); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	if h.webhookSender == nil {
 		respondJSONOK(w, webhook.DispatchStats{})
 		return
@@ -480,7 +495,11 @@ func (h *DiagnosticsHandler) GetWebhookDispatch(w http.ResponseWriter, _ *http.R
 // coalescing, latency, and response-size counters.
 //
 // GET /api/admin/diagnostics/transition-matrix
-func (h *DiagnosticsHandler) GetTransitionMatrix(w http.ResponseWriter, _ *http.Request) {
+func (h *DiagnosticsHandler) GetTransitionMatrix(w http.ResponseWriter, r *http.Request) {
+	if err := h.controls.Check(operatorcontrols.RuntimeDiagnostics); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	if h.transitionMatrix == nil {
 		respondJSONOK(w, services.TransitionMatrixStats{})
 		return
@@ -492,7 +511,11 @@ func (h *DiagnosticsHandler) GetTransitionMatrix(w http.ResponseWriter, _ *http.
 // counters. In a multi-instance deployment each replica reports its own view.
 //
 // GET /api/admin/diagnostics/session-validation-cache
-func (h *DiagnosticsHandler) GetSessionValidationCache(w http.ResponseWriter, _ *http.Request) {
+func (h *DiagnosticsHandler) GetSessionValidationCache(w http.ResponseWriter, r *http.Request) {
+	if err := h.controls.Check(operatorcontrols.RuntimeDiagnostics); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	stats := h.sessionManager.SessionValidationCacheStats()
 	respondJSONOK(w, map[string]any{
 		"enabled":               stats.Enabled,
@@ -553,7 +576,11 @@ const databasePoolSaturationThresholdPercent = 90
 // distinguish connection starvation from query execution latency.
 //
 // GET /api/admin/diagnostics/database-pool
-func (h *DiagnosticsHandler) GetDatabasePool(w http.ResponseWriter, _ *http.Request) {
+func (h *DiagnosticsHandler) GetDatabasePool(w http.ResponseWriter, r *http.Request) {
+	if err := h.controls.Check(operatorcontrols.RuntimeDiagnostics); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	stats := h.databaseDiagRepo.PoolStats()
 	pools := make([]DatabasePoolSnapshot, 0, len(stats))
 	healthy := true
@@ -640,6 +667,10 @@ func (h *DiagnosticsHandler) GetDatabasePool(w http.ResponseWriter, _ *http.Requ
 //
 // GET /api/admin/diagnostics/frac-index
 func (h *DiagnosticsHandler) GetFracIndexState(w http.ResponseWriter, r *http.Request) {
+	if err := h.controls.Check(operatorcontrols.RuntimeDiagnostics); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	dbState, err := h.fracIndexRepo.GetDBStats()
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -698,6 +729,10 @@ type GlobalRankMigrationControlRequest struct {
 //
 // POST /api/admin/diagnostics/frac-index/migration
 func (h *DiagnosticsHandler) ControlGlobalRankMigration(w http.ResponseWriter, r *http.Request) {
+	if err := h.controls.Check(operatorcontrols.Maintenance); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	req, ok := decodeJSON[GlobalRankMigrationControlRequest](w, r)
 	if !ok {
 		return
@@ -907,6 +942,10 @@ type PurgeWebhookDeliveriesRequest struct {
 //
 // POST /api/admin/diagnostics/webhook-deliveries/purge
 func (h *DiagnosticsHandler) PurgeWebhookDeliveries(w http.ResponseWriter, r *http.Request) {
+	if err := h.controls.Check(operatorcontrols.Maintenance); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	req, ok := decodeJSON[PurgeWebhookDeliveriesRequest](w, r)
 	if !ok {
 		return
@@ -941,6 +980,10 @@ func (h *DiagnosticsHandler) PurgeWebhookDeliveries(w http.ResponseWriter, r *ht
 //
 // GET /api/admin/diagnostics/scheduler-runs
 func (h *DiagnosticsHandler) GetSchedulerRuns(w http.ResponseWriter, r *http.Request) {
+	if err := h.controls.Check(operatorcontrols.RuntimeDiagnostics); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	q := r.URL.Query()
 
 	since, err := parseSinceDuration(q.Get("since"), 24*time.Hour)
@@ -985,6 +1028,10 @@ func (h *DiagnosticsHandler) GetSchedulerRuns(w http.ResponseWriter, r *http.Req
 //
 // GET /api/admin/diagnostics/scheduler-stats
 func (h *DiagnosticsHandler) GetSchedulerStats(w http.ResponseWriter, r *http.Request) {
+	if err := h.controls.Check(operatorcontrols.RuntimeDiagnostics); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	since, err := parseSinceDuration(r.URL.Query().Get("since"), 24*time.Hour)
 	if err != nil {
 		respondValidationError(w, r, err.Error())
@@ -1007,6 +1054,10 @@ func (h *DiagnosticsHandler) GetSchedulerStats(w http.ResponseWriter, r *http.Re
 //
 // POST /api/admin/diagnostics/scheduler-runs/purge
 func (h *DiagnosticsHandler) PurgeSchedulerRuns(w http.ResponseWriter, r *http.Request) {
+	if err := h.controls.Check(operatorcontrols.Maintenance); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	req, ok := decodeJSON[PurgeWebhookDeliveriesRequest](w, r)
 	if !ok {
 		return

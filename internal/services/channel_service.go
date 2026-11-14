@@ -192,6 +192,9 @@ type ChannelCreateRequest struct {
 
 // Create creates a new channel
 func (s *ChannelService) Create(ctx context.Context, req ChannelCreateRequest) (*models.Channel, error) {
+	if err := s.checkChannelPolicy(req.Type, req.Config); err != nil {
+		return nil, err
+	}
 	if req.Name == "" || req.Type == "" || req.Direction == "" {
 		return nil, fmt.Errorf("name, type, and direction are required")
 	}
@@ -281,6 +284,9 @@ type ChannelUpdateRequest struct {
 
 // Update updates an existing channel
 func (s *ChannelService) Update(ctx context.Context, id int, req ChannelUpdateRequest) (*models.Channel, error) {
+	if err := s.CheckTransportMutation(ctx, id); err != nil {
+		return nil, err
+	}
 	if req.Name == "" {
 		return nil, fmt.Errorf("%w: name is required", ErrInvalidChannelField)
 	}
@@ -313,6 +319,9 @@ func (s *ChannelService) Update(ctx context.Context, id int, req ChannelUpdateRe
 
 // Delete removes a channel
 func (s *ChannelService) Delete(ctx context.Context, id int) error {
+	if err := s.CheckTransportMutation(ctx, id); err != nil {
+		return err
+	}
 	// Check if channel is plugin-managed
 	isPluginManaged, err := s.repo.IsPluginManaged(ctx, id)
 	if err != nil {
@@ -335,12 +344,18 @@ func (s *ChannelService) UpdateLastActivity(ctx context.Context, id int) error {
 // SetStatus updates only the status column. Plugin-managed channels are
 // rejected at the SQL level (plugin_name IS NULL), surfacing as ErrNotFound.
 func (s *ChannelService) SetStatus(ctx context.Context, id int, status string) error {
+	if err := s.CheckTransportMutation(ctx, id); err != nil {
+		return err
+	}
 	return database.WithTx(s.db, func(tx database.Tx) error {
 		return s.repo.SetStatus(ctx, tx, id, status)
 	})
 }
 
 func (s *ChannelService) SetStatusIfConfigUnchanged(ctx context.Context, id int, status, expectedConfig string) (bool, error) {
+	if err := s.CheckTransportMutation(ctx, id); err != nil {
+		return false, err
+	}
 	return database.WithTxResult(s.db, func(tx database.Tx) (bool, error) {
 		return s.repo.SetStatusIfConfigUnchanged(ctx, tx, id, status, expectedConfig)
 	})
@@ -348,6 +363,9 @@ func (s *ChannelService) SetStatusIfConfigUnchanged(ctx context.Context, id int,
 
 // UpdateConfig updates only the config column with caller-prepared JSON.
 func (s *ChannelService) UpdateConfig(ctx context.Context, id int, config string) error {
+	if err := s.CheckTransportConfig(ctx, id, config); err != nil {
+		return err
+	}
 	return database.WithTx(s.db, func(tx database.Tx) error {
 		return s.repo.UpdateConfig(ctx, tx, id, config)
 	})
@@ -355,6 +373,9 @@ func (s *ChannelService) UpdateConfig(ctx context.Context, id int, config string
 
 // UpdateConfigIfUnchanged avoids losing a concurrent channel-config edit.
 func (s *ChannelService) UpdateConfigIfUnchanged(ctx context.Context, id int, expectedConfig, expectedStatus, config string) (bool, error) {
+	if err := s.CheckTransportConfig(ctx, id, config); err != nil {
+		return false, err
+	}
 	return database.WithTxResult(s.db, func(tx database.Tx) (bool, error) {
 		return s.repo.UpdateConfigIfUnchanged(ctx, tx, id, expectedConfig, expectedStatus, config)
 	})

@@ -28079,6 +28079,165 @@
         },
         "type": "object"
       },
+      "GetOperatorControlsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "blocked_definitions": {
+                "description": "The blocked definitions value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "description": "The id value.",
+                      "type": "integer"
+                    },
+                    "kind": {
+                      "description": "The kind value.",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "name"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "blocked_definitions_truncated": {
+                "description": "The blocked definitions truncated value.",
+                "type": "boolean"
+              },
+              "policy": {
+                "additionalProperties": false,
+                "description": "The policy value.",
+                "properties": {
+                  "ai_denied_features": {
+                    "description": "The ai denied features value.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "ai_max_output_tokens": {
+                    "description": "The ai max output tokens value.",
+                    "type": "integer"
+                  },
+                  "ai_models": {
+                    "description": "The ai models value.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "deny": {
+                    "description": "The deny value.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "import_admission_required": {
+                    "description": "The import admission required value.",
+                    "type": "boolean"
+                  },
+                  "limits": {
+                    "additionalProperties": false,
+                    "description": "The limits value.",
+                    "properties": {
+                      "ai_tokens_per_day": {
+                        "description": "The ai tokens per day value.",
+                        "type": "integer"
+                      },
+                      "attachment_bytes": {
+                        "description": "The attachment bytes value.",
+                        "type": "integer"
+                      },
+                      "automation_steps_per_day": {
+                        "description": "The automation steps per day value.",
+                        "type": "integer"
+                      },
+                      "blob_bytes": {
+                        "description": "The blob bytes value.",
+                        "type": "integer"
+                      },
+                      "concurrent_ai": {
+                        "description": "The concurrent ai value.",
+                        "type": "integer"
+                      },
+                      "concurrent_requests": {
+                        "description": "The concurrent requests value.",
+                        "type": "integer"
+                      },
+                      "concurrent_scripts": {
+                        "description": "The concurrent scripts value.",
+                        "type": "integer"
+                      },
+                      "concurrent_streams": {
+                        "description": "The concurrent streams value.",
+                        "type": "integer"
+                      },
+                      "mail_recipients_per_day": {
+                        "description": "The mail recipients per day value.",
+                        "type": "integer"
+                      },
+                      "requests_per_minute": {
+                        "description": "The requests per minute value.",
+                        "type": "integer"
+                      },
+                      "script_timeout_ms": {
+                        "description": "The script timeout ms value.",
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "mail_mode": {
+                    "description": "The mail mode value.",
+                    "type": "string"
+                  },
+                  "mail_suspended": {
+                    "description": "The mail suspended value.",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "deny",
+                  "import_admission_required",
+                  "limits"
+                ],
+                "type": "object"
+              },
+              "usage": {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "description": "The usage value.",
+                "type": "object"
+              }
+            },
+            "required": [
+              "blocked_definitions",
+              "blocked_definitions_truncated",
+              "policy",
+              "usage"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "GetPacksResult": {
         "additionalProperties": false,
         "properties": {
@@ -118368,6 +118527,59 @@
         "summary": "Get the API v2 OpenAPI document",
         "tags": [
           "API"
+        ]
+      }
+    },
+    "/operator-controls": {
+      "get": {
+        "description": "Read effective operator restrictions, current instance usage and blocked script definitions. Requires system administrator permission and admin:operator-controls:read for bearer tokens. Credentials and deployment paths are never returned. This read-only operation cannot modify operator policy.",
+        "operationId": "getOperatorControls",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetOperatorControlsResult"
+                }
+              }
+            },
+            "description": "Read operator controls response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDocument"
+                }
+              }
+            },
+            "description": "Service Unavailable."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Read operator controls",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "admin:operator-controls:read"
         ]
       }
     },

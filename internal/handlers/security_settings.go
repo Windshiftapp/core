@@ -119,6 +119,13 @@ func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, 
 	sanitize.Apply(&settings.APIKeyCreationPolicy, sanitize.ShortIdentifier)
 
 	before := h.loadSecuritySettings()
+	if settings.PluginCLIExecEnabled && !before.PluginCLIExecEnabled {
+		// Validate immutable controls before persisting any other preference.
+		if err := h.settings.CheckPluginExecution(); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+	}
 
 	if err := h.settings.Upsert(
 		"calendar_feed_enabled", boolToString(settings.CalendarFeedEnabled),

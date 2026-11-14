@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +21,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 )
@@ -124,6 +126,9 @@ func (s *AssetApplicationService) WithImportStorage(path string) *AssetApplicati
 }
 
 func (s *AssetApplicationService) UploadCSV(userID, setID int, filename string, hasHeader bool, delimiterName string, source io.Reader) (AssetCSVUpload, error) {
+	if err := operatorcontrols.From(s.db).CheckImport(context.Background(), "assets"); err != nil {
+		return AssetCSVUpload{}, err
+	}
 	if err := s.require(userID, setID, AssetPermissionKeyAdmin); err != nil {
 		return AssetCSVUpload{}, err
 	}
@@ -141,6 +146,9 @@ func (s *AssetApplicationService) UploadCSV(userID, setID int, filename string, 
 }
 
 func (s *AssetApplicationService) StartImport(userID, setID int, actor AuditActor, input StartAssetImport) (AssetImportJob, error) {
+	if err := operatorcontrols.From(s.db).CheckImport(context.Background(), "assets"); err != nil {
+		return AssetImportJob{}, err
+	}
 	if err := s.require(userID, setID, AssetPermissionKeyAdmin); err != nil {
 		return AssetImportJob{}, err
 	}

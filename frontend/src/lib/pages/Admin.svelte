@@ -24,6 +24,8 @@
   import { resolveAdminGroups } from '../admin/adminNavigation.js';
   import { isTypingInField } from '../utils/keyboardShortcuts.js';
   import { isSystemAdmin } from '../stores/permissions.svelte.js';
+  import { capabilitiesStore } from '../stores/capabilities.svelte.js';
+  import AlertBox from '../components/AlertBox.svelte';
 
   const ADMIN_DETAIL_ROUTES = [
     { prefix: '/admin/permission-sets/', tabId: 'permissions', componentKey: 'permission-set-detail' },
@@ -285,11 +287,15 @@
 
 {#snippet activeAdminComponent()}
   {#key adminComponentKey}
+    {#if adminComponentKey === 'system-import' && !capabilitiesStore.operatorAllows('imports')}
+      <div data-testid="operator-controls-import-restricted"><AlertBox variant="info" message={t('operatorControls.restricted')} /></div>
+    {:else}
     <LazyRootView
       loader={adminComponentLoader}
       componentProps={adminComponentProps}
       label={activeAdminItem?.label || adminComponentKey}
     />
+    {/if}
   {/key}
 {/snippet}
 

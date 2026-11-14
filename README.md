@@ -35,6 +35,11 @@ A built-in importer handles the move off Jira.
 
 It ships as a single Go binary with the Svelte frontend built in, SQLite by default or PostgreSQL for data storage. No Java, no Elasticsearch cluster, no per-user pricing, and your data stays on your infrastructure.
 
+## Operator controls
+
+Deployment owners can apply immutable [operator controls](internal/operatorcontrols/README.md)
+without changing organization preferences or maintaining a separate application fork.
+
 ## Agents and automation
 
 Windshift runs coding agents against your repositories. Agent Studio binds an agent to a workspace, launches it from a work item, and links the resulting pull request back to that item. Source control integrations cover GitHub, GitLab, Gitea, and Forgejo.

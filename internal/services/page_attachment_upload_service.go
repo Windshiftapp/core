@@ -16,6 +16,7 @@ import (
 	"windshift/internal/blobstore"
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 )
 
@@ -244,10 +245,16 @@ func loadAttachmentSettings(db database.Database) (*models.AttachmentSettings, e
 		FROM attachment_settings ORDER BY id DESC LIMIT 1
 	`).Scan(&settings.MaxFileSize, &settings.AllowedMimeTypes, &settings.AttachmentPath, &settings.Enabled)
 	if errors.Is(err, sql.ErrNoRows) {
+		if ceiling := operatorcontrols.From(db).Limits().AttachmentBytes; ceiling > 0 && settings.MaxFileSize > ceiling {
+			settings.MaxFileSize = ceiling
+		}
 		return settings, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	if ceiling := operatorcontrols.From(db).Limits().AttachmentBytes; ceiling > 0 && settings.MaxFileSize > ceiling {
+		settings.MaxFileSize = ceiling
 	}
 	return settings, nil
 }

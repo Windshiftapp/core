@@ -5,23 +5,34 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"windshift/internal/operatorcontrols"
 )
 
 // SystemHandler handles system-level operations like shutdown
 type SystemHandler struct {
 	shutdownChan chan os.Signal
+	controls     *operatorcontrols.Controls
 }
 
 // NewSystemHandler creates a new system handler with a shutdown channel
-func NewSystemHandler(shutdownChan chan os.Signal) *SystemHandler {
-	return &SystemHandler{
+func NewSystemHandler(shutdownChan chan os.Signal, controls ...*operatorcontrols.Controls) *SystemHandler {
+	h := &SystemHandler{
 		shutdownChan: shutdownChan,
 	}
+	if len(controls) > 0 {
+		h.controls = controls[0]
+	}
+	return h
 }
 
 // Shutdown handles graceful shutdown requests
 // POST /api/shutdown
 func (h *SystemHandler) Shutdown(w http.ResponseWriter, r *http.Request) {
+	if err := h.controls.Check(operatorcontrols.Lifecycle); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	slog.Info("shutdown requested via API")
 
 	// Send success response immediately

@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"windshift/internal/jira"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/restapi"
 )
 
@@ -90,6 +91,23 @@ func respondValidationError(w http.ResponseWriter, r *http.Request, message stri
 // it is logged at debug level and answered with 408 instead. The actual error
 // message is logged but not exposed to the client.
 func respondInternalError(w http.ResponseWriter, r *http.Request, err error) {
+	var denied *operatorcontrols.DeniedError
+	if errors.As(err, &denied) {
+		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusForbidden, "operator_restricted", denied.Error()))
+		return
+	}
+	var limited *operatorcontrols.LimitError
+	if errors.As(err, &limited) {
+		if limited.Status() == http.StatusTooManyRequests {
+			w.Header().Set("Retry-After", "60")
+		}
+		restapi.RespondError(w, r, restapi.NewAPIError(limited.Status(), "operator_limit_exceeded", limited.Error()))
+		return
+	}
+	if errors.Is(err, operatorcontrols.ErrBudgetUnavailable) {
+		restapi.RespondError(w, r, restapi.NewAPIError(http.StatusServiceUnavailable, "operator_budget_unavailable", err.Error()))
+		return
+	}
 	// A canceled context means the client went away while the request was in
 	// flight (navigation or reload). That is expected control flow, not a server
 	// fault, so it must not be logged as an internal error.

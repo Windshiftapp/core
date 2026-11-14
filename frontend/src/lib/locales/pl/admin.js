@@ -4,6 +4,32 @@
  */
 
 export default {
+  operatorControls: {
+    title: 'Kontrole operatora',
+    description: 'Te zasady wdrożenia są tylko do odczytu. Aby zmienić ograniczenia lub przydziały, skontaktuj się z operatorem instancji. Preferencje organizacji mogą być bardziej restrykcyjne, ale nie mogą przekraczać tych limitów.',
+    restricted: 'Tą funkcją zarządza operator instancji.',
+    restrictions: 'Ograniczone funkcje', unrestricted: 'Brak dodatkowych ograniczeń funkcji.',
+    limits: 'Limity instancji', usage: 'Wykorzystanie w bieżącym okresie',
+    blockedDefinitions: 'Definicje zablokowane przez kontrole operatora',
+    loadFailed: 'Nie udało się wczytać kontroli operatora.', mailMode: 'Tryb dostarczania poczty',
+    importAdmission: 'Importy zbiorcze wymagają zgody operatora.',
+    models: 'Dostępne modele AI', truncated: 'Wyświetlono pierwsze 1000 zablokowanych definicji.',
+    labels: {
+      instance_lifecycle: 'Cykl życia instancji', maintenance: 'Operacje konserwacyjne',
+      runtime_diagnostics: 'Diagnostyka wykonania', plugin_exec: 'Wykonywanie poleceń wtyczek',
+      ldap: 'LDAP', server_scripts: 'Skrypty serwerowe', imports: 'Importy zbiorcze',
+      mail_transport_management: 'Zarządzanie transportem poczty', generic_mail: 'Ogólne SMTP i IMAP',
+      mail: 'Dostarczanie poczty', ai: 'Generowanie AI', ai_connection_management: 'Zarządzanie połączeniami AI',
+      attachment_bytes: 'Maksymalny rozmiar obiektu (bajty)', blob_bytes: 'Przydział miejsca na obiekty (bajty)',
+      concurrent_requests: 'Równoczesne żądania', concurrent_streams: 'Równoczesne strumienie',
+      requests_per_minute: 'Żądania na minutę', script_timeout_ms: 'Limit czasu skryptu (milisekundy)',
+      concurrent_scripts: 'Równoczesne skrypty', automation_steps_per_day: 'Kroki automatyzacji na dzień UTC',
+      mail_recipients_per_day: 'Próby wysyłki do odbiorców na dzień UTC', ai_tokens_per_day: 'Przydział tokenów AI na dzień UTC',
+      concurrent_ai: 'Równoczesne wywołania AI', requests: 'Próby żądań w tej minucie',
+      automation_steps: 'Dzisiejsze kroki automatyzacji', mail_recipients: 'Dzisiejsze próby wysyłki do odbiorców',
+      ai_tokens: 'Tokeny AI naliczone dzisiaj',
+    },
+  },
   // Ustawienia (połączone z sekcji ustawień ogólnych i szczegółowych)
   settings: {
     title: 'Ustawienia',

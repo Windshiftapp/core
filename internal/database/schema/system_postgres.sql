@@ -568,3 +568,9 @@ CREATE TABLE IF NOT EXISTS pending_custom_field_cleanups (
 );
 
 CREATE INDEX IF NOT EXISTS idx_pending_cfv_cleanups_status ON pending_custom_field_cleanups(status, created_at);
+CREATE TABLE IF NOT EXISTS operator_usage (
+	resource TEXT NOT NULL,
+	period BIGINT NOT NULL,
+	used BIGINT NOT NULL CHECK (used >= 0),
+	PRIMARY KEY (resource, period)
+);
