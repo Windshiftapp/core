@@ -2950,6 +2950,46 @@
         ]
       }
     },
+    "/auth/passkey/complete": {
+      "post": {
+        "description": "Complete staff passkey login. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Complete staff passkey login",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/passkey/start": {
+      "post": {
+        "description": "Start staff passkey login. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Start staff passkey login",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
     "/catalogs/global-bootstrap": {
       "get": {
         "description": "Load global reference catalogs. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",

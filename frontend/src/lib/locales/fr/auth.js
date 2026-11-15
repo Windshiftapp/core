@@ -10,6 +10,19 @@
 
 export default {
   auth: {
+    signInWithPasskey: 'Se connecter avec une clé d’accès',
+    passkeyProgress: 'Suivez les instructions pour utiliser votre clé d’accès…',
+    showPassword: 'Afficher le mot de passe',
+    hidePassword: 'Masquer le mot de passe',
+    usernameRequired: 'L’adresse e-mail ou le nom d’utilisateur est requis',
+    loginOptionsError: 'Impossible de charger les options SSO. Veuillez réessayer.',
+    passwordDisabled: 'La connexion par mot de passe est désactivée',
+    useSSO: 'Veuillez utiliser l’authentification unique (SSO).',
+    usePasskey: 'Veuillez utiliser une clé d’accès pour vous connecter.',
+    contactAdmin: 'Contactez votre administrateur pour obtenir l’accès.',
+    passkeyHint: 'Laissez le nom d’utilisateur vide pour choisir une clé d’accès, ou saisissez-le pour une ancienne clé de sécurité. Entrée sans mot de passe utilise une clé d’accès.',
+    enrollFirstPasskey: 'Configurer votre première clé d’accès',
+    enrollmentPasswordHint: 'Utilisez votre mot de passe uniquement pour vérifier votre identité et configurer votre première clé d’accès. Le mot de passe seul ne donne pas accès.',
     login: 'Se connecter',
     logout: 'Se déconnecter',
     signIn: 'Se connecter',

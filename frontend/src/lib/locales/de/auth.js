@@ -4,6 +4,19 @@
  */
 export default {
   auth: {
+    signInWithPasskey: 'Mit einem Passkey anmelden',
+    passkeyProgress: 'Folge den Anweisungen, um deinen Passkey zu verwenden…',
+    showPassword: 'Passwort anzeigen',
+    hidePassword: 'Passwort verbergen',
+    usernameRequired: 'E-Mail oder Benutzername ist erforderlich',
+    loginOptionsError: 'Single-Sign-On-Optionen konnten nicht geladen werden. Bitte erneut versuchen.',
+    passwordDisabled: 'Passwortanmeldung ist deaktiviert',
+    useSSO: 'Bitte melde dich per Single Sign-On (SSO) an.',
+    usePasskey: 'Bitte melde dich mit einem Passkey an.',
+    contactAdmin: 'Wende dich für den Zugang an deine Administration.',
+    passkeyHint: 'Lass den Benutzernamen leer, um einen Passkey auszuwählen, oder gib ihn für einen älteren Sicherheitsschlüssel ein. Enter ohne Passwort verwendet einen Passkey.',
+    enrollFirstPasskey: 'Ersten Passkey einrichten',
+    enrollmentPasswordHint: 'Verwende dein Passwort nur zur Identitätsprüfung und Einrichtung deines ersten Passkeys. Ein Passwort allein gewährt keinen Zugang.',
     login: 'Anmelden',
     logout: 'Abmelden',
     register: 'Registrieren',

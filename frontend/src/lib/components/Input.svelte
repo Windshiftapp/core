@@ -34,6 +34,7 @@
    *   dataAutofocus?: boolean,
    *   ariaLabel?: string,
    *   ariaDescribedby?: string,
+   *   ariaInvalid?: boolean,
    *   inputRef?: any,
    *   oninput?: (e?: any) => void,
    *   onchange?: (e?: any) => void,
@@ -73,6 +74,7 @@
     dataAutofocus = false,
     ariaLabel = undefined,
     ariaDescribedby = undefined,
+    ariaInvalid = undefined,
     // Optional ref binding for parent components that need the raw input element
     inputRef = $bindable(null),
     // Event handlers
@@ -170,6 +172,7 @@
   data-autofocus={dataAutofocus || undefined}
   aria-label={ariaLabel}
   aria-describedby={ariaDescribedby}
+  aria-invalid={ariaInvalid || undefined}
   {placeholder}
   {disabled}
   {required}

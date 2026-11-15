@@ -1,18 +1,21 @@
-import { fetchAPI } from './core.js';
+import { fetchAPI, fetchAPIV2 } from './core.js';
 
 export const auth = {
-  login: (credentials) =>
+  login: (credentials, options = {}) =>
     fetchAPI('/auth/login', {
+      ...options,
       method: 'POST',
       body: JSON.stringify(credentials),
     }),
-  startFIDOLogin: (emailOrUsername) =>
-    fetchAPI('/auth/webauthn/login/start', {
+  startFIDOLogin: (emailOrUsername, options = {}) =>
+    fetchAPIV2('/auth/passkey/start', {
+      ...options,
       method: 'POST',
       body: JSON.stringify({ email_or_username: emailOrUsername }),
     }),
-  completeFIDOLogin: (credentialData) =>
-    fetchAPI('/auth/webauthn/login/complete', {
+  completeFIDOLogin: (credentialData, options = {}) =>
+    fetchAPIV2('/auth/passkey/complete', {
+      ...options,
       method: 'POST',
       body: JSON.stringify(credentialData),
     }),

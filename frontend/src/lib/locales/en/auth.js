@@ -10,6 +10,19 @@
 
 export default {
   auth: {
+    signInWithPasskey: 'Sign in with a passkey',
+    passkeyProgress: 'Follow the prompts to use your passkey…',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
+    usernameRequired: 'Email or username is required',
+    loginOptionsError: 'Unable to load Single Sign-On options. Please retry.',
+    passwordDisabled: 'Password login is disabled',
+    useSSO: 'Please use Single Sign-On (SSO) to sign in.',
+    usePasskey: 'Please use a passkey to sign in.',
+    contactAdmin: 'Contact your administrator for access.',
+    passkeyHint: 'Leave the username empty to choose a passkey, or enter it for an older security key. Enter without a password uses a passkey.',
+    enrollFirstPasskey: 'Set up your first passkey',
+    enrollmentPasswordHint: 'Use your password only to verify your identity and enroll your first passkey. A password alone does not grant access.',
     login: 'Log In',
     logout: 'Log Out',
     signIn: 'Sign In',

@@ -1,5 +1,18 @@
 export default {
   auth: {
+    signInWithPasskey: '使用通行密钥登录',
+    passkeyProgress: '请按照提示使用通行密钥…',
+    showPassword: '显示密码',
+    hidePassword: '隐藏密码',
+    usernameRequired: '请输入电子邮件或用户名',
+    loginOptionsError: '无法加载单点登录选项，请重试。',
+    passwordDisabled: '密码登录已禁用',
+    useSSO: '请使用单点登录（SSO）。',
+    usePasskey: '请使用通行密钥登录。',
+    contactAdmin: '请联系管理员获取访问权限。',
+    passkeyHint: '将用户名留空以选择通行密钥，或输入用户名以使用旧版安全密钥。不输入密码时按回车将使用通行密钥。',
+    enrollFirstPasskey: '设置首个通行密钥',
+    enrollmentPasswordHint: '密码仅用于验证身份并注册首个通行密钥，不能单独授予访问权限。',
     login: '登录',
     logout: '登出',
     signIn: '登录',

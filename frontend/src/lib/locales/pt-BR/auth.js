@@ -1,5 +1,18 @@
 export default {
   auth: {
+    signInWithPasskey: 'Entrar com uma chave de acesso',
+    passkeyProgress: 'Siga as instruções para usar sua chave de acesso…',
+    showPassword: 'Mostrar senha',
+    hidePassword: 'Ocultar senha',
+    usernameRequired: 'E-mail ou nome de usuário é obrigatório',
+    loginOptionsError: 'Não foi possível carregar as opções de SSO. Tente novamente.',
+    passwordDisabled: 'O acesso por senha está desativado',
+    useSSO: 'Use o login único (SSO) para entrar.',
+    usePasskey: 'Use uma chave de acesso para entrar.',
+    contactAdmin: 'Entre em contato com o administrador para obter acesso.',
+    passkeyHint: 'Deixe o usuário vazio para escolher uma chave de acesso ou informe-o para uma chave de segurança antiga. Enter sem senha usa uma chave de acesso.',
+    enrollFirstPasskey: 'Configurar sua primeira chave de acesso',
+    enrollmentPasswordHint: 'Use sua senha apenas para verificar sua identidade e cadastrar a primeira chave de acesso. A senha sozinha não concede acesso.',
     login: 'Entrar',
     logout: 'Sair',
     signIn: 'Entrar',

@@ -1,6 +1,19 @@
 /** Korean (ko) translations. */
 export default {
   "auth": {
+    "signInWithPasskey": "패스키로 로그인",
+    "passkeyProgress": "안내에 따라 패스키를 사용하세요…",
+    "showPassword": "비밀번호 표시",
+    "hidePassword": "비밀번호 숨기기",
+    "usernameRequired": "이메일 또는 사용자 이름이 필요합니다",
+    "loginOptionsError": "SSO 옵션을 불러올 수 없습니다. 다시 시도하세요.",
+    "passwordDisabled": "비밀번호 로그인이 비활성화되었습니다",
+    "useSSO": "SSO로 로그인하세요.",
+    "usePasskey": "패스키로 로그인하세요.",
+    "contactAdmin": "접근 권한은 관리자에게 문의하세요.",
+    "passkeyHint": "패스키를 선택하려면 사용자 이름을 비워 두고, 기존 보안 키를 사용하려면 이름을 입력하세요. 비밀번호 없이 Enter를 누르면 패스키를 사용합니다.",
+    "enrollFirstPasskey": "첫 패스키 설정",
+    "enrollmentPasswordHint": "비밀번호는 본인 확인 및 첫 패스키 등록에만 사용됩니다. 비밀번호만으로는 접근할 수 없습니다.",
     "login": "로그인",
     "logout": "로그아웃",
     "signIn": "로그인",

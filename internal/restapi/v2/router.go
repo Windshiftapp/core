@@ -626,6 +626,8 @@ type actionApplication interface {
 
 // Deps lists every required v2 dependency. Construction has no fallbacks.
 type Deps struct {
+	PasskeyLogin                 passkeyLoginHTTP
+	PasskeyLoginLimiter          requestLimiter
 	CustomerAccess               customerAccessHTTP
 	Mux                          *http.ServeMux
 	Tokens                       tokenAuthenticator
@@ -960,6 +962,7 @@ func buildRoutes(deps Deps) []route {
 	registerAttachmentRoutes(&builder, deps)
 	registerCollectionRoutes(&builder, deps.Collections)
 	registerCustomerAccessRoutes(&builder, deps)
+	registerPasskeyLoginRoutes(&builder, deps)
 	registerPlanningRoutes(&builder, deps.Planning)
 	registerMilestoneCommentRoutes(&builder, deps)
 	registerMilestonePageLinkRoutes(&builder, deps)

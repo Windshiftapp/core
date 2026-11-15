@@ -10,6 +10,19 @@
 
 export default {
   auth: {
+    signInWithPasskey: 'Zaloguj się kluczem dostępu',
+    passkeyProgress: 'Postępuj zgodnie z instrukcjami, aby użyć klucza dostępu…',
+    showPassword: 'Pokaż hasło',
+    hidePassword: 'Ukryj hasło',
+    usernameRequired: 'Wymagany jest e-mail lub nazwa użytkownika',
+    loginOptionsError: 'Nie udało się załadować opcji SSO. Spróbuj ponownie.',
+    passwordDisabled: 'Logowanie hasłem jest wyłączone',
+    useSSO: 'Zaloguj się przez jednokrotne logowanie (SSO).',
+    usePasskey: 'Użyj klucza dostępu, aby się zalogować.',
+    contactAdmin: 'Skontaktuj się z administratorem, aby uzyskać dostęp.',
+    passkeyHint: 'Pozostaw nazwę pustą, aby wybrać klucz dostępu, lub wpisz ją dla starszego klucza bezpieczeństwa. Enter bez hasła używa klucza dostępu.',
+    enrollFirstPasskey: 'Skonfiguruj pierwszy klucz dostępu',
+    enrollmentPasswordHint: 'Użyj hasła tylko do potwierdzenia tożsamości i rejestracji pierwszego klucza dostępu. Samo hasło nie zapewnia dostępu.',
     login: 'Zaloguj się',
     logout: 'Wyloguj się',
     signIn: 'Zaloguj się',

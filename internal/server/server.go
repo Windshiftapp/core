@@ -2034,23 +2034,24 @@ func (s *Server) initialize() error {
 		routeDeps.AuthMiddleware.RequireAuth(http.HandlerFunc(customWidgetDataHandler.ResolveCustomWidgetData)))
 	catalogMutations := services.NewCatalogMutationService(s.db, permService, workflowService)
 	governanceApplication := services.NewGovernanceApplicationService(s.db, permService, approvalSetService, approvalService)
-	if err := v2.RegisterRoutes(v2.Deps{
-		CustomerAccess:     customerAccessHandler,
-		Mux:                mux,
-		Tokens:             tokenManager,
-		SLA:                s.slaEngine,
-		SLACalendars:       services.NewSLACalendarService(s.db, s.slaEngine),
-		SLASettings:        services.NewSLASettingsService(s.db, s.slaEngine),
-		SLATeamBindings:    services.NewSLATeamBindingService(s.db, permService),
-		SLAMetrics:         services.NewSLAMetricService(s.db, s.slaEngine),
-		Users:              services.NewUserReadService(s.db),
-		Statuses:           services.NewStatusService(s.db),
-		Teams:              teamRepo,
-		Workflows:          workflowService,
-		Configuration:      services.NewConfigReadService(s.db),
-		ObjectTranslations: objectTranslationService,
-		Catalog:            services.NewCatalogReadService(s.db, permService, v2Access, s.activityTracker),
-		CatalogMutations:   catalogMutations,
+	v2Deps := v2.Deps{
+		PasskeyLoginLimiter: s.fidoRateLimiter,
+		CustomerAccess:      customerAccessHandler,
+		Mux:                 mux,
+		Tokens:              tokenManager,
+		SLA:                 s.slaEngine,
+		SLACalendars:        services.NewSLACalendarService(s.db, s.slaEngine),
+		SLASettings:         services.NewSLASettingsService(s.db, s.slaEngine),
+		SLATeamBindings:     services.NewSLATeamBindingService(s.db, permService),
+		SLAMetrics:          services.NewSLAMetricService(s.db, s.slaEngine),
+		Users:               services.NewUserReadService(s.db),
+		Statuses:            services.NewStatusService(s.db),
+		Teams:               teamRepo,
+		Workflows:           workflowService,
+		Configuration:       services.NewConfigReadService(s.db),
+		ObjectTranslations:  objectTranslationService,
+		Catalog:             services.NewCatalogReadService(s.db, permService, v2Access, s.activityTracker),
+		CatalogMutations:    catalogMutations,
 		CustomFieldProvisioning: services.NewCustomFieldProvisioningService(s.db, services.CustomFieldProvisioningHooks{
 			EnqueueOptionRemoval:     scheduler.EnqueueOptionRemoval,
 			EnqueueFieldCleanup:      scheduler.EnqueueFieldCleanup,
@@ -2123,7 +2124,11 @@ func (s *Server) initialize() error {
 		CSRF:                         v2CSRF,
 		Concurrency:                  s.userConcurrency,
 		RateLimiter:                  s.v2RateLimiter,
-	}); err != nil {
+	}
+	if webAuthnHandler != nil {
+		v2Deps.PasskeyLogin = webAuthnHandler
+	}
+	if err := v2.RegisterRoutes(v2Deps); err != nil {
 		return fmt.Errorf("register REST API v2: %w", err)
 	}
 
