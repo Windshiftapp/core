@@ -67,6 +67,7 @@
   import Button from '../../components/Button.svelte';
   import ButtonGroup from '../../components/ButtonGroup.svelte';
   import SearchInput from '../../components/SearchInput.svelte';
+  import StateDisplay from '../../components/StateDisplay.svelte';
   import SubFilterBar from './SubFilterBar.svelte';
   import BoardColumn from './BoardColumn.svelte';
   import BoardEmptyState from './BoardEmptyState.svelte';
@@ -173,7 +174,7 @@
   let savingMilestoneSwimlaneConfig = $state(false);
 
   let loading = $state(true);
-  let currentCollectionName = $derived(collectionStore.collectionName);
+  let currentCollectionName = $derived(collectionStore.boardCollection?.name ?? collectionStore.collectionName);
   const boardColumnElements = new Set();
   let showItemModal = $state(false);
   let selectedItemId = $state(null);
@@ -1972,9 +1973,9 @@
 
 </script>
 
-{#if loading || collectionStore.loading || workspaceDataStore.initialLoading}
+{#if loading || workspaceDataStore.initialLoading}
   <div class="p-6">
-    <div class="animate-pulse">{t('common.loading')}</div>
+    <StateDisplay type="loading" />
   </div>
 {:else if workspace || !workspaceId}
   <!-- The board chrome (view header and filters) is fixed to the viewport
@@ -1990,7 +1991,7 @@
   >
       <!-- Header with view tabs. The chrome stays in normal flow above the
            scrolling canvas so the toolbar never pans with the lanes. -->
-      <div class="flex-shrink-0 px-6 pt-6" data-testid="board-header">
+      <div class="flex-shrink-0 px-6 pt-6 pb-6" data-testid="board-header">
         <ViewHeader
           workspaceName={workspace?.name || ''}
           collection={currentCollectionName === 'Default' ? t('common.default') : currentCollectionName}
@@ -2066,6 +2067,7 @@
                 {#snippet children(segment)}
                   <DropdownMenu
                     items={groupByMenuItems}
+                    disabled={collectionStore.loading}
                     triggerIcon={Layers}
                     triggerText={selectedGroupByLabel}
                     placement="bottom-end"
@@ -2076,6 +2078,7 @@
                   />
                   <DropdownMenu
                     items={sortByMenuItems}
+                    disabled={collectionStore.loading}
                     triggerIcon={ArrowDownUp}
                     triggerText={sortMode === 'bubble' ? t('boardControls.sortBubble') : t('boardControls.sortBy')}
                     placement="bottom-end"
@@ -2093,6 +2096,7 @@
                     aria-pressed={selection.selectionMode}
                     title={t('collections.selectItems')}
                     onclick={selection.toggleSelectionMode}
+                    disabled={collectionStore.loading}
                     data-testid="board-select-mode-toggle"
                   >
                     <CheckSquare class="w-4 h-4" />
@@ -2136,6 +2140,13 @@
         }}
       >
       <div class="px-6 py-6 min-w-fit">
+
+      {#if collectionStore.loading}
+        <StateDisplay type="loading" dataTestid="board-items-loading" />
+      {:else}
+      {#if !searchActive && collectionStore.boardBackgroundLoading}
+        <StateDisplay type="loading" inline size="sm" class="mb-4" dataTestid="board-background-loading" />
+      {/if}
 
       {#if searchActive && (searchDebouncing || collectionStore.searchLoading)}
         <p class="-mt-2 mb-4 text-sm" style="color: var(--ds-text-subtle);" data-testid="board-search-status">
@@ -2410,6 +2421,7 @@
             {t('collections.boardSummary', { itemCount: totalVisibleItems, columnCount: displayColumns.length })}
           </p>
         </div>
+      {/if}
       {/if}
       </div>
       </div>
