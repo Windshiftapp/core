@@ -29,6 +29,7 @@
 
   let query = $state('');
   let workItems = $state([]);
+  let workItemsQuery = $state('');
   let pageResults = $state([]);
   let searching = $state(false);
   let highlightIndex = $state(0);
@@ -67,7 +68,8 @@
         modules: {},
         workspaces: workspacesForSearch,
         currentWorkspace: null,
-        workItems,
+        workItems: workItemsQuery === query.trim() ? workItems : [],
+        workItemsQuery,
         pageResults,
         activeTimer: timerStore.activeTimer,
         t,
@@ -99,6 +101,7 @@
       ]);
       if (seq !== searchSeq) return;
       workItems = itemsRes.status === 'fulfilled' ? (itemsRes.value ?? []) : [];
+      workItemsQuery = trimmed;
       pageResults = pagesRes.status === 'fulfilled' ? (pagesRes.value ?? []) : [];
     } finally {
       if (seq === searchSeq) {

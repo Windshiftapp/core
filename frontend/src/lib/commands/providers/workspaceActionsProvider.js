@@ -64,7 +64,7 @@ export function workspaceActionsProvider(ctx) {
   }
 
   // Test management create actions when module enabled in this workspace
-  if (modules?.test_management_enabled && workspacePermissions.canViewTests(workspaceId)) {
+  if (modules?.test_management_enabled) {
     const testBase = `/workspaces/${workspaceId}/tests`;
     const makeTrigger = (label, descriptionKey, eventName, route, keywords) =>
       createCommand({
@@ -83,29 +83,33 @@ export function workspaceActionsProvider(ctx) {
         },
       });
 
-    out.push(
-      makeTrigger(
-        'test-case',
-        'commandPalette.commands.createTestCase.description',
-        'trigger-test-case-form',
-        testBase,
-        ['create', 'new', 'test', 'case', 'testing', 'qa']
-      ),
-      makeTrigger(
-        'test-plan',
-        'commandPalette.commands.createTestPlan.description',
-        'trigger-test-plan-form',
-        `${testBase}/sets`,
-        ['create', 'new', 'test', 'plan', 'testing', 'qa', 'suite']
-      ),
-      makeTrigger(
-        'test-run',
-        'commandPalette.commands.createTestRun.description',
-        'trigger-test-run-form',
-        `${testBase}/runs`,
-        ['create', 'new', 'test', 'run', 'execution']
-      )
-    );
+    if (workspacePermissions.canManageTests(workspaceId))
+      out.push(
+        makeTrigger(
+          'test-case',
+          'commandPalette.commands.createTestCase.description',
+          'trigger-test-case-form',
+          testBase,
+          ['create', 'new', 'test', 'case', 'testing', 'qa']
+        ),
+        makeTrigger(
+          'test-plan',
+          'commandPalette.commands.createTestPlan.description',
+          'trigger-test-plan-form',
+          `${testBase}/sets`,
+          ['create', 'new', 'test', 'plan', 'testing', 'qa', 'suite']
+        )
+      );
+    if (workspacePermissions.canExecuteTests(workspaceId))
+      out.push(
+        makeTrigger(
+          'test-run',
+          'commandPalette.commands.createTestRun.description',
+          'trigger-test-run-form',
+          `${testBase}/runs`,
+          ['create', 'new', 'test', 'run', 'execution']
+        )
+      );
   }
 
   return out;
