@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { actions as actionsApi } from '../../api/actions.js';
   import { workspaces } from '../../api/workspaces.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -24,6 +24,8 @@
   import UnauthorizedAccess from '../../pages/UnauthorizedAccess.svelte';
 
   let { workspaceId, actionId = 0 } = $props();
+  const readController = new AbortController();
+  onDestroy(() => readController.abort());
 
   // Permission check
   let canManageActions = $derived(workspacePermissions.canManageActions(workspaceId));
@@ -145,7 +147,7 @@
     await loadActions();
     // Open the freshly created action in the editor. The URL effect will fetch
     // and hydrate editingAction once the route updates.
-    if (result?.action_id) {
+    if (!readController.signal.aborted && result?.action_id) {
       navigate(`/workspaces/${workspaceId}/actions/${result.action_id}`);
     }
   }
@@ -156,8 +158,9 @@
   });
 
   async function loadActions() {
+    if (readController.signal.aborted) return;
     try {
-      actions = await actionsApi.getAll(workspaceId) || [];
+      actions = await actionsApi.getAll(workspaceId, { signal: readController.signal }) || [];
     } catch (error) {
       if (error?.name === 'AbortError') return;
       console.error('Failed to load actions:', error);
@@ -167,9 +170,11 @@
   }
 
   async function loadStatuses() {
+    if (readController.signal.aborted) return;
     try {
-      statuses = await workspaces.getStatuses(workspaceId) || [];
+      statuses = await workspaces.getStatuses(workspaceId, null, { signal: readController.signal }) || [];
     } catch (error) {
+      if (readController.signal.aborted) return;
       console.error('Failed to load statuses:', error);
       statuses = [];
     }
@@ -198,7 +203,7 @@
       showCreateModal = false;
       successToast(t('common.created'));
       await loadActions();
-      navigate(`/workspaces/${workspaceId}/actions/${newAction.id}`);
+      if (!readController.signal.aborted) navigate(`/workspaces/${workspaceId}/actions/${newAction.id}`);
     } catch (error) {
       console.error('Failed to create action:', error);
       errorToast(t('errors.failedToCreate'));

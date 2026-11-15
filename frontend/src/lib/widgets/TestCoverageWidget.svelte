@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import ShieldX from '@lucide/svelte/icons/shield-x';
   import EmptyState from '../components/EmptyState.svelte';
   import PieChartSegments from '../components/PieChartSegments.svelte';
@@ -8,6 +8,8 @@
   import { t } from '../stores/i18n.svelte.js';
 
   let { workspaceId, collectionId = null } = $props();
+  const controller = new AbortController();
+  onDestroy(() => controller.abort());
 
   let loading = $state(true);
   let error = $state(null);
@@ -27,8 +29,9 @@
       loading = true;
       error = null;
       const id = collectionId || 'default';
-      coverageData = await tests.coverage.getSummary(id, workspaceId);
+      coverageData = await tests.coverage.getSummary(id, workspaceId, { signal: controller.signal });
     } catch (err) {
+      if (controller.signal.aborted) return;
       console.error('Failed to load test coverage:', err);
       error = t('widgets.testCoverage.loadError');
     } finally {
@@ -44,7 +47,7 @@
   const coverageRate = $derived(coverageData?.coverage_rate ?? 0);
 </script>
 
-<div class="coverage-widget">
+<div class="coverage-widget" data-testid="test-coverage-widget">
   {#if loading}
     <div class="loading-state">
       <div class="loading-spinner"></div>
@@ -66,7 +69,7 @@
       <div class="pie-wrapper">
         <svg viewBox="0 0 140 140" role="img" aria-label={t('widgets.testCoverage.chartAria')}>
           <PieChartSegments {segments} {radius} />
-          <text class="pie-percent" x="70" y="68">{Math.round(coverageRate)}%</text>
+          <text class="pie-percent" x="70" y="68" data-testid="test-coverage-rate">{Math.round(coverageRate)}%</text>
           <text class="pie-label" x="70" y="84">{t('widgets.testCoverage.covered')}</text>
         </svg>
       </div>

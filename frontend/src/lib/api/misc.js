@@ -212,7 +212,8 @@ export const revokeCalendarFeedToken = calendarFeed.revokeToken;
 
 // Global item labels
 export const labels = {
-  getAll: (workspaceId) => fetchV2Data(`/workspaces/${workspaceId}/labels`),
+  getAll: (workspaceId, requestOptions = {}) =>
+    fetchV2Data(`/workspaces/${workspaceId}/labels`, requestOptions),
   get: (workspaceId, id) => fetchV2Data(`/workspaces/${workspaceId}/labels/${id}`),
   create: ({ workspace_id: workspaceId, ...data }) =>
     fetchV2Data(`/workspaces/${workspaceId}/labels`, {

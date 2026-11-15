@@ -33,6 +33,8 @@ function createViewSettingsStore() {
   /** @type {Record<string, ViewSettingsEntry>} */
   let entries = $state({});
   const inflight = new Map();
+  let generation = 0;
+  let controller = new AbortController();
 
   function scopeKey(workspaceId, collectionId) {
     return `${collectionId ?? ''}|${workspaceId ?? ''}`;
@@ -46,6 +48,8 @@ function createViewSettingsStore() {
    * settle.
    */
   async function load(workspaceId, collectionId = null) {
+    const captured = generation;
+    const signal = controller.signal;
     const key = scopeKey(workspaceId, collectionId);
     if (entries[key]?.loaded) return entries[key];
 
@@ -55,7 +59,7 @@ function createViewSettingsStore() {
     const promise = (async () => {
       let entry = DEFAULT_ENTRY;
       try {
-        const config = await resolveBoardConfiguration(workspaceId, collectionId);
+        const config = await resolveBoardConfiguration(workspaceId, collectionId, signal);
         const enabled = config?.view_settings?.enabled_views;
         entry = {
           // Missing or empty settings mean the workspace default (everything
@@ -67,6 +71,7 @@ function createViewSettingsStore() {
       } catch {
         // Keep the default entry.
       }
+      if (captured !== generation) return DEFAULT_ENTRY;
       entries[key] = entry;
       return entry;
     })();
@@ -74,7 +79,7 @@ function createViewSettingsStore() {
     try {
       return await promise;
     } finally {
-      inflight.delete(key);
+      if (inflight.get(key) === promise) inflight.delete(key);
     }
   }
 
@@ -84,17 +89,18 @@ function createViewSettingsStore() {
    * one-microtask wait lets a sibling view effect register its bootstrap in
    * the same flush; navigation-only scopes still use the lightweight endpoint.
    */
-  async function resolveBoardConfiguration(workspaceId, collectionId) {
+  async function resolveBoardConfiguration(workspaceId, collectionId, signal) {
     let peeked = collectionStore.peekBoardConfiguration(workspaceId, collectionId);
     if (!peeked) {
       await Promise.resolve();
+      signal.throwIfAborted();
       peeked = collectionStore.peekBoardConfiguration(workspaceId, collectionId);
     }
     if (peeked) {
       if (peeked.config !== undefined) return peeked.config;
       return await peeked.pending;
     }
-    return collections.getBoardConfiguration(collectionId, workspaceId);
+    return collections.getBoardConfiguration(collectionId, workspaceId, { signal });
   }
 
   /** Enabled view ids for a scope; the workspace default while unloaded. */
@@ -162,6 +168,13 @@ function createViewSettingsStore() {
   }
 
   return {
+    reset() {
+      generation += 1;
+      controller.abort();
+      controller = new AbortController();
+      inflight.clear();
+      entries = {};
+    },
     load,
     entryFor,
     applyEnabledViews,

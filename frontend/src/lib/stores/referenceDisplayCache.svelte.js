@@ -19,6 +19,8 @@ class ReferenceDisplayCache {
   #pendingAssetLoads = [];
   #flushScheduled = false;
   #generation = 0;
+  #controller = new AbortController();
+  #assetControllers = new Set();
 
   async loadUsers() {
     if (this.users.length > 0) return this.users;
@@ -26,7 +28,7 @@ class ReferenceDisplayCache {
 
     const generation = this.#generation;
     this.usersLoading = true;
-    const request = Promise.resolve(getUsers())
+    const request = Promise.resolve(getUsers({ signal: this.#controller.signal }))
       .then((users) => {
         if (generation !== this.#generation) return [];
         this.users = users || [];
@@ -98,6 +100,7 @@ class ReferenceDisplayCache {
     }
 
     const controller = new AbortController();
+    this.#assetControllers.add(controller);
     const abortIfUnused = () => {
       if (requests.every((request) => request.signal?.aborted)) controller.abort();
     };
@@ -108,6 +111,7 @@ class ReferenceDisplayCache {
     try {
       const summaries = [];
       for (let start = 0; start < ids.length; start += ASSET_BATCH_SIZE) {
+        if (generation !== this.#generation) return;
         const chunk = ids.slice(start, start + ASSET_BATCH_SIZE);
         summaries.push(
           ...((await assets.getSummaries(chunk, { signal: controller.signal })) || [])
@@ -130,6 +134,7 @@ class ReferenceDisplayCache {
         this.assets = next;
       }
     } finally {
+      this.#assetControllers.delete(controller);
       requests.forEach((request) => {
         request.signal?.removeEventListener('abort', abortIfUnused);
         request.resolve();
@@ -139,6 +144,10 @@ class ReferenceDisplayCache {
 
   reset() {
     this.#generation += 1;
+    this.#controller.abort();
+    this.#controller = new AbortController();
+    for (const controller of this.#assetControllers) controller.abort();
+    this.#assetControllers.clear();
     this.users = [];
     this.usersLoading = false;
     this.assets = new Map();

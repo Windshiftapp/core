@@ -24,7 +24,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateOnly } from '../utils/dateFormatter.js';
   import { createId } from '../utils/uuid.js';
-  import { errorToast } from '../stores/toasts.svelte.js';
+  import { errorToast, surfaceError } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { createDashboardWidgetDrag } from '../composables/dashboardWidgetDrag.js';
   import { useDashboardCustomization } from '../composables/useDashboardCustomization.svelte.js';
@@ -100,7 +100,6 @@
   // Initialize gradient styles from global stores
   const gradientStyles = useGradientStyles();
 
-  let pendingSaveQueued = false;
 
   // Default section layout
   function getDefaultSections() {
@@ -213,7 +212,9 @@
       collectionFilter = filter;
 
       await loadWorkspace();
+      if (currentVersion !== dataLoadVersion) return;
       await loadStatusCategories();
+      if (currentVersion !== dataLoadVersion) return;
       await Promise.all([
         loadStats(),
         loadChartData(),
@@ -380,31 +381,32 @@
     savedWidgetWidths = captureWorkspaceWidgetWidths(widgets);
   }
 
-  async function saveHomepageLayout() {
+  let destroyed = false;
+  let queuedLayout = null;
+
+  function captureLayout() {
+    return {
+      sections: sections.map((s, display_order) => ({ ...s, display_order })),
+      widgets: widgets.map((w, position) => ({ ...w, position })),
+      gradient: get(workspaceGradientIndex),
+      applyToAllViews: get(applyToAllViewsStore),
+      backgroundImageUrl: get(workspaceBackgroundImageUrl) || ''
+    };
+  }
+
+  async function saveHomepageLayout(layout = captureLayout()) {
     if (savePending) {
-      pendingSaveQueued = true;
+      queuedLayout = layout;
       return;
     }
     savePending = true;
     let attemptedLayout = null;
 
     try {
-      attemptedLayout = {
-        sections: sections.map((s, idx) => ({
-          ...s,
-          display_order: idx
-        })),
-        widgets: widgets.map((w, idx) => ({
-          ...w,
-          position: idx
-        })),
-        gradient: get(workspaceGradientIndex),
-        applyToAllViews: get(applyToAllViewsStore),
-        backgroundImageUrl: get(workspaceBackgroundImageUrl) || ''
-      };
+      attemptedLayout = layout;
 
       await workspaces.updateHomepageLayout(workspaceId, attemptedLayout);
-      hydrateWorkspaceGradientLayout(workspaceId, attemptedLayout);
+      if (!destroyed) hydrateWorkspaceGradientLayout(workspaceId, attemptedLayout);
       savedWidgetWidths = captureWorkspaceWidgetWidths(attemptedLayout.widgets);
     } catch (error) {
       console.error('Failed to save homepage layout:', error);
@@ -418,9 +420,10 @@
       errorToast(t('dialogs.alerts.failedToSaveLayout'));
     } finally {
       savePending = false;
-      if (pendingSaveQueued) {
-        pendingSaveQueued = false;
-        debouncedSave();
+      if (queuedLayout) {
+        const next = queuedLayout;
+        queuedLayout = null;
+        void saveHomepageLayout(next);
       }
     }
   }
@@ -560,8 +563,12 @@
   }
 
   onDestroy(() => {
+    destroyed = true;
+    dataLoadVersion += 1;
     dnd.cleanup();
-    debouncedSave.cancel();
+    void Promise.resolve(debouncedSave.runScheduledNow()).catch(error => {
+      surfaceError(error, { context: 'saveWorkspaceLayoutOnLeave' });
+    });
   });
 
   function getWidgetTitle(type) {

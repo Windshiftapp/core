@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { tests } from '../../api/tests/index.js';
   import { milestones as milestonesApi } from '../../api/milestones.js';
   import { getAssignableUsers } from '../../api/users.js';
@@ -28,6 +28,9 @@
   import TestManagementHeader from './TestManagementHeader.svelte';
 
   let { workspaceId = null } = $props();
+  const readController = new AbortController();
+  const readOptions = { signal: readController.signal };
+  onDestroy(() => readController.abort());
 
   // Run creation belongs to the test.execute tier (denied with 404 otherwise).
   let canExecuteTests = $derived(workspacePermissions.canExecuteTests(workspaceId));
@@ -51,6 +54,7 @@
   });
 
   async function loadData() {
+    if (readController.signal.aborted) return;
     try {
       // Build query params for assignee filter
       const params = {};
@@ -61,11 +65,12 @@
       }
 
       const [sets, runs, milestonesData, usersData] = await Promise.all([
-        tests.testPlans.getAll(workspaceId, { page_size: 200 }),
-        tests.testRuns.getAll(workspaceId, { ...params, page_size: 200 }),
-        milestonesApi.getAll({ workspace_id: workspaceId }),
-        getAssignableUsers(workspaceId)
+        tests.testPlans.getAll(workspaceId, { page_size: 200 }, readOptions),
+        tests.testRuns.getAll(workspaceId, { ...params, page_size: 200 }, readOptions),
+        milestonesApi.getAll({ workspace_id: workspaceId }, readOptions),
+        getAssignableUsers(workspaceId, readOptions)
       ]);
+      if (readController.signal.aborted) return;
       const safeSets = sets || [];
       const safeRuns = runs || [];
 
@@ -74,6 +79,7 @@
       milestones.set(milestonesData || []);
       users.set(usersData || []);
     } catch (error) {
+      if (readController.signal.aborted) return;
       console.error('Failed to load data:', error);
     }
   }

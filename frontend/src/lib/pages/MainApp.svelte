@@ -296,7 +296,7 @@
     previousRoutePath = routePath;
   });
 
-  useMainAppWorkspaceContext(
+  const navigationLifetime = useMainAppWorkspaceContext(
     () => $currentRoute,
     () => $workspacesStore.personalWorkspace?.id
   );
@@ -375,7 +375,8 @@
       />
     {/if}
     <div class="authenticated-body flex flex-1 min-h-0 overflow-hidden">
-      {#if showWorkspaceNav}
+      {#if showWorkspaceNav && navigationLifetime.ready}
+        {#key navigationLifetime.generation}
         <Button
           class="mobile-workspace-nav-trigger"
           variant="default"
@@ -406,10 +407,13 @@
               : $currentRoute.params.id}
           />
         </div>
-      {:else if showCollectionNav}
+        {/key}
+      {:else if showCollectionNav && navigationLifetime.ready}
+        {#key navigationLifetime.generation}
         <div class="h-full min-h-0">
           <CollectionNavigation collectionId={$currentRoute.params.id} />
         </div>
+        {/key}
       {/if}
 
       <div class="flex-1 flex min-w-0 min-h-0 overflow-hidden main-split-container">
@@ -427,7 +431,11 @@
               ? `${backgroundStyles.backgroundStyle} ${backgroundStyles.contextVars}`
               : ''}
           >
-            <MainRouteContent view={effectiveView} route={$currentRoute} {lazyComponents} />
+            {#if navigationLifetime.ready}
+              {#key navigationLifetime.generation}
+                <MainRouteContent view={effectiveView} route={$currentRoute} {lazyComponents} />
+              {/key}
+            {/if}
           </main>
         </div>
 

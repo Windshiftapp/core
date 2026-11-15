@@ -44,14 +44,14 @@ export const collections = {
       body: JSON.stringify(data),
     }),
   // Board configuration methods
-  getBoardConfiguration: (collectionId, workspaceId = null) => {
-    return fetchV2Data(boardConfigurationPath(collectionId, workspaceId));
+  getBoardConfiguration: (collectionId, workspaceId = null, requestOptions = {}) => {
+    return fetchV2Data(boardConfigurationPath(collectionId, workspaceId), requestOptions);
   },
-  getBoardConfigurationBootstrap: (collectionId, workspaceId = null) => {
+  getBoardConfigurationBootstrap: (collectionId, workspaceId = null, requestOptions = {}) => {
     const path = boardConfigurationPath(collectionId, workspaceId);
     const query =
       collectionId && workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : '';
-    return fetchV2Data(`${path}/bootstrap${query}`);
+    return fetchV2Data(`${path}/bootstrap${query}`, requestOptions);
   },
   createBoardConfiguration: (collectionId, workspaceId, data) => {
     return fetchV2Data(boardConfigurationPath(collectionId, workspaceId), {

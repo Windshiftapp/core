@@ -122,6 +122,7 @@ class ItemDetailStore {
   // on completion so rapid edits are not dropped.
   #pendingSaves = new Map();
   #drainingPendingSaves = false;
+  #saveOwner = null;
   // The detail view closes when an SSE deletion or refresh 404 sets this.
   notFound = $state(false);
 
@@ -129,7 +130,7 @@ class ItemDetailStore {
   workspace = $state(null);
 
   // === Editing State (unified flag + value) ===
-  editing = $state({ ...DEFAULT_EDITING_STATE });
+  editing = $state(structuredClone(DEFAULT_EDITING_STATE));
 
   // === Related Data (cached) ===
   parentHierarchy = $state([]);
@@ -477,10 +478,13 @@ class ItemDetailStore {
 
       if (previousStatusID !== this.item.status_id) {
         await this.#loadAvailableStatusTransitions();
+        if (token !== this.#refreshToken) return;
       }
       if (previousItemTypeID !== this.item.item_type_id) {
         await this.#loadItemTypeData();
+        if (token !== this.#refreshToken) return;
         await this.#hydrateScreenFields(null, this.item.item_type_id ?? null, this.#loadToken);
+        if (token !== this.#refreshToken) return;
       }
       if (previousParentID !== this.item.parent_id) {
         if (this.item.parent_id) {
@@ -512,7 +516,9 @@ class ItemDetailStore {
   #runPendingRefresh() {
     if (!this.#refreshPending || this.loading || this.saving || this.#refreshInFlight) return;
     this.#refreshPending = false;
+    const token = this.#loadToken;
     queueMicrotask(() => {
+      if (token !== this.#loadToken) return;
       this.refreshCurrentItem().catch(() => {
         // refreshCurrentItem already logged the failure.
       });
@@ -555,7 +561,11 @@ class ItemDetailStore {
     const promise = time.worklogs
       .getByItem(itemId, { signal: controller.signal })
       .then((worklogs) => {
-        if (this.itemId === itemId) {
+        if (
+          this.#worklogsController === controller &&
+          !controller.signal.aborted &&
+          this.itemId === itemId
+        ) {
           this.timeWorklogs = worklogs || [];
           this.#worklogsLoadedItemId = itemId;
         }
@@ -600,6 +610,7 @@ class ItemDetailStore {
       fallback(workspacesStore.load(), 'workspaces'),
     ])
       .then(([customers, workItems, workspaces]) => {
+        if (this.#timeModalDataController !== controller || controller.signal.aborted) return;
         this.customers = customers || [];
         this.workItems = workItems?.data ?? [];
         this.workspaces = workspaces || [];
@@ -621,30 +632,38 @@ class ItemDetailStore {
 
   /** Reload worklogs after a timer or manual time-entry mutation. */
   async reloadWorklogs() {
+    const token = this.#loadToken;
     await this.loadWorklogs({ force: true });
+    if (token !== this.#loadToken) return;
     if (this.includeChildItems) this.loadTimeRollup({ force: true });
   }
 
   // Fetch and cache the current item's descendant time rollup.
   async loadTimeRollup({ force = false } = {}) {
+    const token = this.#loadToken;
     if (!this.itemId) return;
     if (this.timeRollup && !force) return;
     this.timeRollupLoading = true;
     try {
-      this.timeRollup = await items.getTimeRollup(this.itemId);
+      const rollup = await items.getTimeRollup(this.itemId);
+      if (token !== this.#loadToken) return;
+      this.timeRollup = rollup;
     } catch (err) {
+      if (token !== this.#loadToken) return;
       console.error('Failed to load time rollup:', err);
       this.timeRollup = null;
     } finally {
-      this.timeRollupLoading = false;
+      if (token === this.#loadToken) this.timeRollupLoading = false;
     }
   }
 
   async loadChildItems(requestOptions = {}) {
+    const token = this.#loadToken;
     if (!this.itemId) return;
     try {
       this.loadingChildItems = true;
       const response = await items.getChildren(this.itemId, requestOptions);
+      if (token !== this.#loadToken) return;
       let nextChildItems = [];
       if (Array.isArray(response)) {
         nextChildItems = response;
@@ -658,11 +677,13 @@ class ItemDetailStore {
         this.childItems = nextChildItems;
       }
     } catch (err) {
+      if (token !== this.#loadToken) return;
       if (isAbortError(err)) return;
       console.error('Failed to load child items:', err);
       this.childItems = [];
     } finally {
-      if (!requestOptions.signal?.aborted) this.loadingChildItems = false;
+      if (token === this.#loadToken && !requestOptions.signal?.aborted)
+        this.loadingChildItems = false;
     }
   }
 
@@ -678,7 +699,12 @@ class ItemDetailStore {
       const links = await linksApi.getForItem('items', itemId, {
         signal: controller.signal,
       });
-      if (this.itemId !== itemId) return;
+      if (
+        this.#linksController !== controller ||
+        controller.signal.aborted ||
+        this.itemId !== itemId
+      )
+        return;
       this.#applyLinks(links);
     } catch (err) {
       if (isAbortError(err)) return;
@@ -707,7 +733,11 @@ class ItemDetailStore {
 
     const promise = getDiagrams(itemId, { signal: controller.signal })
       .then((diagrams) => {
-        if (this.item?.id === itemId) {
+        if (
+          this.#diagramsController === controller &&
+          !controller.signal.aborted &&
+          this.item?.id === itemId
+        ) {
           this.diagrams = diagrams || [];
           this.diagramsLoaded = true;
           this.#diagramsLoadedItemId = itemId;
@@ -749,21 +779,27 @@ class ItemDetailStore {
   }
 
   async #loadAvailableStatusTransitions(requestOptions = {}) {
+    const token = this.#loadToken;
     if (!this.item?.id) return;
     const itemId = this.item.id;
     try {
       this.loadingStatusTransitions = true;
       const result = await items.getAvailableStatusTransitions(itemId, requestOptions);
-      if (this.item?.id !== itemId) return;
+      if (token !== this.#loadToken || this.item?.id !== itemId) return;
       this.availableStatusTransitions = result.available_transitions || [];
       this.pendingApproval = result.pending_approval || null;
     } catch (err) {
+      if (token !== this.#loadToken) return;
       if (isAbortError(err)) return;
       console.error('Failed to load status transitions:', err);
       this.availableStatusTransitions = [];
       this.pendingApproval = null;
     } finally {
-      if (!requestOptions.signal?.aborted && this.item?.id === itemId) {
+      if (
+        token === this.#loadToken &&
+        !requestOptions.signal?.aborted &&
+        this.item?.id === itemId
+      ) {
         this.loadingStatusTransitions = false;
       }
     }
@@ -774,8 +810,10 @@ class ItemDetailStore {
   }
 
   async #loadParentHierarchy(requestOptions = {}) {
+    const token = this.#loadToken;
     try {
       const ancestors = await items.getAncestors(this.item.id, requestOptions);
+      if (token !== this.#loadToken) return;
       try {
         // The type list came with the workspace reference snapshot.
         this.parentHierarchy = ancestors.map((ancestor) => {
@@ -791,6 +829,7 @@ class ItemDetailStore {
         this.parentHierarchy = ancestors;
       }
     } catch (err) {
+      if (token !== this.#loadToken) return;
       if (isAbortError(err)) return;
       console.error('Failed to load ancestors:', err);
       this.parentHierarchy = [];
@@ -798,10 +837,12 @@ class ItemDetailStore {
   }
 
   async #loadItemTypeData(requestOptions = {}) {
+    const token = this.#loadToken;
     try {
       // The type list already came with the workspace reference snapshot; only
       // the hierarchy-level catalog needs its own read here.
       const hierarchyLevels = await hierarchyLevelsApi.getAll({}, requestOptions);
+      if (token !== this.#loadToken) return;
 
       if (this.item.item_type_id) {
         this.currentItemType = this.itemTypes.find((type) => type.id === this.item.item_type_id);
@@ -820,6 +861,7 @@ class ItemDetailStore {
         this.availableSubIssueTypes = [];
       }
     } catch (err) {
+      if (token !== this.#loadToken) return;
       if (isAbortError(err)) return;
       console.error('Failed to load item type data:', err);
       this.currentItemType = null;
@@ -900,6 +942,58 @@ class ItemDetailStore {
   }
 
   async saveField(
+    field,
+    directValue = null,
+    assigneeName = null,
+    iterationName = null,
+    teamName = null,
+    transitionFields = null
+  ) {
+    if (!this.item) return;
+    const token = this.#loadToken;
+    if (
+      !this.#saveOwner ||
+      this.#saveOwner.token !== token ||
+      this.#saveOwner.store.item?.id !== this.item.id
+    ) {
+      const store = new ItemDetailStore();
+      store.item = structuredClone($state.snapshot(this.item));
+      store.availableStatusTransitions = this.availableStatusTransitions;
+      store.pendingApproval = this.pendingApproval;
+      this.#saveOwner = { token, store };
+    }
+    const owner = this.#saveOwner;
+    const store = owner.store;
+    if (!store.saving) store.item = structuredClone($state.snapshot(this.item));
+    store.editing = structuredClone($state.snapshot(this.editing));
+    store.milestones = structuredClone($state.snapshot(this.milestones));
+    store.customFieldDefinitions = structuredClone($state.snapshot(this.customFieldDefinitions));
+    const sync = () => {
+      if (this.#saveOwner !== owner || this.#loadToken !== token) return;
+      this.item = structuredClone($state.snapshot(store.item));
+      this.saving = store.saving;
+      this.availableStatusTransitions = store.availableStatusTransitions;
+      this.pendingApproval = store.pendingApproval;
+    };
+    try {
+      const pending = store.#saveField(
+        field,
+        structuredClone($state.snapshot(directValue)),
+        assigneeName,
+        iterationName,
+        teamName,
+        structuredClone($state.snapshot(transitionFields))
+      );
+      sync();
+      await pending;
+      if (this.#saveOwner === owner && this.#loadToken === token) this.cancelEditing(field);
+    } finally {
+      sync();
+      if (this.#saveOwner === owner && this.#loadToken === token) this.#runPendingRefresh();
+    }
+  }
+
+  async #saveField(
     field,
     directValue = null,
     assigneeName = null,
@@ -1115,6 +1209,9 @@ class ItemDetailStore {
   // Resolve an editing-state value into a direct value so a queued save keeps
   // writing the same content after the editor closes.
   #resolveSaveValue(field, directValue) {
+    if (directValue === null && (field === 'description' || field === 'project')) {
+      return structuredClone($state.snapshot(this.editing[field]?.value));
+    }
     if (directValue !== null || !field.startsWith('custom_field_')) {
       return directValue;
     }
@@ -1128,22 +1225,28 @@ class ItemDetailStore {
   async #drainPendingSaves() {
     if (this.#drainingPendingSaves) return;
     this.#drainingPendingSaves = true;
+    const errors = [];
     try {
       while (this.#pendingSaves.size > 0) {
         const [field, pending] = this.#pendingSaves.entries().next().value;
         this.#pendingSaves.delete(field);
-        await this.saveField(
-          field,
-          pending.directValue,
-          pending.assigneeName,
-          pending.iterationName,
-          pending.teamName,
-          pending.transitionFields ?? null
-        );
+        try {
+          await this.#saveField(
+            field,
+            pending.directValue,
+            pending.assigneeName,
+            pending.iterationName,
+            pending.teamName,
+            pending.transitionFields ?? null
+          );
+        } catch (error) {
+          errors.push(error);
+        }
       }
     } finally {
       this.#drainingPendingSaves = false;
     }
+    if (errors.length > 0) throw new AggregateError(errors, 'Failed to save queued item edits');
   }
 
   // === Auto-sync editing values when item loads/changes ===
@@ -1234,13 +1337,14 @@ class ItemDetailStore {
   // === Watch Actions ===
 
   async toggleWatch() {
+    const token = this.#loadToken;
     if (!this.item?.id) return;
     const itemId = this.item.id;
     try {
       const status = this.isWatching
         ? await items.removeWatch(itemId)
         : await items.addWatch(itemId);
-      if (this.item?.id !== itemId) return;
+      if (token !== this.#loadToken || this.item?.id !== itemId) return;
       this.isWatching = status?.watching ?? !this.isWatching;
       if (typeof status?.watcher_count === 'number') this.watcherCount = status.watcher_count;
       if (this.watchers !== null) await this.loadWatchers();
@@ -1251,24 +1355,27 @@ class ItemDetailStore {
   }
 
   async loadWatchers() {
+    const token = this.#loadToken;
     if (!this.item?.id) return;
     const itemId = this.item.id;
     const watchers = (await items.listWatchers(itemId)) ?? [];
-    if (this.item?.id === itemId) this.#applyWatchers(watchers);
+    if (token === this.#loadToken && this.item?.id === itemId) this.#applyWatchers(watchers);
   }
 
   async addWatcher(userId) {
+    const token = this.#loadToken;
     if (!this.item?.id) return;
     const itemId = this.item.id;
     const watchers = (await items.addWatcher(itemId, userId)) ?? [];
-    if (this.item?.id === itemId) this.#applyWatchers(watchers);
+    if (token === this.#loadToken && this.item?.id === itemId) this.#applyWatchers(watchers);
   }
 
   async removeWatcher(userId) {
+    const token = this.#loadToken;
     if (!this.item?.id) return;
     const itemId = this.item.id;
     const watchers = (await items.removeWatcher(itemId, userId)) ?? [];
-    if (this.item?.id === itemId) this.#applyWatchers(watchers);
+    if (token === this.#loadToken && this.item?.id === itemId) this.#applyWatchers(watchers);
   }
 
   // Adding or removing yourself from the watchers section also flips the
@@ -1285,6 +1392,7 @@ class ItemDetailStore {
   // === Link Actions ===
 
   async createLink(linkTypeId, targetId, targetType = 'item') {
+    const token = this.#loadToken;
     try {
       await linksApi.create({
         source_type: 'item',
@@ -1293,7 +1401,7 @@ class ItemDetailStore {
         target_id: parseInt(targetId, 10),
         link_type_id: parseInt(linkTypeId, 10),
       });
-      await this.loadLinks();
+      if (token === this.#loadToken) await this.loadLinks();
     } catch (err) {
       console.error('Error creating link:', err);
       throw err;
@@ -1301,9 +1409,10 @@ class ItemDetailStore {
   }
 
   async removeLink(linkId) {
+    const token = this.#loadToken;
     try {
       await linksApi.delete(linkId);
-      await this.loadLinks();
+      if (token === this.#loadToken) await this.loadLinks();
     } catch (err) {
       console.error('Error removing link:', err);
       throw err;
@@ -1390,8 +1499,8 @@ class ItemDetailStore {
     this.#loadToken += 1;
     this.#refreshToken += 1;
     this.#refreshPending = false;
-    this.#pendingSaves.clear();
-    this.#drainingPendingSaves = false;
+    // Pending writes own detached snapshots and keep their original targets.
+    this.#saveOwner = null;
     this.#loadController?.abort();
     this.#refreshController?.abort();
     this.#linksController?.abort();
@@ -1422,7 +1531,7 @@ class ItemDetailStore {
     this.notFound = false;
     this.workspace = null;
 
-    this.editing = { ...DEFAULT_EDITING_STATE };
+    this.editing = structuredClone(DEFAULT_EDITING_STATE);
 
     this.parentHierarchy = [];
     this.childItems = [];

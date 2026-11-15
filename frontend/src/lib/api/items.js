@@ -158,8 +158,10 @@ export const items = {
    * rest). Chunked under the server's 500-id cap. Replaces the former
    * Promise.all(...map(id => /items/{id})) fan-out that could exhaust the
    * Postgres pool on a collection delta refresh.
+   * @param {Array<number>} [ids]
+   * @param {object} [requestOptions]
    */
-  getMany: async (ids = []) => {
+  getMany: async (ids = [], requestOptions = {}) => {
     const unique = [...new Set(ids)];
     if (unique.length === 0) return [];
     const chunks = [];
@@ -168,7 +170,11 @@ export const items = {
     }
     const results = await Promise.all(
       chunks.map((chunk) =>
-        fetchV2Data('/items/batch', { method: 'POST', body: JSON.stringify({ ids: chunk }) })
+        fetchV2Data('/items/batch', {
+          ...requestOptions,
+          method: 'POST',
+          body: JSON.stringify({ ids: chunk }),
+        })
       )
     );
     return results.flat();

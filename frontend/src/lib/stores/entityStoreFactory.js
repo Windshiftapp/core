@@ -14,17 +14,25 @@ import { writable } from 'svelte/store';
 export function createEntityStore(apiMethods, entityName, options = {}) {
   const { subscribe, set, update } = writable([]);
   const { exposeSet = false } = options;
+  let generation = 0;
 
   const store = {
     subscribe,
+    captureGeneration: () => {
+      const captured = generation;
+      return () => captured === generation;
+    },
 
     // Initialize store by loading from API
     async init(filters = {}) {
+      const captured = generation;
       try {
         const entities = await apiMethods.getAll(filters);
+        if (captured !== generation) return [];
         set(entities || []);
         return entities || [];
       } catch (error) {
+        if (captured !== generation) return [];
         console.error(`Failed to load ${entityName}s:`, error);
         set([]);
         return [];
@@ -33,9 +41,10 @@ export function createEntityStore(apiMethods, entityName, options = {}) {
 
     // Add a new entity
     async add(entityData) {
+      const captured = generation;
       try {
         const newEntity = await apiMethods.create(entityData);
-        update((entities) => [...entities, newEntity]);
+        if (captured === generation) update((entities) => [...entities, newEntity]);
         return newEntity;
       } catch (error) {
         console.error(`Failed to add ${entityName}:`, error);
@@ -48,10 +57,12 @@ export function createEntityStore(apiMethods, entityName, options = {}) {
     // re-evaluate. In-place `entities[i] = updated; return entities` notifies
     // store subscribers but fine-grained derives can short-circuit on identity.
     async update(entityId, updates) {
+      const captured = generation;
       try {
         const updatedEntity = await apiMethods.update(entityId, updates);
 
         update((entities) => {
+          if (captured !== generation) return entities;
           const index = entities.findIndex((e) => e.id === entityId);
           if (index === -1) return entities;
           const next = entities.slice();
@@ -68,10 +79,12 @@ export function createEntityStore(apiMethods, entityName, options = {}) {
 
     // Delete an entity
     async delete(entityId) {
+      const captured = generation;
       try {
         await apiMethods.delete(entityId);
 
         update((entities) => {
+          if (captured !== generation) return entities;
           return entities.filter((e) => e.id !== entityId);
         });
 
@@ -84,6 +97,7 @@ export function createEntityStore(apiMethods, entityName, options = {}) {
 
     // Reset store (useful for testing or logout)
     reset() {
+      generation += 1;
       set([]);
     },
   };

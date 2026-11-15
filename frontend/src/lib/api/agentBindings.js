@@ -6,7 +6,8 @@ import { fetchAPI } from './core.js';
 
 export const agentBindings = {
   /** List the member-safe Agent Studio catalog projection. */
-  listCatalog: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/agent-profiles`),
+  listCatalog: (workspaceId, requestOptions = {}) =>
+    fetchAPI(`/workspaces/${workspaceId}/agent-profiles`, requestOptions),
 
   /** List the approved immutable templates available to workspace admins. */
   listTemplates: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/agent-templates`),
