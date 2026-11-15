@@ -20,6 +20,7 @@ import {
   isExpectedBackgroundSyncError,
   onBackgroundSyncAvailable,
 } from '../utils/backgroundSync.js';
+import { onCollectionsChanged } from '../utils/collectionChanges.js';
 import { calcHasMore } from '../utils/paginationUtils.js';
 import { collectionPreferences } from './collectionPreferences.svelte.js';
 import { surfaceError } from './toasts.svelte.js';
@@ -317,6 +318,7 @@ class CollectionStore {
   #sortBy = null;
   #sortDirection = null;
   #boardSortMode = 'rank';
+  #boardPlacement = new Map();
   // Selected item-type hierarchy level for tree/map/roadmap. Null until the
   // view resolves a persisted or default level; hierarchy item fetches are
   // level-scoped and opt into has_children while it is set.
@@ -380,6 +382,7 @@ class CollectionStore {
     this.#sortBy = null;
     this.#sortDirection = null;
     this.#boardSortMode = 'rank';
+    this.#boardPlacement.clear();
     this.sortableFields = [];
     this.boardConfiguration = null;
     this.boardCollection = null;
@@ -534,10 +537,13 @@ class CollectionStore {
    * this so their state shapes cannot drift apart.
    */
   #applyResults({ itemsResult, backlogResult, deferredResult, boardPartition, collection }) {
+    this.boardCollection = collection;
     if (itemsResult) {
       this.items = deferredResult
         ? [...itemsResult.items, ...deferredResult.items]
         : itemsResult.items;
+      this.#boardPlacement.clear();
+      if (BOARD_VIEWS.has(this.#currentView)) this.#recordBoardPlacement(this.items);
       this.boardDeferred = deferredResult
         ? {
             ...boardPartition,
@@ -556,6 +562,7 @@ class CollectionStore {
 
     if (backlogResult) {
       this.backlogItems = backlogResult.items;
+      if (BOARD_VIEWS.has(this.#currentView)) this.#recordBoardPlacement(this.backlogItems);
       this.backlogPagination = backlogResult.pagination;
       this.backlogHasMore = calcHasMore(backlogResult.pagination);
       if (!itemsResult) {
@@ -803,6 +810,7 @@ class CollectionStore {
         if (loadId !== this.#loadId) return;
 
         this.items = appendUniqueItems(this.items, result.items);
+        this.#recordBoardPlacement(result.items);
         this.itemsPagination = result.pagination;
         if (!this.boardDeferred) this.itemsHasMore = calcHasMore(result.pagination);
         this.#changesWatermark = minimumWatermark(this.#changesWatermark, result.watermark ?? 0);
@@ -1103,6 +1111,7 @@ class CollectionStore {
     try {
       const result = await fetchCollectionItems(this.#wsId, this.#colId, {
         page: nextPage,
+        collection: this.boardCollection ?? undefined,
         limit: pagination?.limit ?? DEFAULT_PAGE_SIZE,
         sub_ql: this.effectiveSubFilterQL || undefined,
         requestOptions: this.#readOptions(BACKGROUND_READ),
@@ -1152,6 +1161,7 @@ class CollectionStore {
     try {
       const result = await fetchCollectionBacklog(this.#wsId, this.#colId, {
         page: nextPage,
+        collection: this.boardCollection ?? undefined,
         limit: this.backlogPagination?.limit ?? DEFAULT_PAGE_SIZE,
         sub_ql: this.effectiveBacklogSubFilterQL || undefined,
         requestOptions: this.#readOptions(BACKGROUND_READ),
@@ -1159,6 +1169,7 @@ class CollectionStore {
 
       if (loadId !== this.#loadId) return;
       this.backlogItems = [...this.backlogItems, ...result.items];
+      if (BOARD_VIEWS.has(this.#currentView)) this.#recordBoardPlacement(result.items);
       this.backlogPagination = result.pagination;
       this.backlogHasMore = result.pagination
         ? result.pagination.page < result.pagination.total_pages
@@ -1186,6 +1197,7 @@ class CollectionStore {
       const result = await fetchCollectionItems(this.#wsId, this.#colId, {
         page,
         limit,
+        collection: this.boardCollection ?? undefined,
         sub_ql: this.effectiveSubFilterQL || undefined,
         requestOptions: this.#readOptions(),
         ...this.#itemSortOptions(),
@@ -1370,6 +1382,15 @@ class CollectionStore {
     this.reset();
   }
 
+  invalidateCollectionMetadata() {
+    if (!this.#colId) return;
+    const workspace = this.#wsId;
+    const collection = this.#colId;
+    const view = this.#currentView;
+    this.reset();
+    void this.load(workspace, collection, view);
+  }
+
   async refreshItem(itemId) {
     const generation = this.#generation;
     try {
@@ -1541,6 +1562,14 @@ class CollectionStore {
 
       const hasNewVisibleItem = loadedChangedIds.length !== changedIds.length;
       const touchesBacklog = loadedChangedIds.some((id) => loadedBacklogIds.has(id));
+      if (BOARD_VIEWS.has(this.#currentView) && !hasNewVisibleItem) {
+        const patched = await this.#patchStableBoardRows(loadedChangedIds, loadId);
+        if (loadId !== this.#loadId) return false;
+        if (patched) {
+          this.#changesWatermark = nextWatermark;
+          return true;
+        }
+      }
       const usesServerOrderedItems =
         BOARD_VIEWS.has(this.#currentView) ||
         (LIST_VIEWS.has(this.#currentView) && (this.#sortBy || this.#sortDirection));
@@ -1628,6 +1657,66 @@ class CollectionStore {
     if (bIdx !== -1) Object.assign(this.backlogItems[bIdx], updated);
     const searchIdx = this.searchItems.findIndex((i) => i.id === updated.id);
     if (searchIdx !== -1) Object.assign(this.searchItems[searchIdx], updated);
+  }
+
+  #placementKey(item) {
+    if (item?.workspace_id == null || item?.status_id == null || !item?.frac_index) return null;
+    return JSON.stringify([
+      item.workspace_id,
+      item.status_id,
+      item.frac_index,
+      item.parent_id ?? null,
+      item.item_type_id ?? null,
+    ]);
+  }
+
+  #recordBoardPlacement(items) {
+    for (const item of items) this.#boardPlacement.set(item.id, this.#placementKey(item));
+  }
+
+  async #patchStableBoardRows(ids, loadId) {
+    // Rank and partition keys must still match the last authoritative page,
+    // not an optimistic mutation of its rows. Bubble/partial partitions reload.
+    if (
+      this.#boardSortMode !== 'rank' ||
+      this.boardBackgroundLoading ||
+      this.itemsLoadingMore ||
+      this.backlogLoadingMore
+    )
+      return false;
+    const deferred = new Set(this.boardDeferred?.statusIds ?? []);
+    const loaded = new Map([...this.backlogItems, ...this.items].map((item) => [item.id, item]));
+    if (ids.some((id) => !this.#boardPlacement.get(id) || deferred.has(loaded.get(id)?.status_id)))
+      return false;
+    const idFilter = `id IN (${ids.join(',')})`;
+    const subQL = this.effectiveSubFilterQL;
+    const result = await fetchCollectionItems(this.#wsId, this.#colId, {
+      page: 1,
+      limit: ids.length,
+      collection: this.boardCollection ?? undefined,
+      sub_ql: subQL ? `(${subQL}) AND (${idFilter})` : idFilter,
+      requestOptions: this.#readOptions(BACKGROUND_READ),
+    });
+    if (loadId !== this.#loadId) return false;
+    const snapshots = new Map(result.items.map((item) => [item.id, item]));
+    if (
+      snapshots.size !== ids.length ||
+      result.pagination?.total_items !== ids.length ||
+      ids.some((id) => this.#placementKey(snapshots.get(id)) !== this.#boardPlacement.get(id))
+    )
+      return false;
+    // The scoped v2 list proves current membership; equal rank/partition keys
+    // prove this patch cannot move page boundaries or change board totals.
+    const searched = new Map(this.searchItems.map((item) => [item.id, item]));
+    const backlog = new Map(this.backlogItems.map((item) => [item.id, item]));
+    for (const id of ids) {
+      Object.assign(loaded.get(id), snapshots.get(id));
+      if (backlog.has(id)) Object.assign(backlog.get(id), snapshots.get(id));
+      if (searched.has(id)) Object.assign(searched.get(id), snapshots.get(id));
+    }
+    this.items = [...this.items];
+    this.backlogItems = [...this.backlogItems];
+    return true;
   }
 
   #hideCompletedItem(item) {
@@ -1727,6 +1816,7 @@ class CollectionStore {
 }
 
 export const collectionStore = new CollectionStore();
+onCollectionsChanged(() => collectionStore.invalidateCollectionMetadata());
 
 /** Trigger a background refresh preserving current pagination */
 export function reloadCollection() {

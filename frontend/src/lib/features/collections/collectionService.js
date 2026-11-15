@@ -120,10 +120,10 @@ export async function fetchCollectionItems(
   filters.include_watermark = true;
 
   if (collectionId) {
-    // Reuse a collection the caller already fetched this load cycle (one board
-    // load otherwise issued the same /collections/{id} request 2-3 times).
+    // Only reuse metadata for this collection. A global collection needs no
+    // workspace association; the server remains authoritative for membership.
     collection =
-      preloadedCollection !== undefined
+      preloadedCollection?.id != null && String(preloadedCollection.id) === String(collectionId)
         ? preloadedCollection
         : await getCollection(collectionId, requestOptions);
     if (collection) {
@@ -161,7 +161,7 @@ export async function fetchCollectionBacklog(
 
   if (collectionId) {
     const collection =
-      preloadedCollection !== undefined
+      preloadedCollection?.id != null && String(preloadedCollection.id) === String(collectionId)
         ? preloadedCollection
         : await getCollection(collectionId, requestOptions);
     if (collection) {

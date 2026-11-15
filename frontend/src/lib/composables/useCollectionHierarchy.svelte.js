@@ -1,9 +1,11 @@
-import { untrack } from 'svelte';
+import { onDestroy, untrack } from 'svelte';
 import { items as itemsApi } from '../api/items.js';
+import { BACKGROUND_READ } from '../api/readScheduler.js';
 import { collectionStore } from '../stores/collectionContext.js';
 import { collectionPreferences } from '../stores/collectionPreferences.svelte.js';
 
 const DEFAULT_PER_ROOT_LIMIT = 100;
+const RESPONSE_BUDGET = 400;
 
 function compareItems(a, b) {
   const aIndex = a?.frac_index ?? '';
@@ -30,8 +32,7 @@ function mergeById(existing, incoming) {
  * the store owns the level-scoped base page. This composable owns everything
  * below it:
  *
- * - eager-loads each base item's matching descendants (one batched call),
- * - loads a node's descendants on demand when it is expanded,
+ * - loads matching descendants only for expanded roots, in bounded batches,
  * - pages within a root for a per-row "Load more",
  * - flattens a matching descendant whose intermediate parent is filtered out
  *   onto the nearest present ancestor (the node whose subtree fetch returned
@@ -65,11 +66,15 @@ export function useCollectionHierarchy({
   // generation no longer matches is dropped instead of merged, so a fetch for
   // a previous view, level, or filter cannot change the current hierarchy.
   let fetchGeneration = 0;
+  let controller = new AbortController();
+  let queue = Promise.resolve();
+  onDestroy(() => controller.abort());
 
   let baseSignature = null;
   let previousBaseIds = null;
 
   const baseItems = $derived(collectionStore.items);
+  const baseItemIds = $derived(new Set(baseItems.map((item) => item.id)));
 
   const itemById = $derived.by(() => {
     const map = new Map();
@@ -91,6 +96,15 @@ export function useCollectionHierarchy({
       }
     }
     return merged;
+  });
+
+  const completeDescendants = $derived.by(() => {
+    const ids = new Set();
+    if (getMaxDepth() !== 0) return ids;
+    for (const group of Object.values(overlayByRoot)) {
+      if (!group.hasMore) for (const item of group.items) ids.add(item.id);
+    }
+    return ids;
   });
 
   // Descendant id -> the root whose subtree fetch returned it. Used to flatten
@@ -141,7 +155,7 @@ export function useCollectionHierarchy({
 
   function hasChildren(itemId) {
     if (hierarchyIndex.childrenByParent.has(itemId)) return true;
-    if (loadedRoots.has(itemId)) return false;
+    if (isLoaded(itemId)) return false;
     return itemById.get(itemId)?.has_children === true;
   }
 
@@ -168,47 +182,89 @@ export function useCollectionHierarchy({
   }
 
   function isLoaded(itemId) {
-    return loadedRoots.has(itemId);
+    return loadedRoots.has(itemId) || completeDescendants.has(itemId);
   }
 
-  async function fetchRoots(rootIds, { offsetByRoot = {}, force = false } = {}) {
+  function isExposed(itemId) {
+    const seen = new Set();
+    while (!baseItemIds.has(itemId) && !seen.has(itemId)) {
+      seen.add(itemId);
+      const actualParent = itemById.get(itemId)?.parent_id;
+      const parent = itemById.has(actualParent) ? actualParent : rootIdByItemId.get(itemId);
+      if (parent == null) return true;
+      if (!expanded.has(parent)) return false;
+      itemId = parent;
+    }
+    return true;
+  }
+
+  function enqueue(read) {
+    const signal = controller.signal;
+    const run = queue.then(async () => {
+      if (!signal.aborted) return await read(signal);
+    });
+    queue = run.then(
+      () => {},
+      () => {}
+    );
+    return run;
+  }
+
+  async function fetchRoots(rootIds, { force = false } = {}) {
     const ids = [...new Set(rootIds)].filter(
-      (id) => !loadingRoots.has(id) && (force || offsetByRoot[id] != null || !loadedRoots.has(id))
+      (id) => !loadingRoots.has(id) && (force || !isLoaded(id))
     );
     if (ids.length === 0) return;
     const generation = fetchGeneration;
     loadingRoots = new Set([...loadingRoots, ...ids]);
     try {
-      const groups = await itemsApi.getHierarchy({
-        rootIds: ids,
+      const perRootLimit = Math.min(RESPONSE_BUDGET, Math.max(1, getPerRootLimit()));
+      const rootsPerBatch = Math.max(1, Math.floor(RESPONSE_BUDGET / perRootLimit));
+      const scope = {
         workspaceId: getWorkspaceId(),
         collectionId: getCollectionId(),
         subQl: getSubFilterQL() || null,
         maxDepth: getMaxDepth(),
-        perRootLimit: getPerRootLimit(),
+        perRootLimit,
         perRootOffset: 0,
-      });
-      if (generation !== fetchGeneration) return;
-      const next = { ...overlayByRoot };
-      const nextLoaded = new Set(loadedRoots);
-      for (const group of groups) {
-        const offset = offsetByRoot[group.root_id];
-        const existing = offset != null ? (next[group.root_id]?.items ?? []) : [];
-        next[group.root_id] = {
-          items: mergeById(existing, group.items ?? []),
-          total: group.total ?? 0,
-          hasMore: group.has_more === true,
-        };
-        nextLoaded.add(group.root_id);
-        // A complete unlimited-depth fetch contains every descendant subtree,
-        // so those nodes are already loaded and must not refetch on expand.
-        if (!group.has_more && getMaxDepth() === 0) {
-          for (const entry of group.items ?? []) nextLoaded.add(entry.id);
+      };
+      await enqueue(async (signal) => {
+        for (let index = 0; index < ids.length; index += rootsPerBatch) {
+          if (signal.aborted || generation !== fetchGeneration) return;
+          const batch = ids.slice(index, index + rootsPerBatch);
+          // A user may collapse queued roots before their batch starts.
+          const needed = batch.filter((id) => expanded.has(id) && isExposed(id));
+          if (!needed.length) continue;
+          const groups = await itemsApi.getHierarchy(
+            { ...scope, rootIds: needed },
+            { ...BACKGROUND_READ, signal }
+          );
+          if (signal.aborted || generation !== fetchGeneration) return;
+          const next = { ...overlayByRoot };
+          const nextLoaded = new Set(loadedRoots);
+          for (const group of groups) {
+            next[group.root_id] = {
+              items: group.items ?? [],
+              total: group.total ?? 0,
+              hasMore: group.has_more === true,
+            };
+            nextLoaded.add(group.root_id);
+          }
+          overlayByRoot = next;
+          loadedRoots = nextLoaded;
+          const nested = [...expanded].filter(
+            (id) => isExposed(id) && itemById.get(id)?.has_children && !isLoaded(id)
+          );
+          if (nested.length) void fetchRoots(nested);
         }
-      }
-      overlayByRoot = next;
-      loadedRoots = nextLoaded;
+      });
     } catch (error) {
+      if (
+        generation !== fetchGeneration ||
+        controller.signal.aborted ||
+        error?.name === 'AbortError'
+      )
+        return;
       console.error('[useCollectionHierarchy] failed to load descendants:', error);
     } finally {
       if (generation === fetchGeneration) {
@@ -226,16 +282,20 @@ export function useCollectionHierarchy({
     const generation = fetchGeneration;
     loadingRoots = new Set([...loadingRoots, itemId]);
     try {
-      const groups = await itemsApi.getHierarchy({
+      const scope = {
         rootIds: [itemId],
         workspaceId: getWorkspaceId(),
         collectionId: getCollectionId(),
         subQl: getSubFilterQL() || null,
         maxDepth: getMaxDepth(),
-        perRootLimit: getPerRootLimit(),
+        perRootLimit: Math.min(RESPONSE_BUDGET, Math.max(1, getPerRootLimit())),
         perRootOffset: group.items.length,
-      });
-      if (generation !== fetchGeneration) return;
+      };
+      const groups = await enqueue((signal) =>
+        itemsApi.getHierarchy(scope, { ...BACKGROUND_READ, signal })
+      );
+      if (generation !== fetchGeneration || controller.signal.aborted) return;
+      if (!groups) return;
       const next = groups.find((entry) => entry.root_id === itemId);
       if (!next) return;
       overlayByRoot = {
@@ -247,6 +307,12 @@ export function useCollectionHierarchy({
         },
       };
     } catch (error) {
+      if (
+        generation !== fetchGeneration ||
+        controller.signal.aborted ||
+        error?.name === 'AbortError'
+      )
+        return;
       console.error('[useCollectionHierarchy] failed to load more descendants:', error);
     } finally {
       if (generation === fetchGeneration) {
@@ -259,7 +325,7 @@ export function useCollectionHierarchy({
 
   /** Load a node's descendants if it has not been fetched yet. */
   function ensureLoaded(itemId) {
-    if (loadedRoots.has(itemId) || loadingRoots.has(itemId)) return;
+    if (isLoaded(itemId) || loadingRoots.has(itemId)) return;
     if (!itemById.get(itemId)?.has_children) return;
     void fetchRoots([itemId]);
   }
@@ -295,7 +361,7 @@ export function useCollectionHierarchy({
   function expand(itemId) {
     expanded.add(itemId);
     expanded = new Set(expanded);
-    ensureLoaded(itemId);
+    for (const id of expanded) if (isExposed(id)) ensureLoaded(id);
     persistExpanded();
   }
 
@@ -321,64 +387,91 @@ export function useCollectionHierarchy({
     for (const item of allItems) {
       if (!hasChildren(item.id)) continue;
       next.add(item.id);
-      if (!loadedRoots.has(item.id) && !loadingRoots.has(item.id)) toLoad.push(item.id);
+      if (!isLoaded(item.id) && !loadingRoots.has(item.id)) toLoad.push(item.id);
     }
     expanded = next;
     if (toLoad.length > 0) void fetchRoots(toLoad);
     persistExpanded();
   }
 
-  // Reset the overlay when the base set is replaced (level or scope change) and
-  // eager-load the base items' subtrees. Appending a base page keeps the
-  // already-loaded subtrees. A store refresh that leaves the base rows
-  // unchanged still re-fetches the loaded subtrees so new descendants appear.
+  function resetReads() {
+    controller.abort();
+    controller = new AbortController();
+    queue = Promise.resolve();
+    fetchGeneration += 1;
+    loadingRoots = new Set();
+  }
+
+  // Refresh ancestors first; exposed expanded children hydrate from fresh results.
+  function coveringRoots(ids) {
+    const selected = new Set(ids);
+    return ids.filter((id) => {
+      const seen = new Set([id]);
+      for (;;) {
+        const actualParent = itemById.get(id)?.parent_id;
+        const parent = itemById.has(actualParent) ? actualParent : rootIdByItemId.get(id);
+        if (parent == null || seen.has(parent)) return true;
+        if (selected.has(parent)) return false;
+        seen.add(parent);
+        id = parent;
+      }
+    });
+  }
+
   let lastGeneration = null;
+  let lastScope = null;
   $effect(() => {
     const signature = baseItems.map((item) => item.id).join(',');
     const generation = collectionStore.dataGeneration;
+    const scope = JSON.stringify([
+      getWorkspaceId(),
+      getCollectionId(),
+      getSubFilterQL(),
+      getMaxDepth(),
+    ]);
+    untrack(() => syncBase(signature, generation, scope));
+  });
+
+  function syncBase(signature, generation, scope) {
     const generationChanged = lastGeneration !== null && lastGeneration !== generation;
     lastGeneration = generation;
+    const scopeChanged = lastScope !== scope;
+    lastScope = scope;
 
-    if (signature === baseSignature) {
-      // An authoritative refresh with the same base rows can still change
-      // has_children or add descendants, so re-fetch every known root plus any
-      // base row that now reports children.
+    if (!scopeChanged && signature === baseSignature) {
       if (generationChanged) {
-        const roots = new Set(loadedRoots);
-        const nextExpanded = new Set(expanded);
-        for (const item of baseItems) {
-          if (!item.has_children) continue;
-          roots.add(item.id);
-          // A base root can report children only after the level filter
-          // resolves. It missed the initial default expansion, so expand it
-          // now instead of leaving its subtree behind a collapsed expander.
-          if (!hierarchyIndex.childrenByParent.has(item.id)) nextExpanded.add(item.id);
+        if (readStoredExpanded() == null) {
+          expanded = new Set([
+            ...expanded,
+            ...baseItems.filter((item) => item.has_children).map((item) => item.id),
+          ]);
         }
-        expanded = nextExpanded;
-        if (roots.size > 0) void fetchRoots([...roots], { force: true });
+        const roots = coveringRoots(
+          [...expanded].filter((id) => isExposed(id) && itemById.get(id)?.has_children)
+        );
+        resetReads();
+        overlayByRoot = {};
+        loadedRoots = new Set();
+        void fetchRoots(roots);
       }
       return;
     }
     const nextIds = new Set(baseItems.map((item) => item.id));
     const isAppend =
-      previousBaseIds !== null && [...previousBaseIds].every((id) => nextIds.has(id));
+      !scopeChanged &&
+      previousBaseIds !== null &&
+      [...previousBaseIds].every((id) => nextIds.has(id));
     // Read without subscribing: preferences are written by the actions below,
     // and a tracked read would re-run this effect on every save.
     const stored = untrack(readStoredExpanded);
     if (!isAppend) {
       overlayByRoot = {};
       loadedRoots = new Set();
-      loadingRoots = new Set();
       expanded = stored ?? new Set();
-      fetchGeneration += 1;
+      resetReads();
     }
     baseSignature = signature;
     previousBaseIds = nextIds;
-
-    const toLoad = baseItems
-      .filter((item) => item.has_children && !loadedRoots.has(item.id))
-      .map((item) => item.id);
-    if (toLoad.length > 0) void fetchRoots(toLoad);
 
     // Base roots with children start expanded until the view has a stored
     // expansion, after which the user's choice is authoritative.
@@ -390,7 +483,11 @@ export function useCollectionHierarchy({
       expanded = nextExpanded;
       if (expanded.size > 0) persistExpanded();
     }
-  });
+    const toLoad = baseItems
+      .filter((item) => item.has_children && expanded.has(item.id) && !isLoaded(item.id))
+      .map((item) => item.id);
+    void fetchRoots(toLoad);
+  }
 
   return {
     get allItems() {

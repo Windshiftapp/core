@@ -8,6 +8,7 @@ import { milestonesStore } from './milestones.js';
 import { referenceDisplayCache } from './referenceDisplayCache.svelte.js';
 import { viewSettingsStore } from './viewSettings.svelte.js';
 import { workItemFormStore } from './workItemFormStore.svelte.js';
+import { workspaceCollectionCatalog } from './workspaceCollectionCatalog.svelte.js';
 import { workspaceDataStore } from './workspaceDataStore.svelte.js';
 import { clearWorkspaceGradient } from './workspaceGradient.svelte.js';
 import { currentWorkspace } from './workspaces.svelte.js';
@@ -15,6 +16,7 @@ import { currentWorkspace } from './workspaces.svelte.js';
 /** Reset read projections only; session state and captured writes outlive navigation. */
 export function resetScopedNavigation() {
   collectionStore.reset();
+  workspaceCollectionCatalog.reset();
   backlogStore.reset();
   milestonesStore.reset();
   workspaceDataStore.reset();
