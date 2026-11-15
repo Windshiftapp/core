@@ -13910,6 +13910,75 @@
         ]
       }
     },
+    "/workspaces/{workspace_id}/overview-charts": {
+      "get": {
+        "description": "Returns zero-filled daily counts for the current workspace/collection cohort, without item bodies or pagination. Dates are inclusive UTC calendar dates, at most 366 days. Completion is each item's first recorded transition from a non-completed status to a completed status; creation in a completed status is not inferred. Edits, reopening, and recompletion do not move or duplicate that event. Merged/deleted items are excluded. A collection must belong to this workspace and be visible to the caller; inaccessible scopes return 404. Unrequested series are omitted.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "from",
+            "In": "query",
+            "Description": "Inclusive UTC date (YYYY-MM-DD).",
+            "Required": true,
+            "Schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "Name": "to",
+            "In": "query",
+            "Description": "Inclusive UTC date (YYYY-MM-DD).",
+            "Required": true,
+            "Schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "Name": "collection_id",
+            "In": "query",
+            "Description": "Optional visible collection belonging to this workspace; its current saved query restricts both series.",
+            "Required": false,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "series",
+            "In": "query",
+            "Description": "Comma-separated requested series: created, completed, or both. Defaults to both.",
+            "Required": false,
+            "Schema": {
+              "default": "created,completed",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Get date-bounded overview chart counts",
+        "tags": [
+          "Workspaces"
+        ]
+      }
+    },
     "/workspaces/{workspace_id}/page-labels": {
       "get": {
         "description": "List page labels. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",

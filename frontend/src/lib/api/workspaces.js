@@ -46,9 +46,11 @@ export const workspaces = {
   getProjects: (id, requestOptions = {}) =>
     fetchV2Data(`/workspaces/${id}/time-projects`, requestOptions),
   getOrCreatePersonal: () => fetchAPI('/workspaces/personal'),
-  getStats: (id, params = {}) => {
-    return fetchAPI(`/workspaces/${id}/stats${buildQueryString(params)}`);
+  getStats: (id, params = {}, requestOptions = {}) => {
+    return fetchAPI(`/workspaces/${id}/stats${buildQueryString(params)}`, requestOptions);
   },
+  getOverviewCharts: (id, params, requestOptions = {}) =>
+    fetchV2Data(`/workspaces/${id}/overview-charts${buildQueryString(params)}`, requestOptions),
   getHomepageLayout: (id) => fetchAPI(`/workspaces/${id}/homepage/layout`),
   updateHomepageLayout: (id, layout) =>
     fetchAPI(`/workspaces/${id}/homepage/layout`, {

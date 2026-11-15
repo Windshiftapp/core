@@ -38705,6 +38705,72 @@
         ],
         "type": "object"
       },
+      "GetWorkspacesWorkspaceIdOverviewChartsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "buckets": {
+                "description": "The buckets value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "completed": {
+                      "description": "The completed value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "created": {
+                      "description": "The created value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "date": {
+                      "description": "The date value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "date"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "completion_definition": {
+                "description": "The completion definition value.",
+                "type": "string"
+              },
+              "from": {
+                "description": "The from value.",
+                "type": "string"
+              },
+              "timezone": {
+                "description": "The timezone value.",
+                "type": "string"
+              },
+              "to": {
+                "description": "The to value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "buckets",
+              "completion_definition",
+              "from",
+              "timezone",
+              "to"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "GetWorkspacesWorkspaceIdPageLabelsLabelIdResult": {
         "additionalProperties": false,
         "properties": {
@@ -128423,6 +128489,106 @@
         ],
         "x-required-scopes": [
           "items:write"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/overview-charts": {
+      "get": {
+        "description": "Returns zero-filled daily counts for the current workspace/collection cohort, without item bodies or pagination. Dates are inclusive UTC calendar dates, at most 366 days. Completion is each item's first recorded transition from a non-completed status to a completed status; creation in a completed status is not inferred. Edits, reopening, and recompletion do not move or duplicate that event. Merged/deleted items are excluded. A collection must belong to this workspace and be visible to the caller; inaccessible scopes return 404. Unrequested series are omitted.",
+        "operationId": "getWorkspacesWorkspaceIdOverviewCharts",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Inclusive UTC date (YYYY-MM-DD).",
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Inclusive UTC date (YYYY-MM-DD).",
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional visible collection belonging to this workspace; its current saved query restricts both series.",
+            "in": "query",
+            "name": "collection_id",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Comma-separated requested series: created, completed, or both. Defaults to both.",
+            "in": "query",
+            "name": "series",
+            "required": false,
+            "schema": {
+              "default": "created,completed",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetWorkspacesWorkspaceIdOverviewChartsResult"
+                }
+              }
+            },
+            "description": "Get date-bounded overview chart counts response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get date-bounded overview chart counts",
+        "tags": [
+          "Workspaces"
+        ],
+        "x-required-scopes": [
+          "items:read"
         ]
       }
     },

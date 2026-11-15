@@ -335,6 +335,8 @@ export default {
   },
 
   workspaceDashboard: {
+    loadError: 'Could not load this overview.',
+    chartError: 'Could not load chart counts. Retry to load the complete data.',
     overview: 'Overview', overviewDescription: 'Key metrics and statistics', progress: 'Progress Tracking', progressDescription: 'Charts and timelines', homepage: 'Homepage', loading: 'Loading workspace data…', noSectionsHint: 'Choose Edit to add sections to the workspace homepage',
     customize: 'Customize', doneEditing: 'Done editing', editModeHint: 'Edit mode: add, rename, reorder, or delete sections and widgets', weekOf: 'Week of {date}',
     widgets: {

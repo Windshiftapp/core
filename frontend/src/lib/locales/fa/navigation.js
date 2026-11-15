@@ -491,6 +491,8 @@ export default {
     }
   },
   "workspaceDashboard": {
+    "loadError": "بارگذاری این نمای کلی ممکن نشد.",
+    "chartError": "بارگذاری مقادیر نمودار ممکن نشد. برای دریافت داده‌های کامل دوباره تلاش کنید.",
     "overview": "نمای کلی",
     "overviewDescription": "معیارها و آمارهای کلیدی",
     "progress": "ردیابی پیشرفت",

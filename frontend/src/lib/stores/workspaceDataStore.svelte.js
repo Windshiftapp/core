@@ -213,6 +213,7 @@ class WorkspaceDataStore {
     if (isActive && this.workspaceId === id && this.initialized) {
       return {
         workspace: this.workspace,
+        status_categories: this.statusCategories,
         custom_field_definitions: this.customFieldDefinitions,
         milestones: this.milestones,
         iterations: this.iterations,

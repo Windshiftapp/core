@@ -241,6 +241,8 @@ export default {
   },
 
   workspaceDashboard: {
+    loadError: '无法加载此概览。',
+    chartError: '无法加载图表计数。请重试以加载完整数据。',
     widgets: {
       supportMetrics: { name: '支持指标', description: '客户工单的待办、首次响应、解决情况和 SLA 合规性' },
     },

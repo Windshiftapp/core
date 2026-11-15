@@ -351,9 +351,11 @@ export default {
       items: '项',
     },
     completionChart: {
+      definition: '按周统计首次记录的完成次数（UTC）。重新打开不会重复计数。',
       emptyMessage: '无完成数据',
     },
     createdChart: {
+      definition: '最近七个 UTC 日期内创建的项目，包含今天。',
       emptyMessage: '无创建数据',
     },
     savedSearch: {
