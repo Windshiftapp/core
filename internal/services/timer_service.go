@@ -530,28 +530,82 @@ func int64Ptr(v int64) *int64 { return &v }
 // scoped by the authenticated user id, so another user's draft is
 // indistinguishable from a missing one.
 
-// ListDrafts returns the caller's incomplete entries.
+// ListDrafts returns the caller's incomplete entries with authorized labels.
 func (s *TimerService) ListDrafts(userID int) ([]models.TimeWorklogDraft, error) {
-	return s.draftRepo.ListDrafts(userID)
+	drafts, err := s.draftRepo.ListDrafts(userID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range drafts {
+		s.redactDraftMetadata(userID, &drafts[i])
+	}
+	return drafts, nil
 }
 
-// GetDraft returns one draft owned by the caller.
+// GetDraft returns one owned draft with authorized labels.
 func (s *TimerService) GetDraft(userID, id int) (*models.TimeWorklogDraft, error) {
 	draft, err := s.draftRepo.GetDraft(id, userID)
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, ErrTimerDraftNotFound
 	}
-	return draft, err
+	if err != nil {
+		return nil, err
+	}
+	s.redactDraftMetadata(userID, draft)
+	return draft, nil
+}
+
+// Keep existing association IDs for merge edits and recovery, but never expose
+// linked labels without current access. Permission lookup failures redact too.
+func (s *TimerService) redactDraftMetadata(userID int, draft *models.TimeWorklogDraft) {
+	projectVisible := false
+	if draft.ProjectID != nil && s.timePerm != nil {
+		allowed, err := s.timePerm.CanViewProject(userID, *draft.ProjectID)
+		projectVisible = err == nil && allowed
+	}
+	if !projectVisible {
+		draft.ProjectName = ""
+		draft.CustomerName = ""
+		draft.CustomerBuiltin = ""
+	}
+	if draft.WorkspaceID == nil || !s.canViewTimerWorkspace(userID, *draft.WorkspaceID) {
+		draft.WorkspaceName = ""
+		draft.WorkspaceKey = ""
+	}
+	if s.visibleDraftItem(userID, draft.ItemID) == nil {
+		draft.ItemTitle = ""
+	}
 }
 
 // UpdateDraft saves an incomplete entry, applying the same civil-time parsing
 // as a worklog create but without requiring an active project.
 func (s *TimerService) UpdateDraft(userID, id, expectedVersion int, input WorklogMutationInput) (*models.TimeWorklogDraft, error) {
-	if _, err := s.draftRepo.GetDraft(id, userID); err != nil {
+	current, err := s.draftRepo.GetDraft(id, userID)
+	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, ErrTimerDraftNotFound
 		}
 		return nil, err
+	}
+	// Revoked access must not block recovery of an existing draft. New project
+	// associations require access and existence, but not active booking status.
+	if input.ProjectID > 0 && (current.ProjectID == nil || *current.ProjectID != input.ProjectID) {
+		if s.timePerm == nil {
+			return nil, ErrTimerForbidden
+		}
+		allowed, err := s.timePerm.CanViewProject(userID, input.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			return nil, ErrTimerForbidden
+		}
+		if _, err := s.repo.GetProjectStatus(input.ProjectID); err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return nil, ErrWorklogProjectNotFound
+			}
+			return nil, err
+		}
 	}
 	prepared, err := s.worklogs.PrepareDraft(userID, input)
 	if err != nil {
@@ -672,8 +726,7 @@ func (s *TimerService) visibleDraftItem(userID int, itemID *int) *int {
 	if err != nil {
 		return nil
 	}
-	canView, err := s.permService.HasWorkspacePermission(userID, wsID, models.PermissionItemView)
-	if err != nil || !canView {
+	if !s.canViewTimerWorkspace(userID, wsID) {
 		return nil
 	}
 	return itemID
