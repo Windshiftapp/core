@@ -497,10 +497,9 @@ class CollectionStore {
         collection,
       });
       this.dataGeneration += 1;
-      // The count is scope-scoped, not filter-scoped: only a scope change needs
-      // a read. A same-scope reload (level, sub-filter, completed visibility)
-      // keeps the value it already has, and mutations refresh it directly.
-      if (!sameCollection) {
+      // Reuse a known or pending scope total, but fetch it if a newer load
+      // superseded the initial rows before their count request could start.
+      if (!sameCollection || (this.collectionTotal === null && !this.#countPending)) {
         void this.#requestCollectionTotal();
       }
       if (itemsResult && BOARD_VIEWS.has(view)) {
