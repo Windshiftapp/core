@@ -9976,7 +9976,7 @@
     },
     "/portal/{slug}/boards/{placement_id}": {
       "get": {
-        "description": "Read a board in its linked portal context. Customer sessions remain bound to the portal. Admission intersects portal policy, board baseline and placement policy on every request. Missing, disabled, revoked, paused or cross-portal placements are masked with 404; a restricted audience without a portal customer session returns 401, and a signed-in customer outside the audience returns 403. Responses are private and non-cacheable. Internal sessions are not board audience evidence.",
+        "description": "Read a board in its linked portal context. Customer sessions remain bound to the portal. Admission enforces manual registration and email-domain restrictions, intersecting portal policy, board baseline and placement policy on every request. Missing, disabled, revoked, paused or cross-portal placements are masked with 404; restricted admission or audience without a portal customer session returns 401, and a signed-in customer outside admission or audience returns 403. Responses are private and non-cacheable. Internal sessions are not board audience evidence.",
         "parameters": [
           {
             "Name": "slug",
@@ -10014,7 +10014,7 @@
     },
     "/portal/{slug}/boards/{placement_id}/attachments/{id}/download": {
       "get": {
-        "description": "Download a visible image in its portal board context. Customer sessions remain bound to the portal. Admission intersects portal policy, board baseline and placement policy on every request. Missing, disabled, revoked, paused or cross-portal placements are masked with 404; a restricted audience without a portal customer session returns 401, and a signed-in customer outside the audience returns 403. Responses are private and non-cacheable. Internal sessions are not board audience evidence.",
+        "description": "Download a visible image in its portal board context. Customer sessions remain bound to the portal. Admission enforces manual registration and email-domain restrictions, intersecting portal policy, board baseline and placement policy on every request. Missing, disabled, revoked, paused or cross-portal placements are masked with 404; restricted admission or audience without a portal customer session returns 401, and a signed-in customer outside admission or audience returns 403. Responses are private and non-cacheable. Internal sessions are not board audience evidence.",
         "parameters": [
           {
             "Name": "id",
@@ -10062,7 +10062,7 @@
     },
     "/portal/{slug}/boards/{placement_id}/items/{key}": {
       "get": {
-        "description": "Read externally projected board item detail. Customer sessions remain bound to the portal. Admission intersects portal policy, board baseline and placement policy on every request. Missing, disabled, revoked, paused or cross-portal placements are masked with 404; a restricted audience without a portal customer session returns 401, and a signed-in customer outside the audience returns 403. Responses are private and non-cacheable. Internal sessions are not board audience evidence.",
+        "description": "Read externally projected board item detail. Customer sessions remain bound to the portal. Admission enforces manual registration and email-domain restrictions, intersecting portal policy, board baseline and placement policy on every request. Missing, disabled, revoked, paused or cross-portal placements are masked with 404; restricted admission or audience without a portal customer session returns 401, and a signed-in customer outside admission or audience returns 403. Responses are private and non-cacheable. Internal sessions are not board audience evidence.",
         "parameters": [
           {
             "Name": "slug",
@@ -10110,7 +10110,7 @@
     },
     "/portal/{slug}/experience": {
       "get": {
-        "description": "Read the policy-filtered customer experience. Customer sessions remain bound to the portal. Admission intersects portal policy, board baseline and placement policy on every request. Missing, disabled, revoked, paused or cross-portal placements are masked with 404; a restricted audience without a portal customer session returns 401, and a signed-in customer outside the audience returns 403. Responses are private and non-cacheable. Internal sessions are not board audience evidence.",
+        "description": "Read the policy-filtered customer experience. Customer sessions remain bound to the portal. Admission enforces manual registration and email-domain restrictions, intersecting portal policy, board baseline and placement policy on every request. Missing, disabled, revoked, paused or cross-portal placements are masked with 404; restricted admission or audience without a portal customer session returns 401, and a signed-in customer outside admission or audience returns 403. Responses are private and non-cacheable. Internal sessions are not board audience evidence.",
         "parameters": [
           {
             "Name": "slug",

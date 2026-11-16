@@ -35,19 +35,18 @@ func (h *PortalHandler) resolvePortalRequest(w http.ResponseWriter, r *http.Requ
 	// Get auth info from context (middleware already validated)
 	internalUserID, portalCustomerID = h.getAuthFromContext(r)
 
-	// Owner branch.
+	// Ownership grants request access only while the requests module is enabled.
 	isOwner, err := h.portalService.VerifyRequestOwnership(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
 	if err != nil {
 		cancel()
 		respondInternalError(w, r, err)
 		return 0, models.ChannelConfig{}, nil, nil, false, nil, nil, false
 	}
-	if isOwner {
+	if isOwner && config.PortalModuleEnabled("requests") {
 		return itemID, config, internalUserID, portalCustomerID, true, ctx, cancel, true
 	}
 
-	// Active-approver branch. Only consulted when ownership failed; approvers
-	// who are also creators have already returned via the owner branch.
+	// Active approvers may also read item context with requests disabled.
 	// channel.ID is passed in so approver-derived access does not leak across
 	// portal channels (an approver on item X in channel A must not be able to
 	// read X via channel B's portal slug).

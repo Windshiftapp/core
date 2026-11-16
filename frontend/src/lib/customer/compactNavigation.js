@@ -39,8 +39,9 @@ export function compactTarget(experience, route, modules) {
   const query = route.query || {};
   if (params.placementId) return { kind: `board:${params.placementId}` };
   if (params.pageId) return { kind: 'knowledge-base', articleId: Number(params.pageId) };
-  if (route.path.includes('/kb')) return { kind: 'knowledge-base' };
-  if (route.path.endsWith('/profile')) return { kind: 'profile' };
+  const suffix = route.path.replace(/^\/portal\/[^/]+/, '');
+  if (suffix === '/kb') return { kind: 'knowledge-base' };
+  if (suffix === '/profile') return { kind: 'profile' };
   if (params.requestTypeId) return { kind: 'forms', formId: Number(params.requestTypeId) };
   if (query.module || ['requests', 'approvals', 'drafts'].includes(query.view))
     return { kind: query.module || query.view };

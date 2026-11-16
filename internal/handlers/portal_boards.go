@@ -61,7 +61,7 @@ func (h *CustomerAccessHandler) portalBoard(w http.ResponseWriter, r *http.Reque
 		respondInternalError(w, r, err)
 		return nil, false
 	}
-	restricted := portalPolicy.Mode != "public" || boardPolicy.Mode != "public" || placement.Policy.Mode != "public"
+	restricted := portalAdmissionRequired(config) || portalPolicy.Mode != "public" || boardPolicy.Mode != "public" || placement.Policy.Mode != "public"
 	if restricted && id == 0 {
 		respondJSON(w, http.StatusUnauthorized, map[string]any{"error": "Customer sign-in is required", "code": "CUSTOMER_LOGIN_REQUIRED"})
 		return nil, false
@@ -133,6 +133,10 @@ func (h *CustomerAccessHandler) GetPortalExperience(w http.ResponseWriter, r *ht
 		return
 	}
 	id := h.customer(r, *surface)
+	if id == 0 && portalAdmissionRequired(config) {
+		respondJSON(w, http.StatusUnauthorized, map[string]any{"error": "Customer sign-in is required", "code": "CUSTOMER_LOGIN_REQUIRED"})
+		return
+	}
 	if id > 0 {
 		_, email, err := h.customers.GetIdentity(r.Context(), id)
 		if err != nil || h.portalAdmission(r.Context(), *surface, email) != nil {

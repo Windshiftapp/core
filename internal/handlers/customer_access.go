@@ -328,6 +328,11 @@ func (h *CustomerAccessHandler) Guard(next http.Handler) http.Handler {
 				switch parts[3] {
 				case "my-requests", "requests":
 					module = "requests"
+					// Only item context is shared with approvals; the handler still
+					// requires active approver access when requests are disabled.
+					if parts[3] == "requests" && len(parts) == 5 && r.Method == http.MethodGet && config.PortalModuleEnabled("approvals") {
+						module = ""
+					}
 				case "request-types", "submit", "custom-fields":
 					module = "forms"
 				case "drafts":
@@ -431,7 +436,11 @@ func (h *CustomerAccessHandler) issueSession(w http.ResponseWriter, r *http.Requ
 	return nil
 }
 
-// Check registration rules before a GitHub identity can create a customer.
+func portalAdmissionRequired(config models.ChannelConfig) bool {
+	return config.PortalRegistrationMode != "" && config.PortalRegistrationMode != "open" || len(config.PortalAllowedDomains) > 0
+}
+
+// Check current registration rules for customer sign-in and portal board reads.
 func (h *CustomerAccessHandler) portalAdmission(ctx context.Context, surface models.CustomerSurface, email string) error {
 	if surface.Kind != "portal" {
 		return nil

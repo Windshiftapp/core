@@ -36,7 +36,7 @@ func applyBoardContractMetadata(route *Route) {
 	route.Description = summary + ". Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state."
 	if strings.HasPrefix(route.Path, "/portal/") {
 		route.Tag = "API"
-		route.Description = summary + ". Customer sessions remain bound to the portal. Admission intersects portal policy, board baseline and placement policy on every request. Missing, disabled, revoked, paused or cross-portal placements are masked with 404; a restricted audience without a portal customer session returns 401, and a signed-in customer outside the audience returns 403. Responses are private and non-cacheable. Internal sessions are not board audience evidence."
+		route.Description = summary + ". Customer sessions remain bound to the portal. Admission enforces manual registration and email-domain restrictions, intersecting portal policy, board baseline and placement policy on every request. Missing, disabled, revoked, paused or cross-portal placements are masked with 404; restricted admission or audience without a portal customer session returns 401, and a signed-in customer outside admission or audience returns 403. Responses are private and non-cacheable. Internal sessions are not board audience evidence."
 	}
 	if route.Path == "/admin/board-publications" {
 		route.Description += " Requires system administrator permission; a publishing permission alone does not grant cross-owner inventory access."

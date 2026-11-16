@@ -10,6 +10,7 @@
   import Spinner from '../components/Spinner.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import PortalLoginModal from '../portal/PortalLoginModal.svelte';
+  import GlobalConfirmDialog from '../dialogs/GlobalConfirmDialog.svelte';
 
   let { slug, kind, formId = null, articleId = null, draftsEnabled = true, onidentitychange = null, ondefaultunavailable = null } = $props();
   let ready = $state(false);
@@ -74,6 +75,7 @@
     {/if}
   {/if}
   <PortalLoginModal onloginsuccess={async () => { await onidentitychange?.(); if (!disposed) await load(); }} />
+  <GlobalConfirmDialog />
   {#if selectedForm}
     <LazyRootDialog loader={loadForm} isOpen={true} componentProps={{ requestType: selectedForm, portalSlug: slug, prefill, draftsEnabled, onsubmitted: id => navigate(`/portal/${slug}?view=requests&id=${id}`), onclose: () => { selectedForm = null; navigate(`/portal/${slug}?module=forms&choose=1`); } }} />
   {/if}
