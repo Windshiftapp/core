@@ -1,4 +1,5 @@
 <script>
+  let tabPanelElement = $state(null);
   import { onMount, onDestroy } from 'svelte';
   import ColorDot from '../components/ColorDot.svelte';
   import TabStrip from '../components/TabStrip.svelte';
@@ -815,6 +816,7 @@
         <Panel padding="spacious" class="w-full" style="border-color: {styles.hasCustomBackground ? 'transparent' : 'var(--ds-border)'};">
         <!-- Tab Navigation -->
         <TabStrip
+          panelElement={tabPanelElement}
           tabs={[
             { id: 'columns', label: t('settings.boardConfig.columns') },
             { id: 'backlog', label: t('settings.boardConfig.backlog') },
@@ -824,6 +826,7 @@
         />
 
         <!-- Columns Tab -->
+        <div bind:this={tabPanelElement}>
         {#if activeTab === 'columns'}
         <div class="mt-5 flex flex-col gap-4 rounded-xl border p-5" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
           <div>
@@ -997,7 +1000,7 @@
                     <button
                       onclick={() => removeColumn(colIndex)}
                       class="danger-ghost-btn p-1 rounded transition-colors flex-shrink-0"
-                      title={t('common.delete')}
+                      title={`${t('common.delete')}: ${column.name || colIndex + 1}`}
                     >
                       <X class="w-4 h-4" />
                     </button>
@@ -1070,7 +1073,7 @@
                         <button
                           onclick={() => removeStatusFromColumn(colIndex, statusId)}
                           class="remove-btn opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 p-0.5 rounded transition-all flex-shrink-0"
-                          title={t('common.remove')}
+                          title={`${t('common.remove')}: ${getStatusName(statusId)}`}
                         >
                           <X class="w-3.5 h-3.5" />
                         </button>
@@ -1189,7 +1192,7 @@
                     <button
                       onclick={() => removeCardField(field.field_identifier)}
                       class="remove-btn p-0.5 rounded transition-colors flex-shrink-0"
-                      title={t('common.remove')}
+                      title={`${t('common.remove')}: ${getCardFieldLabel(field)}`}
                     >
                       <X class="w-4 h-4" />
                     </button>
@@ -1322,6 +1325,7 @@
               {saving ? t('common.saving') : t('common.saveChanges')}
             </Button>
           </div>
+        </div>
         </div>
         </Panel>
       </div>

@@ -756,7 +756,7 @@ import { parseScenarioSpec, flattenExamples } from './bddSpec.js';
 
               {#if canExecuteTests}
               <!-- Status Buttons -->
-              <div class="flex gap-3 mb-4">
+              <div role="group" aria-label={t('testing.recordResult')} class="flex flex-wrap gap-3 mb-4">
                 <StatusButton
                   status="passed"
                   selected={stepResults[currentStep.id]?.status === 'passed'}

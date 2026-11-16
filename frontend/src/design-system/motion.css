@@ -1,0 +1,15 @@
+/* biome-ignore-all lint/complexity/noImportantStyles: User motion preferences must override inline and component animation rules. */
+/* Unlayered and important so component and Tailwind animation rules cannot
+   override the user's preference. Glass utilities stay opt-in. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}

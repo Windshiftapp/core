@@ -13,6 +13,7 @@ html[data-color-mode="light"],
      Background colors for UI layers
      ================================================================= */
   --ds-surface: #fafbfc;
+  --ds-surface-sunken: #f1f2f4;
   --ds-surface-hovered: #f5f6f7;
   --ds-surface-pressed: #e9eaeb;
   --ds-surface-raised: #ffffff;
@@ -30,10 +31,15 @@ html[data-color-mode="light"],
      TEXT COLORS
      ================================================================= */
   --ds-text: #172b4d;
-  --ds-text-subtle: #6b778c;
-  --ds-text-subtlest: #8993a4;
+  --ds-text-subtle: #5e6c84;
+  --ds-text-subtlest: #626f82;
   --ds-text-disabled: #a5adba;
   --ds-text-inverse: #ffffff;
+  --ds-text-on-interactive: #ffffff;
+  --ds-text-on-interactive-hovered: #ffffff;
+  --ds-text-on-interactive-pressed: #ffffff;
+  --ds-text-on-danger: #ffffff;
+  --ds-status-solid-text: #ffffff;
   --ds-text-link: #0052cc;
   --ds-text-link-hovered: #0747a6;
 
@@ -59,6 +65,9 @@ html[data-color-mode="light"],
   --ds-interactive-hovered: var(--color-primary-700);
   --ds-interactive-pressed: var(--color-primary-800);
   --ds-interactive-subtle: var(--color-primary-50);
+  --ds-background-brand-bold: var(--color-primary-600);
+  --ds-background-brand-bold-hovered: var(--color-primary-700);
+  --ds-background-brand-bold-pressed: var(--color-primary-800);
 
   /* =================================================================
      FEEDBACK COLORS - SUCCESS (Green)
@@ -198,7 +207,7 @@ html[data-color-mode="light"],
   --ds-status-success-bg: #dcfce7;
   --ds-status-success-text: #166534;
   --ds-status-success-border: #86efac;
-  --ds-status-success-solid: #16a34a;
+  --ds-status-success-solid: #15803d;
 
   /* Danger (Failed) */
   --ds-status-danger-bg: #fee2e2;
@@ -210,7 +219,7 @@ html[data-color-mode="light"],
   --ds-status-warning-bg: #fef3c7;
   --ds-status-warning-text: #92400e;
   --ds-status-warning-border: #fcd34d;
-  --ds-status-warning-solid: #d97706;
+  --ds-status-warning-solid: #b45309;
 
   /* Info (In Progress) */
   --ds-status-info-bg: #dbeafe;

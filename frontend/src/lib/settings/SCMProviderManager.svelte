@@ -494,14 +494,14 @@
           </div>
           <div class="flex items-center space-x-2">
             {#if provider.auth_method !== 'oauth'}
-              <Button variant="ghost" size="sm" onclick={() => testConnection(provider.id)} disabled={testLoading} dataTestid={`scm-provider-test-${provider.id}`}>
+              <Button variant="ghost" size="sm" title={`${t('connections.testConnection')}: ${provider.name}`} onclick={() => testConnection(provider.id)} disabled={testLoading} dataTestid={`scm-provider-test-${provider.id}`}>
                 <TestTube class="w-4 h-4" />
               </Button>
             {/if}
-            <Button variant="ghost" size="sm" onclick={() => openEditModal(provider)} dataTestid={`scm-provider-edit-${provider.id}`}>
+            <Button variant="ghost" size="sm" title={`${t('common.edit')}: ${provider.name}`} onclick={() => openEditModal(provider)} dataTestid={`scm-provider-edit-${provider.id}`}>
               <Edit class="w-4 h-4" />
             </Button>
-            <Button variant="danger-ghost" size="sm" icon={Trash2} title={t('common.delete')} onclick={() => deleteProvider(provider)} dataTestid={`scm-provider-delete-${provider.id}`}></Button>
+            <Button variant="danger-ghost" size="sm" icon={Trash2} title={`${t('common.delete')}: ${provider.name}`} onclick={() => deleteProvider(provider)} dataTestid={`scm-provider-delete-${provider.id}`}></Button>
           </div>
         </div>
       {/each}

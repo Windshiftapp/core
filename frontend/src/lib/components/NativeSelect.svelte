@@ -1,5 +1,6 @@
 <script>
   import { cn } from '../utils/cn.js';
+  import { fieldControl } from '../utils/fieldContext.svelte.js';
   import { controlSizeClasses } from '../utils/controlSizes.js';
 
   let {
@@ -14,8 +15,11 @@
     class: className = '',
     dataTestid = undefined,
     ariaLabel = undefined,
+    ariaDescribedby = undefined,
+    ariaInvalid = undefined,
     onchange = undefined,
   } = $props();
+  const field = fieldControl(() => ({ id, ariaDescribedby, ariaInvalid, required }));
 
   const sizeClasses = $derived(controlSizeClasses(size));
 
@@ -36,10 +40,13 @@
 
 {#if multiple}
   <select
-    {id}
+    id={field.id}
+    aria-describedby={field.describedby}
+    aria-invalid={field.invalid}
+    aria-required={field.ariaRequired || undefined}
     bind:value
     {disabled}
-    {required}
+    required={field.required}
     multiple
     dir="auto"
     data-testid={dataTestid}
@@ -54,10 +61,13 @@
   </select>
 {:else}
   <select
-    {id}
+    id={field.id}
+    aria-describedby={field.describedby}
+    aria-invalid={field.invalid}
+    aria-required={field.ariaRequired || undefined}
     bind:value
     {disabled}
-    {required}
+    required={field.required}
     dir="auto"
     data-testid={dataTestid}
     aria-label={ariaLabel}

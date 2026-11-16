@@ -1,10 +1,15 @@
 <script>
-  import Label from './Label.svelte';
+  import FormField from './FormField.svelte';
   import Select from './Select.svelte';
 
   /**
    * @type {{
-   *   label?: string,
+    *   label?: string,
+    *   helper?: string,
+    *   error?: string,
+    *   ariaDescribedby?: string,
+    *   ariaInvalid?: boolean,
+    *   dataTestid?: string,
    *   value?: any,
    *   options?: Array<any>,
    *   placeholder?: string,
@@ -21,6 +26,11 @@
    */
   let {
     label = '',
+    helper = '',
+    error = '',
+    ariaDescribedby = undefined,
+    ariaInvalid = undefined,
+    dataTestid = undefined,
     value = $bindable(''),
     options = [],
     placeholder = '',
@@ -36,12 +46,12 @@
   } = $props();
 </script>
 
-<div class={className}>
-  {#if label}
-    <Label for={id} {required} color={labelColor} class={labelClass}>{label}</Label>
-  {/if}
+<FormField {label} {id} {required} {helper} {error} {labelColor} {labelClass} labelTestid={dataTestid ? `${dataTestid}-label` : undefined} class="mb-0 {className}">
   <Select
     {id}
+    {ariaDescribedby}
+    {ariaInvalid}
+    {dataTestid}
     bind:value
     {options}
     {placeholder}
@@ -51,4 +61,4 @@
     {ariaLabel}
     {onchange}
   />
-</div>
+</FormField>

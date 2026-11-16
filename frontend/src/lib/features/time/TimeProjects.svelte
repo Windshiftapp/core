@@ -330,6 +330,7 @@
       {/if}
     {/snippet}
   </PageHeader>
+  </div>
 
   <!-- Tabs -->
   <TabStrip
@@ -338,7 +339,7 @@
       { id: 'categories', label: t('time.projects.categoriesTab') }
     ]}
     bind:activeTab
-  />
+  >
 
   <!-- Filters Bar (only show on projects tab) -->
   {#if activeTab === 'projects'}
@@ -376,7 +377,6 @@
       </div>
     </div>
   {/if}
-</div>
 
 {#if activeTab === 'projects'}
   <DataTable
@@ -445,6 +445,7 @@
 {:else if activeTab === 'categories'}
   <TimeProjectCategories />
 {/if}
+  </TabStrip>
 
 <!-- Time Project Modal -->
 <TimeProjectModal
@@ -464,4 +465,3 @@
   project={permissionsProject}
   onClose={closePermissionsModal}
 />
-

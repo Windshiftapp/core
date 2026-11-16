@@ -403,6 +403,7 @@
 				<Button
 					variant="primary"
 					onclick={() => securityStore.showAddToken = true}
+          dataTestid="security-create-token"
 					icon={Plus}
 					size="medium"
 					keyboardHint="T"

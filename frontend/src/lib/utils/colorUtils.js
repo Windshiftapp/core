@@ -105,37 +105,24 @@ export function isGrayColor(hexColor) {
 }
 
 /**
- * Determine text color based on background brightness
- * Uses WCAG luminance formula with saturation awareness
+ * Choose the higher-contrast black/white foreground for an opaque hex fill.
+ * Unknown CSS inputs use the theme foreground and need a paired token instead.
  * @param {string} backgroundColor - Hex color code (with or without #)
  * @returns {string} CSS color value
  */
 export function getTextColorForBackground(backgroundColor) {
   if (!backgroundColor) return 'var(--ds-text)';
 
-  // If it's a CSS variable, return appropriate fallback
-  if (backgroundColor.startsWith('var(')) {
-    return 'var(--ds-text)';
-  }
-
-  // Convert to RGB
-  const { r, g, b } = hexToRgb(backgroundColor);
-
-  // Calculate luminance using WCAG formula
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-
-  // Calculate saturation to distinguish grey colors from saturated colors
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const saturation = max === 0 ? 0 : (max - min) / max;
-
-  // For grey/desaturated colors (low saturation), use lower luminance threshold
-  // For saturated colors, use higher luminance threshold
-  if (saturation < 0.15) {
-    // Grey color - use dark text if luminance > 0.4
-    return luminance > 0.4 ? 'var(--ds-text)' : 'var(--ds-text-inverse)';
-  } else {
-    // Saturated color - use dark text only if luminance > 0.65
-    return luminance > 0.65 ? 'var(--ds-text)' : 'var(--ds-text-inverse)';
-  }
+  let hex = backgroundColor.replace(/^#/, '');
+  if (/^[\da-f]{3}$/i.test(hex)) hex = [...hex].map((char) => char + char).join('');
+  if (!/^[\da-f]{6}$/i.test(hex)) return 'var(--ds-text)';
+  const channels = hex
+    .match(/../g)
+    .map((value) => Number.parseInt(value, 16) / 255)
+    .map((value) => (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4));
+  const luminance = channels.reduce(
+    (sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index],
+    0
+  );
+  return (luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05) ? '#000000' : '#ffffff';
 }

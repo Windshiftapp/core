@@ -6,6 +6,7 @@
    * Emits Gregorian YYYY-MM-DD strings.
    */
   import { createPopover, melt } from '@melt-ui/svelte';
+  import { derived } from 'svelte/store';
   import { DateFormatter, parseDate } from '@internationalized/date';
   import Calendar from '@lucide/svelte/icons/calendar';
   import X from '@lucide/svelte/icons/x';
@@ -14,6 +15,7 @@
   import { formatDate } from '../utils/dateFormatter.js';
   import { serverNow } from '../utils/serverClock.js';
   import { cn } from '../utils/cn.js';
+  import { fieldControl } from '../utils/fieldContext.svelte.js';
   import { controlSizeClasses } from '../utils/controlSizes.js';
   import CalendarGrid from './CalendarGrid.svelte';
   import { useRowRetention } from '../virtualization/useRowRetention.svelte';
@@ -33,6 +35,9 @@
     style = '',
     title = undefined,
     ariaDescribedby = undefined,
+    ariaInvalid = undefined,
+    ariaRequired = undefined,
+    ariaLabelledby = undefined,
     name = undefined,
     inputRef = $bindable(null),
     onblur = undefined,
@@ -51,6 +56,7 @@
     dataTestid = undefined,
     onchange = undefined
   } = $props();
+  const field = fieldControl(() => ({ id, ariaDescribedby, ariaInvalid, required, ariaLabel }));
 
   const descriptionId = $props.id();
 
@@ -85,6 +91,9 @@
     portal: 'body',
     forceVisible: true
   }));
+  const fieldTrigger = derived(trigger, attributes => Object.defineProperty(
+    { ...attributes, role: 'combobox' }, 'action', { value: attributes.action }
+  ));
   useRowRetention(() => $open, 'picker');
 
   const controlClass = $derived(
@@ -178,13 +187,20 @@
     {:else}
       <!-- svelte-ignore a11y_autofocus -->
       <button
-        use:melt={$trigger}
+        use:melt={$fieldTrigger}
         type="button"
-        {id}
+        role="combobox"
+        aria-controls={$content.id}
+        aria-expanded={$open}
+        aria-haspopup="dialog"
+        id={field.id}
+        aria-invalid={field.invalid || Boolean(validationMessage) || undefined}
+        aria-required={ariaRequired || field.ariaRequired || undefined}
+        aria-labelledby={ariaLabelledby ?? field.labelledby}
         {disabled}
         {autofocus}
         {title}
-        aria-describedby={[ariaDescribedby, required ? `${descriptionId}-required` : '', validationMessage ? `${descriptionId}-error` : ''].filter(Boolean).join(' ') || undefined}
+        aria-describedby={[field.describedby, required ? `${descriptionId}-required` : '', validationMessage ? `${descriptionId}-error` : ''].filter(Boolean).join(' ') || undefined}
         bind:this={inputRef}
         {onfocus}
         onkeydown={(event) => {

@@ -484,8 +484,8 @@
                   type="button"
                   class="rounded p-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100"
                   style="color: var(--ds-text-subtle);"
-                  title={t('common.delete')}
-                  aria-label={t('common.delete')}
+                  title={`${t('common.delete')}: ${view.name}`}
+                  aria-label={`${t('common.delete')}: ${view.name}`}
                   data-testid={`filter-menu-shared-delete-${view.id}`}
                   onclick={() => removeView(view)}
                 >

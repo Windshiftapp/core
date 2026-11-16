@@ -1,4 +1,5 @@
 <script>
+  let tabPanelElement = $state(null);
   import IconExternalLink from '@tabler/icons-svelte-runes/icons/external-link';
   import { t } from '../../stores/i18n.svelte.js';
   import Button from '../../components/Button.svelte';
@@ -60,10 +61,10 @@
         {/if}
       </div>
 
-      <TabStrip tabs={stripTabs} bind:activeTab />
+      <TabStrip tabs={stripTabs} bind:activeTab panelElement={tabPanelElement} />
     </div>
 
-    <div class="flex-1 overflow-y-auto">
+    <div class="flex-1 overflow-y-auto" bind:this={tabPanelElement}>
       {@render children?.(activeTab)}
     </div>
   </div>

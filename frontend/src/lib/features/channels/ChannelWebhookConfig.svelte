@@ -199,7 +199,7 @@
                 <div class="flex gap-2 items-center">
                   <Input bind:value={header.key} placeholder={t('channel.headerName')} class="flex-1" />
                   <Input bind:value={header.value} placeholder={t('channel.headerValue')} class="flex-1" />
-                  <Button type="button" variant="ghost" size="small" onclick={() => removeWebhookHeader(index)}>
+                  <Button type="button" variant="ghost" size="small" title={`${t('common.remove')}: ${header.key || index + 1}`} onclick={() => removeWebhookHeader(index)}>
                     <IconX class="w-4 h-4" />
                   </Button>
                 </div>

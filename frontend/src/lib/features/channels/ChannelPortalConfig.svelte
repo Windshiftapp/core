@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../../components/FormField.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import Textarea from '../../components/Textarea.svelte';
   import Label from '../../components/Label.svelte';
@@ -143,6 +144,7 @@
 
       <div class="space-y-4">
         <div>
+          <FormField class="contents">
           <Label color="default" class="mb-2">
             {t('channel.portalRegistrationMode', 'Registration Mode')}
           </Label>
@@ -153,6 +155,7 @@
               { value: 'manual', label: t('channel.portalRegistrationManual', 'Manual — only admin-managed customers can sign in') }
             ]}
           />
+          </FormField>
           <DescriptionText>
             {formData.registration_mode === 'manual'
               ? t('channel.portalRegistrationManualHelp', 'Only portal customers you have added and granted channel access can request a magic link.')

@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { t } from '../../../stores/i18n.svelte.js';
   import CheckCircle from '@lucide/svelte/icons/check-circle';
   import XCircle from '@lucide/svelte/icons/x-circle';
   import Clock from '@lucide/svelte/icons/clock';
@@ -104,7 +105,7 @@
         {/if}
       {:else if column.key === 'actions'}
         {#if row.execution_trace}
-          <Button variant="ghost" size="small" onclick={() => (selectedLog = row)}>
+          <Button variant="ghost" size="small" title={`${t('common.details')}: ${row.id}`} onclick={() => (selectedLog = row)}>
             <Eye size={14} />
           </Button>
         {/if}

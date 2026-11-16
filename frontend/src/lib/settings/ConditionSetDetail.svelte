@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../components/FormField.svelte';
   import { onMount } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
@@ -424,6 +425,7 @@
 
 {#snippet conditionUserSource(cond, transitionId, condIdx)}
   <div>
+    <FormField class="contents">
     <Label color="default" class="text-xs mb-1">{t('conditionSets.userEvaluated')}</Label>
     <NativeSelect
       value={cond.config?.source || 'current_user'}
@@ -436,12 +438,14 @@
       }}
       size="small"
     />
+    </FormField>
   </div>
 {/snippet}
 
 {#snippet conditionUserField(cond, transitionId, condIdx)}
   {#if cond.config?.source === 'custom_field'}
     <div>
+      <FormField class="contents">
       <Label color="default" class="text-xs mb-1">{t('conditionSets.userField')}</Label>
       <BasePicker
         value={cond.config?.field_id}
@@ -451,6 +455,7 @@
         getLabel={(f) => f.name}
         onSelect={(f) => updateConditionConfig(transitionId, condIdx, 'field_id', f?.id || null)}
       />
+      </FormField>
     </div>
   {/if}
 {/snippet}
@@ -495,6 +500,7 @@
               />
             </div>
             <div>
+              <FormField class="contents" requiredMark>
               <Label color="default" required class="mb-1">{t('conditionSets.workflow')}</Label>
               <WorkflowPicker
                 value={formData.workflow_id}
@@ -503,6 +509,7 @@
                 disabled={!isNewMode}
                 onSelect={handleWorkflowChange}
               />
+              </FormField>
               {#if !isNewMode}
                 <DescriptionText>{t('conditionSets.workflowLocked')}</DescriptionText>
               {/if}
@@ -599,6 +606,7 @@
                           <div class="border rounded-md p-3 space-y-3" style="border-color: var(--ds-border); background-color: var(--ds-surface);">
                             <div class="flex items-center justify-between">
                               <div class="flex items-center gap-3 flex-1">
+                                <FormField class="contents">
                                 <Label color="default" class="text-xs whitespace-nowrap">{t('conditionSets.type')}</Label>
                                 <NativeSelect
                                   class="w-auto"
@@ -607,6 +615,7 @@
                                   onchange={(value) => updateConditionType(tc.transition_id, condIdx, value)}
                                   size="small"
                                 />
+                                </FormField>
                               </div>
                               <button
                                 class="p-1 rounded transition-colors"
@@ -653,12 +662,14 @@
                               <div class="grid grid-cols-2 gap-3">
                                 {@render conditionUserSource(cond, tc.transition_id, condIdx)}
                                 <div>
+                                  <FormField class="contents">
                                   <Label color="default" class="text-xs mb-1">{t('conditionSets.againstRole')}</Label>
                                   <RolePicker
                                     value={cond.config?.role_id}
                                     placeholder={t('conditionSets.selectRole')}
                                     onSelect={(role) => updateConditionConfig(tc.transition_id, condIdx, 'role_id', role?.id || null)}
                                   />
+                                  </FormField>
                                 </div>
                               </div>
                               {@render conditionUserField(cond, tc.transition_id, condIdx)}
@@ -667,6 +678,7 @@
                               <div class="grid grid-cols-2 gap-3">
                                 {@render conditionUserSource(cond, tc.transition_id, condIdx)}
                                 <div>
+                                  <FormField class="contents">
                                   <Label color="default" class="text-xs mb-1">{t('conditionSets.againstGroup')}</Label>
                                   <BasePicker
                                     value={cond.config?.group_id}
@@ -676,6 +688,7 @@
                                     getLabel={(g) => g.name}
                                     onSelect={(g) => updateConditionConfig(tc.transition_id, condIdx, 'group_id', g?.id || null)}
                                   />
+                                  </FormField>
                                 </div>
                               </div>
                               {@render conditionUserField(cond, tc.transition_id, condIdx)}

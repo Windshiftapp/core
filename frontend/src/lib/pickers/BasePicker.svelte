@@ -1,5 +1,6 @@
 <script>
   import { untrack } from 'svelte';
+  import { fieldControl } from '../utils/fieldContext.svelte.js';
   import { createCombobox, melt } from '@melt-ui/svelte';
   import Check from '@lucide/svelte/icons/check';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
@@ -25,6 +26,9 @@
     placeholder = '',
     label = '',
     ariaLabel = undefined,
+    ariaDescribedby = undefined,
+    ariaInvalid = undefined,
+    required = false,
     class: className = '',
 
     // Feature toggles
@@ -105,6 +109,7 @@
     onCancel = () => {},
     onChange = () => {}
   } = $props();
+  const field = fieldControl(() => ({ id, ariaDescribedby, ariaInvalid, required, ariaLabel }));
 
   // Popover mode: when a children snippet is provided the trigger is custom
   // and the search input lives inside the dropdown.
@@ -571,6 +576,12 @@
              class="absolute inset-0 w-full h-full opacity-0 pointer-events-none" />
       <div
         role="combobox"
+        id={field.id}
+        aria-label={ariaLabel}
+        aria-labelledby={field.labelledby}
+        aria-describedby={field.describedby}
+        aria-invalid={field.invalid}
+        aria-required={field.ariaRequired || undefined}
         data-testid={triggerTestid}
         tabindex={disabled ? -1 : 0}
         aria-expanded={$open}
@@ -608,7 +619,8 @@
           </button>
         </div>
       {/each}
-      <input bind:this={inputRef} use:melt={$input} {id} type="text"
+      <input bind:this={inputRef} use:melt={$input} id={field.id} type="text"
+             aria-labelledby={field.labelledby} aria-describedby={field.describedby} aria-invalid={field.invalid} aria-required={field.ariaRequired || undefined}
              data-testid={inputTestid}
              placeholder={selectedItems.length === 0 ? resolvedPlaceholder : ''}
              {disabled} aria-label={ariaLabel} onkeydowncapture={handleKeydown}
@@ -621,7 +633,8 @@
     </div>
   {:else}
     <!-- Single-select: Input/Trigger (original combobox mode) -->
-    <input use:melt={$input} {id} type="text" placeholder={resolvedPlaceholder} {disabled}
+    <input use:melt={$input} id={field.id} type="text" placeholder={resolvedPlaceholder} {disabled}
+           aria-labelledby={field.labelledby} aria-describedby={field.describedby} aria-invalid={field.invalid} aria-required={field.ariaRequired || undefined}
            data-testid={inputTestid}
            aria-label={ariaLabel}
            onkeydowncapture={handleKeydown}

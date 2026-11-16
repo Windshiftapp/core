@@ -1,4 +1,5 @@
 <script>
+  let tabPanelElement = $state(null);
   import Palette from '@lucide/svelte/icons/palette';
   import Navigation from '@lucide/svelte/icons/navigation';
   import X from '@lucide/svelte/icons/x';
@@ -50,6 +51,7 @@
 
     <!-- Section Navigation -->
     <TabStrip
+      panelElement={tabPanelElement}
       tabs={[
         { id: 'hero-gradient', label: t('portal.theme', 'Theme'), icon: Palette },
         { id: 'sections', label: t('hub.sections', 'Sections'), icon: Navigation }
@@ -60,7 +62,7 @@
     />
 
     <!-- Panel Content -->
-    <div class="flex-1 overflow-y-auto p-4">
+    <div class="flex-1 overflow-y-auto p-4" bind:this={tabPanelElement}>
       <!-- Hero/Gradient Section -->
       {#if hubStore.activeSection === 'hero-gradient'}
         <div class="space-y-6">

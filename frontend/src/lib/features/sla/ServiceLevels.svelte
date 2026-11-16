@@ -1,4 +1,5 @@
 <script>
+  let tabPanelElement = $state(null);
   import SlaCalendarsTab from './SlaCalendarsTab.svelte';
   import SlaMetricsTab from './SlaMetricsTab.svelte';
   import SlaWarningThresholdsTab from './SlaWarningThresholdsTab.svelte';
@@ -69,6 +70,7 @@
 <div class="space-y-4" data-testid="service-levels">
   {#if tabs.length > 1}
     <TabStrip
+      panelElement={tabPanelElement}
       tabs={tabs.map((tab) => ({
         id: tab.id,
         label: t(tab.labelKey),
@@ -79,10 +81,12 @@
     />
   {/if}
 
+  <div bind:this={tabPanelElement}>
   {#each tabs as tab (tab.id)}
     {#if active === tab.id}
       {@const TabComponent = tab.component}
       <TabComponent {workspaceId} />
     {/if}
   {/each}
+  </div>
 </div>

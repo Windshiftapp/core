@@ -442,7 +442,8 @@
           class="flex-1 px-3 py-1.5 rounded-md border text-sm"
           style="background: var(--ds-surface); color: var(--ds-text); border-color: var(--ds-border);"
         />
-        <Button size="sm" onclick={addFilterLabel}>
+        <!-- shortcut-guard-exempt: Adds the adjacent label; Enter in that input performs the same action. -->
+        <Button size="sm" title={`${t('common.add')}: ${t('issueSync.filterLabels')}`} onclick={addFilterLabel}>
           <Plus class="w-4 h-4" />
         </Button>
       </div>
@@ -485,7 +486,8 @@
           placeholder={t('issueSync.windshiftUser')}
           workspaceId={workspaceId}
         />
-        <Button size="sm" onclick={addAssigneeMapping} disabled={!newAssigneeGH || !newAssigneeWS}>
+        <!-- shortcut-guard-exempt: Contextual mapping-row action; a global Add shortcut would conflict with filter labels. -->
+        <Button size="sm" title={`${t('common.add')}: ${t('common.assignee')}`} onclick={addAssigneeMapping} disabled={!newAssigneeGH || !newAssigneeWS}>
           <Plus class="w-4 h-4" />
         </Button>
       </div>

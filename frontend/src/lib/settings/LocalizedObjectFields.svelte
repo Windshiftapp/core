@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../components/FormField.svelte';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import Languages from '@lucide/svelte/icons/languages';
   import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -295,6 +296,7 @@
           />
           {#if includesDescription}
             <div>
+              <FormField class="contents">
               <Label>{t('common.description')}</Label>
               <Textarea
                 value={primaryValues.description}
@@ -302,6 +304,7 @@
                 data-testid={`localized-object-description-${activeLocale}`}
                 rows={2}
               />
+              </FormField>
             </div>
           {/if}
         </div>

@@ -217,10 +217,10 @@
 						</p>
 					</div>
 					<div class="flex items-center gap-1">
-						<Button variant="ghost" size="small" onclick={() => openEdit(provider)}>
+            <Button variant="ghost" size="small" title={`${t('common.edit')}: ${provider.name}`} onclick={() => openEdit(provider)}>
 							<Edit2 class="w-4 h-4" />
 						</Button>
-						<Button variant="danger-ghost" size="small" icon={Trash2} title={t('common.delete')} onclick={() => deleteProvider(provider)}></Button>
+						<Button variant="danger-ghost" size="small" icon={Trash2} title={`${t('common.delete')}: ${provider.name}`} onclick={() => deleteProvider(provider)}></Button>
 					</div>
 				</div>
 			{/each}

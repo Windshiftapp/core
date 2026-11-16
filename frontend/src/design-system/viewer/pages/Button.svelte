@@ -1,5 +1,7 @@
 <script>
   import Button from '../../../lib/components/Button.svelte'
+  import Input from '../../../lib/components/Input.svelte';
+  import Select from '../../../lib/components/Select.svelte';
   import Settings from '@lucide/svelte/icons/settings';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import Plus from '@lucide/svelte/icons/plus';
@@ -36,6 +38,16 @@
       <Button variant="primary" size="medium">Medium</Button>
       <Button variant="primary" size="large">Large</Button>
     </div>
+    <p class="ds-text-helper text-ds-text-subtle mt-4">Shared bordered control heights: small 34px, medium 38px, large 50px at a 16px root. These are minimum single-line metrics, not fixed heights: translated labels may wrap. Buttons keep wider horizontal padding; link buttons have no padding. Caller utilities override defaults within the same responsive/state scope; important modifiers keep CSS precedence.</p>
+    <div class="space-y-3 mt-4">
+      {#each ['small', 'medium', 'large'] as size}
+        <div class="flex flex-wrap items-start gap-3">
+          <Button size={/** @type {'small'|'medium'|'large'} */ (size)}>{size}</Button>
+          <div class="w-48"><Input {size} placeholder={size} /></div>
+          <div class="w-48"><Select {size} options={[{value:'example', label:size}]} value="example" /></div>
+        </div>
+      {/each}
+    </div>
   </section>
 
   <!-- With Icons -->
@@ -47,6 +59,7 @@
       <Button variant="primary" icon={ArrowRight} iconPosition="right">Continue</Button>
       <Button variant="secondary" icon={Download}>Download</Button>
       <Button variant="danger" icon={Trash2}>Delete</Button>
+      <Button variant="ghost" icon={Settings} title="Configure example" ariaLabel="Configure example" />
     </div>
   </section>
 

@@ -219,7 +219,7 @@ export function getStatusButtonStyle(status, isSelected) {
   const color = colors[status] || colors.skipped;
 
   if (isSelected) {
-    return `background-color: ${color.active}; color: white; border: 1px solid ${color.active};`;
+    return `background-color: ${color.active}; color: var(--ds-status-solid-text); border: 1px solid ${color.active};`;
   }
   return `background-color: transparent; color: ${color.text}; border: 1px solid ${color.border};`;
 }

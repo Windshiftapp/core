@@ -1,4 +1,5 @@
 <script>
+  let tabPanelElement = $state(null);
   import { onMount } from 'svelte';
   import TabStrip from '../../components/TabStrip.svelte';
   import { assetCategories as assetCategoriesApi, assetRoles as assetRolesApi, assetSets as assetSetsApi, assetTypes as assetTypesApi } from '../../api/assets.js';
@@ -693,6 +694,7 @@
     <!-- Tabs -->
     <div class="mb-6">
       <TabStrip
+        panelElement={tabPanelElement}
         tabs={[
           { id: 'types', label: t('assets.types'), icon: IconSettings, testid: 'asset-manager-types-tab' },
           { id: 'categories', label: t('assets.categories'), icon: IconListTree, testid: 'asset-manager-categories-tab' },
@@ -708,6 +710,7 @@
     </div>
 
     <!-- Types Tab -->
+    <div bind:this={tabPanelElement}>
     {#if activeTab === 'types'}
       {#if isSetAdmin}
         <div class="mb-4 flex justify-end">
@@ -754,10 +757,10 @@
                 <Button variant="ghost" size="sm" dataTestid={`asset-manager-type-fields-${row.id}`} onclick={() => showFieldsForm(row)} title="Configure Fields">
                   <IconSettings class="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="sm" dataTestid={`asset-manager-edit-type-${row.id}`} onclick={() => showEditTypeForm(row)}>
+                <Button variant="ghost" size="sm" title={`${t('common.edit')}: ${row.name}`} dataTestid={`asset-manager-edit-type-${row.id}`} onclick={() => showEditTypeForm(row)}>
                   <IconEdit class="w-4 h-4" />
                 </Button>
-                <Button variant="ghost" size="sm" onclick={() => deleteType(row.id)}>
+                <Button variant="ghost" size="sm" title={`${t('common.delete')}: ${row.name}`} dataTestid={`asset-manager-delete-type-${row.id}`} onclick={() => deleteType(row.id)}>
                   <IconTrash class="w-4 h-4 text-ds-icon-danger" />
                 </Button>
               </div>
@@ -829,10 +832,10 @@
                   <Button variant="ghost" size="sm" onclick={() => showAddCategoryForm(category.id)} title="Add subcategory">
                     <IconPlus class="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" dataTestid={`asset-manager-edit-category-${category.id}`} onclick={() => showEditCategoryForm(category)}>
+                  <Button variant="ghost" size="sm" title={`${t('common.edit')}: ${category.name}`} dataTestid={`asset-manager-edit-category-${category.id}`} onclick={() => showEditCategoryForm(category)}>
                     <IconEdit class="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" onclick={() => deleteCategory(category.id)}>
+                  <Button variant="ghost" size="sm" title={`${t('common.delete')}: ${category.name}`} dataTestid={`asset-manager-delete-category-${category.id}`} onclick={() => deleteCategory(category.id)}>
                     <IconTrash class="w-4 h-4 text-ds-icon-danger" />
                   </Button>
                 </div>
@@ -914,18 +917,19 @@
             </Lozenge>
           {/snippet}
           {#snippet actions(row)}
-            <Button variant="ghost" size="sm" onclick={() => revokeRole(row.id, row.type)}>
+            <Button variant="ghost" size="sm" title={`${t('common.remove')}: ${row.assignee_name}`} onclick={() => revokeRole(row.id, row.type)}>
               <IconX class="w-4 h-4" style="color: var(--ds-text-danger);" />
             </Button>
           {/snippet}
         </DataTable>
       {/if}
     {/if}
-  {/if}
 
   <!-- Automations Tab -->
   {#if activeTab === 'automations' && isSetAdmin}
     <AssetActionsSettings assetSetId={selectedSetId} />
+  {/if}
+    </div>
   {/if}
   </Card>
 </div>

@@ -354,8 +354,8 @@
                   {connection.oauth_connected || connection.reauthorization_required ? t('zammad.reauthorizeOAuth') : t('zammad.connectOAuth')}
                 </Button>
               {/if}
-              <Button variant="ghost" size="small" onclick={() => openEdit(connection)} dataTestid={`zammad-connection-edit-${connection.id}`}><Edit2 class="w-4 h-4" /></Button>
-              <Button variant="danger-ghost" size="small" onclick={() => remove(connection)} dataTestid={`zammad-connection-delete-${connection.id}`}><Trash2 class="w-4 h-4" /></Button>
+            <Button variant="ghost" size="small" title={`${t('common.edit')}: ${connection.name}`} onclick={() => openEdit(connection)} dataTestid={`zammad-connection-edit-${connection.id}`}><Edit2 class="w-4 h-4" /></Button>
+            <Button variant="danger-ghost" size="small" title={`${t('common.delete')}: ${connection.name}`} onclick={() => remove(connection)} dataTestid={`zammad-connection-delete-${connection.id}`}><Trash2 class="w-4 h-4" /></Button>
             </div>
           </div>
           {#if metadataByConnection[connection.id]}

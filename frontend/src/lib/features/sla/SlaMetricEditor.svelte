@@ -356,7 +356,7 @@
                   size="small"
                   icon={Trash2}
                   onclick={() => removeCondition(phase, index)}
-                  title={t('common.remove')}
+                  title={`${t('common.remove')}: ${phase} ${index + 1}`}
                   dataTestid="sla-metric-condition-remove-{phase}-{index}"
                 />
               </div>
@@ -426,7 +426,7 @@
                 size="small"
                 icon={Trash2}
                 onclick={() => removeGoal(goalIndex)}
-                title={t('common.remove')}
+                title={`${t('common.remove')}: ${goal.name || goalIndex + 1}`}
                 dataTestid="sla-goal-remove-{goalIndex}"
               />
             </div>

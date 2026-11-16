@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../../components/FormField.svelte';
   // Presentational renderer for a transition screen's field list. It takes the
   // resolved screen fields plus a values map keyed by the item update keys the
   // transition endpoint accepts, and emits changes. Shared by the transition
@@ -87,8 +88,10 @@
     {@const identifier = field.field_identifier}
     {#if identifier === 'title'}
       <div class="space-y-1">
-        <Label color="default">{t('common.title') || 'Title'}{#if isRequired(field)}<span style="color: var(--ds-text-danger, #ef4444);"> *</span>{/if}</Label>
+        <FormField class="contents" requiredMark={isRequired(field)}>
+        <Label color="default" required={isRequired(field)}>{t('common.title') || 'Title'}</Label>
         <Input value={values.title ?? ''} disabled={disabled} oninput={(e) => setValue('title', e.target.value)} dataTestid="transition-field-title" />
+        </FormField>
       </div>
     {:else if identifier === 'description'}
       <div class="space-y-1">
@@ -106,34 +109,42 @@
       </div>
     {:else if identifier === 'priority'}
       <div class="space-y-1">
-        <Label color="default">{t('common.priority')}{#if isRequired(field)}<span style="color: var(--ds-text-danger, #ef4444);"> *</span>{/if}</Label>
+        <FormField class="contents" requiredMark={isRequired(field)}>
+        <Label color="default" required={isRequired(field)}>{t('common.priority')}</Label>
         <PriorityPicker
           {workspaceId}
           selectedPriorityId={values.priority_id ?? null}
           onChange={(id) => setValue('priority_id', id)}
           disabled={disabled}
         />
+        </FormField>
       </div>
     {:else if identifier === 'assignee'}
       <div class="space-y-1">
-        <Label color="default">{t('common.assignee') || 'Assignee'}{#if isRequired(field)}<span style="color: var(--ds-text-danger, #ef4444);"> *</span>{/if}</Label>
+        <FormField class="contents" requiredMark={isRequired(field)}>
+        <Label color="default" required={isRequired(field)}>{t('common.assignee') || 'Assignee'}</Label>
         <UserPicker
           {workspaceId}
           value={values.assignee_id ?? null}
           disabled={disabled}
           onSelect={(user) => setValue('assignee_id', user?.id ?? null)}
         />
+        </FormField>
       </div>
     {:else if identifier === 'due_date' || identifier === 'start_date' || identifier === 'end_date'}
       <div class="space-y-1">
-        <Label color="default">{identifier === 'due_date' ? t('items.dueDate') : identifier === 'start_date' ? t('items.startDate') : t('common.endDate')}{#if isRequired(field)}<span style="color: var(--ds-text-danger, #ef4444);"> *</span>{/if}</Label>
+        <FormField class="contents" requiredMark={isRequired(field)}>
+        <Label color="default" required={isRequired(field)}>{identifier === 'due_date' ? t('items.dueDate') : identifier === 'start_date' ? t('items.startDate') : t('common.endDate')}</Label>
         <Input type="date" value={values[identifier] ?? ''} disabled={disabled} oninput={(e) => setValue(identifier, e.target.value)} />
+        </FormField>
       </div>
     {:else if identifier === 'story_points' || identifier === 'estimate_minutes' || identifier === 'estimate'}
       {@const key = identifier === 'estimate' ? 'estimate_minutes' : identifier}
       <div class="space-y-1">
-        <Label color="default">{key === 'story_points' ? t('items.storyPoints') || 'Story points' : t('items.estimate') || 'Estimate'}{#if isRequired(field)}<span style="color: var(--ds-text-danger, #ef4444);"> *</span>{/if}</Label>
+        <FormField class="contents" requiredMark={isRequired(field)}>
+        <Label color="default" required={isRequired(field)}>{key === 'story_points' ? t('items.storyPoints') || 'Story points' : t('items.estimate') || 'Estimate'}</Label>
         <Input type="number" value={values[key] ?? ''} disabled={disabled} oninput={(e) => setValue(key, e.target.value === '' ? null : Number(e.target.value))} />
+        </FormField>
       </div>
     {:else if identifier === 'labels'}
       <div class="space-y-1">

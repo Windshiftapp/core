@@ -1,5 +1,6 @@
 <script>
   import { controlSizeClasses } from '../utils/controlSizes.js';
+  import { fieldControl } from '../utils/fieldContext.svelte.js';
 
   let {
     value = $bindable(''),
@@ -12,6 +13,8 @@
     dir = 'auto',
     size = 'medium',
     id = undefined,
+    ariaDescribedby = undefined,
+    ariaInvalid = undefined,
     class: className = '',
     style = '',
     'data-testid': dataTestid = undefined,
@@ -26,6 +29,7 @@
     ...restProps
   } = $props();
   export { className as class };
+  const field = fieldControl(() => ({ id, ariaDescribedby, ariaInvalid, required }));
 
   // Size variants
   const sizeClasses = $derived(controlSizeClasses(size));
@@ -45,12 +49,15 @@
 <!-- svelte-ignore a11y_autofocus -->
 <textarea
   {...restProps}
-  {id}
+  id={field.id}
+  aria-describedby={field.describedby}
+  aria-invalid={field.invalid}
+  aria-required={field.ariaRequired || undefined}
   bind:value
   bind:this={textareaRef}
   {placeholder}
   {disabled}
-  {required}
+  required={field.required}
   {autofocus}
   {spellcheck}
   {rows}

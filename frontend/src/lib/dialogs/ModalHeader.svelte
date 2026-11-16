@@ -31,8 +31,10 @@
   </div>
   {#if showCloseButton && closeHandler}
     <button
+      type="button"
+      data-testid="modal-header-close"
       onclick={closeHandler}
-      class="p-1.5 rounded transition-colors"
+      class="ds-focus-ring p-1.5 rounded transition-colors"
       style="color: var(--ds-text-subtle);"
       onmouseover={(e) => e.currentTarget.style.backgroundColor = 'var(--ds-background-neutral-hovered)'}
       onmouseout={(e) => e.currentTarget.style.backgroundColor = 'transparent'}

@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../components/FormField.svelte';
   const dialogId = $props.id();
   // Transition screen modal: shown before a status move whose governing
   // transition carries a screen. It collects the screen's fields plus an
@@ -188,8 +189,10 @@
         <ScreenFieldsForm bind:values {workspaceId} {milestones} {iterations} {itemLabels} screenFields={fields} />
 
         <div class="space-y-1">
+          <FormField class="contents">
           <Label color="default">{t('transitionScreen.comment')}</Label>
           <Textarea bind:value={comment} placeholder={t('transitionScreen.commentPlaceholder')} data-testid="transition-screen-comment" />
+          </FormField>
         </div>
 
         {#if errorMessage}

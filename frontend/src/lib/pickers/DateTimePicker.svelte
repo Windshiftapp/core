@@ -9,7 +9,7 @@
     disabled = false, readonly = false, required = false, autofocus = false,
     size = 'medium', class: className = '', style = '', title = undefined,
     placeholder = '', dataTestid = undefined, ariaLabel = undefined,
-    ariaDescribedby = undefined, onchange = undefined, onfocus = undefined,
+    ariaDescribedby = undefined, ariaInvalid = undefined, ariaRequired = undefined, ariaLabelledby = undefined, onchange = undefined, onfocus = undefined,
     onblur = undefined, onkeydown = undefined, onclick = undefined, onkeyup = undefined,
   } = $props();
 
@@ -46,7 +46,7 @@
   <div class="flex items-center gap-2">
     <DatePicker {id} value={date} bind:inputRef {disabled} {readonly} {autofocus} {size}
       min={min?.split('T')[0]} max={max?.split('T')[0]} {placeholder} {title} {style}
-      class={className} {dataTestid} {ariaLabel}
+      class={className} {dataTestid} {ariaLabel} {ariaInvalid} {ariaRequired} {ariaLabelledby}
       ariaDescribedby={[ariaDescribedby, validationMessage ? descriptionId : ''].filter(Boolean).join(' ') || undefined}
       {onfocus} {onblur} {onkeydown} {onclick} {onkeyup}
       onchange={(next) => { date = next; commit(); }} />

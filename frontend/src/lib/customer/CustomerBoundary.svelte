@@ -53,7 +53,7 @@
   <div class="max-w-md mx-auto p-8 space-y-4"><AlertBox variant="error" message={error} /><Button onclick={refresh} dataTestid="customer-access-retry">Try again</Button></div>
 {:else if status?.allowed}
   {#if kind === 'board' && status.authenticated}
-    <div class="p-2 text-right"><Button variant="subtle" dataTestid="customer-board-logout" onclick={async () => { await customerAccess.login(kind, slug, 'logout'); await refresh(); }}>Sign out</Button></div>
+    <div class="p-2 text-right"><Button variant="ghost" dataTestid="customer-board-logout" onclick={async () => { await customerAccess.login(kind, slug, 'logout'); await refresh(); }}>Sign out</Button></div>
   {/if}
   {@render children()}
 {:else if status}

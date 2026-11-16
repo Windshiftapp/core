@@ -288,6 +288,7 @@
               variant="ghost"
               size="small"
               dataTestid="channel-intake-edit-{intake.id}"
+              title={`${t('common.edit')}: ${intake.name || intake.id}`}
               onclick={() => startEdit(intake)}
             >
               <IconPencil size={14} />
@@ -296,6 +297,7 @@
               variant="ghost"
               size="small"
               dataTestid="channel-intake-delete-{intake.id}"
+              title={`${t('common.delete')}: ${intake.name || intake.id}`}
               onclick={() => remove(intake)}
             >
               <IconTrash size={14} />

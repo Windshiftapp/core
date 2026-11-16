@@ -8,19 +8,22 @@
    *
    * @type {{
    *   status: 'passed' | 'failed' | 'blocked' | 'skipped',
-   *   selected?: boolean,
+    *   selected?: boolean,
+    *   disabled?: boolean,
    *   onclick?: (event: MouseEvent) => void,
    *   dataTestid?: string,
    *   class?: string,
    *   children?: import('svelte').Snippet,
    * }}
    */
-  let { status, selected = false, onclick = undefined, dataTestid = undefined, class: className = '', children } = $props();
+  let { status, selected = false, disabled = false, onclick = undefined, dataTestid = undefined, class: className = '', children } = $props();
 </script>
 
 <button
   type="button"
-  class={cn('status-btn', className)}
+  aria-pressed={selected}
+  {disabled}
+  class={cn('ds-focus-ring status-btn disabled:opacity-50 disabled:cursor-not-allowed', className)}
   data-status={status}
   class:selected
   data-testid={dataTestid}
@@ -56,7 +59,7 @@
   }
 
   .status-btn.selected {
-    color: white;
+    color: var(--ds-status-solid-text);
   }
 
   .status-btn[data-status='passed'].selected {

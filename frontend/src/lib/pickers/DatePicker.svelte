@@ -21,6 +21,9 @@
     style = '',
     title = undefined,
     ariaDescribedby = undefined,
+    ariaInvalid = undefined,
+    ariaRequired = undefined,
+    ariaLabelledby = undefined,
     clearable = true,
     inline = false,
     autoOpen = false,
@@ -64,6 +67,9 @@
     {autoOpen}
     {title}
     {ariaDescribedby}
+    {ariaInvalid}
+    {ariaRequired}
+    {ariaLabelledby}
     {style}
     {onclick}
     {onkeyup}

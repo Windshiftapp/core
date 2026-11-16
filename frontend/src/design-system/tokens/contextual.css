@@ -1,0 +1,87 @@
+/* Contextual semantic pairs shared by status, selection and branded surfaces.
+   Declare aliases at theme/brand boundaries so their dependencies resolve in
+   the current scope rather than capturing an ancestor's theme. */
+:root,
+[data-ds-color-mode],
+.ds-brand-scope {
+  --ds-background: var(--ds-surface);
+  --ds-bg: var(--ds-surface);
+  --ds-bg-subtle: var(--ds-background-neutral);
+  --ds-surface-subtle: var(--ds-background-neutral);
+  --ds-background-neutral-subtle: var(--ds-background-neutral);
+  --ds-background-hover: var(--ds-background-neutral-hovered);
+  --ds-background-neutral-bold: var(--ds-status-neutral-solid);
+  --ds-background-neutral-bold-hovered: var(--color-gray-600);
+
+  --ds-background-selected: var(--ds-surface-selected);
+  --ds-border-selected: var(--ds-border-focused);
+  --ds-text-selected: var(--ds-text);
+
+  --ds-link: var(--ds-text-link);
+  --ds-link-pressed: var(--ds-text-link-hovered);
+  --ds-text-muted: var(--ds-text-subtlest);
+  --ds-text-accent: var(--ds-text-link);
+  --ds-accent: var(--ds-interactive);
+  --ds-icon-accent: var(--ds-text-link);
+  --ds-icon-brand: var(--ds-text-link);
+  --ds-interactive-primary: var(--ds-interactive);
+  --ds-background-brand: var(--ds-interactive);
+  --ds-background-brand-subtle: var(--ds-interactive-subtle);
+  --ds-accent-subtle: var(--ds-interactive-subtle);
+
+  --ds-background-information: var(--ds-status-info-bg);
+  --ds-surface-information: var(--ds-status-info-bg);
+  --ds-text-information: var(--ds-status-info-text);
+  --ds-icon-information: var(--ds-icon-info);
+  --ds-info-bg: var(--ds-status-info-bg);
+  --ds-info-subtle: var(--ds-status-info-bg);
+  --ds-info-text: var(--ds-status-info-text);
+
+  --ds-background-success: var(--ds-status-success-bg);
+  --ds-background-success-subtle: var(--ds-status-success-bg);
+  --ds-surface-success: var(--ds-status-success-bg);
+  --ds-success-bg: var(--ds-status-success-bg);
+  --ds-success-subtler: var(--ds-status-success-bg);
+  --ds-background-success-bold: var(--ds-status-success-solid);
+
+  --ds-background-warning: var(--ds-status-warning-bg);
+  --ds-background-warning-subtle: var(--ds-status-warning-bg);
+  --ds-surface-warning: var(--ds-status-warning-bg);
+  --ds-surface-warning-subtle: var(--ds-status-warning-bg);
+  --ds-status-warning-subtle: var(--ds-status-warning-bg);
+  --ds-status-warning: var(--ds-text-warning);
+  --ds-text-warning-inverse: var(--color-gray-900);
+
+  --ds-background-danger: var(--ds-status-danger-bg);
+  --ds-background-danger-subtle: var(--ds-status-danger-bg);
+  --ds-background-danger-hovered: var(--ds-danger-subtle);
+  --ds-surface-danger: var(--ds-status-danger-bg);
+  --ds-error-bg: var(--ds-status-danger-bg);
+  --ds-error-subtle: var(--ds-status-danger-bg);
+  --ds-status-error-subtle: var(--ds-status-danger-bg);
+  --ds-status-error: var(--ds-text-danger);
+  --ds-error: var(--ds-text-danger);
+
+  --ds-background-discovery: var(--ds-accent-purple-subtle);
+  --ds-text-discovery: var(--ds-text-accent-purple);
+  --ds-background-accent-purple: var(--ds-accent-purple-subtle);
+  --ds-background-accent-purple-subtler: var(--ds-accent-purple-subtler);
+  --ds-background-accent-blue-subtler: var(--ds-accent-blue-subtler);
+  --ds-background-accent-blue-subtlest: var(--ds-accent-blue-subtle);
+  --ds-background-accent-blue-subtle: var(--ds-accent-blue-subtle);
+  --ds-accent-blue-subtlest: var(--ds-accent-blue-subtle);
+  --ds-background-accent-green-subtler: var(--ds-accent-green-subtler);
+  --ds-background-accent-orange-subtler: var(--ds-accent-orange-subtler);
+  --ds-background-accent-teal-subtler: var(--ds-accent-teal-subtler);
+  --ds-background-accent-yellow-subtler: var(--ds-accent-yellow-subtler);
+  --ds-accent-green-bolder: var(--ds-text-accent-green);
+  --ds-accent-red-bolder: var(--ds-text-accent-red);
+  --ds-accent-yellow-bolder: var(--ds-text-accent-yellow);
+  --ds-accent-blue-bolder: var(--ds-text-accent-blue);
+
+  --ds-border-subtle: var(--ds-border);
+  --ds-focus-ring: var(--ds-border-focused);
+  --ds-shadow-overlay: 0 8px 24px #00000033;
+  --ds-blanket: var(--ds-glass-backdrop);
+  --ds-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}

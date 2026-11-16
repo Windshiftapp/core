@@ -13,6 +13,7 @@
   import Tooltip from '../../components/Tooltip.svelte';
   import Text from '../../components/Text.svelte';
   import Input from '../../components/Input.svelte';
+  import Button from '../../components/Button.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { surfaceError } from '../../stores/toasts.svelte.js';
 
@@ -20,6 +21,8 @@
     itemId,
     workspaceId
   } = $props();
+  const instanceId = $props.id();
+  const contentId = `${instanceId}-personal-tasks`;
 
   // Status ID constants (matching backend constants/statuses.go)
   const STATUS_ID_OPEN = 1;    // Default status for new tasks
@@ -246,22 +249,22 @@
   <div class="border-t my-4" style="border-color: var(--ds-border);"></div>
 
   <!-- Section Header -->
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="w-full flex items-center justify-between mb-3 group cursor-pointer"
-    onclick={toggleExpanded}
-  >
-    <div class="flex items-center gap-2">
+  <div class="w-full flex items-center gap-2 mb-3 group">
+    <Button variant="ghost" class="flex-1 justify-start p-0" ariaLabel={t('personal.personalTasks')} ariaExpanded={expanded} ariaControls={contentId} dataTestid="personal-tasks-disclosure" onclick={toggleExpanded}>
       <Text variant="subtle" size="xs" weight="semibold" class="uppercase tracking-wider">{t('personal.personalTasks')}</Text>
       {#if openTasks.length > 0}
         <span class="px-1.5 py-0.5 text-xs font-medium rounded-full" style="background-color: var(--ds-accent-blue-subtler); color: var(--ds-accent-blue);">
           {openTasks.length}
         </span>
       {/if}
+      {#if expanded}<ChevronDown size={16} />{:else}<ChevronRight size={16} />{/if}
+    </Button>
       {#if completedTasks.length > 0}
         <button
-          class="px-1.5 py-0.5 text-xs font-medium rounded-full transition-colors"
+          type="button"
+          data-testid="personal-tasks-filter-completed"
+          aria-pressed={showCompleted}
+          class="ds-focus-ring px-1.5 py-0.5 text-xs font-medium rounded-full transition-colors"
           style="background-color: {showCompleted ? 'var(--ds-background-success-subtle)' : 'var(--ds-surface)'}; color: {showCompleted ? 'var(--ds-text-success)' : 'var(--ds-text-subtle)'};"
           onclick={toggleShowCompleted}
           title="{showCompleted ? 'Hide' : 'Show'} {completedTasks.length} completed task{completedTasks.length === 1 ? '' : 's'}"
@@ -270,25 +273,22 @@
           {completedTasks.length}
         </button>
       {/if}
-    </div>
     <div class="flex items-center gap-1">
       <button
-        class="p-1 rounded transition-colors opacity-40 group-hover:opacity-100 disabled:opacity-20 disabled:cursor-not-allowed"
+        type="button"
+        data-testid="personal-tasks-add"
+        class="ds-focus-ring p-1 rounded transition-colors opacity-40 group-hover:opacity-100 focus-visible:opacity-100 disabled:opacity-20 disabled:cursor-not-allowed"
         disabled={!personalWorkspace || showAddForm || !expanded}
         onclick={(e) => { e.stopPropagation(); showAddForm = true; }}
         title={t('personal.addPersonalTask')}
       >
         <Plus size={14} style="color: var(--ds-text-subtle);" />
       </button>
-      {#if expanded}
-        <ChevronDown size={16} style="color: var(--ds-text-subtle);" />
-      {:else}
-        <ChevronRight size={16} style="color: var(--ds-text-subtle);" />
-      {/if}
     </div>
   </div>
 
   <!-- Expandable Content -->
+  <div id={contentId} data-testid="personal-tasks-content" hidden={!expanded}>
   {#if expanded}
     <div class="mt-1">
       {#if loading}
@@ -310,6 +310,7 @@
             <form onsubmit={(e) => { e.preventDefault(); handleAddTask(); }} class="flex flex-col gap-2">
               <Input
                 type="text"
+                dataTestid="personal-tasks-title"
                 bind:inputRef={addTaskInput}
                 bind:value={newTaskTitle}
                 placeholder={t('personal.taskTitlePlaceholder')}
@@ -401,6 +402,7 @@
       {/if}
     </div>
   {/if}
+  </div>
 </div>
 
 <style>

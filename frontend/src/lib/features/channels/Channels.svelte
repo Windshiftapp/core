@@ -1,4 +1,5 @@
 <script>
+  let tabPanelElement = $state(null);
   import { onMount } from 'svelte';
   import StateDisplay from '../../components/StateDisplay.svelte';
   import { useEventListener } from 'runed';
@@ -466,6 +467,7 @@
     {#if embedded}
       <!-- Type Tabs with Category filter and Manage button on right -->
       <TabStrip
+        panelElement={tabPanelElement}
         tabs={channelTabs}
         activeTab={activeTypeFilter ?? 'all'}
         onTabChange={(id) => handleTypeClick(id === 'all' ? null : id)}
@@ -505,6 +507,7 @@
     {/if}
 
     <!-- Header -->
+    <div bind:this={tabPanelElement}>
     <div class="flex items-center justify-between mb-6">
       <div>
         {#if !embedded}
@@ -621,6 +624,7 @@
         {/snippet}
       </DataTable>
     {/if}
+    </div>
   </div>
 </div>
 
@@ -760,4 +764,3 @@
   initialTab={emailLogInitialTab}
   onClose={() => { showEmailLog = false; emailLogChannel = null; }}
 />
-

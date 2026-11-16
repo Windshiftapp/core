@@ -1,8 +1,8 @@
 <script>
   let {
     variant = 'default', // 'default', 'subtle', 'subtlest', 'disabled', 'inverse', 'link', 'danger', 'success', 'warning', 'info'
-    size = 'base',       // 'xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl'
-    weight = 'normal',   // 'normal', 'medium', 'semibold', 'bold'
+    size = 'body',       // Text roles or explicit xs/sm/base/lg/xl/2xl/3xl/4xl
+    weight = null,       // Optional override: 'normal', 'medium', 'semibold', 'bold'
     as = 'span',         // 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'label', 'div'
     truncate = false,
     leading = null,      // 'none', 'tight', 'snug', 'normal', 'relaxed', 'loose'
@@ -29,6 +29,12 @@
 
   // Map sizes to Tailwind classes
   const sizeClasses = {
+    body: 'ds-text-body',
+    label: 'ds-text-label',
+    helper: 'ds-text-helper',
+    metadata: 'ds-text-metadata',
+    heading: 'ds-text-heading',
+    compact: 'ds-text-compact',
     xs: 'text-xs',
     sm: 'text-sm',
     base: 'text-base',
@@ -72,7 +78,7 @@
 
   const allClasses = $derived([
     sizeClasses[size],
-    weightClasses[weight],
+    weightClasses[weight ?? (sizeClasses[size]?.startsWith('ds-text-') ? undefined : 'normal')],
     leading ? leadingClasses[leading] : '',
     align ? alignClasses[align] : '',
     truncate ? 'truncate' : '',

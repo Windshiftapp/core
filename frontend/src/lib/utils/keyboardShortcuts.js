@@ -396,6 +396,29 @@ export function isTypingInField(event) {
   );
 }
 
+/** Keep the ambient double-Space shortcut away from interactive workflows. */
+export function canUseDoubleSpaceShortcut(event) {
+  if (
+    event.code !== 'Space' ||
+    event.defaultPrevented ||
+    event.repeat ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey
+  )
+    return false;
+  const target = event.target;
+  return (
+    target instanceof Element &&
+    !target.closest(
+      'a[href], button, input, textarea, select, summary, [contenteditable]:not([contenteditable="false"]), ' +
+        '[tabindex]:not([tabindex="-1"]), [role="dialog"], [role="button"], [role="combobox"], ' +
+        '[role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="menuitem"], [aria-activedescendant]'
+    )
+  );
+}
+
 /**
  * Convert a shortcut context+action into the string format expected by @github/hotkey.
  * Examples: { key: 'a' } → 'a', { key: 'k', modifierKey: true } → 'Mod+k'

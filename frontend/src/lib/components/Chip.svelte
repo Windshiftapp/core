@@ -1,6 +1,8 @@
 <script>
   import X from '@lucide/svelte/icons/x';
   import { t } from '../stores/i18n.svelte.js';
+  import { tick } from 'svelte';
+  import { isFocusEligible, tabStops } from '../utils/overlayScope.js';
 
   /**
    * Chip - Metadata container with optional icon and remove button
@@ -18,11 +20,15 @@
     dotColor = null,
     removable = false,
     onRemove = null,
+    /** Full localized name for rich/non-text chip content. */
+    removeLabel = undefined,
+    removeTestid = undefined,
     icon: Icon = null,
     title = undefined,
     class: className = '',
     children
   } = $props();
+  const instanceId = $props.id();
 
   const colorStyles = $derived({
     blue: 'background-color: var(--ds-accent-blue-subtle); color: var(--ds-text-accent-blue);',
@@ -37,8 +43,8 @@
 
   const appearanceClasses = $derived(
     appearance === 'metadata'
-      ? 'max-w-full gap-1.5 rounded-[3px] px-1.5 py-0.5 text-[11px] leading-4'
-      : 'gap-1.5 rounded-full px-2 py-1 text-xs',
+      ? 'max-w-full gap-1.5 rounded-[3px] px-1.5 py-0.5 ds-text-metadata'
+      : 'gap-1.5 rounded-full px-2 py-1 ds-text-metadata',
   );
 
   const appearanceStyles = $derived(
@@ -47,9 +53,20 @@
       : colorStyles,
   );
 
-  function handleRemove(e) {
+  async function handleRemove(e) {
     e.stopPropagation();
-    onRemove?.();
+    const button = e.currentTarget;
+    const hadFocus = document.activeElement === button;
+    const scope = button.closest('[role="dialog"]') ?? document;
+    const controls = tabStops(scope);
+    const index = controls.indexOf(button);
+    await onRemove?.();
+    await tick();
+    if (hadFocus && !button.isConnected && document.activeElement === document.body) {
+      const candidates = [...controls.slice(index + 1), ...controls.slice(0, index).reverse()];
+      const target = candidates.find(node => node.tabIndex >= 0 && isFocusEligible(node));
+      target?.focus({ preventScroll: true });
+    }
   }
 </script>
 
@@ -65,14 +82,17 @@
   {#if Icon}
     <Icon class="h-3 w-3 shrink-0" />
   {/if}
-  {@render children?.()}
+  <span id={`${instanceId}-label`} class="min-w-0">{@render children?.()}</span>
   {#if removable && onRemove}
     <button
       type="button"
+      data-testid={removeTestid}
       onclick={handleRemove}
-      class="hover:opacity-70 transition-opacity -mr-0.5"
-      aria-label={t('common.remove')}
+      class="ds-focus-ring inline-flex shrink-0 items-center justify-center min-w-6 min-h-6 hover:opacity-70 transition-opacity rounded"
+      aria-label={removeLabel}
+      aria-labelledby={removeLabel ? undefined : `${instanceId}-remove ${instanceId}-label`}
     >
+      <span id={`${instanceId}-remove`} class="sr-only">{t('common.remove')}</span>
       <X class="w-3 h-3" />
     </button>
   {/if}

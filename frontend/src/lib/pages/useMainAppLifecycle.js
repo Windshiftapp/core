@@ -16,6 +16,7 @@ import { registerReferenceDataInvalidation } from '../stores/referenceDataInvali
 import { onWorkItemRefresh } from '../stores/workItemRefresh.js';
 import { workspacesStore } from '../stores/workspaces.svelte.js';
 import { initDesktopFocusRefresh } from '../utils/desktopFocusRefresh.svelte.js';
+import { canUseDoubleSpaceShortcut } from '../utils/keyboardShortcuts.js';
 import { buildAuthenticatedShellTasks } from './authenticatedShellTasks.js';
 
 const DOUBLE_SPACE_THRESHOLD_MS = 300;
@@ -99,14 +100,10 @@ export function useMainAppLifecycle({
     'keydown',
     (event) => {
       if (event.code !== 'Space') return;
-
-      const target = /** @type {HTMLElement} */ (event.target);
-      const isInInputField =
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.contentEditable === 'true' ||
-        target.closest('[contenteditable="true"]');
-      if (isInInputField) return;
+      if (!canUseDoubleSpaceShortcut(event)) {
+        lastSpaceTime = 0;
+        return;
+      }
 
       const now = Date.now();
       if (now - lastSpaceTime < DOUBLE_SPACE_THRESHOLD_MS) onShowCommandPalette();

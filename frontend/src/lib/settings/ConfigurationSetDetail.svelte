@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../components/FormField.svelte';
   import { onMount } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
@@ -410,6 +411,7 @@
                   <h3 class="text-base font-medium mb-4" style="color: var(--ds-text);">{t('settings.configSets.defaultSettings')}</h3>
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
+                      <FormField class="contents">
                       <Label color="default" class="mb-1">{t('settings.configSets.workflow')}</Label>
                       <WorkflowPicker
                         value={formData.workflow_id}
@@ -437,9 +439,11 @@
                           }
                         }}
                       />
+                      </FormField>
                     </div>
 
                     <div>
+                      <FormField class="contents">
                       <Label color="default" class="mb-1">{t('conditionSets.title')}</Label>
                       <ConditionSetPicker
                         value={formData.condition_set_id}
@@ -448,12 +452,14 @@
                         disabled={!formData.workflow_id}
                         onSelect={(cs) => formData.condition_set_id = cs?.id || null}
                       />
+                      </FormField>
                       {#if !formData.workflow_id}
                         <DescriptionText>{t('conditionSets.selectWorkflowFirst')}</DescriptionText>
                       {/if}
                     </div>
 
                     <div>
+                      <FormField class="contents">
                       <Label color="default" class="mb-1">{t('approvalSets.title')}</Label>
                       <ApprovalSetPicker
                         value={formData.approval_set_id}
@@ -463,12 +469,14 @@
                         onSelect={(ap) => formData.approval_set_id = ap?.id || null}
                         dataTestid="config-set-approval-picker"
                       />
+                      </FormField>
                       {#if !formData.workflow_id}
                         <DescriptionText>{t('approvalSets.selectWorkflow')}</DescriptionText>
                       {/if}
                     </div>
 
                     <div>
+                      <FormField class="contents">
                       <Label color="default" class="mb-1">{t('settings.configSets.notificationSettings')}</Label>
                       <BasePicker
                         bind:value={formData.notification_setting_id}
@@ -479,9 +487,11 @@
                         getValue={(item) => item.id}
                         getLabel={(item) => item.name}
                       />
+                      </FormField>
                     </div>
 
                     <div>
+                      <FormField class="contents">
                       <Label color="default" class="mb-1">{t('settings.configSets.createScreen')}</Label>
                       <ScreenPicker
                         value={formData.create_screen_id}
@@ -490,9 +500,11 @@
                         placeholder={t('settings.configSets.screens')}
                         onSelect={(screen) => formData.create_screen_id = screen?.id || null}
                       />
+                      </FormField>
                     </div>
 
                     <div>
+                      <FormField class="contents">
                       <Label color="default" class="mb-1">{t('settings.configSets.editScreen')}</Label>
                       <ScreenPicker
                         value={formData.edit_screen_id}
@@ -501,9 +513,11 @@
                         placeholder={t('settings.configSets.screens')}
                         onSelect={(screen) => formData.edit_screen_id = screen?.id || null}
                       />
+                      </FormField>
                     </div>
 
                     <div>
+                      <FormField class="contents">
                       <Label color="default" class="mb-1">{t('settings.configSets.viewScreen')}</Label>
                       <ScreenPicker
                         value={formData.view_screen_id}
@@ -512,9 +526,11 @@
                         placeholder={t('settings.configSets.screens')}
                         onSelect={(screen) => formData.view_screen_id = screen?.id || null}
                       />
+                      </FormField>
                     </div>
 
                     <div>
+                      <FormField class="contents">
                       <Label color="default" class="mb-1">{t('settings.configSets.defaultItemType')}</Label>
                       <BasePicker
                         bind:value={formData.default_item_type_id}
@@ -525,6 +541,7 @@
                         getValue={(item) => item.id}
                         getLabel={(item) => item.name}
                       />
+                      </FormField>
                       <DescriptionText>
                         {t('settings.configSets.preselectedItemType')}
                       </DescriptionText>

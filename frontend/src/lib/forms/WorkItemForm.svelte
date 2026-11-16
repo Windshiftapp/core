@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../components/FormField.svelte';
   import { createOwnedPopup } from '../utils/overlayScope.js';
   const ownedPopup = createOwnedPopup();
   import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
@@ -729,10 +730,12 @@
           </div>
         {:else if field.field_identifier === 'team'}
           <div class="space-y-1">
-            <Label color="default">
-              {t('createModal.team')} <span style="color: var(--ds-text-danger, #ef4444);">*</span>
+            <FormField class="contents" requiredMark>
+            <Label color="default" required>
+              {t('createModal.team')}
             </Label>
             <TeamPicker bind:value={store.formData.team_id} placeholder={t('items.noTeam')} />
+            </FormField>
           </div>
         {:else if field.field_identifier === 'iteration'}
           <div class="space-y-1">
