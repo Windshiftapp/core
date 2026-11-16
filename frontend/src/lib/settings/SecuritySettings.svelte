@@ -25,6 +25,7 @@
   import { errorToast } from '../stores/toasts.svelte.js';
   import PageHeader from '../layout/PageHeader.svelte';
   import DescriptionText from '../components/DescriptionText.svelte';
+  import { capabilitiesStore } from '../stores/capabilities.svelte.js';
 
   let loading = $state(true);
   let saving = $state(false);
@@ -372,7 +373,8 @@
               </div>
               <Toggle
                 bind:checked={pluginCliExecEnabled}
-                disabled={saving}
+                disabled={saving || !capabilitiesStore.operatorAllows('plugin_exec')}
+                dataTestid="security-plugin-execution-toggle"
                 onchange={handleCliExecToggle}
               />
             </div>
@@ -381,6 +383,9 @@
               <div class="mt-3">
                 <AlertBox variant="error" message={t('settings.security.pluginExecutionWarning')} />
               </div>
+            {/if}
+            {#if !capabilitiesStore.operatorAllows('plugin_exec')}
+              <AlertBox variant="info" message={t('operatorControls.restricted', 'This capability is managed by the instance operator.')} />
             {/if}
           </div>
         </div>

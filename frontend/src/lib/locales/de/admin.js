@@ -3,6 +3,36 @@
  * Includes: settings, roles, permissions
  */
 export default {
+  operatorControls: {
+    title: 'Betreiberkontrollen',
+    description: 'Diese Bereitstellungsvorgaben sind schreibgeschützt. Änderungen an Einschränkungen oder Kontingenten nimmt der Instanzbetreiber vor. Organisationseinstellungen dürfen strenger sein, diese Obergrenzen aber nicht überschreiten.',
+    restricted: 'Diese Funktion wird vom Instanzbetreiber verwaltet.',
+    restrictions: 'Eingeschränkte Funktionen',
+    unrestricted: 'Keine zusätzlichen Funktionseinschränkungen.',
+    limits: 'Obergrenzen der Instanz',
+    usage: 'Verbrauch im aktuellen Zeitraum',
+    blockedDefinitions: 'Durch Betreiberkontrollen gesperrte Definitionen',
+    loadFailed: 'Betreiberkontrollen konnten nicht geladen werden.',
+    mailMode: 'E-Mail-Versandmodus',
+    importAdmission: 'Massenimporte benötigen eine Betreiberfreigabe.',
+    models: 'Verfügbare KI-Modelle',
+    truncated: 'Die ersten 1.000 gesperrten Definitionen werden angezeigt.',
+    labels: {
+      instance_lifecycle: 'Instanzlebenszyklus', maintenance: 'Wartungsvorgänge',
+      runtime_diagnostics: 'Laufzeitdiagnose', plugin_exec: 'Plugin-Befehlsausführung',
+      ldap: 'LDAP', server_scripts: 'Serverskripte', imports: 'Massenimporte',
+      mail_transport_management: 'E-Mail-Transportverwaltung', generic_mail: 'Generisches SMTP und IMAP',
+      mail: 'E-Mail-Versand', ai: 'KI-Generierung', ai_connection_management: 'KI-Verbindungsverwaltung',
+      attachment_bytes: 'Maximale Objektgröße (Bytes)', blob_bytes: 'Blob-Speicherkontingent (Bytes)',
+      concurrent_requests: 'Gleichzeitige Anfragen', concurrent_streams: 'Gleichzeitige Streams',
+      requests_per_minute: 'Anfragen pro Minute', script_timeout_ms: 'Skriptzeitlimit (Millisekunden)',
+      concurrent_scripts: 'Gleichzeitige Skripte', automation_steps_per_day: 'Automatisierungsschritte pro UTC-Tag',
+      mail_recipients_per_day: 'E-Mail-Empfängerversuche pro UTC-Tag', ai_tokens_per_day: 'KI-Token-Kontingent pro UTC-Tag',
+      concurrent_ai: 'Gleichzeitige KI-Aufrufe', requests: 'Anfrageversuche in dieser Minute',
+      automation_steps: 'Automatisierungsschritte heute', mail_recipients: 'E-Mail-Empfängerversuche heute',
+      ai_tokens: 'Heute angerechnete KI-Token',
+    },
+  },
   settings: {
     title: 'Einstellungen',
     subtitle: 'Ihre Anwendungseinstellungen konfigurieren',

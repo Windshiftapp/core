@@ -9,6 +9,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 )
 
@@ -21,6 +22,9 @@ type ConditionService struct {
 
 // NewConditionService creates a new condition service.
 func NewConditionService(db database.Database, permService *PermissionService, scriptEngine *ScriptEngine) *ConditionService {
+	if controls := operatorcontrols.From(db); controls != nil {
+		scriptEngine = NewScriptEngine(controls)
+	}
 	return &ConditionService{
 		db:           db,
 		permService:  permService,
@@ -161,6 +165,13 @@ type TransitionWithID struct {
 }
 
 func (s *ConditionService) evaluateConditions(ctx context.Context, conditions []conditionRow, logicMode string, userID int, item map[string]any) (allowed bool, failureMessage string, err error) {
+	for _, condition := range conditions {
+		if condition.ConditionType == models.ConditionTypeScript {
+			if err := operatorcontrols.From(s.db).Check(operatorcontrols.Scripts); err != nil {
+				return false, "", err
+			}
+		}
+	}
 	// Validators are hard gates: every validator must pass regardless of the
 	// binding's logic mode. Conditions then decide availability under logicMode.
 	var conditionRules []conditionRow
@@ -351,6 +362,9 @@ func conditionFieldValue(fieldIdentifier string, item map[string]any) any {
 }
 
 func (s *ConditionService) evaluateScript(ctx context.Context, configJSON string, userID int, item map[string]any) (bool, error) {
+	if err := operatorcontrols.From(s.db).Check(operatorcontrols.Scripts); err != nil {
+		return false, err
+	}
 	var cfg models.ConditionScriptConfig
 	if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
 		return false, fmt.Errorf("invalid script config: %w", err)

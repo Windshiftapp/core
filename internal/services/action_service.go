@@ -24,6 +24,7 @@ import (
 	"windshift/internal/llm"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 	"windshift/internal/repository/actionutil"
 	"windshift/internal/utils"
@@ -767,6 +768,7 @@ func (as *ActionService) executeActionForEvent(executionCtx context.Context, act
 		MaxSteps:          maxStepsPerFlow,
 		BudgetExceededErr: errStepBudgetExceeded,
 		TotalSteps:        &ctx.TotalSteps,
+		AdmitStep:         automationStepAdmission(as.db),
 		OnStep:            func(step *models.StepResult) { ctx.StepResults = append(ctx.StepResults, *step) },
 	}, func(node *models.ActionNode, step *models.StepResult, markExecuted func(int)) error {
 		var err error
@@ -937,6 +939,11 @@ func (as *ActionService) bindExecutionRevision(action *models.Action, log *model
 // precedence over the legacy switch so new node types can ship without
 // touching this function.
 func (as *ActionService) executeNode(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
+	if string(node.NodeType) == "execute_script" {
+		if err := operatorcontrols.From(as.db).Check(operatorcontrols.Scripts); err != nil {
+			return err
+		}
+	}
 	if exec, ok := as.lookupNodeExecutor(node.NodeType); ok {
 		return exec.Execute(node, ctx, stepResult)
 	}

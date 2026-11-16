@@ -1,4 +1,23 @@
 export default {
+  operatorControls: {
+    title: '运营方控制',
+    description: '这些部署规则为只读。请联系实例运营方更改限制或配额。组织偏好可以更加严格，但不能超过这些上限。',
+    restricted: '此功能由实例运营方管理。', restrictions: '受限功能', unrestricted: '没有额外的功能限制。',
+    limits: '实例上限', usage: '当前周期用量', blockedDefinitions: '被运营方控制阻止的定义',
+    loadFailed: '无法加载运营方控制。', mailMode: '邮件发送模式',
+    importAdmission: '批量导入需要运营方准入许可。', models: '可用的 AI 模型', truncated: '显示前 1,000 个被阻止的定义。',
+    labels: {
+      instance_lifecycle: '实例生命周期', maintenance: '维护操作', runtime_diagnostics: '运行时诊断',
+      plugin_exec: '插件命令执行', ldap: 'LDAP', server_scripts: '服务器脚本', imports: '批量导入',
+      mail_transport_management: '邮件传输管理', generic_mail: '通用 SMTP 和 IMAP', mail: '邮件发送',
+      ai: 'AI 生成', ai_connection_management: 'AI 连接管理', attachment_bytes: '最大对象大小（字节）',
+      blob_bytes: '对象存储配额（字节）', concurrent_requests: '并发请求数', concurrent_streams: '并发流数',
+      requests_per_minute: '每分钟请求数', script_timeout_ms: '脚本超时（毫秒）', concurrent_scripts: '并发脚本数',
+      automation_steps_per_day: '每个 UTC 日的自动化步骤数', mail_recipients_per_day: '每个 UTC 日的收件人发送尝试数',
+      ai_tokens_per_day: '每个 UTC 日的 AI 令牌配额', concurrent_ai: '并发 AI 调用数', requests: '本分钟的请求尝试数',
+      automation_steps: '今日自动化步骤数', mail_recipients: '今日收件人发送尝试数', ai_tokens: '今日计入用量的 AI 令牌数',
+    },
+  },
   settings: {
     title: '设置',
     subtitle: '配置应用程序设置',

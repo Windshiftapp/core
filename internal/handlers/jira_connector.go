@@ -14,6 +14,7 @@ import (
 	"windshift/internal/jira"
 	"windshift/internal/jiraimport"
 	"windshift/internal/logger"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/sanitize"
 	"windshift/internal/services"
 	"windshift/internal/sso"
@@ -42,6 +43,14 @@ type JiraImportHandler struct {
 	importWatchers bool
 	// importConcurrency bounds in-flight Jira requests for independent work.
 	importConcurrency int
+	importAdmission   operatorcontrols.ImportAdmission
+}
+
+// WithImportAdmission supplies a host/fleet permit implementation. It is used
+// only when immutable operator policy requires admission; nil uses host locks.
+func (h *JiraImportHandler) WithImportAdmission(admission operatorcontrols.ImportAdmission) *JiraImportHandler {
+	h.importAdmission = admission
+	return h
 }
 
 func (h *JiraImportHandler) WithAuthorizationCacheInvalidator(invalidator *services.AuthorizationCacheInvalidator) *JiraImportHandler {
@@ -98,6 +107,10 @@ func NewJiraImportHandler(db database.Database, sessionSecret, capturePayloadsDi
 
 // Connect handles POST /api/admin/jira-import/connect
 func (h *JiraImportHandler) Connect(w http.ResponseWriter, r *http.Request) {
+	if err := operatorcontrols.From(h.db).Check(operatorcontrols.Imports); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	req, ok := decodeJSON[JiraConnectRequest](w, r)
 	if !ok {
 		return
@@ -169,6 +182,10 @@ func (h *JiraImportHandler) Connect(w http.ResponseWriter, r *http.Request) {
 // expired or revoked token is recoverable without deleting the connection and
 // its import provenance.
 func (h *JiraImportHandler) UpdateConnection(w http.ResponseWriter, r *http.Request) {
+	if err := operatorcontrols.From(h.db).Check(operatorcontrols.Imports); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	connectionID := r.PathValue("connectionId")
 	req, ok := decodeJSON[JiraConnectionUpdateRequest](w, r)
 	if !ok {
@@ -360,6 +377,9 @@ func (h *JiraImportHandler) DeleteConnection(w http.ResponseWriter, r *http.Requ
 
 // getClientForConnection retrieves stored credentials and creates a Jira client
 func (h *JiraImportHandler) getClientForConnection(_ context.Context, connectionID string) (jira.Client, error) {
+	if err := operatorcontrols.From(h.db).Check(operatorcontrols.Imports); err != nil {
+		return nil, err
+	}
 	connection, err := h.imports.UseConnection(connectionID)
 	if err != nil {
 		return nil, fmt.Errorf("connection not found: %w", err)

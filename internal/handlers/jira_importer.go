@@ -14,6 +14,7 @@ import (
 
 	"windshift/internal/jiraimport"
 	"windshift/internal/logger"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 	"windshift/internal/restapi"
 	"windshift/internal/sanitize"
@@ -235,6 +236,26 @@ func (h *JiraImportHandler) validateJiraEntityMappings(req StartImportRequest) e
 // StartImport handles POST /api/admin/jira-import/start
 // Starts a background import job and returns immediately with the job ID
 func (h *JiraImportHandler) StartImport(w http.ResponseWriter, r *http.Request) {
+	if err := operatorcontrols.From(h.db).Check(operatorcontrols.Imports); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	controls := operatorcontrols.From(h.db)
+	ceiling := 0
+	if admission, _ := controls.ImportAdmission(); admission != nil {
+		ceiling = 1
+	}
+	releaseAdmission, err := controls.Acquire(r.Context(), "import_jobs", ceiling)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	handedOff := false
+	defer func() {
+		if !handedOff {
+			releaseAdmission()
+		}
+	}()
 	req, ok := decodeJSON[StartImportRequest](w, r)
 	if !ok {
 		return
@@ -343,7 +364,8 @@ func (h *JiraImportHandler) StartImport(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Start the import in a background goroutine
-	go h.executeImport(jobID, req) //nolint:gosec // G118: an import job must outlive its initiating HTTP request.
+	handedOff = true
+	go func() { defer releaseAdmission(); h.executeImport(jobID, req) }() //nolint:gosec // G118: an import job must outlive its initiating HTTP request.
 
 	respondJSONOK(w, StartImportResponse{
 		JobID:   jobID,

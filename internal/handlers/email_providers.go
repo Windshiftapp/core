@@ -17,6 +17,7 @@ import (
 	"windshift/internal/email"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 	"windshift/internal/services"
@@ -279,6 +280,10 @@ func (h *EmailProviderHandler) CreateEmailProvider(w http.ResponseWriter, r *htt
 	)
 	normalizeEmailProviderRequest(&req)
 	if req.Type == models.EmailProviderTypeGeneric {
+		if err := operatorcontrols.From(h.db).Check(operatorcontrols.GenericMail); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
 		if req.IMAPPort == 0 {
 			req.IMAPPort = 993
 		}
@@ -372,6 +377,10 @@ func (h *EmailProviderHandler) UpdateEmailProvider(w http.ResponseWriter, r *htt
 	)
 	normalizeEmailProviderRequest(&req)
 	if req.Type == models.EmailProviderTypeGeneric {
+		if err := operatorcontrols.From(h.db).Check(operatorcontrols.GenericMail); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
 		if req.IMAPPort == 0 {
 			req.IMAPPort = 993
 		}

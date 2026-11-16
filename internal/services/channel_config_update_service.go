@@ -150,6 +150,9 @@ func (s *ChannelConfigUpdateService) Update(ctx context.Context, actorUserID, ch
 	if err := json.Unmarshal(configJSON, &final); err != nil {
 		return false, channelConfigInvalid("Channel config fields have invalid types")
 	}
+	if err := s.channels.CheckTransportConfig(ctx, channelID, string(configJSON)); err != nil {
+		return false, err
+	}
 
 	if err := s.validate(ctx, actorUserID, channel, incoming, stored, &final); err != nil {
 		return false, err
