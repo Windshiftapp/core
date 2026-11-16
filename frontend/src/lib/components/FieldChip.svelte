@@ -1,4 +1,6 @@
 <script>
+  import { createOwnedPopup } from '../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
   import { createPopover, melt } from '@melt-ui/svelte';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { getVisibleColor } from '../utils/colorUtils.js';
@@ -28,6 +30,8 @@
       shift: true
     }),
     portal: 'body',
+    disableFocusTrap: ownedPopup.withinModal,
+    closeFocus: ownedPopup.withinModal ? null : undefined,
     forceVisible: true,
     onOpenChange: ({ next }) => {
       if (next && onOpen) {
@@ -88,6 +92,7 @@
 {#if $open && children}
   <div
     use:melt={$content}
+    use:ownedPopup={{ close: () => { $open = false; } }}
     class="z-50 rounded-lg shadow-lg overflow-hidden"
     style="
       background-color: var(--ds-surface-raised);

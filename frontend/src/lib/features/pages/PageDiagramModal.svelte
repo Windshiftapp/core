@@ -1,4 +1,6 @@
 <script>
+  import { createOverlayDialog } from '../../utils/overlayScope.js';
+  const overlayDialog = createOverlayDialog(handleKeyDown);
   import ExcalidrawEditor from '../../components/ExcalidrawEditor.svelte';
   import Button from '../../components/Button.svelte';
   import Input from '../../components/Input.svelte';
@@ -148,7 +150,7 @@
   }
 
   function handleKeyDown(event) {
-    if (event.key === 'Escape') {
+    if (event.key === 'Escape' && !event.defaultPrevented) {
       event.stopPropagation();
       void handleClose();
     }
@@ -159,9 +161,11 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     use:portal
+    use:overlayDialog
     class="fixed inset-0 flex items-center justify-center z-[60]"
     style="background-color: rgba(0, 0, 0, 0.3); backdrop-filter: blur(2px);"
-    onkeydown={handleKeyDown}
+    role="dialog" aria-modal="true" tabindex="-1"
+    aria-label={diagramName || t('assets.editDiagram')}
     data-testid="page-diagram-modal"
   >
     <div class="rounded shadow-xl w-full h-full max-w-[95vw] max-h-[95vh] flex flex-col" style="background-color: var(--ds-surface-raised);">

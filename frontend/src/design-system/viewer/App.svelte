@@ -87,6 +87,7 @@
 
   // Modal Component Pages
   import ModalPage from './pages/Modal.svelte'
+  import ModalBackdropPage from './pages/ModalBackdrop.svelte'
 
   // Menu Component Page
   import DropdownMenuPage from './pages/DropdownMenu.svelte'
@@ -190,6 +191,7 @@
       title: 'Modals',
       items: [
         { id: 'modal', label: 'Modal', icon: Layers },
+        { id: 'modal-backdrop', label: 'ModalBackdrop', icon: Layers },
       ]
     },
     {
@@ -350,6 +352,8 @@
       <PaginationPage />
     {:else if currentPage === 'modal'}
       <ModalPage />
+    {:else if currentPage === 'modal-backdrop'}
+      <ModalBackdropPage />
     {:else if currentPage === 'dropdownmenu'}
       <DropdownMenuPage />
     {:else if currentPage === 'itemkey'}

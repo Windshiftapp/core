@@ -353,9 +353,7 @@
   }
 </style>
 
-<svelte:window onkeydown={handleKeydown} />
-
-<ModalBackdrop bind:show={isOpen} opacity={0.4} blur={8} extraFilter="saturate(120%)" zIndex={60} align="top" paddingTop="pt-[20vh]" onclose={close}>
+<ModalBackdrop bind:show={isOpen} onKeydown={handleKeydown} ariaLabel={t('nav.search')} opacity={0.4} blur={8} extraFilter="saturate(120%)" zIndex={60} align="top" paddingTop="pt-[20vh]" onclose={close}>
   <div
     class="relative w-full max-w-2xl mx-4"
   >

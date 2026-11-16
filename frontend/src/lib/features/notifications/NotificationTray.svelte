@@ -1,4 +1,6 @@
 <script>
+  import { createOwnedPopup } from '../../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
   import { onMount, onDestroy } from 'svelte';
   import Bell from '@lucide/svelte/icons/bell';
   import Check from '@lucide/svelte/icons/check';
@@ -43,7 +45,9 @@
       fitViewport: true,
       placement: 'right-start'
     },
-    portal: 'body'
+    portal: 'body',
+    disableFocusTrap: ownedPopup.withinModal,
+    closeFocus: ownedPopup.withinModal ? null : undefined,
   });
 
   // Track unread notifications.
@@ -124,6 +128,7 @@
   {#if $open}
     <div
       use:melt={$content}
+      use:ownedPopup={{ close: () => { $open = false; } }}
       data-testid="notifications-menu"
       tabindex="-1"
       class="notification-dropdown z-[60] w-96 rounded shadow-xl flex flex-col overflow-hidden"

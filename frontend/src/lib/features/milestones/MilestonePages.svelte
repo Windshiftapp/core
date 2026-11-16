@@ -63,27 +63,15 @@
 	}
 
 	// Cancel, Escape, a backdrop click and a successful link all end here.
-	// Modal does not restore focus itself, so return it to "+ Add".
 	function closeDialog() {
 		if (linking) return;
 		dialogOpen = false;
 		selectedPageId = null;
 		selectedPage = null;
-		addButton?.focus();
 	}
 
 	function handleSelectPage(page) {
 		selectedPage = page || null;
-	}
-
-	// PagePicker marks Escape as handled (preventDefault), which stops Modal
-	// from closing on it. Listen in the capture phase so Escape from the
-	// search box still closes the dialog, except while the picker's dropdown
-	// is open: then the first Escape only closes the dropdown.
-	function handleDialogKeydown(event) {
-		if (event.key !== 'Escape') return;
-		if (event.target?.getAttribute?.('aria-expanded') === 'true') return;
-		closeDialog();
 	}
 
 	async function linkSelectedPage() {
@@ -211,8 +199,7 @@
 		dataTestid="milestone-page-link-modal"
 	>
 		{#snippet children(submitHint)}
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div onkeydowncapture={handleDialogKeydown}>
+			<div>
 				<ModalHeader title={t('items.addPage')} onClose={closeDialog} />
 
 				<div class="p-6 space-y-1">

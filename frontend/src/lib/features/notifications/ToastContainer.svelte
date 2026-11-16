@@ -1,4 +1,5 @@
 <script>
+  import { overlayAnnouncement } from '../../utils/overlayScope.js';
   import XCircle from '@lucide/svelte/icons/x-circle';
   import CircleCheck from '@lucide/svelte/icons/circle-check';
   import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
@@ -104,6 +105,7 @@
        transient feedback and must never be buried by an open modal. -->
   <div
     use:portal
+    use:overlayAnnouncement
     class="fixed left-1/2 -translate-x-1/2 z-[110] flex flex-col items-center"
     style="
       top: max(3rem, calc(env(safe-area-inset-top, 0px) + 0.75rem));

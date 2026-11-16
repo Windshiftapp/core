@@ -1,4 +1,6 @@
 <script>
+  import { createOwnedPopup } from '../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
   /**
    * Calendar trigger and popover, or an inline grid, for any calendar system.
    * Emits Gregorian YYYY-MM-DD strings.
@@ -76,6 +78,8 @@
     elements: { trigger, content },
     states: { open }
   } = untrack(() => createPopover({
+    disableFocusTrap: ownedPopup.withinModal,
+    closeFocus: ownedPopup.withinModal ? null : undefined,
     defaultOpen: autoOpen && !disabled && !readonly && !inline,
     positioning: { placement: 'bottom-start', gutter: 4 },
     portal: 'body',
@@ -220,6 +224,7 @@
   {#if !inline && $open}
     <div
       use:melt={$content}
+      use:ownedPopup={{ close: () => { $open = false; } }}
       class="date-picker-popover bg-ds-surface-raised border border-ds-border"
       data-testid={dataTestid ? `${dataTestid}-popover` : undefined}
     >

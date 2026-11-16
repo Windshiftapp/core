@@ -153,6 +153,7 @@
   dir={isRTL ? 'rtl' : 'ltr'}
   class="calendar"
   data-testid={dataTestid}
+  data-calendar-start={$months?.[0]?.value?.toString()}
 >
   <div class="calendar-header">
     <button

@@ -1,4 +1,6 @@
 <script>
+  import { createOwnedPopup } from '../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
   import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
   import Calendar from '@lucide/svelte/icons/calendar';
   import Flag from '@lucide/svelte/icons/flag';
@@ -59,6 +61,8 @@
     elements: { trigger: dueDateTrigger, content: dueDateContent },
     states: { open: dueDateOpen }
   } = createPopover({
+    disableFocusTrap: ownedPopup.withinModal,
+    closeFocus: ownedPopup.withinModal ? null : undefined,
     positioning: { placement: 'bottom-start', gutter: 4 },
     portal: 'body',
     forceVisible: true
@@ -69,6 +73,8 @@
     elements: { trigger: startDateTrigger, content: startDateContent },
     states: { open: startDateOpen }
   } = createPopover({
+    disableFocusTrap: ownedPopup.withinModal,
+    closeFocus: ownedPopup.withinModal ? null : undefined,
     positioning: { placement: 'bottom-start', gutter: 4 },
     portal: 'body',
     forceVisible: true
@@ -79,6 +85,8 @@
     elements: { trigger: endDateTrigger, content: endDateContent },
     states: { open: endDateOpen }
   } = createPopover({
+    disableFocusTrap: ownedPopup.withinModal,
+    closeFocus: ownedPopup.withinModal ? null : undefined,
     positioning: { placement: 'bottom-start', gutter: 4 },
     portal: 'body',
     forceVisible: true
@@ -379,6 +387,7 @@
       {#if $dueDateOpen}
         <div
           use:melt={$dueDateContent}
+          use:ownedPopup={{ close: () => { $dueDateOpen = false; } }}
           class="z-[70] rounded-lg shadow-lg p-3"
           style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
         >
@@ -409,6 +418,7 @@
       {#if $startDateOpen}
         <div
           use:melt={$startDateContent}
+          use:ownedPopup={{ close: () => { $startDateOpen = false; } }}
           class="z-[70] rounded-lg shadow-lg p-3"
           style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
         >
@@ -439,6 +449,7 @@
       {#if $endDateOpen}
         <div
           use:melt={$endDateContent}
+          use:ownedPopup={{ close: () => { $endDateOpen = false; } }}
           class="z-[70] rounded-lg shadow-lg p-3"
           style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border);"
         >

@@ -209,6 +209,7 @@
           labelColor="default"
           labelClass="mb-1.5"
           id="iteration-start-date-input"
+          dataTestid="iteration-start-date-input"
           type="date"
           bind:value={formData.start_date}
           required
@@ -218,6 +219,7 @@
           labelColor="default"
           labelClass="mb-1.5"
           id="iteration-end-date-input"
+          dataTestid="iteration-end-date-input"
           type="date"
           bind:value={formData.end_date}
           required

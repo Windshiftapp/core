@@ -1028,7 +1028,7 @@ import { parseScenarioSpec, flattenExamples } from './bddSpec.js';
 
 
 <!-- Image Preview Modal -->
-<ModalBackdrop opacity={0.8} blur={0} bind:show={previewImage} onclose={() => (previewImage = null)}>
+<ModalBackdrop ariaLabel={t('assets.preview')} opacity={0.8} blur={0} bind:show={previewImage} onclose={() => (previewImage = null)}>
   <div class="relative max-w-4xl max-h-full">
     <img src={previewImage?.src} alt={previewImage?.alt} class="max-w-full max-h-[90vh] object-contain rounded" />
     <p class="text-white text-center mt-2 text-sm">{previewImage?.alt}</p>

@@ -1,4 +1,6 @@
 <script>
+  import { createOwnedPopup } from '../../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
   import { createPopover, melt } from '@melt-ui/svelte';
   import Link2 from '@lucide/svelte/icons/link-2';
   import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -36,6 +38,8 @@
     forceVisible: true,
     positioning: { strategy: 'fixed', placement: 'bottom-end', fitViewport: true },
     portal: 'body',
+    disableFocusTrap: ownedPopup.withinModal,
+    closeFocus: ownedPopup.withinModal ? null : undefined,
   });
 
   let count = $derived(pageLinks.length);
@@ -166,7 +170,7 @@
 </button>
 
 {#if $open}
-  <div use:melt={$content} class="popover" data-testid="page-work-items-popover">
+  <div use:melt={$content} use:ownedPopup={{ close: () => { $open = false; } }} class="popover" data-testid="page-work-items-popover">
     <header class="popover-header">
       <span class="title">{t('pages.workItemsTitle')}</span>
       {#if pageLinkTypeId != null && mode === 'list'}

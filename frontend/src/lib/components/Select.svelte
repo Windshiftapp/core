@@ -4,6 +4,8 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import Check from '@lucide/svelte/icons/check';
   import { tick, untrack } from 'svelte';
+  import { createOwnedPopup } from '../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
 
   /**
    * @type {{
@@ -44,6 +46,9 @@
     elements: { trigger, content },
     states: { open }
   } = createPopover({
+    disableFocusTrap: ownedPopup.withinModal,
+    openFocus: null,
+    closeFocus: ownedPopup.withinModal ? null : undefined,
     forceVisible: true,
     positioning: {
       strategy: 'fixed',
@@ -87,7 +92,7 @@
     value = opt.value;
     onchange?.(opt.value);
     closeDropdown();
-    tick().then(() => triggerElement?.focus());
+    tick().then(() => triggerElement?.focus({ preventScroll: true }));
   }
 
   function optionId(opt, index) {
@@ -127,11 +132,12 @@
     } else if (e.key === 'Escape' && $open) {
       e.preventDefault();
       closeDropdown();
-      triggerElement?.focus();
+      triggerElement?.focus({ preventScroll: true });
     }
   }
 
   function handleListboxKeydown(e) {
+    if (e.key === 'Tab') return;
     const total = options.length;
     if (total === 0) return;
 
@@ -151,9 +157,7 @@
     } else if (e.key === 'Escape') {
       e.preventDefault();
       closeDropdown();
-      triggerElement?.focus();
-    } else if (e.key === 'Tab') {
-      closeDropdown();
+      triggerElement?.focus({ preventScroll: true });
     } else if (e.key === 'Home') {
       e.preventDefault();
       highlightedIndex = 0;
@@ -170,7 +174,7 @@
   $effect(() => {
     if ($open && !wasOpen) {
       tick().then(() => {
-        listboxElement?.focus();
+        if ($open) listboxElement?.focus({ preventScroll: true });
       });
     } else if (!$open && wasOpen) {
       // Return focus to trigger
@@ -213,6 +217,7 @@
 {#if $open}
   <div
     use:melt={$content}
+    use:ownedPopup={{ trigger: () => triggerElement, close: closeDropdown, keepTabStops: false }}
     bind:this={listboxElement}
     data-testid={id ? `${id}-listbox` : undefined}
     data-popover-owner={portalOwner}

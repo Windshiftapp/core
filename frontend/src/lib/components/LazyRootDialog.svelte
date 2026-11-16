@@ -1,4 +1,5 @@
 <script>
+  const dialogId = $props.id();
   import Button from './Button.svelte';
   import ModalBackdrop from './ModalBackdrop.svelte';
   import Spinner from './Spinner.svelte';
@@ -24,7 +25,7 @@
     opacity={0.4}
     closeOnClick={false}
     closeOnEscape={false}
-    ariaLabelledBy="root-dialog-loading-label"
+    ariaLabelledBy="{dialogId}-loading"
   >
     <div
       class="rounded-lg px-6 py-5 text-center"
@@ -34,7 +35,7 @@
       data-root-label={label}
     >
       <Spinner class="mx-auto mb-3" />
-      <p id="root-dialog-loading-label" class="text-sm" style="color: var(--ds-text-subtle);">
+      <p id="{dialogId}-loading" class="text-sm" style="color: var(--ds-text-subtle);">
         {t('common.loading')}
       </p>
     </div>
@@ -48,7 +49,7 @@
     opacity={0.4}
     closeOnClick={false}
     closeOnEscape={false}
-    ariaLabelledBy="root-dialog-error-title"
+    ariaLabelledBy="{dialogId}-error"
   >
     <div
       class="mx-2 max-w-sm rounded-lg px-6 py-5 text-center"
@@ -57,7 +58,7 @@
       data-testid="root-dialog-error"
       data-root-label={label}
     >
-      <h1 id="root-dialog-error-title" class="mb-2 text-lg font-semibold">
+      <h1 id="{dialogId}-error" class="mb-2 text-lg font-semibold">
         {t('errors.failedToLoad')}
       </h1>
       <p class="mb-4 text-sm" style="color: var(--ds-text-subtle);">

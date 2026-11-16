@@ -118,6 +118,7 @@
 </script>
 
 <Modal
+  ariaLabel={t('portal.visibility.configureAccess')}
   {isOpen}
   {onclose}
   maxWidth="max-w-md"

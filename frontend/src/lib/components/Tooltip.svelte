@@ -1,4 +1,6 @@
 <script>
+  import { createOwnedPopup } from '../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
   import { createTooltip, melt } from '@melt-ui/svelte';
 
   let {
@@ -47,6 +49,7 @@
   {#if $open}
     <div
       use:melt={$tooltipContent}
+      use:ownedPopup={{ close: () => { $open = false; } }}
       data-testid="tooltip"
       class="z-[100] rounded-md bg-[#253858] text-white shadow-lg {contentClass}"
     >

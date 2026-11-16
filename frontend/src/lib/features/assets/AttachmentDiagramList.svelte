@@ -222,7 +222,7 @@
        restore. PDFs render in an iframe; images render at their native size,
        capped to the viewport. -->
   <div use:portal>
-  <ModalBackdrop show={true} onclose={closeLightbox} zIndex={50} opacity={0.85} blur={0}>
+  <ModalBackdrop show={true} ariaLabel={lightbox.original_filename || t('assets.preview')} onclose={closeLightbox} zIndex={50} opacity={0.85} blur={0}>
     <div class="absolute top-4 right-4 flex items-center gap-3">
       <button
         type="button"

@@ -1,7 +1,8 @@
 <script>
   import { onDestroy } from 'svelte';
   import { getShortcut, matchesShortcut, getDisplayString } from '../utils/keyboardShortcuts.js';
-  import { portal } from '../actions/portal.js';
+  import ModalBackdrop from '../components/ModalBackdrop.svelte';
+  import { overlayOwnsFocus, overlayHasFocusedControl, isFocusEligible } from '../utils/overlayScope.js';
 
   let {
     isOpen = $bindable(false),
@@ -18,6 +19,8 @@
     onclose = null,
     onKeydown = null,
     dataTestid = undefined,
+    ariaLabelledBy = undefined,
+    ariaLabel = undefined,
     children
   } = $props();
 
@@ -25,7 +28,6 @@
   let modalContentElement = $state(null);
   let hasTextarea = $state(false);
 
-  // Get shortcut configurations
   const submitShortcut = getShortcut('modal', 'submit');
   const cancelShortcut = getShortcut('modal', 'cancel');
 
@@ -37,10 +39,6 @@
   }
 
   function handleBackdropClick(e) {
-    // Clicking outside the modal content can silently dismiss it and lose
-    // anything the user has typed. Creation / editing dialogs gate this off
-    // (closeOnBackdropClick=false); the modal is closed through its explicit
-    // buttons or Escape instead.
     if (closeOnBackdropClick && e.target === e.currentTarget) {
       close();
     }
@@ -55,13 +53,10 @@
   function handleKeydown(e) {
     onKeydown?.(e);
     e.stopPropagation();
+    if (e.isComposing || e.keyCode === 229) return;
 
-    // The submit gesture (Ctrl/Cmd+Enter) must fire even when inner content
-    // already handled the key: a rich-text editor (ProseMirror) calls
-    // preventDefault() on Cmd+Enter, which would otherwise bail at the
-    // defaultPrevented guard below and swallow the submit. Checking it first
-    // mirrors CreateModal's window-level handler.
-    if (onSubmit && !submitDisabled && matchesShortcut(e, submitShortcut)) {
+    // Rich-text editors may prevent Cmd/Ctrl+Enter while still requesting submit.
+    if (onSubmit && matchesShortcut(e, submitShortcut)) {
       e.preventDefault();
       handleSubmit();
       return;
@@ -69,33 +64,24 @@
 
     if (e.defaultPrevented) return;
 
-    // Check for cancel shortcut (Escape)
     if (matchesShortcut(e, cancelShortcut)) {
       close();
       return;
     }
 
-    // Only handle submission if onSubmit is provided
-    if (!onSubmit || submitDisabled) return;
+    if (!onSubmit) return;
 
-    // Enter without modifier
-    if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
-      // A <textarea> or a rich-text contenteditable (the Markdown editor's
-      // ProseMirror surface) owns bare Enter — it inserts a line rather than
-      // submitting the modal.
-      if (e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
-        return;
-      }
-      // In input field or outside input: submit
+    // Native buttons, pickers and multiline editors own their Enter activation.
+    if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey &&
+        e.target instanceof HTMLInputElement &&
+        ['text', 'search', 'email', 'url', 'tel', 'password', 'number'].includes(e.target.type) &&
+        !e.target.closest('[role="combobox"], [role="listbox"], [contenteditable="true"]')) {
       e.preventDefault();
       handleSubmit();
     }
   }
 
-  // Detect if the modal contains a multiline editor (a <textarea> or a
-  // contenteditable rich-text surface). This drives the footer submit hint:
-  // Ctrl/Cmd+Enter when present, plain Enter otherwise. Re-run on focusin too,
-  // since a lazily-mounted editor may not exist yet at initial detection.
+  // Lazy multiline editors switch the footer hint from Enter to Cmd/Ctrl+Enter.
   function detectTextarea() {
     if (modalContentElement) {
       hasTextarea =
@@ -105,10 +91,7 @@
 
   let submitHint = $derived(hasTextarea ? getDisplayString(submitShortcut) : '↵');
 
-  // Auto-focus runs once per open. The effect below re-runs whenever the modal
-  // content is (re)mounted, so a timer scheduled inside it would keep resetting
-  // and could fire late — after the user has opened a dropdown — stealing focus
-  // back to the first field and scrolling the modal away from the control.
+  // Schedule once per opening, not for every content update.
   let autoFocusTimer = null;
 
   onDestroy(() => {
@@ -128,22 +111,15 @@
     if (autoFocusTimer === null) {
       autoFocusTimer = setTimeout(() => {
         autoFocusTimer = null;
-        if (!modalContentElement || !backdropElement) return;
+        if (!isOpen || !modalContentElement || !backdropElement || !overlayOwnsFocus(backdropElement)) return;
         detectTextarea();
-        if (modalContentElement.contains(document.activeElement)) return;
-        // Never steal focus from an open portaled overlay (select listbox,
-        // menu, nested dialog). Those render outside the modal content, so the
-        // containment check above cannot see them.
-        const active = document.activeElement;
-        if (active && active !== document.body && active.closest?.('[data-escapee]')) return;
-        // Focus without scrolling: the timer can fire after the user (or a
-        // test) has scrolled a tall modal, and a plain focus() would yank the
-        // backdrop back to the first field.
+        if (overlayHasFocusedControl(backdropElement)) return;
+        // Managed focus must not scroll a dialog the user already positioned.
         backdropElement.focus({ preventScroll: true });
         if (autoFocus) {
-          const focusable = modalContentElement.querySelector(
+          const focusable = [...modalContentElement.querySelectorAll(
             'input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled])'
-          );
+          )].find(isFocusEligible);
           if (focusable) {
             focusable.focus({ preventScroll: true });
           }
@@ -151,8 +127,7 @@
       }, 100);
     }
 
-    // A lazily-mounted editor may appear after the initial detect — keep the
-    // submit hint in sync as the modal's subtree changes.
+    // Keep the hint current when an editor mounts after opening.
     const observer = new MutationObserver(detectTextarea);
     observer.observe(modalContentElement, { childList: true, subtree: true });
     return () => observer.disconnect();
@@ -170,25 +145,31 @@
   </div>
 {:else if isOpen}
   <!-- Backdrop -->
-  <div
-    use:portal
-    bind:this={backdropElement}
-    class={`fixed inset-0 flex items-start justify-center pt-8 overflow-y-auto ${zIndexClass}`}
-    style={noBackdrop ? '' : 'background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px);'}
-    tabindex="-1"
-    onclick={handleBackdropClick}
-    onkeydown={handleKeydown}
-    onfocusin={detectTextarea}
-    role="dialog"
-    aria-modal="true"
-    data-testid={dataTestid}
+  <ModalBackdrop
+    bind:show={isOpen}
+    portal={true}
+    zIndex={null}
+    class={zIndexClass}
+    {dataTestid}
+    {ariaLabelledBy}
+    {ariaLabel}
+    align="top" paddingTop="pt-8" scrollable
+    opacity={noBackdrop ? 0 : 0.4}
+    blur={noBackdrop ? 0 : 4}
+    closeOnClick={false} closeOnEscape={false}
+    onKeydown={handleKeydown}
+    onBackdropClick={handleBackdropClick}
+    bind:backdropElement
+    focusOnOpen={false}
+    onclose={close}
   >
     <div
       bind:this={modalContentElement}
+      onfocusin={detectTextarea}
       class="relative rounded-lg overflow-hidden {maxWidth} w-full mx-4 mb-8 {maxHeight ? 'flex flex-col' : ''}"
       style="background-color: var(--ds-surface-raised, var(--ds-surface, white)); box-shadow: var(--shadow-float, 0 20px 50px rgba(0, 0, 0, 0.18));{maxHeight ? ` max-height: ${maxHeight};` : ''}"
     >
       {@render children?.(submitHint)}
     </div>
-  </div>
+  </ModalBackdrop>
 {/if}

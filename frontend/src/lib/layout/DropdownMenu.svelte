@@ -1,4 +1,6 @@
 <script>
+  import { createOwnedPopup } from '../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
   import { createPopover, melt } from '@melt-ui/svelte';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import Check from '@lucide/svelte/icons/check';
@@ -68,6 +70,8 @@
       placement: /** @type {import('@floating-ui/dom').Placement} */ (placement || 'bottom')
     },
     portal: 'body',
+    disableFocusTrap: ownedPopup.withinModal,
+    closeFocus: ownedPopup.withinModal ? null : undefined,
     open: controlledOpen,
     // svelte-ignore state_referenced_locally
     disabled: isDisabled
@@ -250,6 +254,7 @@
 {#if $open}
   <div
     use:melt={$content}
+    use:ownedPopup={{ trigger: () => triggerElement, close: () => { $open = false; } }}
     data-menu-container
     data-testid={triggerTestid ? `${triggerTestid}-menu` : undefined}
     role="menu"

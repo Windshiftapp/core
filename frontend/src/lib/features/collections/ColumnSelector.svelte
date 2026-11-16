@@ -1,4 +1,6 @@
 <script>
+  import { createOwnedPopup } from '../../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
   import { createPopover, melt } from '@melt-ui/svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { LIST_COLUMN_FIELDS } from '../../stores/fieldConfig.js';
@@ -49,7 +51,9 @@
       fitViewport: true,
       placement: 'bottom-end'
     },
-    portal: 'body'
+    portal: 'body',
+    disableFocusTrap: ownedPopup.withinModal,
+    closeFocus: ownedPopup.withinModal ? null : undefined,
   });
 
   const MAX_VISIBLE_CUSTOM_FIELDS = 5;
@@ -241,6 +245,7 @@
 {#if $open}
   <div
     use:melt={$content}
+    use:ownedPopup={{ close: () => { $open = false; } }}
     data-testid="column-selector-menu"
     class="w-80 rounded-lg shadow-xl border z-[60] flex flex-col overflow-hidden"
     style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"

@@ -407,7 +407,7 @@
   }
 
   function handleKeydown(e) {
-    if (!isOpen) return;
+    if (!isOpen || e.isComposing) return;
     if (matchesShortcut(e, submitShortcut)) {
       e.preventDefault();
       if (isFormValid && !submitting) {
@@ -415,15 +415,6 @@
       }
     }
   }
-
-  // Focus first input when modal opens
-  $effect(() => {
-    if (isOpen && nameInputRef) {
-      setTimeout(() => {
-        nameInputRef?.focus();
-      }, 100);
-    }
-  });
 
   // Initialize store when modal opens for work items
   $effect(() => {
@@ -546,10 +537,8 @@
   useEventListener(() => window, 'set-create-parent', handleSetCreateParent);
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
-<!-- shortcut-guard-exempt: Cmd+Enter submit is handled via svelte:window onkeydown (matchesShortcut) above, outside the ModalBackdrop block the guard scans. -->
-<ModalBackdrop bind:show={isOpen} opacity={0.4} align="top" paddingTop="pt-16" scrollable zIndex={60} closeOnClick={false} onclose={close}>
+<!-- shortcut-guard-exempt: Cmd+Enter is dispatched by the active overlay through onKeydown. -->
+<ModalBackdrop bind:show={isOpen} onKeydown={handleKeydown} initialFocus='input:not([type="hidden"]):not([tabindex="-1"])' opacity={0.4} align="top" paddingTop="pt-16" scrollable zIndex={60} closeOnClick={false} onclose={close}>
     <CreateFormFrame dataTestid="create-modal">
       {#snippet header()}
         <!-- Type Selector FIRST (independent of workspace) -->

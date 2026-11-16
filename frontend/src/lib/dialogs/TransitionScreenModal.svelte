@@ -1,4 +1,5 @@
 <script>
+  const dialogId = $props.id();
   // Transition screen modal: shown before a status move whose governing
   // transition carries a screen. It collects the screen's fields plus an
   // optional transition comment and submits them with the move (WI-1835).
@@ -129,7 +130,7 @@
   // Mirror Modal.svelte: once the screen has focus it owns the keyboard, so
   // background shortcuts do not also fire.
   function handleKeydown(event) {
-    if (!show) return;
+    if (!show || event.isComposing) return;
     event.stopPropagation();
     if (matchesShortcut(event, getShortcut('modal', 'submit'))) {
       event.preventDefault();
@@ -138,7 +139,7 @@
     }
     if (event.key === 'Enter' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
       const target = /** @type {HTMLElement} */ (event.target);
-      if (target?.tagName === 'TEXTAREA' || target?.isContentEditable) return;
+      if (event.defaultPrevented || !(target instanceof HTMLInputElement) || target.closest('[role="combobox"]')) return;
       event.preventDefault();
       submit();
     }
@@ -158,7 +159,7 @@
   bind:show
   onclose={cancel}
   onKeydown={handleKeydown}
-  ariaLabelledBy="transition-screen-title"
+  ariaLabelledBy="{dialogId}-title"
   zIndex={60}
   portal={true}
 >
@@ -168,7 +169,7 @@
     data-testid="transition-screen-modal"
   >
     <div class="px-5 py-4 border-b" style="border-color: var(--ds-border);">
-      <h2 id="transition-screen-title" class="text-lg font-semibold">
+      <h2 id="{dialogId}-title" class="text-lg font-semibold">
         {screen?.name || t('transitionScreen.title')}
       </h2>
       {#if targetStatusName}

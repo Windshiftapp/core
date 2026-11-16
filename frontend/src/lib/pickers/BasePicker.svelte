@@ -9,6 +9,8 @@
   import { t } from '../stores/i18n.svelte.js';
   import { controlSizeClasses } from '../utils/controlSizes.js';
   import { useRowRetention } from '../virtualization/useRowRetention.svelte';
+  import { createOwnedPopup } from '../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
 
   let {
     // Core props
@@ -65,6 +67,7 @@
     //   menuTestid — the portalled menu container
     //   scrollTestid — the option-list scroll container
     inputTestid = undefined,
+    triggerTestid = undefined,
     searchTestid = undefined,
     searchPlaceholder = '',
     optionTestid = null,
@@ -388,15 +391,13 @@
       // Return focus to the in-modal trigger so the next Tab continues inside
       // the dialog instead of escaping behind it (WI-455).
       restoreFocusToTrigger();
-      onCancel();
+      $open = false;
+      if ($selected || multiple) onCancel();
       return;
     }
 
-    // Tab is intentionally left to native handling: when closed it advances to
-    // the next field (no trap, WI-445); when open the user selects with Enter
-    // rather than tabbing out. Focus is kept inside the modal by restoring it to
-    // the trigger on select/Escape (see restoreFocusToTrigger), not by
-    // intercepting Tab.
+    // The modal scope handles Tab across the popup and its in-dialog trigger.
+    if (event.key === 'Tab') return;
 
     const totalItems = visibleOptions.length;
 
@@ -433,24 +434,26 @@
 
   // Notify callers whenever the dropdown closes. Preserve the legacy
   // single-select cancellation callback for closes without a selection.
-  let wasOpen = $state(false);
+  let wasOpen = false;
   $effect(() => {
-    if (wasOpen && !$open) {
-      onClose();
-      if (!$selected && !multiple) {
-        onCancel();
+    const isOpen = $open;
+    let focusTimer;
+    untrack(() => {
+      if (wasOpen && !isOpen) {
+        onClose();
+        if (!$selected && !multiple) onCancel();
       }
-    }
-    if (!wasOpen && $open) {
-      highlightedIndex = 0;
-      onOpen();
-      // Remember focus before entering the portalled dropdown.
-      activeElementBeforeOpen = document.activeElement;
-      if (popoverMode) {
-        setTimeout(() => searchInputRef?.focus(), 50);
+      if (!wasOpen && isOpen) {
+        highlightedIndex = 0;
+        onOpen();
+        activeElementBeforeOpen = document.activeElement;
+        if (popoverMode) {
+          focusTimer = setTimeout(() => { if ($open) searchInputRef?.focus({ preventScroll: true }); }, 50);
+        }
       }
-    }
-    wasOpen = $open;
+      wasOpen = isOpen;
+    });
+    return () => clearTimeout(focusTimer);
   });
 
   // Restore focus after unmount so portalled menus cannot drop Tab navigation
@@ -464,7 +467,7 @@
         // useful. A user may already have moved to the next field before this
         // frame runs; never steal focus back from that newer target.
         if (!active || active === document.body || menuRef?.contains(active)) {
-          target.focus();
+          target.focus({ preventScroll: true });
         }
       });
     }
@@ -568,6 +571,7 @@
              class="absolute inset-0 w-full h-full opacity-0 pointer-events-none" />
       <div
         role="combobox"
+        data-testid={triggerTestid}
         tabindex={disabled ? -1 : 0}
         aria-expanded={$open}
         aria-controls={$menu.id}
@@ -640,7 +644,9 @@
 
   <!-- Dropdown Menu -->
   {#if $open}
-    <div bind:this={menuRef} use:melt={$menu} data-testid={menuTestid || 'picker-dropdown'}
+    <div bind:this={menuRef} use:melt={$menu}
+         use:ownedPopup={{ trigger: () => activeElementBeforeOpen, close: () => { $open = false; }, keepTabStops: keepOpenOnFooterTab }}
+         data-testid={menuTestid || 'picker-dropdown'}
          class="fixed z-[70] min-w-[250px] rounded border shadow-lg flex flex-col overflow-y-auto overscroll-contain"
          style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
       {#if popoverMode}

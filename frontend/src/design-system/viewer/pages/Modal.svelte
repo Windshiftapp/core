@@ -13,7 +13,8 @@
 <div class="p-8 max-w-6xl">
   <h1 class="text-2xl font-bold mb-2" style="color: var(--ds-text);">Modal</h1>
   <p class="mb-8" style="color: var(--ds-text-subtle);">
-    Base modal component with backdrop, close button, and flexible content slot.
+    Dialog policy and panel chrome over ModalBackdrop's shared focus, portal and isolation mechanics.
+    Pair with ModalHeader for a unique title association, or supply ariaLabelledBy / ariaLabel.
   </p>
 
   <!-- Basic Usage -->
@@ -74,7 +75,6 @@
     <Modal
       bind:isOpen={preventCloseOpen}
       preventClose
-      showCloseButton={false}
     >
       <div class="p-6">
         <h3 class="text-lg font-semibold mb-2">Persistent Modal</h3>
@@ -153,9 +153,9 @@
             <td class="p-2">false</td>
           </tr>
           <tr style="border-bottom: 1px solid var(--ds-border);">
-            <td class="p-2"><code>showCloseButton</code></td>
+             <td class="p-2"><code>inline</code></td>
             <td class="p-2">boolean</td>
-            <td class="p-2">true</td>
+             <td class="p-2">false (plain page flow, no dialog semantics)</td>
           </tr>
           <tr style="border-bottom: 1px solid var(--ds-border);">
             <td class="p-2"><code>preventClose</code></td>
@@ -198,6 +198,20 @@
   </section>
 
   <!-- Events Reference -->
+  <section class="mb-10 text-ds-text-subtle">
+    <h2 class="text-lg font-semibold mb-4 text-ds-text">Overlay and focus contract</h2>
+    <ul class="list-disc pl-5 space-y-2">
+      <li><code>ariaLabelledBy</code> references existing heading IDs; <code>ariaLabel</code> supplies an explicit name. Otherwise the registered ModalHeader or first custom heading names the dialog with an instance-unique ID.</li>
+      <li><code>maxHeight</code> constrains the panel; <code>dataTestid</code> identifies the dialog root.</li>
+      <li><code>closeOnBackdropClick=true</code> allows outside dismissal; <code>preventClose</code> blocks both outside dismissal and Escape.</li>
+      <li><code>noBackdrop=false</code> controls only dimming/blur. An invisible backdrop remains modal. <code>inline=false</code> opts into modal ownership.</li>
+      <li><code>autoFocus=true</code> prefers an eligible field after 100ms without scrolling. False focuses only the container. Focus already in this dialog, an owned popup or a newer child is preserved.</li>
+      <li><code>zIndexClass</code> passes all CSS classes through, including layout overrides. The visually highest dialog owns keyboard dispatch.</li>
+      <li>Only single-line text inputs submit with bare Enter. Buttons, pickers and multiline editors keep native activation; Cmd/Ctrl+Enter remains the deliberate submit shortcut.</li>
+      <li>Owned body portals register with <code>createOwnedPopup</code>. Do not add another focus trap or window-level modal shortcut listener.</li>
+    </ul>
+  </section>
+
   <section class="mb-10">
     <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">Events</h2>
     <div

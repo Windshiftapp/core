@@ -1,4 +1,5 @@
 <script>
+  const dialogId = $props.id();
   import { onMount } from 'svelte';
   import Spinner from '../components/Spinner.svelte';
   import { setOAuthReturnURL } from '../utils/oauthReturn.js';
@@ -164,7 +165,7 @@
 
 <!-- Modal Backdrop -->
 <!-- shortcut-guard-exempt: picker confirms via its explicit footer button; no submit shortcut owned -->
-<ModalBackdrop show={true} onclose={close} ariaLabelledBy="repo-selector-title">
+<ModalBackdrop show={true} onclose={close} ariaLabelledBy="{dialogId}-title">
   <div
     class="w-full max-w-2xl max-h-[80vh] flex flex-col rounded-lg shadow-xl border overflow-hidden"
     style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
@@ -172,7 +173,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: var(--ds-border);">
       <div>
-        <h2 id="repo-selector-title" class="text-lg font-semibold" style="color: var(--ds-text);">
+        <h2 id="{dialogId}-title" class="text-lg font-semibold" style="color: var(--ds-text);">
           {t('pickers.linkRepositories')}
         </h2>
         <p class="text-sm" style="color: var(--ds-text-subtle);">

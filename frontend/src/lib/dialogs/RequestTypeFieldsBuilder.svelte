@@ -1,4 +1,6 @@
 <script>
+  import { createOwnedPopup } from '../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import StateDisplay from '../components/StateDisplay.svelte';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
@@ -101,7 +103,9 @@
   } = createPopover({
     forceVisible: true,
     positioning: { placement: 'bottom-start', gutter: 6 },
-    portal: 'body'
+    portal: 'body',
+    disableFocusTrap: ownedPopup.withinModal,
+    closeFocus: ownedPopup.withinModal ? null : undefined,
   });
 
   $effect(() => {
@@ -960,6 +964,7 @@
 {#if $addFieldOpen}
   <div
     use:melt={$addFieldContent}
+    use:ownedPopup={{ close: () => { $addFieldOpen = false; } }}
     class="z-[70] w-72 rounded border shadow-lg flex flex-col"
     style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
   >

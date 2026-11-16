@@ -411,7 +411,7 @@
 {/snippet}
 
 {#if isModal}
-  <Modal isOpen={true} onclose={closeModal} maxWidth="max-w-2xl" dataTestid="personal-task-detail">
+  <Modal isOpen={true} ariaLabel={item?.title || t('items.workItemDetails')} onclose={closeModal} maxWidth="max-w-2xl" dataTestid="personal-task-detail">
     {@render taskContent()}
   </Modal>
 {:else}

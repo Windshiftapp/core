@@ -1,4 +1,6 @@
 <script>
+  import { createOwnedPopup } from '../../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
   import Plus from '@lucide/svelte/icons/plus';
   import X from '@lucide/svelte/icons/x';
   import Package from '@lucide/svelte/icons/package';
@@ -210,6 +212,7 @@
       {#if showWorkspaceDropdown && !workspacesPending}
         <div
           use:portal
+          use:ownedPopup={{ trigger: () => workspaceAnchor?.querySelector('button'), close: () => { showWorkspaceDropdown = false; } }}
           data-quick-add-menu
           class="fixed z-[1000] overflow-y-auto rounded-md shadow-lg border py-1"
           style="{workspaceMenuStyle} background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
@@ -315,6 +318,7 @@
         {#if showItemTypeDropdown}
           <div
             use:portal
+            use:ownedPopup={{ trigger: () => itemTypeAnchor?.querySelector('button'), close: () => { showItemTypeDropdown = false; } }}
             data-quick-add-menu
             class="fixed z-[1000] overflow-y-auto rounded-md shadow-lg border py-1"
             style="{itemTypeMenuStyle} background-color: var(--ds-surface-raised); border-color: var(--ds-border);"

@@ -407,14 +407,7 @@
   </div>
 {/snippet}
 
-<ModalBackdrop
-  show={portalStore.showCustomizePanel && portalStore.activeSection !== 'request-types' && portalStore.activeSection !== 'asset-reports'}
-  opacity={0.3}
-  blur={0}
-  align="none"
-  onclose={() => portalStore.showCustomizePanel = false}
-/>
-
+{#snippet customizationPanel()}
 <!-- Customization Panel - Slides from Left.
      In edit mode, leave room for Portal's edit bar above the fixed panels.
      The full-bleed shadow is only applied when the inline fields builder
@@ -1085,6 +1078,17 @@
       onclose={() => expandedRequestTypeForFields = null}
     />
   </div>
+{/if}
+{/snippet}
+
+{#if portalStore.showCustomizePanel && portalStore.activeSection !== 'request-types' && portalStore.activeSection !== 'asset-reports'}
+  <ModalBackdrop show={true} opacity={0.3} blur={0} align="none"
+    ariaLabel={t('portal.customize.heroGradient')}
+    onclose={() => portalStore.showCustomizePanel = false}>
+    {@render customizationPanel()}
+  </ModalBackdrop>
+{:else}
+  {@render customizationPanel()}
 {/if}
 
 <!-- Request Type Visibility Modal -->
