@@ -406,6 +406,7 @@
                 {:else}
                   <Input
                     id={`wsf-${field.field_identifier}`}
+                    dataTestid={`wsf-${field.field_identifier}`}
                     type={kind === 'email' ? 'email' : kind === 'date' ? 'date' : kind === 'number' ? 'number' : 'text'}
                     step={kind === 'number' ? 'any' : undefined}
                     value={valueFor(field)}

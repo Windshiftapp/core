@@ -387,6 +387,7 @@
         <TextField
           label={t('common.date')}
           id="time-log-date"
+          dataTestid="time-log-date"
           labelColor="default"
           type="date"
           size="small"

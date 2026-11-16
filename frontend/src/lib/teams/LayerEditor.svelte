@@ -283,7 +283,7 @@
         <label for="layer-start" class="block text-sm font-medium" style="color: var(--ds-text)">
           {t('teams.oncall.startDate')}
         </label>
-        <Input id="layer-start" type="date" bind:value={formData.start_date} required />
+        <Input id="layer-start" dataTestid="layer-start" type="date" bind:value={formData.start_date} required />
       </div>
       <div class="col-span-2">
         <label for="layer-end" class="block text-sm font-medium" style="color: var(--ds-text)">

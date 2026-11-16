@@ -743,6 +743,7 @@
 				<TextField
 					label="Last valid date (optional)"
 					id="token-expiry"
+					dataTestid="token-expiry"
 					labelColor="default"
 					labelClass="mb-1"
 					type="date"

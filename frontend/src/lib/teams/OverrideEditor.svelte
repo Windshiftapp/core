@@ -92,13 +92,13 @@
       <label for="override-start" class="block text-sm font-medium" style="color: var(--ds-text)">
         {t('teams.oncall.startTime')}
       </label>
-      <Input id="override-start" type="datetime-local" bind:value={formData.start_time} required />
+      <Input id="override-start" dataTestid="override-start" type="datetime-local" bind:value={formData.start_time} required />
     </div>
     <div>
       <label for="override-end" class="block text-sm font-medium" style="color: var(--ds-text)">
         {t('teams.oncall.endTime')}
       </label>
-      <Input id="override-end" type="datetime-local" bind:value={formData.end_time} required />
+      <Input id="override-end" dataTestid="override-end" type="datetime-local" bind:value={formData.end_time} required />
     </div>
     <div>
       <label for="override-reason" class="block text-sm font-medium" style="color: var(--ds-text)">
