@@ -218,6 +218,21 @@ CREATE INDEX IF NOT EXISTS idx_collections_is_public ON collections(is_public);
 CREATE INDEX IF NOT EXISTS idx_collections_category_id ON collections(category_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_public_slug ON collections(public_slug);
 
+-- migration: 20261126_board_portal_placements
+CREATE TABLE IF NOT EXISTS board_placements (
+	id TEXT PRIMARY KEY,
+	collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+	channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+	label TEXT NOT NULL,
+	display_order INTEGER NOT NULL DEFAULT 0,
+	enabled BOOLEAN NOT NULL DEFAULT true,
+	access_mode TEXT NOT NULL DEFAULT 'public' CHECK(access_mode IN ('public', 'organisations')),
+	organisation_ids TEXT NOT NULL DEFAULT '[]',
+	revision INTEGER NOT NULL DEFAULT 1,
+	UNIQUE(collection_id, channel_id)
+);
+CREATE INDEX IF NOT EXISTS idx_board_placements_channel ON board_placements(channel_id, display_order);
+
 
 CREATE OR REPLACE FUNCTION log_collection_change() RETURNS trigger AS $$
 BEGIN
