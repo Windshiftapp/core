@@ -53,6 +53,8 @@ func (r *AuditLogRepository) Get(id int) (*AuditLogRow, error) {
 // Zero-valued / nil fields are skipped at WHERE-clause build time.
 type AuditLogFilters struct {
 	ActionType   string     // exact match
+	ActionTypes  []string   // any of these exact action types
+	ResourceID   *int       // exact resource ID, paired with ResourceType
 	UserID       *int       // exact match (nil = any)
 	ResourceType string     // exact match
 	Source       string     // exact match (USER, SCIM, SYSTEM, ...)
@@ -333,6 +335,16 @@ func buildAuditLogWhere(f AuditLogFilters) (whereClause string, args []any) {
 	if f.ActionType != "" {
 		conditions = append(conditions, "action_type = ?")
 		args = append(args, f.ActionType)
+	}
+	if len(f.ActionTypes) > 0 {
+		conditions = append(conditions, "action_type IN ("+strings.TrimSuffix(strings.Repeat("?,", len(f.ActionTypes)), ",")+")")
+		for _, action := range f.ActionTypes {
+			args = append(args, action)
+		}
+	}
+	if f.ResourceID != nil {
+		conditions = append(conditions, "resource_id = ?")
+		args = append(args, *f.ResourceID)
 	}
 	if f.UserID != nil {
 		conditions = append(conditions, "user_id = ?")

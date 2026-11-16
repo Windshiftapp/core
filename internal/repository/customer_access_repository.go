@@ -107,20 +107,20 @@ func (r *CustomerAccessRepository) OrganisationExists(ctx context.Context, id in
 	return exists, err
 }
 
-func (r *CustomerAccessRepository) SavePolicy(ctx context.Context, surface models.CustomerSurface, policy models.CustomerAccessPolicy) error {
+func (r *CustomerAccessRepository) ValidatePolicy(ctx context.Context, policy models.CustomerAccessPolicy) (models.CustomerAccessPolicy, error) {
 	if policy.Mode != "public" && policy.Mode != "organisations" {
-		return fmt.Errorf("%w: access mode must be public or organisations", ErrCustomerAccessPolicyInvalid)
+		return policy, fmt.Errorf("%w: access mode must be public or organisations", ErrCustomerAccessPolicyInvalid)
 	}
 	if len(policy.OrganisationIDs) > 100 {
-		return fmt.Errorf("%w: select at most 100 customer organisations", ErrCustomerAccessPolicyInvalid)
+		return policy, fmt.Errorf("%w: select at most 100 customer organisations", ErrCustomerAccessPolicyInvalid)
 	}
 	for _, id := range policy.OrganisationIDs {
 		exists, err := r.OrganisationExists(ctx, id)
 		if err != nil {
-			return err
+			return policy, err
 		}
 		if id <= 0 || !exists {
-			return fmt.Errorf("%w: customer organisation %d does not exist", ErrCustomerAccessPolicyInvalid, id)
+			return policy, fmt.Errorf("%w: customer organisation %d does not exist", ErrCustomerAccessPolicyInvalid, id)
 		}
 	}
 	ids := slices.Clone(policy.OrganisationIDs)
@@ -129,7 +129,16 @@ func (r *CustomerAccessRepository) SavePolicy(ctx context.Context, surface model
 	if ids == nil {
 		ids = []int{}
 	}
-	raw, err := json.Marshal(ids)
+	policy.OrganisationIDs = ids
+	return policy, nil
+}
+
+func (r *CustomerAccessRepository) SavePolicy(ctx context.Context, surface models.CustomerSurface, policy models.CustomerAccessPolicy) error {
+	policy, err := r.ValidatePolicy(ctx, policy)
+	if err != nil {
+		return err
+	}
+	raw, err := json.Marshal(policy.OrganisationIDs)
 	if err != nil {
 		return err
 	}

@@ -31,6 +31,7 @@
     isOpen = $bindable(false),
     requestType = null,
     portalSlug = '',
+    draftsEnabled = true,
     isDarkMode = false,
     // Field values to seed on open, keyed by field_identifier (e.g. the
     // clicked asset id for an asset field). Applied after any draft resume so
@@ -145,7 +146,7 @@
 
       // Auto-resume any saved draft for this request type. Only the portal
       // path has drafts — internal usage of this modal opens fresh.
-      if (portalSlug) {
+      if (portalSlug && draftsEnabled) {
         await applyDraftIfPresent();
       }
 
@@ -234,7 +235,7 @@
   // not block on it. Returns a promise so callers may await if they want to
   // (e.g. before navigating away).
   async function saveDraft() {
-    if (!portalSlug || !requestType) return;
+    if (!portalSlug || !requestType || !draftsEnabled) return;
     savingDraft = true;
     draftJustSaved = false;
     try {
@@ -365,7 +366,7 @@
       // call delete here too so callers polling drafts.list right after
       // submission see a consistent view without depending on backend
       // ordering. Best-effort.
-      if (portalSlug) {
+      if (portalSlug && draftsEnabled) {
         portal.drafts.delete(portalSlug, requestType.id).catch((err) => {
           if (err?.status !== 404) {
             surfaceError(err, { silent: true, context: 'deleteDraftAfterSubmit' });

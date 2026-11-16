@@ -126,7 +126,9 @@ configurePortalActivityStore({
 /**
  * Load portal data by slug
  */
+let portalLoadId = 0;
 async function loadPortal(slug) {
+  const loadId = ++portalLoadId;
   try {
     loading = true;
     error = null;
@@ -144,6 +146,7 @@ async function loadPortal(slug) {
     }
 
     const bootstrap = await portal.getBootstrap(slug);
+    if (loadId !== portalLoadId) return;
     portalData = bootstrap.portal;
 
     // Initialize editable state with portal data
@@ -183,13 +186,14 @@ async function loadPortal(slug) {
 
     // Allow saves from user changes after initial load
     setTimeout(() => {
-      isInitialLoad = false;
+      if (loadId === portalLoadId) isInitialLoad = false;
     }, 100);
   } catch (err) {
+    if (loadId !== portalLoadId) return;
     error = err.message || 'Failed to load portal';
     surfaceError(err, { context: 'loadPortal' });
   } finally {
-    loading = false;
+    if (loadId === portalLoadId) loading = false;
   }
 }
 
@@ -615,6 +619,7 @@ function closeAllMenus() {
 
 // Reset store (for cleanup)
 function reset() {
+  portalLoadId++;
   // Cancel a pending debounced customization save so it cannot fire after
   // navigation and write stale state to a newly loaded portal.
   if (saveTimeout) {

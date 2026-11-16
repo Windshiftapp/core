@@ -161,6 +161,8 @@ const routes = {
   '/portal/:slug/kb': 'portal',
   '/portal/:slug/kb/:pageId': 'portal',
   '/portal/:slug/request/:requestTypeId': 'portal',
+  '/portal/:slug/boards/:placementId': 'portal',
+  '/portal/:slug/boards/:placementId/items/:itemKey': 'portal',
   '/forms/:slug/:formId': 'public-form',
   '/forms/:slug': 'public-form',
   '/set-password/:token': 'set-password',

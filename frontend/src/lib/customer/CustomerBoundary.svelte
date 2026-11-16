@@ -4,6 +4,8 @@
   import CustomerLogin from './CustomerLogin.svelte';
   import Button from '../components/Button.svelte';
   import AlertBox from '../components/AlertBox.svelte';
+  import { navigate } from '../router.js';
+  import { toLogical } from '../runtime/contextPath.js';
   let { kind, slug, children } = $props();
   let status = $state(null);
   let loading = $state(true);
@@ -34,8 +36,11 @@
         if (type === 'portal' && portalToken) {
           const access = await customerAccess.status(type, key);
           if (access.restricted && !access.allowed) {
+            const destination = new URLSearchParams(window.location.hash.slice(1)).get('next');
+            const next = destination ? toLogical(destination) : null;
             await portalAuth.verifyMagicLink(key, portalToken);
-            history.replaceState(null, '', window.location.pathname);
+            const root = `/portal/${key}`;
+            navigate(next && (next === root || next.startsWith(`${root}/`) || next.startsWith(`${root}?`)) ? next : root, { replace: true });
           }
         }
         const result = await customerAccess.status(type, key);

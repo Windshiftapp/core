@@ -869,6 +869,7 @@ func (s *Server) initialize() error {
 	reviewHandler := handlers.NewReviewHandler(s.db, permService)
 	calendarFeedHandler := handlers.NewCalendarFeedHandler(s.db, permService, cfg.BaseURL)
 	securitySettingsHandler := handlers.NewSecuritySettingsHandler(repository.NewSystemSettingRepository(s.db), logger.NewAuditor(s.db), cfg.Plugins.Disabled)
+	publicBoardHandler.SetAvailability(securitySettingsHandler)
 
 	// WI-87/88/89/90 coding-agent harness stack lands later in the
 	// constructor — see the block right after the SCM handlers are
@@ -1441,6 +1442,9 @@ func (s *Server) initialize() error {
 		Scope:          services.NewPublicBoardScopeService(s.db, permService),
 		PortalSessions: portalSessionManager, PortalAuth: portalAuthHandler, Passkeys: portalWebAuthnHandler,
 		MagicLinks: magicLinkService, IP: ipExtractor, Secure: enableHTTPS || strings.HasPrefix(baseURL, "https://"),
+		PublicBoards: securitySettingsHandler,
+		Sharing:      services.NewCollectionApplicationService(s.db, permService, securitySettingsHandler),
+		BoardViewer:  publicBoardHandler,
 	})
 	customerAccessHandler.SetLimiter(s.customerAccessLimiter)
 	ssoHandler.SetCustomerAccess(customerAccessHandler)
@@ -1633,6 +1637,7 @@ func (s *Server) initialize() error {
 		hubHandler,
 		channelService,
 		workItemStalenessHandler,
+		services.NewCollectionApplicationService(s.db, permService, securitySettingsHandler),
 	)
 
 	s.briefingScheduler = scheduler.NewBriefingScheduler(s.db, llmManager, permService, timePermissionService, services.NewUserReadService(s.db), promptStore)
@@ -2107,7 +2112,7 @@ func (s *Server) initialize() error {
 		CommentAccess:                permService,
 		Attachments:                  services.NewItemAttachmentService(s.db, attachmentStorage, permService),
 		PageAttachments:              services.NewPageAttachmentUploadService(s.db, attachmentStorage, permService, pagePermissionService),
-		Collections:                  services.NewCollectionApplicationService(s.db, permService),
+		Collections:                  services.NewCollectionApplicationService(s.db, permService, securitySettingsHandler).WithSharingNotifications(s.notificationService),
 		Planning:                     planningApplication,
 		MilestoneComments:            milestoneCommentService,
 		MilestonePageLinks:           milestonePageLinkService,

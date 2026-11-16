@@ -1,6 +1,6 @@
 <script>
   import { currentRoute } from '../router.js';
-  import Portal from '../layout/Portal.svelte';
+  import PortalExperience from './PortalExperience.svelte';
   import CustomerBoundary from './CustomerBoundary.svelte';
 </script>
-<CustomerBoundary kind="portal" slug={$currentRoute.params.slug}><Portal /></CustomerBoundary>
+<CustomerBoundary kind="portal" slug={$currentRoute.params.slug}><PortalExperience /></CustomerBoundary>

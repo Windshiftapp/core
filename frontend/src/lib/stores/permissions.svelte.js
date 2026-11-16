@@ -22,6 +22,7 @@ function createPermissionStore() {
   const hasPortals = writable(false);
   const managesChannels = writable(false);
   const managesAssetSets = writable(false);
+  const ownsBoards = writable(false);
   let allPermissionsLoaded = false;
   let allPermissionsLoadPromise = null;
   let allPermissionsLoadGeneration = 0;
@@ -73,10 +74,10 @@ function createPermissionStore() {
   );
 
   const canManageChannels = derived(
-    [authStore, managesChannels],
-    ([$authStore, $managesChannels]) => {
+    [authStore, managesChannels, ownsBoards, userPermissionKeys],
+    ([$authStore, $managesChannels, $ownsBoards, $keys]) => {
       if (!$authStore.currentUser) return false;
-      return $managesChannels;
+      return $managesChannels || $ownsBoards || $keys.has('public_board.manage');
     }
   );
 
@@ -96,6 +97,7 @@ function createPermissionStore() {
       canManageAssets,
       canManageChannels,
       managesAssetSets,
+      managesChannels,
     ],
     ([
       $permissions,
@@ -111,6 +113,7 @@ function createPermissionStore() {
       $canManageAssets,
       $canManageChannels,
       $managesAssetSets,
+      $managesChannels,
     ]) => ({
       permissions: $permissions,
       userPermissions: $userPermissions,
@@ -125,6 +128,7 @@ function createPermissionStore() {
       canManageAssets: $canManageAssets,
       canManageChannels: $canManageChannels,
       managesAssetSets: $managesAssetSets,
+      managesChannels: $managesChannels,
     })
   );
 
@@ -199,6 +203,9 @@ function createPermissionStore() {
     // Set whether the current user manages at least one channel
     setManagesChannels(value) {
       managesChannels.set(value);
+    },
+    setOwnsBoards(value) {
+      ownsBoards.set(value);
     },
 
     // Set whether the current user administers at least one asset set
@@ -294,6 +301,7 @@ function createPermissionStore() {
       userPermissions.set(new Set());
       userPermissionKeys.set(new Set());
       managesChannels.set(false);
+      ownsBoards.set(false);
       managesAssetSets.set(false);
       loading.set(false);
       error.set(null);

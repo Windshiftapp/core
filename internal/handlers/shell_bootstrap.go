@@ -18,6 +18,10 @@ type assetSetCapability interface {
 	ManagesAssetSets(int) (bool, error)
 }
 
+type boardManagementCapability interface {
+	OwnsBoardCollections(context.Context, int) (bool, error)
+}
+
 // ShellBootstrapHandler composes the capability snapshots needed by the
 // authenticated application shell. Keeping this as one request prevents every
 // optional feature from competing for a per-user concurrency slot at login.
@@ -30,6 +34,7 @@ type ShellBootstrapHandler struct {
 	hub         *HubHandler
 	channels    channelManagementCapability
 	staleness   *WorkItemStalenessHandler
+	boards      boardManagementCapability
 }
 
 type ShellBootstrapResponse struct {
@@ -42,6 +47,7 @@ type ShellBootstrapResponse struct {
 	HasPortals        bool                               `json:"has_portals"`
 	HasActivePortals  bool                               `json:"has_active_portals"`
 	ManagesChannels   bool                               `json:"manages_channels"`
+	OwnsBoards        bool                               `json:"owns_boards"`
 	WorkItemStaleness services.WorkItemStalenessSettings `json:"work_item_staleness"`
 }
 
@@ -54,11 +60,16 @@ func NewShellBootstrapHandler(
 	hub *HubHandler,
 	channels channelManagementCapability,
 	staleness *WorkItemStalenessHandler,
+	boards ...boardManagementCapability,
 ) *ShellBootstrapHandler {
-	return &ShellBootstrapHandler{
+	h := &ShellBootstrapHandler{
 		features: features, setup: setup, attachments: attachments,
 		ai: ai, assets: assets, hub: hub, channels: channels, staleness: staleness,
 	}
+	if len(boards) > 0 {
+		h.boards = boards[0]
+	}
+	return h
 }
 
 func (h *ShellBootstrapHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -138,5 +149,13 @@ func (h *ShellBootstrapHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if h.boards != nil {
+		owns, err := h.boards.OwnsBoardCollections(r.Context(), user.ID)
+		if err != nil {
+			slog.Warn("shell bootstrap: board management availability unavailable", "user_id", user.ID, "error", err)
+		} else {
+			response.OwnsBoards = owns
+		}
+	}
 	respondJSONOK(w, response)
 }

@@ -963,6 +963,9 @@ func buildRoutes(deps Deps) []route {
 	registerCommentRoutes(&builder, deps)
 	registerAttachmentRoutes(&builder, deps)
 	registerCollectionRoutes(&builder, deps.Collections)
+	registerBoardPublicationRoutes(&builder, deps.Collections)
+	registerBoardPlacementRoutes(&builder, deps.Collections)
+	registerPortalBoardRoutes(&builder, deps)
 	registerCustomerAccessRoutes(&builder, deps)
 	registerPasskeyLoginRoutes(&builder, deps)
 	registerPlanningRoutes(&builder, deps.Planning)
@@ -1059,6 +1062,7 @@ func applyEmbeddedContractMetadata(routes []route, document []byte) {
 		}
 		slices.Sort(routes[index].DocumentedErrors)
 		applyParameterCorrections(&routes[index].Route)
+		applyBoardContractMetadata(&routes[index].Route)
 	}
 }
 

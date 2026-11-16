@@ -15,7 +15,7 @@
    * wiring does not publish.
    */
 
-  let { pageId } = $props();
+  let { pageId, onunavailable = null } = $props();
 
   let page = $state(null);
   let loading = $state(true);
@@ -40,6 +40,7 @@
       if (seq !== requestSeq) return;
       page = null;
       error = err?.message || 'Failed to load this article.';
+      if (err?.status === 403 || err?.status === 404) onunavailable?.();
     } finally {
       if (seq === requestSeq) loading = false;
     }

@@ -5,6 +5,7 @@
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import AlertBox from '../components/AlertBox.svelte';
+  import { toLogical } from '../runtime/contextPath.js';
   let { kind, slug, status, onlogin } = $props();
   let email = $state('');
   let busy = $state(false);
@@ -15,7 +16,7 @@
     event.preventDefault();
     busy = true;
     error = '';
-    try { message = (await customerAccess.login(kind, slug, 'request', { email })).message; }
+    try { message = (await customerAccess.login(kind, slug, 'request', { email, ...(kind === 'portal' ? { next: toLogical(window.location.pathname + window.location.search) } : {}) })).message; }
     catch (err) { error = err.message; }
     finally { busy = false; }
   }
