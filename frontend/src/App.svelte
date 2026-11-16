@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { currentRoute, initRouter, isMobileRoute, navigate } from './lib/router.js';
   import { authStore } from './lib/stores/auth.svelte.js';
   import { portalAuthStore } from './lib/stores/portalAuth.svelte.js';
@@ -229,6 +229,8 @@
 
   $effect(() => {
     if ($authStore.isAuthenticated && setupCompleted && !enrollmentRequired) {
+      // Auth can publish before the dialog's async submit finishes and unmount it.
+      untrack(() => { if (showLoginDialog) handleLoginSuccess(); });
       showLoginDialog = false;
       appInitialized = true;
       void prepareAuthenticatedShellUI(authStore.currentUser?.id);
@@ -246,6 +248,13 @@
       resetAuthenticatedShellUILoad();
     }
   });
+
+  function handleLoginSuccess() {
+    showLoginDialog = false;
+    const returnTo = safeLoginReturnPath(window.location.search);
+    if (returnTo) navigate(returnTo);
+    else maybeRedirectToMobile();
+  }
 
   // Theme loading follows the authenticated audience rather than only the
   // initial bootstrap. This covers interactive login/logout without delaying
@@ -570,17 +579,7 @@
     loader={ROOT_VIEW_LOADERS.login}
     label="sign in"
     bind:isOpen={showLoginDialog}
-    componentProps={{
-      onsuccess: () => {
-        showLoginDialog = false;
-        const returnTo = safeLoginReturnPath(window.location.search);
-        if (returnTo) {
-          navigate(returnTo);
-        } else {
-          maybeRedirectToMobile();
-        }
-      },
-    }}
+    componentProps={{ onsuccess: handleLoginSuccess }}
   />
 {/if}
 
