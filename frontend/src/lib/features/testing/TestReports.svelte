@@ -380,7 +380,7 @@
             </FormField>
 
             <!-- Configure button -->
-            <FormField label={t('common.action')} labelHidden>
+            <FormField label={t('common.action')} labelHidden class="mb-0">
               <Button variant="default" onclick={handleOpenCoverageConfig} dataTestid="coverage-configure">
                 <IconSettings class="w-4 h-4" />
                 {t('common.configure')}
