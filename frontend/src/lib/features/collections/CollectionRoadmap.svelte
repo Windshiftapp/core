@@ -699,8 +699,8 @@
   // Load config data
   async function loadConfig(targetWorkspace, targetCollection, signal) {
     try {
-      const config = await collections.getBoardConfiguration(targetCollection, targetWorkspace, { signal });
-      if (signal.aborted) return;
+      const config = await collectionStore.getBoardConfiguration(targetWorkspace, targetCollection);
+      if (signal.aborted || !config) return;
       boardConfig = config;
       boardConfigId = config.id;
       if (config.roadmap_config) {
