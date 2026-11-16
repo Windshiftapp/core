@@ -998,10 +998,12 @@ func (m *Manager) Close() error {
 	return nil
 }
 
-// GetAssetAuth returns the auth policy for a plugin asset. It errors when the
-// plugin is unknown or disabled so callers can fail closed before reading the
-// asset. An asset that matches no declared policy requires a session.
+// GetAssetAuth rejects noncanonical paths before matching policies. Unknown or
+// disabled plugins fail closed; undeclared assets require a session.
 func (m *Manager) GetAssetAuth(pluginName, assetPath string) (RouteAuth, error) {
+	if err := validateAssetFilePath(assetPath); err != nil {
+		return "", err
+	}
 	m.mu.RLock()
 	p, exists := m.plugins[pluginName]
 	m.mu.RUnlock()
@@ -1016,8 +1018,12 @@ func (m *Manager) GetAssetAuth(pluginName, assetPath string) (RouteAuth, error) 
 	return assetAuth(p.Assets, assetPath), nil
 }
 
-// GetAsset serves a static asset from a plugin's assets directory.
+// GetAsset reads only canonical paths from a plugin's assets directory, using
+// the same validation as policy matching.
 func (m *Manager) GetAsset(pluginName, assetPath string) (data []byte, contentType string, err error) {
+	if err := validateAssetFilePath(assetPath); err != nil {
+		return nil, "", err
+	}
 	m.mu.RLock()
 	p, exists := m.plugins[pluginName]
 	m.mu.RUnlock()

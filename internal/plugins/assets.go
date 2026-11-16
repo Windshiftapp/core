@@ -66,11 +66,19 @@ func validateAssetPath(assetPath string) error {
 		return fmt.Errorf("invalid asset path %q: '*' is only allowed as a trailing prefix wildcard", assetPath)
 	}
 	for _, segment := range strings.Split(assetPath, "/") {
-		if segment == ".." {
-			return fmt.Errorf("invalid asset path %q: must not contain '..'", assetPath)
+		if segment == "" || segment == "." || segment == ".." {
+			return fmt.Errorf("invalid asset path %q: must use nonempty canonical segments", assetPath)
 		}
 	}
 	return nil
+}
+
+// Concrete asset paths must match policy paths without filesystem cleaning.
+func validateAssetFilePath(assetPath string) error {
+	if strings.Contains(assetPath, "*") {
+		return fmt.Errorf("invalid asset path %q: wildcards are only allowed in policies", assetPath)
+	}
+	return validateAssetPath(assetPath)
 }
 
 // assetAuth returns the auth policy for an asset path. An exact entry beats a
