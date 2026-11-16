@@ -181,7 +181,13 @@ export const timeLogStore = new TimeLogStore();
 export function resolveTimerWorkspaceId() {
   const context = resolveTimeLogContext();
   if (context.workspaceId) return context.workspaceId;
+  if (context.itemId) return null;
   const route = get(currentRoute);
-  const id = Number.parseInt(route?.params?.id, 10);
-  return Number.isFinite(id) ? id : null;
+  // `id` names collections and other resources too. Only a matched workspace
+  // URL establishes that this parameter identifies a workspace.
+  if (!route?.view || route.view === '404' || !/^\/workspaces\/[1-9]\d*(?:\/|$)/.test(route.path)) {
+    return null;
+  }
+  const id = Number(route.params?.id);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
