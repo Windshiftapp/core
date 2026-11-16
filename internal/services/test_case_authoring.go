@@ -1,6 +1,8 @@
 package services
 
 import (
+	"database/sql"
+	"errors"
 	"strings"
 	"time"
 
@@ -50,7 +52,24 @@ func (s *TestCaseService) validateAuthoredContent(workspaceID int, format string
 }
 
 // Explicit arrays replace authored steps and labels; omitted arrays preserve them.
-func (s *TestCaseService) writeAuthoredContent(tx database.Tx, caseID int, steps *[]TestStepCreateRequest, labels *[]int) error {
+func (s *TestCaseService) writeAuthoredContent(tx database.Tx, workspaceID, caseID int, steps *[]TestStepCreateRequest, labels *[]int) error {
+	if labels != nil {
+		query := "SELECT id FROM test_labels WHERE id = ? AND workspace_id = ?"
+		// SQLite serializes writers; PostgreSQL needs row locks through label insertion.
+		if s.db.GetDriverName() == "postgres" {
+			query += " FOR KEY SHARE"
+		}
+		for _, id := range *labels {
+			var found int
+			err := tx.QueryRow(query, id, workspaceID).Scan(&found)
+			if errors.Is(err, sql.ErrNoRows) {
+				return repository.ErrNotFound
+			}
+			if err != nil {
+				return err
+			}
+		}
+	}
 	if steps != nil {
 		rows, err := tx.Query("SELECT id FROM test_steps WHERE test_case_id = ? ORDER BY step_number, id", caseID)
 		if err != nil {

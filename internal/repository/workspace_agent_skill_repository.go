@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"windshift/internal/agentskills"
 	"windshift/internal/database"
 	"windshift/internal/models"
 )
@@ -153,8 +154,7 @@ func (r *WorkspaceAgentSkillRepository) ListForWorkspace(ctx context.Context, wo
 	return out, rows.Err()
 }
 
-// ListEnabledForBinding returns the enabled skills attached to a binding,
-// name order — what the run prompt indexes and `ws skill ls` reports.
+// ListEnabledForBinding reads one overflow sentinel beyond the snapshot skill cap.
 func (r *WorkspaceAgentSkillRepository) ListEnabledForBinding(ctx context.Context, bindingID int) ([]*models.WorkspaceAgentSkill, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT s.id, s.workspace_id, s.name, s.description, s.body, s.enabled,
@@ -163,7 +163,8 @@ func (r *WorkspaceAgentSkillRepository) ListEnabledForBinding(ctx context.Contex
 		JOIN workspace_agent_binding_skills bs ON bs.skill_id = s.id
 		WHERE bs.binding_id = ? AND s.enabled = true
 		ORDER BY s.name ASC
-	`, bindingID)
+		LIMIT ?
+	`, bindingID, agentskills.MaxSnapshotSkills+1)
 	if err != nil {
 		return nil, fmt.Errorf("list skills for binding: %w", err)
 	}

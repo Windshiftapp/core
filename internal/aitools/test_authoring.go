@@ -52,12 +52,12 @@ func testApplication(env *Env) *services.TestManagementApplicationService {
 	return services.NewTestManagementApplicationService(env.DB, env.PermService)
 }
 
-func testAuthoringResult(value any, err error) (any, error) {
+func testManagementToolResult(value any, err error, notFound string) (any, error) {
 	if err == nil {
 		return value, nil
 	}
 	if errors.Is(err, repository.ErrNotFound) || errors.Is(err, services.ErrTestManagementForbidden) {
-		return testToolError("test case not found"), nil
+		return testToolError(notFound), nil
 	}
 	var validation *services.TestManagementValidationError
 	var bddValidation *services.TestBDDValidationError
@@ -75,7 +75,8 @@ func init() {
 			if !hasTestPermission(env, args.WorkspaceID, models.PermissionTestManage) {
 				return testToolError("workspace not found"), nil
 			}
-			return testAuthoringResult(testApplication(env).CreateCase(env.UserID, args.WorkspaceID, pageAuditActor(env), args.TestCaseCreateRequest))
+			value, err := testApplication(env).CreateCase(env.UserID, args.WorkspaceID, pageAuditActor(env), args.TestCaseCreateRequest)
+			return testManagementToolResult(value, err, "test case not found")
 		},
 	})
 	Register(Default, Tool[updateTestCaseArgs]{
@@ -88,10 +89,11 @@ func init() {
 			if args.ClearFolder && args.FolderID != nil {
 				return testToolError("folder_id and clear_folder are mutually exclusive"), nil
 			}
-			return testAuthoringResult(testApplication(env).UpdateCase(env.UserID, args.WorkspaceID, args.TestCaseID, pageAuditActor(env), services.TestCasePatch{
+			value, err := testApplication(env).UpdateCase(env.UserID, args.WorkspaceID, args.TestCaseID, pageAuditActor(env), services.TestCasePatch{
 				Title: args.Title, Preconditions: args.Preconditions, Priority: args.Priority, Status: args.Status, EstimatedDuration: args.EstimatedDuration,
 				FolderID: args.FolderID, FolderIDSet: args.ClearFolder || args.FolderID != nil, Steps: args.Steps, LabelIDs: args.LabelIDs, Gherkin: args.Gherkin,
-			}))
+			})
+			return testManagementToolResult(value, err, "test case not found")
 		},
 	})
 	Register(Default, Tool[archiveTestCaseArgs]{
@@ -102,7 +104,8 @@ func init() {
 				return testToolError("test case not found"), nil
 			}
 			status := "inactive"
-			return testAuthoringResult(testApplication(env).UpdateCase(env.UserID, args.WorkspaceID, args.TestCaseID, pageAuditActor(env), services.TestCasePatch{Status: &status}))
+			value, err := testApplication(env).UpdateCase(env.UserID, args.WorkspaceID, args.TestCaseID, pageAuditActor(env), services.TestCasePatch{Status: &status})
+			return testManagementToolResult(value, err, "test case not found")
 		},
 	})
 	Register(Default, Tool[bulkTestCasesArgs]{
@@ -112,7 +115,8 @@ func init() {
 			if !hasTestPermission(env, args.WorkspaceID, models.PermissionTestManage) {
 				return testToolError("workspace not found"), nil
 			}
-			return testAuthoringResult(testApplication(env).BulkCases(env.UserID, args.WorkspaceID, pageAuditActor(env), args.TestCaseBulkRequest))
+			value, err := testApplication(env).BulkCases(env.UserID, args.WorkspaceID, pageAuditActor(env), args.TestCaseBulkRequest)
+			return testManagementToolResult(value, err, "test case not found")
 		},
 	})
 	Register(Default, Tool[itemTestCoverageArgs]{
@@ -120,17 +124,18 @@ func init() {
 		Description: "Get explicit test coverage for one ticket. Direct child items represent acceptance criteria; no children falls back to item-level coverage. Uses existing Tests links, excluding inactive/foreign cases. Does not infer coverage from prose or semantic similarity. Includes uncovered rows, totals and truncation.",
 		Run: func(_ context.Context, env *Env, args itemTestCoverageArgs) (any, error) {
 			if !hasTestPermission(env, args.WorkspaceID, models.PermissionTestView) {
-				return testToolError("test case not found"), nil
+				return testToolError("item not found"), nil
 			}
-			return testAuthoringResult(testApplication(env).ItemCoverage(env.UserID, args.WorkspaceID, args.ItemID))
+			value, err := testApplication(env).ItemCoverage(env.UserID, args.WorkspaceID, args.ItemID)
+			return testManagementToolResult(value, err, "item not found")
 		},
 	})
 	Register(Default, Tool[testEffectivenessArgs]{
 		Name: "get_test_effectiveness", Group: CapabilityTests, Access: AccessRead, Risk: RiskLow, Scopes: []string{auth.ScopeTestsRead},
-		Description: "Rank test cases by observed defect-finding executions in a time window. Returns distinct linked Bugs, executions, outcomes, evidence and finding rate with explicit denominator and limitations. Zero-execution and no-link cases remain visible. Not proof of causation or ineffectiveness.",
+		Description: "Rank test cases by observed defect-finding executions in a time window. Returns distinct linked Bugs, executions, outcomes, evidence and finding rate with explicit denominator and limitations. Zero-execution and no-link cases remain visible. Offset pages are independent samples of a mutable ranking, not a consistent snapshot; concurrent edits or new links can shift rows. Not proof of causation or ineffectiveness.",
 		Run: func(_ context.Context, env *Env, args testEffectivenessArgs) (any, error) {
 			if !hasTestPermission(env, args.WorkspaceID, models.PermissionTestView) {
-				return testToolError("test case not found"), nil
+				return testToolError("workspace not found"), nil
 			}
 			filter := repository.TestEffectivenessFilter{WorkspaceID: args.WorkspaceID, MilestoneID: args.MilestoneID, Limit: args.Limit, Offset: args.Offset}
 			var err error
@@ -146,7 +151,8 @@ func init() {
 					return testToolError("until must be RFC3339"), nil //nolint:nilerr // validation errors use tool JSON
 				}
 			}
-			return testAuthoringResult(testApplication(env).Effectiveness(env.UserID, filter))
+			value, err := testApplication(env).Effectiveness(env.UserID, filter)
+			return testManagementToolResult(value, err, "workspace not found")
 		},
 	})
 }

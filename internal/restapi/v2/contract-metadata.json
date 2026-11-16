@@ -17876,7 +17876,7 @@
     },
     "/workspaces/{workspace_id}/test-reports/effectiveness": {
       "get": {
-        "description": "Ranks all workspace cases by observed defect-finding executions, then distinct linked Bugs, then case ID. One execution is one persisted run/case result in [since, until) with an execution timestamp and passed/failed/blocked/skipped status. Findings require a failed result linked to a same-workspace builtin Bug. Rate is findings/executions (0..1), null for zero executions. Milestone filters executions via their plan, not the case population. Missing links are not proof of ineffectiveness. Bounded to 100 cases per page. Permission denials and missing workspaces return the same 404 envelope.",
+        "description": "Ranks all workspace cases by observed defect-finding executions, then distinct linked Bugs, then case ID. One execution is one persisted run/case result in [since, until) with an execution timestamp and passed/failed/blocked/skipped status. Findings require a failed result linked to a same-workspace builtin Bug. Rate is findings/executions (0..1), null for zero executions. Milestone filters executions via their plan, not the case population. Missing links are not proof of ineffectiveness. Bounded to 100 cases per page. Offset pages independently sample a mutable ranking, not a consistent snapshot: concurrent executions, edits and links can shift rows even with a fixed time window. Deduplicate IDs and report sampling limits. Permission denials and missing workspaces return the same 404 envelope.",
         "parameters": [
           {
             "Name": "workspace_id",

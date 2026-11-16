@@ -39,8 +39,8 @@ type Env struct {
 	// AuditDetails contains adapter-supplied correlation identifiers only.
 	// Raw tool arguments and results must never be placed here.
 	AuditDetails map[string]any
-	// Skills contains immutable grants supplied only by the Standard run snapshot.
-	Skills []models.SkillGrant
+	// Grants contains immutable resources supplied by the Standard run snapshot.
+	Grants *models.RunGrants
 
 	PermService     *services.PermissionService
 	TimePermService *services.TimePermissionService

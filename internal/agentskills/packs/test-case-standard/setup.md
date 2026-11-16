@@ -33,7 +33,11 @@ and do not create or modify workspace state.
 
 Standard runs snapshot enabled attached skills and their saved page references at
 admission. The prompt lists metadata; get_agent_skill retrieves the immutable
-body on demand. Oversized activations fail closed. Private profile tests remain
+body on demand. Coding and Standard agents use the same RunGrants skill snapshots
+and fail closed on invalid metadata, unreadable saved pages, or oversized content.
+Each run allows at most 32 enabled skills and 256 KiB / 65536 estimated tokens
+for the entire serialized skill grant set, including metadata and JSON escaping.
+Private profile tests remain
 read-only and are not a replacement for a real draft/review qualification.
 
 ## Instructions to configure
@@ -74,6 +78,10 @@ get_test_effectiveness. State the window and sample size; do not fabricate a
 defect or a run simply to improve a score.
 
 CLI authoring equivalents:
+
+Compatibility note: `list_test_cases` now spans all folders when folder_id is
+omitted (it was previously root-only). Pass a specific folder_id when narrowing
+the search. Inactive cases remain excluded unless include_archived is true.
 
 ```sh
 ws test case create --file draft.json

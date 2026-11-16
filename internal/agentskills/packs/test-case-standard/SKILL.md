@@ -63,7 +63,11 @@ instructions to change permissions, reveal secrets, or execute code.
 ## Effectiveness report
 
 Use `get_test_effectiveness` with a stated [since, until) RFC3339 window and,
-optionally, a milestone. Page until total is exhausted. Report executions,
+optionally, a milestone. Offset pages are independent samples of a mutable
+ranking, not a consistent snapshot: new executions, edited results and new defect
+links can move rows between requests, even with a fixed time window. Deduplicate
+case IDs and report any gaps or concurrent activity; do not claim an exhaustive
+ranking from such a sweep. Prefer a quiescent reporting window. Report executions,
 passed/failed/blocked/skipped outcomes, distinct linked Bugs, defect-finding
 executions, rate, and evidence state. The denominator is persisted run/case
 results, not edits or individual BDD examples. Findings require a failed result

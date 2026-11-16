@@ -111,7 +111,7 @@ func (s *TestManagementApplicationService) Effectiveness(userID int, filter repo
 		return result, err
 	}
 	return TestEffectivenessReport{Cases: cases, Total: total, Limit: filter.Limit, Offset: filter.Offset, Since: filter.Since, Until: filter.Until, MilestoneID: filter.MilestoneID,
-		Definition: "One execution is one persisted run/case result with executed_at in [since, until) and status passed, failed, blocked, or skipped. Findings are failed executions linked to same-workspace Bug items (builtin_key=bug). Rate is findings/executions (0..1), null for zero executions. Defects are distinct per case. All workspace cases, including inactive and zero-execution cases, remain in the denominator population; milestone filters executions via their plan. Observational evidence only: missing links are not proof of ineffectiveness; repeated edits to one result are not separate executions."}, nil
+		Definition: "One execution is one persisted run/case result with executed_at in [since, until) and status passed, failed, blocked, or skipped. Findings are failed executions linked to same-workspace Bug items (builtin_key=bug). Rate is findings/executions (0..1), null for zero executions. Defects are distinct per case. All workspace cases, including inactive and zero-execution cases, remain in the denominator population; milestone filters executions via their plan. Observational evidence only: missing links are not proof of ineffectiveness; repeated edits to one result are not separate executions. Offset pages independently sample a mutable ranking, not a consistent snapshot; concurrent executions, edits or links can shift rows. Deduplicate IDs and report sampling limits; a fixed time window does not freeze edits or links."}, nil
 }
 
 const MaxTestCaseBatch = 50
@@ -167,7 +167,7 @@ func (s *TestManagementApplicationService) BulkCases(userID, workspaceID int, ac
 	if count < 1 || count > MaxTestCaseBatch {
 		return result, &TestManagementValidationError{Msg: "batch must contain 1..50 cases"}
 	}
-	// Authorize every reference before any case can be changed.
+	// Preflight every reference; authored-content validation remains per case so other cases can succeed.
 	seen := map[int]bool{}
 	for _, id := range input.TestCaseIDs {
 		if seen[id] {

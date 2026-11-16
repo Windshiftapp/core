@@ -87,55 +87,6 @@ func (s *TestCaseService) GetBDDContent(testCaseID int) (*models.TestCaseBDD, er
 	return s.bddRepo.FindBDD(testCaseID)
 }
 
-// UpdateBDDContent validates and stores new Gherkin for a BDD case inside
-// its workspace, syncing the case title with the scenario name — the
-// authored source stays authoritative.
-func (s *TestCaseService) UpdateBDDContent(id, workspaceID int, source string) (*models.TestCase, error) {
-	existing, err := s.repo.FindByID(id, workspaceID)
-	if err != nil {
-		return nil, err
-	}
-	if existing.Format != TestFormatBDD {
-		return nil, &TestManagementValidationError{Msg: "gherkin can only be updated on BDD-format test cases"}
-	}
-	source, err = capGherkin(source)
-	if err != nil {
-		return nil, err
-	}
-	spec, errs := BuildScenarioSpec(source)
-	if !errs.Empty() {
-		return nil, &TestBDDValidationError{Errors: errs.Errors}
-	}
-
-	encoded, err := encodeScenarioSpec(spec)
-	if err != nil {
-		return nil, err
-	}
-	keyword := spec.ScenarioKeyword
-	if keyword == "" {
-		keyword = "Scenario"
-	}
-
-	return database.WithTxResult(s.db, func(tx database.Tx) (*models.TestCase, error) {
-		bdd := &models.TestCaseBDD{
-			TestCaseID:      id,
-			Gherkin:         source,
-			FeatureName:     spec.FeatureName,
-			ScenarioKeyword: keyword,
-			Spec:            encoded,
-		}
-		if err := s.bddRepo.Upsert(tx, bdd); err != nil {
-			return nil, err
-		}
-		existing.Title = spec.ScenarioName
-		existing.UpdatedAt = time.Now()
-		if err := s.repo.Update(tx, existing); err != nil {
-			return nil, err
-		}
-		return existing, nil
-	})
-}
-
 func encodeScenarioSpec(spec *gherkin.ScenarioSpec) (string, error) {
 	encoded, err := json.Marshal(spec)
 	if err != nil {

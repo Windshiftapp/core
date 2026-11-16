@@ -311,6 +311,7 @@ func (s *TestManagementApplicationService) ReportsSummary(userID, workspaceID in
 }
 
 func (s *TestManagementApplicationService) require(userID, workspaceID int, permission string) error {
+	// System administrators pass permission checks even for nonexistent workspaces.
 	var exists bool
 	if err := s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", workspaceID).Scan(&exists); err != nil {
 		return err
@@ -438,14 +439,6 @@ func (s *TestManagementApplicationService) UpdateCase(userID, workspaceID, id in
 	if err != nil {
 		return nil, err
 	}
-	if patch.Gherkin != nil {
-		// Keep source and metadata in the same transaction; an explicit title wins.
-		spec, errs := BuildScenarioSpec(*patch.Gherkin)
-		if !errs.Empty() {
-			return nil, &TestBDDValidationError{Errors: errs.Errors}
-		}
-		existing.Title = spec.ScenarioName
-	}
 	if patch.Title != nil {
 		existing.Title = *patch.Title
 	}
@@ -472,6 +465,7 @@ func (s *TestManagementApplicationService) UpdateCase(userID, workspaceID, id in
 		Status: existing.Status, EstimatedDuration: existing.EstimatedDuration,
 		FolderID: existing.FolderID, SortOrder: existing.SortOrder,
 		Steps: patch.Steps, LabelIDs: patch.LabelIDs, Gherkin: patch.Gherkin,
+		SyncBDDTitle: patch.Gherkin != nil && patch.Title == nil,
 	})
 	if err != nil {
 		return nil, err

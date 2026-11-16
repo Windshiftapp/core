@@ -191,7 +191,7 @@ func (s *TestCaseService) Create(workspaceID int, req TestCaseCreateRequest) (*m
 			return nil, err
 		}
 		tc.ID = id
-		if err := s.writeAuthoredContent(tx, tc.ID, &req.Steps, &req.LabelIDs); err != nil {
+		if err := s.writeAuthoredContent(tx, workspaceID, tc.ID, &req.Steps, &req.LabelIDs); err != nil {
 			return nil, err
 		}
 		if bddSpec != nil {
@@ -229,6 +229,7 @@ type TestCaseUpdateRequest struct {
 	Steps             *[]TestStepCreateRequest
 	LabelIDs          *[]int
 	Gherkin           *string
+	SyncBDDTitle      bool
 }
 
 // Update updates an existing test case
@@ -241,21 +242,14 @@ func (s *TestCaseService) Update(id, workspaceID int, req TestCaseUpdateRequest)
 	req.Title = sanitize.PlainTextField.Sanitize(req.Title)
 	req.Preconditions = sanitize.Comment.Sanitize(req.Preconditions)
 
-	if req.Title == "" {
-		return nil, &TestManagementValidationError{Msg: "test case title is required"}
-	}
-
-	// Validate priority if provided
 	if req.Priority != "" && !isValidTestCasePriority(req.Priority) {
 		return nil, &TestManagementValidationError{Msg: "invalid priority value: must be low, medium, high, or critical"}
 	}
 
-	// Validate status if provided
 	if req.Status != "" && !isValidTestCaseStatus(req.Status) {
 		return nil, &TestManagementValidationError{Msg: "invalid status value: must be active, inactive, or draft"}
 	}
 
-	// Validate estimated duration
 	if req.EstimatedDuration < 0 {
 		return nil, &TestManagementValidationError{Msg: "estimated duration cannot be negative"}
 	}
@@ -279,11 +273,17 @@ func (s *TestCaseService) Update(id, workspaceID int, req TestCaseUpdateRequest)
 		if !errs.Empty() {
 			return nil, &TestBDDValidationError{Errors: errs.Errors}
 		}
+		if req.SyncBDDTitle {
+			req.Title = sanitize.PlainTextField.Sanitize(spec.ScenarioName)
+		}
 		encoded, err := encodeScenarioSpec(spec)
 		if err != nil {
 			return nil, err
 		}
 		bdd = &models.TestCaseBDD{TestCaseID: id, Gherkin: source, FeatureName: spec.FeatureName, ScenarioKeyword: spec.ScenarioKeyword, Spec: encoded}
+	}
+	if req.Title == "" {
+		return nil, &TestManagementValidationError{Msg: "test case title is required"}
 	}
 
 	tc := &models.TestCase{
@@ -309,7 +309,7 @@ func (s *TestCaseService) Update(id, workspaceID int, req TestCaseUpdateRequest)
 				return nil, err
 			}
 		}
-		if err := s.writeAuthoredContent(tx, id, req.Steps, req.LabelIDs); err != nil {
+		if err := s.writeAuthoredContent(tx, workspaceID, id, req.Steps, req.LabelIDs); err != nil {
 			return nil, err
 		}
 		return tc, nil
