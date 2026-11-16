@@ -87,8 +87,8 @@ export function findForbiddenEntryAssets(html) {
 export function findStaticImports(source) {
   const specifiers = new Set();
   const patterns = [
-    /\bimport\s*(?:[\w*{},\s]+?\s*from\s*)?["']([^"']+)["']/g,
-    /\bexport\s*(?:[\w*{},\s]+?\s*)?from\s*["']([^"']+)["']/g,
+    /\bimport\s*(?:[\w$*{},\s]+?\s*from\s*)?["']([^"']+)["']/g,
+    /\bexport\s*(?:[\w$*{},\s]+?\s*)?from\s*["']([^"']+)["']/g,
   ];
 
   for (const pattern of patterns) {
