@@ -17,7 +17,7 @@
   import DialogFooter from './DialogFooter.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { customerDisplayName } from '../utils/customerLabel.js';
-  import { getUserTimezone } from '../utils/dateFormatter.js';
+  import { getUserTimezone, worklogDateKey } from '../utils/dateFormatter.js';
   import { authStore } from '../stores/auth.svelte.js';
   import { dateKeyInZone, formatClockInZone } from '../utils/worklogTimezone.js';
 	import TextField from '../components/TextField.svelte';
@@ -42,9 +42,8 @@
     ondiscard = null
   } = $props();
 
-  // One explicit timezone populates and interprets every form control, so
-  // browser and profile timezone differences cannot silently reinterpret
-  // stored work on save.
+  // Interpret clocks in the profile timezone; stored business dates are
+  // UTC-midnight keys, not instants to convert into that timezone.
   const formTimezone = $derived(getUserTimezone(authStore?.currentUser));
 
   // Helper to format minutes to duration string
@@ -69,7 +68,9 @@
     item_id: sourceRecord?.item_id ?? defaultItemId,
     description: sourceRecord?.description ?? '',
     date: sourceRecord
-      ? dateKeyInZone(sourceRecord.date ?? sourceRecord.start_time, formTimezone)
+      ? (sourceRecord.date != null
+          ? worklogDateKey(sourceRecord.date)
+          : dateKeyInZone(sourceRecord.start_time, formTimezone))
       : (defaultDate ?? dateKeyInZone(Date.now() / 1000, formTimezone)),
     start_time: sourceRecord?.start_time != null ? formatClockInZone(sourceRecord.start_time, formTimezone) : (defaultStartTime ?? ''),
     end_time: sourceRecord?.end_time != null ? formatClockInZone(sourceRecord.end_time, formTimezone) : '',
