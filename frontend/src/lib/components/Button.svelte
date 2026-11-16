@@ -3,7 +3,6 @@
     import { useEventListener } from 'runed';
     import Tooltip from "./Tooltip.svelte";
     import { cn } from '../utils/cn.js';
-    import { controlSizeClasses } from '../utils/controlSizes.js';
 
   let {
     /** @type {'default'|'primary'|'secondary'|'context'|'danger'|'danger-ghost'|'selected'|'ghost'|'link'} */
@@ -100,11 +99,11 @@
   const normalizedSize = $derived(size === 'sm' ? 'small' : size);
 
   // Size variants
-  const sizeClasses = $derived(cn(controlSizeClasses(normalizedSize), 'rounded gap-2', {
-    'px-3.5': normalizedSize === 'small',
-    'px-4': normalizedSize === 'medium',
-    'px-6': normalizedSize === 'large'
-  }));
+  const sizeClasses = $derived({
+    small: 'px-3.5 py-1.5 text-sm rounded gap-2',
+    medium: 'px-4 py-1.5 text-sm rounded gap-2',
+    large: 'px-6 py-2.5 text-base rounded gap-2'
+  }[normalizedSize]);
 
   // Color variants using Tailwind arbitrary values with CSS variables
   // Using design system tokens for dark mode support
