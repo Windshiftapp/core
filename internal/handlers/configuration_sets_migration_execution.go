@@ -308,11 +308,10 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 		}
 	}
 
-	// Target statuses are validated against the workflow effective for each
-	// mapping's item type. A pending default-workflow change overrides only the
-	// set-level workflow; item-type overrides still win.
+	// Source type IDs identify the items; their final types determine which
+	// target workflow may accept the mapped status.
 	for _, mapping := range req.StatusMappings {
-		workflowID, resolveErr := h.resolveConfigSetWorkflowID(req.NewConfigurationSetID, mapping.ItemTypeID, req.ApplyWorkflowToConfigSet)
+		workflowID, resolveErr := h.resolveMigrationTargetWorkflowID(&req, mapping.ItemTypeID)
 		if resolveErr != nil {
 			respondInternalError(w, r, resolveErr)
 			return
@@ -375,6 +374,14 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 		actorUserID = currentUser.ID
 	}
 
+	// Freeze source type/status membership before any remap can merge groups
+	// or make one mapping's destination match another mapping's source.
+	statusPlan, err := itemRepo.SnapshotStatusRemapsForWorkspacesTx(tx, req.StatusMappings, req.WorkspaceIDs)
+	if err != nil {
+		respondInternalError(w, r, fmt.Errorf("failed to snapshot status mappings: %w", err))
+		return
+	}
+
 	// 1. Execute Item Type Migrations
 	for _, mapping := range req.ItemTypeMappings {
 		var rowsAffected int
@@ -400,14 +407,11 @@ func (h *ConfigurationSetHandler) ExecuteComprehensiveMigration(w http.ResponseW
 		// "keep" and "orphan" require no action - data is preserved in JSON
 	}
 
-	// 3. Execute Status Migrations (NULL-aware via *int FromStatusID)
-	for _, mapping := range req.StatusMappings {
-		rows, err := h.applyStatusMappingTx(tx, mapping, req.WorkspaceIDs, now, actorUserID)
-		if err != nil {
-			respondInternalError(w, r, fmt.Errorf("failed to migrate statuses: %w", err))
-			return
-		}
-		stats.StatusesMigrated += rows
+	// 3. Apply statuses to their original source items, not the remapped types.
+	stats.StatusesMigrated, err = itemRepo.ApplyStatusRemapsTxAsUser(tx, statusPlan, now, actorUserID)
+	if err != nil {
+		respondInternalError(w, r, fmt.Errorf("failed to migrate statuses: %w", err))
+		return
 	}
 
 	// 4. Execute Priority Migrations
@@ -867,7 +871,7 @@ func (h *ConfigurationSetHandler) validateMigrationMappingPayload(req *models.Co
 		}
 	}
 
-	statusMigrations, _, err := h.analyzeStatusMigrationForConfigSet(req.WorkspaceIDs, req.NewConfigurationSetID, req.ApplyWorkflowToConfigSet)
+	statusMigrations, _, err := h.analyzeStatusMigrationForRequest(req)
 	if err != nil {
 		return "", err
 	}
@@ -1047,7 +1051,7 @@ func (h *ConfigurationSetHandler) validateAttachMigrationMappings(req *models.Co
 		}
 	}
 
-	statuses, _, err := h.analyzeStatusMigrationForConfigSet(req.WorkspaceIDs, req.NewConfigurationSetID, req.ApplyWorkflowToConfigSet)
+	statuses, _, err := h.analyzeStatusMigrationForRequest(req)
 	if err != nil {
 		return "", err
 	}

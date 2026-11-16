@@ -863,6 +863,39 @@ func (h *ConfigurationSetHandler) analyzeStatusMigrationForConfigSet(
 	targetConfigSetID int,
 	overrideDefaultWorkflowID *int,
 ) ([]models.StatusMigrationInfo, bool, error) {
+	return h.analyzeStatusMigrationWithWorkflows(workspaceIDs, func(itemTypeID *int) (*int, error) {
+		return h.resolveConfigSetWorkflowID(targetConfigSetID, itemTypeID, overrideDefaultWorkflowID)
+	})
+}
+
+func (h *ConfigurationSetHandler) analyzeStatusMigrationForRequest(req *models.ComprehensiveMigrationRequest) ([]models.StatusMigrationInfo, bool, error) {
+	return h.analyzeStatusMigrationWithWorkflows(req.WorkspaceIDs, func(itemTypeID *int) (*int, error) {
+		return h.resolveMigrationTargetWorkflowID(req, itemTypeID)
+	})
+}
+
+func (h *ConfigurationSetHandler) resolveMigrationTargetWorkflowID(req *models.ComprehensiveMigrationRequest, sourceTypeID *int) (*int, error) {
+	targetTypeID := sourceTypeID
+	for _, mapping := range req.ItemTypeMappings {
+		if nullableInt(mapping.FromItemTypeID) == nullableInt(sourceTypeID) {
+			id := mapping.ToItemTypeID
+			targetTypeID = &id
+			break
+		}
+	}
+	if req.ApplyItemTypeConfigsToConfigSet != nil {
+		for _, config := range *req.ApplyItemTypeConfigsToConfigSet {
+			if targetTypeID != nil && config.ItemTypeID == *targetTypeID && config.WorkflowID != nil {
+				return config.WorkflowID, nil
+			}
+		}
+		// The proposed list replaces persisted per-type overrides completely.
+		targetTypeID = nil
+	}
+	return h.resolveConfigSetWorkflowID(req.NewConfigurationSetID, targetTypeID, req.ApplyWorkflowToConfigSet)
+}
+
+func (h *ConfigurationSetHandler) analyzeStatusMigrationWithWorkflows(workspaceIDs []int, resolveWorkflow func(*int) (*int, error)) ([]models.StatusMigrationInfo, bool, error) {
 	statusCounts, err := repository.NewItemRepository(h.db).ListItemTypeStatusCountsForWorkspaces(workspaceIDs)
 	if err != nil {
 		return nil, false, err
@@ -873,7 +906,7 @@ func (h *ConfigurationSetHandler) analyzeStatusMigrationForConfigSet(
 	requiresMigration := false
 
 	for _, row := range statusCounts {
-		workflowID, err := h.resolveConfigSetWorkflowID(targetConfigSetID, row.ItemTypeID, overrideDefaultWorkflowID)
+		workflowID, err := resolveWorkflow(row.ItemTypeID)
 		if err != nil {
 			return nil, false, err
 		}

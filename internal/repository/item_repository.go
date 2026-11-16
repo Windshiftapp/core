@@ -781,11 +781,61 @@ func (r *ItemRepository) RemapFieldForWorkspacesTxAsUser(tx database.Tx, column 
 }
 
 func (r *ItemRepository) remapFieldForWorkspacesTx(tx database.Tx, column string, fromID *int, toID int, itemTypeID *int, workspaceIDs []int, now time.Time, actorUserID int) (int, error) {
+	itemIDs, err := r.captureRemapTargetsTx(tx, column, fromID, itemTypeID, workspaceIDs, false)
+	if err != nil {
+		return 0, err
+	}
+	return r.applyCapturedRemapTx(tx, column, fromID, toID, itemIDs, now, actorUserID)
+}
+
+type statusRemapTargets struct {
+	fromID  *int
+	toID    int
+	itemIDs []int
+}
+
+// StatusRemapPlan retains original item membership across type/status changes.
+type StatusRemapPlan struct {
+	targets []statusRemapTargets
+}
+
+func (r *ItemRepository) SnapshotStatusRemapsForWorkspacesTx(tx database.Tx, mappings []models.StatusMigrationMapping, workspaceIDs []int) (*StatusRemapPlan, error) {
+	plan := &StatusRemapPlan{}
+	for _, mapping := range mappings {
+		fromID := mapping.FromStatusID
+		if fromID != nil && *fromID == 0 {
+			fromID = nil
+		}
+		if fromID != nil && *fromID == mapping.ToStatusID {
+			continue
+		}
+		ids, err := r.captureRemapTargetsTx(tx, "status_id", fromID, mapping.ItemTypeID, workspaceIDs, true)
+		if err != nil {
+			return nil, err
+		}
+		plan.targets = append(plan.targets, statusRemapTargets{fromID: fromID, toID: mapping.ToStatusID, itemIDs: ids})
+	}
+	return plan, nil
+}
+
+func (r *ItemRepository) ApplyStatusRemapsTxAsUser(tx database.Tx, plan *StatusRemapPlan, now time.Time, actorUserID int) (int, error) {
+	count := 0
+	for _, target := range plan.targets {
+		rows, err := r.applyCapturedRemapTx(tx, "status_id", target.fromID, target.toID, target.itemIDs, now, actorUserID)
+		if err != nil {
+			return 0, err
+		}
+		count += rows
+	}
+	return count, nil
+}
+
+func (r *ItemRepository) captureRemapTargetsTx(tx database.Tx, column string, fromID, itemTypeID *int, workspaceIDs []int, exactItemType bool) ([]int, error) {
 	if !itemRemapColumns[column] {
-		return 0, fmt.Errorf("RemapFieldForWorkspacesTx: column %q is not in the allow-list", column)
+		return nil, fmt.Errorf("RemapFieldForWorkspacesTx: column %q is not in the allow-list", column)
 	}
 	if len(workspaceIDs) == 0 {
-		return 0, nil
+		return nil, nil
 	}
 	// The column name is validated against the fixed allow-list above, so the
 	// fmt.Sprintf cannot splice attacker-controlled input.
@@ -800,6 +850,8 @@ func (r *ItemRepository) remapFieldForWorkspacesTx(tx database.Tx, column string
 	if itemTypeID != nil {
 		where += " AND item_type_id = ?"
 		args = append(args, *itemTypeID)
+	} else if exactItemType {
+		where += " AND item_type_id IS NULL"
 	}
 	ph, wsArgs := inPlaceholders(workspaceIDs)
 	where += " AND workspace_id IN (" + ph + ")"
@@ -809,32 +861,45 @@ func (r *ItemRepository) remapFieldForWorkspacesTx(tx database.Tx, column string
 	// item-history row; the remap is otherwise invisible to audit trails.
 	idRows, err := tx.Query("SELECT id FROM items"+where, args...)
 	if err != nil {
-		return 0, fmt.Errorf("list %s remap targets: %w", column, err)
+		return nil, fmt.Errorf("list %s remap targets: %w", column, err)
 	}
 	var itemIDs []int
 	for idRows.Next() {
 		var id int
 		if err := idRows.Scan(&id); err != nil {
 			_ = idRows.Close()
-			return 0, fmt.Errorf("scan %s remap target: %w", column, err)
+			return nil, fmt.Errorf("scan %s remap target: %w", column, err)
 		}
 		itemIDs = append(itemIDs, id)
 	}
 	if err := idRows.Err(); err != nil {
 		_ = idRows.Close()
-		return 0, fmt.Errorf("iterate %s remap targets: %w", column, err)
+		return nil, fmt.Errorf("iterate %s remap targets: %w", column, err)
 	}
 	_ = idRows.Close()
+	return itemIDs, nil
+}
 
-	updateQuery := fmt.Sprintf("UPDATE items SET %s = ?, updated_at = ?", column) + where
-	updateArgs := make([]any, 0, 2+len(args))
-	updateArgs = append(updateArgs, toID, now)
-	updateArgs = append(updateArgs, args...)
-	res, err := tx.Exec(updateQuery, updateArgs...)
-	if err != nil {
-		return 0, fmt.Errorf("remap %s: %w", column, err)
+func (r *ItemRepository) applyCapturedRemapTx(tx database.Tx, column string, fromID *int, toID int, itemIDs []int, now time.Time, actorUserID int) (int, error) {
+	if !itemRemapColumns[column] {
+		return 0, fmt.Errorf("remap column %q is not in the allow-list", column)
 	}
-	rows, _ := res.RowsAffected()
+	var rows int64
+	// Bound parameter counts for both SQLite and PostgreSQL.
+	for start := 0; start < len(itemIDs); start += 500 {
+		end := min(start+500, len(itemIDs))
+		ph, args := inPlaceholders(itemIDs[start:end])
+		updateArgs := append([]any{toID, now}, args...)
+		res, err := tx.Exec(fmt.Sprintf("UPDATE items SET %s = ?, updated_at = ? WHERE id IN (%s)", column, ph), updateArgs...)
+		if err != nil {
+			return 0, fmt.Errorf("remap %s: %w", column, err)
+		}
+		changed, err := res.RowsAffected()
+		if err != nil {
+			return 0, err
+		}
+		rows += changed
+	}
 
 	// Record the remap per item, committed atomically with the update.
 	oldValue := ""
