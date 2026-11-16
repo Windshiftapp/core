@@ -135,15 +135,18 @@ async function loadTranslations(localeCode) {
   loading = true;
 
   try {
-    if (localeCode !== DEFAULT_LOCALE) {
-      await loadFallbackTranslations();
-    }
+    // English is the fallback for missing keys in every other locale. Start
+    // both catalog imports together so a non-English cold start pays one round
+    // trip instead of awaiting English before requesting the selected locale.
+    const needsFallback = localeCode !== DEFAULT_LOCALE;
+    const [, selectedModule] = await Promise.all([
+      needsFallback ? loadFallbackTranslations() : Promise.resolve(),
+      import(`../locales/${localeCode}/index.js`),
+    ]);
 
-    // Dynamic import for lazy loading
-    const module = await import(`../locales/${localeCode}/index.js`);
-    translations = module.default;
-    if (localeCode === DEFAULT_LOCALE) {
-      fallbackTranslations = module.default;
+    translations = selectedModule.default;
+    if (!needsFallback) {
+      fallbackTranslations = selectedModule.default;
     }
     locale = localeCode;
     setAppLocale(localeCode);
