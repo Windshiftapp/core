@@ -174,15 +174,9 @@ export default defineConfig({
       output: {
         codeSplitting: {
           groups: [
-            // Milkdown is a large optional editor. `includeDependenciesRecursively:
-            // false` keeps its chunk to the @milkdown modules themselves, so
-            // the shared DOMPurify dependency (used by the always-loaded
-            // sanitizer) is not absorbed into the editor chunk and pulled into
-            // the desktop shell's static closure.
             {
               name: 'milkdown',
               test: /@milkdown/,
-              includeDependenciesRecursively: false,
             },
             {
               name: 'dnd',
