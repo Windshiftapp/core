@@ -53,7 +53,8 @@
   </dl>
   {#if presentation.layout === 'condition'}
     <div class="branch-labels" class:vertical={direction === 'vertical'}>
-      <span>{t('actions.condition.true')}</span><span>{t('actions.condition.false')}</span>
+      <span class="branch-true" style={conditionPositions.trueStyle} data-testid="action-node-branch-label-true">{t('actions.condition.true')}</span>
+      <span class="branch-false" style={conditionPositions.falseStyle} data-testid="action-node-branch-label-false">{t('actions.condition.false')}</span>
     </div>
     <Handle type="source" position={conditionPositions.trueOutput} id="true" style={conditionPositions.trueStyle} data-testid="action-node-handle-true" />
     <Handle type="source" position={conditionPositions.falseOutput} id="false" style={conditionPositions.falseStyle} data-testid="action-node-handle-false" />
@@ -64,6 +65,7 @@
 
 <style>
   .action-canvas-node {
+    position: relative;
     width: var(--_card-width);
     background: var(--ds-surface-raised);
     border: 2px solid var(--_accent);
@@ -96,9 +98,14 @@
     border-radius: 2px;
   }
   .preview-value:focus-visible { outline: 2px solid var(--ds-border-focused); outline-offset: 2px; }
-  .branch-labels { display: flex; justify-content: flex-end; gap: 14px; padding: 0 10px 6px; font-size: 10px; color: var(--ds-text-subtle); }
-  .branch-labels.vertical { justify-content: space-evenly; }
+  .branch-labels { position: absolute; inset: 0; pointer-events: none; font-size: 10px; font-weight: 500; }
+  .branch-labels span { position: absolute; left: calc(100% + 12px); transform: translateY(-50%); white-space: nowrap; }
+  .branch-labels.vertical span { top: calc(100% + 12px); transform: translateX(-50%); }
+  .branch-true { color: var(--ds-success); }
+  .branch-false { color: var(--ds-danger); }
   :global(.action-canvas-node .svelte-flow__handle) {
     width: 10px; height: 10px; background: var(--_accent); border: 2px solid var(--ds-surface-raised);
   }
+  :global(.action-canvas-node .svelte-flow__handle[data-handleid="true"]) { background: var(--ds-success); }
+  :global(.action-canvas-node .svelte-flow__handle[data-handleid="false"]) { background: var(--ds-danger); }
 </style>
