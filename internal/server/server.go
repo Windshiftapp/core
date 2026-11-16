@@ -15,7 +15,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -1478,15 +1477,9 @@ func (s *Server) initialize() error {
 
 	itemDiagramService := services.NewItemDiagramService(repository.NewDiagramRepository(s.db))
 
-	// CSRF origins are shared by the /api middleware chain and the plugin
-	// router, which mounts on the raw mux outside that chain. Derive the scheme
-	// from BASE_URL for origin construction.
-	corsScheme := ""
-	if cfg.BaseURL != "" {
-		if parsed, err := url.Parse(cfg.BaseURL); err == nil {
-			corsScheme = parsed.Scheme
-		}
-	}
+	// CORS and CSRF (including the raw plugin router) share the same browser
+	// scheme, including hostname-only deployments without BASE_URL.
+	corsScheme := browserOriginScheme(cfg)
 	csrfOrigins := buildAllowedOrigins(cfg.AllowedHosts, effectivePort, corsScheme, cfg.UseProxy)
 	csrfValidator := middleware.NewDisabledCSRFValidator()
 	if !cfg.DisableCSRF {

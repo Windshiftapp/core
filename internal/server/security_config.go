@@ -116,6 +116,9 @@ func ResolveSecurityConfig(cfg Config) (*ResolvedSecurityConfig, error) {
 			"Proxy mode auto-detected: BASE_URL uses https:// but no TLS certificate is configured. Assuming a reverse proxy handles TLS termination.",
 			"Ensure this server is NOT directly accessible from the internet — it must only be reachable through the reverse proxy. Set USE_PROXY=true to silence this warning.")
 	}
+	if r.Scheme == "" {
+		r.Scheme = browserOriginScheme(cfg)
+	}
 
 	// 6. No BASE_URL and no AllowedHosts
 	if cfg.BaseURL == "" && cfg.AllowedHosts == "" {
@@ -172,6 +175,20 @@ func ResolveSecurityConfig(cfg Config) (*ResolvedSecurityConfig, error) {
 	}
 
 	return r, nil
+}
+
+// Browser origins follow BASE_URL when explicit, otherwise the listener or
+// proxy TLS policy. Insecure-origin opt-in does not change the actual scheme.
+func browserOriginScheme(cfg Config) string {
+	if cfg.BaseURL != "" {
+		if parsed, err := url.Parse(cfg.BaseURL); err == nil && parsed.Scheme != "" {
+			return parsed.Scheme
+		}
+	}
+	if cfg.UseProxy || (cfg.TLSCertPath != "" && cfg.TLSKeyPath != "") {
+		return "https"
+	}
+	return "http"
 }
 
 // LogDiagnostics logs all diagnostics at appropriate slog levels.
