@@ -315,12 +315,6 @@ func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Reque
 
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		// No explicit board config — build default columns from status categories
-		columns, err = h.buildDefaultColumns()
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
 		backlogStatusSet = make(map[int]bool)
 	case err != nil:
 		respondInternalError(w, r, err)
@@ -344,6 +338,15 @@ func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Reque
 
 		// Load columns with status mappings
 		columns, err = h.loadColumnsWithStatuses(boardConfigID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+	}
+
+	// Settings-only configurations still use default columns.
+	if len(columns) == 0 {
+		columns, err = h.buildDefaultColumns()
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
