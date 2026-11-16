@@ -18,7 +18,7 @@ export default {
     'bookFailed': 'Der Zeiteintrag konnte nicht gebucht werden.',
     'discardFailed': 'Der Entwurf konnte nicht verworfen werden.',
     'menu': {
-      'startTimerHint': 'Verwendet das geöffnete Arbeitselement, falls vorhanden',
+      'startTimerHint': 'Verwendet den geöffneten Vorgang, falls vorhanden',
       'logWork': 'Arbeit erfassen',
       'logWorkHint': 'Arbeitszeit manuell erfassen',
     },
@@ -204,7 +204,7 @@ export default {
       title: 'Zeiteintrag',
       subtitle: 'Erfassen Sie Ihre Arbeitsstunden und verwalten Sie Zeiteinträge',
       addTimeEntry: 'Neuen Zeiteintrag hinzufügen',
-      'needWorkspace': 'Öffne einen Arbeitsbereich oder ein Arbeitselement, bevor du einen Timer startest.',
+      'needWorkspace': 'Öffne einen Arbeitsbereich oder einen Vorgang, bevor du einen Timer startest.',
       failedToSave:
         'Zeiteintrag konnte nicht gespeichert werden. Bitte überprüfen Sie Ihre Eingaben.',
       confirmDelete: 'Sind Sie sicher, dass Sie diesen Zeiteintrag löschen möchten?',

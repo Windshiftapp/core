@@ -104,22 +104,23 @@
     }, SLOW_START_MS);
 
     try {
-      // Initialize i18n (loads the user's preferred locale), instance branding
-      // (public, no auth), and the setup status together. Branding drives the
-      // browser tab title and the sidebar text on every surface, including
-      // pre-auth; the setup check is independent of both and gates whether a
-      // session is restored.
-      const [, , setupComplete] = await Promise.all([
-        withBootstrapDeadline(i18n.init()),
-        brandStore.load({ timeout: BOOTSTRAP_TIMEOUT_MS }),
+      // Load locale, branding, and setup together. Apply startup copy and the
+      // title even if the setup request is still pending or has failed.
+      const [, setupComplete] = await Promise.all([
+        Promise.all([
+          withBootstrapDeadline(i18n.init()),
+          brandStore.load({ timeout: BOOTSTRAP_TIMEOUT_MS }),
+        ]).then(() => {
+          if (attempt !== startupAttempt) return;
+          i18nReady = true;
+          if (typeof document !== 'undefined') {
+            document.title = brandStore.siteTitle;
+          }
+        }),
         checkSetupStatus(),
       ]);
       if (attempt !== startupAttempt) return;
 
-      i18nReady = true;
-      if (typeof document !== 'undefined') {
-        document.title = brandStore.siteTitle;
-      }
       setupCompleted = setupComplete;
       if (!setupCompleted) {
         showWelcomeAssistant = true;

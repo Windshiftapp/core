@@ -12,6 +12,7 @@ let logoFullURL = $state('');
 let logoFullURLDark = $state('');
 let loaded = $state(false);
 let loading = $state(false);
+let loadPromise = null;
 
 function hydrate(value) {
   if (!value) return;
@@ -26,8 +27,13 @@ function hydrate(value) {
 }
 
 async function load(options = {}) {
-  if (loaded || loading) return;
+  if (loaded || loading) return loadPromise;
   loading = true;
+  loadPromise = loadBranding(options);
+  return loadPromise;
+}
+
+async function loadBranding(options) {
   try {
     hydrate(await brandingApi.get(options));
   } catch (error) {
