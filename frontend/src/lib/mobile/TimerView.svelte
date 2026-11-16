@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import Square from '@lucide/svelte/icons/square';
   import Clock from '@lucide/svelte/icons/clock';
   import Plus from '@lucide/svelte/icons/plus';
@@ -55,6 +55,14 @@
   onMount(() => {
     timeEntryStore.init();
     void timeLogStore.refreshDrafts();
+  });
+
+  let savedRevision = untrack(() => timeLogStore.revision);
+  $effect(() => {
+    const revision = timeLogStore.revision;
+    if (revision === savedRevision) return;
+    savedRevision = revision;
+    untrack(() => { void timeEntryStore.loadWorklogs(); });
   });
 </script>
 
