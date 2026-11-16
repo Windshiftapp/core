@@ -1,5 +1,6 @@
 <script>
   let tabPanelElement = $state(null);
+  import { untrack } from 'svelte';
   import { configurationSets } from '../api/configuration.js';
   import { workflows } from '../api/workflows.js';
   import StateDisplay from '../components/StateDisplay.svelte';
@@ -58,7 +59,8 @@
   $effect(() => {
     if (!isVisible) return;
     if (preloadedAnalysis) {
-      hydrateFromAnalysis(preloadedAnalysis);
+      // Hydration initializes editable state; user edits must not retrigger it.
+      untrack(() => hydrateFromAnalysis(preloadedAnalysis));
     } else if (configurationSet || targetConfigurationSet) {
       analyzeMigration();
     }
