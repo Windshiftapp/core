@@ -11,6 +11,7 @@
   let {
     mappings = [],
     targetFields = [],
+    sourceFields = [],
     showPlaceholderModal = $bindable(false),
     onchange = () => {},
   } = $props();
@@ -59,6 +60,7 @@
         <div class="flex items-start gap-2">
           <div class="flex-1 space-y-2">
             <Select
+              id={`asset-mapping-${index}-source-type`}
               options={sourceTypes}
               value={mapping.source_type}
               onchange={(v) => handleMappingChange(index, 'source_type', v)}
@@ -67,6 +69,7 @@
             {#if mapping.source_type === 'item_field'}
               <div data-testid={`mapping-source-field-${index}`}>
                 <FieldSelector
+                  customFieldItems={sourceFields}
                   placeholder={t('actions.config.fromField')}
                   selectedField={getFieldSelectorValue({ field_name: mapping.source_value })}
                   onSelect={(field) => handleMappingChange(index, 'source_value', backendFieldName(field))}
@@ -75,6 +78,7 @@
               </div>
             {:else}
               <Input
+                dataTestid={`asset-mapping-${index}-source-value`}
                 type="text"
                 class="text-xs"
                 value={mapping.source_value}
@@ -83,6 +87,7 @@
               />
             {/if}
             <Select
+              id={`asset-mapping-${index}-target`}
               options={[{ value: '', label: t('actions.config.selectTargetField') }, ...targetFields.map(f => ({ value: f.field_name, label: f.name ?? f.display_name ?? f.label ?? f.field_name }))]}
               value={mapping.target_field_id}
               onchange={(v) => handleMappingChange(index, 'target_field_id', v)}

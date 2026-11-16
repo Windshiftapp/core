@@ -1,23 +1,12 @@
 <script>
-  import { onMount } from 'svelte';
-  import Pencil from '@lucide/svelte/icons/pencil';
-  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
-  import MessageSquare from '@lucide/svelte/icons/message-square';
-  import Bell from '@lucide/svelte/icons/bell';
-  import HelpCircle from '@lucide/svelte/icons/help-circle';
+  import { onDestroy, onMount, untrack } from 'svelte';
+  import { workspaceConditionOperators } from './conditionOperators.js';
+  import { fetchV2Data } from '../../api/core.js';
+  import { queryLanguage } from '../../api/queryLanguage.js';
+  import { customFields as customFieldsApi } from '../../api/configuration.js';
+  import { assetSets as assetSetsApi, assetTypes as assetTypesApi, assetCategories as assetCategoriesApi, assetStatuses as assetStatusesApi } from '../../api/assets.js';
+  import { completionFieldToFilterField } from '../../utils/qlCompletion.js';
   import PlaceholderFieldLabel from './PlaceholderFieldLabel.svelte';
-  import Database from '@lucide/svelte/icons/database';
-  import PlusSquare from '@lucide/svelte/icons/plus-square';
-  import Box from '@lucide/svelte/icons/box';
-  import Globe from '@lucide/svelte/icons/globe';
-  import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
-  import Bot from '@lucide/svelte/icons/bot';
-  import Milestone from '@lucide/svelte/icons/milestone';
-  import UsersRound from '@lucide/svelte/icons/users-round';
-  import Send from '@lucide/svelte/icons/send';
-  import FileText from '@lucide/svelte/icons/file-text';
-  import Tag from '@lucide/svelte/icons/tag';
-  import Code from '@lucide/svelte/icons/code';
   import X from '@lucide/svelte/icons/x';
   import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import { actionCapabilities } from '../../api/ai.js';
@@ -30,26 +19,7 @@
   import { labels } from '../../api/misc.js';
   import FieldSelector from '../../pickers/FieldSelector.svelte';
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
-  import TriggerNode from './nodes/TriggerNode.svelte';
-  import SetFieldNode from './nodes/SetFieldNode.svelte';
-  import SetStatusNode from './nodes/SetStatusNode.svelte';
-  import AddCommentNode from './nodes/AddCommentNode.svelte';
-  import NotifyUserNode from './nodes/NotifyUserNode.svelte';
-  import ConditionNode from './nodes/ConditionNode.svelte';
-  import UpdateAssetNode from './nodes/UpdateAssetNode.svelte';
-  import CreateAssetNode from './nodes/CreateAssetNode.svelte';
-  import RelatedItemsNode from './nodes/RelatedItemsNode.svelte';
-  import TransitionItemNode from './nodes/TransitionItemNode.svelte';
-  import RoundRobinAssignNode from './nodes/RoundRobinAssignNode.svelte';
-  import ContainerRunNode from './nodes/ContainerRunNode.svelte';
-  import HTTPRequestNode from './nodes/HTTPRequestNode.svelte';
-  import AIExtractNode from './nodes/AIExtractNode.svelte';
-  import AIAgentNode from './nodes/AIAgentNode.svelte';
-  import CreateMilestoneNode from './nodes/CreateMilestoneNode.svelte';
-  import NotifyCustomerNode from './nodes/NotifyCustomerNode.svelte';
-  import InsertCannedResponseNode from './nodes/InsertCannedResponseNode.svelte';
-  import AdjustLabelsNode from './nodes/AdjustLabelsNode.svelte';
-  import ExecuteScriptNode from './nodes/ExecuteScriptNode.svelte';
+  import { actionNodeDefinitions, nodePresentation, triggerLabel, minimapNodeColor, minimapNodeStroke } from './shared/actionNodeDefinitions.js';
   import CreateMilestoneConfigPanel from './CreateMilestoneConfigPanel.svelte';
   import ScriptConfigPanel from './ScriptConfigPanel.svelte';
   import UpdateAssetConfigPanel from './UpdateAssetConfigPanel.svelte';
@@ -73,19 +43,120 @@
   let {
     action,
     statuses = [],
+    statusesState = 'ready',
     onSave,
     onCancel
   } = $props();
 
   let showPlaceholderModal = $state(false);
-  let milestones = $state([]);
-  let teams = $state([]);
-  let linkTypes = $state([]);
-  let itemTypes = $state([]);
-  let statusCategories = $state([]);
-  let assignableUsers = $state([]);
-  let cannedResponses = $state([]);
-  let workspaceLabels = $state([]);
+  const idleLookup = { items: [], state: 'idle' };
+  let lookups = $state({});
+  const lookup = (key) => lookups[key] ?? idleLookup;
+  let milestones = $derived(lookup('milestones').items);
+  let teams = $derived(lookup('teams').items);
+  let linkTypes = $derived(lookup('linkTypes').items);
+  let itemTypes = $derived(lookup('itemTypes').items);
+  let statusCategories = $derived(lookup('statusCategories').items);
+  let assignableUsers = $derived(lookup('users').items);
+  let cannedResponses = $derived(lookup('cannedResponses').items.filter((response) => response.is_active !== false));
+  let workspaceLabels = $derived(lookup('labels').items);
+  let assetSets = $state({ items: [], state: 'idle' });
+  let assetReferenceFields = $state({ items: [], state: 'idle' });
+  let assetDestinations = $state({});
+  let assetFieldsByType = $state({});
+  const assetSetRequests = new Map();
+  const assetFieldRequests = new Map();
+  let hasAssetNodes = $derived(actionFlowStore.nodes.some((node) => ['create_asset', 'update_asset'].includes(node.type)));
+  let hasAssetUpdates = $derived(actionFlowStore.nodes.some((node) => node.type === 'update_asset'));
+  let hasRunnerPools = $derived(actionFlowStore.nodes.some((node) => node.type === 'container_run' && node.data?.config?.pool_capability_id));
+  let runnerPools = $state({ items: [], state: 'idle' });
+
+  function sourceAssetSet(config) {
+    if (!config?.source_field_id) return config?.asset_set_id || 0;
+    const source = assetReferenceFields.items.find((field) => String(field.id) === String(config?.source_field_id) || field.field_name === config?.source_field_id);
+    return config?.asset_set_id || source?.field_config?.asset_set_id || 0;
+  }
+  let assetScopes = $derived(actionFlowStore.nodes.filter((node) => ['create_asset', 'update_asset'].includes(node.type))
+    .map((node) => ({ setId: sourceAssetSet(node.data?.config), typeId: node.data?.config?.asset_type_id || 0 })));
+  let assetSetKeys = $derived([...new Set(assetScopes.map((scope) => scope.setId).filter(Boolean))].sort((a, b) => a - b).join(','));
+
+  onDestroy(() => { assetSetRequests.clear(); assetFieldRequests.clear(); });
+
+  $effect(() => {
+    if (!hasAssetNodes) { assetSets = { items: [], state: 'idle' }; return; }
+    let active = true;
+    assetSets = { items: [], state: 'loading' };
+    assetSetsApi.getAll().then((items) => { if (active) assetSets = { items: items || [], state: 'ready' }; })
+      .catch(() => { if (active) assetSets = { items: [], state: 'error' }; });
+    return () => { active = false; };
+  });
+  $effect(() => {
+    if (!hasAssetUpdates) { assetReferenceFields = { items: [], state: 'idle' }; return; }
+    let active = true;
+    assetReferenceFields = { items: [], state: 'loading' };
+    customFieldsApi.getAll().then((items) => { if (active) assetReferenceFields = { items: items || [], state: 'ready' }; })
+      .catch(() => { if (active) assetReferenceFields = { items: [], state: 'error' }; });
+    return () => { active = false; };
+  });
+  $effect(() => {
+    const workspaceId = action?.workspace_id;
+    if (!hasRunnerPools || !workspaceId) { runnerPools = { items: [], state: 'idle' }; return; }
+    let active = true;
+    runnerPools = { items: [], state: 'loading' };
+    actionCapabilities.getForWorkspace(workspaceId, 'runner_pool').then((items) => { if (active) runnerPools = { items: items || [], state: 'ready' }; })
+      .catch(() => { if (active) runnerPools = { items: [], state: 'error' }; });
+    return () => { active = false; };
+  });
+
+  $effect(() => {
+    const keys = assetSetKeys ? assetSetKeys.split(',') : [];
+    untrack(() => {
+      for (const key of assetSetRequests.keys()) if (!keys.includes(key)) assetSetRequests.delete(key);
+      assetDestinations = Object.fromEntries(Object.entries(assetDestinations).filter(([key]) => keys.includes(key)));
+      for (const key of keys) {
+        if (assetSetRequests.has(key)) continue;
+        const token = Symbol(key);
+        assetSetRequests.set(key, token);
+        assetDestinations[key] = {
+          types: { items: [], state: 'loading' }, categories: { items: [], state: 'loading' }, statuses: { items: [], state: 'loading' },
+        };
+        const requests = { types: () => assetTypesApi.getAll(key), categories: () => assetCategoriesApi.getAll(key), statuses: () => assetStatusesApi.getAll(key) };
+        for (const [kind, request] of Object.entries(requests)) {
+          request().then((items) => {
+            if (assetSetRequests.get(key) === token) assetDestinations[key][kind] = { items: items || [], state: 'ready' };
+          }).catch(() => {
+            if (assetSetRequests.get(key) === token) assetDestinations[key][kind] = { items: [], state: 'error' };
+          });
+        }
+      }
+    });
+  });
+
+  $effect(() => {
+    const scopes = assetScopes.filter((scope) => scope.setId && scope.typeId).map((scope) => ({
+      ...scope, key: `${scope.setId}:${scope.typeId}`, taxonomy: assetDestinations[String(scope.setId)]?.types,
+    }));
+    untrack(() => {
+      const keys = scopes.map((scope) => scope.key);
+      for (const key of assetFieldRequests.keys()) if (!keys.includes(key)) assetFieldRequests.delete(key);
+      assetFieldsByType = Object.fromEntries(Object.entries(assetFieldsByType).filter(([key]) => keys.includes(key)));
+      for (const { key, typeId, taxonomy } of scopes) {
+        if (assetFieldRequests.has(key)) continue;
+        if (!taxonomy || taxonomy.state === 'loading') { assetFieldsByType[key] = { items: [], state: 'loading' }; continue; }
+        if (taxonomy.state !== 'ready' || !taxonomy.items.some((type) => String(type.id) === String(typeId))) {
+          assetFieldsByType[key] = { items: [], state: 'error' }; continue;
+        }
+        const token = Symbol(key);
+        assetFieldRequests.set(key, token);
+        assetFieldsByType[key] = { items: [], state: 'loading' };
+        assetTypesApi.getFields(typeId).then((items) => {
+          if (assetFieldRequests.get(key) === token) assetFieldsByType[key] = { items: items || [], state: 'ready' };
+        }).catch(() => {
+          if (assetFieldRequests.get(key) === token) assetFieldsByType[key] = { items: [], state: 'error' };
+        });
+      }
+    });
+  });
 
   // Actor override: null means the action runs under the triggering user's
   // permissions. Only users with the global action.set_actor permission can
@@ -113,277 +184,64 @@
     allowedRoleIds = [...roleIDs];
   });
 
-  const nodeTypes = {
-    trigger: TriggerNode,
-    set_field: SetFieldNode,
-    set_status: SetStatusNode,
-    add_comment: AddCommentNode,
-    notify_user: NotifyUserNode,
-    condition: ConditionNode,
-    update_asset: UpdateAssetNode,
-    create_asset: CreateAssetNode,
-    related_items: RelatedItemsNode,
-    transition_item: TransitionItemNode,
-    round_robin_assign: RoundRobinAssignNode,
-    container_run: ContainerRunNode,
-    http_request: HTTPRequestNode,
-    ai_extract: AIExtractNode,
-    ai_agent: AIAgentNode,
-    create_milestone: CreateMilestoneNode,
-    notify_customer: NotifyCustomerNode,
-    insert_canned_response: InsertCannedResponseNode,
-    adjust_labels: AdjustLabelsNode,
-    execute_script: ExecuteScriptNode,
-  };
+  let catalog = $state(null);
+  let nodePalette = $derived((catalog?.nodes ?? [])
+    .filter((node) => node.type !== 'trigger' && Object.hasOwn(actionNodeDefinitions, node.type))
+    .map((node) => ({ type: node.type, ...nodePresentation(node.type, t, node.label) })));
+  let triggerTypes = $derived((catalog?.triggers ?? [])
+    .map((trigger) => ({ value: trigger.type, label: triggerLabel(trigger.type, t, trigger.label) })));
 
-  // Mirror each node's accentColor in the minimap so the overview reflects
-  // the canvas colour coding instead of rendering every node the same grey.
-  const nodeTypeAccents = {
-    trigger: 'amber',
-    set_field: 'purple',
-    set_status: 'teal',
-    add_comment: 'orange',
-    notify_user: 'magenta',
-    condition: 'yellow',
-    update_asset: 'teal',
-    create_asset: 'green',
-    related_items: 'indigo',
-    transition_item: 'teal',
-    round_robin_assign: 'magenta',
-    container_run: 'blue',
-    http_request: 'cyan',
-    ai_extract: 'purple',
-    ai_agent: 'magenta',
-    create_milestone: 'green',
-    notify_customer: 'magenta',
-    insert_canned_response: 'orange',
-    adjust_labels: 'purple',
-    execute_script: 'cyan',
-  };
-
-  function minimapNodeColor(node) {
-    const accent = nodeTypeAccents[node.type];
-    if (!accent) return 'var(--ds-accent-gray-subtle, #94a3b8)';
-    return `var(--ds-accent-${accent}-subtle)`;
+  function getEditorData() {
+    return {
+      domain: 'workspace', workspaceId: action?.workspace_id,
+      statuses: { items: statuses, state: statusesState },
+      teams: lookup('teams'), linkTypes: lookup('linkTypes'), itemTypes: lookup('itemTypes'),
+      users: lookup('users'), cannedResponses: lookup('cannedResponses'), labels: lookup('labels'),
+      customFields: lookup('customFields'), milestones: lookup('milestones'), roles: lookup('roles'),
+      assetSets, assetDestinations, assetFieldsByType, assetReferenceFields, sourceAssetSet,
+      capabilitiesByType: { docker_environment: lookup('docker_environment'), http_client: lookup('http_client'), llm_connection: lookup('llm_connection'), runner_pool: runnerPools },
+      allowedRoleIds,
+      nodeLabels: Object.fromEntries((catalog?.nodes ?? []).map((node) => [node.type, node.label])),
+    };
   }
 
-  function minimapNodeStroke(node) {
-    const accent = nodeTypeAccents[node.type];
-    if (!accent) return 'var(--ds-border, #64748b)';
-    return `var(--ds-accent-${accent})`;
-  }
-
-  // Map node types to lucide icons (icons stay client-side; everything else
-  // about the palette comes from the server-provided catalog so adding a new
-  // node type only requires registering it in internal/services/actioncatalog
-  // and rebuilding — the editor picks it up automatically). Types missing
-  // from this map render with the trigger icon as a neutral fallback.
-  const typeIcons = {
-    set_field: Pencil,
-    set_status: RefreshCw,
-    add_comment: MessageSquare,
-    notify_user: Bell,
-    condition: HelpCircle,
-    update_asset: Database,
-    create_asset: PlusSquare,
-    http_request: Globe,
-    container_run: Box,
-    ai_extract: IconMessageChatbot,
-    ai_agent: Bot,
-    transition_item: RefreshCw,
-    related_items: RefreshCw,
-    round_robin_assign: UsersRound,
-    create_milestone: Milestone,
-    notify_customer: Send,
-    insert_canned_response: FileText,
-    adjust_labels: Tag,
-    execute_script: Code,
-  };
-
-  // i18n keys for node types. When a type isn't in this map, the palette
-  // falls back to the server-provided label string (English). New node types
-  // can ship as catalog-only entries; translations land here in a follow-up.
-  const typeI18nKeys = {
-    set_field: 'actions.nodes.setField',
-    set_status: 'actions.nodes.setStatus',
-    add_comment: 'actions.nodes.addComment',
-    notify_user: 'actions.nodes.notifyUser',
-    condition: 'actions.nodes.condition',
-    update_asset: 'actions.nodes.updateAsset',
-    create_asset: 'actions.nodes.createAsset',
-    http_request: 'actions.nodes.httpRequest',
-    container_run: 'actions.nodes.containerRun',
-    ai_extract: 'actions.nodes.aiExtract',
-    ai_agent: 'actions.nodes.aiAgent',
-    transition_item: 'actions.nodes.transitionItem',
-    related_items: 'actions.nodes.relatedItems',
-    round_robin_assign: 'actions.nodes.roundRobinAssign',
-    create_milestone: 'actions.nodes.createMilestone',
-    notify_customer: 'actions.nodes.notifyCustomer',
-    insert_canned_response: 'actions.nodes.insertCannedResponse',
-    adjust_labels: 'actions.nodes.adjustLabels',
-    execute_script: 'actions.nodes.executeScript',
-  };
-
-  // nodePalette is built from the catalog response on mount. Trigger nodes
-  // are filtered out (they're created implicitly by the editor) along with
-  // any type the editor doesn't yet have a custom Svelte node component for.
-  let nodePalette = $state([]);
-  let triggerTypes = $state([]);
-
-  function buildPaletteFromCatalog(catalog) {
-    nodePalette = (catalog?.nodes ?? [])
-      .filter((n) => n.type !== 'trigger' && nodeTypes[n.type])
-      .map((n) => ({
-        type: n.type,
-        label: typeI18nKeys[n.type] ? t(typeI18nKeys[n.type]) : n.label,
-        icon: typeIcons[n.type] ?? Pencil,
-      }));
-    triggerTypes = (catalog?.triggers ?? []).map((tr) => ({
-      value: tr.type,
-      label: triggerI18nKey(tr.type) ? t(triggerI18nKey(tr.type)) : tr.label,
-    }));
-  }
-
-  function triggerI18nKey(triggerType) {
-    switch (triggerType) {
-      case 'status_transition': return 'actions.trigger.statusTransition';
-      case 'status_loop': return 'actions.trigger.statusLoop';
-      case 'item_created': return 'actions.trigger.itemCreated';
-      case 'item_updated': return 'actions.trigger.itemUpdated';
-      case 'item_linked': return 'actions.trigger.itemLinked';
-      case 'sla_breached': return 'actions.trigger.slaBreached';
-      case 'sla_warning': return 'actions.trigger.slaWarning';
-      case 'comment_created': return 'actions.trigger.commentCreated';
-      case 'item_inactive': return 'actions.trigger.itemInactive';
-      case 'manual': return 'actions.trigger.manual';
-      default: return null;
+  $effect(() => {
+    const workspaceId = action?.workspace_id;
+    let active = true;
+    catalog = null;
+    lookups = {};
+    if (!workspaceId) return;
+    actions.getCatalog(workspaceId).then((result) => {
+      if (active) catalog = result;
+    }).catch(() => {});
+    // These collections also feed the existing pickers; never retry a denial elsewhere.
+    const requests = {
+      milestones: () => milestonesApi.getAll({ workspace_id: workspaceId, include_global: true }),
+      teams: () => teamsApi.getAll(), linkTypes: () => linkTypesApi.getAll(),
+      itemTypes: () => itemTypesApi.getAll({ workspace_id: workspaceId }),
+      statusCategories: () => statusCategoriesApi.getAll(),
+      users: () => getAssignableUsers(workspaceId),
+      cannedResponses: () => cannedResponsesApi.getAll(workspaceId, true),
+      labels: () => labels.getAll(workspaceId),
+      roles: () => fetchV2Data('/workspace-roles'),
+      customFields: async () => (await queryLanguage.getCatalog())?.fields
+        ?.filter((field) => /^cfid_\d+$/i.test(field.name)).map(completionFieldToFilterField) || [],
+      docker_environment: () => actionCapabilities.getForWorkspace(workspaceId, 'docker_environment'),
+      http_client: () => actionCapabilities.getForWorkspace(workspaceId, 'http_client'),
+      llm_connection: () => actionCapabilities.getForWorkspace(workspaceId, 'llm_connection'),
+    };
+    lookups = Object.fromEntries(Object.keys(requests).map((key) => [key, { items: [], state: 'loading' }]));
+    for (const [key, request] of Object.entries(requests)) {
+      request().then((items) => {
+        if (active) lookups[key] = { items: items || [], state: 'ready' };
+      }).catch(() => {
+        if (active) lookups[key] = { items: [], state: 'error' };
+      });
     }
-  }
-
-  // Workspace-scoped capability lists for the picker. Loaded once per
-  // capability type when the editor mounts, then reused as the user clicks
-  // through capability-consuming nodes.
-  let capabilitiesByType = $state({
-    docker_environment: [],
-    http_client: [],
-    llm_connection: [],
+    return () => { active = false; };
   });
 
-  async function loadCapabilities(type) {
-    if (!action?.workspace_id) return;
-    try {
-      const list = await actionCapabilities.getForWorkspace(action.workspace_id, type);
-      capabilitiesByType[type] = list || [];
-    } catch (err) {
-      console.error(`Failed to load ${type} capabilities for workspace`, err);
-    }
-  }
-
-  async function loadCatalog() {
-    if (!action?.workspace_id) return;
-    try {
-      const catalog = await actions.getCatalog(action.workspace_id);
-      buildPaletteFromCatalog(catalog);
-    } catch (err) {
-      console.error('Failed to load action catalog; palette will be empty', err);
-    }
-  }
-
-  async function loadMilestones() {
-    if (!action?.workspace_id) return;
-    try {
-      milestones = await milestonesApi.getAll({ workspace_id: action.workspace_id, include_global: true }) || [];
-    } catch (err) {
-      console.error('Failed to load milestones for action editor', err);
-      milestones = [];
-    }
-  }
-
-  async function loadTeams() {
-    try {
-      teams = await teamsApi.getAll() || [];
-    } catch (err) {
-      console.error('Failed to load teams for action editor', err);
-      teams = [];
-    }
-  }
-
-  async function loadLinkTypes() {
-    try {
-      linkTypes = await linkTypesApi.getAll() || [];
-    } catch (err) {
-      console.error('Failed to load link types for action editor', err);
-      linkTypes = [];
-    }
-  }
-
-  async function loadItemTypes() {
-    if (!action?.workspace_id) return;
-    try {
-      itemTypes = await itemTypesApi.getAll({ workspace_id: action.workspace_id }) || [];
-    } catch (err) {
-      console.error('Failed to load item types for action editor', err);
-      itemTypes = [];
-    }
-  }
-
-  async function loadStatusCategories() {
-    try {
-      statusCategories = await statusCategoriesApi.getAll() || [];
-    } catch (err) {
-      console.error('Failed to load status categories for action editor', err);
-      statusCategories = [];
-    }
-  }
-
-  async function loadAssignableUsers() {
-    if (!action?.workspace_id) return;
-    try {
-      assignableUsers = await getAssignableUsers(action.workspace_id) || [];
-    } catch (err) {
-      console.error('Failed to load users for action editor', err);
-      assignableUsers = [];
-    }
-  }
-
-  async function loadCannedResponses() {
-    if (!action?.workspace_id) return;
-    try {
-      const list = await cannedResponsesApi.getAll(action.workspace_id, true) || [];
-      cannedResponses = list.filter((response) => response.is_active !== false);
-    } catch (err) {
-      console.error('Failed to load canned responses for action editor', err);
-      cannedResponses = [];
-    }
-  }
-
-  async function loadWorkspaceLabels() {
-    if (!action?.workspace_id) return;
-    try {
-      workspaceLabels = await labels.getAll(action.workspace_id) || [];
-    } catch (err) {
-      console.error('Failed to load labels for action editor', err);
-      workspaceLabels = [];
-    }
-  }
-
   onMount(() => {
-    if (action?.workspace_id) {
-      loadCatalog();
-      loadCapabilities('docker_environment');
-      loadCapabilities('http_client');
-      loadCapabilities('llm_connection');
-      loadMilestones();
-      loadTeams();
-      loadLinkTypes();
-      loadItemTypes();
-      loadStatusCategories();
-      loadAssignableUsers();
-      loadCannedResponses();
-      loadWorkspaceLabels();
-    }
-
     // Live-reload after every AI chat agent run, regardless of tool calls:
     // any agent activity may have touched this action indirectly, so refetch
     // and rehydrate to reflect the latest server state.
@@ -391,7 +249,7 @@
       if (!action?.id) return;
       try {
         const fresh = await actions.get(action.workspace_id, action.id);
-        actionFlowStore.init(fresh, statuses);
+        actionFlowStore.init(fresh);
         infoToast(t('actions.aiUpdated', 'Action updated by AI'));
       } catch (err) {
         console.error('Failed to reload action after agent run:', err);
@@ -402,7 +260,7 @@
 
   function capabilityOptions(type) {
     const empty = [{ value: '', label: t('actions.config.selectCapability') }];
-    const list = capabilitiesByType[type] || [];
+    const list = lookup(type).items;
     if (list.length === 0) {
       return [{ value: '', label: t('actions.config.noCapabilitiesForWorkspace') }];
     }
@@ -655,8 +513,7 @@
 <BaseActionFlowEditor
   {action}
   flowStore={actionFlowStore}
-  initArgs={[statuses]}
-  {nodeTypes}
+  {getEditorData}
   {nodePalette}
   {triggerTypes}
   sidebarTitle={t('actions.title')}
@@ -741,7 +598,9 @@
         >
           {t('actions.manualAccess.label')}
         </label>
-        <RolePicker
+      <RolePicker
+        roles={lookup('roles').items}
+        rolesState={lookup('roles').state}
           bind:value={allowedRoleIds}
           id="manual-action-role-selector-input"
           multiple={true}
@@ -817,6 +676,7 @@
       <div>
         <div class="block text-xs font-medium mb-1">{t('actions.config.triggerField')}</div>
         <FieldSelector
+          customFieldItems={lookup('customFields').items}
           placeholder={t('actions.config.anyField')}
           selectedField={getFieldSelectorValue(selectedNode.data?.config)}
           onSelect={(field) => {
@@ -915,6 +775,7 @@
       <div>
         <label for="config-set-field-name" class="block text-xs font-medium mb-1">{t('actions.config.fieldName')}</label>
         <FieldSelector
+          customFieldItems={lookup('customFields').items}
           selectedField={getFieldSelectorValue(selectedNode.data?.config)}
           excludedFieldIds={['itemType', 'createdAt', 'updatedAt', 'labels']}
           onSelect={(field) => {
@@ -1006,6 +867,7 @@
             size="small"
           />
           <FieldSelector
+            customFieldItems={lookup('customFields').items}
             selectedField={getConditionSelectorValue(selectedNode.data?.config)}
             includeAggregates
             onSelect={(field) => store.updateNodeConfig(selectedNode.id, { field_name: withConditionScope(selectedNode.data?.config?.field_name, backendFieldName(field)) })}
@@ -1017,15 +879,7 @@
         <label for="config-condition-operator" class="block text-xs font-medium mb-1">{t('actions.config.operator')}</label>
         <Select
           id="config-condition-operator"
-          options={[
-            { value: 'eq', label: t('actions.operators.equals') },
-            { value: 'ne', label: t('actions.operators.notEquals') },
-            { value: 'contains', label: t('actions.operators.contains') },
-            { value: 'gt', label: t('actions.operators.greaterThan') },
-            { value: 'lt', label: t('actions.operators.lessThan') },
-            { value: 'is_empty', label: t('actions.operators.isEmpty') },
-            { value: 'is_not_empty', label: t('actions.operators.isNotEmpty') }
-          ]}
+          options={workspaceConditionOperators(t)}
           value={selectedNode.data?.config?.operator || 'eq'}
           onchange={(v) => store.updateNodeConfig(selectedNode.id, { operator: v })}
           size="small"
@@ -1560,10 +1414,10 @@
       <div>
         <label for="config-aia-tools" class="block text-xs font-medium mb-1">{t('actions.config.agentTools')}</label>
         <p class="text-xs mb-2" style="color: var(--ds-text-subtle);">{t('actions.config.agentToolsHint')}</p>
-        {#if (capabilitiesByType.http_client || []).length === 0}
+        {#if lookup('http_client').items.length === 0}
           <p class="text-xs" style="color: var(--ds-text-subtle); font-style: italic;">{t('actions.config.noToolsAvailable')}</p>
         {:else}
-          {#each capabilitiesByType.http_client as cap}
+          {#each lookup('http_client').items as cap}
             <Checkbox
                 checked={(selectedNode.data?.config?.tools || []).includes(String(cap.id))}
                 onchange={(checked) => {

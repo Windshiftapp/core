@@ -45,6 +45,7 @@
       : '');
 </script>
 
+<g data-testid="action-edge">
 <!-- Hide base edge during reconnection -->
 {#if !reconnecting}
   <BaseEdge
@@ -81,12 +82,14 @@
   >
     <div
       class="edge-label"
+      data-testid={`action-edge-branch-${sourceHandleId}`}
       style:background-color={edgeColor}
     >
       {labelText}
     </div>
   </foreignObject>
 {/if}
+</g>
 
 <style>
   .edge-label {

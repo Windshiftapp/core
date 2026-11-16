@@ -1,3 +1,11 @@
+export function getActionNotificationRecipients(config = {}) {
+  if (config.recipients?.length) return config.recipients;
+  if (Number(config.user_id) > 0) return [String(config.user_id)];
+  if (config.recipient_type)
+    return config.recipient_type === 'specific' ? [] : [config.recipient_type];
+  return [];
+}
+
 /**
  * Factory for creating Action Flow stores.
  * Eliminates duplication between domain-specific flow stores by sharing
@@ -6,13 +14,8 @@
  * @param {Object} options
  * @param {string} options.defaultTrigger - Default trigger type for this domain
  * @param {Record<string, Object>} options.nodeConfigDefaults - Map of nodeType → default config object
- * @param {boolean} [options.includeStatuses=false] - Whether to track statuses state and pass to nodes
  */
-export function createActionFlowStore({
-  defaultTrigger,
-  nodeConfigDefaults,
-  includeStatuses = false,
-}) {
+export function createActionFlowStore({ defaultTrigger, nodeConfigDefaults }) {
   // Core state
   let nodes = $state([]);
   let edges = $state([]);
@@ -21,7 +24,6 @@ export function createActionFlowStore({
   let saving = $state(false);
   let direction = $state('horizontal');
 
-  let statuses = $state(includeStatuses ? [] : null);
   let clientNodeSeq = 0;
   let clientEdgeSeq = 0;
 
@@ -50,12 +52,11 @@ export function createActionFlowStore({
       Number(normalized.user_id) > 0
     ) {
       normalized.recipient_type = 'specific';
-      normalized.recipients = [String(normalized.user_id)];
+      normalized.recipients = getActionNotificationRecipients(normalized);
     }
 
     if (nodeType === 'notify_user' && normalized.recipient_type && !normalized.recipients?.length) {
-      normalized.recipients =
-        normalized.recipient_type === 'specific' ? [] : [normalized.recipient_type];
+      normalized.recipients = getActionNotificationRecipients(normalized);
     }
 
     if (nodeType === 'notify_user') {
@@ -100,7 +101,7 @@ export function createActionFlowStore({
       Number(hydrated.user_id) > 0
     ) {
       hydrated.recipient_type = 'specific';
-      hydrated.recipients = [String(hydrated.user_id)];
+      hydrated.recipients = getActionNotificationRecipients(hydrated);
     }
 
     // Legacy notify_user configs stored specific user IDs in `recipients`
@@ -167,13 +168,8 @@ export function createActionFlowStore({
       return nodes.find((n) => n.type === 'trigger') || null;
     },
 
-    get statuses() {
-      return includeStatuses ? statuses : undefined;
-    },
-
-    init(action, initStatuses = []) {
+    init(action) {
       _action = action;
-      if (includeStatuses) statuses = initStatuses;
       selectedNodeId = null;
       saving = false;
 
@@ -197,12 +193,10 @@ export function createActionFlowStore({
             data: {
               nodeType: node.node_type,
               nodeId: node.id,
-              flowStore: store,
               ...(isTrigger ? { triggerType: action.trigger_type } : {}),
               config: isTrigger
                 ? parseConfig(action.trigger_config)
                 : hydrateNodeConfig(node.node_type, parseConfig(node.node_config)),
-              ...(includeStatuses ? { statuses: initStatuses } : {}),
             },
           };
         });
@@ -215,10 +209,8 @@ export function createActionFlowStore({
             deletable: false,
             data: {
               nodeType: 'trigger',
-              flowStore: store,
               triggerType: action.trigger_type,
               config: parseConfig(action.trigger_config),
-              ...(includeStatuses ? { statuses: initStatuses } : {}),
             },
           },
         ];
@@ -241,18 +233,6 @@ export function createActionFlowStore({
       } else {
         edges = [];
       }
-    },
-
-    setStatuses(nextStatuses = []) {
-      if (!includeStatuses) return;
-      statuses = nextStatuses;
-      nodes = nodes.map((node) => ({
-        ...node,
-        data: {
-          ...node.data,
-          statuses,
-        },
-      }));
     },
 
     updateNodeConfig(nodeId, configUpdates) {
@@ -314,9 +294,7 @@ export function createActionFlowStore({
         },
         data: {
           nodeType,
-          flowStore: store,
           config: getDefaultConfig(nodeType),
-          ...(includeStatuses ? { statuses } : {}),
         },
       };
 
@@ -451,7 +429,6 @@ export function createActionFlowStore({
       edges = [];
       selectedNodeId = null;
       triggerType = defaultTrigger;
-      if (includeStatuses) statuses = [];
       saving = false;
       direction = 'horizontal';
       _action = null;
