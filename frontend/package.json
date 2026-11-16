@@ -34,7 +34,7 @@
     "check:hmr-boundaries": "node scripts/check-hmr-boundaries.js && node scripts/check-openui-components.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.3",
+    "@biomejs/biome": "2.6.4",
     "@hugeicons/core-free-icons": "4.2.2",
     "@hugeicons/svelte": "1.1.4",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
