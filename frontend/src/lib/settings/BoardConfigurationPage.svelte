@@ -791,6 +791,7 @@
   </div>
 {:else if workspace || !workspaceId}
   <StaticViewBackground
+    dotGrid={false}
     backgroundStyle={styles.backgroundStyle}
     contextVars={styles.contextVars}
   >

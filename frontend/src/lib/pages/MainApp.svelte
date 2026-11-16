@@ -9,6 +9,7 @@
   import CollectionNavigation from '../features/collections/CollectionNavigation.svelte';
   import MainSidebar from '../layout/MainSidebar.svelte';
   import { isCollectionContentView, VIEW_BACKGROUND_CONTEXT } from '../layout/viewBackgroundContext.js';
+  import '../layout/viewBackground.css';
   import {
     GLOBAL_COLLECTION_VIEWS,
     currentRoute,
@@ -427,6 +428,7 @@
             bind:this={mainScrollElement}
             data-testid="main-content-scroll"
             class="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+            class:view-dot-grid={sharedBackgroundActive && !backgroundStyles.hasCustomBackground}
             style={sharedBackgroundActive
               ? `${backgroundStyles.backgroundStyle} ${backgroundStyles.contextVars}`
               : ''}

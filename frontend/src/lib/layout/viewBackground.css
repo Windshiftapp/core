@@ -1,0 +1,5 @@
+.view-dot-grid {
+  background-image: radial-gradient(circle, var(--ds-icon-subtle) 0.5px, transparent 0.5px);
+  background-size: 20px 20px;
+  background-attachment: fixed;
+}

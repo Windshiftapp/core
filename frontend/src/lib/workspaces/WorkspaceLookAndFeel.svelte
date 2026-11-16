@@ -294,6 +294,7 @@
   </Card>
 {:else if workspace}
   <StaticViewBackground
+    dotGrid={false}
     backgroundStyle={backgroundStyle()}
     class="look-and-feel-wrapper"
     testid="workspace-look-and-feel"
