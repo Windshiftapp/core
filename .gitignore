@@ -176,6 +176,7 @@ RELEASE_NOTES.md
 .jscpd-report
 scripts/*
 !scripts/pre-commit
+!scripts/check-browser-smoke.sh
 !scripts/run-golangci-lint.sh
 !scripts/check-layering.sh
 !scripts/check-handler-db-access.sh

@@ -210,10 +210,8 @@ vulncheck:
 # Install git hooks
 hooks:
 	@echo "Installing git hooks..."
-	@mkdir -p .git/hooks
-	@cp scripts/pre-commit .git/hooks/pre-commit
-	@chmod +x .git/hooks/pre-commit
-	@echo "Pre-commit hook installed."
+	@git config core.hooksPath scripts
+	@echo "Pre-commit hook enabled from scripts/ (also works in worktrees and follows updates)."
 
 # Quick development build
 dev-build:

@@ -46,6 +46,43 @@ run. The OpenUI packages ship a telemetry postinstall; keep
 `OPENUI_TELEMETRY_DISABLED=1` and `DO_NOT_TRACK=1` set in any environment that
 re-enables install scripts (CI, Docker, or an explicit `npm rebuild`).
 
+## Pre-commit browser verification
+
+Run `make hooks` once to enable the repository's current pre-commit hook. Hooks
+run directly from `scripts/`, including in worktrees, so subsequent updates take
+effect without reinstalling a copied hook.
+
+Changes to frontend dependencies, build configuration, app loading, or the shared
+markdown editor trigger `scripts/check-browser-smoke.sh` after lint/type checks.
+Choose the narrowest specs that exercise the changed behavior and pass their
+space-separated paths in `BROWSER_SPECS` when committing. For example, a Milkdown
+chunking change can use:
+
+```bash
+BROWSER_SPECS="tests/item-description-markdown-view.spec.ts" git commit
+```
+
+The hook builds a temporary checkout of the **staged index**, installs its locked
+dependencies, and runs only the selected specs through the production Go server
+in Chromium. It requires an explicit selection rather than running a fixed or
+full browser suite. A successful build alone cannot detect broken lazy-module
+initialization.
+
+Keep the private `core-tests` checkout beside `core`, or set `CORE_TESTS_DIR` to
+its absolute path. The check fails if required coverage is unavailable or fails;
+failure artifacts and the staged checkout are retained at the printed paths.
+Go, the pinned Node.js version, and Playwright's browser prerequisites are needed.
+On macOS, coding agents must obtain permission to run Chromium outside the sandbox.
+
+For other interactive UI changes, run focused production-browser specs for the
+affected workflow before committing. The hook's path triggers cover known
+high-risk areas; they do not replace choosing coverage for the actual change.
+From the core root:
+
+```bash
+CORE_DIR="$PWD" E2E_KEEP_ARTIFACTS=1 ../core-tests/run-e2e.sh tests/<feature>.spec.ts
+```
+
 ## Build Output
 
 ### Development Builds (Makefile)

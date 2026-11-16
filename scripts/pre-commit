@@ -157,6 +157,13 @@ else
     SKIPPED+=("frontend checks")
 fi
 
+# Build and exercise high-risk frontend changes only after the cheap checks pass.
+if [[ "$FAILED" -eq 0 ]]; then
+    if ! bash "$REPO_ROOT/scripts/check-browser-smoke.sh"; then
+        FAILED=1
+    fi
+fi
+
 if [ "$FAILED" -ne 0 ]; then
     echo ""
     echo "Pre-commit checks failed. Fix the issues above or use 'git commit --no-verify' to bypass."
