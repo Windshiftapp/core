@@ -21,9 +21,6 @@ type WorkspaceAgentSkill struct {
 	// content is rendered into a run grant. nil/omitted when there are none.
 	Pages []SkillPageReference  `json:"pages,omitempty"`
 	Usage *SkillActivationUsage `json:"usage,omitempty"`
-	// ActivationError is copied into a run grant when legacy content cannot be
-	// activated safely. It is internal and never author-controlled.
-	ActivationError string `json:"-"`
 	// CreatedByUserID is a soft audit ref; nil when the creator was deleted.
 	CreatedByUserID *int      `json:"created_by_user_id,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`

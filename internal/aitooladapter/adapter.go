@@ -21,6 +21,9 @@ type Executor struct {
 func NewExecutor(env *aitools.Env, entries []aitools.Entry) *Executor {
 	allowed := make(map[string]aitools.Entry, len(entries))
 	for _, entry := range entries {
+		if !entry.AvailableFor(env.Source) {
+			continue
+		}
 		allowed[entry.Name] = entry
 	}
 	return &Executor{env: env, allowed: allowed}
@@ -58,7 +61,7 @@ func EntriesForStandard(registry *aitools.Registry, selected []string) []aitools
 	}
 	var out []aitools.Entry
 	for _, entry := range registry.All() {
-		if !groups[entry.Group] || entry.Access == aitools.AccessDestructive || entry.Access == aitools.AccessAdmin {
+		if !entry.AvailableFor(aitools.SourceStandardAgent) || !groups[entry.Group] || entry.Access == aitools.AccessDestructive || entry.Access == aitools.AccessAdmin {
 			continue
 		}
 		out = append(out, entry)
@@ -75,7 +78,7 @@ func EntriesForScopes(registry *aitools.Registry, scopes []string) []aitools.Ent
 	all := registry.All()
 	out := make([]aitools.Entry, 0, len(all))
 	for _, entry := range all {
-		if !auth.ScopesSatisfy(scopes, entry.Scopes) {
+		if !entry.AvailableFor(aitools.SourceAIChat) || !auth.ScopesSatisfy(scopes, entry.Scopes) {
 			continue
 		}
 		out = append(out, entry)

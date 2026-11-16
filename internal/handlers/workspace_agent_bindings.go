@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"windshift/internal/agentskills"
 	"windshift/internal/aitools"
 	"windshift/internal/auth"
 	"windshift/internal/llm"
@@ -520,24 +521,25 @@ func (h *WorkspaceAgentBindingHandler) CreateProfile(w http.ResponseWriter, r *h
 		})
 	}
 	profile, err := h.bindings.CreateStudioProfile(r.Context(), services.CreateStudioProfileRequest{
-		WorkspaceID:     workspaceID,
-		CreatedByUserID: user.ID,
-		TemplateKey:     body.TemplateKey,
-		ProfileType:     body.ProfileType,
-		ActingUserID:    body.ActingUserID,
-		Name:            body.Name,
-		Handle:          body.Handle,
-		AvatarURL:       strings.TrimSpace(body.AvatarURL),
-		Purpose:         body.Purpose,
-		Instructions:    body.Instructions,
-		LLMConnectionID: body.LLMConnectionID,
-		Repos:           repos,
-		TargetPoolID:    body.TargetPoolID,
-		RunnerImage:     body.RunnerImage,
-		TokenScopes:     body.TokenScopes,
-		TokenTTLMinutes: body.TokenTTLMinutes,
-		MaxRunsPerDay:   body.MaxRunsPerDay,
-		SkillIDs:        body.SkillIDs,
+		WorkspaceID:      workspaceID,
+		CreatedByUserID:  user.ID,
+		TemplateKey:      body.TemplateKey,
+		ProfileType:      body.ProfileType,
+		ActingUserID:     body.ActingUserID,
+		Name:             body.Name,
+		Handle:           body.Handle,
+		AvatarURL:        strings.TrimSpace(body.AvatarURL),
+		Purpose:          body.Purpose,
+		Instructions:     body.Instructions,
+		CapabilityGroups: body.CapabilityGroups,
+		LLMConnectionID:  body.LLMConnectionID,
+		Repos:            repos,
+		TargetPoolID:     body.TargetPoolID,
+		RunnerImage:      body.RunnerImage,
+		TokenScopes:      body.TokenScopes,
+		TokenTTLMinutes:  body.TokenTTLMinutes,
+		MaxRunsPerDay:    body.MaxRunsPerDay,
+		SkillIDs:         body.SkillIDs,
 	})
 	if err != nil {
 		switch {
@@ -1218,10 +1220,10 @@ func sanitizeRepoInputs(repos []createBindingRepoBody) []services.RepoInput {
 	return inputs
 }
 
-// isSkillAttachError reports whether the error came from skill-id
-// validation during binding create/update (bad or foreign ids → 400).
+// isSkillAttachError maps invalid skill attachments or excessive counts to 400.
 func isSkillAttachError(err error) bool {
 	return errors.Is(err, repository.ErrBindingSkillNotInWorkspace) ||
+		errors.Is(err, agentskills.ErrSnapshotTooLarge) ||
 		errors.Is(err, services.ErrBindingSkillsUnavailable)
 }
 

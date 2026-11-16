@@ -105,13 +105,14 @@ func (r *TestCaseRepository) Search(query string, workspaceIDs []int, limit int)
 
 // TestCaseListParams contains parameters for listing test cases
 type TestCaseListParams struct {
-	WorkspaceID int
-	FolderID    *int // nil = root level, pointer to int = specific folder
-	All         bool // true = return all test cases in workspace
-	Limit       int
-	Offset      int
-	Search      string
-	LabelID     *int
+	WorkspaceID     int
+	FolderID        *int // nil = root level, pointer to int = specific folder
+	All             bool // true = return all test cases in workspace
+	Limit           int
+	Offset          int
+	Search          string
+	LabelID         *int
+	ExcludeInactive bool
 }
 
 // FindAll returns test cases with optional folder filtering
@@ -186,6 +187,9 @@ func (r *TestCaseRepository) Count(params TestCaseListParams) (int, error) {
 }
 
 func appendTestCaseListFilters(query string, args []any, params TestCaseListParams) (filteredQuery string, filteredArgs []any) {
+	if params.ExcludeInactive {
+		query += " AND tc.status <> 'inactive'"
+	}
 	if !params.All {
 		if params.FolderID == nil {
 			query += " AND tc.folder_id IS NULL"
@@ -206,8 +210,11 @@ func appendTestCaseListFilters(query string, args []any, params TestCaseListPara
 			EXISTS (SELECT 1 FROM test_case_labels search_tcl
 				JOIN test_labels search_tl ON search_tl.id = search_tcl.label_id
 				WHERE search_tcl.test_case_id = tc.id AND LOWER(search_tl.name) LIKE ?)
+			OR EXISTS (SELECT 1 FROM test_steps search_ts WHERE search_ts.test_case_id = tc.id
+				AND (LOWER(search_ts.action) LIKE ? OR LOWER(search_ts.data) LIKE ? OR LOWER(search_ts.expected) LIKE ?))
+			OR EXISTS (SELECT 1 FROM test_case_bdd search_bdd WHERE search_bdd.test_case_id = tc.id AND LOWER(search_bdd.gherkin) LIKE ?)
 		)`
-		args = append(args, pattern, pattern, pattern, pattern, pattern)
+		args = append(args, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern)
 	}
 	return query, args
 }

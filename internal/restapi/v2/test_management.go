@@ -85,6 +85,7 @@ func registerTestManagementRoutes(builder *routeBuilder, application *services.T
 	registerBDDRunRoutes(builder, application)
 	registerTestReportRoutes(builder, application)
 	registerTestCoverageRoutes(builder, application)
+	registerTestQARoutes(builder, application)
 }
 
 type testExampleResultPatch struct {
@@ -242,8 +243,10 @@ type testCaseCreate struct {
 	EstimatedDuration int    `json:"estimated_duration"`
 	FolderID          *int   `json:"folder_id"`
 	// Format defaults to steps; "bdd" requires gherkin and validates it.
-	Format  string `json:"format"`
-	Gherkin string `json:"gherkin"`
+	Format   string                           `json:"format"`
+	Gherkin  string                           `json:"gherkin"`
+	Steps    []services.TestStepCreateRequest `json:"steps"`
+	LabelIDs []int                            `json:"label_ids"`
 }
 
 type testCasePatch struct {
@@ -255,7 +258,9 @@ type testCasePatch struct {
 	FolderID          Optional[int] `json:"folder_id"`
 	SortOrder         *int          `json:"sort_order"`
 	// Gherkin replaces the authored source of a BDD-format case.
-	Gherkin *string `json:"gherkin"`
+	Gherkin  *string                           `json:"gherkin"`
+	Steps    *[]services.TestStepCreateRequest `json:"steps"`
+	LabelIDs *[]int                            `json:"label_ids"`
 }
 
 type moveTestCaseRequest struct {
@@ -317,6 +322,7 @@ func registerTestCaseRoutes(builder *routeBuilder, app *services.TestManagementA
 				Title: input.Title, Preconditions: input.Preconditions, Priority: input.Priority, Status: input.Status,
 				EstimatedDuration: input.EstimatedDuration, FolderID: input.FolderID,
 				Format: input.Format, Gherkin: input.Gherkin,
+				Steps: input.Steps, LabelIDs: input.LabelIDs,
 			})
 		},
 		patch: func(r *http.Request, userID, workspaceID, id int, input testCasePatch) (*models.TestCase, error) {
@@ -324,6 +330,7 @@ func registerTestCaseRoutes(builder *routeBuilder, app *services.TestManagementA
 				Title: input.Title, Preconditions: input.Preconditions, Priority: input.Priority, Status: input.Status,
 				EstimatedDuration: input.EstimatedDuration, FolderID: optionalInt(input.FolderID), FolderIDSet: input.FolderID.Set, SortOrder: input.SortOrder,
 				Gherkin: input.Gherkin,
+				Steps:   input.Steps, LabelIDs: input.LabelIDs,
 			})
 		},
 		delete: func(r *http.Request, userID, workspaceID, id int) error {

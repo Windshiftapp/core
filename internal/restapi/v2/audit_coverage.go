@@ -8,6 +8,7 @@ package v2
 // request middleware flushes it. AuditService: the application service emits the
 // central audit event with the request actor. AuditExempt: reviewed exemption.
 var auditSpecRegistry = map[string]AuditKind{
+	"postWorkspacesWorkspaceIdTestCasesBulk":            AuditService,
 	"putChannelsChannelIdExperience":                    AuditService,
 	"postChannelsChannelIdBoardPlacements":              AuditService,
 	"putChannelsChannelIdBoardPlacementsPlacementId":    AuditService,

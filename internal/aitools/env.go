@@ -9,6 +9,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/itemevents"
 	"windshift/internal/logger"
+	"windshift/internal/models"
 	"windshift/internal/services"
 )
 
@@ -38,6 +39,8 @@ type Env struct {
 	// AuditDetails contains adapter-supplied correlation identifiers only.
 	// Raw tool arguments and results must never be placed here.
 	AuditDetails map[string]any
+	// Grants contains immutable resources supplied by the Standard run snapshot.
+	Grants *models.RunGrants
 
 	PermService     *services.PermissionService
 	TimePermService *services.TimePermissionService

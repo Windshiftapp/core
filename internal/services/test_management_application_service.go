@@ -34,7 +34,9 @@ type TestCasePatch struct {
 	FolderIDSet                            bool
 	// Gherkin replaces the authored source of a BDD-format case. It is
 	// rejected for step-based cases; the format itself is immutable.
-	Gherkin *string
+	Gherkin  *string
+	Steps    *[]TestStepCreateRequest
+	LabelIDs *[]int
 }
 
 type TestStepPatch struct {
@@ -309,6 +311,14 @@ func (s *TestManagementApplicationService) ReportsSummary(userID, workspaceID in
 }
 
 func (s *TestManagementApplicationService) require(userID, workspaceID int, permission string) error {
+	// System administrators pass permission checks even for nonexistent workspaces.
+	var exists bool
+	if err := s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", workspaceID).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return repository.ErrNotFound
+	}
 	allowed, err := s.permissions.HasWorkspacePermission(userID, workspaceID, permission)
 	if err != nil {
 		return err
@@ -429,16 +439,6 @@ func (s *TestManagementApplicationService) UpdateCase(userID, workspaceID, id in
 	if err != nil {
 		return nil, err
 	}
-	if patch.Gherkin != nil {
-		// Updating the source also syncs the case title with the scenario
-		// name; later explicit patch fields still win.
-		updated, err := s.cases.UpdateBDDContent(id, workspaceID, *patch.Gherkin)
-		if err != nil {
-			return nil, err
-		}
-		existing = updated
-		emitServiceAudit(s.db, actor, logger.ActionTestCaseUpdate, logger.ResourceTestCase, &updated.ID, updated.Title, nil)
-	}
 	if patch.Title != nil {
 		existing.Title = *patch.Title
 	}
@@ -464,6 +464,8 @@ func (s *TestManagementApplicationService) UpdateCase(userID, workspaceID, id in
 		Title: existing.Title, Preconditions: existing.Preconditions, Priority: existing.Priority,
 		Status: existing.Status, EstimatedDuration: existing.EstimatedDuration,
 		FolderID: existing.FolderID, SortOrder: existing.SortOrder,
+		Steps: patch.Steps, LabelIDs: patch.LabelIDs, Gherkin: patch.Gherkin,
+		SyncBDDTitle: patch.Gherkin != nil && patch.Title == nil,
 	})
 	if err != nil {
 		return nil, err

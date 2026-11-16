@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -71,7 +72,9 @@ type Tool[Args any] struct {
 	// per-user workspace permission checks inside Run remain the only gate
 	// on that surface.
 	Scopes []string
-	Run    func(ctx context.Context, env *Env, args Args) (any, error)
+	// Sources restricts adapters when the tool needs a runtime-specific context. Empty permits all.
+	Sources []string
+	Run     func(ctx context.Context, env *Env, args Args) (any, error)
 }
 
 // Entry is the type-erased view of a registered Tool, suitable for use
@@ -85,7 +88,8 @@ type Entry struct {
 	Risk        RiskLevel
 	// Scopes are the required API-token scopes copied from the Tool at
 	// register time. See Tool.Scopes for semantics.
-	Scopes []string
+	Scopes  []string
+	Sources []string
 	// Schema is the JSON Schema for the tool's Args, derived from the
 	// typed Args struct via jsonschema.For. Pre-computed at register time.
 	Schema json.RawMessage
@@ -156,6 +160,7 @@ func Register[Args any](r *Registry, t Tool[Args]) {
 		Access:      t.Access,
 		Risk:        t.Risk,
 		Scopes:      t.Scopes,
+		Sources:     slices.Clone(t.Sources),
 		Schema:      schemaJSON,
 		NewArgs:     func() any { return new(Args) },
 		Run: func(ctx context.Context, env *Env, args any) (any, error) {
@@ -168,6 +173,10 @@ func Register[Args any](r *Registry, t Tool[Args]) {
 	}
 	r.entries[t.Name] = entry
 	r.order = append(r.order, t.Name)
+}
+
+func (e Entry) AvailableFor(source string) bool {
+	return len(e.Sources) == 0 || slices.Contains(e.Sources, source)
 }
 
 func validCapabilityGroup(group CapabilityGroup) bool {

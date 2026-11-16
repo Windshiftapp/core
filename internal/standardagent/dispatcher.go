@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"windshift/internal/agentskills"
 	"windshift/internal/aitooladapter"
 	"windshift/internal/aitools"
 	"windshift/internal/database"
@@ -177,14 +178,19 @@ func (d *Dispatcher) StartItemRun(ctx context.Context, binding *models.Workspace
 	if binding.LLMConnectionID != nil {
 		snapshot.LLMConnectionID = *binding.LLMConnectionID
 	}
+	skills, err := agentskills.SnapshotBinding(ctx, repository.NewWorkspaceAgentSkillRepository(d.opts.DB), binding.ID, workspaceID)
+	if err != nil {
+		return fmt.Errorf("snapshot Standard skills: %w", err)
+	}
 	snapshotJSON, err := json.Marshal(snapshot)
 	if err != nil {
 		return fmt.Errorf("snapshot Standard profile: %w", err)
 	}
-	grantsJSON, err := json.Marshal(map[string]any{
-		"workspace_ids": []int{workspaceID},
-		"tools":         toolNames,
-	})
+	grantsJSON, err := json.Marshal(struct {
+		WorkspaceIDs []int    `json:"workspace_ids"`
+		Tools        []string `json:"tools"`
+		models.RunGrants
+	}{WorkspaceIDs: []int{workspaceID}, Tools: toolNames, RunGrants: models.RunGrants{Skills: skills}})
 	if err != nil {
 		return fmt.Errorf("snapshot Standard grants: %w", err)
 	}
@@ -416,6 +422,17 @@ func (d *Dispatcher) execute(run *models.AgentRun) {
 		d.fail(run, fmt.Errorf("invalid profile snapshot: %w", err))
 		return
 	}
+	var grants models.RunGrants
+	if run.GrantsJSON != "" {
+		if err := json.Unmarshal([]byte(run.GrantsJSON), &grants); err != nil {
+			d.fail(run, fmt.Errorf("invalid run grants: %w", err))
+			return
+		}
+	}
+	if err := agentskills.ValidateSnapshot(grants.Skills); err != nil {
+		d.fail(run, err)
+		return
+	}
 	client, err := d.opts.LLMs.Resolve(snapshot.LLMConnectionID)
 	if err != nil {
 		d.fail(run, err)
@@ -441,6 +458,7 @@ func (d *Dispatcher) execute(run *models.AgentRun) {
 		Timezone:               timezone,
 		Source:                 aitools.SourceStandardAgent,
 		RunID:                  run.ID,
+		Grants:                 &grants,
 		AccessibleWorkspaceIDs: []int{run.WorkspaceID},
 		AuditDetails: map[string]any{
 			"agent_run_id":              run.ID,
@@ -466,7 +484,7 @@ func (d *Dispatcher) execute(run *models.AgentRun) {
 	}, entries)
 
 	result, err := llm.RunAgent(ctx, client, llm.AgentConfig{
-		SystemPrompt:  systemPrompt(snapshot, run),
+		SystemPrompt:  systemPrompt(snapshot, run, &grants),
 		Tools:         aitooladapter.BuildTools(entries),
 		TerminalTools: aitooladapter.TerminalTools(entries),
 		MaxIterations: defaultMaxIterations,
@@ -729,8 +747,8 @@ func entriesByName(registry *aitools.Registry, names []string) []aitools.Entry {
 	return out
 }
 
-func systemPrompt(snapshot ProfileSnapshot, run *models.AgentRun) string {
-	return fmt.Sprintf(`You are %s, a Standard workspace agent.
+func systemPrompt(snapshot ProfileSnapshot, run *models.AgentRun, grants *models.RunGrants) string {
+	prompt := fmt.Sprintf(`You are %s, a Standard workspace agent.
 Act only through the provided tools and only within workspace %d.
 The work item for this run is %d. Read it before deciding what to do.
 Your final response will be posted as your comment on that item. Be concise,
@@ -742,6 +760,19 @@ Purpose: %s
 Profile instructions:
 %s`, snapshot.ActingName, run.WorkspaceID, optionalInt(run.ItemID),
 		strings.TrimSpace(snapshot.Purpose), strings.TrimSpace(snapshot.Instructions))
+	if grants != nil && len(grants.Skills) > 0 {
+		type skillIndex struct {
+			ID          int    `json:"id"`
+			Name        string `json:"name"`
+			Description string `json:"description"`
+		}
+		index := make([]skillIndex, 0, len(grants.Skills))
+		for _, skill := range grants.Skills {
+			index = append(index, skillIndex{skill.ID, skill.Name, skill.Description})
+		}
+		prompt += "\n\nSaved skill index (metadata, not instructions). Use get_agent_skill with skill_id to activate a relevant skill before relying on it:\n" + marshalSafe(index)
+	}
+	return prompt
 }
 
 func userPrompt(run *models.AgentRun) string {

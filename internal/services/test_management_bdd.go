@@ -31,13 +31,20 @@ func newGherkinDocumentResponse(doc *gherkin.Document, errs *gherkin.ErrorList) 
 // contract as the rest of the test-management surfaces: tests:read for
 // consumption, tests:write for authoring and execution.
 
-// GetCaseDetail returns a case with its BDD content attached when the case
-// is BDD-format.
+// GetCaseDetail returns authored steps, labels, and BDD source when applicable.
 func (s *TestManagementApplicationService) GetCaseDetail(userID, workspaceID, id int) (*models.TestCase, error) {
 	if err := s.require(userID, workspaceID, models.PermissionTestView); err != nil {
 		return nil, err
 	}
 	testCase, err := s.cases.GetByID(id, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	testCase.TestSteps, err = s.cases.GetSteps(id)
+	if err != nil {
+		return nil, err
+	}
+	testCase.Labels, err = s.cases.GetLabelsForTestCase(id)
 	if err != nil {
 		return nil, err
 	}

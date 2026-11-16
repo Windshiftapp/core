@@ -565,19 +565,21 @@ type History struct {
 // ============================================
 
 type TestCase struct {
-	ID                int         `json:"id"`
-	WorkspaceID       int         `json:"workspace_id"`
-	FolderID          *int        `json:"folder_id,omitempty"`
-	FolderName        string      `json:"folder_name,omitempty"`
-	Title             string      `json:"title"`
-	Preconditions     string      `json:"preconditions,omitempty"`
-	Priority          string      `json:"priority,omitempty"`
-	Status            string      `json:"status,omitempty"`
-	EstimatedDuration int         `json:"estimated_duration,omitempty"`
-	SortOrder         int         `json:"sort_order,omitempty"`
-	Labels            []TestLabel `json:"labels,omitempty"`
-	CreatedAt         time.Time   `json:"created_at"`
-	UpdatedAt         time.Time   `json:"updated_at"`
+	ID                int             `json:"id"`
+	WorkspaceID       int             `json:"workspace_id"`
+	FolderID          *int            `json:"folder_id,omitempty"`
+	FolderName        string          `json:"folder_name,omitempty"`
+	Title             string          `json:"title"`
+	Format            string          `json:"format"`
+	BDD               json.RawMessage `json:"bdd,omitempty"`
+	Preconditions     string          `json:"preconditions,omitempty"`
+	Priority          string          `json:"priority,omitempty"`
+	Status            string          `json:"status,omitempty"`
+	EstimatedDuration int             `json:"estimated_duration,omitempty"`
+	SortOrder         int             `json:"sort_order,omitempty"`
+	Labels            []TestLabel     `json:"labels,omitempty"`
+	CreatedAt         time.Time       `json:"created_at"`
+	UpdatedAt         time.Time       `json:"updated_at"`
 }
 
 type TestStep struct {

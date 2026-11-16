@@ -29,25 +29,27 @@ func NewTestCaseService(db database.Database) *TestCaseService {
 
 // TestCaseListParams contains parameters for listing test cases
 type TestCaseListParams struct {
-	WorkspaceID int
-	FolderID    *int
-	All         bool
-	Limit       int
-	Offset      int
-	Search      string
-	LabelID     *int
+	WorkspaceID     int
+	FolderID        *int
+	All             bool
+	Limit           int
+	Offset          int
+	Search          string
+	LabelID         *int
+	ExcludeInactive bool
 }
 
 // List retrieves test cases with optional folder filtering
 func (s *TestCaseService) List(params TestCaseListParams) ([]models.TestCase, error) {
 	testCases, err := s.repo.FindAll(repository.TestCaseListParams{
-		WorkspaceID: params.WorkspaceID,
-		FolderID:    params.FolderID,
-		All:         params.All,
-		Limit:       params.Limit,
-		Offset:      params.Offset,
-		Search:      params.Search,
-		LabelID:     params.LabelID,
+		WorkspaceID:     params.WorkspaceID,
+		FolderID:        params.FolderID,
+		All:             params.All,
+		Limit:           params.Limit,
+		Offset:          params.Offset,
+		Search:          params.Search,
+		LabelID:         params.LabelID,
+		ExcludeInactive: params.ExcludeInactive,
 	})
 	if err != nil {
 		return nil, err
@@ -73,6 +75,7 @@ func (s *TestCaseService) Count(params TestCaseListParams) (int, error) {
 	return s.repo.Count(repository.TestCaseListParams{
 		WorkspaceID: params.WorkspaceID, FolderID: params.FolderID, All: params.All,
 		Search: params.Search, LabelID: params.LabelID,
+		ExcludeInactive: params.ExcludeInactive,
 	})
 }
 
@@ -84,14 +87,16 @@ func (s *TestCaseService) GetByID(id, workspaceID int) (*models.TestCase, error)
 // TestCaseCreateRequest contains data for creating a test case
 // Format defaults to steps; "bdd" requires Gherkin and validates it.
 type TestCaseCreateRequest struct {
-	Title             string
-	Preconditions     string
-	Priority          string
-	Status            string
-	EstimatedDuration int
-	FolderID          *int
-	Format            string
-	Gherkin           string
+	Title             string                  `json:"title"`
+	Preconditions     string                  `json:"preconditions,omitempty"`
+	Priority          string                  `json:"priority,omitempty"`
+	Status            string                  `json:"status,omitempty"`
+	EstimatedDuration int                     `json:"estimated_duration,omitempty"`
+	FolderID          *int                    `json:"folder_id,omitempty"`
+	Format            string                  `json:"format,omitempty"`
+	Gherkin           string                  `json:"gherkin,omitempty"`
+	Steps             []TestStepCreateRequest `json:"steps,omitempty"`
+	LabelIDs          []int                   `json:"label_ids,omitempty"`
 }
 
 // Create creates a new test case
@@ -155,6 +160,9 @@ func (s *TestCaseService) Create(workspaceID int, req TestCaseCreateRequest) (*m
 	if err := s.validateFolderInWorkspace(workspaceID, req.FolderID); err != nil {
 		return nil, err
 	}
+	if err := s.validateAuthoredContent(workspaceID, req.Format, &req.Steps, &req.LabelIDs); err != nil {
+		return nil, err
+	}
 
 	// Get max sort order
 	maxSortOrder, err := s.repo.GetMaxSortOrder(workspaceID, req.FolderID)
@@ -183,6 +191,9 @@ func (s *TestCaseService) Create(workspaceID int, req TestCaseCreateRequest) (*m
 			return nil, err
 		}
 		tc.ID = id
+		if err := s.writeAuthoredContent(tx, workspaceID, tc.ID, &req.Steps, &req.LabelIDs); err != nil {
+			return nil, err
+		}
 		if bddSpec != nil {
 			encoded, err := encodeScenarioSpec(bddSpec)
 			if err != nil {
@@ -215,29 +226,30 @@ type TestCaseUpdateRequest struct {
 	EstimatedDuration int
 	FolderID          *int
 	SortOrder         int
+	Steps             *[]TestStepCreateRequest
+	LabelIDs          *[]int
+	Gherkin           *string
+	SyncBDDTitle      bool
 }
 
 // Update updates an existing test case
 func (s *TestCaseService) Update(id, workspaceID int, req TestCaseUpdateRequest) (*models.TestCase, error) {
-	// Sanitize input
+	// Validate the entire edit before writing metadata or authored content.
+	existing, err := s.repo.FindByID(id, workspaceID)
+	if err != nil {
+		return nil, err
+	}
 	req.Title = sanitize.PlainTextField.Sanitize(req.Title)
 	req.Preconditions = sanitize.Comment.Sanitize(req.Preconditions)
 
-	if req.Title == "" {
-		return nil, &TestManagementValidationError{Msg: "test case title is required"}
-	}
-
-	// Validate priority if provided
 	if req.Priority != "" && !isValidTestCasePriority(req.Priority) {
 		return nil, &TestManagementValidationError{Msg: "invalid priority value: must be low, medium, high, or critical"}
 	}
 
-	// Validate status if provided
 	if req.Status != "" && !isValidTestCaseStatus(req.Status) {
 		return nil, &TestManagementValidationError{Msg: "invalid status value: must be active, inactive, or draft"}
 	}
 
-	// Validate estimated duration
 	if req.EstimatedDuration < 0 {
 		return nil, &TestManagementValidationError{Msg: "estimated duration cannot be negative"}
 	}
@@ -245,12 +257,41 @@ func (s *TestCaseService) Update(id, workspaceID int, req TestCaseUpdateRequest)
 	if err := s.validateFolderInWorkspace(workspaceID, req.FolderID); err != nil {
 		return nil, err
 	}
+	if err := s.validateAuthoredContent(workspaceID, existing.Format, req.Steps, req.LabelIDs); err != nil {
+		return nil, err
+	}
+	var bdd *models.TestCaseBDD
+	if req.Gherkin != nil {
+		if existing.Format != TestFormatBDD {
+			return nil, &TestManagementValidationError{Msg: "gherkin can only be updated on BDD-format test cases"}
+		}
+		source, err := capGherkin(*req.Gherkin)
+		if err != nil {
+			return nil, err
+		}
+		spec, errs := BuildScenarioSpec(source)
+		if !errs.Empty() {
+			return nil, &TestBDDValidationError{Errors: errs.Errors}
+		}
+		if req.SyncBDDTitle {
+			req.Title = sanitize.PlainTextField.Sanitize(spec.ScenarioName)
+		}
+		encoded, err := encodeScenarioSpec(spec)
+		if err != nil {
+			return nil, err
+		}
+		bdd = &models.TestCaseBDD{TestCaseID: id, Gherkin: source, FeatureName: spec.FeatureName, ScenarioKeyword: spec.ScenarioKeyword, Spec: encoded}
+	}
+	if req.Title == "" {
+		return nil, &TestManagementValidationError{Msg: "test case title is required"}
+	}
 
 	tc := &models.TestCase{
 		ID:                id,
 		WorkspaceID:       workspaceID,
 		FolderID:          req.FolderID,
 		Title:             req.Title,
+		Format:            existing.Format,
 		Preconditions:     req.Preconditions,
 		Priority:          req.Priority,
 		Status:            req.Status,
@@ -261,6 +302,14 @@ func (s *TestCaseService) Update(id, workspaceID int, req TestCaseUpdateRequest)
 
 	return database.WithTxResult(s.db, func(tx database.Tx) (*models.TestCase, error) {
 		if err := s.repo.Update(tx, tc); err != nil {
+			return nil, err
+		}
+		if bdd != nil {
+			if err := s.bddRepo.Upsert(tx, bdd); err != nil {
+				return nil, err
+			}
+		}
+		if err := s.writeAuthoredContent(tx, workspaceID, id, req.Steps, req.LabelIDs); err != nil {
 			return nil, err
 		}
 		return tc, nil
@@ -325,9 +374,9 @@ func (s *TestCaseService) GetSteps(testCaseID int) ([]models.TestStep, error) {
 
 // TestStepCreateRequest contains data for creating a test step
 type TestStepCreateRequest struct {
-	Action   string
-	Data     string
-	Expected string
+	Action   string `json:"action"`
+	Data     string `json:"data"`
+	Expected string `json:"expected"`
 }
 
 // CreateStep creates a new test step

@@ -16,6 +16,9 @@ import (
 // JSON Schema bytes; handlers unmarshal registry-validated arguments directly.
 func (ms *MCPServer) registerAITools() {
 	for _, e := range aitools.Default.All() {
+		if !e.AvailableFor(aitools.SourceMCP) {
+			continue
+		}
 		entry := e // capture per iteration
 		ms.server.AddTool(&mcp.Tool{
 			Name:        entry.Name,

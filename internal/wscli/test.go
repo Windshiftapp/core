@@ -573,6 +573,7 @@ func init() {
 	testCmd.AddCommand(testCaseCmd)
 	testCaseCmd.AddCommand(testCaseListCmd)
 	testCaseCmd.AddCommand(testCaseGetCmd)
+	testCaseCmd.AddCommand(newTestCaseWriteCommand(false), newTestCaseWriteCommand(true))
 
 	testCaseListCmd.Flags().StringVar(&testCaseFolderFilter, "folder", "", "filter by folder ID")
 

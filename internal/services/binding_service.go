@@ -438,6 +438,9 @@ func (s *BindingService) Create(ctx context.Context, req CreateBindingRequest) (
 	if len(req.SkillIDs) > 0 && s.skills == nil {
 		return nil, ErrBindingSkillsUnavailable
 	}
+	if err := agentskills.ValidateAttachmentCount(req.SkillIDs); err != nil {
+		return nil, err
+	}
 	identity, err := s.identity.Resolve(ctx, req.CreatedByUserID, req.ActingUserID, req.WorkspaceID)
 	if err != nil {
 		return nil, err
@@ -627,6 +630,9 @@ func (s *BindingService) UpdateBinding(ctx context.Context, req UpdateBindingReq
 	if len(req.SkillIDs) > 0 && s.skills == nil {
 		return nil, ErrBindingSkillsUnavailable
 	}
+	if err := agentskills.ValidateAttachmentCount(req.SkillIDs); err != nil {
+		return nil, err
+	}
 	repos, err := normalizeRepoInputs(req.Repos)
 	if err != nil {
 		return nil, err
@@ -707,6 +713,9 @@ func (s *BindingService) UpdateAgentConfig(ctx context.Context, workspaceID, bin
 	}
 	if binding.Lifecycle == models.AgentLifecycleArchived {
 		return ErrBindingUnavailable
+	}
+	if err := agentskills.ValidateAttachmentCount(skillIDs); err != nil {
+		return err
 	}
 	var newRunnerImage string
 	if runnerImage != nil {
@@ -1081,7 +1090,7 @@ func (s *BindingService) MaybeStartRunsForMentions(ctx context.Context, workspac
 // pointers — progressive disclosure, so skill bodies cost no context until
 // the agent decides one is relevant. Returns "" when the binding has
 // neither.
-func (s *BindingService) promptSuffixForBinding(binding *models.WorkspaceAgentBinding, skills []*models.WorkspaceAgentSkill) string {
+func (s *BindingService) promptSuffixForBinding(binding *models.WorkspaceAgentBinding, skills []models.SkillGrant) string {
 	var b strings.Builder
 	if strings.TrimSpace(binding.Instructions) != "" {
 		b.WriteString("\n\n## Your role\n")
@@ -1130,49 +1139,11 @@ func renderInstruction(trigger *models.RunTrigger) string {
 	return b.String()
 }
 
-// enabledSkillsForBinding loads the binding's enabled skills; nil when the
-// skills repo is not wired or the lookup fails (logged — a skills hiccup
-// must not block the run).
-func (s *BindingService) enabledSkillsForBinding(ctx context.Context, binding *models.WorkspaceAgentBinding) []*models.WorkspaceAgentSkill {
+func (s *BindingService) snapshotBindingSkills(ctx context.Context, binding *models.WorkspaceAgentBinding) ([]models.SkillGrant, error) {
 	if s.skills == nil {
-		return nil
+		return nil, nil
 	}
-	skills, err := s.skills.ListEnabledForBinding(ctx, binding.ID)
-	if err != nil {
-		s.logger.Printf("binding service: list skills for binding=%d: %v (run proceeds without skills)", binding.ID, err)
-		return nil
-	}
-	out := make([]*models.WorkspaceAgentSkill, 0, len(skills))
-	for _, skill := range skills {
-		refs, err := s.skills.PageRefsForSkill(ctx, skill.ID)
-		if err != nil {
-			s.logger.Printf("binding service: snapshot pages for skill=%d: %v (skill omitted)", skill.ID, err)
-			continue
-		}
-		rendered, _, err := agentskills.RenderActivation(skill.Body, refs)
-		if err != nil {
-			snapshot := *skill
-			snapshot.Body = ""
-			snapshot.ActivationError = err.Error()
-			out = append(out, &snapshot)
-			s.logger.Printf("binding service: render skill=%d: %v (run gets typed unavailable grant)", skill.ID, err)
-			continue
-		}
-		snapshot := *skill
-		snapshot.Body = rendered
-		out = append(out, &snapshot)
-	}
-	return out
-}
-
-func skillGrants(skills []*models.WorkspaceAgentSkill) []models.SkillGrant {
-	grants := make([]models.SkillGrant, 0, len(skills))
-	for _, skill := range skills {
-		grants = append(grants, models.SkillGrant{
-			ID: skill.ID, Name: skill.Name, Description: skill.Description, Body: skill.Body, Error: skill.ActivationError,
-		})
-	}
-	return grants
+	return agentskills.SnapshotBinding(ctx, s.skills, binding.ID, binding.WorkspaceID)
 }
 
 // applyContinuation reuses an open PR in a bound repository for mentions and
@@ -1269,7 +1240,10 @@ func (s *BindingService) startRunForBinding(ctx context.Context, binding *models
 			return ErrBindingBudgetExceeded
 		}
 	}
-	skills := s.enabledSkillsForBinding(ctx, binding)
+	skills, err := s.snapshotBindingSkills(ctx, binding)
+	if err != nil {
+		return fmt.Errorf("snapshot binding skills: %w", err)
+	}
 
 	// Remote pool binding: persist a queued run for the pool and stop. The
 	// per-run token, grants, and runner env are derived at claim time by the
@@ -1292,7 +1266,7 @@ func (s *BindingService) startRunForBinding(ctx context.Context, binding *models
 			// remote claim time (ResolveRunInputs), the same place the binding
 			// suffix is re-derived — so it survives the queue→claim hop.
 			Trigger: trigger,
-			Grants:  &models.RunGrants{Skills: skillGrants(skills)},
+			Grants:  &models.RunGrants{Skills: skills},
 		}
 		// Pre-validate the full SCM resolution now — credential principal AND
 		// clone-host config — rather than letting the run sit queued until a
@@ -1434,7 +1408,7 @@ func (s *BindingService) startRunForBinding(ctx context.Context, binding *models
 	// (WI-144). Shared with the remote claim path via bindingTokenAndGrants so
 	// both transports derive identical inputs (WI-195). The git ref is filled
 	// at claim from the prepared worktree branch.
-	req.Token, req.Grants = s.bindingTokenAndGrants(binding, itemID, triggeredByUserID, skillGrants(skills))
+	req.Token, req.Grants = s.bindingTokenAndGrants(binding, itemID, triggeredByUserID, skills)
 
 	runID, err := s.runs.Start(ctx, req)
 	if err != nil {
@@ -1721,19 +1695,28 @@ func (s *BindingService) ResolveRunInputs(ctx context.Context, run *models.Agent
 	if run.TriggeredByUserID != nil {
 		triggeredBy = *run.TriggeredByUserID
 	}
-	skills := s.enabledSkillsForBinding(ctx, binding)
+	var skills []models.SkillGrant
 	if run.GrantsJSON != "" {
 		var frozen models.RunGrants
 		if err := json.Unmarshal([]byte(run.GrantsJSON), &frozen); err != nil {
 			return nil, fmt.Errorf("resolve run inputs: decode frozen skill grants: %w", err)
 		}
-		skills = skillsFromGrants(frozen.Skills)
+		if err := agentskills.ValidateSnapshot(frozen.Skills); err != nil {
+			return nil, err
+		}
+		skills = frozen.Skills
+	} else {
+		var err error
+		skills, err = s.snapshotBindingSkills(ctx, binding)
+		if err != nil {
+			return nil, fmt.Errorf("snapshot binding skills: %w", err)
+		}
 	}
 	// Re-derive the binding persona/skills suffix, then append the run's own
 	// instruction (the @mentioning comment, persisted on the run as Trigger) so
 	// the remote claim prepares the prompt identically to the local path.
 	promptSuffix := s.promptSuffixForBinding(binding, skills) + visionSuffix + renderInstruction(run.Trigger)
-	spec, grants := s.bindingTokenAndGrants(binding, itemID, triggeredBy, skillGrants(skills))
+	spec, grants := s.bindingTokenAndGrants(binding, itemID, triggeredBy, skills)
 	if run.IsEphemeral && spec != nil {
 		spec.Scopes = append([]string(nil), auth.DefaultCodingAgentPrivateTestScopes...)
 	}
@@ -1768,16 +1751,6 @@ func (s *BindingService) ResolveRunInputs(ctx context.Context, run *models.Agent
 		repo = &primary
 	}
 	return &RunInputs{Token: spec, Grants: grants, Repo: repo, Repos: repos, Env: env, PromptSuffix: promptSuffix}, nil
-}
-
-func skillsFromGrants(grants []models.SkillGrant) []*models.WorkspaceAgentSkill {
-	skills := make([]*models.WorkspaceAgentSkill, 0, len(grants))
-	for _, grant := range grants {
-		skills = append(skills, &models.WorkspaceAgentSkill{
-			ID: grant.ID, Name: grant.Name, Description: grant.Description, Body: grant.Body, Enabled: true, ActivationError: grant.Error,
-		})
-	}
-	return skills
 }
 
 func (s *BindingService) buildRunEnv(ctx context.Context, workspaceID, itemID int) (map[string]string, error) {
