@@ -2,7 +2,6 @@ import { createActionFlowStore } from './createActionFlowStore.svelte.js';
 
 export const actionFlowStore = createActionFlowStore({
   defaultTrigger: 'status_transition',
-  includeStatuses: true,
   nodeConfigDefaults: {
     set_field: { field_name: '', value: '' },
     set_status: { status_id: null },

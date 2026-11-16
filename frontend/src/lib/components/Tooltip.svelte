@@ -59,7 +59,15 @@
       }
     });
     const action = trigger(node);
+    function handleEscape(event) {
+      if (event.key !== 'Escape' || !get(open)) return;
+      open.set(false);
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    node.addEventListener('keydown', handleEscape, true);
     return () => {
+      node.removeEventListener('keydown', handleEscape, true);
       action?.destroy?.();
       unsubscribe();
       for (const name of ['data-melt-tooltip-trigger', 'data-state']) node.removeAttribute(name);

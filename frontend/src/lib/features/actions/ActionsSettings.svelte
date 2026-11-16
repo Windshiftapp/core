@@ -32,6 +32,7 @@
 
   let actions = $state([]);
   let statuses = $state([]);
+  let statusesState = $state('idle');
   let loading = $state(true);
   let editingAction = $state(null);
   let viewingLogsAction = $state(null);
@@ -171,12 +172,15 @@
 
   async function loadStatuses() {
     if (readController.signal.aborted) return;
+    statusesState = 'loading';
     try {
       statuses = await workspaces.getStatuses(workspaceId, null, { signal: readController.signal }) || [];
+      statusesState = 'ready';
     } catch (error) {
       if (readController.signal.aborted) return;
       console.error('Failed to load statuses:', error);
       statuses = [];
+      statusesState = 'error';
     }
   }
 
@@ -277,6 +281,7 @@
     <ActionFlowEditor
       action={editingAction}
       {statuses}
+      {statusesState}
       onSave={handleSaveAction}
       onCancel={handleCancelEdit}
     />
