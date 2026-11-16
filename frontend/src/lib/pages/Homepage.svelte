@@ -265,6 +265,7 @@
 
 <div
   class="min-h-full w-full"
+  class:dashboard-dot-grid={!homepageStore.hasCustomBackground}
   style="{homepageStore.backgroundStyle} background-attachment: fixed;"
   data-testid="homepage"
   data-ready={layoutLoaded}
@@ -556,3 +557,10 @@
   }}
   onsaved={handleWidgetSaved}
 />
+
+<style>
+  .dashboard-dot-grid {
+    background-image: radial-gradient(circle, var(--ds-icon-subtle) 0.5px, transparent 0.5px);
+    background-size: 20px 20px;
+  }
+</style>
