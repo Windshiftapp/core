@@ -239,7 +239,7 @@
     role="listbox"
     tabindex="-1"
     aria-activedescendant={highlightedIndex >= 0 ? optionId(options[highlightedIndex], highlightedIndex) : undefined}
-    onkeydown={handleListboxKeydown}
+    onkeydowncapture={handleListboxKeydown}
     class="rounded border shadow-lg flex flex-col overflow-hidden z-[60] focus:outline-none"
     style="background-color: var(--ds-surface-raised); border-color: var(--ds-border); width: {menuWidth || undefined};
            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.15);"
