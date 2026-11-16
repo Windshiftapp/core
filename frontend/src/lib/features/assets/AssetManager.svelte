@@ -617,6 +617,7 @@
     {#snippet actions()}
       <div class="flex items-center gap-2">
         <ItemPicker
+          id="asset-manager-set-picker"
           bind:value={selectedSetId}
           disabled={savingConfiguration}
           optionTestid={(option) => `asset-manager-set-${option.value}`}

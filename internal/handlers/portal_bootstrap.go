@@ -71,11 +71,18 @@ func (h *PortalHandler) GetBootstrap(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.Portal = portal
+	if config.PortalPresentation == "compact" {
+		respondJSONOK(w, response)
+		return
+	}
 	vc := h.getPortalVisibilityContext(ctx, r, channel.ID)
 	var wait sync.WaitGroup
 	wait.Add(2)
 	go func() {
 		defer wait.Done()
+		if !config.PortalModuleEnabled("forms") {
+			return
+		}
 		requestTypes, err := h.loadPortalRequestTypes(ctx, channel.ID, vc)
 		if err != nil {
 			slog.Warn("portal bootstrap: request types unavailable", "channel_id", channel.ID, "error", err)
@@ -85,6 +92,9 @@ func (h *PortalHandler) GetBootstrap(w http.ResponseWriter, r *http.Request) {
 	}()
 	go func() {
 		defer wait.Done()
+		if !config.PortalModuleEnabled("asset-reports") {
+			return
+		}
 		assetReports, err := h.loadPortalAssetReports(ctx, channel, config, vc)
 		if err != nil {
 			slog.Warn("portal bootstrap: asset reports unavailable", "channel_id", channel.ID, "error", err)
@@ -126,11 +136,18 @@ func (h *PortalHandler) GetUserBootstrap(w http.ResponseWriter, r *http.Request)
 		respondInternalError(w, r, err)
 		return
 	}
+	if config.PortalPresentation == "compact" {
+		respondJSONOK(w, response)
+		return
+	}
 
 	var wait sync.WaitGroup
 	wait.Add(2)
 	go func() {
 		defer wait.Done()
+		if !config.PortalModuleEnabled("requests") {
+			return
+		}
 		requests, err := h.loadMyPortalRequests(ctx, r, channel.ID, config)
 		if err != nil {
 			slog.Warn("portal user bootstrap: requests unavailable", "channel_id", channel.ID, "error", err)
@@ -140,7 +157,7 @@ func (h *PortalHandler) GetUserBootstrap(w http.ResponseWriter, r *http.Request)
 	}()
 	go func() {
 		defer wait.Done()
-		if h.approvalService == nil {
+		if h.approvalService == nil || !config.PortalModuleEnabled("approvals") {
 			return
 		}
 		actor, err := h.portalApprovalActorFromRequest(r)

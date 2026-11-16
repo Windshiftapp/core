@@ -47,6 +47,9 @@ type CustomerAccessHandler struct {
 	ip             *utils.IPExtractor
 	secure         bool
 	limiter        interface{ AllowRequest(*http.Request) bool }
+	publicBoards   services.PublicBoardAvailability
+	sharing        *services.CollectionApplicationService
+	boardViewer    *PublicBoardHandler
 }
 
 func (h *CustomerAccessHandler) SetLimiter(limiter interface{ AllowRequest(*http.Request) bool }) {
@@ -75,10 +78,13 @@ type CustomerAccessDependencies struct {
 	MagicLinks     *services.MagicLinkService
 	IP             *utils.IPExtractor
 	Secure         bool
+	PublicBoards   services.PublicBoardAvailability
+	Sharing        *services.CollectionApplicationService
+	BoardViewer    *PublicBoardHandler
 }
 
 func NewCustomerAccessHandler(deps CustomerAccessDependencies) *CustomerAccessHandler {
-	return &CustomerAccessHandler{repo: deps.Access, providers: deps.Providers, customers: deps.Customers, channels: deps.Channels, collections: deps.Collections, permissions: deps.Permissions, scope: deps.Scope, portalSessions: deps.PortalSessions, portalAuth: deps.PortalAuth, passkeys: deps.Passkeys, magicLinks: deps.MagicLinks, ip: deps.IP, secure: deps.Secure}
+	return &CustomerAccessHandler{repo: deps.Access, providers: deps.Providers, customers: deps.Customers, channels: deps.Channels, collections: deps.Collections, permissions: deps.Permissions, scope: deps.Scope, portalSessions: deps.PortalSessions, portalAuth: deps.PortalAuth, passkeys: deps.Passkeys, magicLinks: deps.MagicLinks, ip: deps.IP, secure: deps.Secure, publicBoards: deps.PublicBoards, sharing: deps.Sharing, boardViewer: deps.BoardViewer}
 }
 
 func customerSurfacePath(surface models.CustomerSurface) string {
@@ -94,6 +100,10 @@ func customerOpaqueToken() (string, error) {
 }
 
 func (h *CustomerAccessHandler) resolve(w http.ResponseWriter, r *http.Request) (*models.CustomerSurface, bool) {
+	if r.PathValue("kind") == "board" && h.publicBoards != nil && !h.publicBoards.PublicBoardsEnabled() {
+		respondNotFound(w, r, "customer resource")
+		return nil, false
+	}
 	surface, err := h.repo.Resolve(r.Context(), r.PathValue("kind"), r.PathValue("slug"))
 	if err != nil {
 		respondNotFound(w, r, "customer resource")
@@ -195,16 +205,9 @@ func (h *CustomerAccessHandler) managementSurface(w http.ResponseWriter, r *http
 		allowed, err = h.channels.UserCanManage(r.Context(), user.ID, id)
 	}
 	if !allowed && surface.Kind == "board" {
-		allowed, err = h.permissions.HasGlobalPermission(user.ID, models.PermissionPublicBoardManage)
-		if err == nil && allowed {
-			collection, e := h.collections.GetVisibleModel(id, user.ID)
-			if e != nil {
-				allowed = false
-			} else {
-				_, err = h.scope.AuthorizePublishing(user.ID, collection.QLQuery)
-				allowed = err == nil
-			}
-		}
+		ownerID, ownerErr := h.collections.GetOwnerID(id)
+		err = ownerErr
+		allowed = err == nil && ownerID != nil && *ownerID == user.ID
 	}
 	if err != nil || !allowed {
 		respondForbidden(w, r)
@@ -233,6 +236,35 @@ func (h *CustomerAccessHandler) PutPolicy(w http.ResponseWriter, r *http.Request
 	}
 	policy, ok := decodeJSON[models.CustomerAccessPolicy](w, r)
 	if !ok {
+		return
+	}
+	if surface.Kind == "board" {
+		user := utils.GetCurrentUser(r)
+		service := h.sharing
+		if service == nil {
+			respondInternalError(w, r, errors.New("board sharing service is unavailable"))
+			return
+		}
+		current, err := service.GetBoardSharing(user.ID, surface.ID)
+		if err == nil {
+			_, err = service.SaveBoardSharing(services.AuditActor{UserID: user.ID, Username: user.Username, IPAddress: utils.GetClientIP(r), UserAgent: r.UserAgent()}, surface.ID,
+				services.BoardSharingSave{Revision: current.Revision, Enabled: current.Enabled, StandaloneEnabled: current.StandaloneEnabled, Slug: current.Slug, MilestoneSwimlanes: current.MilestoneSwimlanes, Policy: policy})
+		}
+		if err != nil {
+			var validation *services.CollectionValidationError
+			switch {
+			case errors.Is(err, services.ErrCollectionForbidden):
+				respondForbidden(w, r)
+			case errors.Is(err, services.ErrCollectionConflict):
+				respondJSON(w, http.StatusConflict, map[string]any{"error": "Sharing changed; reload before saving", "code": "CONFLICT"})
+			case errors.As(err, &validation):
+				respondValidationError(w, r, validation.Error())
+			default:
+				respondInternalError(w, r, err)
+			}
+			return
+		}
+		h.GetPolicy(w, r)
 		return
 	}
 	if err := h.repo.SavePolicy(r.Context(), *surface, policy); err != nil {
@@ -269,12 +301,60 @@ func (h *CustomerAccessHandler) Guard(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		if kind == "board" && h.publicBoards != nil && !h.publicBoards.PublicBoardsEnabled() {
+			respondNotFound(w, r, "customer resource")
+			return
+		}
 		w.Header().Set("Cache-Control", "private, no-store")
 		w.Header().Add("Vary", "Cookie")
 		surface, err := h.repo.Resolve(r.Context(), kind, slug)
 		if err != nil {
 			respondNotFound(w, r, "customer resource")
 			return
+		}
+		if kind == "portal" {
+			channel, err := h.channels.FindByID(r.Context(), surface.ID)
+			if err != nil {
+				respondInternalError(w, r, err)
+				return
+			}
+			var config models.ChannelConfig
+			if err := json.Unmarshal([]byte(channel.Config), &config); err != nil {
+				respondInternalError(w, r, err)
+				return
+			}
+			module := ""
+			if len(parts) > 3 {
+				switch parts[3] {
+				case "my-requests", "requests":
+					module = "requests"
+					// Only item context is shared with approvals; the handler still
+					// requires active approver access when requests are disabled.
+					if parts[3] == "requests" && len(parts) == 5 && r.Method == http.MethodGet && config.PortalModuleEnabled("approvals") {
+						module = ""
+					}
+				case "request-types", "submit", "custom-fields":
+					module = "forms"
+				case "drafts":
+					module = "drafts"
+				case "approvals":
+					module = "approvals"
+				case "knowledge-base":
+					module = "knowledge-base"
+				case "asset-reports", "assets":
+					module = "asset-reports"
+				case "credentials", "passkey-prompt":
+					module = "profile"
+				case "auth":
+					if r.Method == http.MethodPut && len(parts) > 4 && parts[4] == "me" {
+						module = "profile"
+					}
+				}
+			}
+			if module != "" && !config.PortalModuleEnabled(module) {
+				respondForbidden(w, r)
+				return
+			}
 		}
 		policy, err := h.repo.Policy(r.Context(), kind, surface.ID)
 		if err != nil {
@@ -356,7 +436,11 @@ func (h *CustomerAccessHandler) issueSession(w http.ResponseWriter, r *http.Requ
 	return nil
 }
 
-// Check registration rules before a GitHub identity can create a customer.
+func portalAdmissionRequired(config models.ChannelConfig) bool {
+	return config.PortalRegistrationMode != "" && config.PortalRegistrationMode != "open" || len(config.PortalAllowedDomains) > 0
+}
+
+// Check current registration rules for customer sign-in and portal board reads.
 func (h *CustomerAccessHandler) portalAdmission(ctx context.Context, surface models.CustomerSurface, email string) error {
 	if surface.Kind != "portal" {
 		return nil

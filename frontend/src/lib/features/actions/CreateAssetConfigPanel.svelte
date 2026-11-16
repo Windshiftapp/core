@@ -1,6 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
-  import { assetCategories, assetSets as assetSetsApi, assetStatuses, assetTypes as assetTypesApi } from '../../api/assets.js';
+  import { useActionEditorContext } from './shared/actionEditorContext.js';
   import PlaceholderFieldLabel from './PlaceholderFieldLabel.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { actionFlowStore } from '../../stores/actionFlowStore.svelte.js';
@@ -9,7 +8,6 @@
   import Textarea from '../../components/Textarea.svelte';
   import FieldMappingsEditor from './shared/FieldMappingsEditor.svelte';
   import {
-    useAssetTypeFields,
     applyAssetTypeChange,
     applyMappingsChange,
   } from './shared/assetConfigHelpers.svelte.js';
@@ -20,62 +18,15 @@
     showPlaceholderModal = $bindable(false),
   } = $props();
 
-  // Data state
-  let assetSets = $state([]);
-  let assetTypes = $state([]);
-  let categories = $state([]);
-  let statuses = $state([]);
-  let loading = $state(true);
-  let assetSetLoadToken = 0;
-
-  const assetTypeFields = useAssetTypeFields(
-    () => selectedNode?.data?.config?.asset_type_id
-  );
-
-  // Load asset sets on mount
-  onMount(async () => {
-    try {
-      assetSets = await assetSetsApi.getAll() || [];
-    } catch (error) {
-      console.error('Failed to load asset sets:', error);
-    } finally {
-      loading = false;
-    }
-  });
-
-  // When asset set changes, load types, categories, and statuses
-  $effect(() => {
-    const setId = selectedNode?.data?.config?.asset_set_id;
-    if (setId) {
-      loadAssetSetData(setId);
-    } else {
-      assetSetLoadToken += 1;
-      assetTypes = [];
-      categories = [];
-      statuses = [];
-    }
-  });
-
-  async function loadAssetSetData(setId) {
-    const token = ++assetSetLoadToken;
-    try {
-      const [typesResult, categoriesResult, statusesResult] = await Promise.all([
-        assetTypesApi.getAll(setId),
-        assetCategories.getAll(setId),
-        assetStatuses.getAll(setId)
-      ]);
-      if (token !== assetSetLoadToken) return;
-      assetTypes = typesResult || [];
-      categories = categoriesResult || [];
-      statuses = statusesResult || [];
-    } catch (error) {
-      if (token !== assetSetLoadToken) return;
-      console.error('Failed to load asset set data:', error);
-      assetTypes = [];
-      categories = [];
-      statuses = [];
-    }
-  }
+  const editor = useActionEditorContext();
+  let editorData = $derived(editor.getEditorData());
+  let scope = $derived(editorData.assetDestinations?.[String(selectedNode.data?.config?.asset_set_id)]);
+  let assetSets = $derived(editorData.assetSets?.items || []);
+  let assetTypes = $derived(scope?.types?.items || []);
+  let categories = $derived(scope?.categories?.items || []);
+  let statuses = $derived(scope?.statuses?.items || []);
+  let loading = $derived(editorData.assetSets?.state === 'loading');
+  let targetFields = $derived(editorData.assetFieldsByType?.[`${selectedNode.data?.config?.asset_set_id}:${selectedNode.data?.config?.asset_type_id}`]?.items || []);
 
   function handleAssetSetChange(e) {
     const value = parseInt(e.target.value) || 0;
@@ -236,7 +187,8 @@
     <!-- Step 4: Field mappings -->
     <FieldMappingsEditor
       mappings={selectedNode.data?.config?.field_mappings || []}
-      targetFields={assetTypeFields.fields}
+      {targetFields}
+      sourceFields={editorData.customFields?.items || []}
       bind:showPlaceholderModal
       onchange={handleMappingsChange}
     />

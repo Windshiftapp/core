@@ -3,6 +3,48 @@
  */
 export default {
   actions: {
+    preview: {
+      notSelected: 'Non sélectionné', notConfigured: 'Non configuré', none: 'Aucun', clearValue: 'Effacer la valeur',
+      loadingName: 'chargement du nom', unavailableName: 'nom indisponible',
+      status: 'Statut', customField: 'Champ personnalisé', user: 'Utilisateur', team: 'Équipe',
+      capability: 'Capacité', response: 'Réponse', label: 'Étiquette', linkType: 'Type de lien',
+      trigger: 'Déclencheur', from: 'De', to: 'Vers', field: 'Champ', value: 'Valeur', target: 'Cible',
+      content: 'Contenu', recipients: 'Destinataires', message: 'Message', operator: 'Opérateur',
+      relation: 'Relation', direction: 'Direction', scope: 'Portée', mappings: 'Correspondances',
+      title: 'Titre', upsertKey: 'Clé de mise à jour ou création', name: 'Nom', tools: 'Outils', method: 'Méthode',
+      url: 'URL', input: 'Entrée', output: 'Sortie', addLabels: 'Ajouter des étiquettes', removeLabels: 'Retirer des étiquettes', source: 'Code source',
+      anyStatus: 'Tout statut', anyCompletedStatus: 'Tout statut terminé', anyNonCompletedStatus: 'Tout statut non terminé', anyField: 'Tout champ',
+      anyLinkType: 'Tout type de lien', category: 'Catégorie', matchingTerminal: 'Reprendre la catégorie finale du déclencheur dans le workflow de cet élément',
+      descendants: 'Tous les descendants', direct_children: 'Enfants directs', ancestors: 'Ancêtres', linked: 'Éléments liés',
+      crossWorkspace: 'Dans les espaces de travail accessibles', sameWorkspace: 'Même espace de travail',
+      sourceLines_one: '{count} ligne configurée', sourceLines_other: '{count} lignes configurées',
+      entryCount_one: '{count} entrée', entryCount_other: '{count} entrées', more: '+{count} autres', truncated: '[tronqué]',
+      configuredURL: 'URL configurée (modèle ou URL sûre indisponible)', unsupported: 'Non pris en charge',
+      unsupportedNode: 'Type de nœud non pris en charge : {type}', unsupportedValue: 'Valeur non prise en charge : {value}',
+      itemType: 'Type d’élément', assetType: 'Type d’actif', fieldScope: 'Portée des champs', role: 'Rôle', access: 'Accès',
+      invocation: 'Appel', humanInvoked: 'Déclenché manuellement', anyItemType: 'Tout type d’élément', anyAssetType: 'Tout type d’actif',
+      cascades: 'Réagir aux cascades', author: 'Auteur', anyAuthor: 'Tout auteur', customer: 'Client', agent: 'Agent',
+      inactiveHours: 'Inactivité', hours: '{count} heures', invalidThreshold: 'Seuil positif manquant ou invalide',
+      repository: 'Dépôt', repositoryName: 'Nom du dépôt', anyRepository: 'Tout dépôt', milestone: 'Jalon',
+      clearMilestones: 'Retirer les jalons', unassigned: 'Non attribué', fallback: 'Repli', firstTerminal: 'Premier statut final du workflow de cet élément',
+      skipMatching: 'Ignorer les correspondances', visibility: 'Visibilité', private: 'Privé',
+      publicWithCaveat: 'Public ; les commentaires déclencheurs privés restent privés', includeLink: 'Inclure le lien (configuré)',
+      linkBehavior: 'Comportement du lien', workspaceLinkCaveat: 'Les notifications d’espace de travail incluent le lien vers l’élément indépendamment de ce réglage',
+      thisAsset: 'Cet actif', outgoing: 'Sortant', incoming: 'Entrant', both: 'Les deux sens', maxItems: 'Nombre maximal d’éléments',
+      skipOnLeave: 'Ignorer les membres absents', useSubstitutes: 'Utiliser les remplaçants', subject: 'Objet', ticketSubject: 'Objet du ticket (par défaut)',
+      destination: 'Destination', customerEmail: 'E-mail au client du portail de l’élément', skipPrivateTrigger: 'Ignoré pour les commentaires déclencheurs privés',
+      availability: 'Disponibilité', inactiveResponse: 'Réponse inactive ; exécution indisponible',
+      asset_title: 'Titre', asset_tag: 'Identifiant d’actif', asset_type_name: 'Nom du type d’actif', asset_status_name: 'Nom du statut d’actif',
+      assetSet: 'Ensemble d’actifs', workspace: 'Espace de travail', description: 'Description', assetTag: 'Identifiant d’actif',
+      anyAssetSet: 'Tout ensemble d’actifs (sans contrainte d’ensemble attendu)', automaticTag: 'Généré automatiquement', initialStatus: 'Statut initial',
+      setDefaultStatus: 'Valeur par défaut de l’ensemble', item_field: 'Champ d’élément', literal: 'Valeur fixe', variable: 'Modèle',
+      branchStatus: 'Statut de branche', tagStatus: 'Statut de tag', attachRelease: 'Joindre la version au tag', attachCommitItems: 'Joindre les éléments des commits',
+      upsertNameDefault: 'Clé de mise à jour ou création (par défaut)', model: 'Modèle', timeout: 'Délai maximal', routing: 'Exécuteur', localRunner: 'Exécuteur local',
+      seconds: '{count} secondes', milliseconds: '{count} ms', localTimeoutOnly: '{count} secondes (local uniquement ; durée distante gérée par l’exécuteur)',
+      body: 'Corps', configuredBody: 'Configuré ({type}) ; contenu masqué', headers: 'En-têtes', headersCount: 'En-têtes ({count})',
+      prompt: 'Instruction', schema: 'Schéma de sortie', schemaConfigured: 'Schéma configuré (structure non résolue)', schemaType: 'Type de schéma : {type}',
+      anyType: 'Tout type', maxSteps: 'Nombre maximal d’étapes', maxAPICalls: 'Nombre maximal d’appels API',
+    },
     title: 'Actions',
     description: 'Automatisez les flux de travail avec des actions basées sur des règles',
     create: 'Créer une action',
@@ -35,6 +77,9 @@ export default {
 
     // Trigger types
     trigger: {
+      scmTagCreated: 'Tag SCM créé', scmReleaseBranchCreated: 'Branche de version SCM créée',
+      scmPrLinked: 'Pull request SCM liée', scmPrMerged: 'Pull request SCM fusionnée',
+      assetCreated: 'Actif créé', assetUpdated: 'Actif mis à jour', assetStatusChanged: 'Statut de l’actif modifié',
       statusTransition: 'Changement de statut',
       statusLoop: 'Boucle de statut',
       itemCreated: 'Élément créé',
@@ -57,6 +102,7 @@ export default {
 
     // Node types
     nodes: {
+      createItem: 'Créer un élément',
       trigger: 'Déclencheur',
       setField: 'Définir un champ',
       setStatus: 'Définir le statut',
@@ -218,6 +264,7 @@ export default {
 
     // Operators
     operators: {
+      notContains: 'Ne contient pas', startsWith: 'Commence par', endsWith: 'Se termine par', matches: 'Correspond à (Regex)',
       equals: 'Égal à',
       notEquals: 'Différent de',
       contains: 'Contient',

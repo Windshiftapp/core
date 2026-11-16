@@ -8,7 +8,14 @@ package v2
 // request middleware flushes it. AuditService: the application service emits the
 // central audit event with the request actor. AuditExempt: reviewed exemption.
 var auditSpecRegistry = map[string]AuditKind{
-	"postWorkspacesWorkspaceIdTestCasesBulk": AuditService,
+	"postWorkspacesWorkspaceIdTestCasesBulk":            AuditService,
+	"putChannelsChannelIdExperience":                    AuditService,
+	"postChannelsChannelIdBoardPlacements":              AuditService,
+	"putChannelsChannelIdBoardPlacementsPlacementId":    AuditService,
+	"deleteChannelsChannelIdBoardPlacementsPlacementId": AuditService,
+	"putBoardPublicationsCollectionId":                  AuditService,
+	"postBoardPublicationsCollectionIdRevoke":           AuditService,
+	"postBoardPublicationsCollectionIdAllowRepublish":   AuditService,
 	// Public WebAuthn ceremonies create browser sessions, not resource mutations.
 	"postAuthPasskeyStart":          AuditExempt,
 	"postAuthPasskeyComplete":       AuditExempt,

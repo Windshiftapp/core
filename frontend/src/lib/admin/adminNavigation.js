@@ -65,6 +65,14 @@ export const adminGroups = [
         icon: IconSettings,
         descriptionKey: 'settings.adminItems.general.description',
       },
+      {
+        id: 'operator-controls',
+        labelKey: 'operatorControls.title',
+        labelFallback: 'Operator controls',
+        icon: IconShield,
+        descriptionKey: 'operatorControls.description',
+        descriptionFallback: 'Read-only deployment restrictions and instance allowances.',
+      },
     ],
   },
   {

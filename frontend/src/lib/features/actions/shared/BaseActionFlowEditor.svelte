@@ -15,11 +15,14 @@
   import Button from '../../../components/Button.svelte';
   import ActionEdge from '../edges/ActionEdge.svelte';
   import { errorToast } from '../../../stores/toasts.svelte.js';
+  import ActionCanvasNode from './ActionCanvasNode.svelte';
+  import { actionNodeDefinitions } from './actionNodeDefinitions.js';
+  import { provideActionEditorContext } from './actionEditorContext.js';
 
   let {
     action,
     flowStore,
-    nodeTypes,
+    getEditorData = () => ({}),
     nodePalette = [],
     triggerTypes = [],
     sidebarTitle = 'Actions',
@@ -46,7 +49,6 @@
     minimapNodeStrokeWidth = undefined,
     minimapNodeBorderRadius = undefined,
     minimapMaskColor = undefined,
-    initArgs = [],
     onSave,
     onCancel,
     triggerConfig,
@@ -54,6 +56,11 @@
     sidebarExtra = null,
     sidebarTop = null,
   } = $props();
+
+  provideActionEditorContext({
+    get flowStore() { return flowStore; },
+    getEditorData: () => getEditorData(),
+  });
 
   let nodes = $state([]);
   let edges = $state([]);
@@ -76,16 +83,11 @@
 
   let lastInitializedActionKey = $state(null);
 
-  function comparableNodeData(data = {}) {
-    const { flowStore: _flowStore, ...rest } = data || {};
-    return rest;
-  }
-
   function storeNodesVersion(storeNodes) {
     return JSON.stringify(storeNodes.map((n) => ({
       id: n.id,
       type: n.type,
-      data: comparableNodeData(n.data),
+      data: n.data,
     })));
   }
 
@@ -135,7 +137,7 @@
     if (currentKey === lastInitializedActionKey) return;
 
     lastInitializedActionKey = currentKey;
-    flowStore.init(action, ...initArgs);
+    flowStore.init(action);
     nodes = cloneNodes(flowStore.nodes);
     edges = cloneEdges(flowStore.edges);
     selectedNodeId = flowStore.selectedNodeId;
@@ -168,6 +170,11 @@
   let selectedNode = $derived(
     selectedNodeId ? nodes.find(n => n.id === selectedNodeId) : null
   );
+
+  let nodeTypes = $derived(Object.fromEntries(
+    [...new Set([...Object.keys(actionNodeDefinitions), ...nodes.map((node) => node.type)])]
+      .map((type) => [type, ActionCanvasNode]),
+  ));
 
   /** @type {any} */
   const edgeTypes = { action: ActionEdge };
@@ -238,10 +245,8 @@
     if (node) flowStore.selectNode(node.id);
   }
 
-  // Approximate default node footprint used to center the drop: nodes are
-  // around 180x80 px at zoom=1. Offsetting by half keeps the new node roughly
-  // centered on the viewport rather than anchored at its top-left.
-  const NODE_CENTER_OFFSET = { x: 90, y: 40 };
+  // Center new cards in the current viewport.
+  const NODE_CENTER_OFFSET = { x: 140, y: 40 };
 
   function viewportCenterInFlowCoords() {
     if (!flowContainer) return null;
@@ -403,6 +408,7 @@
       </div>
       <button
         class="direction-toggle flex-shrink-0 rounded-lg border p-2"
+        data-testid="action-editor-direction"
         onclick={() => flowStore.toggleDirection()}
         title={flowStore.direction === 'horizontal' ? switchToVerticalLabel : switchToHorizontalLabel}
       >
@@ -423,6 +429,7 @@
           <h3 class="text-sm font-medium sidebar-title">{nodeConfigLabel}</h3>
           <button
             class="text-sm text-ds-text-subtle hover:text-ds-text"
+            data-testid="action-editor-clear-selection"
             onclick={handleClearSelection}
           >
             &times;

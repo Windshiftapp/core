@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"windshift/internal/database"
+	"windshift/internal/operatorcontrols"
 )
 
 // SystemSettingRepository provides data access for the system_settings table.
@@ -18,9 +19,23 @@ func NewSystemSettingRepository(db database.Database) *SystemSettingRepository {
 	return &SystemSettingRepository{db: db}
 }
 
+func (r *SystemSettingRepository) CheckPluginExecution() error {
+	return operatorcontrols.From(r.db).Check(operatorcontrols.PluginExec)
+}
+
+func (r *SystemSettingRepository) OperatorControls() *operatorcontrols.Controls {
+	if r == nil {
+		return nil
+	}
+	return operatorcontrols.From(r.db)
+}
+
 // GetValue returns the value for the given setting key. The second return
 // value indicates whether the key exists and has a non-NULL value.
 func (r *SystemSettingRepository) GetValue(key string) (value string, ok bool, err error) {
+	if key == "plugin_cli_exec_enabled" && !operatorcontrols.From(r.db).Allowed(operatorcontrols.PluginExec) {
+		return "false", true, nil
+	}
 	var val sql.NullString
 	err = r.db.QueryRow("SELECT value FROM system_settings WHERE key = ?", key).Scan(&val)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -39,6 +54,11 @@ func (r *SystemSettingRepository) GetValue(key string) (value string, ok bool, e
 // doesn't already exist. valueType, description, and category are only used
 // for a fresh insert.
 func (r *SystemSettingRepository) Upsert(key, value, valueType, description, category string) error {
+	if key == "plugin_cli_exec_enabled" && value != "false" {
+		if err := operatorcontrols.From(r.db).Check(operatorcontrols.PluginExec); err != nil {
+			return err
+		}
+	}
 	result, err := r.db.ExecWrite(`
 		UPDATE system_settings SET value = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE key = ?

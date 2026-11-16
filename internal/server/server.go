@@ -43,6 +43,7 @@ import (
 	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/objecttranslation"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/plugins"
 	"windshift/internal/portalwebauthn"
 	"windshift/internal/ratelimit"
@@ -323,6 +324,11 @@ func (s *Server) initialize() error {
 	if err = s.db.Initialize(); err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
+	controls, err := operatorcontrols.New(cfg.OperatorPolicy, repository.NewOperatorUsageRepository(s.db))
+	if err != nil {
+		return fmt.Errorf("operator controls: %w", err)
+	}
+	s.db = database.WithOperatorControls(s.db, controls)
 	if err = database.ValidateCanonicalSchemaCheckpoint(s.db); err != nil {
 		return fmt.Errorf("database startup refused: %w", err)
 	}
@@ -704,6 +710,7 @@ func (s *Server) initialize() error {
 	if storageErr != nil {
 		return fmt.Errorf("initialize attachment storage: %w", storageErr)
 	}
+	attachmentStorage.SetOperatorControls(controls)
 	if attachmentStorage.Enabled() {
 		if attachmentStorage.Backend() == config.StorageBackendS3 {
 			// The S3 probe retries transient failures and tolerates an
@@ -862,6 +869,7 @@ func (s *Server) initialize() error {
 	reviewHandler := handlers.NewReviewHandler(s.db, permService)
 	calendarFeedHandler := handlers.NewCalendarFeedHandler(s.db, permService, cfg.BaseURL)
 	securitySettingsHandler := handlers.NewSecuritySettingsHandler(repository.NewSystemSettingRepository(s.db), logger.NewAuditor(s.db), cfg.Plugins.Disabled)
+	publicBoardHandler.SetAvailability(securitySettingsHandler)
 
 	// WI-87/88/89/90 coding-agent harness stack lands later in the
 	// constructor — see the block right after the SCM handlers are
@@ -1251,7 +1259,7 @@ func (s *Server) initialize() error {
 	itemHandler.SetActionService(s.actionService)
 	itemLinkService.WithActionEmitter(s.actionService)
 
-	scriptEngine := services.NewScriptEngine()
+	scriptEngine := services.NewScriptEngine(controls)
 	conditionService := services.NewConditionService(s.db, permService, scriptEngine)
 
 	approvalService := services.NewApprovalService(s.db, leaveRepo, workflowService)
@@ -1434,6 +1442,9 @@ func (s *Server) initialize() error {
 		Scope:          services.NewPublicBoardScopeService(s.db, permService),
 		PortalSessions: portalSessionManager, PortalAuth: portalAuthHandler, Passkeys: portalWebAuthnHandler,
 		MagicLinks: magicLinkService, IP: ipExtractor, Secure: enableHTTPS || strings.HasPrefix(baseURL, "https://"),
+		PublicBoards: securitySettingsHandler,
+		Sharing:      services.NewCollectionApplicationService(s.db, permService, securitySettingsHandler),
+		BoardViewer:  publicBoardHandler,
 	})
 	customerAccessHandler.SetLimiter(s.customerAccessLimiter)
 	ssoHandler.SetCustomerAccess(customerAccessHandler)
@@ -1584,13 +1595,13 @@ func (s *Server) initialize() error {
 	s.ldapHandler = handlers.NewLDAPHandler(s.db, ldapSyncService, ssoHandler.GetEncryption())
 	ldapHandler := s.ldapHandler
 
-	featuresHandler := handlers.NewFeaturesHandler(s.pluginManager, cfg.SSH.Enabled)
+	featuresHandler := handlers.NewFeaturesHandler(s.pluginManager, cfg.SSH.Enabled, controls)
 
 	shutdownChan := cfg.ShutdownChan
 	if shutdownChan == nil {
 		shutdownChan = make(chan os.Signal, 1)
 	}
-	systemHandler := handlers.NewSystemHandler(shutdownChan)
+	systemHandler := handlers.NewSystemHandler(shutdownChan, controls)
 
 	llmConnHandler := handlers.NewLLMConnectionHandler(llmManager, logger.NewAuditor(s.db), llmModelCache, llmModelRefresher)
 	workItemStalenessHandler := handlers.NewWorkItemStalenessHandler(
@@ -1626,6 +1637,7 @@ func (s *Server) initialize() error {
 		hubHandler,
 		channelService,
 		workItemStalenessHandler,
+		services.NewCollectionApplicationService(s.db, permService, securitySettingsHandler),
 	)
 
 	s.briefingScheduler = scheduler.NewBriefingScheduler(s.db, llmManager, permService, timePermissionService, services.NewUserReadService(s.db), promptStore)
@@ -2100,7 +2112,7 @@ func (s *Server) initialize() error {
 		CommentAccess:                permService,
 		Attachments:                  services.NewItemAttachmentService(s.db, attachmentStorage, permService),
 		PageAttachments:              services.NewPageAttachmentUploadService(s.db, attachmentStorage, permService, pagePermissionService),
-		Collections:                  services.NewCollectionApplicationService(s.db, permService),
+		Collections:                  services.NewCollectionApplicationService(s.db, permService, securitySettingsHandler).WithSharingNotifications(s.notificationService),
 		Planning:                     planningApplication,
 		MilestoneComments:            milestoneCommentService,
 		MilestonePageLinks:           milestonePageLinkService,
@@ -2117,6 +2129,7 @@ func (s *Server) initialize() error {
 		ItemDetail:                   itemDetailApplication,
 		ItemLifecycle:                services.NewItemLifecycleService(s.db, permService),
 		TicketImport:                 services.NewTicketImportService(s.db, permService, importScratch),
+		OperatorControls:             services.NewOperatorControlsService(s.db, attachmentStorage),
 		SessionMiddleware:            authMiddleware.OptionalAuth,
 		SearchAllowed:                s.searchLimiter.AllowRequest,
 		DBRequestTimeout:             s.config.DB.RequestTimeout,
@@ -2265,7 +2278,7 @@ func (s *Server) initialize() error {
 	// Recovery converts panics before the metrics layer records the final status.
 	securityMiddleware := createSecurityHeaders(enableHTTPS, cfg.UseProxy, additionalProxyIPs, jiraHosts.Allowed, securitySettingsHandler.ExternalImagesAllowed)
 	compressionMiddleware := middleware.CreateCompressionMiddleware(cfg.UseProxy)
-	applicationHandler := middleware.Recovery(compressionMiddleware(securityMiddleware(s.metrics.CaptureRoutePattern(mux))))
+	applicationHandler := middleware.Recovery(compressionMiddleware(securityMiddleware(middleware.OperatorAdmission(controls)(s.metrics.CaptureRoutePattern(mux)))))
 	handler := s.metrics.Instrument(applicationHandler)
 	handler = withContextPath(handler, cfg.ContextPath)
 

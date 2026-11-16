@@ -15,19 +15,65 @@ type loginHTTPResponse struct {
 	header http.Header
 	status int
 	body   bytes.Buffer
+	target http.ResponseWriter
 }
 
 func (w *loginHTTPResponse) Header() http.Header { return w.header }
 func (w *loginHTTPResponse) WriteHeader(status int) {
 	if w.status == 0 {
 		w.status = status
+		if w.target != nil && status < 400 {
+			for key, values := range w.header {
+				for _, value := range values {
+					w.target.Header().Add(key, value)
+				}
+			}
+			w.target.WriteHeader(status)
+		}
 	}
 }
 func (w *loginHTTPResponse) Write(body []byte) (int, error) {
 	if w.status == 0 {
-		w.status = http.StatusOK
+		w.WriteHeader(http.StatusOK)
+	}
+	if w.target != nil && w.status < 400 {
+		return w.target.Write(body)
 	}
 	return w.body.Write(body)
+}
+
+func adaptCustomerContent(w http.ResponseWriter, r *http.Request, operation func(http.ResponseWriter, *http.Request)) error {
+	response := &loginHTTPResponse{header: make(http.Header), target: w}
+	response.header.Set("Cache-Control", "private, no-store")
+	operation(response, r)
+	if response.status < 400 {
+		return nil
+	}
+	for key, values := range response.header {
+		for _, value := range values {
+			w.Header().Add(key, value)
+		}
+	}
+	var body struct{ Error, Message, Code string }
+	if err := json.Unmarshal(response.body.Bytes(), &body); err != nil {
+		return internalError(err)
+	}
+	if body.Error == "" {
+		body.Error = body.Message
+	}
+	if body.Code == "" {
+		switch response.status {
+		case http.StatusNotFound:
+			body.Code = "not_found"
+		case http.StatusForbidden:
+			body.Code = "permission_denied"
+		case http.StatusUnauthorized:
+			body.Code = "authentication_required"
+		default:
+			body.Code = "customer_access_failed"
+		}
+	}
+	return newError(response.status, strings.ToLower(body.Code), body.Error)
 }
 
 type customerAccessHTTP interface {

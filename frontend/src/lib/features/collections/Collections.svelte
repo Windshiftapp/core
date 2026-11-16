@@ -318,8 +318,19 @@
     }
   }
 
-  async function handlePublicSharingSave({ isPublic, publicSlug, publicMilestoneSwimlanes }) {
+  async function handlePublicSharingSave({ isPublic, publicSlug, publicMilestoneSwimlanes, savedSharing = null }) {
     if (!currentCollection) return { ok: false, error: 'Collection not found.' };
+    if (savedSharing) {
+      currentCollection = { ...currentCollection,
+        is_public: savedSharing.enabled && savedSharing.standalone_enabled,
+        board_enabled: savedSharing.enabled,
+        public_slug: savedSharing.slug,
+        public_milestone_swimlanes: savedSharing.milestone_swimlanes,
+        sharing_revision: savedSharing.revision,
+      };
+      slugSaved = Boolean(currentCollection.is_public && currentCollection.public_slug);
+      return { ok: true };
+    }
     savingPublicSharing = true;
     try {
       const update = buildCollectionUpdate({

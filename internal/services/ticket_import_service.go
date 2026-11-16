@@ -16,6 +16,7 @@ import (
 	"windshift/internal/itemevents"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 	"windshift/internal/validation"
@@ -57,6 +58,9 @@ type TicketImportStaged = csvimport.StagedUpload
 
 // Upload stages a CSV file for a workspace import.
 func (s *TicketImportService) Upload(ctx context.Context, userID, workspaceID int, filename string, hasHeader bool, delimiterName string, source io.Reader) (*TicketImportStaged, error) {
+	if err := operatorcontrols.From(s.db).CheckImport(ctx, "tickets"); err != nil {
+		return nil, err
+	}
 	if err := s.require(userID, workspaceID, models.PermissionItemCreate); err != nil {
 		return nil, err
 	}
@@ -95,6 +99,9 @@ type TicketImportJob struct {
 // The upload ID doubles as the job ID, so re-issuing the same start request
 // returns the existing job instead of running the file twice.
 func (s *TicketImportService) Start(ctx context.Context, actor AuditActor, workspaceID int, input TicketImportStart) (*TicketImportJob, error) {
+	if err := operatorcontrols.From(s.db).CheckImport(ctx, "tickets"); err != nil {
+		return nil, err
+	}
 	if err := s.require(actor.UserID, workspaceID, models.PermissionItemCreate); err != nil {
 		return nil, err
 	}

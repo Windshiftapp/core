@@ -1,20 +1,11 @@
 <script>
-  import FileText from '@lucide/svelte/icons/file-text';
-  import Pencil from '@lucide/svelte/icons/pencil';
-  import Bell from '@lucide/svelte/icons/bell';
-  import HelpCircle from '@lucide/svelte/icons/help-circle';
-  import Zap from '@lucide/svelte/icons/zap';
+  import { onDestroy, untrack } from 'svelte';
   import X from '@lucide/svelte/icons/x';
   import Select from '../../components/Select.svelte';
   import Button from '../../components/Button.svelte';
   import Input from '../../components/Input.svelte';
   import Textarea from '../../components/Textarea.svelte';
-  import TriggerNode from '../actions/nodes/TriggerNode.svelte';
-  import SetFieldNode from '../actions/nodes/SetFieldNode.svelte';
-  import SetStatusNode from '../actions/nodes/SetStatusNode.svelte';
-  import ConditionNode from '../actions/nodes/ConditionNode.svelte';
-  import NotifyUserNode from '../actions/nodes/NotifyUserNode.svelte';
-  import CreateItemNode from '../actions/nodes/CreateItemNode.svelte';
+  import { nodePresentation, triggerLabel, minimapNodeColor, minimapNodeStroke } from '../actions/shared/actionNodeDefinitions.js';
   import CreateItemConfigPanel from '../actions/CreateItemConfigPanel.svelte';
   import BaseActionFlowEditor from '../actions/shared/BaseActionFlowEditor.svelte';
   import ConditionConfigPanel from '../actions/shared/ConditionConfigPanel.svelte';
@@ -23,6 +14,8 @@
   import UserPicker from '../../pickers/UserPicker.svelte';
   import { assetStatuses as assetStatusesApi, assetTypes as assetTypesApi } from '../../api/assets.js';
   import { getUsers } from '../../api/users.js';
+  import { workspaces } from '../../api/workspaces.js';
+  import { itemTypes as itemTypesApi } from '../../api/configuration.js';
   import { t } from '../../stores/i18n.svelte.js';
   import {
     assetActionConditionFields,
@@ -47,6 +40,39 @@
   let assetTypes = $state([]);
   let assetStatuses = $state([]);
   let users = $state([]);
+  let taxonomyState = $state('idle');
+  let fieldState = $state('idle');
+  let usersState = $state('idle');
+  let workspaceDestinations = $state({});
+  const workspaceRequests = new Map();
+  let destinationKeys = $derived([...new Set(assetActionFlowStore.nodes
+    .filter((node) => node.type === 'create_item').map((node) => node.data?.config?.workspace_id).filter(Boolean))]
+    .sort((a, b) => a - b).join(','));
+  onDestroy(() => workspaceRequests.clear());
+
+  $effect(() => {
+    const keys = destinationKeys ? destinationKeys.split(',') : [];
+    untrack(() => {
+      for (const key of workspaceRequests.keys()) if (!keys.includes(key)) workspaceRequests.delete(key);
+      workspaceDestinations = Object.fromEntries(Object.entries(workspaceDestinations).filter(([key]) => keys.includes(key)));
+      for (const key of keys) {
+        if (workspaceRequests.has(key)) continue;
+        const token = Symbol(key);
+        workspaceRequests.set(key, token);
+        workspaceDestinations[key] = { workspace: { items: [], state: 'loading' }, types: { items: [], state: 'loading' } };
+        workspaces.get(key).then((workspace) => {
+          if (workspaceRequests.get(key) === token) workspaceDestinations[key].workspace = { items: workspace ? [workspace] : [], state: 'ready' };
+        }).catch(() => {
+          if (workspaceRequests.get(key) === token) workspaceDestinations[key].workspace = { items: [], state: 'error' };
+        });
+        itemTypesApi.getAll({ workspace_id: key }).then((items) => {
+          if (workspaceRequests.get(key) === token) workspaceDestinations[key].types = { items: items || [], state: 'ready' };
+        }).catch(() => {
+          if (workspaceRequests.get(key) === token) workspaceDestinations[key].types = { items: [], state: 'error' };
+        });
+      }
+    });
+  });
   let taxonomyLoadToken = 0;
   let fieldLoadToken = 0;
 
@@ -60,9 +86,13 @@
       taxonomyLoadToken += 1;
       assetTypes = [];
       assetStatuses = [];
+      taxonomyState = 'idle';
       return;
     }
     const token = ++taxonomyLoadToken;
+    assetTypes = [];
+    assetStatuses = [];
+    taxonomyState = 'loading';
     Promise.all([
       assetTypesApi.getAll(setId),
       assetStatusesApi.getAll(setId),
@@ -70,35 +100,59 @@
       if (token !== taxonomyLoadToken) return;
       assetTypes = types || [];
       assetStatuses = statuses || [];
+      taxonomyState = 'ready';
     }).catch(() => {
       if (token !== taxonomyLoadToken) return;
       assetTypes = [];
       assetStatuses = [];
+      taxonomyState = 'error';
     });
+    return () => { taxonomyLoadToken += 1; };
   });
 
   $effect(() => {
     const typeId = scopedAssetTypeId;
     const token = ++fieldLoadToken;
+    assetCustomFields = [];
     if (!typeId) {
       assetCustomFields = [];
+      fieldState = 'idle';
+      return;
+    }
+    if (taxonomyState !== 'ready') {
+      fieldState = taxonomyState === 'loading' ? 'loading' : 'error';
+      return;
+    }
+    if (!assetTypes.some((type) => String(type.id) === String(typeId))) {
+      fieldState = 'error';
       return;
     }
     loadAssetActionCustomFields(typeId).then((result) => {
       if (token !== fieldLoadToken) return;
       assetCustomFields = result;
+      fieldState = 'ready';
     }).catch(() => {
       if (token !== fieldLoadToken) return;
       assetCustomFields = [];
+      fieldState = 'error';
     });
+    fieldState = 'loading';
+    return () => { fieldLoadToken += 1; };
   });
 
   $effect(() => {
+    let active = true;
+    usersState = 'loading';
     getUsers().then((result) => {
+      if (!active) return;
       users = result || [];
+      usersState = 'ready';
     }).catch(() => {
+      if (!active) return;
       users = [];
+      usersState = 'error';
     });
+    return () => { active = false; };
   });
 
   function getUserDisplayName(user) {
@@ -147,29 +201,21 @@
     return { id: config.field_name, name: config.field_display_name || config.field_name, type: 'text' };
   }
 
-  const nodeTypes = {
-    trigger: TriggerNode,
-    create_item: CreateItemNode,
-    set_field: SetFieldNode,
-    set_status: SetStatusNode,
-    condition: ConditionNode,
-    notify_user: NotifyUserNode,
-  };
+  let nodePalette = $derived(['create_item', 'set_field', 'set_status', 'condition', 'notify_user']
+    .map((type) => ({ type, ...nodePresentation(type, t) })));
+  let triggerTypes = $derived(['asset_created', 'asset_updated', 'asset_status_changed', 'manual']
+    .map((type) => ({ value: type, label: triggerLabel(type, t) })));
 
-  const nodePalette = [
-    { type: 'create_item', label: 'Create Work Item', icon: FileText },
-    { type: 'set_field', label: 'Set Field', icon: Pencil },
-    { type: 'set_status', label: 'Set Status', icon: Zap },
-    { type: 'condition', label: 'Condition', icon: HelpCircle },
-    { type: 'notify_user', label: 'Notify User', icon: Bell },
-  ];
-
-  const triggerTypes = [
-    { value: 'asset_created', label: 'Asset Created' },
-    { value: 'asset_updated', label: 'Asset Updated' },
-    { value: 'asset_status_changed', label: 'Status Changed' },
-    { value: 'manual', label: 'Manual' },
-  ];
+  function getEditorData() {
+    return {
+      domain: 'asset', setId: action?.set_id, assetTypeId: scopedAssetTypeId,
+      statuses: { items: assetStatuses, state: taxonomyState },
+      assetTypes: { items: assetTypes, state: taxonomyState },
+      customFields: { items: assetCustomFields, state: fieldState },
+      users: { items: users, state: usersState },
+      workspaceDestinations,
+    };
+  }
 
   const conditionFields = assetActionConditionFields;
 </script>
@@ -177,9 +223,11 @@
 <BaseActionFlowEditor
   {action}
   flowStore={assetActionFlowStore}
-  {nodeTypes}
+  {getEditorData}
   {nodePalette}
   {triggerTypes}
+  {minimapNodeColor}
+  minimapNodeStrokeColor={minimapNodeStroke}
   sidebarTitle="Asset Actions"
   {onSave}
   {onCancel}

@@ -4,6 +4,32 @@
  */
 
 export default {
+  operatorControls: {
+    title: 'Contrôles de l’exploitant',
+    description: 'Ces règles de déploiement sont en lecture seule. Contactez l’exploitant de l’instance pour modifier les restrictions ou les quotas. Les préférences de l’organisation peuvent être plus strictes, mais ne peuvent pas dépasser ces plafonds.',
+    restricted: 'Cette fonctionnalité est gérée par l’exploitant de l’instance.',
+    restrictions: 'Fonctionnalités restreintes', unrestricted: 'Aucune restriction supplémentaire des fonctionnalités.',
+    limits: 'Plafonds de l’instance', usage: 'Utilisation sur la période actuelle',
+    blockedDefinitions: 'Définitions bloquées par les contrôles de l’exploitant',
+    loadFailed: 'Impossible de charger les contrôles de l’exploitant.', mailMode: 'Mode d’envoi des e-mails',
+    importAdmission: 'Les imports en masse nécessitent l’autorisation de l’exploitant.',
+    models: 'Modèles d’IA disponibles', truncated: 'Les 1 000 premières définitions bloquées sont affichées.',
+    labels: {
+      instance_lifecycle: 'Cycle de vie de l’instance', maintenance: 'Opérations de maintenance',
+      runtime_diagnostics: 'Diagnostics d’exécution', plugin_exec: 'Exécution de commandes par les extensions',
+      ldap: 'LDAP', server_scripts: 'Scripts serveur', imports: 'Imports en masse',
+      mail_transport_management: 'Gestion du transport des e-mails', generic_mail: 'SMTP et IMAP génériques',
+      mail: 'Envoi des e-mails', ai: 'Génération par IA', ai_connection_management: 'Gestion des connexions IA',
+      attachment_bytes: 'Taille maximale d’un objet (octets)', blob_bytes: 'Quota de stockage des objets (octets)',
+      concurrent_requests: 'Requêtes simultanées', concurrent_streams: 'Flux simultanés',
+      requests_per_minute: 'Requêtes par minute', script_timeout_ms: 'Délai maximal des scripts (millisecondes)',
+      concurrent_scripts: 'Scripts simultanés', automation_steps_per_day: 'Étapes d’automatisation par jour UTC',
+      mail_recipients_per_day: 'Tentatives par destinataire d’e-mail par jour UTC', ai_tokens_per_day: 'Quota de jetons IA par jour UTC',
+      concurrent_ai: 'Appels IA simultanés', requests: 'Tentatives de requêtes cette minute',
+      automation_steps: 'Étapes d’automatisation aujourd’hui', mail_recipients: 'Tentatives par destinataire d’e-mail aujourd’hui',
+      ai_tokens: 'Jetons IA comptabilisés aujourd’hui',
+    },
+  },
   // Settings (merged from general and detailed settings sections)
   settings: {
     title: 'Paramètres',

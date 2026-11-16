@@ -22,6 +22,7 @@ function createPortalAuthStore() {
   const userBootstrap = writable(null);
   const customer = writable(null);
   const user = writable(null); // internal user
+  let authCheckId = 0;
   const isAuthenticated = writable(false);
   const isInternal = writable(false); // true if authenticated via internal session
   const loading = writable(false);
@@ -122,11 +123,13 @@ function createPortalAuthStore() {
      * @param {string} slug - Portal slug
      */
     async checkAuth(slug) {
+      const checkId = ++authCheckId;
       loading.set(true);
       error.set(null);
 
       try {
         const response = await portal.getUserBootstrap(slug);
+        if (checkId !== authCheckId) return null;
         userBootstrap.set(response);
         if (response.authenticated) {
           if (response.is_internal) {
@@ -152,6 +155,7 @@ function createPortalAuthStore() {
         }
         return response;
       } catch (_err) {
+        if (checkId !== authCheckId) return null;
         // Not authenticated is not an error
         customer.set(null);
         user.set(null);
@@ -161,7 +165,7 @@ function createPortalAuthStore() {
         userBootstrap.set({ authenticated: false, my_requests: [], my_approvals: [] });
         return getStoreValue(userBootstrap);
       } finally {
-        loading.set(false);
+        if (checkId === authCheckId) loading.set(false);
       }
     },
 
@@ -355,6 +359,7 @@ function createPortalAuthStore() {
      * Clear all state (used when navigating away from portal)
      */
     reset() {
+      authCheckId++;
       clearStores(customer, user, error);
       isAuthenticated.set(false);
       isInternal.set(false);

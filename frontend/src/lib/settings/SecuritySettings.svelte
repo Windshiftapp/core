@@ -25,6 +25,7 @@
   import { errorToast } from '../stores/toasts.svelte.js';
   import PageHeader from '../layout/PageHeader.svelte';
   import DescriptionText from '../components/DescriptionText.svelte';
+  import { capabilitiesStore } from '../stores/capabilities.svelte.js';
 
   let loading = $state(true);
   let saving = $state(false);
@@ -32,6 +33,7 @@
   let calendarFeedEnabled = $state(true);
   let pluginCliExecEnabled = $state(false);
   let allowExternalImages = $state(false);
+  let publicBoardsEnabled = $state(true);
   let allowUserManagedAgents = $state(false);
   let maxAgentsPerUser = $state(5);
   let workspaceManagedAgents = $state(true);
@@ -126,6 +128,7 @@
       calendarFeedEnabled = settings.calendar_feed_enabled ?? true;
       pluginCliExecEnabled = settings.plugin_cli_exec_enabled ?? false;
       allowExternalImages = settings.allow_external_images ?? false;
+      publicBoardsEnabled = settings.public_boards_enabled ?? true;
       allowUserManagedAgents = settings.allow_user_managed_agents ?? false;
       maxAgentsPerUser = settings.max_agents_per_user ?? 5;
       workspaceManagedAgents = settings.workspace_managed_agents ?? true;
@@ -170,6 +173,7 @@
         calendar_feed_enabled: calendarFeedEnabled,
         plugin_cli_exec_enabled: pluginCliExecEnabled,
         allow_external_images: allowExternalImages,
+        public_boards_enabled: publicBoardsEnabled,
         allow_user_managed_agents: allowUserManagedAgents,
         max_agents_per_user: maxAgentsPerUser,
         workspace_managed_agents: workspaceManagedAgents,
@@ -218,6 +222,11 @@
     if (!(await saveSettings())) {
       allowExternalImages = !newValue;
     }
+  }
+
+  async function handlePublicBoardsToggle(newValue) {
+    publicBoardsEnabled = newValue;
+    if (!(await saveSettings())) publicBoardsEnabled = !newValue;
   }
 
   async function handleUserManagedAgentsToggle(newValue) {
@@ -287,6 +296,12 @@
     <StateDisplay type="loading" />
   {:else}
     <!-- Calendar Feed Settings -->
+    <Panel padding="spacious">
+      <h2 class="mb-3 font-semibold">Public boards</h2>
+      <Toggle id="security-public-boards-enabled" dataTestid="security-public-boards-enabled" bind:checked={publicBoardsEnabled} disabled={saving} onchange={handlePublicBoardsToggle} label="Allow external board publications" />
+      <DescriptionText>Pausing retains publication settings and URLs. Re-enabling resumes boards that have not been disabled or revoked.</DescriptionText>
+      {#if !publicBoardsEnabled}<AlertBox variant="warning" message="External board access is paused on this instance." />{/if}
+    </Panel>
     <Panel padding="spacious">
       <div class="flex items-start gap-4">
         <div class="p-2 rounded-lg" style="background-color: var(--ds-background-neutral);">
@@ -372,7 +387,8 @@
               </div>
               <Toggle
                 bind:checked={pluginCliExecEnabled}
-                disabled={saving}
+                disabled={saving || !capabilitiesStore.operatorAllows('plugin_exec')}
+                dataTestid="security-plugin-execution-toggle"
                 onchange={handleCliExecToggle}
               />
             </div>
@@ -381,6 +397,9 @@
               <div class="mt-3">
                 <AlertBox variant="error" message={t('settings.security.pluginExecutionWarning')} />
               </div>
+            {/if}
+            {#if !capabilitiesStore.operatorAllows('plugin_exec')}
+              <AlertBox variant="info" message={t('operatorControls.restricted', 'This capability is managed by the instance operator.')} />
             {/if}
           </div>
         </div>

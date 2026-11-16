@@ -29,6 +29,7 @@ import (
 	"windshift/internal/emailutil"
 	"windshift/internal/i18n"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 	"windshift/internal/utils"
 )
@@ -385,6 +386,13 @@ func (s *NotificationSMTPSender) IsSMTPConfigured() bool {
 
 // getSMTPConfig retrieves the active SMTP configuration
 func (s *NotificationSMTPSender) getSMTPConfig() (*models.ChannelConfig, error) {
+	controls := operatorcontrols.From(s.db)
+	if err := controls.Check(operatorcontrols.MailSend); err != nil {
+		return nil, err
+	}
+	if managed := controls.Mail(); managed != nil && managed.Mode == "managed" {
+		return managedSMTPConfig(managed), nil
+	}
 	query := `
 		SELECT COALESCE(config, '{}') FROM channels
 		WHERE type = 'smtp' AND direction = 'outbound'
@@ -716,6 +724,18 @@ func formatMessageIDHeader(value string) string {
 // encryption-aware sender, even the channel-test path that loads raw config
 // from the DB on its own.
 func (s *NotificationSMTPSender) dispatchContext(ctx context.Context, config *models.ChannelConfig, toEmail string, message []byte) error {
+	controls := operatorcontrols.From(s.db)
+	if err := controls.Check(operatorcontrols.MailSend); err != nil {
+		return err
+	}
+	if managed := controls.Mail(); managed != nil && managed.Mode == "managed" {
+		if config == nil || config.SMTPFromEmail != managed.FromAddress {
+			return &operatorcontrols.DeniedError{Capability: operatorcontrols.MailTransport}
+		}
+		config = managedSMTPConfig(managed)
+	} else if err := controls.Check(operatorcontrols.GenericMail); err != nil {
+		return err
+	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -736,7 +756,13 @@ func (s *NotificationSMTPSender) dispatchContext(ctx context.Context, config *mo
 	if err := ValidateTransport(config); err != nil {
 		return err
 	}
-	password, err := decryptOrLegacy(s.encryption, config.SMTPPassword)
+	if err := controls.Consume(ctx, "mail_recipients", 1, controls.Limits().MailRecipientsPerDay, 24*time.Hour); err != nil {
+		return err
+	}
+	password := config.SMTPPassword
+	if managed := controls.Mail(); managed == nil || managed.Mode != "managed" {
+		password, err = decryptOrLegacy(s.encryption, config.SMTPPassword)
+	}
 	if err != nil {
 		return err
 	}
@@ -776,6 +802,10 @@ func (s *NotificationSMTPSender) dispatchContext(ctx context.Context, config *mo
 	s.releaseSession(session, true)
 	s.observeDispatch(nil)
 	return nil
+}
+
+func managedSMTPConfig(policy *operatorcontrols.MailPolicy) *models.ChannelConfig {
+	return &models.ChannelConfig{SMTPHost: policy.Host, SMTPPort: policy.Port, SMTPEncryption: policy.Encryption, SMTPUsername: policy.Username, SMTPPassword: policy.Password, SMTPAuthMethod: "auto", SMTPFromEmail: policy.FromAddress, SMTPFromName: policy.FromName}
 }
 
 // acquireSession returns a live session for the config, preferring an idle

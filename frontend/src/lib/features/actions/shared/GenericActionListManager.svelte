@@ -118,7 +118,7 @@
               </Button>
             {/if}
             {#if onedit}
-              <Button variant="ghost" size="small" title="Edit" onclick={() => onedit(action)}>
+              <Button variant="ghost" size="small" title="Edit" dataTestid={`action-edit-${action.id}`} onclick={() => onedit(action)}>
                 <Pencil size={14} />
               </Button>
             {/if}

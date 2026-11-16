@@ -2,6 +2,8 @@
   let tabPanelElement = $state(null);
   import { onMount } from 'svelte';
   import StateDisplay from '../../components/StateDisplay.svelte';
+  import LazyRootView from '../../components/LazyRootView.svelte';
+  const loadPublicBoards = () => import('../../settings/PublicBoards.svelte');
   import { useEventListener } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
   import IconLifebuoy from '@tabler/icons-svelte-runes/icons/lifebuoy';
@@ -47,7 +49,8 @@
   // Channel type definitions for embedded tab navigation.
   let channelTabs = $derived([
     { id: 'all', label: t('channels.allTypes', 'All'), icon: allTypesEntry.icon },
-    ...channelTypeDefs.map(ct => ({ id: ct.id, label: t(`channels.${ct.id}`, ct.id), icon: ct.icon }))
+    ...channelTypeDefs.map(ct => ({ id: ct.id, label: t(`channels.${ct.id}`, ct.id), icon: ct.icon })),
+    { id: 'public-boards', label: 'Public boards', icon: allTypesEntry.icon },
   ]);
 
   let channels = $state([]);
@@ -508,6 +511,9 @@
 
     <!-- Header -->
     <div bind:this={tabPanelElement}>
+    {#if activeTypeFilter === 'public-boards'}
+      <LazyRootView loader={loadPublicBoards} label="Public boards" />
+    {:else}
     <div class="flex items-center justify-between mb-6">
       <div>
         {#if !embedded}
@@ -623,6 +629,7 @@
           </div>
         {/snippet}
       </DataTable>
+    {/if}
     {/if}
     </div>
   </div>

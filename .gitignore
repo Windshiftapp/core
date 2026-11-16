@@ -185,6 +185,7 @@ scripts/*
 !scripts/check-audit-literals.mjs
 !scripts/check-vulnerabilities.sh
 !scripts/generate-i18n-catalog.mjs
+!scripts/generate-object-translation-catalog.mjs
 !scripts/check-deprecated-v1-api.sh
 !scripts/audit_coverage_inventory.py
 !scripts/.layering-baseline

@@ -7,6 +7,9 @@
   import WorkspacePicker from '../../pickers/WorkspacePicker.svelte';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import Toggle from '../../components/Toggle.svelte';
+  import Checkbox from '../../components/Checkbox.svelte';
+  import SelectField from '../../components/SelectField.svelte';
+  import PortalBoardPlacements from './PortalBoardPlacements.svelte';
   import Lozenge from '../../components/Lozenge.svelte';
 	import TextField from '../../components/TextField.svelte';
 
@@ -20,7 +23,8 @@
       registration_mode: 'open',
       allowed_domains: ''
     }),
-    connectedMailboxes = []
+    connectedMailboxes = [],
+    channelId = null,
   } = $props();
 
   const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
@@ -41,7 +45,7 @@
     if (!SLUG_PATTERN.test(formData.slug.trim())) {
       return { valid: false, message: t('channel.portalSlugInvalid') };
     }
-    if (!formData.workspace_ids?.length) {
+    if (!formData.workspace_ids?.length && (formData.modules == null || formData.modules.includes('forms'))) {
       return { valid: false, message: t('channel.selectAtLeastOneWorkspace') };
     }
     const domains = parseDomains(formData.allowed_domains);
@@ -58,7 +62,11 @@
       portal_title: formData.title || formData.slug,
       portal_description: formData.description || '',
       portal_registration_mode: formData.registration_mode === 'manual' ? 'manual' : 'open',
-      portal_allowed_domains: parseDomains(formData.allowed_domains)
+      portal_allowed_domains: parseDomains(formData.allowed_domains),
+      portal_presentation: formData.presentation || 'classic',
+      portal_modules: formData.modules ?? null,
+      portal_navigation: formData.navigation || [],
+      portal_default_module: formData.default_module || '',
     };
   }
 </script>
@@ -67,6 +75,20 @@
   <h4 class="text-sm font-semibold mb-4" style="color: var(--ds-text);">{t('channel.portalConfiguration')}</h4>
 
   <div class="space-y-4">
+    <SelectField id="portal-presentation" label="Presentation" value={formData.presentation || 'classic'} options={[{ value: 'classic', label: 'Existing portal layout' }, { value: 'compact', label: 'Compact — content first' }]} onchange={value => formData.presentation = value} />
+    <DescriptionText>Compact omits the hero, background artwork, and footer columns. Branding, features, access rules, URLs, and existing layout settings are retained when switching back.</DescriptionText>
+    <div class="space-y-2" data-testid="portal-enabled-modules">
+      <h5 class="font-medium">Enabled capabilities</h5>
+      {#each [{ id: 'boards', label: 'Boards' }, { id: 'requests', label: 'My requests' }, { id: 'forms', label: 'Request forms' }, { id: 'knowledge-base', label: 'Knowledge base' }, { id: 'drafts', label: 'Drafts' }, { id: 'approvals', label: 'Approvals' }, { id: 'profile', label: 'Profile and security' }, { id: 'asset-reports', label: 'Asset reports' }] as capability}
+        <Checkbox id={`portal-module-${capability.id}`} dataTestid={`portal-module-${capability.id}`} label={capability.label} checked={formData.modules == null || formData.modules.includes(capability.id)} onchange={enabled => {
+          const modules = formData.modules ?? ['boards', 'requests', 'forms', 'knowledge-base', 'drafts', 'approvals', 'profile', 'asset-reports'];
+          formData.modules = enabled ? [...new Set([...modules, capability.id])] : modules.filter(id => id !== capability.id);
+        }} />
+      {/each}
+    </div>
+    <TextField id="portal-navigation-order" dataTestid="portal-navigation-order" label="Navigation order" value={(formData.navigation || []).join(', ')} oninput={event => formData.navigation = event.currentTarget.value.split(',').map(value => value.trim()).filter(Boolean)} helper="Comma-separated module keys or board:<placement ID>. Unlisted modules follow in their existing order." />
+    <TextField id="portal-default-module" dataTestid="portal-default-module" label="Default landing module" value={formData.default_module || ''} oninput={event => formData.default_module = event.currentTarget.value.trim()} helper="Use requests, forms, knowledge-base, board:<placement ID>, form:<request type ID>, or article:<page ID>. Leave empty for the first accessible module." />
+    {#if channelId}<PortalBoardPlacements {channelId} />{/if}
     <div>
       {#snippet portalSlugLabel()}
         {t('channel.portalSlug')} <span class="text-xs font-normal" style="color: var(--ds-text-subtle);">({t('channel.portalSlugHelp')})</span>

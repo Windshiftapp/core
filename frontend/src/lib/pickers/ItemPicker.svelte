@@ -10,6 +10,7 @@
 
   let {
     value = $bindable(null),
+    id = undefined,
     items = [],
     config = {},
     placeholder = '',
@@ -60,6 +61,7 @@
 
 <!-- Always forward a children snippet to BasePicker -->
 <BasePicker
+  {id}
   bind:value
   bind:values
   {items}

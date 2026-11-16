@@ -1,6 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
-  import { itemTypes as itemTypesApi } from '../../api/configuration.js';
+  import { useActionEditorContext } from './shared/actionEditorContext.js';
   import { actionFlowStore } from '../../stores/actionFlowStore.svelte.js';
   import WorkspacePicker from '../../pickers/WorkspacePicker.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
@@ -9,18 +8,11 @@
 
   let { selectedNode, flowStore = actionFlowStore } = $props();
 
-  let itemTypes = $state([]);
-  let loading = $state(true);
-
-  onMount(async () => {
-    try {
-      itemTypes = await itemTypesApi.getAll() || [];
-    } catch (error) {
-      console.error('Failed to load item types:', error);
-    } finally {
-      loading = false;
-    }
-  });
+  const editor = useActionEditorContext();
+  let editorData = $derived(editor.getEditorData());
+  let scope = $derived(editorData.workspaceDestinations?.[String(selectedNode.data?.config?.workspace_id)]);
+  let itemTypes = $derived(scope?.types?.items || []);
+  let loading = $derived(scope?.types?.state === 'loading');
 
   function handleWorkspaceSelect(workspace) {
     flowStore.updateNodeConfig(selectedNode.id, {
@@ -64,6 +56,8 @@
   <div>
     <div class="block text-xs font-medium mb-1">Workspace</div>
     <WorkspacePicker
+      id="create-item-workspace"
+      optionTestid={(option) => `create-item-workspace-${option.value}`}
       multiple={false}
       value={selectedNode.data?.config?.workspace_id || null}
       onSelect={handleWorkspaceSelect}
@@ -74,6 +68,8 @@
   <div>
     <div class="block text-xs font-medium mb-1">Item Type</div>
     <ItemPicker
+      id="create-item-type"
+      optionTestid={(option) => `create-item-type-${option.value}`}
       items={itemTypes}
       value={selectedNode.data?.config?.item_type_id || null}
       config={itemTypePickerConfig}

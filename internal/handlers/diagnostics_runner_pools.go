@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 )
 
 // runnerPoolDiag is one pool's health snapshot for the admin Diagnostics
@@ -33,6 +34,10 @@ type runnerPoolDiag struct {
 //
 // GET /api/admin/diagnostics/runner-pools
 func (h *DiagnosticsHandler) GetRunnerPools(w http.ResponseWriter, r *http.Request) {
+	if err := h.controls.Check(operatorcontrols.RuntimeDiagnostics); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
 	if h.runnerRepo == nil || h.agentRunRepo == nil {
 		respondJSONOK(w, []runnerPoolDiag{})
 		return

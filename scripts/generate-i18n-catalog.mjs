@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 
 /**
  * Generates internal/i18n/date_formats_generated.go and
@@ -12,7 +12,7 @@
  * values with no hand copy.
  *
  * Usage:
- *   bun scripts/generate-i18n-catalog.mjs           # write the Go files
+ *   node scripts/generate-i18n-catalog.mjs          # write the Go files
  *   node scripts/generate-i18n-catalog.mjs --check   # fail if they are stale
  */
 
@@ -108,7 +108,7 @@ if (process.argv.includes('--check')) {
     const existing = await readFile(target, 'utf-8').catch(() => '');
     if (existing !== generated) {
       console.error(
-        `${target.slice(repoRoot.length + 1)} is out of date; run \`bun scripts/generate-i18n-catalog.mjs\``
+        `${target.slice(repoRoot.length + 1)} is out of date; run \`node scripts/generate-i18n-catalog.mjs\``
       );
       stale = true;
     }

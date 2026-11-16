@@ -626,6 +626,7 @@ type actionApplication interface {
 
 // Deps lists every required v2 dependency. Construction has no fallbacks.
 type Deps struct {
+	OperatorControls             *services.OperatorControlsService
 	PasskeyLogin                 passkeyLoginHTTP
 	PasskeyLoginLimiter          requestLimiter
 	CustomerAccess               customerAccessHTTP
@@ -956,11 +957,15 @@ func buildRoutes(deps Deps) []route {
 	registerWorklogRoutes(&builder, deps)
 	registerTimeRoutes(&builder, deps)
 	registerAdminRoutes(&builder, deps)
+	registerOperatorControlsRoutes(&builder, deps)
 	registerAdminIntegrationRoutes(&builder, deps)
 	registerPageRoutes(&builder, deps)
 	registerCommentRoutes(&builder, deps)
 	registerAttachmentRoutes(&builder, deps)
 	registerCollectionRoutes(&builder, deps.Collections)
+	registerBoardPublicationRoutes(&builder, deps.Collections)
+	registerBoardPlacementRoutes(&builder, deps.Collections)
+	registerPortalBoardRoutes(&builder, deps)
 	registerCustomerAccessRoutes(&builder, deps)
 	registerPasskeyLoginRoutes(&builder, deps)
 	registerPlanningRoutes(&builder, deps.Planning)
@@ -1057,6 +1062,7 @@ func applyEmbeddedContractMetadata(routes []route, document []byte) {
 		}
 		slices.Sort(routes[index].DocumentedErrors)
 		applyParameterCorrections(&routes[index].Route)
+		applyBoardContractMetadata(&routes[index].Route)
 	}
 }
 
@@ -1091,6 +1097,9 @@ func appendUniqueParameter(parameters []ParameterMetadata, candidate ParameterMe
 }
 
 func applyParameterCorrections(route *Route) {
+	if route.Path == "/operator-controls" {
+		route.Description = "Read effective operator restrictions, current instance usage and blocked script definitions. Requires system administrator permission and admin:operator-controls:read for bearer tokens. Credentials and deployment paths are never returned. This read-only operation cannot modify operator policy."
+	}
 	if strings.HasPrefix(route.Path, "/admin/") && route.Exposure == ExposureBoth {
 		route.Description += " Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope."
 		if route.Path == "/admin/audit-logs/since" {

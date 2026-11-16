@@ -7,10 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"windshift/internal/blobstore"
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 )
 
 // AttachmentSettingsService encapsulates business logic for attachment settings.
@@ -79,6 +81,9 @@ func (s *AttachmentSettingsService) Get() (*models.AttachmentSettings, error) {
 
 	if errors.Is(err, sql.ErrNoRows) {
 		// No settings in database, return defaults
+		if ceiling := operatorcontrols.From(s.db).Limits().AttachmentBytes; ceiling > 0 && settings.MaxFileSize > ceiling {
+			settings.MaxFileSize = ceiling
+		}
 		return settings, nil
 	}
 
@@ -86,11 +91,20 @@ func (s *AttachmentSettingsService) Get() (*models.AttachmentSettings, error) {
 		return nil, fmt.Errorf("failed to get attachment settings: %w", err)
 	}
 
+	if ceiling := operatorcontrols.From(s.db).Limits().AttachmentBytes; ceiling > 0 && settings.MaxFileSize > ceiling {
+		settings.MaxFileSize = ceiling
+	}
+	if operatorcontrols.From(s.db).Active() {
+		settings.AttachmentPath = ""
+	}
 	return settings, nil
 }
 
 // Update modifies attachment settings by ID.
 func (s *AttachmentSettingsService) Update(settingsID int, req *models.AttachmentSettingsRequest) (*models.AttachmentSettings, error) {
+	if ceiling := operatorcontrols.From(s.db).Limits().AttachmentBytes; ceiling > 0 && req.MaxFileSize > ceiling {
+		return nil, &operatorcontrols.LimitError{Resource: "attachment_bytes"}
+	}
 	// Validate max file size
 	if req.MaxFileSize <= 0 {
 		return nil, fmt.Errorf("max file size must be greater than 0")
@@ -133,10 +147,11 @@ func (s *AttachmentSettingsService) Update(settingsID int, req *models.Attachmen
 
 // AttachmentStatus represents the status of the attachment system.
 type AttachmentStatus struct {
-	Enabled        bool   `json:"enabled"`
-	AttachmentPath string `json:"attachment_path"`
-	Backend        string `json:"backend"`
-	Writable       bool   `json:"writable"`
+	Usage          *blobstore.Usage `json:"usage,omitempty"`
+	Enabled        bool             `json:"enabled"`
+	AttachmentPath string           `json:"attachment_path"`
+	Backend        string           `json:"backend"`
+	Writable       bool             `json:"writable"`
 }
 
 // GetStatus returns the attachment system status (enabled/disabled, backend,
@@ -147,6 +162,18 @@ func (s *AttachmentSettingsService) GetStatus() (*AttachmentStatus, error) {
 		AttachmentPath: s.storage.Describe(),
 		Backend:        s.storage.Backend(),
 		Writable:       false,
+	}
+	if controls := operatorcontrols.From(s.db); controls.Active() {
+		status.AttachmentPath = ""
+		if controls.Limits().BlobBytes > 0 {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			usage, err := s.storage.Usage(ctx)
+			if err != nil {
+				return nil, err
+			}
+			status.Usage = &usage
+		}
 	}
 
 	var enabled bool

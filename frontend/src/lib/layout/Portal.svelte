@@ -10,6 +10,13 @@
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
   import Spinner from '../components/Spinner.svelte';
   import EmptyState from '../components/EmptyState.svelte';
+  import LazyRootView from '../components/LazyRootView.svelte';
+  import Link from '../components/Link.svelte';
+  import { portalBoards } from '../api/portalBoards.js';
+  let { experience = null } = $props();
+  const loadLinkedBoard = () => import('../pages/PublicBoard.svelte');
+  const linkedPlacementId = $derived($currentRoute.params?.placementId || null);
+  const linkedBoardClient = $derived(linkedPlacementId ? portalBoards.client($currentRoute.params.slug, linkedPlacementId) : null);
   import Button from '../components/Button.svelte';
   import PortalHeader from '../portal/PortalHeader.svelte';
   import PortalHero from '../portal/PortalHero.svelte';
@@ -506,7 +513,7 @@
           <p style="color: var(--ds-text-subtle);">{t('portal.checkingAuth')}</p>
         </div>
       </div>
-    {:else if isUserAuthenticated}
+    {:else if isUserAuthenticated || linkedPlacementId}
       <!-- AUTHENTICATED: Show full portal -->
       <div class="flex-1 flex flex-col">
         <!-- Edit Mode Top Bar -->
@@ -527,17 +534,27 @@
 
         <!-- Stable portal navigation -->
         <PortalHeader />
+        {#if experience?.boards?.length}
+          <nav class="flex gap-2 overflow-x-auto px-6 py-2" aria-label="Portal boards" data-testid="portal-board-navigation">
+            {#each experience.boards as board (board.id)}<Link href={`/portal/${experience.slug}/boards/${board.id}`} active={linkedPlacementId === board.id} data-testid={`portal-board-link-${board.id}`}>{board.label}</Link>{/each}
+          </nav>
+        {/if}
 
         <!-- Branded search hero on the portal home. Hidden on the
              knowledge-base routes, which are full sections of their own. -->
-        {#if !portalRequestsStore.visible && !portalApprovalsStore.visible && !portalDraftsStore.visible && !isProfileRoute && !isKBBrowseRoute && !isKBArticleRoute}
+        {#if !linkedPlacementId && !portalRequestsStore.visible && !portalApprovalsStore.visible && !portalDraftsStore.visible && !isProfileRoute && !isKBBrowseRoute && !isKBArticleRoute}
           <PortalHero />
         {/if}
 
         <!-- Portal work area -->
         <main class="flex-1" style="background-color: var(--ds-surface);">
           <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-            {#if isProfileRoute}
+            {#if linkedPlacementId}
+              {#key linkedPlacementId}<LazyRootView loader={loadLinkedBoard} label="Board" componentProps={{ slug: $currentRoute.params.slug, client: linkedBoardClient, embedded: true, initialItemKey: $currentRoute.params?.itemKey || null,
+                onitemchange: key => navigate(`/portal/${experience.slug}/boards/${linkedPlacementId}${key ? `/items/${encodeURIComponent(key)}` : ''}`),
+                onaccessdenied: status => { if (status === 401) portalStore.showLoginDialog = true; },
+              }} />{/key}
+            {:else if isProfileRoute}
               <PortalProfile />
             {:else if isKBArticleRoute}
               <PortalKBArticle pageId={kbPageId} />

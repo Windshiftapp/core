@@ -1,6 +1,17 @@
 <script>
   import { onMount } from 'svelte';
   import StateDisplay from '../../components/StateDisplay.svelte';
+  import LazyRootView from '../../components/LazyRootView.svelte';
+  import TabStrip from '../../components/TabStrip.svelte';
+  import { permissionStore } from '../../stores/permissions.svelte.js';
+  const loadPublicBoards = () => import('../../settings/PublicBoards.svelte');
+  let chosenSection = $state(null);
+  let panelElement = $state(null);
+  const activeSection = $derived(chosenSection || ($permissionStore.managesChannels ? 'channels' : 'public-boards'));
+  const managementTabs = $derived([
+    ...($permissionStore.managesChannels ? [{ id: 'channels', label: 'Channels' }] : []),
+    { id: 'public-boards', label: 'Public boards' },
+  ]);
   import IconLifebuoy from '@tabler/icons-svelte-runes/icons/lifebuoy';
   import { channels as channelsApi } from '../../api/channels.js';
   import Button from '../../components/Button.svelte';
@@ -41,7 +52,7 @@
     );
   });
 
-  onMount(loadChannels);
+  onMount(() => { if ($permissionStore.managesChannels) void loadChannels(); });
 
   async function loadChannels() {
     loading = true;
@@ -99,6 +110,11 @@
     subtitle={t('channels.manager.subtitle')}
   />
 
+  <TabStrip tabs={managementTabs} activeTab={activeSection} onTabChange={id => chosenSection = id} {panelElement} />
+  <div bind:this={panelElement}>
+  {#if activeSection === 'public-boards'}
+    <LazyRootView loader={loadPublicBoards} label="Public boards" />
+  {:else}
   <SearchInput
     bind:value={search}
     placeholder={t('channels.searchChannels')}
@@ -153,6 +169,8 @@
       {/snippet}
     </DataTable>
   {/if}
+  {/if}
+  </div>
 </div>
 
 <ChannelConfigModal

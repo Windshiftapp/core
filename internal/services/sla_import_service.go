@@ -14,6 +14,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/jira"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 	"windshift/internal/sla"
 )
@@ -172,6 +173,9 @@ func (s *SLAImportService) Preview(ctx context.Context, workspaceID int, documen
 
 // Import applies a document in merge or replace mode.
 func (s *SLAImportService) Import(ctx context.Context, workspaceID int, document SLAImportDocument, mode string) (*SLAImportResult, error) {
+	if err := operatorcontrols.From(s.db).CheckImport(ctx, "sla"); err != nil {
+		return nil, err
+	}
 	if mode != SLAImportModeMerge && mode != SLAImportModeReplace {
 		return nil, fmt.Errorf("%w: mode must be merge or replace", ErrSLAImportInvalid)
 	}

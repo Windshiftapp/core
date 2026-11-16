@@ -42,6 +42,10 @@
     description: '',
     registration_mode: 'open',
     allowed_domains: '',
+    presentation: 'classic',
+    modules: null,
+    navigation: [],
+    default_module: '',
   });
 
   // Email channels with an intake linked to this portal.
@@ -78,6 +82,10 @@
         title: config.portal_title || '',
         description: config.portal_description || '',
         registration_mode: config.portal_registration_mode === 'manual' ? 'manual' : 'open',
+        presentation: config.portal_presentation || 'classic',
+        modules: config.portal_modules ?? null,
+        navigation: config.portal_navigation || [],
+        default_module: config.portal_default_module || '',
         allowed_domains: Array.isArray(config.portal_allowed_domains)
           ? config.portal_allowed_domains.join(', ')
           : '',
@@ -158,6 +166,7 @@
     {#if tabId === 'settings'}
       <ChannelAdminSettings bind:channelFormData {saving} onSave={handleSaveSettings}>
         <ChannelPortalConfig
+          {channelId}
           bind:this={portalConfigRef}
           bind:formData={portalFormData}
           {connectedMailboxes}

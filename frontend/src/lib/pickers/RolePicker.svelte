@@ -13,6 +13,8 @@
     label = '',
     disabled = false,
     multiple = false,
+    roles: suppliedRoles = undefined,
+    rolesState = 'ready',
     class: className = '',
     onSelect = () => {},
     onChange = () => {},
@@ -23,16 +25,16 @@
 
   const roles = createAsyncLoader(() => get('/workspace-roles'));
 
-  onMount(() => roles.load());
+  onMount(() => { if (suppliedRoles === undefined) roles.load(); });
   onDestroy(() => roles.dispose());
 </script>
 
 <BasePicker
   bind:value
   {id}
-  items={roles.data}
-  loading={roles.loading}
-  error={roles.error}
+  items={suppliedRoles ?? roles.data}
+  loading={suppliedRoles === undefined ? roles.loading : rolesState === 'loading'}
+  error={suppliedRoles === undefined ? roles.error : rolesState === 'error' ? t('errors.failedToLoad') : null}
   placeholder={resolvedPlaceholder}
   {label}
   {disabled}

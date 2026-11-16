@@ -15,6 +15,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 )
 
 const encryptedSecretPrefix = "enc:v1:"
@@ -259,6 +260,9 @@ func (m *CredentialManager) GetProviderForChannel(ctx context.Context, channelID
 
 	// Fall back to basic IMAP (generic provider with channel's IMAP credentials)
 	if config.IMAPHost != "" {
+		if err := operatorcontrols.From(m.db).Check(operatorcontrols.GenericMail); err != nil {
+			return nil, nil, err
+		}
 		provider := NewGenericProvider(config.IMAPHost, config.IMAPPort, config.IMAPEncryption)
 		return provider, &config, nil
 	}
@@ -329,6 +333,9 @@ func (m *CredentialManager) GetProvider(ctx context.Context, providerID int) (Pr
 		return NewGoogleProvider(ep.OAuthClientID, clientSecret, scopes), nil
 
 	case models.EmailProviderTypeGeneric:
+		if err := operatorcontrols.From(m.db).Check(operatorcontrols.GenericMail); err != nil {
+			return nil, err
+		}
 		return NewGenericProvider(ep.IMAPHost, ep.IMAPPort, ep.IMAPEncryption), nil
 
 	default:

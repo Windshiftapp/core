@@ -149,6 +149,7 @@ const (
 
 	// Admin scopes (require system admin role AND scope on token)
 	ScopeAdminUsersRead         = "admin:users:read"
+	ScopeOperatorControlsRead   = "admin:operator-controls:read"
 	ScopeAdminUsersWrite        = "admin:users:write"
 	ScopeAdminGroupsRead        = "admin:groups:read"
 	ScopeAdminGroupsWrite       = "admin:groups:write"
@@ -269,6 +270,7 @@ var scopeCatalog = []ScopeInfo{
 	{Scope: ScopeMCPAccess, Resource: "mcp", ResourceLabel: "MCP server", Action: "access", Label: "Connect to the MCP server", Description: "Open the MCP transport. Each tool still requires the resource scopes above.", AgentDefault: true},
 
 	{Scope: ScopeAdminUsersRead, Resource: "admin:users", ResourceLabel: "Users (admin)", Action: "read", Label: "Read all users", Description: "Read every user account.", Admin: true},
+	{Scope: ScopeOperatorControlsRead, Resource: "admin:operator-controls", ResourceLabel: "Operator controls", Action: "read", Label: "Read operator controls", Description: "Read effective deployment restrictions and instance usage. Does not grant policy write access.", Admin: true},
 	{Scope: ScopeAdminUsersWrite, Resource: "admin:users", ResourceLabel: "Users (admin)", Action: "write", Label: "Manage all users", Description: "Create, update, and deactivate user accounts.", Admin: true},
 	{Scope: ScopeAdminGroupsRead, Resource: "admin:groups", ResourceLabel: "Groups (admin)", Action: "read", Label: "Read all groups", Description: "Read every group and its membership.", Admin: true},
 	{Scope: ScopeAdminGroupsWrite, Resource: "admin:groups", ResourceLabel: "Groups (admin)", Action: "write", Label: "Manage all groups", Description: "Create, update, and delete groups.", Admin: true},

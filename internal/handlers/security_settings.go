@@ -20,6 +20,7 @@ type SecuritySettingsHandler struct {
 	auditor               *logger.Auditor
 	pluginsDisabled       bool
 	externalImagesAllowed atomic.Bool
+	publicBoardsEnabled   atomic.Bool
 }
 
 // NewSecuritySettingsHandler creates a new security settings handler
@@ -32,8 +33,12 @@ func NewSecuritySettingsHandler(settings *repository.SystemSettingRepository, au
 	if value, ok, err := settings.GetValue("allow_external_images"); err == nil && ok {
 		h.externalImagesAllowed.Store(strings.EqualFold(value, "true"))
 	}
+	value, exists, err := settings.GetValue("public_boards_enabled")
+	h.publicBoardsEnabled.Store(err == nil && (!exists || strings.EqualFold(value, "true")))
 	return h
 }
+
+func (h *SecuritySettingsHandler) PublicBoardsEnabled() bool { return h.publicBoardsEnabled.Load() }
 
 // ExternalImagesAllowed reports whether CSP may load images from arbitrary
 // HTTP and HTTPS origins.
@@ -46,6 +51,7 @@ type SecuritySettings struct {
 	CalendarFeedEnabled    bool   `json:"calendar_feed_enabled"`
 	PluginCLIExecEnabled   bool   `json:"plugin_cli_exec_enabled"`
 	AllowExternalImages    bool   `json:"allow_external_images"`
+	PublicBoardsEnabled    bool   `json:"public_boards_enabled"`
 	PluginsDisabled        bool   `json:"plugins_disabled"`
 	APIKeyCreationPolicy   string `json:"api_key_creation_policy"`   // "all_users", "groups_only", or "disabled"
 	APIKeyAllowedGroupIDs  []int  `json:"api_key_allowed_group_ids"` // Group IDs when policy = "groups_only"
@@ -64,9 +70,10 @@ func (h *SecuritySettingsHandler) GetSecuritySettings(w http.ResponseWriter, r *
 // previous values for the audit trail.
 func (h *SecuritySettingsHandler) loadSecuritySettings() SecuritySettings {
 	settings := SecuritySettings{
-		CalendarFeedEnabled:    true,              // Default enabled
-		PluginCLIExecEnabled:   false,             // Default disabled for security
-		AllowExternalImages:    false,             // Default restricted to approved image origins
+		CalendarFeedEnabled:    true,  // Default enabled
+		PluginCLIExecEnabled:   false, // Default disabled for security
+		AllowExternalImages:    false, // Default restricted to approved image origins
+		PublicBoardsEnabled:    true,
 		PluginsDisabled:        h.pluginsDisabled, // Read-only, set by startup flag
 		APIKeyCreationPolicy:   "all_users",       // Default: everyone can create
 		APIKeyAllowedGroupIDs:  []int{},
@@ -83,6 +90,9 @@ func (h *SecuritySettingsHandler) loadSecuritySettings() SecuritySettings {
 	}
 	if v, ok, _ := h.settings.GetValue("allow_external_images"); ok {
 		settings.AllowExternalImages = strings.EqualFold(v, "true")
+	}
+	if v, ok, _ := h.settings.GetValue("public_boards_enabled"); ok {
+		settings.PublicBoardsEnabled = strings.EqualFold(v, "true")
 	}
 	if v, ok, _ := h.settings.GetValue("api_key_creation_policy"); ok {
 		settings.APIKeyCreationPolicy = v
@@ -110,15 +120,30 @@ func (h *SecuritySettingsHandler) loadSecuritySettings() SecuritySettings {
 
 // UpdateSecuritySettings updates security settings
 func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, r *http.Request) {
-	settings, ok := decodeJSON[SecuritySettings](w, r)
+	request, ok := decodeJSON[struct {
+		SecuritySettings
+		PublicBoardsEnabled *bool `json:"public_boards_enabled"`
+	}](w, r)
 	if !ok {
 		return
+	}
+	settings := request.SecuritySettings
+	before := h.loadSecuritySettings()
+	settings.PublicBoardsEnabled = before.PublicBoardsEnabled
+	if request.PublicBoardsEnabled != nil {
+		settings.PublicBoardsEnabled = *request.PublicBoardsEnabled
 	}
 	// Policy is identifier-shaped ("all_users"/"groups_only"/"disabled")
 	// and persisted + echoed verbatim in the settings UI and audit log.
 	sanitize.Apply(&settings.APIKeyCreationPolicy, sanitize.ShortIdentifier)
 
-	before := h.loadSecuritySettings()
+	if settings.PluginCLIExecEnabled && !before.PluginCLIExecEnabled {
+		// Validate immutable controls before persisting any other preference.
+		if err := h.settings.CheckPluginExecution(); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+	}
 
 	if err := h.settings.Upsert(
 		"calendar_feed_enabled", boolToString(settings.CalendarFeedEnabled),
@@ -198,6 +223,11 @@ func (h *SecuritySettingsHandler) UpdateSecuritySettings(w http.ResponseWriter, 
 		return
 	}
 	h.externalImagesAllowed.Store(settings.AllowExternalImages)
+	if err := h.settings.Upsert("public_boards_enabled", boolToString(settings.PublicBoardsEnabled), "boolean", "Allow external board publications", "security"); err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	h.publicBoardsEnabled.Store(settings.PublicBoardsEnabled)
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
@@ -228,6 +258,9 @@ func securitySettingsChanges(before, after SecuritySettings) map[string]any {
 	}
 	if before.AllowExternalImages != after.AllowExternalImages {
 		add("allow_external_images", before.AllowExternalImages, after.AllowExternalImages)
+	}
+	if before.PublicBoardsEnabled != after.PublicBoardsEnabled {
+		add("public_boards_enabled", before.PublicBoardsEnabled, after.PublicBoardsEnabled)
 	}
 	if before.APIKeyCreationPolicy != after.APIKeyCreationPolicy {
 		add("api_key_creation_policy", before.APIKeyCreationPolicy, after.APIKeyCreationPolicy)

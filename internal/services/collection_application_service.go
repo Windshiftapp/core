@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"windshift/internal/database"
 	"windshift/internal/logger"
@@ -96,14 +97,18 @@ type BoardConfigurationBootstrap struct {
 }
 
 type CollectionApplicationService struct {
-	db          database.Database
-	repository  *repository.CollectionRepository
-	permissions *PermissionService
-	publicScope *PublicBoardScopeService
-	categories  *EnumService
-	boards      *repository.BoardConfigurationRepository
-	items       *ItemCRUDService
-	workspaces  *WorkspaceService
+	db                   database.Database
+	repository           *repository.CollectionRepository
+	permissions          *PermissionService
+	publicScope          *PublicBoardScopeService
+	categories           *EnumService
+	boards               *repository.BoardConfigurationRepository
+	items                *ItemCRUDService
+	workspaces           *WorkspaceService
+	publicBoards         PublicBoardAvailability
+	sharingNotifications interface {
+		CreateNotification(models.Notification) (models.Notification, error)
+	}
 
 	// beforePublicSharingWrite runs between scope authorization and the
 	// conditional write. Tests use it to reproduce a concurrent query edit
@@ -111,8 +116,8 @@ type CollectionApplicationService struct {
 	beforePublicSharingWrite func()
 }
 
-func NewCollectionApplicationService(db database.Database, permissions *PermissionService) *CollectionApplicationService {
-	return &CollectionApplicationService{
+func NewCollectionApplicationService(db database.Database, permissions *PermissionService, availability ...PublicBoardAvailability) *CollectionApplicationService {
+	s := &CollectionApplicationService{
 		db: db, repository: repository.NewCollectionRepository(db), permissions: permissions,
 		publicScope: NewPublicBoardScopeService(db, permissions),
 		categories:  NewEnumService(db, NewCollectionCategoryConfig()),
@@ -120,6 +125,10 @@ func NewCollectionApplicationService(db database.Database, permissions *Permissi
 		items:       NewItemCRUDService(db),
 		workspaces:  NewWorkspaceService(db),
 	}
+	if len(availability) > 0 {
+		s.publicBoards = availability[0]
+	}
+	return s
 }
 
 func (s *CollectionApplicationService) ListCategories() ([]models.CollectionCategory, error) {
@@ -277,11 +286,30 @@ func (s *CollectionApplicationService) Create(actor AuditActor, collection model
 		return nil, err
 	}
 	if collection.IsPublic {
+		if collection.IsPrivate {
+			return nil, collectionValidation("make the collection shared before publishing its board")
+		}
+		enabled, err := s.boardsEnabled()
+		if err != nil {
+			return nil, err
+		}
+		if !enabled {
+			return nil, collectionValidation("public boards are disabled on this instance")
+		}
 		if err := s.authorizePublicScope(actor.UserID, collection.QLQuery); err != nil {
 			return nil, err
 		}
 	}
-	if err := s.repository.Create(&collection, actor.UserID); err != nil {
+	var publicationAudit []logger.AuditEvent
+	if collection.IsPublic {
+		now := time.Now().UTC().Format(time.RFC3339Nano)
+		collection.SharingChangedAt, collection.SharingChangedBy = &now, &actor.UserID
+		publicationAudit = append(publicationAudit, logger.AuditEvent{UserID: actor.UserID, Username: actor.Username, IPAddress: actor.IPAddress, UserAgent: actor.UserAgent, Source: actor.Source,
+			ActionType: logger.ActionCollectionSharingUpdate, ResourceType: logger.ResourceCollection, ResourceID: &collection.ID, ResourceName: collection.Name, Success: true,
+			Details: mergeAuditDetails(map[string]any{"before": nil, "after": map[string]any{"collection_id": &collection.ID, "enabled": true, "standalone_enabled": true, "slug": collection.PublicSlug,
+				"scope": collection.QLQuery, "workspace_id": collection.WorkspaceID, "milestone_swimlanes": collection.PublicMilestoneSwimlanes, "revision": 1, "policy": models.CustomerAccessPolicy{Mode: "public", OrganisationIDs: []int{}}, "changed_at": now, "changed_by": actor.UserID}}, actor)})
+	}
+	if err := s.repository.Create(&collection, actor.UserID, publicationAudit...); err != nil {
 		if database.IsUniqueConstraintError(err) {
 			return nil, ErrCollectionConflict
 		}
@@ -289,6 +317,10 @@ func (s *CollectionApplicationService) Create(actor AuditActor, collection model
 	}
 	emitServiceAudit(s.db, actor, logger.ActionCollectionCreate, logger.ResourceCollection, &collection.ID, collection.Name, nil)
 	return s.repository.GetModel(collection.ID)
+}
+
+func optionalCollectionValueEqual[T comparable](left, right *T) bool {
+	return left == nil && right == nil || left != nil && right != nil && *left == *right
 }
 
 func (s *CollectionApplicationService) Update(actor AuditActor, id int, update CollectionUpdate) (*models.Collection, error) {
@@ -300,6 +332,20 @@ func (s *CollectionApplicationService) Update(actor AuditActor, id int, update C
 		return nil, err
 	}
 	oldPublic := collection.IsPublic
+	oldBoardEnabled := collection.BoardEnabled
+	sharingChanged := update.IsPublicSet && (update.IsPublic != collection.IsPublic || update.IsPublic != collection.BoardEnabled) ||
+		update.PublicSlugSet && !optionalCollectionValueEqual(update.PublicSlug, collection.PublicSlug) ||
+		update.PublicMilestoneSwimlanesSet && update.PublicMilestoneSwimlanes != collection.PublicMilestoneSwimlanes ||
+		oldBoardEnabled && (update.QLQuerySet && update.QLQuery != collection.QLQuery ||
+			update.WorkspaceIDSet && !optionalCollectionValueEqual(update.WorkspaceID, collection.WorkspaceID) ||
+			update.IsPrivateSet && update.IsPrivate != collection.IsPrivate)
+	var beforeSharing *BoardSharing
+	if sharingChanged {
+		beforeSharing, err = s.GetBoardSharing(actor.UserID, id)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if update.NameSet {
 		collection.Name = update.Name
 	}
@@ -320,6 +366,10 @@ func (s *CollectionApplicationService) Update(actor AuditActor, id int, update C
 	}
 	if update.IsPublicSet {
 		collection.IsPublic = update.IsPublic
+		collection.BoardEnabled = update.IsPublic
+		if update.IsPublic {
+			collection.BoardStandaloneEnabled = true
+		}
 	}
 	if update.IsPrivateSet {
 		collection.IsPrivate = update.IsPrivate
@@ -334,6 +384,7 @@ func (s *CollectionApplicationService) Update(actor AuditActor, id int, update C
 	// stay anonymously readable at its public slug.
 	if collection.IsPrivate {
 		collection.IsPublic = false
+		collection.BoardEnabled = false
 		collection.PublicSlug = nil
 	}
 	if err := sanitizeCollectionModel(collection); err != nil {
@@ -342,7 +393,7 @@ func (s *CollectionApplicationService) Update(actor AuditActor, id int, update C
 	if strings.TrimSpace(collection.Name) == "" {
 		return nil, collectionValidation("name is required")
 	}
-	publicPolicyChanged := update.IsPublicSet || update.PublicSlugSet || (collection.IsPublic && (update.QLQuerySet || update.WorkspaceIDSet))
+	publicPolicyChanged := update.IsPublicSet || update.PublicSlugSet || (collection.BoardEnabled && (update.QLQuerySet || update.WorkspaceIDSet))
 	if err := s.validatePublicPermission(actor.UserID, publicPolicyChanged); err != nil {
 		return nil, err
 	}
@@ -352,13 +403,35 @@ func (s *CollectionApplicationService) Update(actor AuditActor, id int, update C
 	if err := s.validateWorkspaceAndCategory(actor.UserID, collection.WorkspaceID, collection.CategoryID); err != nil {
 		return nil, err
 	}
-	if collection.IsPublic && (!oldPublic || update.QLQuerySet || update.WorkspaceIDSet) {
+	if collection.BoardEnabled && (!oldBoardEnabled || !oldPublic && collection.IsPublic || update.IsPublicSet || update.QLQuerySet || update.WorkspaceIDSet) {
+		enabled, err := s.boardsEnabled()
+		if err != nil {
+			return nil, err
+		}
+		if !enabled {
+			return nil, collectionValidation("public boards are disabled on this instance")
+		}
+		if collection.PublicRevokedAt != nil {
+			return nil, collectionValidation("an administrator must allow re-publishing this board")
+		}
 		if err := s.authorizePublicScope(actor.UserID, collection.QLQuery); err != nil {
 			return nil, err
 		}
 	}
-	if err := s.repository.Update(id, collection); err != nil {
-		if database.IsUniqueConstraintError(err) {
+	var sharingAudit []logger.AuditEvent
+	if sharingChanged {
+		now := time.Now().UTC().Format(time.RFC3339Nano)
+		collection.SharingChangedAt, collection.SharingChangedBy = &now, &actor.UserID
+		after := *beforeSharing
+		after.Name, after.Scope, after.WorkspaceID = collection.Name, collection.QLQuery, collection.WorkspaceID
+		after.Enabled, after.StandaloneEnabled, after.Slug = collection.BoardEnabled, collection.BoardStandaloneEnabled, collection.PublicSlug
+		after.MilestoneSwimlanes, after.Revision, after.ChangedAt, after.ChangedBy = collection.PublicMilestoneSwimlanes, collection.SharingRevision+1, &now, &actor.UserID
+		sharingAudit = append(sharingAudit, logger.AuditEvent{UserID: actor.UserID, Username: actor.Username, IPAddress: actor.IPAddress, UserAgent: actor.UserAgent, Source: actor.Source,
+			ActionType: logger.ActionCollectionSharingUpdate, ResourceType: logger.ResourceCollection, ResourceID: &id, ResourceName: collection.Name, Success: true,
+			Details: mergeAuditDetails(map[string]any{"before": boardSharingAuditState(beforeSharing), "after": boardSharingAuditState(&after)}, actor)})
+	}
+	if err := s.repository.Update(id, collection, sharingAudit...); err != nil {
+		if database.IsUniqueConstraintError(err) || errors.Is(err, repository.ErrConflict) {
 			return nil, ErrCollectionConflict
 		}
 		return nil, err
@@ -368,58 +441,23 @@ func (s *CollectionApplicationService) Update(actor AuditActor, id int, update C
 }
 
 func (s *CollectionApplicationService) UpdateSharing(actor AuditActor, id int, update CollectionSharingUpdate) (*models.Collection, error) {
-	collection, err := s.requireOwner(actor.UserID, id)
+	collection, _, err := s.sharingCollection(actor.UserID, id)
 	if err != nil {
 		return nil, err
-	}
-	if err := s.requireWorkspaceAccess(actor.UserID, collection); err != nil {
-		return nil, err
-	}
-	// Private always overrides public sharing, so a private collection cannot be
-	// published. Reject the contradictory request instead of storing an is_public
-	// flag the public board will never honor, and clear any slug left behind.
-	if collection.IsPrivate {
-		if update.IsPublic {
-			return nil, collectionValidation("make the collection shared before publishing its board")
-		}
-		update.PublicSlug = nil
-	}
-	if update.PublicSlug != nil {
-		value := sanitize.ShortIdentifier.Sanitize(*update.PublicSlug)
-		update.PublicSlug = &value
-	}
-	if err := s.validatePublicPermission(actor.UserID, true); err != nil {
-		return nil, err
-	}
-	if err := s.validateSlug(update.PublicSlug, update.IsPublic); err != nil {
-		return nil, err
-	}
-	if update.IsPublic {
-		if err := s.authorizePublicScope(actor.UserID, collection.QLQuery); err != nil {
-			return nil, err
-		}
-	}
-	if s.beforePublicSharingWrite != nil {
-		s.beforePublicSharingWrite()
 	}
 	publicMilestoneSwimlanes := collection.PublicMilestoneSwimlanes
 	if update.PublicMilestoneSwimlanes != nil {
 		publicMilestoneSwimlanes = *update.PublicMilestoneSwimlanes
 	}
-	// Publishing is conditional on the authorized scope still being current, so
-	// a query edit between authorization and this write cannot make an
-	// unauthorized scope anonymously readable.
-	updated, err := s.repository.UpdatePublicSharing(id, update.IsPublic, update.PublicSlug, publicMilestoneSwimlanes, collection.QLQuery, collection.WorkspaceID)
+	policy, err := repository.NewCustomerAccessRepository(s.db).Policy(context.Background(), "board", id)
 	if err != nil {
-		if database.IsUniqueConstraintError(err) {
-			return nil, ErrCollectionConflict
-		}
 		return nil, err
 	}
-	if !updated {
-		return nil, fmt.Errorf("%w: collection query changed before it could be published", ErrCollectionConflict)
+	_, err = s.SaveBoardSharing(actor, id, BoardSharingSave{Revision: collection.SharingRevision, Enabled: update.IsPublic,
+		StandaloneEnabled: update.IsPublic || collection.BoardStandaloneEnabled, Slug: update.PublicSlug, MilestoneSwimlanes: publicMilestoneSwimlanes, Policy: policy})
+	if err != nil {
+		return nil, err
 	}
-	emitServiceAudit(s.db, actor, logger.ActionCollectionUpdate, logger.ResourceCollection, &id, collection.Name, nil)
 	return s.repository.GetModel(id)
 }
 

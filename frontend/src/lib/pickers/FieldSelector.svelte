@@ -33,6 +33,10 @@
   let customFields = $state([]);
   let completionCatalog = $state(null);
 
+  $effect(() => {
+    if (customFieldItems !== null) customFields = customFieldItems;
+  });
+
   // Helper to get field translation (handles both object and string formats)
   function getFieldTranslation(fieldKey) {
     const field = t(`pickers.fields.${fieldKey}`);

@@ -16,6 +16,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"windshift/internal/operatorcontrols"
 )
 
 var (
@@ -45,16 +47,27 @@ type backend interface {
 // all methods are nil-safe so callers can treat a missing store as "attachments
 // are not enabled".
 type Store struct {
-	backend  backend
-	enabled  bool
-	local    bool
-	root     string
-	describe string
+	controls   *operatorcontrols.Controls
+	quotaMu    sync.Mutex
+	quotaKnown bool
+	quotaBytes int64
+	backend    backend
+	enabled    bool
+	local      bool
+	root       string
+	describe   string
 
 	healthMu  sync.Mutex
 	healthErr error
 	healthAt  time.Time
 	healthTTL time.Duration
+}
+
+// SetOperatorControls is called before the store is published to services.
+func (s *Store) SetOperatorControls(controls *operatorcontrols.Controls) {
+	if s != nil {
+		s.controls = controls
+	}
 }
 
 const (
@@ -143,6 +156,9 @@ func (s *Store) Put(ctx context.Context, storedPath string, r io.Reader, size in
 	}
 	ctx, cancel := withDefaultTimeout(ctx, 5*time.Minute)
 	defer cancel()
+	if limits := s.controls.Limits(); limits.AttachmentBytes > 0 || limits.BlobBytes > 0 {
+		return s.putLimited(ctx, storedPath, r, size, contentType)
+	}
 	return s.backend.put(ctx, storedPath, r, size, contentType)
 }
 
@@ -161,6 +177,9 @@ func (s *Store) Remove(ctx context.Context, storedPath string) error {
 	}
 	ctx, cancel := withDefaultTimeout(ctx, time.Minute)
 	defer cancel()
+	if s.controls.Limits().BlobBytes > 0 {
+		return s.removeLimited(ctx, storedPath)
+	}
 	return s.backend.remove(ctx, storedPath)
 }
 

@@ -684,15 +684,16 @@ const (
 	ActionChannelCategoryDelete = "channel_category.delete"
 
 	// Channel management
-	ActionChannelCreate        = "channel.create"
-	ActionChannelUpdate        = "channel.update"
-	ActionChannelDelete        = "channel.delete"
-	ActionChannelActivate      = "channel.activate"
-	ActionChannelDeactivate    = "channel.deactivate"
-	ActionChannelKBPublish     = "channel.kb_publish"   // Portal knowledge base publish scope changed
-	ActionCustomerView         = "portal_customer.view" // Customer-data detail view
-	ActionChannelAddManager    = "channel.add_manager"
-	ActionChannelRemoveManager = "channel.remove_manager"
+	ActionChannelCreate           = "channel.create"
+	ActionChannelUpdate           = "channel.update"
+	ActionChannelExperienceUpdate = "channel.experience_update"
+	ActionChannelDelete           = "channel.delete"
+	ActionChannelActivate         = "channel.activate"
+	ActionChannelDeactivate       = "channel.deactivate"
+	ActionChannelKBPublish        = "channel.kb_publish"   // Portal knowledge base publish scope changed
+	ActionCustomerView            = "portal_customer.view" // Customer-data detail view
+	ActionChannelAddManager       = "channel.add_manager"
+	ActionChannelRemoveManager    = "channel.remove_manager"
 
 	// Attachment settings management
 	ActionAttachmentSettingsUpdate = "attachment_settings.update"
@@ -721,9 +722,14 @@ const (
 	ActionMilestonePageLinkDelete = "milestone_page_link.delete"
 
 	// Collection management
-	ActionCollectionCreate = "collection.create"
-	ActionCollectionUpdate = "collection.update"
-	ActionCollectionDelete = "collection.delete"
+	ActionCollectionCreate               = "collection.create"
+	ActionCollectionUpdate               = "collection.update"
+	ActionCollectionSharingUpdate        = "collection.sharing_update"
+	ActionCollectionPublicRevoke         = "collection.public_revoke"
+	ActionCollectionPublicAllowRepublish = "collection.public_allow_republish"
+	ActionCollectionPlacementUpdate      = "collection.placement_update"
+	ActionCollectionPlacementRemove      = "collection.placement_remove"
+	ActionCollectionDelete               = "collection.delete"
 
 	// Test case management
 	ActionTestCaseCreate = "test_case.create"

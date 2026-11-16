@@ -474,6 +474,15 @@ type Collection struct {
 	PublicSlug               *string `json:"public_slug,omitempty"`
 	CreatedAt                string  `json:"created_at"`
 	UpdatedAt                string  `json:"updated_at"`
+	BoardEnabled             bool    `json:"board_enabled"`
+	BoardStandaloneEnabled   bool    `json:"board_standalone_enabled"`
+	BoardEverPublished       bool    `json:"board_ever_published"`
+	SharingRevision          int     `json:"sharing_revision"`
+	PublicRevokedAt          *string `json:"public_revoked_at,omitempty"`
+	PublicRevokedBy          *int    `json:"public_revoked_by,omitempty"`
+	PublicRevokeReason       string  `json:"public_revoke_reason"`
+	SharingChangedAt         *string `json:"sharing_changed_at,omitempty"`
+	SharingChangedBy         *int    `json:"sharing_changed_by,omitempty"`
 	// Joined fields for API responses
 	CreatorName   string `json:"creator_name,omitempty"`
 	CreatorEmail  string `json:"creator_email,omitempty"`

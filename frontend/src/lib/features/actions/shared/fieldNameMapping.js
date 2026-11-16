@@ -20,9 +20,10 @@ export const fieldIdToBackendName = {
   itemType: 'item_type_id',
 };
 
-export const backendNameToFieldId = Object.fromEntries(
-  Object.entries(fieldIdToBackendName).map(([k, v]) => [v, k])
-);
+export const backendNameToFieldId = {
+  ...Object.fromEntries(Object.entries(fieldIdToBackendName).map(([key, value]) => [value, key])),
+  milestone_ids: 'milestone',
+};
 
 export const standardFieldTypes = {
   title: 'text',
@@ -55,19 +56,24 @@ const fieldIdToI18nKey = {
   iteration: 'iteration',
   dueDate: 'dueDate',
   startDate: 'startDate',
+  storyPoints: 'storyPoints',
+  parent: 'parent',
+  project: 'project',
+  open_child_count: 'openChildCount',
+  open_descendant_count: 'openDescendantCount',
 };
 
-export function friendlyStandardFieldName(fieldId) {
-  const key = fieldIdToI18nKey[fieldId];
+export function friendlyStandardFieldName(fieldId, translate = t) {
+  const key = Object.hasOwn(fieldIdToI18nKey, fieldId) ? fieldIdToI18nKey[fieldId] : null;
   if (!key) return fieldId;
-  const tr = /** @type {any} */ (t(`pickers.fields.${key}`));
+  const tr = /** @type {any} */ (translate(`pickers.fields.${key}`));
   if (typeof tr === 'object' && tr) return tr.name || fieldId;
   return tr || fieldId;
 }
 
 // Convert a stored config (field_name / custom_field_id) into the object shape
 // FieldSelector expects, hydrating raw backend keys back to friendly labels.
-export function getFieldSelectorValue(config) {
+export function getFieldSelectorValue(config, translate = t) {
   if (config?.target === 'custom_field' && config?.custom_field_id) {
     return {
       id: `cf_${config.custom_field_id}`,
@@ -92,14 +98,18 @@ export function getFieldSelectorValue(config) {
   if (backendName.startsWith('cf_')) {
     return { id: backendName, name: backendName.slice(3), isCustom: true };
   }
-  const fieldId = backendNameToFieldId[backendName];
+  const fieldId = Object.hasOwn(backendNameToFieldId, backendName)
+    ? backendNameToFieldId[backendName]
+    : Object.hasOwn(fieldIdToI18nKey, backendName)
+      ? backendName
+      : null;
   if (fieldId === 'milestone') {
-    return { id: fieldId, name: t('common.milestone', 'Milestone'), type: 'enum' };
+    return { id: fieldId, name: translate('common.milestone'), type: 'enum' };
   }
   return fieldId
     ? {
         id: fieldId,
-        name: friendlyStandardFieldName(fieldId),
+        name: friendlyStandardFieldName(fieldId, translate),
         type: standardFieldTypes[fieldId] || '',
       }
     : { id: backendName, name: backendName, type: config?.field_type || '' };

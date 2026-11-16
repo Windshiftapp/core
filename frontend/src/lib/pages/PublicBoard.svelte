@@ -1,9 +1,8 @@
 <script>
-  import { onMount } from 'svelte';
+  import { untrack } from 'svelte';
   import { publicBoard } from '../api/publicBoard.js';
   import { themeStore } from '../stores/theme.svelte.js';
-  import IconSun from '@tabler/icons-svelte-runes/icons/sun';
-  import IconMoon from '@tabler/icons-svelte-runes/icons/moon';
+  import CustomerHeader from '../customer/CustomerHeader.svelte';
   import IconClipboardList from '@tabler/icons-svelte-runes/icons/clipboard-list';
   import IconAlertTriangle from '@tabler/icons-svelte-runes/icons/alert-triangle';
   import PublicBoardItemDetail from './PublicBoardItemDetail.svelte';
@@ -16,7 +15,7 @@
   import Lozenge from '../components/Lozenge.svelte';
   import StatusPill from '../components/StatusPill.svelte';
 
-  let { slug } = $props();
+  let { slug, client = publicBoard, embedded = false, initialItemKey = null, onitemchange = null, onaccessdenied = null } = $props();
 
   let selectedItemKey = $state(null);
 
@@ -24,6 +23,8 @@
   let loading = $state(true);
   let error = $state(null);
   let loadId = 0;
+
+  function selectItem(key) { selectedItemKey = key; onitemchange?.(key); }
 
   // Card fields set for quick lookup
   let cardFieldSet = $derived(
@@ -97,21 +98,13 @@
     return cardFieldSet.has(fieldId);
   }
 
-  function toggleTheme() {
-    const current = themeStore.resolvedTheme;
-    themeStore.setColorMode(current === 'dark' ? 'light' : 'dark');
-  }
-
-  onMount(() => {
-    themeStore.init();
-  });
-
   // The router reuses this component across public-board URLs, so a slug change
   // must reset scope-owned state and start the new board immediately. Each load
   // is bound to its slug generation: a superseded response, error or finally
   // must never commit over the board the user is now looking at.
   $effect(() => {
     const activeSlug = slug;
+    const activeClient = client;
     const id = ++loadId;
     const controller = new AbortController();
     let inFlight = false;
@@ -121,7 +114,7 @@
     board = null;
     error = null;
     loading = true;
-    selectedItemKey = null;
+    selectedItemKey = untrack(() => initialItemKey);
 
     async function load(silent, recovery = false) {
       if (silent && !canRunBackgroundSync()) return;
@@ -134,13 +127,16 @@
       inFlight = true;
       if (!silent) loading = true;
       try {
-        const result = await publicBoard.get(activeSlug, { signal: controller.signal });
+        const result = await activeClient.get(activeSlug, { signal: controller.signal });
         if (disposed || id !== loadId) return;
         board = result;
         error = null;
       } catch (err) {
         if (disposed || id !== loadId || err?.name === 'AbortError') return;
         error = err?.status === 404 ? 'not_found' : 'error';
+        board = null;
+        selectedItemKey = null;
+        if (err?.status === 401 || err?.status === 403) onaccessdenied?.(err.status);
       } finally {
         inFlight = false;
         if (!disposed && id === loadId) loading = false;
@@ -160,40 +156,20 @@
       stopRecovery();
     };
   });
+
+  $effect(() => { selectedItemKey = initialItemKey; });
 </script>
 
 <div
   class="public-board"
-  style="background-color: var(--ds-surface); color: var(--ds-text); min-height: 100vh; display: flex; flex-direction: column;"
+  style="background-color: var(--ds-surface); color: var(--ds-text); min-height: {embedded ? '0' : '100vh'}; display: flex; flex-direction: column;"
   data-testid="public-board-page"
   data-ready={!loading}
 >
   <!-- Header -->
-  <header class="public-board-header" style="background-color: var(--ds-surface-raised); border-bottom: 1px solid var(--ds-border); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px;">
-    <div style="display: flex; align-items: center; gap: 12px;">
-      <img src="windshift-3.svg" alt="Windshift" style="width: 28px; height: 28px;" />
-      {#if board}
-        <div>
-          <h1 style="font-size: 18px; font-weight: 600; margin: 0; line-height: 1.3;">{board.collection.name}</h1>
-          {#if board.collection.description}
-            <p style="font-size: 13px; color: var(--ds-text-subtle); margin: 0; line-height: 1.4;">{board.collection.description}</p>
-          {/if}
-        </div>
-      {/if}
-    </div>
-    <button
-      onclick={toggleTheme}
-      data-testid="public-board-theme-toggle"
-      style="background: none; border: 1px solid var(--ds-border); border-radius: 6px; padding: 6px 10px; cursor: pointer; color: var(--ds-text-subtle); font-size: 13px;"
-      title="Toggle theme"
-    >
-      {#if themeStore.resolvedTheme === 'dark'}
-        <IconSun class="w-4 h-4" />
-      {:else}
-        <IconMoon class="w-4 h-4" />
-      {/if}
-    </button>
-  </header>
+  {#if !embedded}
+    <CustomerHeader title={board?.collection.name || ''} description={board?.collection.description || ''} logo="windshift-3.svg" />
+  {/if}
 
   <!-- Content -->
   <main style="flex: 1; overflow-x: auto; padding: 20px 24px;">
@@ -233,8 +209,8 @@
       {#snippet publicCard(card)}
         <div
           class="public-card"
-          onclick={() => selectedItemKey = card.key}
-          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectedItemKey = card.key; } }}
+          onclick={() => selectItem(card.key)}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectItem(card.key); } }}
           role="button"
           tabindex="0"
           data-testid="public-board-card"
@@ -379,15 +355,17 @@
   </main>
 
   <!-- Footer -->
+  {#if !embedded}
   <footer style="padding: 12px 24px; text-align: center; border-top: 1px solid var(--ds-border); background-color: var(--ds-surface-raised);">
     <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
       <img src="windshift-3.svg" alt="Windshift" style="width: 16px; height: 16px; opacity: 0.5;" />
       <span style="font-size: 12px; color: var(--ds-text-subtle);">Powered by Windshift</span>
     </div>
   </footer>
+  {/if}
 
   {#if selectedItemKey}
-    <PublicBoardItemDetail {slug} itemKey={selectedItemKey} onclose={() => selectedItemKey = null} />
+    {#key selectedItemKey}<PublicBoardItemDetail {slug} {client} itemKey={selectedItemKey} onclose={() => selectItem(null)} />{/key}
   {/if}
 </div>
 
