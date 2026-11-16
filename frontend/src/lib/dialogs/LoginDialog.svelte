@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import { navigate } from '../router.js';
   import { authStore } from '../stores/auth.svelte.js';
   import { ssoStore } from '../stores/sso.svelte.js';
@@ -9,7 +9,6 @@
   import EyeOff from '@lucide/svelte/icons/eye-off';
   import Lock from '@lucide/svelte/icons/lock';
   import User from '@lucide/svelte/icons/user';
-  import AlertCircle from '@lucide/svelte/icons/alert-circle';
   import LogIn from '@lucide/svelte/icons/log-in';
   import Github from '@tabler/icons-svelte-runes/icons/brand-github';
   import Key from '@lucide/svelte/icons/key';
@@ -20,13 +19,9 @@
   import Label from '../components/Label.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import Spinner from '../components/Spinner.svelte';
-  import {
-    isWebAuthnSupported
-  } from '../utils/webauthn-utils.js';
+  import { isConditionalMediationAvailable, isWebAuthnSupported } from '../utils/webauthn-utils.js';
   import {
     deriveFidoError,
-    evaluateFidoAvailability,
-    getBaseLoginState,
     performFidoLogin
   } from '../utils/loginUtils.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -41,22 +36,34 @@
   let rememberMe = $state(false);
   let showPassword = $state(false);
   let validationError = $state('');
-  let fidoAvailable = $state(false);
   let tryingFido = $state(false);
-  let showFidoOption = $state(false);
+  let activeAttempt = $state(false);
+  let committingPasskey = $state(false);
+  let enrollment = $state(false);
+  let invalidField = $state('');
+  let passwordInput = $state(null);
+  let attemptController = null;
+  let conditionalController = null;
+  let destroyed = false;
   let ssoError = $state(null);
   let ssoRequiredMessage = $state(null);
   let loginOptionsReady = $state(false);
+  let retryingOptions = $state(false);
 
   // Auth policy status (fetched on mount)
   let policyStatus = $state({
     hide_password_form: false,
     sso_enabled: false,
-    passkey_required: false
+    passkey_required: false,
+    password_first_required: false
   });
 
   // Focus the first input when dialog opens
   let emailInput = $state(null);
+  const busy = $derived(activeAttempt || $authStore.loading);
+  const standalonePasskey = $derived(!policyStatus.password_first_required &&
+    (!policyStatus.hide_password_form || policyStatus.passkey_required));
+  const passkeyPrimary = $derived(standalonePasskey && policyStatus.passkey_required);
 
   // Initialize SSO status and auth policy on mount
   onMount(async () => {
@@ -72,6 +79,48 @@
     }
   });
 
+  onDestroy(() => {
+    destroyed = true;
+    cancelCredentialRequests();
+  });
+
+  $effect(() => {
+    if (isOpen && loginOptionsReady && standalonePasskey) {
+      const controller = new AbortController();
+      conditionalController = controller;
+      void startConditionalLogin(controller);
+      return () => controller.abort();
+    }
+  });
+
+  async function startConditionalLogin(controller) {
+    if (!await isConditionalMediationAvailable() || controller.signal.aborted) return;
+    await runPasskey(controller, true);
+  }
+
+  function cancelCredentialRequests() {
+    conditionalController?.abort();
+    attemptController?.abort();
+  }
+
+  function cancelPasskey() {
+    if (committingPasskey) return;
+    attemptController?.abort();
+    attemptController = null;
+    activeAttempt = false;
+    tryingFido = false;
+  }
+
+  async function retryLoginOptions() {
+    if (busy || retryingOptions) return;
+    retryingOptions = true;
+    try {
+      await ssoStore.initStatus();
+    } finally {
+      retryingOptions = false;
+    }
+  }
+
   // Load public policy status
   async function loadPolicyStatus() {
     try {
@@ -79,19 +128,17 @@
     } catch (err) {
       console.warn('Failed to load auth policy status:', err);
       // Default to showing password form on error
-      policyStatus = { hide_password_form: false, sso_enabled: false, passkey_required: false };
+      policyStatus = { hide_password_form: false, sso_enabled: false, passkey_required: false, password_first_required: false };
     }
   }
 
   $effect(() => {
     if (isOpen && emailInput) {
-      setTimeout(() => {
-        try {
-          emailInput?.focus();
-        } catch (error) {
-          console.warn('Failed to focus email input:', error);
-        }
-      }, 100);
+      try {
+        emailInput.focus();
+      } catch (error) {
+        console.warn('Failed to focus email input:', error);
+      }
     }
   });
 
@@ -103,125 +150,153 @@
   });
   
   function clearForm() {
-    const baseState = getBaseLoginState();
-    emailOrUsername = baseState.emailOrUsername;
-    password = baseState.password;
-    rememberMe = baseState.rememberMe;
-    showPassword = baseState.showPassword;
-    validationError = baseState.validationError;
-    fidoAvailable = baseState.fidoAvailable;
-    tryingFido = baseState.tryingFido;
-    showFidoOption = baseState.showFidoOption;
+    cancelCredentialRequests();
+    emailOrUsername = '';
+    password = '';
+    rememberMe = false;
+    showPassword = false;
+    validationError = '';
+    invalidField = '';
+    tryingFido = false;
+    activeAttempt = false;
+    committingPasskey = false;
+    enrollment = false;
     ssoError = null;
     ssoRequiredMessage = null;
     authStore.clearError();
   }
 
-  // Handle SSO login (for single provider or default)
   function handleSSOLogin() {
-    ssoStore.startLogin(rememberMe);
+    handleSSOLoginForProvider(null);
   }
 
-  // Handle SSO login for a specific provider
   function handleSSOLoginForProvider(provider) {
-    ssoStore.startLogin(provider.slug, provider.provider_type, rememberMe);
-  }
-
-  // Check if FIDO authentication is available when user enters email
-  async function checkFidoAvailability() {
-    const { available, showOption } = await evaluateFidoAvailability(emailOrUsername);
-    fidoAvailable = available;
-    showFidoOption = showOption;
-  }
-
-  // Attempt FIDO authentication
-  async function handleFidoLogin() {
-    if (!emailOrUsername.trim()) {
-      validationError = 'Email or username is required';
-      return;
-    }
-
-    // Check WebAuthn support
-    if (!isWebAuthnSupported()) {
-      validationError = 'WebAuthn is not supported by this browser';
-      return;
-    }
-
+    if (busy) return;
+    conditionalController?.abort();
+    activeAttempt = true;
+    clearErrors();
     try {
-      tryingFido = true;
-      validationError = '';
-      authStore.clearError();
+      if (provider) ssoStore.startLogin(provider.slug, provider.provider_type, rememberMe);
+      else ssoStore.startLogin(rememberMe);
+    } catch (error) {
+      activeAttempt = false;
+      validationError = error.message;
+    }
+  }
 
-      const loginResult = await performFidoLogin(emailOrUsername);
+  async function handleFidoLogin() {
+    if (busy || !standalonePasskey) return;
+    conditionalController?.abort();
+    const controller = new AbortController();
+    attemptController = controller;
+    await runPasskey(controller);
+  }
 
+  async function runPasskey(controller, conditional = false) {
+    if (!isWebAuthnSupported()) {
+      validationError = t('security.webAuthnNotSupported');
+      return;
+    }
+    try {
+      if (!conditional) {
+        activeAttempt = true;
+        tryingFido = true;
+        clearErrors();
+      }
+      const loginResult = await performFidoLogin(conditional ? '' : emailOrUsername, rememberMe, {
+        signal: controller.signal,
+        conditional,
+        getRememberMe: () => rememberMe,
+        onCredential: () => {
+          controller.signal.throwIfAborted();
+          if (destroyed || !isOpen || (conditional && busy)) throw new DOMException('Cancelled', 'AbortError');
+          activeAttempt = true;
+          tryingFido = true;
+          committingPasskey = true;
+          clearErrors();
+        }
+      });
+      if (controller.signal.aborted || destroyed || !isOpen) return;
       if (loginResult.success || loginResult.status === 'success') {
-        // Verify the browser session was issued/elevated and load canonical
-        // session metadata before rendering the authenticated application.
-        await authStore.completePasskeyLogin(loginResult.user);
+        await authStore.completePasskeyLogin(loginResult.user, { signal: controller.signal });
+        if (controller.signal.aborted || destroyed || !isOpen) return;
         isOpen = false;
         onsuccess?.();
       } else {
-        throw new Error(loginResult.message || 'FIDO authentication failed');
+        throw new Error(loginResult.message || t('security.authenticationFailed'));
       }
-
     } catch (error) {
-      console.error('FIDO authentication error:', error);
-      validationError = deriveFidoError(error);
+      if (!controller.signal.aborted && !destroyed && isOpen && (!conditional || committingPasskey)) {
+        validationError = deriveFidoError(error);
+        authStore.clearError();
+      }
     } finally {
-      tryingFido = false;
+      if (!controller.signal.aborted && !destroyed) {
+        tryingFido = false;
+        activeAttempt = false;
+        committingPasskey = false;
+      }
     }
   }
-  
-  async function handleSubmit() {
-    // Clear previous errors
+
+  function clearErrors() {
     validationError = '';
+    invalidField = '';
     ssoRequiredMessage = null;
     authStore.clearError();
+  }
 
-    // Basic validation
+  async function fieldError(field, message) {
+    invalidField = field;
+    validationError = message;
+    await tick();
+    (field === 'username' ? emailInput : passwordInput)?.focus();
+  }
+
+  async function handleSubmit() {
+    if (busy || policyStatus.hide_password_form) return;
+    clearErrors();
     if (!emailOrUsername.trim()) {
-      validationError = 'Email or username is required';
+      await fieldError('username', t('auth.usernameRequired'));
       return;
     }
-
     if (!password) {
-      validationError = 'Password is required';
+      await fieldError('password', t('auth.passwordRequired'));
       return;
     }
-
-    // Attempt login
-    const result = await authStore.login({
-      email_or_username: emailOrUsername.trim(),
-      password: password,
-      remember_me: rememberMe
-    });
-
-    if (result.success) {
-      // Check if enrollment is required
-      if (result.enrollment_required) {
+    conditionalController?.abort();
+    const controller = new AbortController();
+    attemptController = controller;
+    activeAttempt = true;
+    try {
+      const result = await authStore.login({
+        email_or_username: emailOrUsername.trim(),
+        password,
+        remember_me: rememberMe
+      }, { signal: controller.signal });
+      if (controller.signal.aborted || destroyed || !isOpen) return;
+      if (result.success) {
         isOpen = false;
         onsuccess?.();
-        // Redirect to security settings for passkey enrollment
-        navigate('/security?enroll=passkey');
-        return;
+        if (result.enrollment_required) navigate('/security?enroll=passkey');
+      } else if (result.passkey_required) {
+        await runPasskey(controller);
+      } else if (result.sso_required) {
+        ssoRequiredMessage = result.policy_message;
       }
-
-      isOpen = false;
-      onsuccess?.();
-    } else if (result.passkey_required) {
-      // The password established only a server-restricted pending session.
-      // Complete the fresh passkey assertion before treating it as authenticated.
-      await handleFidoLogin();
-    } else if (result.sso_required) {
-      // Show SSO required message instead of regular error
-      ssoRequiredMessage = result.policy_message;
+    } catch (error) {
+      if (!controller.signal.aborted && !destroyed) validationError = error.message;
+    } finally {
+      if (!controller.signal.aborted && !destroyed) activeAttempt = false;
     }
   }
   
-  function handleKeydown(event) {
-    if (event.key === 'Enter' && !$authStore.loading) {
-      handleSubmit();
-    }
+  function handleKeydown(event, fromPassword = false) {
+    if (event.key !== 'Enter' || event.isComposing) return;
+    event.preventDefault();
+    if (busy) return;
+    if (!fromPassword && standalonePasskey && !enrollment && (passkeyPrimary || !password)) handleFidoLogin();
+    else handleSubmit();
   }
 </script>
 
@@ -245,25 +320,25 @@
     <!-- Error Messages -->
     {#if ssoError}
       <div data-testid="login-sso-error">
-        <AlertBox variant="error" message={ssoError} class="mb-4" />
+        <AlertBox variant="error" role="alert" message={ssoError} class="mb-4" />
       </div>
     {/if}
 
     {#if ssoRequiredMessage}
-      <AlertBox variant="warning" class="mb-4">
+      <AlertBox variant="warning" role="alert" class="mb-4">
         {ssoRequiredMessage}
         {#if $ssoStore.enabled}
-          <p class="text-xs text-[var(--ds-text-subtle)] mt-1">Use the SSO button above to sign in.</p>
+          <p class="text-xs text-[var(--ds-text-subtle)] mt-1">{t('auth.useSSO')}</p>
         {/if}
       </AlertBox>
     {/if}
 
     {#if validationError}
-      <AlertBox variant="error" message={validationError} class="mb-4" />
+      <AlertBox id="login-validation-error" role="alert" variant="error" message={validationError} class="mb-4" />
     {/if}
 
-    {#if $authStore.error && !ssoRequiredMessage}
-      <AlertBox variant="error" message={$authStore.error} class="mb-4" />
+    {#if $authStore.error && !ssoRequiredMessage && !validationError}
+      <AlertBox role="alert" variant="error" message={$authStore.error} class="mb-4" />
     {/if}
 
     {#if !loginOptionsReady}
@@ -275,12 +350,20 @@
         <span>{t('common.loading')}</span>
       </div>
     {:else}
+    {#if $ssoStore.statusError}
+      <AlertBox variant="error" role="alert" class="mb-4">
+        <p>{t('auth.loginOptionsError')}</p>
+        <Button onclick={retryLoginOptions} disabled={busy} loading={retryingOptions} dataTestid="login-options-retry" class="mt-3">
+          {t('common.retry')}
+        </Button>
+      </AlertBox>
+    {/if}
     <!-- Keep the session choice in front of SSO so it also remains available
          when the authentication policy hides the password form. -->
     {#if $ssoStore.enabled && !$ssoStore.statusLoading}
       <Checkbox
         bind:checked={rememberMe}
-        disabled={$authStore.loading}
+        disabled={busy}
         label={t('auth.staySignedIn')}
         size="small"
         class="mb-4"
@@ -293,7 +376,7 @@
           variant="default"
           fullWidth={true}
           onclick={handleSSOLogin}
-          disabled={$authStore.loading}
+          disabled={busy}
           dataTestid="login-sso"
           class={$ssoStore.providerType === 'github' ? 'github-login' : ''}
         >
@@ -311,7 +394,7 @@
               variant="default"
               fullWidth={true}
               onclick={() => handleSSOLoginForProvider(provider)}
-              disabled={$authStore.loading}
+              disabled={busy}
               dataTestid={`login-sso-${provider.slug}`}
               class={provider.provider_type === 'github' ? 'github-login' : ''}
             >
@@ -332,76 +415,39 @@
             <div class="w-full border-t border-[var(--ds-border)]"></div>
           </div>
           <div class="relative flex justify-center text-sm">
-            <span class="px-2 bg-[var(--ds-surface-raised)] text-[var(--ds-text-subtle)]">{t('auth.orSignInWithPassword')}</span>
+            <span class="px-2 bg-[var(--ds-surface-raised)] text-[var(--ds-text-subtle)]">{t('common.or')}</span>
           </div>
         </div>
       {/if}
     {/if}
 
     <!-- Password Login Form (hidden if SSO-only mode or policy requires it) -->
-    {#if policyStatus.hide_password_form}
+    {#if policyStatus.hide_password_form && !standalonePasskey}
       <!-- Password form hidden by auth policy -->
       <div class="p-4 bg-[var(--ds-background-neutral)] border border-[var(--ds-border)] rounded-md">
         <div class="flex items-start gap-3">
           <Key class="w-5 h-5 text-[var(--ds-icon)] flex-shrink-0 mt-0.5" />
           <div>
-            <p class="text-sm text-[var(--ds-text)] font-medium">Password login is disabled</p>
+            <p class="text-sm text-[var(--ds-text)] font-medium">{t('auth.passwordDisabled')}</p>
             <p class="text-xs text-[var(--ds-text-subtle)] mt-1">
               {#if policyStatus.sso_enabled}
-                Please use Single Sign-On (SSO) to sign in.
+                {t('auth.useSSO')}
               {:else if policyStatus.passkey_required}
-                Please use a passkey to sign in.
+                {t('auth.usePasskey')}
               {:else}
-                Contact your administrator for access.
+                {t('auth.contactAdmin')}
               {/if}
             </p>
           </div>
         </div>
       </div>
 
-      <!-- Passkey login option when password is hidden -->
-      {#if policyStatus.passkey_required}
-        <div class="mt-4">
-          <Label for="emailOrUsernamePasskey" color="default" class="mb-1">
-            {t('auth.emailOrUsername')}
-          </Label>
-          <div class="relative">
-            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <User class="h-4 w-4 text-[var(--ds-icon)]" />
-            </div>
-            <Input
-              id="emailOrUsernamePasskey"
-              type="text"
-              bind:value={emailOrUsername}
-              onblur={checkFidoAvailability}
-              disabled={$authStore.loading || tryingFido}
-              class="pl-10 pr-3 py-2 leading-5"
-              placeholder={t('placeholders.enterEmailOrUsername')}
-              autocomplete="username"
-            />
-          </div>
-        </div>
-
-        <Button
-          variant="primary"
-          fullWidth={true}
-          loading={tryingFido}
-          disabled={$authStore.loading || tryingFido || !emailOrUsername.trim()}
-          onclick={handleFidoLogin}
-          class="mt-4"
-          dataTestid="login-passkey"
-        >
-          {#if !tryingFido}
-            <Key class="w-4 h-4 mr-2" />
-          {/if}
-          {tryingFido ? t('auth.touchSecurityKey') : t('auth.signInWithSecurityKey')}
-        </Button>
-      {/if}
     {:else}
 
     <!-- Login Form -->
     <form
       onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}
+      novalidate
       class="space-y-4"
       data-testid="login-password-form"
     >
@@ -419,17 +465,48 @@
             id="emailOrUsername"
             type="text"
             bind:value={emailOrUsername}
-            onkeydown={handleKeydown}
-            onblur={checkFidoAvailability}
-            disabled={$authStore.loading}
+            onchange={(event) => emailOrUsername = event.currentTarget.value}
+            onkeydown={(event) => handleKeydown(event)}
+            disabled={busy}
             class="pl-10 pr-3 py-2 leading-5"
             placeholder={t('placeholders.enterEmailOrUsername')}
-            autocomplete="username"
-            required
+            autocomplete={standalonePasskey ? 'username webauthn' : 'username'}
+            required={!standalonePasskey}
+            ariaInvalid={invalidField === 'username'}
+            ariaDescribedby={invalidField === 'username' ? 'login-validation-error' : standalonePasskey ? 'login-passkey-hint' : undefined}
           />
         </div>
       </div>
 
+      {#if standalonePasskey}
+        <p id="login-passkey-hint" class="text-xs text-[var(--ds-text-subtle)]">{t('auth.passkeyHint')}</p>
+        <Button
+          variant={passkeyPrimary ? 'primary' : 'default'}
+          fullWidth={true}
+          loading={tryingFido}
+          disabled={busy}
+          onclick={handleFidoLogin}
+          dataTestid="login-passkey"
+          icon={Key}
+        >
+          {tryingFido ? t('auth.passkeyProgress') : t('auth.signInWithPasskey')}
+        </Button>
+      {/if}
+
+      {#if tryingFido && !committingPasskey}
+        <Button fullWidth onclick={cancelPasskey} dataTestid="login-cancel-passkey">{t('common.cancel')}</Button>
+      {/if}
+
+      {#if passkeyPrimary && !policyStatus.hide_password_form}
+        <Button variant="link" disabled={busy} onclick={() => { conditionalController?.abort(); enrollment = !enrollment; password = ''; clearErrors(); }} dataTestid="login-enrollment">
+          {t('auth.enrollFirstPasskey')}
+        </Button>
+        {#if enrollment}
+          <p class="text-sm text-[var(--ds-text-subtle)]">{t('auth.enrollmentPasswordHint')}</p>
+        {/if}
+      {/if}
+
+      {#if !policyStatus.hide_password_form && (!passkeyPrimary || enrollment)}
       <!-- Password Field -->
       <div>
         <Label for="password" color="default" class="mb-1">
@@ -441,68 +518,50 @@
           </div>
           <Input
             id="password"
+            bind:inputRef={passwordInput}
             type={showPassword ? 'text' : 'password'}
             bind:value={password}
-            onkeydown={handleKeydown}
-            disabled={$authStore.loading}
+            onkeydown={(event) => handleKeydown(event, true)}
+            onfocus={() => conditionalController?.abort()}
+            disabled={busy}
             class="pl-10 pr-10 py-2 leading-5"
             placeholder={t('placeholders.enterPassword')}
             autocomplete="current-password"
             required
+            ariaInvalid={invalidField === 'password'}
+            ariaDescribedby={invalidField === 'password' ? 'login-validation-error' : undefined}
           />
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="small"
+            ariaLabel={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+            pressed={showPassword}
+            dataTestid="login-password-visibility"
             onclick={() => showPassword = !showPassword}
-            disabled={$authStore.loading}
-            class="absolute inset-y-0 right-0 pr-3 flex items-center text-[var(--ds-icon)] hover:text-[var(--ds-text)] disabled:hover:text-[var(--ds-icon)]"
+            disabled={busy}
+            class="absolute inset-y-0 right-0"
           >
             {#if showPassword}
               <EyeOff class="h-4 w-4" />
             {:else}
               <Eye class="h-4 w-4" />
             {/if}
-          </button>
+          </Button>
         </div>
       </div>
+      {/if}
 
       {#if !$ssoStore.enabled || $ssoStore.statusLoading}
         <Checkbox
           bind:checked={rememberMe}
-          disabled={$authStore.loading}
+          disabled={busy}
           label={t('auth.staySignedIn')}
           size="small"
           dataTestid="login-remember-me"
         />
       {/if}
 
-      <!-- FIDO Authentication Option -->
-      {#if showFidoOption && fidoAvailable}
-        <div class="relative">
-          <div class="absolute inset-0 flex items-center">
-            <div class="w-full border-t border-[var(--ds-border)]"></div>
-          </div>
-          <div class="relative flex justify-center text-sm">
-            <span class="px-2 bg-[var(--ds-surface-raised)] text-[var(--ds-text-subtle)]">{t('common.or')}</span>
-          </div>
-        </div>
-
-        <Button
-          variant="default"
-          fullWidth={true}
-          loading={tryingFido}
-          disabled={$authStore.loading || tryingFido || !emailOrUsername.trim()}
-          onclick={handleFidoLogin}
-          dataTestid="login-passkey"
-        >
-          {#if !tryingFido}
-            <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-2 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z" clip-rule="evenodd" />
-            </svg>
-          {/if}
-          {tryingFido ? t('auth.touchSecurityKey') : t('auth.signInWithSecurityKey')}
-        </Button>
-      {/if}
-
+      {#if !policyStatus.hide_password_form && (!passkeyPrimary || enrollment)}
       <!-- Submit Button -->
       <Button
         variant="primary"
@@ -510,10 +569,11 @@
         dataTestid="login-submit"
         fullWidth={true}
         loading={$authStore.loading}
-        disabled={$authStore.loading || !emailOrUsername.trim() || !password}
+        disabled={busy}
       >
-        {$authStore.loading ? t('auth.loggingIn') : t('auth.signIn')}
+        {$authStore.loading ? t('auth.loggingIn') : passkeyPrimary ? t('auth.enrollFirstPasskey') : t('auth.signIn')}
       </Button>
+      {/if}
     </form>
     {/if}
     {/if}

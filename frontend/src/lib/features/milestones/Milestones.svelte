@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
   import { t } from '../../stores/i18n.svelte.js';
@@ -68,6 +68,9 @@
 
   // Props for workspace-scoped view (optional)
   let { workspaceId = null } = $props();
+  const readController = new AbortController();
+  const readOptions = { signal: readController.signal };
+  onDestroy(() => readController.abort());
 
   // Determine if this is global view (no workspaceId) or workspace-scoped
   const isGlobalView = $derived(!workspaceId);
@@ -193,7 +196,7 @@
     ]);
 
     // Load test statistics if test management is enabled
-    if ($moduleSettings.test_management_enabled) {
+    if (!readController.signal.aborted && $moduleSettings.test_management_enabled) {
       await loadTestStatistics();
     }
   });
@@ -201,15 +204,18 @@
   useEventListener(() => document, 'manage-categories', () => { showCategoryForm = true; });
 
   async function loadData() {
+    if (readController.signal.aborted) return;
     try {
       const [_, milestones] = await Promise.all([
         categoriesStore.init(),
-        milestonesApi.getAll(listFilters())
+        milestonesApi.getAll(listFilters(), readOptions)
       ]);
+      if (readController.signal.aborted) return;
       // Update the store with filtered milestones
       milestonesStore.set(milestones || []);
       workspaces = await workspacesStore.load();
     } catch (error) {
+      if (readController.signal.aborted) return;
       console.error('Failed to load data:', error);
     }
   }

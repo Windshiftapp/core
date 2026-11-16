@@ -27,6 +27,8 @@
   } = $props();
 
   const submitShortcut = getShortcut('modal', 'submit');
+  const instanceId = $props.id();
+  const titleId = `${instanceId}-title`;
 
   // Use translations for defaults
   const resolvedTitle = $derived(title ?? t('common.areYouSure'));
@@ -52,7 +54,7 @@
 
   // Handle keyboard navigation for submit shortcuts
   function handleKeydown(event) {
-    if (!show) return;
+    if (!show || event.isComposing) return;
 
     // Check for submit shortcut (Cmd/Ctrl+Enter)
     if (matchesShortcut(event, submitShortcut)) {
@@ -62,13 +64,10 @@
     }
 
     // Enter without modifier confirms (unless on cancel button)
-    if (event.key === 'Enter' && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
-      const activeElement = document.activeElement;
-      const isOnCancelButton = activeElement?.textContent?.trim() === resolvedCancelText;
-      if (!isOnCancelButton) {
+    if (!event.defaultPrevented && event.key === 'Enter' && !event.ctrlKey && !event.metaKey && !event.shiftKey &&
+        (event.target instanceof HTMLInputElement || event.target === event.currentTarget)) {
         event.preventDefault();
         doConfirm();
-      }
     }
   }
 
@@ -116,9 +115,7 @@
   let styles = $derived(getVariantStyles(variant));
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
-<ModalBackdrop bind:show onclose={cancel} ariaLabelledBy="{testIdPrefix}-title" zIndex={70}>
+<ModalBackdrop bind:show onclose={cancel} onKeydown={handleKeydown} ariaLabelledBy={titleId} dataTestid="{testIdPrefix}-modal" zIndex={70} portal={true}>
     <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div
       role="presentation"
@@ -138,7 +135,7 @@
             </div>
           {/if}
           <h3
-            id="{testIdPrefix}-title"
+            id={titleId}
             class="text-lg font-medium flex-1"
             style="color: var(--ds-text);"
           >

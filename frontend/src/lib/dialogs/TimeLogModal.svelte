@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../components/FormField.svelte';
   import { onDestroy } from 'svelte';
   import { links } from '../api/configuration.js';
   import { BasePicker } from '../pickers';
@@ -257,6 +258,7 @@
     <!-- Project Selection (shown at top when from work item) -->
     {#if showProjectField}
       <div>
+        <FormField class="contents" requiredMark={!defaultItemId}>
         <Label color="default" required={!defaultItemId} class="mb-2">{t('time.timeTrackingProject')}</Label>
         <BasePicker
           id="time-log-project"
@@ -278,12 +280,14 @@
             </div>
           {/snippet}
         </BasePicker>
+        </FormField>
       </div>
     {/if}
 
     <!-- Work Item Selection (optional on time page) -->
     {#if showWorkItemField}
       <div>
+        <FormField class="contents">
         <Label color="default" class="mb-2">{t('time.workItemOptional')}</Label>
         <BasePicker
           id="time-log-work-item"
@@ -317,6 +321,7 @@
             </div>
           {/snippet}
         </BasePicker>
+        </FormField>
       </div>
     {/if}
 

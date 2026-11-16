@@ -1,4 +1,5 @@
 <script>
+  const dialogId = $props.id();
   import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
   import X from '@lucide/svelte/icons/x';
   import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -173,7 +174,7 @@
 
 </script>
 
-<ModalBackdrop bind:show closeOnClick={!loading} closeOnEscape={!loading} zIndex={60} onclose={handleCancel} ariaLabelledBy="dialog-title">
+<ModalBackdrop bind:show closeOnClick={!loading} closeOnEscape={!loading} zIndex={60} onclose={handleCancel} ariaLabelledBy="{dialogId}-title">
     <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div
       role="presentation"
@@ -192,7 +193,7 @@
             />
           </div>
           <h3
-            id="dialog-title"
+            id="{dialogId}-title"
             class="text-lg font-medium flex-1"
             style="color: var(--ds-text);"
           >

@@ -1,4 +1,6 @@
 <script>
+  import { createOwnedPopup } from '../../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
   import { createPopover, melt } from '@melt-ui/svelte';
   import BoardItemCard from './BoardItemCard.svelte';
   import { useRowRetention } from '../../virtualization/useRowRetention.svelte';
@@ -32,6 +34,8 @@
       flip: true,
     },
     portal: 'body',
+    disableFocusTrap: ownedPopup.withinModal,
+    closeFocus: ownedPopup.withinModal ? null : undefined,
   });
   useRowRetention(() => $open, 'preview');
 
@@ -49,6 +53,7 @@
 {#if $open}
   <div
     use:melt={$content}
+    use:ownedPopup={{ close: () => { $open = false; } }}
     class="roadmap-item-preview z-[60] w-[min(20rem,calc(100vw-2rem))]"
     data-testid={`roadmap-item-preview-${item.id}`}
   >

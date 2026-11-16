@@ -8,7 +8,7 @@ import { createCommand } from '../types.js';
  * looks like an item key (`ABC-123`).
  */
 export function searchProvider(ctx) {
-  const { workItems } = ctx;
+  const { workItems, workItemsQuery } = ctx;
   if (!workItems?.length) return [];
 
   return workItems.map((item) => {
@@ -18,6 +18,7 @@ export function searchProvider(ctx) {
       label: `${itemKey}: ${item.title}`,
       description: `${item.workspace_name} • ${item.status}${item.priority ? ` • ${item.priority}` : ''}`,
       bucket: BUCKET.SEARCH_RESULTS,
+      searchQuery: workItemsQuery,
       keywords: [
         itemKey.toLowerCase(),
         item.title?.toLowerCase(),

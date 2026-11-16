@@ -62,6 +62,7 @@ export default {
       transitionItem: 'Transicionar item',
       roundRobinAssign: 'Atribuir em rodízio',
       createMilestone: 'Criar marco',
+      executeScript: 'Executar script',
     },
 
     aiUpdated: 'Ação atualizada pela IA',
@@ -167,6 +168,7 @@ export default {
       completed: 'Concluído',
       failed: 'Falhou',
       skipped: 'Ignorado',
+      reconciliationRequired: 'Reconciliação necessária',
       startedAt: 'Iniciado em',
       completedAt: 'Concluído em',
       error: 'Erro',

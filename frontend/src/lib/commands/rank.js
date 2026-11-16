@@ -14,20 +14,23 @@ import { deriveLegacyBucket } from './types.js';
  * @returns {any[]}
  */
 export function rankCommands(query, commandsList) {
+  query = query.trim();
   const annotated = commandsList.map((cmd, i) => {
     const label = cmd.label ?? '';
     const description = cmd.description ?? '';
     const keywords = cmd.keywords ?? [];
-    const score = query.trim() ? scoreCommand(query, { label, description, keywords }) : 1;
+    const score = query ? scoreCommand(query, { label, description, keywords }) : 1;
     return {
       ...cmd,
       bucket: cmd.bucket || deriveLegacyBucket(cmd),
-      _score: score,
+      _score: cmd.searchQuery === query ? Math.max(1, score) : score,
       _seq: cmd._seq ?? i,
     };
   });
 
-  const filtered = query.trim() ? annotated.filter((c) => c._score > 0) : annotated;
+  const filtered = annotated.filter(
+    (c) => (c.searchQuery === undefined || c.searchQuery === query) && c._score > 0
+  );
   filtered.sort(compareCommands(query));
 
   const counts = new Map();

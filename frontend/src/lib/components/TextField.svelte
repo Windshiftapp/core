@@ -1,10 +1,14 @@
 <script>
-  import Label from './Label.svelte';
+  import FormField from './FormField.svelte';
   import Input from './Input.svelte';
 
   /**
    * @type {{
-   *   label?: string,
+    *   label?: string,
+    *   helper?: string,
+    *   error?: string,
+    *   ariaDescribedby?: string,
+    *   ariaInvalid?: boolean,
    *   labelSnippet?: import('svelte').Snippet | null,
    *   value?: any,
    *   type?: string,
@@ -42,6 +46,10 @@
    */
   let {
     label = '',
+    helper = '',
+    error = '',
+    ariaDescribedby = undefined,
+    ariaInvalid = undefined,
     // Renders rich label content (icons, helper spans) in place of `label`.
     labelSnippet = null,
     value = $bindable(''),
@@ -81,16 +89,11 @@
   } = $props();
 </script>
 
-<div class={className}>
-  {#if labelSnippet}
-    <Label for={id} required={required || requiredMark} color={labelColor} size={labelSize} class={labelClass}>
-      {@render labelSnippet()}
-    </Label>
-  {:else if label}
-    <Label for={id} required={required || requiredMark} color={labelColor} size={labelSize} class={labelClass}>{label}</Label>
-  {/if}
+<FormField {label} {labelSnippet} {id} {required} {requiredMark} {helper} {error} {labelColor} {labelSize} {labelClass} labelTestid={dataTestid ? `${dataTestid}-label` : undefined} class="mb-0 {className}">
   <Input
     {type}
+    {ariaDescribedby}
+    {ariaInvalid}
     {id}
     bind:value
     bind:inputRef
@@ -118,4 +121,4 @@
     {onkeydown}
     {onkeyup}
   />
-</div>
+</FormField>

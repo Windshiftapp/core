@@ -1,4 +1,6 @@
 <script>
+  import { createOwnedPopup } from '../../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
   import { untrack } from 'svelte';
   import { createPopover, melt } from '@melt-ui/svelte';
   import { toStore } from 'svelte/store';
@@ -61,6 +63,8 @@
       forceVisible: true,
       positioning: { strategy: 'fixed', fitViewport: true, placement: 'bottom-start' },
       portal: 'body',
+      disableFocusTrap: ownedPopup.withinModal,
+      closeFocus: ownedPopup.withinModal ? null : undefined,
       open: controlledOpen,
     })
   );
@@ -343,6 +347,7 @@
 {#if $openState}
   <div
     use:melt={$content}
+    use:ownedPopup={{ close: () => { $openState = false; } }}
     data-testid="filter-menu"
     class="z-[60] max-h-[70vh] w-80 overflow-y-auto rounded border p-3 shadow-xl"
     style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);"
@@ -479,8 +484,8 @@
                   type="button"
                   class="rounded p-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100"
                   style="color: var(--ds-text-subtle);"
-                  title={t('common.delete')}
-                  aria-label={t('common.delete')}
+                  title={`${t('common.delete')}: ${view.name}`}
+                  aria-label={`${t('common.delete')}: ${view.name}`}
                   data-testid={`filter-menu-shared-delete-${view.id}`}
                   onclick={() => removeView(view)}
                 >

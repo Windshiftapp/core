@@ -1,6 +1,7 @@
 import { derived, get, writable } from 'svelte/store';
 import { workspaces as workspacesApi } from '../api/workspaces.js';
 import { isExpectedBackgroundSyncError } from '../utils/backgroundSync.js';
+import { surfaceError } from './toasts.svelte.js';
 
 // Current workspace store - automatically syncs with route
 function createCurrentWorkspaceStore() {
@@ -167,12 +168,35 @@ function createWorkspacesStore() {
       return request;
     },
 
-    // Server-backed directory search for rows beyond the cached first page.
-    // Matching mirrors the server contract: case-insensitive substring on
-    // name, key, and description. Identical concurrent calls share one
-    // request; a newer query supersedes older in-flight ones.
-    searchWorkspaces(query, { limit = 25 } = {}) {
+    /**
+     * Search name, key, and description beyond the cached directory page.
+     * Calls share latest-query ownership unless a signal gives the caller
+     * independent ownership without superseding other consumers.
+     * @param {string} query
+     * @param {{ limit?: number, signal?: AbortSignal }} [options]
+     */
+    searchWorkspaces(query, { limit = 25, signal } = {}) {
       const trimmed = String(query ?? '').trim();
+      if (signal) {
+        const lifecycle = lifecycleGeneration;
+        return workspacesApi
+          .getPage({ page: 1, page_size: limit, search: trimmed }, { signal })
+          .then((document) => {
+            if (signal.aborted || lifecycle !== lifecycleGeneration)
+              return { workspaces: [], total: 0 };
+            return { workspaces: document?.data || [], total: document?.pagination?.total ?? 0 };
+          })
+          .catch((error) => {
+            if (
+              !signal.aborted &&
+              lifecycle === lifecycleGeneration &&
+              !isExpectedBackgroundSyncError(error)
+            ) {
+              surfaceError(error, { context: 'searchWorkspaces', silent: true });
+            }
+            return { workspaces: [], total: 0 };
+          });
+      }
       const key = `${limit}\u0000${trimmed}`;
       if (searchPromise?.key === key) return searchPromise.promise;
 
@@ -261,6 +285,9 @@ function createWorkspacesStore() {
     // Update an existing workspace in the store
     updateWorkspace(id, updates) {
       const workspaceId = String(id);
+      personalWorkspace.update((workspace) =>
+        workspace && String(workspace.id) === workspaceId ? { ...workspace, ...updates } : workspace
+      );
       workspaces.update((ws) =>
         ws.map((w) => (String(w.id) === workspaceId ? { ...w, ...updates } : w))
       );

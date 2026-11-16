@@ -11,6 +11,7 @@ html[data-color-mode="dark"],
      Background colors for UI layers
      ================================================================= */
   --ds-surface: #1d2125;
+  --ds-surface-sunken: #161a1d;
   --ds-surface-hovered: #282e33;
   --ds-surface-pressed: #3a424a;
   --ds-surface-raised: #282e33;
@@ -28,12 +29,17 @@ html[data-color-mode="dark"],
      TEXT COLORS
      ================================================================= */
   --ds-text: #b6c2cf;
-  --ds-text-subtle: #8c9bab;
-  --ds-text-subtlest: #6b778c;
+  --ds-text-subtle: #a5b0c0;
+  --ds-text-subtlest: #9aa8b8;
   --ds-text-disabled: #5e6c84;
   --ds-text-inverse: #1d2125;
-  --ds-text-link: #579dff;
-  --ds-text-link-hovered: #85b8ff;
+  --ds-text-on-interactive: #ffffff;
+  --ds-text-on-interactive-hovered: #ffffff;
+  --ds-text-on-interactive-pressed: #ffffff;
+  --ds-text-on-danger: #ffffff;
+  --ds-status-solid-text: #ffffff;
+  --ds-text-link: #75b1ff;
+  --ds-text-link-hovered: #9fc7ff;
 
   /* =================================================================
      BORDER COLORS
@@ -57,6 +63,9 @@ html[data-color-mode="dark"],
   --ds-interactive-hovered: var(--color-primary-400);
   --ds-interactive-pressed: var(--color-primary-600);
   --ds-interactive-subtle: #09326c;
+  --ds-background-brand-bold: var(--color-primary-600);
+  --ds-background-brand-bold-hovered: var(--color-primary-700);
+  --ds-background-brand-bold-pressed: var(--color-primary-800);
 
   /* =================================================================
      FEEDBACK COLORS - SUCCESS (Green)
@@ -78,8 +87,8 @@ html[data-color-mode="dark"],
   --ds-text-danger: #ff8f73;
   --ds-border-danger: #ae2e24;
   --ds-icon-danger: var(--color-red-400);
-  --ds-background-danger-bold: var(--color-red-500);
-  --ds-background-danger-bold-hovered: var(--color-red-600);
+  --ds-background-danger-bold: var(--color-red-600);
+  --ds-background-danger-bold-hovered: var(--color-red-700);
 
   /* =================================================================
      FEEDBACK COLORS - SUCCESS (Green)
@@ -198,25 +207,25 @@ html[data-color-mode="dark"],
   --ds-status-success-bg: #052e16;
   --ds-status-success-text: #4ade80;
   --ds-status-success-border: #166534;
-  --ds-status-success-solid: #22c55e;
+  --ds-status-success-solid: #15803d;
 
   /* Danger (Failed) */
   --ds-status-danger-bg: #450a0a;
   --ds-status-danger-text: #f87171;
   --ds-status-danger-border: #991b1b;
-  --ds-status-danger-solid: #ef4444;
+  --ds-status-danger-solid: #dc2626;
 
   /* Warning (Blocked) */
   --ds-status-warning-bg: #422006;
   --ds-status-warning-text: #fbbf24;
   --ds-status-warning-border: #92400e;
-  --ds-status-warning-solid: #f59e0b;
+  --ds-status-warning-solid: #b45309;
 
   /* Info (In Progress) */
   --ds-status-info-bg: #1e3a5f;
   --ds-status-info-text: #60a5fa;
   --ds-status-info-border: #1e40af;
-  --ds-status-info-solid: #3b82f6;
+  --ds-status-info-solid: #2563eb;
 
   /* Neutral (Not Run, Skipped) */
   --ds-status-neutral-bg: #374151;

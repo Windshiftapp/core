@@ -1,0 +1,56 @@
+:root {
+  --ds-font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --ds-text-body-size: 0.8125rem;
+  --ds-text-body-weight: 400;
+  --ds-text-body-leading: 1.5;
+  --ds-text-label-size: 0.875rem;
+  --ds-text-label-weight: 500;
+  --ds-text-label-leading: 1.428571;
+  --ds-text-helper-size: 0.75rem;
+  --ds-text-helper-weight: 400;
+  --ds-text-helper-leading: 1.5;
+  --ds-text-metadata-size: 0.75rem;
+  --ds-text-metadata-weight: 500;
+  --ds-text-metadata-leading: 1.333333;
+  --ds-text-heading-size: 1.25rem;
+  --ds-text-heading-weight: 600;
+  --ds-text-heading-leading: 1.4;
+  --ds-text-compact-size: 0.6875rem;
+  --ds-text-compact-weight: 500;
+  --ds-text-compact-leading: 1.454545;
+}
+
+/* Utilities may deliberately override a role, but never pair a size utility
+   with a conflicting inline font size. Compact is opt-in, not the default. */
+@layer components {
+  .ds-text-body {
+    font:
+      var(--ds-text-body-weight) var(--ds-text-body-size) / var(--ds-text-body-leading)
+      var(--ds-font-body);
+  }
+  .ds-text-label {
+    font:
+      var(--ds-text-label-weight) var(--ds-text-label-size) / var(--ds-text-label-leading)
+      var(--ds-font-body);
+  }
+  .ds-text-helper {
+    font:
+      var(--ds-text-helper-weight) var(--ds-text-helper-size) / var(--ds-text-helper-leading)
+      var(--ds-font-body);
+  }
+  .ds-text-metadata {
+    font:
+      var(--ds-text-metadata-weight) var(--ds-text-metadata-size) / var(--ds-text-metadata-leading)
+      var(--ds-font-body);
+  }
+  .ds-text-heading {
+    font:
+      var(--ds-text-heading-weight) var(--ds-text-heading-size) / var(--ds-text-heading-leading)
+      var(--ds-font-body);
+  }
+  .ds-text-compact {
+    font:
+      var(--ds-text-compact-weight) var(--ds-text-compact-size) / var(--ds-text-compact-leading)
+      var(--ds-font-body);
+  }
+}

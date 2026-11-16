@@ -431,6 +431,8 @@ export default {
     noWorkspacesAvailable: 'Es sind noch keine Workspaces verfügbar. Bitte kontaktieren Sie Ihren Administrator, um Zugang zu einem Workspace zu erhalten.',
   },
   workspaceDashboard: {
+    loadError: 'Diese Übersicht konnte nicht geladen werden.',
+    chartError: 'Diagrammwerte konnten nicht geladen werden. Erneut versuchen, um vollständige Daten zu laden.',
     widgets: {
       supportMetrics: { name: 'Support-Kennzahlen', description: 'Backlog, Erstantwort, Lösung und SLA-Einhaltung für Kundentickets' },
       zammadSupportOverview: { name: 'Zammad-Supportübersicht', description: 'Workspaceweiter Stand verknüpfter Tickets und beobachtete Änderungen' },

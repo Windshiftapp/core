@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../components/FormField.svelte';
   import { notificationSettings as notificationSettingsApi } from '../api/notifications.js';
   import { authStore } from '../stores/auth.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -294,6 +295,7 @@
             <div class="border rounded p-4" style="border-color: var(--ds-border)">
               <div class="flex items-end gap-3">
                 <div class="flex-1">
+                  <FormField class="contents" requiredMark>
                   <Label color="default" required class="mb-1">{t('settings.notifications.eventType')}</Label>
                   <BasePicker
                     bind:value={rule.event_type}
@@ -304,6 +306,7 @@
                     getValue={(event) => event.type}
                     getLabel={(event) => `${event.category ? event.category.charAt(0).toUpperCase() + event.category.slice(1) + ': ' : ''}${event.name}`}
                   />
+                  </FormField>
                 </div>
                 <div class="flex items-center pb-1.5">
                   <Checkbox bind:checked={rule.is_enabled} label={t('common.enable')} size="small" />
@@ -331,6 +334,7 @@
               {/if}
 
               <div class="mt-3">
+                <FormField class="contents">
                 <Label color="default" class="mb-1">{t('settings.notifications.notifyRecipients')}</Label>
                 <BasePicker
                   value={getRecipientValue(rule)}
@@ -339,6 +343,7 @@
                   placeholder={t('settings.notifications.selectRecipients')}
                   onChange={(selectedIds) => handleRecipientsChange(index, selectedIds)}
                 />
+                </FormField>
               </div>
 
               <div class="mt-3">

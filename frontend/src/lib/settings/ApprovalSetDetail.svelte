@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../components/FormField.svelte';
   import { onMount } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast, successToast } from '../stores/toasts.svelte.js';
@@ -483,8 +484,9 @@
           {@const fromStatusTransitions = transitionsFromStatus(transitions, ass.status_id)}
           {@const isExpanded = expandedStatuses.has(idx)}
           <div class="border rounded" style="border-color: var(--ds-border); background: var(--ds-surface-raised);">
+            <div class="flex items-center gap-2 pr-4">
             <button type="button"
-                    class="w-full flex items-center justify-between p-4 text-left"
+                    class="ds-focus-ring flex-1 flex items-center justify-between p-4 text-left"
                     onclick={() => toggleStatusExpand(idx)}>
               <div class="flex items-center gap-3 min-w-0">
                 {#if isExpanded}<ChevronUp class="w-4 h-4" />{:else}<ChevronDown class="w-4 h-4" />{/if}
@@ -495,17 +497,20 @@
                   {ass.steps.length} {ass.steps.length === 1 ? 'step' : 'steps'} · {ass.step_mode}
                 </div>
               </div>
+            </button>
               <Button
                 variant="danger-ghost"
                 size="small"
                 icon={Trash2}
+                title={`${t('common.delete')}: ${statusName(ass.status_id) || idx + 1}`}
                 onclick={(e) => { e.stopPropagation(); removeSetStatus(idx); }}
               ></Button>
-            </button>
+            </div>
 
             {#if isExpanded}
               <div class="px-4 pb-4 space-y-4 border-t pt-4" style="border-color: var(--ds-border);">
                 <div>
+                  <FormField class="contents" requiredMark>
                   <Label required>{t('approvalSets.status')}</Label>
                   <BasePicker
                     items={statusesAll}
@@ -519,10 +524,12 @@
                       ass.deny_transition_id = null;
                     }}
                   />
+                  </FormField>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                   <div>
+                    <FormField class="contents" requiredMark>
                     <Label required>{t('approvalSets.approveTransition')}</Label>
                     <BasePicker
                       items={fromStatusTransitions}
@@ -533,8 +540,10 @@
                       getLabel={(tr) => transitionLabel(tr)}
                       onSelect={(tr) => ass.approve_transition_id = tr?.id || null}
                     />
+                    </FormField>
                   </div>
                   <div>
+                    <FormField class="contents" requiredMark>
                     <Label required>{t('approvalSets.denyTransition')}</Label>
                     <BasePicker
                       items={fromStatusTransitions}
@@ -545,6 +554,7 @@
                       getLabel={(tr) => transitionLabel(tr)}
                       onSelect={(tr) => ass.deny_transition_id = tr?.id || null}
                     />
+                    </FormField>
                   </div>
                 </div>
 
@@ -598,7 +608,8 @@
                       {@const sk = stepKey(idx, sIdx)}
                       {@const stepExpanded = expandedSteps.has(sk)}
                       <div class="border rounded" style="border-color: var(--ds-border);">
-                        <button type="button" class="w-full flex items-center justify-between p-3 text-left"
+                        <div class="flex items-center gap-2 pr-3">
+                        <button type="button" class="ds-focus-ring flex-1 flex items-center justify-between p-3 text-left"
                                 onclick={() => toggleStepExpand(idx, sIdx)}>
                           <div class="flex items-center gap-2 min-w-0">
                             {#if stepExpanded}<ChevronUp class="w-4 h-4" />{:else}<ChevronDown class="w-4 h-4" />{/if}
@@ -609,9 +620,10 @@
                               {step.approver_source} · {step.quorum_mode}
                             </span>
                           </div>
-                          <Button variant="danger-ghost" size="small" icon={Trash2}
-                                  onclick={(e) => { e.stopPropagation(); removeStep(idx, sIdx); }}></Button>
                         </button>
+                          <Button variant="danger-ghost" size="small" icon={Trash2} title={`${t('common.delete')}: ${step.name || sIdx + 1}`}
+                                  onclick={(e) => { e.stopPropagation(); removeStep(idx, sIdx); }}></Button>
+                        </div>
 
                         {#if stepExpanded}
                           <div class="p-3 border-t space-y-3" style="border-color: var(--ds-border);">
@@ -628,12 +640,14 @@
 
                             <div class="grid grid-cols-2 gap-3">
                               <div>
+                                <FormField class="contents">
                                 <Label>{t('approvalSets.quorum')}</Label>
                                 <NativeSelect
                                   bind:value={step.quorum_mode}
                                   options={QUORUM_MODES.map((mode) => ({ value: mode.id, label: mode.name }))}
                                   size="small"
                                 />
+                                </FormField>
                                 {#if step.quorum_mode === 'count'}
                                   <Input
                                     type="number"
@@ -656,59 +670,73 @@
                                 {/if}
                               </div>
                               <div>
+                                <FormField class="contents">
                                 <Label>{t('approvalSets.rejectionPolicy')}</Label>
                                 <NativeSelect
                                   bind:value={step.rejection_policy}
                                   options={REJECTION_POLICIES.map((policy) => ({ value: policy.id, label: policy.name }))}
                                   size="small"
                                 />
+                                </FormField>
                               </div>
                             </div>
 
                             <div class="grid grid-cols-2 gap-3">
                               <div>
+                                <FormField class="contents">
                                 <Label>{t('approvalSets.approverSource')}</Label>
                                 <NativeSelect
                                   bind:value={step.approver_source}
                                   options={APPROVER_SOURCES.map((source) => ({ value: source.id, label: source.name }))}
                                   size="small"
                                 />
+                                </FormField>
                               </div>
                               <div>
                                 {#if step.approver_source === 'regular_field'}
+                                  <FormField class="contents">
                                   <Label>{t('approvalSets.approverFieldIdentifier')}</Label>
                                   <NativeSelect
                                     bind:value={step.approver_field_identifier}
                                     options={[{ value: '', label: '…' }, ...REGULAR_FIELD_OPTIONS.map((field) => ({ value: field.id, label: field.name }))]}
                                     size="small"
                                   />
+                                  </FormField>
                                 {:else if step.approver_source === 'custom_field'}
+                                  <FormField class="contents">
                                   <Label>{t('approvalSets.approverFieldId')}</Label>
                                   <NativeSelect
                                     bind:value={step.approver_field_id}
                                     options={[{ value: null, label: '…' }, ...userCustomFields.map((field) => ({ value: field.id, label: field.name }))]}
                                     size="small"
                                   />
+                                  </FormField>
                                 {:else if step.approver_source === 'role'}
+                                  <FormField class="contents">
                                   <Label>{t('approvalSets.approverRole')}</Label>
                                   <NativeSelect
                                     bind:value={step.approver_role_id}
                                     options={[{ value: null, label: '…' }, ...roles.map((role) => ({ value: role.id, label: role.name }))]}
                                     size="small"
                                   />
+                                  </FormField>
                                 {:else if step.approver_source === 'group'}
+                                  <FormField class="contents">
                                   <Label>{t('approvalSets.approverGroup')}</Label>
                                   <NativeSelect
                                     bind:value={step.approver_group_id}
                                     options={[{ value: null, label: '…' }, ...groups.map((group) => ({ value: group.id, label: group.name }))]}
                                     size="small"
                                   />
+                                  </FormField>
                                 {:else if step.approver_source === 'user'}
+                                  <FormField class="contents">
                                   <Label>{t('approvalSets.approverUser')}</Label>
                                   <UserPicker
                                     bind:value={step.approver_user_id}
                                     {users}
                                   />
+                                  </FormField>
                                 {/if}
                               </div>
                             </div>
@@ -803,12 +831,14 @@
                                     {#if step.escalation_action === 'reassign'}
                                       <div class="grid grid-cols-2 gap-3">
                                         <div>
+                                          <FormField class="contents">
                                           <Label>{t('approvalSets.escalationTarget')}</Label>
                                           <NativeSelect
                                             bind:value={step.escalation_target_source}
                                             options={[{ value: '', label: '…' }, ...APPROVER_SOURCES.map((source) => ({ value: source.id, label: source.name }))]}
                                             size="small"
                                           />
+                                          </FormField>
                                         </div>
                                         <div>
                                           <TextField

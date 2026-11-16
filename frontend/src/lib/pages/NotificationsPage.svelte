@@ -223,7 +223,7 @@
             <Button
               onclick={clearFilters}
               variant="secondary"
-              size="xs"
+              size="small"
             >
               {t('common.clear')}
             </Button>

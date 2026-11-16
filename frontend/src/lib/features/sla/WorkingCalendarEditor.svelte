@@ -322,7 +322,7 @@
                       size="small"
                       icon={Trash2}
                       onclick={() => removeInterval(day, index)}
-                      title={t('common.remove')}
+                      title={`${t('common.remove')}: ${day} ${interval.start}–${interval.end}`}
                       dataTestid="sla-calendar-{day}-remove-{index}"
                     />
                   </div>
@@ -387,7 +387,7 @@
               size="small"
               icon={Trash2}
               onclick={() => removeHoliday(index)}
-              title={t('common.remove')}
+              title={`${t('common.remove')}: ${holiday.name || holiday.date || index + 1}`}
               dataTestid="sla-calendar-holiday-remove-{index}"
             />
           </div>

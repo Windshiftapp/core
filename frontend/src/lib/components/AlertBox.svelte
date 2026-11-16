@@ -16,6 +16,8 @@
    *   size?: 'sm' | 'md' | 'lg',
    *   class?: string,
    *   children?: any,
+   *   id?: string,
+   *   role?: 'alert' | 'status',
    * }}
    */
   let {
@@ -28,7 +30,9 @@
     ondismiss = null,
     size = 'md',
     class: className = '',
-    children = undefined
+    children = undefined,
+    id = undefined,
+    role = undefined
   } = $props();
 
   const variant = $derived(appearance || type || variantProp);
@@ -66,6 +70,9 @@
 
 {#if message || children}
   <div
+    {id}
+    {role}
+    aria-atomic={role ? 'true' : undefined}
     class="px-4 py-3 rounded flex items-start gap-3 {className}"
     style="background: var(--ds-surface-raised); border: 1px solid var(--ds-border); border-left: 4px solid {styles?.borderColor}; color: var(--ds-text);"
   >

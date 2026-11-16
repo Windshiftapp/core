@@ -22,6 +22,7 @@ export const milestonesStore = {
   // persists via the scope-specific reorder endpoint and rolls back on
   // error. `scope` is { is_global, workspace_id, category_id }.
   async reorder(scope, orderedIds, allMilestones) {
+    const isCurrent = baseStore.captureGeneration();
     // Snapshot for rollback before mutating.
     const previous = allMilestones;
     const step = 1000;
@@ -38,7 +39,7 @@ export const milestonesStore = {
       await milestones.reorder(scope, orderedIds);
     } catch (error) {
       // Roll back to the pre-drag snapshot.
-      milestonesStore.set(previous);
+      if (isCurrent()) milestonesStore.set(previous);
       throw error;
     }
   },

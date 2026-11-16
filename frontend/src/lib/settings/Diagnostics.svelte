@@ -68,10 +68,10 @@
       subtitle={t('diagnostics.subtitle')}
     />
 
-    <TabNav {tabs} basePath="/admin/diagnostics" defaultTab="clock" />
+    <TabNav {tabs} basePath="/admin/diagnostics" defaultTab="clock" testidPrefix="diagnostics-groups" ariaLabel={t('diagnostics.title')} />
 
     {#if activeGroup.tabs.length > 1}
-      <TabNav tabs={activeGroup.tabs} basePath="/admin/diagnostics" defaultTab={activeGroup.tabs[0].id} />
+      <TabNav tabs={activeGroup.tabs} basePath="/admin/diagnostics" defaultTab={activeGroup.tabs[0].id} testidPrefix="diagnostics-tabs" ariaLabel={activeGroup.label} />
     {/if}
 
     <div>

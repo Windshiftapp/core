@@ -4,6 +4,7 @@
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import LazyRender from '../../components/LazyRender.svelte';
   import ListCellRenderer from './ListCellRenderer.svelte';
+  import { isMenuTriggerEvent } from '../../utils/menuTrigger.js';
 
   let {
     item,
@@ -29,7 +30,28 @@
     leading = undefined,
     deferred = true,
     virtualRow = null,
+    selectionMode = false,
+    selected = false,
+    onselect = null,
+    onshiftselect = null,
   } = $props();
+
+  // In selection mode the whole row toggles its selection; otherwise
+  // shift-click extends the view's selection and a plain click is left to the
+  // cell editors. Mirrors BoardItemCard.
+  function handleRowClick(event) {
+    // The row owns the click, but a menu trigger inside it does not.
+    if (isMenuTriggerEvent(event)) return;
+    if (selectionMode && onselect) {
+      event.preventDefault();
+      onselect(item.id, event);
+      return;
+    }
+    if (event.shiftKey && onshiftselect) {
+      event.preventDefault();
+      onshiftselect(item.id, event);
+    }
+  }
 
   function virtualAttachment(node) {
     return virtualRow?.attach(node);
@@ -80,6 +102,7 @@
       </div>
 {/snippet}
 
+<!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
 <div
   use:virtualAttachment
   use:dragRow
@@ -88,6 +111,9 @@
   data-item-row
   data-item-id={item.id}
   data-testid={rowTestid}
+  data-selected={selected ? 'true' : 'false'}
+  data-selection-mode={selectionMode ? 'true' : 'false'}
+  onclick={handleRowClick}
 >
   {#if deferred}
     <LazyRender>{@render cells()}</LazyRender>
@@ -99,5 +125,20 @@
 <style>
   .list-row:hover {
     background-color: var(--ctx-background-neutral-hovered, var(--ds-background-neutral-hovered));
+  }
+
+  /* Selection mode dims every row so the selected subset stands out. The
+     selected row stays fully opaque and carries the focus accent. */
+  .list-row[data-selection-mode='true']:not([data-selected='true']) {
+    opacity: 0.5;
+  }
+
+  .list-row[data-selection-mode='true']:not([data-selected='true']):hover {
+    opacity: 0.8;
+  }
+
+  .list-row[data-selected='true'] {
+    opacity: 1;
+    box-shadow: inset 2px 0 0 var(--ds-border-focused);
   }
 </style>

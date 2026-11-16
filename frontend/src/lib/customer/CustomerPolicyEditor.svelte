@@ -53,11 +53,11 @@
       {#each organisationIds as id, index (index)}
         <div class="flex gap-2 items-center">
           <div class="flex-1"><CustomerOrganisationPicker id={`customer-policy-organisation-${index}`} value={id} disabled={saving} onSelect={item => { organisationIds[index] = item?.id ?? null; saved = false; }} /></div>
-          <Button variant="subtle" disabled={saving} dataTestid={`customer-policy-remove-${index}`} onclick={() => { organisationIds = organisationIds.filter((_, i) => i !== index); saved = false; }}>Remove</Button>
+          <Button variant="danger-ghost" disabled={saving} dataTestid={`customer-policy-remove-${index}`} onclick={() => { organisationIds = organisationIds.filter((_, i) => i !== index); saved = false; }}>Remove</Button>
         </div>
       {/each}
       <!-- shortcut-guard-exempt: Repeatable allowlist row inside another settings screen or dialog; avoid claiming its global Add shortcut. -->
-      <Button variant="subtle" disabled={saving} dataTestid="customer-policy-add" onclick={() => { organisationIds = [...organisationIds, null]; saved = false; }}>Add organisation</Button>
+      <Button variant="ghost" disabled={saving} dataTestid="customer-policy-add" onclick={() => { organisationIds = [...organisationIds, null]; saved = false; }}>Add organisation</Button>
       {#if organisationIds.length === 0}<AlertBox type="warning">No organisations selected: nobody can access this resource.</AlertBox>{/if}
     {/if}
     <Button variant="secondary" dataTestid="customer-policy-save" disabled={saving || (mode === 'organisations' && organisationIds.some(id => !id))} onclick={save}>{saving ? 'Saving…' : 'Save customer access'}</Button>

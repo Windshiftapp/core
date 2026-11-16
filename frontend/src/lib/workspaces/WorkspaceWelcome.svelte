@@ -1,10 +1,11 @@
 <script>
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import { get } from 'svelte/store';
   import { useDebouncedAction } from '../composables/useDebouncedAction.svelte.js';
   import { workspaces } from '../api/workspaces.js';
-  import { statusCategories as statusCategoriesApi, statuses } from '../api/workflows.js';
-  import { items as itemsApi } from '../api/items.js';
+  import { collections } from '../api/collections.js';
+  import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
+  import { overviewChartData, overviewChartRange } from './overviewChartData.js';
   import {
     useGradientStyles,
     loadWorkspaceGradient,
@@ -14,7 +15,6 @@
     workspaceBackgroundImageUrl
   } from '../stores/workspaceGradient.svelte.js';
 
-  import { getCollection } from '../features/collections/collectionService.js';
   import Edit3 from '@lucide/svelte/icons/edit-3';
   import Plus from '@lucide/svelte/icons/plus';
   import X from '@lucide/svelte/icons/x';
@@ -24,7 +24,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { formatDateOnly } from '../utils/dateFormatter.js';
   import { createId } from '../utils/uuid.js';
-  import { errorToast } from '../stores/toasts.svelte.js';
+  import { errorToast, surfaceError } from '../stores/toasts.svelte.js';
   import { confirm } from '../composables/useConfirm.js';
   import { createDashboardWidgetDrag } from '../composables/dashboardWidgetDrag.js';
   import { useDashboardCustomization } from '../composables/useDashboardCustomization.svelte.js';
@@ -43,6 +43,7 @@
   } from '../services/workspaceWidgetLayout.js';
   import Button from '../components/Button.svelte';
   import Card from '../components/Card.svelte';
+  import StateDisplay from '../components/StateDisplay.svelte';
   import Input from '../components/Input.svelte';
   import ViewHeader from '../layout/ViewHeader.svelte';
   import StaticViewBackground from '../layout/StaticViewBackground.svelte';
@@ -83,6 +84,12 @@
   let currentCollectionName = $state('Default');
   let collectionFilter = $state(null);
   let dataLoadVersion = $state(0);
+  let dataController = new AbortController();
+  let activeScope = $state(null);
+  let loadError = $state(false);
+  let chartLoading = $state(false);
+  let chartError = $state(false);
+  let chartRetry = $state(0);
 
   // Homepage layout state
   let sections = $state([]);
@@ -100,7 +107,6 @@
   // Initialize gradient styles from global stores
   const gradientStyles = useGradientStyles();
 
-  let pendingSaveQueued = false;
 
   // Default section layout
   function getDefaultSections() {
@@ -143,24 +149,6 @@
     return [widget1, widget2, widget3, widget4];
   }
 
-  const normalizeStatusName = value => (typeof value === 'string' ? value.toLowerCase().trim() : '');
-
-  function resolveItemStatus(item, statusMapById, statusMapByName) {
-    if (!item || !statusMapById || !statusMapByName) return null;
-    if (item.status_id && statusMapById.has(item.status_id)) {
-      return statusMapById.get(item.status_id);
-    }
-    const normalizedName = normalizeStatusName(item.status);
-    if (!normalizedName) return null;
-    return statusMapByName.get(normalizedName) || null;
-  }
-
-  function isItemCompleted(item, statusMapById, statusMapByName, completedCategoryIds) {
-    const status = resolveItemStatus(item, statusMapById, statusMapByName);
-    if (!status || !status.category_id) return false;
-    return completedCategoryIds.has(status.category_id);
-  }
-
   let lastLoadKey = null;
 
   let loadKey = $derived(workspaceId ? `${workspaceId}-${collectionId ?? 'default'}` : null);
@@ -169,7 +157,7 @@
     const key = loadKey;
     if (key && key !== lastLoadKey) {
       lastLoadKey = key;
-      loadData();
+      untrack(() => void loadData());
     }
   });
 
@@ -206,20 +194,44 @@
   async function loadData() {
     if (!workspaceId) return;
     const currentVersion = ++dataLoadVersion;
+    const targetWorkspace = workspaceId;
+    const targetCollection = collectionId;
+    dataController.abort();
+    const controller = new AbortController();
+    dataController = controller;
+    activeScope = null;
+    loadError = false;
     loading = true;
+    workspace = null;
+    statusCategories = [];
+    sections = [];
+    widgets = [];
+    stats = { totalCollections: 0, itemsByStatusCategory: {}, totalItems: 0 };
+    milestones = [];
     try {
-      const filter = await resolveCollectionContext();
-      if (currentVersion !== dataLoadVersion) return;
-      collectionFilter = filter;
-
-      await loadWorkspace();
-      await loadStatusCategories();
-      await Promise.all([
-        loadStats(),
-        loadChartData(),
-        loadHomepageLayout()
+      const [snapshot, collection, layout] = await Promise.all([
+        workspaceDataStore.getReferenceSnapshot(targetWorkspace),
+        targetCollection ? collections.get(targetCollection, { signal: controller.signal }) : null,
+        loadWorkspaceGradient(targetWorkspace)
       ]);
+      if (controller.signal.aborted || currentVersion !== dataLoadVersion) return;
+      if (!snapshot?.workspace || (targetCollection && !collection)) throw new Error('Overview scope unavailable');
+      workspace = snapshot.workspace;
+      statusCategories = snapshot.status_categories ?? [];
+      currentCollectionName = collection?.name || 'Default';
+      collectionFilter = collection?.ql_query?.trim() || null;
+      if (layout?.sections?.length > 0) {
+        sections = [...layout.sections].sort((a, b) => a.display_order - b.display_order);
+        widgets = normalizeWorkspaceWidgets(layout.widgets);
+      } else {
+        sections = getDefaultSections();
+        widgets = getDefaultWidgets();
+      }
+      savedWidgetWidths = captureWorkspaceWidgetWidths(widgets);
+      activeScope = { workspaceId: targetWorkspace, collectionId: targetCollection, version: currentVersion };
     } catch (error) {
+      if (controller.signal.aborted || currentVersion !== dataLoadVersion) return;
+      loadError = true;
       console.error('Failed to load workspace data:', error);
     } finally {
       if (currentVersion === dataLoadVersion) {
@@ -228,183 +240,94 @@
     }
   }
 
-  async function resolveCollectionContext() {
-    if (!collectionId) {
-      currentCollectionName = 'Default';
-      return null;
-    }
+  const needsStats = $derived(widgets.some(widget => widget.type === 'stats' || widget.type === 'milestone-progress'));
+  const needsCreated = $derived(widgets.some(widget => widget.type === 'created-chart'));
+  const needsCompleted = $derived(widgets.some(widget => widget.type === 'completion-chart'));
 
-    try {
-      const collection = await getCollection(collectionId);
-      if (collection) {
-        currentCollectionName = collection.name || 'Collection';
-        const query = (collection.ql_query || '').trim();
-        return query.length > 0 ? query : null;
-      }
-      currentCollectionName = 'Default';
-      return null;
-    } catch (error) {
-      console.error('Failed to load collection context:', error);
-      currentCollectionName = 'Default';
-      return null;
-    }
-  }
+  $effect(() => {
+    const scope = activeScope;
+    if (!scope || !needsStats) return;
+    const controller = new AbortController();
+    void loadStats(scope.workspaceId, scope.collectionId, scope.version, controller.signal);
+    return () => controller.abort();
+  });
 
-  async function loadWorkspace() {
+  async function loadStats(targetWorkspace, targetCollection, version, signal) {
     try {
-      workspace = await workspaces.get(workspaceId);
-    } catch (error) {
-      console.error('Failed to load workspace:', error);
-    }
-  }
-
-  async function loadStatusCategories() {
-    try {
-      statusCategories = await statusCategoriesApi.getAll();
-    } catch (error) {
-      console.error('Failed to load status categories:', error);
-    }
-  }
-
-  async function loadStats() {
-    try {
-      const params = {};
-      if (collectionId) {
-        params.collection_id = collectionId;
-      }
-      const statsData = await workspaces.getStats(workspaceId, params);
+      const statsData = await workspaces.getStats(targetWorkspace, targetCollection ? { collection_id: targetCollection } : {}, { signal });
+      if (signal.aborted || version !== dataLoadVersion) return;
       stats.totalCollections = statsData.total_collections || 0;
       stats.totalItems = statsData.total_items || 0;
       stats.itemsByStatusCategory = statsData.items_by_status_category || {};
       milestones = Array.isArray(statsData.milestone_progress) ? statsData.milestone_progress : [];
     } catch (error) {
+      if (signal.aborted || version !== dataLoadVersion) return;
       console.error('Failed to load stats:', error);
     }
   }
 
-  async function loadChartData() {
+  $effect.pre(() => {
+    const scope = activeScope;
+    if (!scope || (!needsCreated && !needsCompleted)) return;
+    void chartRetry;
+    const controller = new AbortController();
+    void loadChartData(scope.workspaceId, scope.collectionId, needsCreated, needsCompleted, scope.version, controller.signal);
+    return () => controller.abort();
+  });
+
+  async function loadChartData(targetWorkspace, targetCollection, created, completed, version, signal) {
+    chartLoading = true;
+    chartError = false;
+    completedByWeekData = [];
+    createdLast7DaysData = [];
     try {
-      const filters = { workspace_id: workspaceId, limit: 5000 };
-      if (collectionId) {
-        filters.collection_id = collectionId;
-      }
-
-      const itemsResponse = await itemsApi.getAll(filters);
-      const items = itemsResponse?.data ?? [];
-      const fetchedStatuses = await statuses.getAll();
-      const statusList = Array.isArray(fetchedStatuses) ? fetchedStatuses : [];
-      const localStatusById = new Map(
-        statusList
-          .filter(status => status?.id)
-          .map(status => [status.id, status])
-      );
-      const localStatusByName = new Map(
-        statusList
-          .filter(status => status?.name)
-          .map(status => [status.name.toLowerCase().trim(), status])
-      );
-      const localCompletedCategoryIds = new Set(
-        statusCategories
-          .filter(category => category?.is_completed)
-          .map(category => category.id)
-      );
-
-      // Completed by week (last 4 weeks aligned to current week)
-      const now = new Date();
-      const startOfCurrentWeek = new Date(now);
-      startOfCurrentWeek.setHours(0, 0, 0, 0);
-      startOfCurrentWeek.setDate(startOfCurrentWeek.getDate() - startOfCurrentWeek.getDay());
-
-      completedByWeekData = [];
-      const totalWeeks = 4;
-      const dayMs = 24 * 60 * 60 * 1000;
-      for (let i = 0; i < totalWeeks; i++) {
-        const offsetWeeks = totalWeeks - 1 - i;
-        const weekStart = new Date(startOfCurrentWeek.getTime() - (offsetWeeks * 7 * dayMs));
-        const weekEnd = new Date(weekStart.getTime() + (7 * dayMs));
-
-        const completedCount = items.filter(item => {
-          if (!isItemCompleted(item, localStatusById, localStatusByName, localCompletedCategoryIds)) return false;
-          const updatedAt = new Date(item.updated_at);
-          return updatedAt >= weekStart && updatedAt < weekEnd;
-        }).length;
-
-        completedByWeekData.push({
-          date: new Date(weekStart),
-          count: completedCount,
-          label: t('workspaceDashboard.weekOf', {
-            date: formatDateOnly(weekStart, { month: 'short', day: 'numeric' })
-          })
-        });
-      }
-
-      // Created last 7 days
-      const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
-      createdLast7DaysData = [];
-      for (let i = 0; i < 7; i++) {
-        const day = new Date(sevenDaysAgo.getTime() + (i * 24 * 60 * 60 * 1000));
-        const nextDay = new Date(day.getTime() + (24 * 60 * 60 * 1000));
-
-        const createdCount = items.filter(item => {
-          const createdAt = new Date(item.created_at);
-          return createdAt >= day && createdAt < nextDay;
-        }).length;
-
-        createdLast7DaysData.push({
-          date: day,
-          count: createdCount
-        });
-      }
+      const range = overviewChartRange(new Date(), completed);
+      const response = await workspaces.getOverviewCharts(targetWorkspace, {
+        ...range,
+        ...(targetCollection ? { collection_id: targetCollection } : {}),
+        series: [created && 'created', completed && 'completed'].filter(Boolean).join(',')
+      }, { signal });
+      if (signal.aborted || version !== dataLoadVersion) return;
+      const chart = overviewChartData(response.buckets, range.to);
+      completedByWeekData = chart.completed.map(point => ({ ...point, label: t('workspaceDashboard.weekOf', {
+        date: formatDateOnly(point.date, { month: 'short', day: 'numeric' })
+      }) }));
+      createdLast7DaysData = chart.created;
     } catch (error) {
+      if (signal.aborted || version !== dataLoadVersion) return;
+      chartError = true;
       console.error('Failed to load chart data:', error);
+    } finally {
+      if (!signal.aborted && version === dataLoadVersion) chartLoading = false;
     }
   }
 
-  async function loadHomepageLayout() {
-    try {
-      // Single fetch: loadWorkspaceGradient returns the layout so we can also
-      // pull sections/widgets from it without a second API call.
-      const layout = await loadWorkspaceGradient(workspaceId);
-      if (layout && layout.sections && layout.sections.length > 0) {
-        sections = layout.sections.sort((a, b) => a.display_order - b.display_order);
-        widgets = normalizeWorkspaceWidgets(layout.widgets);
-      } else {
-        sections = getDefaultSections();
-        widgets = getDefaultWidgets();
-      }
-    } catch (error) {
-      console.error('Failed to load homepage layout:', error);
-      sections = getDefaultSections();
-      widgets = getDefaultWidgets();
-    }
-    savedWidgetWidths = captureWorkspaceWidgetWidths(widgets);
+  let destroyed = false;
+  let queuedLayout = null;
+
+  function captureLayout() {
+    return {
+      sections: sections.map((s, display_order) => ({ ...s, display_order })),
+      widgets: widgets.map((w, position) => ({ ...w, position })),
+      gradient: get(workspaceGradientIndex),
+      applyToAllViews: get(applyToAllViewsStore),
+      backgroundImageUrl: get(workspaceBackgroundImageUrl) || ''
+    };
   }
 
-  async function saveHomepageLayout() {
+  async function saveHomepageLayout(layout = captureLayout()) {
     if (savePending) {
-      pendingSaveQueued = true;
+      queuedLayout = layout;
       return;
     }
     savePending = true;
     let attemptedLayout = null;
 
     try {
-      attemptedLayout = {
-        sections: sections.map((s, idx) => ({
-          ...s,
-          display_order: idx
-        })),
-        widgets: widgets.map((w, idx) => ({
-          ...w,
-          position: idx
-        })),
-        gradient: get(workspaceGradientIndex),
-        applyToAllViews: get(applyToAllViewsStore),
-        backgroundImageUrl: get(workspaceBackgroundImageUrl) || ''
-      };
+      attemptedLayout = layout;
 
       await workspaces.updateHomepageLayout(workspaceId, attemptedLayout);
-      hydrateWorkspaceGradientLayout(workspaceId, attemptedLayout);
+      if (!destroyed) hydrateWorkspaceGradientLayout(workspaceId, attemptedLayout);
       savedWidgetWidths = captureWorkspaceWidgetWidths(attemptedLayout.widgets);
     } catch (error) {
       console.error('Failed to save homepage layout:', error);
@@ -418,9 +341,10 @@
       errorToast(t('dialogs.alerts.failedToSaveLayout'));
     } finally {
       savePending = false;
-      if (pendingSaveQueued) {
-        pendingSaveQueued = false;
-        debouncedSave();
+      if (queuedLayout) {
+        const next = queuedLayout;
+        queuedLayout = null;
+        void saveHomepageLayout(next);
       }
     }
   }
@@ -560,8 +484,13 @@
   }
 
   onDestroy(() => {
+    destroyed = true;
+    dataLoadVersion += 1;
+    dataController.abort();
     dnd.cleanup();
-    debouncedSave.cancel();
+    void Promise.resolve(debouncedSave.runScheduledNow()).catch(error => {
+      surfaceError(error, { context: 'saveWorkspaceLayoutOnLeave' });
+    });
   });
 
   function getWidgetTitle(type) {
@@ -603,9 +532,9 @@
   testid="workspace-welcome"
 >
     {#if loading}
-      <div class="flex items-center justify-center h-64">
-        <p style={gradientStyles.emptyStateStyle}>{t('workspaceDashboard.loading')}</p>
-      </div>
+      <StateDisplay type="loading" message={t('workspaceDashboard.loading')} />
+    {:else if loadError}
+      <StateDisplay type="error" message={t('workspaceDashboard.loadError')} onRetry={() => void loadData()} dataTestid="workspace-overview-error" />
     {:else}
     <!-- Header -->
     <ViewHeader
@@ -766,10 +695,16 @@
                   >
                     {#if widget.type === 'stats'}
                       <StatsCardWidget {stats} {statusCategories} />
-                    {:else if widget.type === 'completion-chart'}
-                      <CompletionChartWidget chartData={completedByWeekData} />
-                    {:else if widget.type === 'created-chart'}
-                      <CreatedChartWidget chartData={createdLast7DaysData} />
+                    {:else if widget.type === 'completion-chart' || widget.type === 'created-chart'}
+                      {#if chartLoading}
+                        <StateDisplay type="loading" dataTestid="workspace-chart-loading" />
+                      {:else if chartError}
+                        <StateDisplay type="error" message={t('workspaceDashboard.chartError')} onRetry={() => chartRetry += 1} dataTestid="workspace-chart-error" />
+                      {:else if widget.type === 'completion-chart'}
+                        <CompletionChartWidget chartData={completedByWeekData} />
+                      {:else}
+                        <CreatedChartWidget chartData={createdLast7DaysData} />
+                      {/if}
                     {:else if widget.type === 'milestone-progress'}
                       <MilestoneProgressWidget {milestones} />
                     {:else if widget.type === 'story-points-by-assignee'}

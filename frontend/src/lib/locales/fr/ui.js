@@ -467,10 +467,12 @@ export default {
       otherSlices: 'Autres ({count} de plus)',
     },
     completionChart: {
+      definition: 'Première réalisation enregistrée par semaine (UTC). Une réouverture ne compte pas deux fois.',
       title: 'Graphique de réalisation',
       emptyMessage: 'Aucune donnée de réalisation disponible',
     },
     createdChart: {
+      definition: 'Créés au cours des sept derniers jours UTC, aujourd’hui inclus.',
       title: 'Graphique des créations',
       emptyMessage: 'Aucune donnée de création disponible',
     },

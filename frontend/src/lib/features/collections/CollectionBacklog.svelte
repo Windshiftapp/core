@@ -34,12 +34,20 @@
   import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
   import { useCollectionEventStream } from '../../composables/useCollectionEventStream.svelte.js';
   import { useCollectionDragDrop } from '../../composables/useCollectionDragDrop.js';
+  import { useItemBulkSelection } from '../../composables/useItemBulkSelection.svelte.js';
   import { errorToast, successToast, warningToast } from '../../stores/toasts.svelte.js';
   import { getIncompleteIterationItems } from './iterationCompletion.js';
   import CompleteIterationDialog from '../../dialogs/CompleteIterationDialog.svelte';
   import { formatItemCount } from '../../utils/itemCount.js';
   import { isSystemFieldAvailableInEffectiveConfig } from '../../utils/screenFields.js';
   import BacklogFieldSelector from './BacklogFieldSelector.svelte';
+  import BulkActionToolbar from './BulkActionToolbar.svelte';
+  import ButtonGroup from '../../components/ButtonGroup.svelte';
+  import CheckSquare from '@lucide/svelte/icons/square-check';
+  import { useListColumnConfig } from './listColumnConfig.svelte.js';
+  import { buildDisplayColumns } from './boardColumns.js';
+  import { objectDisplayName } from '../../utils/systemLabels.js';
+  import { useEventListener } from 'runed';
   import { DEFAULT_BACKLOG_FIELDS, normalizeBacklogFields } from './backlogFields.js';
 
   let { workspaceId, collectionId = null } = $props();
@@ -50,9 +58,32 @@
   let itemTypes = $derived(workspaceDataStore.itemTypes);
   let statuses = $derived(workspaceDataStore.statuses);
   let statusCategories = $derived(workspaceDataStore.statusCategories);
+  let priorities = $derived(workspaceDataStore.priorities);
+  let wdsLabels = $derived(workspaceDataStore.labels);
 
   let backlogItems = $derived(collectionStore.backlogItems);
   let backlogItemsById = $derived(new Map(backlogItems.map((item) => [item.id, item])));
+
+  // Multi-select mirrors the board and list: the same composable owns the
+  // selection set and bulk operations so every view exposes identical actions.
+  const selection = useItemBulkSelection({
+    items: () => backlogItems,
+    scopeWorkspaceId: () => workspaceId,
+    reload: reloadCollection,
+    labelNameLookup: () => wdsLabels,
+  });
+
+  const columnConfig = useListColumnConfig(() => ({ workspaceId, collectionId }));
+  let bulkMoveTargets = $derived(
+    buildDisplayColumns(columnConfig.boardConfig, statuses)
+      .filter((column) => column.status_ids?.length > 0)
+      .map((column) => ({
+        id: column.id,
+        statusId: column.status_ids[0],
+        title: objectDisplayName(column, 'status'),
+        color: column.color,
+      }))
+  );
   let loading = $state(true);
   let currentCollectionName = $derived(collectionStore.collectionName);
 
@@ -207,6 +238,34 @@
   const virtualBacklogRows = $derived(projectBacklogRows(
     [...iterationSections, { iteration: null, items: unassignedItems }], collapsedSections,
   ));
+
+  // Shift selection extends across the rendered item rows, matching the order
+  // the user sees rather than the flat store order.
+  function selectRangeTo(itemId) {
+    selection.selectionMode = true;
+    const ids = virtualBacklogRows.filter((row) => row.kind === 'item').map((row) => row.item.id);
+    const from = ids.indexOf(selection.selectionAnchorId);
+    const to = ids.indexOf(itemId);
+    if (from === -1 || to === -1) {
+      selection.toggleSelected(itemId);
+      return;
+    }
+    const start = Math.min(from, to);
+    const end = Math.max(from, to);
+    selection.selectedIds = [...new Set([...selection.selectedIds, ...ids.slice(start, end + 1)])];
+  }
+
+  useEventListener(() => window, 'keydown', (event) => {
+    const target = event.target;
+    const inEditable =
+      target instanceof HTMLElement &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+    if (event.key === 'Escape' && selection.selectionMode && !inEditable) {
+      event.preventDefault();
+      selection.exitSelectionMode();
+    }
+  });
+
   const backlogDragRevision = $derived(backlogItems.map((item) => `${item.id}:${item.iteration_id}:${item.frac_index}`).join('|'));
 
   // Global iterations available to add (not already visible, not completed/cancelled, deduplicated)
@@ -738,6 +797,23 @@
           size="small"
           dataTestid="backlog-show-completed-iterations"
         />
+        <!-- Selection is an explicit mode, matching the board and list. -->
+        <ButtonGroup testid="backlog-controls-group">
+          {#snippet children(segment)}
+            <button
+              type="button"
+              class={segment}
+              data-active={selection.selectionMode}
+              aria-pressed={selection.selectionMode}
+              title={t('collections.selectItems')}
+              onclick={selection.toggleSelectionMode}
+              data-testid="backlog-select-mode-toggle"
+            >
+              <CheckSquare class="w-4 h-4" />
+              {t('common.select')}
+            </button>
+          {/snippet}
+        </ButtonGroup>
       </div>
 
       {#if backlogItems.length === 0 && visibleIterations.length === 0}
@@ -768,6 +844,8 @@
                   onToggleCollapse={toggleCollapse} onStartIteration={startIteration}
                   onCompleteIteration={completeIteration} onRemoveGlobal={removeGlobalIteration}
                   sectionDndAction={registerBacklogSection}
+                  selectionMode={selection.selectionMode} selectedIds={selection.selectedIdSet}
+                  onSelect={selection.toggleSelected} onShiftSelect={selectRangeTo}
                 />
               {:else if entry.kind === 'empty'}
                 <div use:virtual.attach use:registerBacklogSection={entry.sectionId}
@@ -784,6 +862,10 @@
                   onAssignItemToIteration={assignItemToIteration}
                   {storyPointsConfiguredForItem} storyPointsPendingItemIds={pendingStoryPointsItemIds}
                   onUpdateStoryPoints={updateStoryPoints} itemDndAction={registerBacklogItem}
+                  selectionMode={selection.selectionMode}
+                  selected={selection.selectedIdSet.has(entry.item.id)}
+                  onSelect={selection.toggleSelected}
+                  onShiftSelect={selectRangeTo}
                 />
               {/if}
             {/snippet}
@@ -816,6 +898,13 @@
         </div>
       {/if}
   </StaticViewBackground>
+
+  <BulkActionToolbar
+    {selection}
+    moveTargets={bulkMoveTargets}
+    {priorities}
+    testidPrefix="backlog"
+  />
 {:else}
   <div class="p-6">
     <div class="text-center" style="color: var(--ds-text-subtle);">

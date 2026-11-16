@@ -145,6 +145,7 @@
 		is_active BOOLEAN DEFAULT TRUE,
 		enrollment_required BOOLEAN DEFAULT FALSE,
 		auth_pending_type TEXT,
+		remember_me BOOLEAN NOT NULL DEFAULT FALSE,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 	);

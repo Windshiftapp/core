@@ -25,6 +25,8 @@ const shortcuts = {
   global: {
     commandPalette: { key: 'k', modifierKey: true },
     create: { key: 'c' },
+    startTimer: { key: 't' },
+    logWork: { key: 'l' },
     aiChat: { key: 'j', modifierKey: true },
   },
   modal: {
@@ -391,6 +393,29 @@ export function isTypingInField(event) {
     active?.tagName === 'TEXTAREA' ||
     active?.tagName === 'SELECT' ||
     active?.isContentEditable
+  );
+}
+
+/** Keep the ambient double-Space shortcut away from interactive workflows. */
+export function canUseDoubleSpaceShortcut(event) {
+  if (
+    event.code !== 'Space' ||
+    event.defaultPrevented ||
+    event.repeat ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey
+  )
+    return false;
+  const target = event.target;
+  return (
+    target instanceof Element &&
+    !target.closest(
+      'a[href], button, input, textarea, select, summary, [contenteditable]:not([contenteditable="false"]), ' +
+        '[tabindex]:not([tabindex="-1"]), [role="dialog"], [role="button"], [role="combobox"], ' +
+        '[role="checkbox"], [role="radio"], [role="switch"], [role="tab"], [role="menuitem"], [aria-activedescendant]'
+    )
   );
 }
 

@@ -10,6 +10,11 @@
   import { primaryMilestoneForItem, sortMilestonesForLanes, SWIMLANE_NONE_KEY } from '../features/collections/swimlanes.js';
   import { formatDateOnly } from '../utils/dateFormatter.js';
   import { canRunBackgroundSync, onBackgroundSyncAvailable } from '../utils/backgroundSync.js';
+  import Badge from '../components/Badge.svelte';
+  import Avatar from '../components/Avatar.svelte';
+  import Card from '../components/Card.svelte';
+  import Lozenge from '../components/Lozenge.svelte';
+  import StatusPill from '../components/StatusPill.svelte';
 
   let { slug } = $props();
 
@@ -178,6 +183,7 @@
     </div>
     <button
       onclick={toggleTheme}
+      data-testid="public-board-theme-toggle"
       style="background: none; border: 1px solid var(--ds-border); border-radius: 6px; padding: 6px 10px; cursor: pointer; color: var(--ds-text-subtle); font-size: 13px;"
       title="Toggle theme"
     >
@@ -227,7 +233,6 @@
       {#snippet publicCard(card)}
         <div
           class="public-card"
-          style="background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border); border-radius: 6px; padding: 12px; box-shadow: var(--ds-shadow-raised); cursor: pointer;"
           onclick={() => selectedItemKey = card.key}
           onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectedItemKey = card.key; } }}
           role="button"
@@ -235,121 +240,97 @@
           data-testid="public-board-card"
           data-item-key={card.key}
         >
-          {#if showField('key')}
-            <div style="font-size: 11px; font-weight: 500; color: var(--ds-text-subtle); margin-bottom: 4px; font-family: monospace;">{card.key}</div>
-          {/if}
+          <Card variant="flat" padding="compact" hoverable style="background-color: var(--ds-surface-raised);">
+            {#if showField('key')}
+              <div style="font-size: 11px; font-weight: 500; color: var(--ds-text-subtle); margin-bottom: 4px; font-family: monospace;">{card.key}</div>
+            {/if}
 
-          {#if showField('title')}
-            <div
-              data-testid="public-board-card-title"
-              style="font-size: 13px; font-weight: 500; line-height: 1.4; margin-bottom: 8px;"
-            >
-              {card.title}
-            </div>
-          {/if}
-
-          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-            {#if showField('priority') && card.priority_name}
-              <span
-                style="font-size: 11px; padding: 1px 6px; border-radius: 4px; background: {card.priority_color || 'var(--ds-surface-sunken)'}20; color: {card.priority_color || 'var(--ds-text-subtle)'}; border: 1px solid {card.priority_color || 'var(--ds-border)'}40;"
-                title={card.priority_name}
+            {#if showField('title')}
+              <div
+                data-testid="public-board-card-title"
+                style="font-size: 13px; font-weight: 500; line-height: 1.4; margin-bottom: 8px;"
               >
-                {card.priority_name}
-              </span>
+                {card.title}
+              </div>
             {/if}
 
-            {#if showField('status') && card.status_name}
-              <span
-                data-testid="public-board-card-status"
-                style="font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--ds-surface-sunken); color: var(--ds-text-subtle);"
-              >
-                {card.status_name}
-              </span>
-            {/if}
-
-            {#if showField('item_type') && card.item_type_name}
-              <span style="font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--ds-surface-sunken); color: var(--ds-text-subtle);">
-                {card.item_type_name}
-              </span>
-            {/if}
-
-            {#if showField('story_points') && card.story_points != null}
-              <span style="font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--ds-surface-sunken); color: var(--ds-text-subtle);" title="Story Points">
-                {card.story_points} SP
-              </span>
-            {/if}
-
-            {#if showField('due_date') && card.due_date}
-              {@const isOverdue = new Date(card.due_date) < new Date()}
-              <span style="font-size: 11px; padding: 1px 6px; border-radius: 4px; {isOverdue ? 'background: #ef444420; color: #ef4444;' : 'background: var(--ds-surface-sunken); color: var(--ds-text-subtle);'}">
-                {card.due_date}
-              </span>
-            {/if}
-
-            {#if showField('labels') && card.labels?.length}
-              {#each card.labels as label}
-                <span style="font-size: 10px; padding: 1px 6px; border-radius: 4px; background: {label.color}20; color: {label.color}; border: 1px solid {label.color}40;">
-                  {label.name}
-                </span>
-              {/each}
-            {/if}
-
-            <div style="flex: 1;"></div>
-
-            {#if showField('assignee') && card.assignee_name}
-              {#if card.assignee_avatar}
-                <img
-                  src={card.assignee_avatar}
-                  alt={card.assignee_name}
-                  title={card.assignee_name}
-                  style="width: 22px; height: 22px; border-radius: 50%; object-fit: cover;"
-                />
-              {:else}
-                <div
-                  title={card.assignee_name}
-                  style="width: 22px; height: 22px; border-radius: 50%; background: #2874BB; color: white; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600;"
-                >
-                  {card.assignee_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                </div>
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              {#if showField('priority') && card.priority_name}
+                <Lozenge color="gray" customBg={card.priority_color || null} customText={themeStore.resolvedTheme === 'dark' ? 'var(--ds-text)' : null} text={card.priority_name} />
               {/if}
-            {/if}
-          </div>
+
+              {#if showField('status') && card.status_name}
+                <span data-testid="public-board-card-status">
+                  <StatusPill name={card.status_name} />
+                </span>
+              {/if}
+
+              {#if showField('item_type') && card.item_type_name}
+                <Badge size="xs">{card.item_type_name}</Badge>
+              {/if}
+
+              {#if showField('story_points') && card.story_points != null}
+                <Badge size="xs" title="Story Points">{card.story_points} SP</Badge>
+              {/if}
+
+              {#if showField('due_date') && card.due_date}
+                {@const isOverdue = new Date(card.due_date) < new Date()}
+                <Badge size="xs" variant={isOverdue ? 'danger' : 'neutral'}>{card.due_date}</Badge>
+              {/if}
+
+              {#if showField('labels') && card.labels?.length}
+                {#each card.labels as label}
+                  <Lozenge color="gray" customBg={label.color || null} customText={themeStore.resolvedTheme === 'dark' ? 'var(--ds-text)' : null} text={label.name} />
+                {/each}
+              {/if}
+
+              <div style="flex: 1;"></div>
+
+              {#if showField('assignee') && card.assignee_name}
+                <Avatar size="xs" src={card.assignee_avatar} name={card.assignee_name} title={card.assignee_name} />
+              {/if}
+            </div>
+          </Card>
         </div>
       {/snippet}
 
       {#snippet publicColumn(column, items)}
         <div
           class="board-column"
-          style="min-width: 280px; max-width: 320px; flex: 1; display: flex; flex-direction: column;"
           data-testid="public-board-column"
           data-column-name={column.name}
         >
-          <div style="padding: 10px 12px; margin-bottom: 8px; border-radius: 8px 8px 0 0; display: flex; align-items: center; justify-content: space-between; background-color: var(--ds-surface-raised); border: 1px solid var(--ds-border); border-bottom: 3px solid {column.color || 'var(--ds-border)'};">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 14px; font-weight: 600;">{column.name}</span>
-              <span style="font-size: 12px; color: var(--ds-text-subtle); background: var(--ds-surface-sunken); padding: 1px 7px; border-radius: 10px;">{items.length}</span>
-            </div>
-            {#if column.wip_limit}
-              <span
-                style="font-size: 11px; padding: 1px 6px; border-radius: 8px; {items.length > column.wip_limit ? 'background: #ef4444; color: white;' : 'color: var(--ds-text-subtle); background: var(--ds-surface-sunken);'}"
-                title="WIP limit: {column.wip_limit}"
-              >
-                {items.length}/{column.wip_limit}
-              </span>
-            {/if}
-          </div>
-
-          <div style="flex: 1; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding: 0 2px 8px;">
-            {#each items as card}
-              {@render publicCard(card)}
-            {/each}
-
-            {#if items.length === 0}
-              <div style="padding: 24px 12px; text-align: center; color: var(--ds-text-disabled); font-size: 13px;">
-                No items
+          <Card variant="flat" padding="none" class="h-full" style="background-color: var(--ds-surface-sunken); border-top: 3px solid {column.color || 'var(--ds-border)'};">
+            {#snippet header()}
+              <div class="column-header">
+                <div class="column-heading">
+                  <span class="column-name">{column.name}</span>
+                  <Badge size="xs">{items.length}</Badge>
+                </div>
+                {#if column.wip_limit}
+                  <Badge
+                    size="xs"
+                    variant={items.length > column.wip_limit ? 'danger' : 'neutral'}
+                    title="WIP limit: {column.wip_limit}"
+                  >
+                    {items.length}/{column.wip_limit}
+                  </Badge>
+                {/if}
               </div>
-            {/if}
-          </div>
+            {/snippet}
+
+            <div class="column-cards">
+              {#each items as card}
+                {@render publicCard(card)}
+              {/each}
+
+              {#if items.length === 0}
+                <div style="padding: 24px 12px; text-align: center; color: var(--ds-text-disabled); font-size: 13px;">
+                  No items
+                </div>
+              {/if}
+            </div>
+          </Card>
         </div>
       {/snippet}
 
@@ -416,11 +397,45 @@
   }
 
   .public-card {
-    transition: box-shadow 140ms ease-in-out, transform 80ms ease-in-out;
+    min-width: 0;
+    border-radius: var(--radius-lg, 8px);
+    cursor: pointer;
+    overflow-wrap: anywhere;
   }
-  .public-card:hover {
-    box-shadow: var(--ds-shadow-overlay) !important;
-    transform: translateY(-1px);
+  .public-card:focus-visible {
+    outline: 2px solid var(--ds-border-focused);
+    outline-offset: 2px;
+  }
+
+  .board-column {
+    min-width: 280px;
+    max-width: 320px;
+    flex: 1;
+  }
+
+  .column-header,
+  .column-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .column-header {
+    justify-content: space-between;
+  }
+
+  .column-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .column-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
   }
 
   .board-columns {
@@ -431,11 +446,12 @@
   /* Mobile responsive: stack columns */
   @media (max-width: 768px) {
     .board-columns {
-      flex-direction: column !important;
+      flex-direction: column;
     }
     .board-column {
-      min-width: 100% !important;
-      max-width: 100% !important;
+      min-width: 100%;
+      max-width: 100%;
+      flex: none;
     }
   }
 </style>

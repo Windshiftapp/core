@@ -323,7 +323,7 @@
       onTabChange={handleTabChange}
       ariaLabel="Sections"
       class="mb-4"
-    />
+    >
 
     {#if activeTab === 'inbound'}
     <div class="pt-4">
@@ -634,6 +634,7 @@
       {/if}
     </div>
     {/if}
+    </TabStrip>
   </div>
 
   <ConfirmDialog

@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import Plus from '@tabler/icons-svelte-runes/icons/plus';
   import ArrowLeft from '@tabler/icons-svelte-runes/icons/arrow-left';
   import CheckSquare from '@tabler/icons-svelte-runes/icons/square-check';
@@ -19,7 +19,7 @@
   import { currentWorkspace } from '../stores/workspaces.svelte.js';
   import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import { moduleSettings } from '../stores/moduleSettings.js';
-  import { collections as collectionsApi } from '../api/collections.js';
+  import { workspaceCollectionCatalog } from '../stores/workspaceCollectionCatalog.svelte.js';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import ScrollableSidebar from '../layout/ScrollableSidebar.svelte';
   import SidebarResizeHandle from '../layout/SidebarResizeHandle.svelte';
@@ -57,7 +57,6 @@
   let { workspaceId = null } = $props();
 
   let collections = $state([]);
-  let allCollections = $state([]);
   let currentCollectionId = $state(null); // Track by ID instead of name
   let currentCollectionName = $state(''); // For display
   let collectionDisplayName = $derived(currentCollectionId ? currentCollectionName : t('collections.allItems'));
@@ -143,11 +142,17 @@
     }
   });
 
-  // Reactive statement to reload collections when workspaceId changes
+  // Writes invalidate the active catalog; teardown only cancels this consumer.
   $effect(() => {
-    if (workspaceId) {
-      loadCollections();
-    }
+    const targetWorkspace = workspaceId;
+    void workspaceCollectionCatalog.revision;
+    let active = true;
+    untrack(() => {
+      collections = [];
+      syncCollectionWithRoute($currentRoute.params.collectionId);
+      if (targetWorkspace) void loadCollections(targetWorkspace, () => active);
+    });
+    return () => { active = false; };
   });
 
   // Keep the enabled-views lookup warm for the current scope, plus the
@@ -187,18 +192,16 @@
     buildCollectionDropdownItems();
   }
 
-  async function loadCollections() {
+  async function loadCollections(targetWorkspace, isActive) {
     try {
-      const result = await collectionsApi.getAll();
-      allCollections = result || [];
-
-      // Filter collections for this workspace
-      collections = filterCollectionsForWorkspace(allCollections, workspaceId);
+      const result = await workspaceCollectionCatalog.load(targetWorkspace);
+      if (!isActive()) return;
+      collections = filterCollectionsForWorkspace(result, targetWorkspace);
 
       // Sync with current route (reactive statement will handle this, but we need to rebuild dropdown)
       syncCollectionWithRoute($currentRoute.params.collectionId);
     } catch (error) {
-      if (error?.name === 'AbortError') return;
+      if (!isActive() || error?.name === 'AbortError') return;
       console.error('Failed to load collections:', error);
       collections = [];
       currentCollectionId = null;

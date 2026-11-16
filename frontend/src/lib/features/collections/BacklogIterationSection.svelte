@@ -39,6 +39,10 @@
     sectionDndAction = () => {},
     headerOnly = false,
     virtualRow = null,
+    selectionMode = false,
+    selectedIds = null,
+    onSelect = null,
+    onShiftSelect = null,
   } = $props();
 
   const statusColors = {
@@ -185,7 +189,9 @@
               {statusCategories} {styles} {dragState} {backlogRowGap} {assignableIterations}
               {pendingActionItemIds} {visibleFields} {onOpenItem} {onMoveItemToBoundary}
               {onAssignItemToIteration} {storyPointsConfiguredForItem} {storyPointsPendingItemIds}
-              {onUpdateStoryPoints} {itemDndAction} />
+              {onUpdateStoryPoints} {itemDndAction}
+              {selectionMode} selected={selectedIds?.has(item.id) ?? false}
+              {onSelect} {onShiftSelect} />
           {/each}
         </div>
       {/if}

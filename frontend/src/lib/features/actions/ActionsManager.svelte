@@ -10,6 +10,7 @@
   import Play from '@lucide/svelte/icons/play';
   import Zap from '@lucide/svelte/icons/zap';
   import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
+  import History from '@lucide/svelte/icons/history';
   import Pencil from '@lucide/svelte/icons/pencil';
   import Copy from '@lucide/svelte/icons/copy';
   import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -18,7 +19,7 @@
   import PageHeader from '../../layout/PageHeader.svelte';
   import Badge from '../../components/Badge.svelte';
 
-  /** @type {{ workspaceId: any, actions?: any[], loading?: boolean, oncreate?: () => void, onfromtemplate?: () => void, onedit?: (action: any) => void, onrename?: (action: any) => void, onduplicate?: (action: any) => void, ontoggle?: (action: any) => void, ondelete?: (action: any) => void, onviewlogs?: (action: any) => void, ontestexecuted?: (action: any) => void }} */
+  /** @type {{ workspaceId: any, actions?: any[], loading?: boolean, oncreate?: () => void, onfromtemplate?: () => void, onedit?: (action: any) => void, onrename?: (action: any) => void, onduplicate?: (action: any) => void, ontoggle?: (action: any) => void, ondelete?: (action: any) => void, onviewlogs?: (action: any) => void, onviewhistory?: (action: any) => void, ontestexecuted?: (action: any) => void }} */
   let {
     workspaceId,
     actions = [],
@@ -31,6 +32,7 @@
     ontoggle,
     ondelete,
     onviewlogs,
+    onviewhistory,
     ontestexecuted,
   } = $props();
 
@@ -94,6 +96,10 @@
 
   function handleViewLogs(action) {
     onviewlogs?.(action);
+  }
+
+  function handleViewHistory(action) {
+    onviewhistory?.(action);
   }
 
   function moreItems(action) {
@@ -203,6 +209,14 @@
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
+              </button>
+              <button
+                class="p-2 rounded-md action-button"
+                onclick={() => handleViewHistory(action)}
+                title={t('actions.history.title', 'History')}
+                data-testid={`action-view-history-${action.id}`}
+              >
+                <History class="h-5 w-5" />
               </button>
               <button
                 class="p-2 rounded-md action-button"

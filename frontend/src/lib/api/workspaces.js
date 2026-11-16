@@ -43,21 +43,25 @@ export const workspaces = {
   get: (id, requestOptions = {}) => fetchV2Data(`/workspaces/${id}`, requestOptions),
   getBootstrap: (id, requestOptions = {}) =>
     fetchAPI(`/workspaces/${id}/bootstrap`, requestOptions),
-  getProjects: (id) => fetchV2Data(`/workspaces/${id}/time-projects`),
+  getProjects: (id, requestOptions = {}) =>
+    fetchV2Data(`/workspaces/${id}/time-projects`, requestOptions),
   getOrCreatePersonal: () => fetchAPI('/workspaces/personal'),
-  getStats: (id, params = {}) => {
-    return fetchAPI(`/workspaces/${id}/stats${buildQueryString(params)}`);
+  getStats: (id, params = {}, requestOptions = {}) => {
+    return fetchAPI(`/workspaces/${id}/stats${buildQueryString(params)}`, requestOptions);
   },
+  getOverviewCharts: (id, params, requestOptions = {}) =>
+    fetchV2Data(`/workspaces/${id}/overview-charts${buildQueryString(params)}`, requestOptions),
   getHomepageLayout: (id) => fetchAPI(`/workspaces/${id}/homepage/layout`),
   updateHomepageLayout: (id, layout) =>
     fetchAPI(`/workspaces/${id}/homepage/layout`, {
       method: 'PUT',
       body: JSON.stringify(layout),
     }),
-  getStatuses: async (id, itemTypeId = null) =>
+  getStatuses: async (id, itemTypeId = null, requestOptions = {}) =>
     normalizeStatuses(
       await fetchV2Data(
-        `/workspaces/${id}/statuses${itemTypeId ? `?item_type_id=${itemTypeId}` : ''}`
+        `/workspaces/${id}/statuses${itemTypeId ? `?item_type_id=${itemTypeId}` : ''}`,
+        requestOptions
       )
     ),
   getItemTypes: (id) => fetchV2Data(`/workspaces/${id}/item-types`),

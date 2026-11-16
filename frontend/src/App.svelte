@@ -33,6 +33,7 @@
     publicForm: () => import('./lib/features/forms/PublicFormPage.svelte'),
     setPassword: () => import('./lib/pages/SetPassword.svelte'),
     desktop: () => import('./lib/pages/MainApp.svelte'),
+    enrollment: () => import('./lib/pages/Security.svelte'),
     mobile: () => import('./lib/mobile/MobileShell.svelte'),
     publicBoard: () => import('./lib/customer/CustomerBoard.svelte'),
     pagePrint: () => import('./lib/features/pages/PagePrintView.svelte'),
@@ -56,6 +57,9 @@
   let startupAttempt = 0;
   let themeAudience = null;
   let themeLoadGeneration = 0;
+  const enrollmentRequired = $derived(
+    $authStore.isAuthenticated && $authStore.session?.enrollment_required === true
+  );
 
   const BOOTSTRAP_TIMEOUT_MS = 10_000;
   const SLOW_START_MS = 4_000;
@@ -218,7 +222,7 @@
   });
 
   $effect(() => {
-    if ($authStore.isAuthenticated && setupCompleted) {
+    if ($authStore.isAuthenticated && setupCompleted && !enrollmentRequired) {
       showLoginDialog = false;
       appInitialized = true;
       void prepareAuthenticatedShellUI(authStore.currentUser?.id);
@@ -242,6 +246,7 @@
   // shell rendering or requiring a page reload to pick up the active theme.
   $effect(() => {
     if (!appInitialized) return;
+    if (enrollmentRequired) return;
 
     const nextAudience = $authStore.isAuthenticated
       ? `user:${$authStore.currentUser?.id ?? 'authenticated'}`
@@ -303,6 +308,7 @@
   // PWAs already open at /m via the manifest start_url, so this only affects
   // plain browsers.
   function maybeRedirectToMobile() {
+    if (enrollmentRequired) return;
     try {
       if (localStorage.getItem('windshift-prefer-desktop') === 'true') return;
     } catch {
@@ -335,6 +341,7 @@
     'zammad-resolve',
   ]);
   $effect(() => {
+    if (enrollmentRequired) return;
     const route = $currentRoute;
     if (!route.view || isMobileRoute(route.view)) return;
     if (MOBILE_REDIRECT_SKIP_VIEWS.has(route.view)) return;
@@ -445,6 +452,10 @@
       label={getStartupCopy('common.loading', i18nReady, t)}
       detail={startupSlow ? getStartupCopy('common.loadingSlow', i18nReady, t) : ''}
     />
+  {:else if enrollmentRequired && appInitialized}
+    <div class="w-full p-6" data-testid="passkey-enrollment">
+      <LazyRootView loader={ROOT_VIEW_LOADERS.enrollment} label="passkey enrollment" />
+    </div>
   <!-- Public board route - no authentication required -->
   {:else if $currentRoute.view === 'public-board'}
     <LazyRootView

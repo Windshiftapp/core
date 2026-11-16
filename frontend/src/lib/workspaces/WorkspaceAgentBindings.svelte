@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../components/FormField.svelte';
   // Workspace agent bindings (WI-88). The page workspace admins use to
   // wire up coding-agent runners: pick an acting identity (an
   // allowlisted centralized service user), point it at a repo via
@@ -1042,6 +1043,7 @@
         </div>
         {#if workspaceSkills.length > 0}
           <div class="mt-3" data-testid="binding-skills">
+            <FormField class="contents">
             <Label class="mb-1">Skills</Label>
             <BasePicker
               bind:value={formSkillIds}
@@ -1053,6 +1055,7 @@
               getLabel={skillLabel}
               itemSnippet={skillOption}
             />
+            </FormField>
           </div>
         {/if}
       {/if}

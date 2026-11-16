@@ -41,10 +41,12 @@ export const agentRuns = {
    * List the workspace's recent agent runs.
    * @param {number} workspaceId
    * @param {{ limit?: number, cursor?: string }} [opts]
+   * @param {object} [requestOptions]
    */
-  listForWorkspace: async (workspaceId, opts = {}) => {
+  listForWorkspace: async (workspaceId, opts = {}, requestOptions = {}) => {
     const response = await fetchV2Data(
-      `/workspaces/${workspaceId}/agent-runs${runListQuery(opts)}`
+      `/workspaces/${workspaceId}/agent-runs${runListQuery(opts)}`,
+      requestOptions
     );
     return response?.runs || [];
   },

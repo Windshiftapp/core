@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../components/FormField.svelte';
   import { onMount } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
   import { itemSCMLinks } from '../api/scm.js';
@@ -65,6 +66,7 @@
       />
     {:else}
       <div>
+        <FormField class="contents" requiredMark>
         <Label color="default" required class="mb-1.5">{t('scm.repository')}</Label>
         <BasePicker
           bind:value={selectedRepoId}
@@ -75,6 +77,7 @@
           getValue={(repo) => repo.id}
           getLabel={(repo) => `${repo.repository_name} (${repo.provider_name})`}
         />
+        </FormField>
       </div>
 
       {@render fields()}

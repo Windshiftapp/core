@@ -1,42 +1,10 @@
 import { auth } from '../api/auth.js';
 import { authenticateWithCredential, getWebAuthnErrorMessage } from './webauthn-utils.js';
-export function getBaseLoginState() {
-  return {
-    emailOrUsername: '',
-    password: '',
-    rememberMe: false,
-    showPassword: false,
-    validationError: '',
-    fidoAvailable: false,
-    tryingFido: false,
-    showFidoOption: false,
-  };
-}
-
-export async function evaluateFidoAvailability(emailOrUsername) {
-  if (!emailOrUsername?.trim()) {
-    return { available: false, showOption: false };
-  }
-
-  try {
-    await auth.startFIDOLogin(emailOrUsername.trim());
-    return { available: true, showOption: true };
-  } catch (error) {
-    // Expected errors: 401 (not authenticated), 404 (no FIDO credentials) - don't spam console
-    const isExpectedError = error.status === 401 || error.status === 404;
-    if (!isExpectedError) {
-      console.error('FIDO availability check failed:', error);
-    }
-    return { available: false, showOption: false };
-  }
-}
-
-export async function performFidoLogin(emailOrUsername) {
-  if (!emailOrUsername?.trim()) {
-    throw new Error('Email or username is required');
-  }
-
-  const challengeResponse = await auth.startFIDOLogin(emailOrUsername.trim());
+export async function performFidoLogin(emailOrUsername, rememberMe = false, options = {}) {
+  const { signal, conditional = false, onCredential } = options;
+  signal?.throwIfAborted();
+  const challengeResponse = await auth.startFIDOLogin(emailOrUsername?.trim() || '', { signal });
+  signal?.throwIfAborted();
 
   const sessionId = challengeResponse.sessionId;
   const publicKeyOptions =
@@ -46,11 +14,23 @@ export async function performFidoLogin(emailOrUsername) {
     throw new Error('Invalid FIDO challenge from server');
   }
 
-  const credentialResponse = await authenticateWithCredential(publicKeyOptions);
+  const credentialResponse = await authenticateWithCredential(
+    publicKeyOptions,
+    conditional,
+    signal
+  );
+  signal?.throwIfAborted();
+  onCredential?.();
 
-  const loginData = sessionId ? { sessionId, response: credentialResponse } : credentialResponse;
+  const loginData = sessionId
+    ? {
+        sessionId,
+        response: credentialResponse,
+        remember_me: options.getRememberMe?.() ?? rememberMe,
+      }
+    : credentialResponse;
 
-  return auth.completeFIDOLogin(loginData);
+  return auth.completeFIDOLogin(loginData, { signal });
 }
 
 export function deriveFidoError(error) {

@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../components/FormField.svelte';
   import { onMount, untrack } from 'svelte';
   import { assetSets as assetSetsApi } from '../api/assets.js';
   import { customFields as customFieldsApi, itemTypes as itemTypesApi, linkTypes as linkTypesApi } from '../api/configuration.js';
@@ -934,6 +935,7 @@
             </div>
 
             <div>
+              <FormField class="contents">
               <Label class="mb-2">Allowed Entity Types</Label>
               <BasePicker
                 bind:value={linkingAllowedEntityTypes}
@@ -944,6 +946,7 @@
                 getLabel={(item) => item.name}
                 disabled={linkTypeConstrainsEntities}
               />
+              </FormField>
               <DescriptionText>
                 {linkTypeConstrainsEntities ? 'Constrained by link type' : 'Choose which entity types can be linked'}
               </DescriptionText>
@@ -951,6 +954,7 @@
 
             {#if linkingAllowedEntityTypes.includes('item')}
               <div>
+                <FormField class="contents">
                 <Label class="mb-2">Allowed Item Types (optional)</Label>
                 <BasePicker
                   bind:value={linkingAllowedItemTypeIds}
@@ -960,6 +964,7 @@
                   getValue={(item) => item.id}
                   getLabel={(item) => item.name}
                 />
+                </FormField>
                 <DescriptionText>Leave empty to allow all item types</DescriptionText>
               </div>
             {/if}
@@ -985,6 +990,7 @@
 
               {#if linkingMirrorName.trim() && linkingAllowedEntityTypes.includes('item')}
                 <div class="mt-3">
+                  <FormField class="contents">
                   <Label class="mb-2">Mirror Allowed Item Types (optional)</Label>
                   <BasePicker
                     bind:value={linkingMirrorAllowedItemTypeIds}
@@ -994,6 +1000,7 @@
                     getValue={(item) => item.id}
                     getLabel={(item) => item.name}
                   />
+                  </FormField>
                 </div>
               {/if}
             </div>

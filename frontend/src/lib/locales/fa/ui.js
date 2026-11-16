@@ -459,10 +459,12 @@ export default {
       "otherSlices": "دیگر ({count} بیشتر)"
     },
     "completionChart": {
+      "definition": "نخستین تکمیل ثبت‌شده در هر هفته (UTC). بازگشایی دوباره شمرده نمی‌شود.",
       "title": "نمودار تکمیل",
       "emptyMessage": "داده تکمیل‌شده موجود نیست"
     },
     "createdChart": {
+      "definition": "ایجادشده در هفت روز اخیر UTC، شامل امروز.",
       "title": "نمودار ایجاد",
       "emptyMessage": "داده ایجادشده موجود نیست"
     },

@@ -53,7 +53,8 @@ export default {
       "relatedItems": "각 관련 작업에 대해 실행",
       "transitionItem": "작업 상태 전환",
       "roundRobinAssign": "순환 배정",
-      "createMilestone": "마일스톤 만들기"
+      "createMilestone": "마일스톤 만들기",
+      "executeScript": "스크립트 실행"
     },
     "aiUpdated": "AI가 자동화를 수정했습니다",
     "runAs": "실행 사용자",
@@ -191,6 +192,7 @@ export default {
       "completed": "완료",
       "failed": "실패",
       "skipped": "건너뜀",
+      "reconciliationRequired": "조정 필요",
       "startedAt": "시작 시각",
       "completedAt": "완료 시각",
       "error": "오류",

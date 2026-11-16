@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../components/FormField.svelte';
   import { onMount } from 'svelte';
   import { configurationSets as configurationSetsApi } from '../api/configuration.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -196,6 +197,7 @@
       <div class="space-y-6">
         <!-- Configuration Set Selection -->
         <div>
+          <FormField class="contents">
           <Label color="default" class="mb-3">{t('settings.configSets.select')}</Label>
           <ConfigurationSetPicker
             bind:value={selectedConfigurationSetId}
@@ -203,6 +205,7 @@
             disabled={saving}
             onSelect={(configSet) => updateConfigurationSet(configSet?.id ?? null)}
           />
+          </FormField>
         </div>
 
 

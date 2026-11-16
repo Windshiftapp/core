@@ -61,9 +61,8 @@ type FlowRun struct {
 // after a failed step. These are the loop semantics of the three action
 // engines this runner replaces.
 //
-// The returned error is non-nil only for a cyclic graph (errors.Is with
-// ErrCycleDetected) or a canceled execCtx; a canceled context is detected
-// after each step and the in-flight step is recorded as failed.
+// The returned error is non-nil only for a cyclic graph or a canceled context.
+// Cancellation prevents new dispatches and marks an in-flight step as failed.
 func RunFlow[N RunnerNode, E ActionEdge](execCtx context.Context, nodes []N, edges []E, opts FlowOptions, dispatch FlowDispatch[N]) (FlowRun, error) {
 	nodeIDs := make([]int, len(nodes))
 	nodeMap := make(map[int]N, len(nodes))
@@ -100,6 +99,9 @@ func RunFlow[N RunnerNode, E ActionEdge](execCtx context.Context, nodes []N, edg
 
 	executed := make(map[int]bool)
 	for _, nodeID := range sortedIDs {
+		if err := execCtx.Err(); err != nil {
+			return run, err
+		}
 		node := nodeMap[nodeID]
 		if node.GetNodeType() == opts.TriggerNodeType {
 			executed[node.GetID()] = true

@@ -3,6 +3,7 @@
   import { homepage, search } from '../api/misc.js';
   import { contextCommands } from '../utils/contextCommands.js';
   import { currentRoute } from '../router.js';
+  import { itemDetailStore } from '../stores/itemDetailStore.svelte.js';
   import { toExternal } from '../runtime/contextPath.js';
   import { permissionStore, isSystemAdmin } from '../stores/permissions.svelte.js';
   import { workspacesStore, currentWorkspace } from '../stores/workspaces.svelte.js';
@@ -38,9 +39,10 @@
     onclose,
   } = $props();
 
-  let workspaces = $state([]);
   let workItems = $state([]);
-  let searchTimeout;
+  let workItemsQuery = $state('');
+  let workspaceHits = $state([]);
+  let workspaceHitsQuery = $state('');
   // Plugin admin tabs are fetched once per session, on first palette open by a
   // system admin; adminProvider reads them from the extensions store.
   let extensionsRequested = false;
@@ -58,10 +60,6 @@
       if (!$workspacesStore.loaded) tasks.push(workspacesStore.load());
       if (!$workspacesStore.personalWorkspace) tasks.push(workspacesStore.loadPersonalWorkspace());
       if (tasks.length) await Promise.all(tasks);
-      workspaces = [
-        ...($workspacesStore.personalWorkspace ? [$workspacesStore.personalWorkspace] : []),
-        ...$workspacesStore.regularWorkspaces,
-      ];
     } catch (err) {
       console.error('Failed to load data for command palette:', err);
     }
@@ -72,25 +70,6 @@
     }
   }
 
-  async function searchWorkItems(query) {
-    if (!query || query.length < 2) {
-      workItems = [];
-      return;
-    }
-    try {
-      const results = await search.items({ query: query.trim(), limit: 6 });
-      workItems = results || [];
-    } catch (err) {
-      console.error('Failed to search work items:', err);
-      workItems = [];
-    }
-  }
-
-  function debouncedSearchWorkItems(query) {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => searchWorkItems(query), 300);
-  }
-
   const {
     elements: { menu, input, option },
     states: { open, inputValue, selected },
@@ -99,17 +78,53 @@
     portal: null,
   });
 
+  const normalizedQuery = $derived($inputValue.trim());
+  const workspaces = $derived.by(() => {
+    const cached = [
+      ...($workspacesStore.personalWorkspace ? [$workspacesStore.personalWorkspace] : []),
+      ...$workspacesStore.regularWorkspaces,
+    ];
+    const hits = workspaceHitsQuery === normalizedQuery ? workspaceHits : [];
+    return [...new Map([...cached, ...hits].map((ws) => [String(ws.id), ws])).values()];
+  });
+
   $effect(() => {
     if (isOpen !== $open) open.set(isOpen);
   });
 
   $effect(() => {
-    if (mode !== 'commands') return;
-    if ($inputValue && $inputValue.length >= 2) {
-      debouncedSearchWorkItems($inputValue);
-    } else if ($inputValue.length < 2) {
-      workItems = [];
-    }
+    const query = normalizedQuery;
+    const truncated = $workspacesStore.truncated;
+    workItems = [];
+    workItemsQuery = '';
+    workspaceHits = [];
+    workspaceHitsQuery = '';
+    if (!isOpen || mode !== 'commands' || query.length < 2) return;
+
+    const controller = new AbortController();
+    const ownsQuery = () => !controller.signal.aborted && isOpen && mode === 'commands' && normalizedQuery === query;
+    const timer = setTimeout(() => {
+      void search.items({ query, limit: 6, signal: controller.signal }).then((results) => {
+        if (!ownsQuery()) return;
+        workItems = results || [];
+        workItemsQuery = query;
+      }).catch((err) => {
+        if (!ownsQuery()) return;
+        console.error('Failed to search work items:', err);
+        workItems = [];
+      });
+      if (truncated) {
+        void workspacesStore.searchWorkspaces(query, { limit: 25, signal: controller.signal }).then((result) => {
+          if (!ownsQuery()) return;
+          workspaceHits = result.workspaces;
+          workspaceHitsQuery = query;
+        });
+      }
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   });
 
   // Provider order: focused-entity first, then workspace-context, then
@@ -140,10 +155,13 @@
       modules: $moduleSettings,
       workspaces,
       currentWorkspace: $currentWorkspace,
-      workItems,
+      workItems: workItemsQuery === normalizedQuery ? workItems : [],
+      workItemsQuery,
+      item: itemDetailStore.item,
+      itemWorkspace: itemDetailStore.workspace,
       activeTimer: timerStore.activeTimer,
       t,
-      query: $inputValue,
+      query: normalizedQuery,
     }),
     PROVIDERS,
   ));
@@ -258,7 +276,7 @@
   }
 
   function handleKeydown(e) {
-    if (!isOpen) return;
+    if (!isOpen || e.isComposing || e.target !== searchInputRef) return;
     if (e.key === 'Enter' && $selected) {
       e.preventDefault();
       const cmd = filteredCommands.find((c) => c.id === $selected.value);
@@ -282,10 +300,11 @@
 
   $effect(() => {
     if (isOpen && searchInputRef) {
-      setTimeout(() => {
-        searchInputRef.focus();
-        searchInputRef.select();
+      const timer = setTimeout(() => {
+        searchInputRef?.focus();
+        searchInputRef?.select();
       }, 50);
+      return () => clearTimeout(timer);
     }
   });
 </script>
@@ -334,9 +353,7 @@
   }
 </style>
 
-<svelte:window onkeydown={handleKeydown} />
-
-<ModalBackdrop bind:show={isOpen} opacity={0.4} blur={8} extraFilter="saturate(120%)" zIndex={60} align="top" paddingTop="pt-[20vh]" onclose={close}>
+<ModalBackdrop bind:show={isOpen} onKeydown={handleKeydown} ariaLabel={t('nav.search')} opacity={0.4} blur={8} extraFilter="saturate(120%)" zIndex={60} align="top" paddingTop="pt-[20vh]" onclose={close}>
   <div
     class="relative w-full max-w-2xl mx-4"
   >
@@ -436,6 +453,7 @@
             </div>
             <div class="flex justify-between items-center">
               <button
+                data-testid="command-palette-advanced-search"
                 onclick={() => executeAndClose({ url: '/search' })}
                 class="text-xs underline"
                 style="color: var(--ds-interactive);"

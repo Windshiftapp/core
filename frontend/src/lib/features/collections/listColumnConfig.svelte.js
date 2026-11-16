@@ -94,6 +94,9 @@ export function useListColumnConfig(getScope) {
   }
 
   return {
+    get boardConfig() {
+      return boardConfig;
+    },
     get columns() {
       return columns;
     },

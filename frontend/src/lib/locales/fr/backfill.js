@@ -647,11 +647,7 @@ export default {
       },
     },
     "boardConfig": {
-      "resetViews": "Réinitialiser à la valeur par défaut de l'espace de travail",
       "views": "Vues",
-      "viewsHelp": "Choisissez les vues de collection disponibles ici. Les vues désactivées disparaissent de la navigation et les liens directs basculent vers une vue activée.",
-      "viewsInheritedHint": "Cette collection suit les vues par défaut de l'espace de travail.",
-      "viewsOverrideHint": "Cette collection remplace les vues par défaut de l'espace de travail.",
     },
     "connectedAccounts": {
       "oauthConnected": "Compte connecté",

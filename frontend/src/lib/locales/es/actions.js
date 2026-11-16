@@ -62,6 +62,7 @@ export default {
       transitionItem: 'Transicionar elemento',
       roundRobinAssign: 'Asignar por turno rotativo',
       createMilestone: 'Crear hito',
+      executeScript: 'Ejecutar script',
     },
 
     aiUpdated: 'Acción actualizada por IA',
@@ -167,6 +168,7 @@ export default {
       completed: 'Completado',
       failed: 'Fallido',
       skipped: 'Omitido',
+      reconciliationRequired: 'Se requiere reconciliación',
       startedAt: 'Iniciado a las',
       completedAt: 'Completado a las',
       error: 'Error',

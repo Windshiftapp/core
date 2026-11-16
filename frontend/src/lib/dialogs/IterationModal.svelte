@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../components/FormField.svelte';
   import Globe from '@lucide/svelte/icons/globe';
   import Building2 from '@lucide/svelte/icons/building-2';
   import Calendar from '@lucide/svelte/icons/calendar';
@@ -196,8 +197,10 @@
 
       <!-- Type -->
       <div>
+        <FormField class="contents" requiredMark>
         <Label color="default" required class="mb-1.5"><Tag class="w-4 h-4 inline-block mr-1" />{t('common.type')}</Label>
         <Select id="iteration-type-select" bind:value={formData.type_id} required options={[{ value: null, label: t('iterations.selectType'), disabled: true }, ...iterationTypes.map(type => ({ value: type.id, label: type.name }))]} />
+        </FormField>
       </div>
 
       <!-- Date Range -->
@@ -209,6 +212,7 @@
           labelColor="default"
           labelClass="mb-1.5"
           id="iteration-start-date-input"
+          dataTestid="iteration-start-date-input"
           type="date"
           bind:value={formData.start_date}
           required
@@ -218,6 +222,7 @@
           labelColor="default"
           labelClass="mb-1.5"
           id="iteration-end-date-input"
+          dataTestid="iteration-end-date-input"
           type="date"
           bind:value={formData.end_date}
           required

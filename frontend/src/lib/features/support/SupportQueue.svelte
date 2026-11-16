@@ -173,7 +173,11 @@
     }, 250);
   }
 
+  const readController = new AbortController();
+  const readOptions = { signal: readController.signal };
   onDestroy(() => {
+    readController.abort();
+    itemsLoadId += 1;
     if (searchTimer) clearTimeout(searchTimer);
   });
 
@@ -202,7 +206,7 @@
       return;
     }
     try {
-      collection = await collections.get(collectionId);
+      collection = await collections.get(collectionId, readOptions);
     } catch (error) {
       collection = null;
     }
@@ -211,10 +215,11 @@
   // Reuses the list view's column configuration so both views stay in sync.
   async function loadBoardConfiguration() {
     try {
-      const config = await collections.getBoardConfiguration(collectionId, workspaceId);
+      const config = await collections.getBoardConfiguration(collectionId, workspaceId, readOptions);
       boardConfig = config;
       listColumns = listColumnsFromConfig(config);
     } catch (error) {
+      if (readController.signal.aborted) return;
       boardConfig = null;
       listColumns = [...DEFAULT_LIST_COLUMNS];
       if (error?.status !== 404) {
@@ -250,13 +255,17 @@
   }
 
   async function loadQueues() {
+    if (readController.signal.aborted) return;
     try {
       await workspaceDataStore.initialize(workspaceId);
+      if (readController.signal.aborted) return;
       const path = queuesPath();
       if (!path) throw new Error('workspace bootstrap unavailable');
-      queues = (await fetchV2Data(path)) ?? [];
+      queues = (await fetchV2Data(path, readOptions)) ?? [];
+      if (readController.signal.aborted) return;
       resolveActiveRef();
     } catch (error) {
+      if (readController.signal.aborted) return;
       errorToast(t('supportQueue.loadFailed'));
     } finally {
       loadingQueues = false;
@@ -276,6 +285,7 @@
   }
 
   async function loadItems({ page = currentPage, limit = itemsPerPage, search = searchQuery.trim() } = {}) {
+    if (readController.signal.aborted) return;
     if (!activeQueue?.ql) {
       items = [];
       itemsPagination = null;
@@ -294,7 +304,7 @@
         order_by: 'updated_at',
         sort_direction: 'desc',
         ...(search ? { search } : {}),
-      });
+      }, readOptions);
       if (loadId !== itemsLoadId) return;
       loadedQueryScope = queryScope;
       items = response?.data ?? [];

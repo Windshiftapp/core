@@ -1,4 +1,5 @@
 <script>
+  let tabPanelElement = $state(null);
   import MessageSquare from '@lucide/svelte/icons/message-square';
   import Clock from '@lucide/svelte/icons/clock';
   import Play from '@lucide/svelte/icons/play';
@@ -340,10 +341,10 @@
 <div class="mt-6">
   <div>
     <!-- Tab Navigation -->
-    <TabStrip {tabs} activeTab={tab} onTabChange={switchTab} />
+    <TabStrip {tabs} activeTab={tab} onTabChange={switchTab} panelElement={tabPanelElement} />
 
     <!-- Tab Content -->
-    <div class="pt-6">
+    <div class="pt-6" bind:this={tabPanelElement}>
       {#if tab === 'comments'}
         <Comments itemId={item.id} workspaceId={item.workspace_id} isPersonalWorkspace={workspace?.is_personal} isPortalRequest={!!item.request_type_id} isExternalRequest={isExternalRequest(item)} enableInternalComments={workspace?.internal_comments_enabled} onCommentsLoaded={handleCommentsLoaded} />
       {:else if tab === 'details'}

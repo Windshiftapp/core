@@ -1,5 +1,5 @@
 <script>
-	import { currentRoute, navigate } from '../router.js';
+	import { navigate } from '../router.js';
 	import { authStore } from '../stores/auth.svelte.js';
 	import { securityStore } from '../stores/securityStore.svelte.js';
 	import { t } from '../stores/i18n.svelte.js';
@@ -128,11 +128,9 @@
 		securityStore.newTokenScopes = [];
 	}
 
-	// Initialize in a dedicated enrollment-only mode when login issued a
-	// restricted first-passkey session. This must happen before loading normal
-	// Security-page resources, which the server intentionally denies.
+	// Session state keeps enrollment mandatory across reloads and deep links.
 	$effect(() => {
-		const enrollmentRequested = $currentRoute.query?.enroll === 'passkey';
+		const enrollmentRequested = $authStore.session?.enrollment_required === true;
 		if (enrollmentRequested) {
 			securityStore.checkEnrollmentRequired('passkey');
 		}
@@ -405,6 +403,7 @@
 				<Button
 					variant="primary"
 					onclick={() => securityStore.showAddToken = true}
+          dataTestid="security-create-token"
 					icon={Plus}
 					size="medium"
 					keyboardHint="T"

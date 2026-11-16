@@ -1,3 +1,4 @@
+import { withCollectionInvalidation } from '../utils/collectionChanges.js';
 import { fetchAllV2Pages, fetchAPIV2, fetchV2Data } from './core.js';
 import { createCrudClient } from './createCrudClient.js';
 
@@ -29,29 +30,37 @@ export const collections = {
     return fetchAllV2Pages(`/collections${query ? `?${query}` : ''}`, requestOptions);
   },
   get: (id, requestOptions = {}) => fetchV2Data(`/collections/${id}`, requestOptions),
-  create: (data) => fetchV2Data('/collections', { method: 'POST', body: JSON.stringify(data) }),
+  create: (data) =>
+    withCollectionInvalidation(
+      fetchV2Data('/collections', { method: 'POST', body: JSON.stringify(data) })
+    ),
   update: (id, data) =>
-    fetchV2Data(`/collections/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/merge-patch+json' },
-      body: JSON.stringify(data),
-    }),
-  delete: (id) => fetchV2Data(`/collections/${id}`, { method: 'DELETE' }),
+    withCollectionInvalidation(
+      fetchV2Data(`/collections/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/merge-patch+json' },
+        body: JSON.stringify(data),
+      })
+    ),
+  delete: (id) =>
+    withCollectionInvalidation(fetchV2Data(`/collections/${id}`, { method: 'DELETE' })),
   updatePublicSharing: (id, data) =>
-    fetchV2Data(`/collections/${id}/sharing`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/merge-patch+json' },
-      body: JSON.stringify(data),
-    }),
+    withCollectionInvalidation(
+      fetchV2Data(`/collections/${id}/sharing`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/merge-patch+json' },
+        body: JSON.stringify(data),
+      })
+    ),
   // Board configuration methods
-  getBoardConfiguration: (collectionId, workspaceId = null) => {
-    return fetchV2Data(boardConfigurationPath(collectionId, workspaceId));
+  getBoardConfiguration: (collectionId, workspaceId = null, requestOptions = {}) => {
+    return fetchV2Data(boardConfigurationPath(collectionId, workspaceId), requestOptions);
   },
-  getBoardConfigurationBootstrap: (collectionId, workspaceId = null) => {
+  getBoardConfigurationBootstrap: (collectionId, workspaceId = null, requestOptions = {}) => {
     const path = boardConfigurationPath(collectionId, workspaceId);
     const query =
       collectionId && workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : '';
-    return fetchV2Data(`${path}/bootstrap${query}`);
+    return fetchV2Data(`${path}/bootstrap${query}`, requestOptions);
   },
   createBoardConfiguration: (collectionId, workspaceId, data) => {
     return fetchV2Data(boardConfigurationPath(collectionId, workspaceId), {

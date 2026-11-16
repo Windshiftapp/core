@@ -1,4 +1,6 @@
 <script>
+  import { createOwnedPopup } from '../../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
   import { createPopover, melt } from '@melt-ui/svelte';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
@@ -23,6 +25,8 @@
       placement: 'bottom-start',
     },
     portal: 'body',
+    disableFocusTrap: ownedPopup.withinModal,
+    closeFocus: ownedPopup.withinModal ? null : undefined,
   });
 
   let draftFields = $state([]);
@@ -68,6 +72,7 @@
 {#if $open}
   <div
     use:melt={$content}
+    use:ownedPopup={{ close: () => { $open = false; } }}
     class="w-72 rounded-lg shadow-xl border border-ds-border bg-ds-surface-raised z-[60] overflow-hidden"
     data-testid="backlog-field-selector-menu"
   >

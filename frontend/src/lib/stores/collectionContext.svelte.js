@@ -15,25 +15,16 @@ import {
   buildHierarchyLevels,
   defaultHierarchyLevel,
 } from '../features/collections/hierarchyLevels.js';
-import { currentRoute, GLOBAL_COLLECTION_VIEWS } from '../router.js';
 import {
   canRunBackgroundSync,
   isExpectedBackgroundSyncError,
   onBackgroundSyncAvailable,
 } from '../utils/backgroundSync.js';
+import { onCollectionsChanged } from '../utils/collectionChanges.js';
 import { calcHasMore } from '../utils/paginationUtils.js';
 import { collectionPreferences } from './collectionPreferences.svelte.js';
 import { surfaceError } from './toasts.svelte.js';
 import { workspaceDataStore } from './workspaceDataStore.svelte.js';
-
-const COLLECTION_VIEWS = new Set([
-  'workspace-board',
-  'workspace-backlog',
-  'workspace-list',
-  'workspace-tree',
-  'workspace-map',
-  'workspace-roadmap',
-]);
 
 const BOARD_VIEWS = new Set(['workspace-board', 'collection-board']);
 const LIST_VIEWS = new Set(['workspace-list', 'collection-list']);
@@ -66,8 +57,19 @@ const SEARCH_PAGE_SIZE = 100;
 // reconciliation instead of one visibility query per item.
 const LOCAL_RECONCILE_DEBOUNCE_MS = 200;
 
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function delay(ms, signal) {
+  signal.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', abort);
+      resolve();
+    }, ms);
+    function abort() {
+      clearTimeout(timer);
+      reject(signal.reason);
+    }
+    signal.addEventListener('abort', abort, { once: true });
+  });
 }
 
 function appendUniqueItems(existing, incoming) {
@@ -244,6 +246,7 @@ class CollectionStore {
    * so counts cannot leak across workspace boundaries.
    */
   ensureLevelCounts(wsId = this.#wsId, colId = this.#colId, subQl = this.effectiveSubFilterQL) {
+    const generation = this.#generation;
     const scope = `${wsId ?? ''}|${colId ?? ''}|${subQl ?? ''}`;
     if (this.#levelCountsScope === scope) {
       if (this.#levelCountsLoaded) return Promise.resolve(this.levelCounts);
@@ -262,15 +265,17 @@ class CollectionStore {
           collection_id: colId || undefined,
           sub_ql: subQl || undefined,
         },
-        { readPolicy: { priority: 'background' } }
+        this.#readOptions(BACKGROUND_READ)
       )
       .then((result) => {
-        if (this.#levelCountsScope !== scope) return this.levelCounts;
+        if (generation !== this.#generation || this.#levelCountsScope !== scope)
+          return this.levelCounts;
         this.levelCounts = Array.isArray(result) ? result : [];
         this.#levelCountsLoaded = true;
         return this.levelCounts;
       })
       .catch((error) => {
+        if (generation !== this.#generation) return this.levelCounts;
         // Leave the scope unloaded so a later mount retries instead of pinning
         // an empty level set for the session. Background work with a visible
         // fallback, so log without a toast.
@@ -313,6 +318,7 @@ class CollectionStore {
   #sortBy = null;
   #sortDirection = null;
   #boardSortMode = 'rank';
+  #boardPlacement = new Map();
   // Selected item-type hierarchy level for tree/map/roadmap. Null until the
   // view resolves a persisted or default level; hierarchy item fetches are
   // level-scoped and opt into has_children while it is set.
@@ -327,10 +333,11 @@ class CollectionStore {
   #wsId = null;
   #colId = null;
   #loadId = 0;
+  #generation = 0;
+  #controller = new AbortController();
+  #searchController = new AbortController();
   #changesWatermark = null;
-  #previousRouteKey = null;
   #currentView = null;
-  #unsubscribe = null;
   #boardConfigurationKey = null;
   #boardConfigurationPromise = null;
   #boardConfigurationLoaded = false;
@@ -344,52 +351,76 @@ class CollectionStore {
   #levelCountsPromise = null;
   #levelCountsLoaded = false;
 
-  constructor() {
-    this.#unsubscribe = currentRoute.subscribe(($route) => {
-      const view = $route.view;
+  reset() {
+    this.#generation += 1;
+    this.#loadId += 1;
+    this.#controller.abort();
+    this.#controller = new AbortController();
+    this.#clearScheduledReconciliation();
+    this.#reconcileInFlight = null;
+    this.#reconcilePending = false;
+    this.#wsId = null;
+    this.#colId = null;
+    this.#currentView = null;
+    this.items = [];
+    this.backlogItems = [];
+    this.collectionName = 'Default';
+    this.collectionTotal = null;
+    this.publicSlug = null;
+    this.loading = false;
+    this.itemsPagination = null;
+    this.itemsHasMore = false;
+    this.itemsLoadingMore = false;
+    this.boardBackgroundLoading = false;
+    this.boardDeferred = null;
+    this.backlogPagination = null;
+    this.backlogHasMore = false;
+    this.backlogLoadingMore = false;
+    this.subFilterQL = '';
+    this.subFilterRows = [];
+    this.showCompleted = false;
+    this.#sortBy = null;
+    this.#sortDirection = null;
+    this.#boardSortMode = 'rank';
+    this.#boardPlacement.clear();
+    this.sortableFields = [];
+    this.boardConfiguration = null;
+    this.boardCollection = null;
+    this.boardWorkspaceIds = [];
+    this.boardStatuses = [];
+    this.boardWorkspaceScopeLoaded = false;
+    this.#boardConfigurationKey = null;
+    this.#boardConfigurationPromise = null;
+    this.#boardConfigurationLoaded = false;
+    this.#changesWatermark = null;
+    this.#countGeneration += 1;
+    this.#countPending = null;
+    this.#countPendingGeneration = -1;
+    this.#countDirty = false;
+    this.hierarchyLevel = null;
+    this.levelCounts = [];
+    this.levelCountsLoading = false;
+    this.#levelCountsScope = null;
+    this.#levelCountsPromise = null;
+    this.#levelCountsLoaded = false;
+    this.clearSearch();
+    this.dataGeneration += 1;
+  }
 
-      // Global collection views: /collections/:id/board etc.
-      if (GLOBAL_COLLECTION_VIEWS.has(view)) {
-        const colId = $route.params?.id || null;
-        if (!colId) return;
-
-        const routeKey = `${view}-global-${colId}`;
-        if (routeKey === this.#previousRouteKey) return;
-        this.#previousRouteKey = routeKey;
-
-        this.load(null, colId, view);
-        return;
-      }
-
-      // Workspace collection views
-      const wsId = $route.params?.id;
-      const colId = $route.params?.collectionId || null;
-
-      if (!wsId || !COLLECTION_VIEWS.has(view)) {
-        // Navigated away from a collection view — clear the route key
-        // so that returning to the same collection triggers a fresh load.
-        this.#previousRouteKey = null;
-        this.#clearScheduledReconciliation();
-        return;
-      }
-
-      const routeKey = `${view}-${wsId}-${colId}`;
-      if (routeKey === this.#previousRouteKey) return;
-      this.#previousRouteKey = routeKey;
-
-      this.load(wsId, colId, view);
-    });
+  /** @param {typeof FOREGROUND_READ | typeof BACKGROUND_READ} [policy] */
+  #readOptions(policy = FOREGROUND_READ) {
+    return { ...policy, signal: this.#controller.signal };
   }
 
   /**
    * Initial load: fetches page 1 of items and backlog, resets all pagination state.
    */
   async load(wsId, colId, view = this.#currentView) {
+    if (wsId !== this.#wsId || colId !== this.#colId || view !== this.#currentView) this.reset();
     this.#clearScheduledReconciliation();
     const sameCollection = wsId === this.#wsId && colId === this.#colId;
     const viewChanged = view !== this.#currentView;
     const targetInitialLimit = initialItemsPageSize(view);
-    const previousShowCompleted = this.showCompleted;
     if (BOARD_VIEWS.has(view)) {
       this.showCompleted = true;
     } else if (!sameCollection || viewChanged) {
@@ -403,78 +434,6 @@ class CollectionStore {
       this.hierarchyLevel = this.#persistedHierarchyLevel(wsId, colId, view);
     }
 
-    // Switching between passive collection views does not need another network
-    // roundtrip when the already-loaded item page is large enough and there is
-    // no active server-side sort/filter. Board views fetch completed work
-    // separately, so they intentionally keep loading.
-    const canReuseTargetData =
-      loadsItems(view) &&
-      loadsItems(this.#currentView) &&
-      this.items.length > 0 &&
-      !this.boardDeferred &&
-      (this.itemsPagination?.limit ?? 0) >= targetInitialLimit;
-    if (
-      sameCollection &&
-      viewChanged &&
-      previousShowCompleted === this.showCompleted &&
-      !this.loading &&
-      !BOARD_VIEWS.has(this.#currentView) &&
-      canReuseTargetData &&
-      !this.subFilterQL &&
-      !this.#sortBy &&
-      !this.#sortDirection &&
-      !BOARD_VIEWS.has(view) &&
-      !HIERARCHY_VIEWS.has(view)
-    ) {
-      this.#currentView = view;
-      return;
-    }
-
-    // Clear all scope-owned state synchronously on workspace/collection changes.
-    // MainApp reuses collection view component instances, so retaining the old
-    // arrays until the next request resolves briefly renders one workspace's
-    // board in another workspace (and leaves it there if the request fails).
-    if (!sameCollection) {
-      this.items = [];
-      this.backlogItems = [];
-      this.collectionName = 'Default';
-      this.collectionTotal = null;
-      this.itemsPagination = null;
-      this.itemsHasMore = false;
-      this.itemsLoadingMore = false;
-      this.boardBackgroundLoading = false;
-      this.boardDeferred = null;
-      this.backlogPagination = null;
-      this.backlogHasMore = false;
-      this.backlogLoadingMore = false;
-      this.subFilterQL = '';
-      this.subFilterRows = [];
-      this.publicSlug = null;
-      this.#sortBy = null;
-      this.#sortDirection = null;
-      this.sortableFields = [];
-      this.boardConfiguration = null;
-      this.boardCollection = null;
-      this.boardWorkspaceIds = [];
-      this.boardStatuses = [];
-      this.boardWorkspaceScopeLoaded = false;
-      this.#boardConfigurationKey = null;
-      this.#boardConfigurationPromise = null;
-      this.#boardConfigurationLoaded = false;
-      this.#changesWatermark = null;
-      this.#countGeneration += 1;
-      this.#countPending = null;
-      this.#countPendingGeneration = -1;
-      this.#countDirty = false;
-      this.clearSearch();
-      // Level counts are scope-owned; dropping them here keeps another
-      // workspace's levels from painting during the next load.
-      this.levelCounts = [];
-      this.levelCountsLoading = false;
-      this.#levelCountsScope = null;
-      this.#levelCountsPromise = null;
-      this.#levelCountsLoaded = false;
-    }
     this.#wsId = wsId;
     this.#colId = colId;
     this.#currentView = view;
@@ -491,9 +450,12 @@ class CollectionStore {
         if (loadId !== this.#loadId) return;
       }
       const boardPartition = await this.#resolveBoardPartition(wsId, colId, view);
+      if (loadId !== this.#loadId) return;
       // Reuse the collection already fetched for this scope. A hierarchy level
       // change reloads the item page and must not repeat the metadata read.
-      const collection = colId ? (this.boardCollection ?? (await getCollection(colId))) : null;
+      const collection = colId
+        ? (this.boardCollection ?? (await getCollection(colId, this.#readOptions())))
+        : null;
       if (loadId !== this.#loadId) return; // stale
       // Keep the collection record available to view-scoped controls (shared
       // named views, configure affordances) on every collection view, not just
@@ -517,7 +479,7 @@ class CollectionStore {
               limit: DEFAULT_PAGE_SIZE,
               sub_ql: this.effectiveBacklogSubFilterQL || undefined,
               collection,
-              requestOptions: FOREGROUND_READ,
+              requestOptions: this.#readOptions(),
             })
           : Promise.resolve(null),
         loadsItems(view)
@@ -575,10 +537,13 @@ class CollectionStore {
    * this so their state shapes cannot drift apart.
    */
   #applyResults({ itemsResult, backlogResult, deferredResult, boardPartition, collection }) {
+    this.boardCollection = collection;
     if (itemsResult) {
       this.items = deferredResult
         ? [...itemsResult.items, ...deferredResult.items]
         : itemsResult.items;
+      this.#boardPlacement.clear();
+      if (BOARD_VIEWS.has(this.#currentView)) this.#recordBoardPlacement(this.items);
       this.boardDeferred = deferredResult
         ? {
             ...boardPartition,
@@ -597,6 +562,7 @@ class CollectionStore {
 
     if (backlogResult) {
       this.backlogItems = backlogResult.items;
+      if (BOARD_VIEWS.has(this.#currentView)) this.#recordBoardPlacement(this.backlogItems);
       this.backlogPagination = backlogResult.pagination;
       this.backlogHasMore = calcHasMore(backlogResult.pagination);
       if (!itemsResult) {
@@ -630,7 +596,11 @@ class CollectionStore {
 
   async #runCollectionTotal(generation) {
     try {
-      const result = await fetchCollectionTotal(this.#wsId, this.#colId, BACKGROUND_READ);
+      const result = await fetchCollectionTotal(
+        this.#wsId,
+        this.#colId,
+        this.#readOptions(BACKGROUND_READ)
+      );
       if (generation !== this.#countGeneration) return;
       if (result?.total != null) this.collectionTotal = result.total;
       this.#changesWatermark = minimumWatermark(this.#changesWatermark, result?.watermark);
@@ -657,9 +627,11 @@ class CollectionStore {
    * completed statuses are paged separately and cannot hide active work.
    */
   async #resolveBoardPartition(wsId, colId, view) {
+    const generation = this.#generation;
     if (!BOARD_VIEWS.has(view) || !this.showCompleted) return null;
     try {
       const config = await this.getBoardConfiguration(wsId, colId);
+      if (generation !== this.#generation) return null;
       let statuses = this.boardStatuses;
       if (statuses.length === 0) {
         if (wsId) {
@@ -715,6 +687,7 @@ class CollectionStore {
           }
         : null;
     } catch (error) {
+      if (generation !== this.#generation || isExpectedBackgroundSyncError(error)) return null;
       if (error?.status !== 404) {
         console.error('[collectionStore] board configuration lookup failed:', error);
       }
@@ -723,6 +696,7 @@ class CollectionStore {
   }
 
   async getBoardConfiguration(wsId = this.#wsId, colId = this.#colId, { force = false } = {}) {
+    const generation = this.#generation;
     const key = `${colId ?? ''}|${wsId ?? ''}`;
     if (!force && this.#boardConfigurationLoaded && this.#boardConfigurationKey === key) {
       return this.boardConfiguration;
@@ -735,14 +709,14 @@ class CollectionStore {
     this.#boardConfigurationLoaded = false;
     this.boardWorkspaceScopeLoaded = false;
     const request = collections
-      .getBoardConfigurationBootstrap(colId || null, wsId || null)
+      .getBoardConfigurationBootstrap(colId || null, wsId || null, this.#readOptions())
       .catch((error) => {
         if (error?.status !== 404) throw error;
         return null;
       })
       .then((bootstrap) => {
         const config = bootstrap?.board_configuration ?? null;
-        if (this.#boardConfigurationKey === key) {
+        if (generation === this.#generation && this.#boardConfigurationKey === key) {
           this.boardConfiguration = config;
           this.boardCollection = bootstrap?.collection ?? null;
           this.boardWorkspaceIds = Array.isArray(bootstrap?.referenced_workspace_ids)
@@ -801,7 +775,7 @@ class CollectionStore {
         limit: pageLimit,
         sub_ql: this.effectiveSubFilterQL || undefined,
         collection,
-        requestOptions: FOREGROUND_READ,
+        requestOptions: this.#readOptions(),
         ...this.#hierarchyFilters(),
         ...this.#itemSortOptions(),
         ...this.#boardExclusionFilter(boardPartition?.statusIds ?? null),
@@ -820,7 +794,7 @@ class CollectionStore {
     try {
       for (let page = 2; page <= totalPages; page++) {
         if (loadedCount >= BOARD_UNTHROTTLED_ITEM_COUNT) {
-          await delay(BOARD_BACKGROUND_PAGE_DELAY_MS);
+          await delay(BOARD_BACKGROUND_PAGE_DELAY_MS, this.#controller.signal);
         }
         if (loadId !== this.#loadId) return;
 
@@ -829,13 +803,14 @@ class CollectionStore {
           limit: BOARD_UNFINISHED_PAGE_SIZE,
           sub_ql: this.effectiveSubFilterQL || undefined,
           collection,
-          requestOptions: BACKGROUND_READ,
+          requestOptions: this.#readOptions(BACKGROUND_READ),
           ...this.#itemSortOptions(),
           ...this.#boardExclusionFilter(boardPartition?.statusIds),
         });
         if (loadId !== this.#loadId) return;
 
         this.items = appendUniqueItems(this.items, result.items);
+        this.#recordBoardPlacement(result.items);
         this.itemsPagination = result.pagination;
         if (!this.boardDeferred) this.itemsHasMore = calcHasMore(result.pagination);
         this.#changesWatermark = minimumWatermark(this.#changesWatermark, result.watermark ?? 0);
@@ -861,7 +836,7 @@ class CollectionStore {
       limit,
       sub_ql: subQL,
       collection,
-      requestOptions: FOREGROUND_READ,
+      requestOptions: this.#readOptions(),
     });
     const totalPages = first.pagination?.total_pages ?? 1;
     const pages = [first];
@@ -873,7 +848,7 @@ class CollectionStore {
         limit,
         sub_ql: subQL,
         collection,
-        requestOptions: BACKGROUND_READ,
+        requestOptions: this.#readOptions(BACKGROUND_READ),
       });
       pages.push(result);
       if (result.items.length === 0) break;
@@ -948,7 +923,7 @@ class CollectionStore {
     let loadedCount = first.items.length;
     for (let page = 2; page <= totalPages; page++) {
       if (loadedCount >= BOARD_UNTHROTTLED_ITEM_COUNT) {
-        await delay(BOARD_BACKGROUND_PAGE_DELAY_MS);
+        await delay(BOARD_BACKGROUND_PAGE_DELAY_MS, this.#controller.signal);
       }
       if (loadId !== this.#loadId) return first;
 
@@ -957,7 +932,7 @@ class CollectionStore {
         limit: BOARD_UNFINISHED_PAGE_SIZE,
         sub_ql: this.effectiveSubFilterQL || undefined,
         collection,
-        requestOptions: BACKGROUND_READ,
+        requestOptions: this.#readOptions(BACKGROUND_READ),
         ...this.#itemSortOptions(),
         ...this.#boardExclusionFilter(boardPartition?.statusIds),
       });
@@ -988,7 +963,7 @@ class CollectionStore {
       limit,
       sub_ql: this.effectiveSubFilterQL || undefined,
       collection,
-      requestOptions: FOREGROUND_READ,
+      requestOptions: this.#readOptions(),
       status_id: boardPartition.statusIds.join(','),
       completed_activity_days: boardPartition.completedActivityDays || undefined,
       ...this.#itemSortOptions(),
@@ -1028,6 +1003,8 @@ class CollectionStore {
   }
 
   clearSearch() {
+    this.#searchController.abort();
+    this.#searchController = new AbortController();
     this.#searchId++;
     this.#searchQuery = '';
     this.searchItems = [];
@@ -1038,6 +1015,7 @@ class CollectionStore {
   }
 
   async runSearch(query) {
+    this.clearSearch();
     const normalized = query.trim();
     if (!normalized) {
       this.clearSearch();
@@ -1099,7 +1077,7 @@ class CollectionStore {
       search: query,
       sub_ql: this.effectiveSubFilterQL || undefined,
       collection: this.boardCollection ?? undefined,
-      requestOptions: FOREGROUND_READ,
+      requestOptions: { ...FOREGROUND_READ, signal: this.#searchController.signal },
       ...this.#itemSortOptions(),
     });
   }
@@ -1133,9 +1111,10 @@ class CollectionStore {
     try {
       const result = await fetchCollectionItems(this.#wsId, this.#colId, {
         page: nextPage,
+        collection: this.boardCollection ?? undefined,
         limit: pagination?.limit ?? DEFAULT_PAGE_SIZE,
         sub_ql: this.effectiveSubFilterQL || undefined,
-        requestOptions: BACKGROUND_READ,
+        requestOptions: this.#readOptions(BACKGROUND_READ),
         ...this.#hierarchyFilters(),
         ...this.#itemSortOptions(),
         ...(deferred
@@ -1160,6 +1139,7 @@ class CollectionStore {
       this.itemsHasMore = this.#hasMoreItems();
       this.#changesWatermark = minimumWatermark(this.#changesWatermark, result.watermark ?? 0);
     } catch (error) {
+      if (loadId !== this.#loadId || isExpectedBackgroundSyncError(error)) return;
       console.error('[collectionStore] loadMoreItems failed:', error);
     } finally {
       if (loadId === this.#loadId) {
@@ -1181,19 +1161,22 @@ class CollectionStore {
     try {
       const result = await fetchCollectionBacklog(this.#wsId, this.#colId, {
         page: nextPage,
+        collection: this.boardCollection ?? undefined,
         limit: this.backlogPagination?.limit ?? DEFAULT_PAGE_SIZE,
         sub_ql: this.effectiveBacklogSubFilterQL || undefined,
-        requestOptions: BACKGROUND_READ,
+        requestOptions: this.#readOptions(BACKGROUND_READ),
       });
 
       if (loadId !== this.#loadId) return;
       this.backlogItems = [...this.backlogItems, ...result.items];
+      if (BOARD_VIEWS.has(this.#currentView)) this.#recordBoardPlacement(result.items);
       this.backlogPagination = result.pagination;
       this.backlogHasMore = result.pagination
         ? result.pagination.page < result.pagination.total_pages
         : false;
       this.#changesWatermark = minimumWatermark(this.#changesWatermark, result.watermark ?? 0);
     } catch (error) {
+      if (loadId !== this.#loadId || isExpectedBackgroundSyncError(error)) return;
       console.error('[collectionStore] loadMoreBacklog failed:', error);
     } finally {
       if (loadId === this.#loadId) {
@@ -1214,8 +1197,9 @@ class CollectionStore {
       const result = await fetchCollectionItems(this.#wsId, this.#colId, {
         page,
         limit,
+        collection: this.boardCollection ?? undefined,
         sub_ql: this.effectiveSubFilterQL || undefined,
-        requestOptions: FOREGROUND_READ,
+        requestOptions: this.#readOptions(),
         ...this.#itemSortOptions(),
       });
 
@@ -1271,10 +1255,11 @@ class CollectionStore {
         this.#colId,
         this.#currentView
       );
+      if (loadId !== this.#loadId) return false;
       const collection = this.#colId
         ? BOARD_VIEWS.has(this.#currentView)
-          ? (this.boardCollection ?? (await getCollection(this.#colId)))
-          : await getCollection(this.#colId)
+          ? (this.boardCollection ?? (await getCollection(this.#colId, this.#readOptions())))
+          : await getCollection(this.#colId, this.#readOptions())
         : null;
       if (loadId !== this.#loadId) return false;
 
@@ -1391,18 +1376,30 @@ class CollectionStore {
   }
 
   /**
-   * Clear the route guard so the next navigation always triggers a fresh load.
+   * Discard the active read projection.
    */
   invalidate() {
-    this.#previousRouteKey = null;
+    this.reset();
+  }
+
+  invalidateCollectionMetadata() {
+    if (!this.#colId) return;
+    const workspace = this.#wsId;
+    const collection = this.#colId;
+    const view = this.#currentView;
+    this.reset();
+    void this.load(workspace, collection, view);
   }
 
   async refreshItem(itemId) {
+    const generation = this.#generation;
     try {
-      const updated = await itemsApi.get(itemId);
+      const updated = await itemsApi.get(itemId, this.#readOptions());
+      if (generation !== this.#generation) return;
       this.#applyUpdatedItem(updated);
       await this.#requestCollectionTotal();
     } catch (e) {
+      if (generation !== this.#generation || isExpectedBackgroundSyncError(e)) return;
       console.error('[collectionStore] refreshItem failed:', e);
     }
   }
@@ -1489,6 +1486,7 @@ class CollectionStore {
    * once after it settles.
    */
   refreshDeltas() {
+    const generation = this.#generation;
     if (!canRunBackgroundSync()) {
       this.scheduleLocalReconciliation();
       return Promise.resolve(false);
@@ -1500,6 +1498,7 @@ class CollectionStore {
     const run = this.#fetchDeltas();
     this.#reconcileInFlight = run;
     const settle = () => {
+      if (generation !== this.#generation) return;
       if (this.#reconcileInFlight === run) this.#reconcileInFlight = null;
       if (this.#reconcilePending) {
         this.#reconcilePending = false;
@@ -1526,6 +1525,7 @@ class CollectionStore {
       }
 
       const changes = await fetchCollectionItemChanges(this.#wsId, this.#colId, {
+        requestOptions: this.#readOptions(BACKGROUND_READ),
         since: this.#changesWatermark,
         sub_ql:
           (BACKLOG_VIEWS.has(this.#currentView)
@@ -1562,6 +1562,14 @@ class CollectionStore {
 
       const hasNewVisibleItem = loadedChangedIds.length !== changedIds.length;
       const touchesBacklog = loadedChangedIds.some((id) => loadedBacklogIds.has(id));
+      if (BOARD_VIEWS.has(this.#currentView) && !hasNewVisibleItem) {
+        const patched = await this.#patchStableBoardRows(loadedChangedIds, loadId);
+        if (loadId !== this.#loadId) return false;
+        if (patched) {
+          this.#changesWatermark = nextWatermark;
+          return true;
+        }
+      }
       const usesServerOrderedItems =
         BOARD_VIEWS.has(this.#currentView) ||
         (LIST_VIEWS.has(this.#currentView) && (this.#sortBy || this.#sortDirection));
@@ -1569,7 +1577,10 @@ class CollectionStore {
         return await this.refresh();
       }
 
-      const updatedItems = await fetchItemsById(loadedChangedIds);
+      const updatedItems = await fetchItemsById(
+        loadedChangedIds,
+        this.#readOptions(BACKGROUND_READ)
+      );
       if (loadId !== this.#loadId) return false;
       for (const updated of updatedItems) {
         this.#applyUpdatedItem(updated);
@@ -1579,11 +1590,13 @@ class CollectionStore {
       this.items = [...this.items];
       this.backlogItems = [...this.backlogItems];
       await this.#requestCollectionTotal();
+      if (loadId !== this.#loadId) return false;
       // Commit the cursor only after the patch applied successfully so a
       // failure preserves the previous cursor for replay.
       this.#changesWatermark = nextWatermark;
       return true;
     } catch (error) {
+      if (loadId !== this.#loadId) return false;
       if (!isExpectedBackgroundSyncError(error)) {
         console.error('[collectionStore] Delta refresh failed:', error);
       }
@@ -1626,6 +1639,7 @@ class CollectionStore {
     const wsId = this.#wsId;
     const colId = this.#colId;
     const changes = await fetchCollectionItemChanges(wsId, colId, {
+      requestOptions: this.#readOptions(BACKGROUND_READ),
       sub_ql:
         (BACKLOG_VIEWS.has(this.#currentView)
           ? this.effectiveBacklogSubFilterQL
@@ -1643,6 +1657,66 @@ class CollectionStore {
     if (bIdx !== -1) Object.assign(this.backlogItems[bIdx], updated);
     const searchIdx = this.searchItems.findIndex((i) => i.id === updated.id);
     if (searchIdx !== -1) Object.assign(this.searchItems[searchIdx], updated);
+  }
+
+  #placementKey(item) {
+    if (item?.workspace_id == null || item?.status_id == null || !item?.frac_index) return null;
+    return JSON.stringify([
+      item.workspace_id,
+      item.status_id,
+      item.frac_index,
+      item.parent_id ?? null,
+      item.item_type_id ?? null,
+    ]);
+  }
+
+  #recordBoardPlacement(items) {
+    for (const item of items) this.#boardPlacement.set(item.id, this.#placementKey(item));
+  }
+
+  async #patchStableBoardRows(ids, loadId) {
+    // Rank and partition keys must still match the last authoritative page,
+    // not an optimistic mutation of its rows. Bubble/partial partitions reload.
+    if (
+      this.#boardSortMode !== 'rank' ||
+      this.boardBackgroundLoading ||
+      this.itemsLoadingMore ||
+      this.backlogLoadingMore
+    )
+      return false;
+    const deferred = new Set(this.boardDeferred?.statusIds ?? []);
+    const loaded = new Map([...this.backlogItems, ...this.items].map((item) => [item.id, item]));
+    if (ids.some((id) => !this.#boardPlacement.get(id) || deferred.has(loaded.get(id)?.status_id)))
+      return false;
+    const idFilter = `id IN (${ids.join(',')})`;
+    const subQL = this.effectiveSubFilterQL;
+    const result = await fetchCollectionItems(this.#wsId, this.#colId, {
+      page: 1,
+      limit: ids.length,
+      collection: this.boardCollection ?? undefined,
+      sub_ql: subQL ? `(${subQL}) AND (${idFilter})` : idFilter,
+      requestOptions: this.#readOptions(BACKGROUND_READ),
+    });
+    if (loadId !== this.#loadId) return false;
+    const snapshots = new Map(result.items.map((item) => [item.id, item]));
+    if (
+      snapshots.size !== ids.length ||
+      result.pagination?.total_items !== ids.length ||
+      ids.some((id) => this.#placementKey(snapshots.get(id)) !== this.#boardPlacement.get(id))
+    )
+      return false;
+    // The scoped v2 list proves current membership; equal rank/partition keys
+    // prove this patch cannot move page boundaries or change board totals.
+    const searched = new Map(this.searchItems.map((item) => [item.id, item]));
+    const backlog = new Map(this.backlogItems.map((item) => [item.id, item]));
+    for (const id of ids) {
+      Object.assign(loaded.get(id), snapshots.get(id));
+      if (backlog.has(id)) Object.assign(backlog.get(id), snapshots.get(id));
+      if (searched.has(id)) Object.assign(searched.get(id), snapshots.get(id));
+    }
+    this.items = [...this.items];
+    this.backlogItems = [...this.backlogItems];
+    return true;
   }
 
   #hideCompletedItem(item) {
@@ -1737,14 +1811,12 @@ class CollectionStore {
   }
 
   destroy() {
-    if (this.#unsubscribe) {
-      this.#unsubscribe();
-    }
-    this.#clearScheduledReconciliation();
+    this.reset();
   }
 }
 
 export const collectionStore = new CollectionStore();
+onCollectionsChanged(() => collectionStore.invalidateCollectionMetadata());
 
 /** Trigger a background refresh preserving current pagination */
 export function reloadCollection() {

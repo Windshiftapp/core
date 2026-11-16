@@ -44,10 +44,27 @@ export function getMainAppWorkspaceRedirect(currentRoute, activeWorkspace) {
   if (currentRoute.view !== 'workspace-detail' || !activeWorkspace) return null;
   const workspaceId = currentRoute.params?.id;
   if (!workspaceId) return null;
+  if (String(activeWorkspace.id) !== String(workspaceId)) return null;
 
   const collectionId = currentRoute.params?.collectionId;
   const base = collectionId
     ? `/workspaces/${workspaceId}/collections/${collectionId}`
     : `/workspaces/${workspaceId}`;
   return `${base}/${activeWorkspace.default_view || 'board'}`;
+}
+
+export function mainAppNavigationIdentity(route, personalWorkspaceId) {
+  const context = resolveMainAppWorkspaceContext(route, personalWorkspaceId);
+  const params = route.params ?? {};
+  const collectionId = context.kind === 'global-collection' ? params.id : params.collectionId;
+  const entities = Object.entries(params)
+    .filter(([key]) => key !== 'id' && key !== 'collectionId')
+    .sort(([a], [b]) => a.localeCompare(b));
+  return JSON.stringify([
+    context.kind,
+    context.workspaceId ? Number(context.workspaceId) : null,
+    collectionId ? String(collectionId) : null,
+    route.view,
+    entities,
+  ]);
 }

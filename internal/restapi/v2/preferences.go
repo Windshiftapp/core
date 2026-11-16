@@ -16,6 +16,7 @@ func registerPreferenceRoutes(builder *routeBuilder, preferences preferencesAppl
 }
 
 type preferencesDTO struct {
+	WeekStart    string                    `json:"week_start"`
 	Calendar     string                    `json:"calendar"`
 	ColorMode    string                    `json:"color_mode"`
 	ThemeID      *int                      `json:"theme_id"`
@@ -38,6 +39,7 @@ type tuiPreferencesPatch struct {
 }
 
 type preferencesPatchRequest struct {
+	WeekStart    Optional[string]                    `json:"week_start"`
 	Calendar     Optional[string]                    `json:"calendar"`
 	ColorMode    Optional[string]                    `json:"color_mode"`
 	ThemeID      Optional[int]                       `json:"theme_id"`
@@ -75,12 +77,16 @@ func updatePreferences(preferences preferencesApplication) jsonOperation[prefere
 			return preferencesDTO{}, newError(http.StatusBadRequest, "invalid_request", "color_mode cannot be null")
 		}
 		patch := services.UserPreferencesPatch{
+			WeekStartSet: input.WeekStart.Set, WeekStart: input.WeekStart.Value,
 			CalendarSet: input.Calendar.Set, Calendar: input.Calendar.Value,
 			ColorModeSet: input.ColorMode.Set, ColorMode: input.ColorMode.Value,
 			ThemeIDSet: input.ThemeID.Set,
 		}
 		if input.Calendar.Null {
 			patch.Calendar = "auto"
+		}
+		if input.WeekStart.Null {
+			patch.WeekStart = "auto"
 		}
 		if input.ThemeID.Set && !input.ThemeID.Null {
 			patch.ThemeID = &input.ThemeID.Value
@@ -147,7 +153,8 @@ func preferencesFromSnapshot(snapshot services.UserPreferencesSnapshot) preferen
 		savedFilters = map[string]any{}
 	}
 	return preferencesDTO{
-		Calendar: snapshot.Calendar, ColorMode: snapshot.ColorMode, ThemeID: snapshot.ThemeID,
+		WeekStart: snapshot.WeekStart,
+		Calendar:  snapshot.Calendar, ColorMode: snapshot.ColorMode, ThemeID: snapshot.ThemeID,
 		Theme: snapshot.Theme, TUI: snapshot.TUI,
 		ViewState: viewState, SavedFilters: savedFilters,
 		DueDateRemindersEnabled: snapshot.DueDateRemindersEnabled,
@@ -161,6 +168,8 @@ func preferenceMutationError(err error) error {
 	case errors.Is(err, repository.ErrConcurrentUpdate):
 		return newError(http.StatusConflict, "conflict", "Preferences changed concurrently; retry")
 	case errors.Is(err, services.ErrInvalidCalendar):
+		return newError(http.StatusBadRequest, "invalid_request", err.Error())
+	case errors.Is(err, services.ErrInvalidWeekStart):
 		return newError(http.StatusBadRequest, "invalid_request", err.Error())
 	case errors.Is(err, services.ErrInvalidColorMode):
 		return newError(http.StatusBadRequest, "invalid_request", "color_mode must be light, dark, or system")

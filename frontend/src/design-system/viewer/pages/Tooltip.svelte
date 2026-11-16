@@ -9,7 +9,7 @@
 <div class="p-8 max-w-6xl">
   <h1 class="text-2xl font-bold mb-2" style="color: var(--ds-text);">Tooltip</h1>
   <p class="mb-8" style="color: var(--ds-text-subtle);">
-    Tooltip component built on Melt UI for displaying helpful information on hover.
+    Tooltips open on hover or keyboard focus on the actual trigger, dismiss with Escape and remain hoverable. No wrapper tab stop is added. Descriptions belong to the trigger only while the tooltip exists; names must remain available independently. Button uses ariaLabel, visible text or a title fallback for icon-only content. Supply triggerElement for snippets containing multiple controls.
   </p>
 
   <!-- Basic Usage -->

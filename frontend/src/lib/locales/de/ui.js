@@ -416,9 +416,11 @@ export default {
       items: 'Vorgänge',
     },
     completionChart: {
+      definition: 'Erster erfasster Abschluss pro Woche (UTC). Erneutes Öffnen wird nicht doppelt gezählt.',
       emptyMessage: 'Keine Abschlussdaten verfügbar',
     },
     createdChart: {
+      definition: 'Erstellt in den letzten sieben UTC-Tagen, einschließlich heute.',
       emptyMessage: 'Keine Erstellungsdaten verfügbar',
     },
     savedSearch: {

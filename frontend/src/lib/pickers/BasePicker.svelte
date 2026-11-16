@@ -1,5 +1,6 @@
 <script>
   import { untrack } from 'svelte';
+  import { fieldControl } from '../utils/fieldContext.svelte.js';
   import { createCombobox, melt } from '@melt-ui/svelte';
   import Check from '@lucide/svelte/icons/check';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
@@ -9,6 +10,8 @@
   import { t } from '../stores/i18n.svelte.js';
   import { controlSizeClasses } from '../utils/controlSizes.js';
   import { useRowRetention } from '../virtualization/useRowRetention.svelte';
+  import { createOwnedPopup } from '../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
 
   let {
     // Core props
@@ -23,6 +26,9 @@
     placeholder = '',
     label = '',
     ariaLabel = undefined,
+    ariaDescribedby = undefined,
+    ariaInvalid = undefined,
+    required = false,
     class: className = '',
 
     // Feature toggles
@@ -65,6 +71,7 @@
     //   menuTestid — the portalled menu container
     //   scrollTestid — the option-list scroll container
     inputTestid = undefined,
+    triggerTestid = undefined,
     searchTestid = undefined,
     searchPlaceholder = '',
     optionTestid = null,
@@ -102,6 +109,7 @@
     onCancel = () => {},
     onChange = () => {}
   } = $props();
+  const field = fieldControl(() => ({ id, ariaDescribedby, ariaInvalid, required, ariaLabel }));
 
   // Popover mode: when a children snippet is provided the trigger is custom
   // and the search input lives inside the dropdown.
@@ -388,15 +396,13 @@
       // Return focus to the in-modal trigger so the next Tab continues inside
       // the dialog instead of escaping behind it (WI-455).
       restoreFocusToTrigger();
-      onCancel();
+      $open = false;
+      if ($selected || multiple) onCancel();
       return;
     }
 
-    // Tab is intentionally left to native handling: when closed it advances to
-    // the next field (no trap, WI-445); when open the user selects with Enter
-    // rather than tabbing out. Focus is kept inside the modal by restoring it to
-    // the trigger on select/Escape (see restoreFocusToTrigger), not by
-    // intercepting Tab.
+    // The modal scope handles Tab across the popup and its in-dialog trigger.
+    if (event.key === 'Tab') return;
 
     const totalItems = visibleOptions.length;
 
@@ -433,24 +439,26 @@
 
   // Notify callers whenever the dropdown closes. Preserve the legacy
   // single-select cancellation callback for closes without a selection.
-  let wasOpen = $state(false);
+  let wasOpen = false;
   $effect(() => {
-    if (wasOpen && !$open) {
-      onClose();
-      if (!$selected && !multiple) {
-        onCancel();
+    const isOpen = $open;
+    let focusTimer;
+    untrack(() => {
+      if (wasOpen && !isOpen) {
+        onClose();
+        if (!$selected && !multiple) onCancel();
       }
-    }
-    if (!wasOpen && $open) {
-      highlightedIndex = 0;
-      onOpen();
-      // Remember focus before entering the portalled dropdown.
-      activeElementBeforeOpen = document.activeElement;
-      if (popoverMode) {
-        setTimeout(() => searchInputRef?.focus(), 50);
+      if (!wasOpen && isOpen) {
+        highlightedIndex = 0;
+        onOpen();
+        activeElementBeforeOpen = document.activeElement;
+        if (popoverMode) {
+          focusTimer = setTimeout(() => { if ($open) searchInputRef?.focus({ preventScroll: true }); }, 50);
+        }
       }
-    }
-    wasOpen = $open;
+      wasOpen = isOpen;
+    });
+    return () => clearTimeout(focusTimer);
   });
 
   // Restore focus after unmount so portalled menus cannot drop Tab navigation
@@ -464,7 +472,7 @@
         // useful. A user may already have moved to the next field before this
         // frame runs; never steal focus back from that newer target.
         if (!active || active === document.body || menuRef?.contains(active)) {
-          target.focus();
+          target.focus({ preventScroll: true });
         }
       });
     }
@@ -568,6 +576,13 @@
              class="absolute inset-0 w-full h-full opacity-0 pointer-events-none" />
       <div
         role="combobox"
+        id={field.id}
+        aria-label={ariaLabel}
+        aria-labelledby={field.labelledby}
+        aria-describedby={field.describedby}
+        aria-invalid={field.invalid}
+        aria-required={field.ariaRequired || undefined}
+        data-testid={triggerTestid}
         tabindex={disabled ? -1 : 0}
         aria-expanded={$open}
         aria-controls={$menu.id}
@@ -604,7 +619,8 @@
           </button>
         </div>
       {/each}
-      <input bind:this={inputRef} use:melt={$input} {id} type="text"
+      <input bind:this={inputRef} use:melt={$input} id={field.id} type="text"
+             aria-labelledby={field.labelledby} aria-describedby={field.describedby} aria-invalid={field.invalid} aria-required={field.ariaRequired || undefined}
              data-testid={inputTestid}
              placeholder={selectedItems.length === 0 ? resolvedPlaceholder : ''}
              {disabled} aria-label={ariaLabel} onkeydowncapture={handleKeydown}
@@ -617,7 +633,8 @@
     </div>
   {:else}
     <!-- Single-select: Input/Trigger (original combobox mode) -->
-    <input use:melt={$input} {id} type="text" placeholder={resolvedPlaceholder} {disabled}
+    <input use:melt={$input} id={field.id} type="text" placeholder={resolvedPlaceholder} {disabled}
+           aria-labelledby={field.labelledby} aria-describedby={field.describedby} aria-invalid={field.invalid} aria-required={field.ariaRequired || undefined}
            data-testid={inputTestid}
            aria-label={ariaLabel}
            onkeydowncapture={handleKeydown}
@@ -640,7 +657,9 @@
 
   <!-- Dropdown Menu -->
   {#if $open}
-    <div bind:this={menuRef} use:melt={$menu} data-testid={menuTestid || 'picker-dropdown'}
+    <div bind:this={menuRef} use:melt={$menu}
+         use:ownedPopup={{ trigger: () => activeElementBeforeOpen, close: () => { $open = false; }, keepTabStops: keepOpenOnFooterTab }}
+         data-testid={menuTestid || 'picker-dropdown'}
          class="fixed z-[70] min-w-[250px] rounded border shadow-lg flex flex-col overflow-y-auto overscroll-contain"
          style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
       {#if popoverMode}

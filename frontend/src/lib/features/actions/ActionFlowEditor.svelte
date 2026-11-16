@@ -17,6 +17,7 @@
   import Send from '@lucide/svelte/icons/send';
   import FileText from '@lucide/svelte/icons/file-text';
   import Tag from '@lucide/svelte/icons/tag';
+  import Code from '@lucide/svelte/icons/code';
   import X from '@lucide/svelte/icons/x';
   import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import { actionCapabilities } from '../../api/ai.js';
@@ -48,7 +49,9 @@
   import NotifyCustomerNode from './nodes/NotifyCustomerNode.svelte';
   import InsertCannedResponseNode from './nodes/InsertCannedResponseNode.svelte';
   import AdjustLabelsNode from './nodes/AdjustLabelsNode.svelte';
+  import ExecuteScriptNode from './nodes/ExecuteScriptNode.svelte';
   import CreateMilestoneConfigPanel from './CreateMilestoneConfigPanel.svelte';
+  import ScriptConfigPanel from './ScriptConfigPanel.svelte';
   import UpdateAssetConfigPanel from './UpdateAssetConfigPanel.svelte';
   import CreateAssetConfigPanel from './CreateAssetConfigPanel.svelte';
   import PlaceholderReferenceModal from './PlaceholderReferenceModal.svelte';
@@ -130,6 +133,7 @@
     notify_customer: NotifyCustomerNode,
     insert_canned_response: InsertCannedResponseNode,
     adjust_labels: AdjustLabelsNode,
+    execute_script: ExecuteScriptNode,
   };
 
   // Mirror each node's accentColor in the minimap so the overview reflects
@@ -154,6 +158,7 @@
     notify_customer: 'magenta',
     insert_canned_response: 'orange',
     adjust_labels: 'purple',
+    execute_script: 'cyan',
   };
 
   function minimapNodeColor(node) {
@@ -192,6 +197,7 @@
     notify_customer: Send,
     insert_canned_response: FileText,
     adjust_labels: Tag,
+    execute_script: Code,
   };
 
   // i18n keys for node types. When a type isn't in this map, the palette
@@ -216,6 +222,7 @@
     notify_customer: 'actions.nodes.notifyCustomer',
     insert_canned_response: 'actions.nodes.insertCannedResponse',
     adjust_labels: 'actions.nodes.adjustLabels',
+    execute_script: 'actions.nodes.executeScript',
   };
 
   // nodePalette is built from the catalog response on mount. Trigger nodes
@@ -1110,6 +1117,8 @@
       <CreateAssetConfigPanel {selectedNode} flowStore={store} bind:showPlaceholderModal />
     {:else if selectedNode.type === 'create_milestone'}
       <CreateMilestoneConfigPanel {selectedNode} flowStore={store} bind:showPlaceholderModal />
+    {:else if selectedNode.type === 'execute_script'}
+      <ScriptConfigPanel {selectedNode} flowStore={store} />
     {:else if selectedNode.type === 'notify_customer'}
       <div>
         <label for="config-notify-customer-subject" class="block text-xs font-medium mb-1">{t('actions.config.notifySubject')}</label>

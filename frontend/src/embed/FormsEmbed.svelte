@@ -1,4 +1,5 @@
 <script>
+  import { brandStyle } from '../lib/utils/brandStyle.js';
   import { onMount } from 'svelte';
   import AlertBox from '../lib/components/AlertBox.svelte';
   import Button from '../lib/components/Button.svelte';
@@ -292,9 +293,9 @@
 
 <div
   class="wsf-root"
-  class:ds-brand-scope={Boolean(brandColor)}
+  class:ds-brand-scope={Boolean(brandStyle(brandColor))}
   data-ds-color-mode={effectiveTheme}
-  style={brandColor ? `--ds-brand-color: ${brandColor}` : undefined}
+  style={brandStyle(brandColor)}
 >
   <div class="wsf-card">
     {#if loading}

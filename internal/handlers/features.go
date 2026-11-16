@@ -26,15 +26,18 @@ func NewFeaturesHandler(pluginManager *plugins.Manager, sshEnabled bool, control
 // Snapshot returns feature discovery data for callers that need to compose it
 // into a larger response without making an internal HTTP request.
 func (h *FeaturesHandler) Snapshot() FeaturesResponse {
+	policy := h.controls.Snapshot()
 	resp := FeaturesResponse{
-		Edition:          "community",
-		SAMLAvailable:    true,
-		LDAPAvailable:    h.controls.Allowed(operatorcontrols.LDAP),
-		SCIMAvailable:    true,
-		SSHAvailable:     h.sshEnabled,
-		Plugins:          make([]string, 0),
-		Capabilities:     make([]string, 0),
-		OperatorControls: h.controls.Snapshot(),
+		Edition:       "community",
+		SAMLAvailable: true,
+		LDAPAvailable: h.controls.Allowed(operatorcontrols.LDAP),
+		SCIMAvailable: true,
+		SSHAvailable:  h.sshEnabled,
+		Plugins:       make([]string, 0),
+		Capabilities:  make([]string, 0),
+		OperatorControls: FeatureOperatorControls{
+			Deny: policy.Deny, MailMode: policy.MailMode, MailSuspended: policy.MailSuspended,
+		},
 	}
 
 	if h.pluginManager != nil {
@@ -48,16 +51,23 @@ func (h *FeaturesHandler) Snapshot() FeaturesResponse {
 	return resp
 }
 
+// FeatureOperatorControls is the public capability projection, not the admin policy.
+type FeatureOperatorControls struct {
+	Deny          []operatorcontrols.Capability `json:"deny"`
+	MailMode      string                        `json:"mail_mode,omitempty"`
+	MailSuspended bool                          `json:"mail_suspended,omitempty"`
+}
+
 // FeaturesResponse represents the available features and installed plugins.
 type FeaturesResponse struct {
-	OperatorControls operatorcontrols.Snapshot `json:"operator_controls"`
-	Edition          string                    `json:"edition"`
-	SAMLAvailable    bool                      `json:"saml_available"`
-	LDAPAvailable    bool                      `json:"ldap_available"`
-	SCIMAvailable    bool                      `json:"scim_available"`
-	SSHAvailable     bool                      `json:"ssh_available"`
-	Plugins          []string                  `json:"plugins"`
-	Capabilities     []string                  `json:"capabilities"`
+	OperatorControls FeatureOperatorControls `json:"operator_controls"`
+	Edition          string                  `json:"edition"`
+	SAMLAvailable    bool                    `json:"saml_available"`
+	LDAPAvailable    bool                    `json:"ldap_available"`
+	SCIMAvailable    bool                    `json:"scim_available"`
+	SSHAvailable     bool                    `json:"ssh_available"`
+	Plugins          []string                `json:"plugins"`
+	Capabilities     []string                `json:"capabilities"`
 }
 
 // GetFeatures handles GET /api/features (public, no auth required).

@@ -1,4 +1,5 @@
 <script>
+  import { brandStyle } from '../../utils/brandStyle.js';
   import { untrack } from 'svelte';
   import StateDisplay from '../../components/StateDisplay.svelte';
   import ExternalLink from '@lucide/svelte/icons/external-link';
@@ -340,8 +341,8 @@
 </script>
 
 <div
-  class:ds-brand-scope={Boolean(brandColor)}
-  style={brandColor ? `--ds-brand-color: ${brandColor}` : undefined}
+  class:ds-brand-scope={Boolean(brandStyle(brandColor))}
+  style={brandStyle(brandColor)}
 >
   {#if loading}
     <StateDisplay type="loading" />

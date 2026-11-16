@@ -25,6 +25,12 @@ const SCREEN_CONFIG_CACHE_LIMIT = 50;
  */
 class WorkspaceDataStore {
   workspaceId = $state(null);
+  #generation = 0;
+  #controller = new AbortController();
+
+  get generation() {
+    return this.#generation;
+  }
 
   /** @type {Map<string, Promise<object>>} */
   #screenConfigPromises = new Map();
@@ -107,17 +113,17 @@ class WorkspaceDataStore {
     this.initialized = false;
     this.error = null;
 
-    const request = this._fetchAll(id)
+    const generation = this.#generation;
+    const request = this._fetchAll(id, generation)
       .then(() => {
-        // Race condition guard: make sure we're still on the same workspace
-        if (this.workspaceId !== id) return;
+        if (generation !== this.#generation) return;
 
         this.initialized = true;
         this.lastRefreshedAt = Date.now();
         this._startAutoRefresh();
       })
       .catch((err) => {
-        if (this.workspaceId !== id) return;
+        if (generation !== this.#generation) return;
         // A navigation/reload aborts outstanding fetches as the document is
         // torn down. That is expected control flow, not an initialization
         // failure to surface in the UI or browser console.
@@ -126,7 +132,7 @@ class WorkspaceDataStore {
         console.error('WorkspaceDataStore: initialization failed', err);
       })
       .finally(() => {
-        if (this.workspaceId === id) {
+        if (generation === this.#generation) {
           this.initialLoading = false;
         }
         if (this._initPromise === request) this._initPromise = null;
@@ -161,21 +167,22 @@ class WorkspaceDataStore {
     this.initialized = false;
     this.error = null;
 
-    const request = this._fetchAllGlobal()
+    const generation = this.#generation;
+    const request = this._fetchAllGlobal(generation)
       .then(() => {
-        if (this.workspaceId !== GLOBAL_SENTINEL) return;
+        if (generation !== this.#generation) return;
         this.initialized = true;
         this.lastRefreshedAt = Date.now();
         this._startAutoRefresh();
       })
       .catch((err) => {
-        if (this.workspaceId !== GLOBAL_SENTINEL) return;
+        if (generation !== this.#generation) return;
         if (isExpectedBackgroundSyncError(err)) return;
         this.error = err.message || 'Failed to load global data';
         console.error('WorkspaceDataStore: global initialization failed', err);
       })
       .finally(() => {
-        if (this.workspaceId === GLOBAL_SENTINEL) {
+        if (generation === this.#generation) {
           this.initialLoading = false;
         }
         if (this._initPromise === request) this._initPromise = null;
@@ -194,16 +201,19 @@ class WorkspaceDataStore {
    * @returns {Promise<object|null>}
    */
   async getReferenceSnapshot(workspaceId) {
+    const generation = this.#generation;
     const id = typeof workspaceId === 'string' ? parseInt(workspaceId, 10) : workspaceId;
     if (!Number.isInteger(id) || id <= 0) return null;
 
     const isActive = Number(this.workspaceId) === id;
     if (isActive && this._initPromise) {
       await this._initPromise;
+      if (generation !== this.#generation) return null;
     }
     if (isActive && this.workspaceId === id && this.initialized) {
       return {
         workspace: this.workspace,
+        status_categories: this.statusCategories,
         custom_field_definitions: this.customFieldDefinitions,
         milestones: this.milestones,
         iterations: this.iterations,
@@ -219,7 +229,7 @@ class WorkspaceDataStore {
     const pending = this.#bootstrapPromises.get(id);
     if (pending) return pending;
     const promise = workspaces
-      .getBootstrap(id, FOREGROUND_READ)
+      .getBootstrap(id, { ...FOREGROUND_READ, signal: this.#controller.signal })
       .catch((error) => {
         if (error?.status === 404) return null;
         throw error;
@@ -242,18 +252,21 @@ class WorkspaceDataStore {
     if (this._refreshPromise) return this._refreshPromise;
 
     const id = this.workspaceId;
+    const generation = this.#generation;
     const request = (async () => {
       try {
         if (id === 'global') {
-          await this._fetchAllGlobal();
+          await this._fetchAllGlobal(generation);
         } else {
-          await this._fetchAll(id);
+          await this._fetchAll(id, generation);
         }
+        if (generation !== this.#generation) return;
         await this.#refreshScreenConfigs();
-        if (this.workspaceId === id) {
+        if (generation === this.#generation) {
           this.lastRefreshedAt = Date.now();
         }
       } catch (err) {
+        if (generation !== this.#generation) return;
         if (!isExpectedBackgroundSyncError(err)) {
           console.warn('WorkspaceDataStore: background refresh failed, keeping stale data', err);
         }
@@ -284,6 +297,9 @@ class WorkspaceDataStore {
 
   /** @private */
   _clearData() {
+    this.#generation += 1;
+    this.#controller.abort();
+    this.#controller = new AbortController();
     this.workspace = null;
     this.homepageLayout = null;
     this.statuses = [];
@@ -389,7 +405,7 @@ class WorkspaceDataStore {
     this.#userDisplayOutstanding += 1;
     getUserDisplayBatch(
       chunk.map((entry) => entry.id),
-      BACKGROUND_READ
+      { ...BACKGROUND_READ, signal: this.#controller.signal }
     )
       .then((users) => this.#settleDisplayBatch(chunk, generation, users, null))
       .catch((error) => this.#settleDisplayBatch(chunk, generation, null, error))
@@ -482,7 +498,10 @@ class WorkspaceDataStore {
 
     const epoch = this.#screenConfigEpoch;
     const promise = workspaces
-      .getEffectiveConfig(workspaceId, itemTypeId, FOREGROUND_READ)
+      .getEffectiveConfig(workspaceId, itemTypeId, {
+        ...FOREGROUND_READ,
+        signal: this.#controller.signal,
+      })
       .then((config) => {
         if (this.#screenConfigEpoch === epoch) {
           this.#storeScreenConfig(key, config);
@@ -535,7 +554,9 @@ class WorkspaceDataStore {
         if (!Number.isInteger(workspaceId) || workspaceId <= 0) return;
         const epoch = this.#screenConfigEpoch;
         try {
-          const config = await workspaces.getEffectiveConfig(workspaceId, itemTypeId);
+          const config = await workspaces.getEffectiveConfig(workspaceId, itemTypeId, {
+            signal: this.#controller.signal,
+          });
           if (this.#screenConfigEpoch === epoch) {
             this.#storeScreenConfig(key, config);
           }
@@ -558,6 +579,7 @@ class WorkspaceDataStore {
     if (!this.workspaceId) return;
 
     const id = this.workspaceId;
+    const generation = this.#generation;
 
     if (!field) {
       return this.refresh();
@@ -565,28 +587,29 @@ class WorkspaceDataStore {
 
     try {
       const data = await this._fetchField(id, field);
-      if (this.workspaceId === id && data !== undefined) {
+      if (generation === this.#generation && data !== undefined) {
         this[field] = data;
       }
     } catch (err) {
+      if (generation !== this.#generation) return;
       console.warn(`WorkspaceDataStore: failed to invalidate "${field}"`, err);
     }
   }
 
   /** @private */
-  async _fetchAll(workspaceId) {
+  async _fetchAll(workspaceId, generation = this.#generation) {
     // Labels are not part of the bootstrap aggregate, so fetch the workspace
     // label directory alongside it instead of serializing a second round trip.
     const [bootstrap, labels] = await Promise.all([
-      workspaces.getBootstrap(workspaceId, FOREGROUND_READ),
-      labelsApi.getAll(workspaceId).catch((err) => {
+      workspaces.getBootstrap(workspaceId, { ...FOREGROUND_READ, signal: this.#controller.signal }),
+      labelsApi.getAll(workspaceId, { signal: this.#controller.signal }).catch((err) => {
+        if (generation !== this.#generation || isExpectedBackgroundSyncError(err)) return [];
         console.warn('WorkspaceDataStore: failed to load labels', err);
         return [];
       }),
     ]);
 
-    // Race condition guard
-    if (this.workspaceId !== workspaceId) return;
+    if (generation !== this.#generation) return;
 
     this.workspace = bootstrap?.workspace ?? null;
     this.homepageLayout = bootstrap?.homepage_layout ?? null;
@@ -610,10 +633,13 @@ class WorkspaceDataStore {
   }
 
   /** @private */
-  async _fetchAllGlobal() {
-    const bootstrap = await catalogs.getGlobalBootstrap(FOREGROUND_READ);
+  async _fetchAllGlobal(generation = this.#generation) {
+    const bootstrap = await catalogs.getGlobalBootstrap({
+      ...FOREGROUND_READ,
+      signal: this.#controller.signal,
+    });
 
-    if (this.workspaceId !== 'global') return;
+    if (generation !== this.#generation) return;
 
     this.workspace = null;
     this.itemTypes = bootstrap?.item_types ?? [];

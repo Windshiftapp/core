@@ -1,7 +1,7 @@
 import { fetchAllV2Pages, fetchAPI, fetchV2Data } from './core.js';
 
 // Users
-export const getUsers = () => fetchAllV2Pages('/users');
+export const getUsers = (requestOptions = {}) => fetchAllV2Pages('/users', requestOptions);
 export const getAdminUsers = () => fetchAllV2Pages('/admin/users');
 export const getAssignableUsers = (workspaceId, requestOptions = {}) =>
   fetchV2Data(`/workspaces/${workspaceId}/assignable-users`, requestOptions);

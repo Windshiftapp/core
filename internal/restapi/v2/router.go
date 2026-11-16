@@ -500,6 +500,7 @@ type commentApplication interface {
 	CountFeedByItemID(int) (int, error)
 	UserCanReadItemAsApprover(context.Context, int, int) (bool, error)
 	Create(services.CreateCommentParams) (*services.CreateCommentResult, error)
+	CreateContext(context.Context, services.CreateCommentParams) (*services.CreateCommentResult, error)
 	UpdateWithEffects(services.UpdateCommentParams) (*models.Comment, error)
 	DeleteWithEffects(services.DeleteCommentParams) error
 	AttachReactions([]models.Comment) error
@@ -618,12 +619,16 @@ type actionApplication interface {
 	Update(int, int, int, services.AuditActor, models.UpdateActionRequest) (*models.Action, error)
 	Delete(int, int, int, services.AuditActor) error
 	Logs(int, int, int, int, int) ([]*models.ActionExecutionLog, int, error)
+	ListRevisions(int, int, int, int, int) ([]models.ActionDefinitionRevisionSummary, int, error)
+	GetRevision(int, int, int, int) (*models.ActionDefinitionRevision, error)
 	Execute(int, int, int, int) (models.ActionExecutionStatus, error)
 }
 
 // Deps lists every required v2 dependency. Construction has no fallbacks.
 type Deps struct {
 	OperatorControls             *services.OperatorControlsService
+	PasskeyLogin                 passkeyLoginHTTP
+	PasskeyLoginLimiter          requestLimiter
 	CustomerAccess               customerAccessHTTP
 	Mux                          *http.ServeMux
 	Tokens                       tokenAuthenticator
@@ -959,6 +964,7 @@ func buildRoutes(deps Deps) []route {
 	registerAttachmentRoutes(&builder, deps)
 	registerCollectionRoutes(&builder, deps.Collections)
 	registerCustomerAccessRoutes(&builder, deps)
+	registerPasskeyLoginRoutes(&builder, deps)
 	registerPlanningRoutes(&builder, deps.Planning)
 	registerMilestoneCommentRoutes(&builder, deps)
 	registerMilestonePageLinkRoutes(&builder, deps)
@@ -973,6 +979,7 @@ func buildRoutes(deps Deps) []route {
 	registerItemRoutes(&builder, deps.ItemApplication, deps.ItemDetail, deps.ItemLifecycle, deps.Access, deps.StoryPointRollup, deps.DBRequestTimeout)
 	registerQueueRoutes(&builder, deps.ItemApplication)
 	registerSupportMetricsRoutes(&builder, deps)
+	registerOverviewChartRoutes(&builder, deps)
 	registerSLARoutes(&builder, deps)
 	registerSLACalendarRoutes(&builder, deps)
 	registerSLAWarningThresholdRoutes(&builder, deps)
@@ -1103,6 +1110,19 @@ func applyParameterCorrections(route *Route) {
 		upsertParameter(route, integerQuery("page_size", "Maximum number of resources to return.", maxPageSize, defaultPageSize))
 	}
 	switch route.Method + " " + route.Path {
+	case "GET /workspaces/{workspace_id}/overview-charts":
+		route.Tag = "Workspaces"
+		route.Summary = "Get date-bounded overview chart counts"
+		route.Description = "Returns zero-filled daily counts for the current workspace/collection cohort, without item bodies or pagination. Dates are inclusive UTC calendar dates, at most 366 days. Completion is each item's first recorded transition from a non-completed status to a completed status; creation in a completed status is not inferred. Edits, reopening, and recompletion do not move or duplicate that event. Merged/deleted items are excluded. A collection must belong to this workspace and be visible to the caller; inaccessible scopes return 404. Unrequested series are omitted."
+		upsertParameter(route, ParameterMetadata{Name: "workspace_id", In: "path", Required: true, Description: "The workspace identifier.", Schema: map[string]any{"type": "integer", "minimum": 1}})
+		for _, name := range []string{"from", "to"} {
+			upsertParameter(route, ParameterMetadata{Name: name, In: "query", Required: true, Description: "Inclusive UTC date (YYYY-MM-DD).", Schema: map[string]any{"type": "string", "format": "date"}})
+		}
+		upsertParameter(route, positiveIDQuery("collection_id", "Optional visible collection belonging to this workspace; its current saved query restricts both series."))
+		upsertParameter(route, ParameterMetadata{Name: "series", In: "query", Description: "Comma-separated requested series: created, completed, or both. Defaults to both.", Schema: map[string]any{"type": "string", "default": "created,completed"}})
+		if !slices.Contains(route.DocumentedErrors, http.StatusBadRequest) {
+			route.DocumentedErrors = append(route.DocumentedErrors, http.StatusBadRequest)
+		}
 	case "POST /workspaces/{workspace_id}/tickets/import/upload",
 		"POST /workspaces/{workspace_id}/tickets/import/start":
 		upsertParameter(route, ParameterMetadata{Name: "workspace_id", In: "path", Required: true, Description: "The workspace identifier.", Schema: map[string]any{"type": "integer", "minimum": 1}})

@@ -1,4 +1,5 @@
 <script>
+  const instanceId = $props.id();
   import X from '@lucide/svelte/icons/x';
   import Spinner from './Spinner.svelte';
   import ModalBackdrop from './ModalBackdrop.svelte';
@@ -9,7 +10,7 @@
     icon: Icon = null,
     loading = false,
     error = null,
-    titleId = 'ai-modal-title',
+    titleId = `${instanceId}-title`,
     onclose = null,
     body,
     footer = null,

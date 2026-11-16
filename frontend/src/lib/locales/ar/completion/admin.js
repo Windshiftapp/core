@@ -35,7 +35,6 @@ export default {
       latestFiftyRightmost: 'عرض أحدث 50 عنصرًا فقط في العمود الأيمن',
       latestFiftyRightmostHint: 'مفيد لأعمدة «مكتمل» المزدحمة دون تقييد بقية اللوحة.',
       recentActivityWindow: 'نافذة النشاط الحديث',
-      resetViews: 'إعادة التعيين إلى افتراضي مساحة العمل',
       retentionRangeError: 'أدخل عددًا صحيحًا من 1 إلى 3650.',
       retentionWindowHint: 'تُخفى العناصر المكتملة التي لا نشاط لها خلال هذه الفترة.',
       systemFieldNames: {
@@ -56,10 +55,6 @@ export default {
         time_in_status: 'الوقت في الحالة',
       },
       views: 'العروض',
-      viewsHelp:
-        'اختر عروض المجموعة المتاحة هنا. تختفي العروض المعطّلة من التنقل، وتعود الروابط المباشرة إلى عرض مفعّل.',
-      viewsInheritedHint: 'تتبع هذه المجموعة عروض مساحة العمل الافتراضية.',
-      viewsOverrideHint: 'تتجاوز هذه المجموعة عروض مساحة العمل الافتراضية.',
     },
     connectedAccounts: {
       oauthConnected: 'تم ربط الحساب',

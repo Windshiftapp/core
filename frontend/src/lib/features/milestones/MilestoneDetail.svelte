@@ -325,7 +325,7 @@
   {/snippet}
 
   {#snippet body(progress)}
-    <TabStrip tabs={detailTabs} bind:activeTab ariaLabel={progress.milestone_name} class="mb-6" />
+    <TabStrip tabs={detailTabs} bind:activeTab ariaLabel={progress.milestone_name} class="mb-6">
 
     <!-- Overview stays mounted while the Activity tab is open so a comment
          draft survives switching tabs. -->
@@ -367,6 +367,7 @@
     {#if activeTab === 'activity'}
       <MilestoneActivity {milestoneId} reloadToken={activityReloadToken} />
     {/if}
+    </TabStrip>
   {/snippet}
 </PlanningEntityDetail>
 

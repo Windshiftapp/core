@@ -1,0 +1,16 @@
+/* Use an outline as well as color changes so focus survives forced colors. */
+.ds-focus-ring:focus-visible {
+  outline: 2px solid var(--ds-border-focused);
+  outline-offset: 2px;
+}
+
+/* Keep the complete outline inside horizontally scrolling tab bars. */
+.ds-tab-focus:focus-visible {
+  outline-offset: -3px;
+}
+
+@media (forced-colors: active) {
+  .ds-focus-ring:focus-visible {
+    outline-color: Highlight;
+  }
+}

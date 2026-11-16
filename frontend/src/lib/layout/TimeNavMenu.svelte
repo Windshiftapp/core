@@ -1,8 +1,11 @@
 <script>
   import IconClock from '@tabler/icons-svelte-runes/icons/clock';
+  import IconClockPlus from '@tabler/icons-svelte-runes/icons/clock-plus';
   import IconPlayerPlay from '@tabler/icons-svelte-runes/icons/player-play';
   import IconPlayerStop from '@tabler/icons-svelte-runes/icons/player-stop';
+  import Button from '../components/Button.svelte';
   import DropdownMenu from './DropdownMenu.svelte';
+  import { getShortcutDisplay, toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { currentRoute, navigate } from '../router.js';
   import { timerStore } from '../stores/timerStore.svelte.js';
   import { resolveTimeLogContext, resolveTimerWorkspaceId, timeLogStore } from '../stores/timeLogStore.svelte.js';
@@ -30,7 +33,7 @@
       .slice(0, 8)
   );
 
-  async function startTimer(project = null) {
+  async function startTimer() {
     const workspaceId = resolveTimerWorkspaceId();
     if (!workspaceId) {
       errorToast(t('time.entry.needWorkspace'));
@@ -45,15 +48,21 @@
     try {
       await timerStore.start({
         workspace_id: workspaceId,
-        project_id: project?.id ?? null,
+        project_id: null,
         item_id: context.itemId ?? null,
-        description: project?.name ?? '',
+        description: '',
       });
     } catch (err) {
       if (!err.message?.includes('already running')) {
         errorToast(t('items.failedToStartTimer'), err.message);
       }
     }
+  }
+
+  async function openLogWork(project = null) {
+    await timeLogStore.open({
+      defaultProjectId: project?.id ?? null,
+    });
   }
 
   async function stopTimer() {
@@ -83,10 +92,22 @@
         icon: IconPlayerPlay,
         title: t('items.startTimer'),
         subtitle: t('time.menu.startTimerHint'),
+        shortcut: getShortcutDisplay('global', 'startTimer'),
         onClick: () => startTimer(),
         testid: 'time-menu-start-timer',
       });
     }
+
+    out.push({
+      id: 'log-work',
+      type: 'regular',
+      icon: IconClockPlus,
+      title: t('time.menu.logWork'),
+      subtitle: t('time.menu.logWorkHint'),
+      shortcut: getShortcutDisplay('global', 'logWork'),
+      onClick: () => openLogWork(),
+      testid: 'time-menu-log-work',
+    });
 
     out.push({
       type: 'search',
@@ -102,9 +123,8 @@
         type: 'group',
         items: projectOptions.map((project) => ({
           id: `project-${project.id}`,
-          icon: IconClock,
           title: project.name,
-          onClick: () => startTimer(project),
+          onClick: () => openLogWork(project),
           testid: `time-menu-project-${project.id}`,
         })),
       });
@@ -128,8 +148,6 @@
       type: 'group',
       items: [
         { id: 'time-entry', icon: IconClock, title: t('nav.timeAndProjects'), href: '/time' },
-        { id: 'time-worklogs', title: t('commandPalette.commands.timeReports.label'), href: '/time/worklogs' },
-        { id: 'time-projects', title: t('commandPalette.commands.timeProjects.label'), href: '/time/projects' },
       ],
     });
     return out;
@@ -154,3 +172,16 @@
   onOpen={() => timeLogStore.ensurePickerData()}
   onOpenChange={(open) => onSurfaceChange(open ? 'time' : null)}
 />
+
+<!-- Global shortcuts. @github/hotkey ignores keystrokes that originate in form
+     fields, so 'T' and 'L' type normally while editing. -->
+<Button
+  class="sr-only"
+  onclick={() => startTimer()}
+  hotkeyConfig={{ key: toHotkeyString('global', 'startTimer'), guard: () => timerStore.canStart }}
+>{t('items.startTimer')}</Button>
+<Button
+  class="sr-only"
+  onclick={() => openLogWork()}
+  hotkeyConfig={{ key: toHotkeyString('global', 'logWork') }}
+>{t('time.menu.logWork')}</Button>

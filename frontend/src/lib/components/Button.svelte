@@ -3,9 +3,12 @@
     import { useEventListener } from 'runed';
     import Tooltip from "./Tooltip.svelte";
     import { cn } from '../utils/cn.js';
+    import { controlSizeClasses } from '../utils/controlSizes.js';
 
   let {
+    /** @type {'default'|'primary'|'secondary'|'context'|'danger'|'danger-ghost'|'selected'|'ghost'|'link'} */
     variant = 'default',
+    /** @type {'small'|'medium'|'large'|'sm'} */
     size = 'medium',
     disabled = false,
     /** Toggle state for toggle buttons; renders aria-pressed when set. */
@@ -21,6 +24,9 @@
     keyboardHint = null,
     id = undefined,
     title = null,
+    ariaLabel = undefined,
+    ariaExpanded = undefined,
+    ariaControls = undefined,
     onclick = null,
     hotkeyConfig = null,
     dataTestid = undefined,
@@ -33,8 +39,30 @@
 
   const buttonType = $derived(/** @type {"button"|"submit"|"reset"} */ (type));
   const effectiveDisabled = $derived(disabled || loading);
+  let hasTextLabel = $state(false);
+  const accessibleName = $derived(ariaLabel ?? (!hasTextLabel ? title ?? undefined : undefined));
 
   let buttonEl = $state(null);
+  $effect(() => {
+    if (!buttonEl) return;
+    const node = buttonEl;
+    function updateLabel() {
+      const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+      let text;
+      let labelled = false;
+      while ((text = walker.nextNode())) {
+        if (text.textContent.trim() && !text.parentElement.closest('svg, kbd, [aria-hidden="true"]')) {
+          labelled = true;
+          break;
+        }
+      }
+      hasTextLabel = labelled;
+    }
+    updateLabel();
+    const observer = new MutationObserver(updateLabel);
+    observer.observe(node, { childList: true, characterData: true, subtree: true });
+    return () => observer.disconnect();
+  });
 
   function handleClick(event) {
     if (effectiveDisabled) {
@@ -63,39 +91,37 @@
 
   // Base styles
   const baseClasses = $derived(cn(
-    'inline-flex items-center justify-center font-medium transition-colors duration-200 cursor-pointer',
-    'focus:outline-none focus:ring-2 focus:ring-offset-2',
+    'ds-focus-ring inline-flex items-center justify-center font-medium transition-colors duration-200 cursor-pointer border border-transparent',
     'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
-    fullWidth && 'w-full',
-    className
+    fullWidth && 'w-full'
   ));
 
   // Normalize size aliases
   const normalizedSize = $derived(size === 'sm' ? 'small' : size);
 
   // Size variants
-  const sizeClasses = $derived({
-    small: 'px-3.5 py-1.5 text-sm rounded gap-2',
-    medium: 'px-4 py-1.5 text-sm rounded gap-2',
-    large: 'px-6 py-2.5 text-base rounded gap-2'
-  }[normalizedSize]);
+  const sizeClasses = $derived(cn(controlSizeClasses(normalizedSize), 'rounded gap-2', {
+    'px-3.5': normalizedSize === 'small',
+    'px-4': normalizedSize === 'medium',
+    'px-6': normalizedSize === 'large'
+  }));
 
   // Color variants using Tailwind arbitrary values with CSS variables
   // Using design system tokens for dark mode support
   const variantClasses = $derived({
-    primary: 'bg-[var(--ds-interactive)] hover:bg-[var(--ds-interactive-hovered)] focus:ring-[var(--ds-border-focused)] text-white border border-transparent',
+    primary: 'bg-[var(--ds-background-brand-bold)] hover:bg-[var(--ds-background-brand-bold-hovered)] active:bg-[var(--ds-background-brand-bold-pressed)] text-[var(--ds-text-on-interactive)] hover:text-[var(--ds-text-on-interactive-hovered)] active:text-[var(--ds-text-on-interactive-pressed)]',
     default: 'bg-[var(--ds-surface-raised,white)] hover:bg-[var(--ds-background-neutral-hovered,#f9fafb)] focus:ring-2 focus:ring-ds-border-bold border border-[var(--ds-border,#d1d5db)] text-[var(--ds-text,#111827)]',
     secondary: 'bg-[var(--ds-background-neutral,#f3f4f6)] hover:bg-[var(--ds-background-neutral-hovered,#e5e7eb)] focus:ring-2 focus:ring-ds-border-bold text-[var(--ds-text,#374151)] border border-[var(--ds-border,#e5e7eb)]',
     context: 'bg-[var(--ctx-surface,var(--ds-background-neutral))] hover:bg-[var(--ctx-hover-bg,var(--ds-surface-hovered))] focus:ring-2 focus:ring-[var(--ctx-border-focused,var(--ds-border-focused))] text-[var(--ds-text)]',
-    danger: 'bg-[var(--ds-background-danger-bold)] hover:bg-[var(--ds-background-danger-bold-hovered)] focus:ring-[var(--ds-danger)] text-white border border-transparent',
-    'danger-ghost': 'bg-transparent text-[var(--ds-text-danger)] hover:bg-[var(--ds-background-danger-bold)] hover:text-white focus:ring-[var(--ds-danger)] border border-transparent',
-    selected: 'bg-[var(--ds-interactive-pressed)] hover:bg-[var(--ds-interactive-hovered)] focus:ring-[var(--ds-border-focused)] text-white border border-transparent',
+    danger: 'bg-[var(--ds-background-danger-bold)] hover:bg-[var(--ds-background-danger-bold-hovered)] text-[var(--ds-text-on-danger)]',
+    'danger-ghost': 'bg-transparent text-[var(--ds-text-danger)] hover:bg-[var(--ds-background-danger-bold)] hover:text-[var(--ds-text-on-danger)]',
+    selected: 'bg-[var(--ds-background-brand-bold-pressed)] hover:bg-[var(--ds-background-brand-bold-hovered)] text-[var(--ds-text-on-interactive-pressed)] hover:text-[var(--ds-text-on-interactive-hovered)]',
     ghost: 'bg-transparent hover:bg-[var(--ctx-active-bg,var(--ds-background-neutral-hovered,#f3f4f6))] focus:ring-2 focus:ring-ds-border-bold text-[var(--ctx-text,var(--ds-text,#374151))]',
-    link: 'bg-transparent hover:underline focus:ring-0 text-[var(--ds-text-link)] hover:text-[var(--ds-text-link-hovered)] border-none p-0'
+    link: 'bg-transparent hover:underline focus-visible:underline text-[var(--ds-text-link)] hover:text-[var(--ds-text-link-hovered)] border-none p-0'
   }[variant]);
 
   // Combine all classes
-  const allClasses = $derived(cn(baseClasses, sizeClasses, variantClasses));
+  const allClasses = $derived(cn(baseClasses, sizeClasses, variantClasses, className));
 
   // Icon size based on button size
   const iconSize = $derived({
@@ -106,13 +132,13 @@
 
   // Keyboard hint styling based on variant using CSS variables
   const kbdClasses = $derived({
-    primary: 'bg-[var(--ds-interactive-hovered)] bg-opacity-50 border-[var(--ds-border-focused)] text-white',
+    primary: 'border-[var(--ds-border-focused)] text-current',
     default: 'bg-[var(--ds-background-neutral)] border-[var(--ds-border)] text-[var(--ds-text)]',
     secondary: 'bg-[var(--ds-background-neutral)] border-[var(--ds-border)] text-[var(--ds-text)]',
     context: 'bg-[var(--ds-background-neutral)] border-[var(--ctx-border,var(--ds-border))] text-[var(--ds-text)]',
-    danger: 'bg-[var(--ds-background-danger-bold-hovered)] bg-opacity-50 border-[var(--ds-danger)] text-white',
-    'danger-ghost': 'bg-[var(--ds-background-danger-bold-hovered)] bg-opacity-50 border-[var(--ds-danger)] text-white',
-    selected: 'bg-[var(--ds-interactive-subtle)] border-[var(--ds-border)] text-[var(--ds-interactive-pressed)]',
+    danger: 'bg-[var(--ds-background-danger-bold-hovered)] border-[var(--ds-danger)] text-[var(--ds-text-on-danger)]',
+    'danger-ghost': 'bg-[var(--ds-background-danger-bold-hovered)] border-[var(--ds-danger)] text-[var(--ds-text-on-danger)]',
+    selected: 'border-[var(--ds-border)] text-current',
     ghost: 'bg-[var(--ds-background-neutral)] border-[var(--ds-border)] text-[var(--ds-text-subtle)]',
     link: 'bg-[var(--ds-background-neutral)] border-[var(--ds-border)] text-[var(--ds-text-subtle)]'
   }[variant]);
@@ -168,11 +194,11 @@
 <!-- Snippet for the button/link element -->
 {#snippet buttonElement()}
   {#if href}
-    <a bind:this={buttonEl} {id} {href} {target} {style} aria-disabled={effectiveDisabled} data-testid={dataTestid} data-page-id={dataPageId} class={allClasses} onclick={handleClick}>
+    <a bind:this={buttonEl} {id} {href} {target} {style} aria-label={accessibleName} aria-disabled={effectiveDisabled} tabindex={effectiveDisabled ? -1 : undefined} data-testid={dataTestid} data-page-id={dataPageId} class={allClasses} onclick={handleClick}>
       {@render linkContent()}
     </a>
   {:else}
-    <button bind:this={buttonEl} {id} type={buttonType} disabled={effectiveDisabled} aria-busy={loading} aria-pressed={pressed} {style} data-testid={dataTestid} data-page-id={dataPageId} class={allClasses} onclick={handleClick}>
+    <button bind:this={buttonEl} {id} type={buttonType} disabled={effectiveDisabled} aria-label={accessibleName} aria-expanded={ariaExpanded} aria-controls={ariaControls} aria-busy={loading} aria-pressed={pressed} {style} data-testid={dataTestid} data-page-id={dataPageId} class={allClasses} onclick={handleClick}>
       {@render buttonContent()}
     </button>
   {/if}
@@ -180,7 +206,7 @@
 
 <!-- Main render: wrap with tooltip if title is provided -->
 {#if title}
-  <Tooltip content={title}>
+  <Tooltip content={title} triggerElement={buttonEl}>
     {@render buttonElement()}
   </Tooltip>
 {:else}

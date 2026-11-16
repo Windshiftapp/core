@@ -114,10 +114,13 @@ export async function hydrateCurrentWorkspaceFromSharedData(workspaceId) {
     currentWorkspace.clear();
   }
 
-  await workspaceDataStore.initialize(workspaceId);
+  const ready = workspaceDataStore.initialize(workspaceId);
+  const generation = workspaceDataStore.generation;
+  await ready;
 
   // A newer route already owns the store — let its own hydration finish.
-  if (workspaceDataStore.workspaceId !== expectedId) return false;
+  if (workspaceDataStore.generation !== generation || workspaceDataStore.workspaceId !== expectedId)
+    return false;
   if (!workspaceDataStore.workspace) {
     currentWorkspace.clear();
     return false;

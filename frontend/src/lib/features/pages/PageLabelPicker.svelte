@@ -1,4 +1,6 @@
 <script>
+  import { createOwnedPopup } from '../../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
   import { createPopover, melt } from '@melt-ui/svelte';
   import IconPlus from '@tabler/icons-svelte-runes/icons/plus';
   import IconCheck from '@tabler/icons-svelte-runes/icons/check';
@@ -40,6 +42,8 @@
     forceVisible: true,
     positioning: { strategy: 'fixed', placement: 'bottom-start', fitViewport: true },
     portal: 'body',
+    disableFocusTrap: ownedPopup.withinModal,
+    closeFocus: ownedPopup.withinModal ? null : undefined,
   });
 
   // Lazy-load labels on first open so the trigger button doesn't fire a
@@ -154,7 +158,7 @@
 </button>
 
 {#if $open}
-  <div use:melt={$content} class="popover" data-testid="page-label-picker">
+  <div use:melt={$content} use:ownedPopup={{ close: () => { $open = false; } }} class="popover" data-testid="page-label-picker">
     <div class="search-row">
       <Input
         bind:inputRef={searchInputEl}

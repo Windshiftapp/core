@@ -335,6 +335,8 @@ export default {
   },
 
   workspaceDashboard: {
+    loadError: 'Nie udało się wczytać tego przeglądu.',
+    chartError: 'Nie udało się wczytać wartości wykresu. Spróbuj ponownie, aby pobrać pełne dane.',
     overview: 'Przegląd', overviewDescription: 'Kluczowe wskaźniki i statystyki', progress: 'Śledzenie postępów', progressDescription: 'Wykresy i osie czasu', homepage: 'Strona główna', loading: 'Ładowanie danych przestrzeni roboczej…', noSectionsHint: 'Wybierz Edytuj, aby dodać sekcje do strony głównej przestrzeni roboczej',
     customize: 'Dostosuj', doneEditing: 'Zakończ edycję', editModeHint: 'Tryb edycji: dodawaj, zmieniaj nazwy, zmieniaj kolejność lub usuwaj sekcje i widżety', weekOf: 'Tydzień od {date}',
     widgets: {

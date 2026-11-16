@@ -31,10 +31,11 @@ func ValidateColor(color string) bool {
 // ParseTimestamp parses a timestamp string from the database.
 // Handles both ISO 8601 format and SQLite datetime format.
 func ParseTimestamp(s string) time.Time {
-	// Try common formats
+	// Aggregates can return SQLite's stored text without timestamp decoding.
 	formats := []string{
-		time.RFC3339,
-		"2006-01-02T15:04:05Z07:00",
+		time.RFC3339Nano,
+		"2006-01-02 15:04:05.999999999 -0700 MST",
+		"2006-01-02 15:04:05.999999999-07:00",
 		"2006-01-02 15:04:05",
 		"2006-01-02T15:04:05",
 	}

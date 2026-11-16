@@ -54,8 +54,9 @@ export function arrayBufferToBase64url(buffer) {
  */
 export function isWebAuthnSupported() {
   return !!(
-    window.PublicKeyCredential?.isUserVerifyingPlatformAuthenticatorAvailable &&
-    window.PublicKeyCredential.isConditionalMediationAvailable
+    window.PublicKeyCredential &&
+    navigator.credentials?.get &&
+    navigator.credentials?.create
   );
 }
 
@@ -64,7 +65,10 @@ export function isWebAuthnSupported() {
  * @returns {Promise<boolean>} - True if platform authenticator is available
  */
 export async function isPlatformAuthenticatorAvailable() {
-  if (!isWebAuthnSupported()) {
+  if (
+    !isWebAuthnSupported() ||
+    !window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable
+  ) {
     return false;
   }
 
@@ -81,7 +85,7 @@ export async function isPlatformAuthenticatorAvailable() {
  * @returns {Promise<boolean>} - True if conditional mediation is available
  */
 export async function isConditionalMediationAvailable() {
-  if (!isWebAuthnSupported()) {
+  if (!isWebAuthnSupported() || !window.PublicKeyCredential.isConditionalMediationAvailable) {
     return false;
   }
 
@@ -237,9 +241,14 @@ export async function registerCredential(creationOptions) {
  * Authenticate with WebAuthn credential
  * @param {object} requestOptions - Options from server
  * @param {boolean} conditional - Whether to use conditional UI (autofill)
+ * @param {AbortSignal} [signal] - Cancellation signal
  * @returns {Promise<object>} - Processed credential response
  */
-export async function authenticateWithCredential(requestOptions, conditional = false) {
+export async function authenticateWithCredential(
+  requestOptions,
+  conditional = false,
+  signal = undefined
+) {
   if (!isWebAuthnSupported()) {
     throw new Error('WebAuthn is not supported by this browser');
   }
@@ -247,6 +256,7 @@ export async function authenticateWithCredential(requestOptions, conditional = f
   try {
     // Prepare options
     const options = prepareCredentialRequestOptions(requestOptions);
+    if (signal) options.signal = signal;
 
     // Add conditional mediation if requested
     if (conditional) {

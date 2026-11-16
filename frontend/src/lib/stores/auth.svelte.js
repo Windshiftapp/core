@@ -128,12 +128,13 @@ function createAuthStore() {
     },
 
     // Login with credentials
-    async login(credentials) {
+    async login(credentials, options = {}) {
       loading.set(true);
       error.set(null);
 
       try {
-        const response = await auth.login(credentials);
+        const response = await auth.login(credentials, options);
+        options.signal?.throwIfAborted();
 
         // Handle policy-related responses
         if (response.sso_required) {
@@ -164,7 +165,8 @@ function createAuthStore() {
         if (response.success) {
           // Get session details before marking the store authenticated so a
           // follow-up failure cannot leave user/isAuthenticated inconsistent.
-          const sessionResponse = await auth.getCurrentUser();
+          const sessionResponse = await auth.getCurrentUser(options);
+          options.signal?.throwIfAborted();
           user.set(sessionResponse.user || response.user);
           session.set(sessionResponse.session);
           isAuthenticated.set(true);
@@ -185,6 +187,10 @@ function createAuthStore() {
           return { success: false, message: response.message || 'Login failed' };
         }
       } catch (err) {
+        if (options.signal?.aborted) {
+          loading.set(false);
+          return { success: false };
+        }
         // Check if error response contains policy info
         if (hasPolicyFlag(err, 'passkey_required')) {
           clearStores(user, session);
@@ -293,17 +299,25 @@ function createAuthStore() {
 
     // Confirm that a WebAuthn completion created/elevated the browser session,
     // then populate canonical user and session metadata from /auth/me.
-    async completePasskeyLogin(fallbackUser = null) {
+    async completePasskeyLogin(fallbackUser = null, options = {}) {
       loading.set(true);
       error.set(null);
       try {
-        const response = await auth.getCurrentUser();
+        const response = await auth.getCurrentUser(options);
+        options.signal?.throwIfAborted();
+        if (response.session?.enrollment_required) {
+          throw new Error('Passkey authentication is still required. Please sign in again.');
+        }
         user.set(response.user || fallbackUser);
         session.set(response.session);
         isAuthenticated.set(true);
         loading.set(false);
         return true;
       } catch (err) {
+        if (options.signal?.aborted) {
+          loading.set(false);
+          throw err;
+        }
         clearStores(user, session);
         isAuthenticated.set(false);
         loading.set(false);

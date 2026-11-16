@@ -120,17 +120,17 @@ export async function fetchCollectionItems(
   filters.include_watermark = true;
 
   if (collectionId) {
-    // Reuse a collection the caller already fetched this load cycle (one board
-    // load otherwise issued the same /collections/{id} request 2-3 times).
+    // Only reuse metadata for this collection. A global collection needs no
+    // workspace association; the server remains authoritative for membership.
     collection =
-      preloadedCollection !== undefined ? preloadedCollection : await getCollection(collectionId);
+      preloadedCollection?.id != null && String(preloadedCollection.id) === String(collectionId)
+        ? preloadedCollection
+        : await getCollection(collectionId, requestOptions);
     if (collection) {
       collectionName = collection.name;
-      // collection_id overrides workspace_id — let backend resolve the QL query
-      filters.collection_id = collectionId;
-    } else {
-      filters.workspace_id = workspaceId;
     }
+    // Keep the requested scope even when its metadata is unavailable.
+    filters.collection_id = collectionId;
   } else {
     filters.workspace_id = workspaceId;
   }
@@ -161,7 +161,9 @@ export async function fetchCollectionBacklog(
 
   if (collectionId) {
     const collection =
-      preloadedCollection !== undefined ? preloadedCollection : await getCollection(collectionId);
+      preloadedCollection?.id != null && String(preloadedCollection.id) === String(collectionId)
+        ? preloadedCollection
+        : await getCollection(collectionId, requestOptions);
     if (collection) {
       collectionName = collection.name;
     }
@@ -205,9 +207,9 @@ export async function fetchCollectionItemChanges(
  * than a full collection reload so live updates can patch only loaded rows.
  * @param {Array<number>} ids
  */
-export async function fetchItemsById(ids) {
+export async function fetchItemsById(ids, requestOptions = {}) {
   if (!ids?.length) return [];
-  return itemsApi.getMany(ids);
+  return itemsApi.getMany(ids, requestOptions);
 }
 
 /**
@@ -215,12 +217,13 @@ export async function fetchItemsById(ids) {
  * @param {string|number} collectionId - The collection ID
  * @returns {Promise<Object|null>} The collection object or null if not found
  */
-export async function getCollection(collectionId) {
+export async function getCollection(collectionId, requestOptions = {}) {
   if (!collectionId) return null;
 
   try {
-    return await collections.get(String(collectionId));
+    return await collections.get(String(collectionId), requestOptions);
   } catch (error) {
+    if (error?.name === 'AbortError') throw error;
     console.error(`Failed to load collection ${collectionId}:`, error);
     return null;
   }

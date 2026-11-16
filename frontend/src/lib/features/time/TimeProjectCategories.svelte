@@ -239,7 +239,7 @@
               size="small"
               icon={Trash2}
               onclick={() => deleteCategory(category)}
-              title={t('common.delete')}
+              title={`${t('common.delete')}: ${category.name}`}
             ></Button>
           </div>
         {/if}
@@ -256,4 +256,3 @@
   onsave={saveCategory}
   oncancel={cancelForm}
 />
-

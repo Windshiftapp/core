@@ -13,6 +13,7 @@ import { BUCKET } from './buckets.js';
  * @property {string} [submenu]    Opens a sub-palette instead of navigating; CommandPalette intercepts it (e.g. 'recent').
  * @property {(ctx: CommandContext) => boolean} [isAvailable] Optional gate; defaults to true.
  * @property {string} [source]     Provider name, for debug overlay.
+ * @property {string} [searchQuery] Owning normalized server query; local scores order but do not discard its hits.
  * @property {boolean} [_isContextCommand] Legacy field (contextCommands.js); displayed as a chip.
  */
 

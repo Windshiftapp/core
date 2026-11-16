@@ -1,10 +1,14 @@
 <script>
-  import Label from './Label.svelte';
+  import FormField from './FormField.svelte';
   import Textarea from './Textarea.svelte';
 
   /**
    * @type {{
-   *   label?: string,
+    *   label?: string,
+    *   helper?: string,
+    *   error?: string,
+    *   ariaDescribedby?: string,
+    *   ariaInvalid?: boolean,
    *   value?: any,
    *   placeholder?: string,
    *   required?: boolean,
@@ -24,6 +28,10 @@
    */
   let {
     label = '',
+    helper = '',
+    error = '',
+    ariaDescribedby = undefined,
+    ariaInvalid = undefined,
     value = $bindable(''),
     placeholder = '',
     required = false,
@@ -42,12 +50,11 @@
   } = $props();
 </script>
 
-<div class={className}>
-  {#if label}
-    <Label for={id} {required} color={labelColor} class={labelClass}>{label}</Label>
-  {/if}
+<FormField {label} {id} {required} {helper} {error} {labelColor} {labelClass} labelTestid={dataTestid ? `${dataTestid}-label` : undefined} class="mb-0 {className}">
   <Textarea
     {id}
+    {ariaDescribedby}
+    {ariaInvalid}
     bind:value
     bind:textareaRef
     {placeholder}
@@ -60,4 +67,4 @@
     data-testid={dataTestid}
     {oninput}
   />
-</div>
+</FormField>

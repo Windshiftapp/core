@@ -24,6 +24,7 @@ export class CollectionFieldLinksStore {
   /** @type {Map<number, Promise<void>>} */
   #pending = new Map();
   #generation = 0;
+  #controller = new AbortController();
 
   getFieldLinks(itemId, fieldId, fieldOptions = '{}') {
     const id = Number(itemId);
@@ -67,6 +68,8 @@ export class CollectionFieldLinksStore {
 
   reset() {
     this.#generation += 1;
+    this.#controller.abort();
+    this.#controller = new AbortController();
     this.#pending.clear();
     this.byItem = {};
   }
@@ -74,7 +77,11 @@ export class CollectionFieldLinksStore {
   #loadChunk(chunk) {
     const generation = this.#generation;
     const promise = linksApi
-      .getForItems(chunk, { includeCustomFields: true, ...BACKGROUND_READ })
+      .getForItems(chunk, {
+        includeCustomFields: true,
+        ...BACKGROUND_READ,
+        signal: this.#controller.signal,
+      })
       .then((groups) => {
         if (generation !== this.#generation) return;
         const updates = {};

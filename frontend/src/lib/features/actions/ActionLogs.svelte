@@ -11,6 +11,7 @@
   import XCircle from '@lucide/svelte/icons/x-circle';
   import Clock from '@lucide/svelte/icons/clock';
   import SkipForward from '@lucide/svelte/icons/skip-forward';
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle';
   import Eye from '@lucide/svelte/icons/eye';
   import { formatAuthenticatedDateTime } from '../../utils/authenticatedDateFormatter.js';
   import { actionLogElapsedMs, formatElapsedMs } from '../../utils/timeUtils.js';
@@ -118,6 +119,9 @@
             {:else if item.status === 'skipped'}
               <SkipForward class="w-4 h-4 text-ds-icon-subtle" />
               <span class="text-ds-text-subtle">{t('actions.logs.skipped')}</span>
+            {:else if item.status === 'reconciliation_required'}
+              <AlertTriangle class="w-4 h-4 text-ds-icon-warning" />
+              <span class="text-ds-text-warning">{t('actions.logs.reconciliationRequired')}</span>
             {:else}
               <span class="capitalize status-text">{item.status}</span>
             {/if}

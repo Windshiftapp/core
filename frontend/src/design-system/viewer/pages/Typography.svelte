@@ -35,6 +35,16 @@
   <p class="mb-8" style="color: var(--ds-text-subtle);">
     Typography tokens for consistent text styling.
   </p>
+  <section class="mb-10 space-y-3">
+    <h2 class="ds-text-heading text-ds-text">Semantic text roles</h2>
+    <p class="ds-text-body">Body · 13px / 1.5 · 400. The application and Text share this default.</p>
+    <p class="ds-text-label">Label · 14px / 20px · 500.</p>
+    <p class="ds-text-helper">Helper · 12px / 18px · 400. Field guidance and validation.</p>
+    <p class="ds-text-metadata">Metadata · 12px / 16px · 500. Chips, timestamps and compact section captions.</p>
+    <p class="ds-text-heading">Heading · 20px / 28px · 600.</p>
+    <p class="ds-text-compact">Compact · 11px / 16px · 500. Opt-in dense visualizations, never a hidden inline override.</p>
+    <p class="ds-text-helper text-ds-text-subtle">Roles use rem sizes and the shared Inter/system font stack. Utility size/weight overrides remain explicit. These roles do not imply that small text alone is a WCAG failure.</p>
+  </section>
 
   <!-- Font Family -->
   <section class="mb-10">

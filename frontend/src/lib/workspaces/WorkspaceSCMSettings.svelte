@@ -344,7 +344,7 @@
                   {t('scmSettings.connected')}
                 </span>
               {:else}
-                <Button dataTestid={`scm-connect-${provider.id}`} size="xs" variant="ghost" onclick={() => connectProvider(provider)}>
+                <Button dataTestid={`scm-connect-${provider.id}`} size="small" variant="ghost" onclick={() => connectProvider(provider)}>
                   <Plus class="w-3 h-3 mr-1" />
                   {t('scmSettings.connect')}
                 </Button>

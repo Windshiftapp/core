@@ -73,6 +73,7 @@ export default {
       transitionItem: 'Faire évoluer l’élément',
       roundRobinAssign: 'Attribution à tour de rôle',
       createMilestone: 'Créer un jalon',
+      executeScript: 'Exécuter le script',
     },
 
     // Toast shown when the AI chat updates the open action via update_action.
@@ -235,11 +236,31 @@ export default {
       completed: 'Terminé',
       failed: 'Échoué',
       skipped: 'Ignoré',
+      reconciliationRequired: 'Réconciliation requise',
       startedAt: 'Démarré le',
       completedAt: 'Terminé le',
       error: 'Erreur',
       details: 'Détails',
       viewDetails: 'Afficher les détails',
+    },
+
+    history: {
+      title: 'Historique de la définition',
+      noRevisions: 'Aucune révision de définition',
+      revision: 'Révision',
+      source: 'Source',
+      editor: 'Modifié par',
+      changedFields: 'Champs modifiés',
+      changeSummary: 'Résumé',
+      createdAt: 'Enregistré le',
+      viewDetails: 'Voir la révision',
+      detailTitle: 'Révision de la définition',
+      snapshot: 'Définition exécutable',
+      nodes: 'Nœuds',
+      edges: 'Liens',
+      noChangedFields: 'Aucun changement exécutable',
+      system: 'Système (base)',
+      triggerType: 'Déclencheur',
     },
 
     // Execution trace

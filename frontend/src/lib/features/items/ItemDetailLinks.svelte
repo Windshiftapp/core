@@ -303,7 +303,7 @@
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-2">
           <Link2 class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-          <h3 class="text-sm font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle); font-size: 11px;">{t('items.linkedItems')}</h3>
+          <h3 class="ds-text-metadata font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('items.linkedItems')}</h3>
         </div>
         <button
           type="button"
@@ -430,7 +430,7 @@
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-2">
           <FileText class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-          <h3 class="text-sm font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle); font-size: 11px;">{t('items.linkedPages')}</h3>
+          <h3 class="ds-text-metadata font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('items.linkedPages')}</h3>
         </div>
         {#if pageLinkTypeId != null}
           <button
@@ -498,7 +498,7 @@
     <div class="pt-2">
       <div class="flex items-center gap-2 mb-4">
         <FileText class="w-4 h-4" style="color: var(--ds-text-subtle);" />
-        <h3 class="text-sm font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle); font-size: 11px;">{t('items.childWorkItems')}</h3>
+        <h3 class="ds-text-metadata font-semibold uppercase tracking-wider" style="color: var(--ds-text-subtle);">{t('items.childWorkItems')}</h3>
       </div>
 
       {#if loadingChildItems}

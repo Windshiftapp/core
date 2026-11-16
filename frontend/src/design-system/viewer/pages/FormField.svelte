@@ -8,15 +8,15 @@
 <div class="p-8 max-w-6xl">
   <h1 class="text-2xl font-bold mb-2" style="color: var(--ds-text);">FormField</h1>
   <p class="mb-8" style="color: var(--ds-text-subtle);">
-    Form field wrapper component that provides consistent labeling, helper text, and error messaging.
+    Form field wrapper with stable generated IDs, associated labels and reactive helper/error descriptions. Standard controls and custom pickers consume the field context; explicit IDs and existing description IDs are preserved. Use one primary control per field. Raw controls can use the children snippet's id, describedby, invalid and required values.
   </p>
 
   <!-- Basic Usage -->
   <section class="mb-10">
     <h2 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">Basic Usage</h2>
     <div class="max-w-md space-y-4">
-      <FormField label="Email Address" id="email">
-        <Input type="email" id="email" placeholder="user@example.com" />
+      <FormField label="Email Address" helper="Click the label or focus the input to inspect the relationship.">
+        <Input type="email" placeholder="user@example.com" />
       </FormField>
 
       <FormField label="Full Name" id="name">

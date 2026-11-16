@@ -1,4 +1,5 @@
 <script>
+  let tabPanelElement = $state(null);
   import LifeBuoy from '@lucide/svelte/icons/life-buoy';
   import Settings from '@lucide/svelte/icons/settings';
   import Webhook from '@lucide/svelte/icons/webhook';
@@ -579,6 +580,7 @@
       <!-- Tab Navigation -->
       <div class="px-6">
         <TabStrip
+          panelElement={tabPanelElement}
           tabs={[
             { id: 'configuration', label: t('channel.configuration'), icon: Settings },
             ...(channel.type === 'form' ? [{ id: 'forms', label: t('forms.title'), icon: ClipboardList }] : []),
@@ -589,7 +591,7 @@
       </div>
 
       <!-- Tab Content -->
-      <div class="flex-1 overflow-y-auto {activeTab === 'forms' ? '' : 'p-6'}">
+      <div class="flex-1 overflow-y-auto {activeTab === 'forms' ? '' : 'p-6'}" bind:this={tabPanelElement}>
         {#if activeTab === 'configuration'}
           <!-- Basic Info Section -->
           <div class="mb-8">

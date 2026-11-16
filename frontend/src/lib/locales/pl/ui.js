@@ -481,10 +481,12 @@ export default {
       otherSlices: 'Inne ({count} więcej)',
     },
     completionChart: {
+      definition: 'Pierwsze zarejestrowane ukończenia według tygodni (UTC). Ponowne otwarcie nie jest liczone dwukrotnie.',
       title: 'Wykres ukończeń',
       emptyMessage: 'Brak danych o ukończeniach',
     },
     createdChart: {
+      definition: 'Utworzone w ciągu ostatnich siedmiu dni UTC, włącznie z dzisiejszym.',
       title: 'Wykres tworzenia',
       emptyMessage: 'Brak danych o tworzeniu',
     },

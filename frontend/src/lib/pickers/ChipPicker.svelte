@@ -1,4 +1,6 @@
 <script>
+  import { createOwnedPopup } from '../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
   import { createPopover, melt } from '@melt-ui/svelte';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import Check from '@lucide/svelte/icons/check';
@@ -38,6 +40,9 @@
       flip: true
     },
     portal: 'body',
+    disableFocusTrap: ownedPopup.withinModal,
+    openFocus: ownedPopup.withinModal ? null : undefined,
+    closeFocus: ownedPopup.withinModal ? null : undefined,
     forceVisible: true
   });
 
@@ -45,6 +50,7 @@
   let highlightedIndex = $state(0);
   let inputElement = $state(null);
   let listRef = $state(null);
+  let triggerRef = $state(null);
 
   // Render cap (WI-1445): mount at most maxVisibleOptions rows and hint to
   // narrow the search. ArrowDown past the end of the slice reveals more.
@@ -86,9 +92,11 @@
       searchTerm = '';
       highlightedIndex = 0;
       if (searchable) {
-        setTimeout(() => inputElement?.focus(), 50);
+        const timer = setTimeout(() => inputElement?.focus({ preventScroll: true }), 50);
+        return () => clearTimeout(timer);
       } else {
-        setTimeout(() => listRef?.focus(), 50);
+        const timer = setTimeout(() => listRef?.focus({ preventScroll: true }), 50);
+        return () => clearTimeout(timer);
       }
     }
   });
@@ -111,9 +119,7 @@
     }
   });
 
-  // Melt restores focus to the trigger after closing. Let that single delayed
-  // focus operation own the hand-off: focusing here as well creates a race
-  // where a fast Tab reaches the next control before Melt moves focus back.
+  // The modal scope owns restoration inside dialogs; Melt handles standalone use.
   function closePicker() {
     $open = false;
   }
@@ -132,10 +138,7 @@
 
     const total = visibleItems.length;
 
-    // Tab is intentionally left to native handling: when closed it moves to the
-    // next field (no trap, WI-445); when open the user selects with Enter rather
-    // than tabbing out. Melt restores focus to the trigger on select/Escape;
-    // Tab itself is not intercepted.
+    // The modal scope coordinates Tab across the owned popup and trigger.
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
@@ -168,6 +171,7 @@
 
 <!-- Chip Trigger Button -->
 <button
+  bind:this={triggerRef}
   use:melt={$trigger}
   {disabled}
   data-testid={testId}
@@ -207,6 +211,7 @@
 {#if $open}
   <div
     use:melt={$content}
+    use:ownedPopup={{ trigger: () => triggerRef, close: closePicker, keepTabStops: false }}
     data-testid={testId ? `${testId}-dropdown` : undefined}
     class="z-[70] rounded-lg shadow-lg flex flex-col overflow-hidden"
     style="

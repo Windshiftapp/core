@@ -3,8 +3,10 @@ package handlers
 import (
 	"bytes"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -15,6 +17,7 @@ import (
 	"windshift/internal/auth"
 	"windshift/internal/database"
 	"windshift/internal/logger"
+	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/sanitize"
 	"windshift/internal/services"
@@ -69,6 +72,15 @@ func (h *WebAuthnHandler) SetAuthPolicyHandler(policy *AuthPolicyHandler) {
 func (h *WebAuthnHandler) passwordPasskeyPolicyActive() bool {
 	return h.authPolicyHandler != nil && !h.authPolicyHandler.IsPreviewMode() &&
 		h.authPolicyHandler.GetCurrentPolicy() == AuthPolicyPasswordPasskey2FA
+}
+
+func (h *WebAuthnHandler) standalonePasskeyBlocked() bool {
+	if h.authPolicyHandler == nil || h.authPolicyHandler.IsPreviewMode() {
+		return false
+	}
+	policy := h.authPolicyHandler.GetCurrentPolicy()
+	return policy == AuthPolicyPasswordPasskey2FA ||
+		(policy == AuthPolicySSOPrimary && !h.authPolicyHandler.fallbackEnabled)
 }
 
 func (h *WebAuthnHandler) pendingPasskeySession(r *http.Request) (*auth.Session, bool) {
@@ -198,7 +210,8 @@ func (h *WebAuthnHandler) StartFIDORegistrationNew(w http.ResponseWriter, r *htt
 	webAuthnUser.SetCredentials(existingCreds)
 
 	// Begin registration with go-webauthn
-	options, sessionData, err := h.config.WebAuthn().BeginRegistration(webAuthnUser)
+	options, sessionData, err := h.config.WebAuthn().BeginRegistration(webAuthnUser,
+		webauthnlib.WithExclusions(webAuthnUser.CredentialExcludeList()))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -319,11 +332,13 @@ func (h *WebAuthnHandler) CompleteFIDORegistrationNew(w http.ResponseWriter, r *
 		return
 	}
 
-	// Clear enrollment required flag for this user's sessions
-	// This allows the user to continue without being redirected to enrollment again
-	if err := h.sessionManager.ClearEnrollmentRequiredByUserID(userID); err != nil {
-		slog.Warn("failed to clear enrollment required flag", slog.String("component", "webauthn"), slog.Int("user_id", userID), slog.Any("error", err))
-		// Non-fatal, continue
+	// A credential added by another browser or administrator is not proof for this session.
+	if session, ok := r.Context().Value(middleware.ContextKeySession).(*auth.Session); ok &&
+		session.UserID == userID && session.EnrollmentRequired && session.AuthPendingType == auth.AuthPendingEnrollment {
+		if err := h.sessionManager.ClearEnrollmentRequired(session.ID); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
 	}
 
 	currentUser := utils.GetCurrentUser(r)
@@ -454,8 +469,14 @@ type FIDOLoginRequestNew struct {
 
 // FIDOCompleteLoginRequest represents the login completion request
 type FIDOCompleteLoginRequest struct {
-	SessionID string `json:"sessionId"`
-	Response  any    `json:"response"`
+	SessionID  string `json:"sessionId"`
+	Response   any    `json:"response"`
+	RememberMe bool   `json:"remember_me"`
+}
+
+// StartPasskeyLogin supports discoverable credentials through the v2 login API.
+func (h *WebAuthnHandler) StartPasskeyLogin(w http.ResponseWriter, r *http.Request) {
+	h.startFIDOLogin(w, r, true)
 }
 
 // StartFIDOLoginNew initiates FIDO authentication with proper verification.
@@ -464,12 +485,20 @@ type FIDOCompleteLoginRequest struct {
 // guaranteed to fail completion because its WebAuthn user ID is not a database
 // user and its database session has a NULL user_id.
 func (h *WebAuthnHandler) StartFIDOLoginNew(w http.ResponseWriter, r *http.Request) {
+	h.startFIDOLogin(w, r, false)
+}
+
+func (h *WebAuthnHandler) startFIDOLogin(w http.ResponseWriter, r *http.Request, allowDiscoverable bool) {
 	req, ok := decodeJSON[FIDOLoginRequestNew](w, r)
 	if !ok {
 		return
 	}
 	sanitize.Apply(&req.EmailOrUsername, sanitize.ShortIdentifier)
 	if strings.TrimSpace(req.EmailOrUsername) == "" {
+		if allowDiscoverable {
+			h.startDiscoverableLogin(w, r)
+			return
+		}
 		respondValidationError(w, r, "Email or username is required")
 		return
 	}
@@ -477,12 +506,12 @@ func (h *WebAuthnHandler) StartFIDOLoginNew(w http.ResponseWriter, r *http.Reque
 	var user models.User
 	var avatarURL sql.NullString
 	err := h.db.QueryRow(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url
+		SELECT id, email, username, first_name, last_name, is_active, avatar_url, is_agent
 		FROM users
 		WHERE email = ? OR username = ?
 	`, req.EmailOrUsername, req.EmailOrUsername).Scan(
 		&user.ID, &user.Email, &user.Username, &user.FirstName,
-		&user.LastName, &user.IsActive, &avatarURL,
+		&user.LastName, &user.IsActive, &avatarURL, &user.IsAgent,
 	)
 	useSynthetic := errors.Is(err, sql.ErrNoRows)
 	if err != nil && !useSynthetic {
@@ -491,7 +520,7 @@ func (h *WebAuthnHandler) StartFIDOLoginNew(w http.ResponseWriter, r *http.Reque
 	}
 
 	credentialUserID := 0
-	if !useSynthetic && user.IsActive {
+	if !useSynthetic && user.IsActive && !user.IsAgent {
 		credentialUserID = user.ID
 		if avatarURL.Valid {
 			user.AvatarURL = avatarURL.String
@@ -510,6 +539,8 @@ func (h *WebAuthnHandler) StartFIDOLoginNew(w http.ResponseWriter, r *http.Reque
 		var pending bool
 		pendingAuthSession, pending = h.pendingSession(r, credentialUserID)
 		useSynthetic = useSynthetic || !pending
+	} else if h.standalonePasskeyBlocked() {
+		useSynthetic = true
 	}
 
 	var storedUserID *int
@@ -563,6 +594,46 @@ func (h *WebAuthnHandler) StartFIDOLoginNew(w http.ResponseWriter, r *http.Reque
 	})
 }
 
+func (h *WebAuthnHandler) startDiscoverableLogin(w http.ResponseWriter, r *http.Request) {
+	if h.standalonePasskeyBlocked() {
+		respondUnauthorized(w, r)
+		return
+	}
+	options, sessionData, err := h.config.WebAuthn().BeginDiscoverableLogin(
+		webauthnlib.WithUserVerification(protocol.VerificationRequired))
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	sessionID, err := h.sessionStore.SaveAuthenticationSession(nil, sessionData)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	respondJSONOK(w, map[string]any{"publicKey": options.Response, "sessionId": sessionID})
+}
+
+func (h *WebAuthnHandler) passkeyUser(userID int) (*webauthn.User, error) {
+	var user models.User
+	var avatarURL sql.NullString
+	err := h.db.QueryRow(`
+		SELECT id, email, username, first_name, last_name, avatar_url
+		FROM users WHERE id = ? AND is_active = true AND is_agent = false
+	`, userID).Scan(&user.ID, &user.Email, &user.Username, &user.FirstName, &user.LastName, &avatarURL)
+	if err != nil {
+		return nil, err
+	}
+	user.IsActive = true
+	user.AvatarURL = avatarURL.String
+	credentials, err := h.credentialStore.GetUserCredentials(userID)
+	if err != nil {
+		return nil, err
+	}
+	subject := webauthn.NewUser(&user)
+	subject.SetCredentials(credentials)
+	return subject, nil
+}
+
 // CompleteFIDOLoginNew completes FIDO authentication with proper verification
 func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Request) {
 	req, ok := decodeJSON[FIDOCompleteLoginRequest](w, r)
@@ -585,6 +656,10 @@ func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Re
 		}
 		sessionData, err = h.sessionStore.GetAuthenticationSessionBound(req.SessionID, pendingSession.ID)
 	} else {
+		if h.standalonePasskeyBlocked() {
+			respondUnauthorized(w, r)
+			return
+		}
 		sessionData, err = h.sessionStore.GetAuthenticationSession(req.SessionID)
 	}
 	if err != nil {
@@ -592,60 +667,7 @@ func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Get user ID from session
-	userIDBytes := sessionData.UserID
-	if len(userIDBytes) == 0 {
-		respondValidationError(w, r, "Session missing user ID")
-		return
-	}
-
-	userID, err := strconv.Atoi(string(userIDBytes))
-	if err != nil {
-		respondValidationError(w, r, "Invalid user ID in session")
-		return
-	}
-	if pendingSession != nil && pendingSession.UserID != userID {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	// Get user information
-	var user models.User
-	var avatarURL sql.NullString
-	err = h.db.QueryRow(`
-		SELECT id, email, username, first_name, last_name, is_active, avatar_url
-		FROM users WHERE id = ? AND is_active = true
-	`, userID).Scan(
-		&user.ID, &user.Email, &user.Username, &user.FirstName,
-		&user.LastName, &user.IsActive, &avatarURL,
-	)
-
-	if err != nil {
-		respondUnauthorized(w, r)
-		return
-	}
-
-	// Handle NULL avatar_url
-	if avatarURL.Valid {
-		user.AvatarURL = avatarURL.String
-	} else {
-		user.AvatarURL = ""
-	}
-
-	// Create WebAuthn user wrapper
-	webAuthnUser := webauthn.NewUser(&user)
-
-	// Get user's credentials
-	credentials, err := h.credentialStore.GetUserCredentials(user.ID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	webAuthnUser.SetCredentials(credentials)
-
-	// Recreate request body with just the credential response for go-webauthn
-	// The library expects to read the credential directly from r.Body
+	// Both ceremonies use the same verification and session-issuance path.
 	credentialJSON, err := json.Marshal(req.Response)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -653,16 +675,38 @@ func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Re
 	}
 	r.Body = io.NopCloser(bytes.NewReader(credentialJSON))
 
-	// Finish authentication with go-webauthn (performs all verification)
-	credential, err := h.config.WebAuthn().FinishLogin(webAuthnUser, *sessionData, r)
+	var subject *webauthn.User
+	var credential *webauthnlib.Credential
+	if len(sessionData.UserID) == 0 {
+		resolver := func(rawID, userHandle []byte) (webauthnlib.User, error) {
+			ownerID, lookupErr := h.credentialStore.LookupUserByCredentialID(base64.RawURLEncoding.EncodeToString(rawID))
+			if lookupErr != nil || !bytes.Equal(userHandle, []byte(strconv.Itoa(ownerID))) {
+				return nil, fmt.Errorf("invalid credential owner")
+			}
+			var resolveErr error
+			subject, resolveErr = h.passkeyUser(ownerID)
+			return subject, resolveErr
+		}
+		credential, err = h.config.WebAuthn().FinishDiscoverableLogin(resolver, *sessionData, r)
+	} else {
+		userID, parseErr := strconv.Atoi(string(sessionData.UserID))
+		if parseErr != nil || (pendingSession != nil && pendingSession.UserID != userID) {
+			respondUnauthorized(w, r)
+			return
+		}
+		subject, err = h.passkeyUser(userID)
+		if err == nil {
+			credential, err = h.config.WebAuthn().FinishLogin(subject, *sessionData, r)
+		}
+	}
 	if err != nil {
 		slog.Warn("failed to verify webauthn login assertion",
 			slog.String("component", "webauthn"),
-			slog.Int("user_id", user.ID),
 			slog.Any("error", err))
 		respondUnauthorized(w, r)
 		return
 	}
+	user := *subject.User
 
 	// Persist sign count and clone_warning regardless of the outcome below —
 	// admins need the flag visible on the credential list even when we reject.
@@ -714,13 +758,13 @@ func (h *WebAuthnHandler) CompleteFIDOLoginNew(w http.ResponseWriter, r *http.Re
 		}
 	} else {
 		clientIP := h.ipExtractor.GetClientIP(r)
-		session, err := h.sessionManager.CreateSession(user.ID, clientIP, r.UserAgent(), false)
+		session, err := h.sessionManager.CreateSession(user.ID, clientIP, r.UserAgent(), req.RememberMe)
 		if err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
 
-		if err := h.sessionManager.SetSessionCookie(w, r, session.Token, false); err != nil {
+		if err := h.sessionManager.SetSessionCookie(w, r, session.Token, req.RememberMe); err != nil {
 			if delErr := h.sessionManager.DeleteSession(session.Token); delErr != nil {
 				slog.Warn("failed to revoke session after cookie error", slog.Any("error", delErr))
 			}

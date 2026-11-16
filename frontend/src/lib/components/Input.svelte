@@ -1,7 +1,9 @@
 <script>
   import { cn } from '../utils/cn.js';
+  import { fieldControl } from '../utils/fieldContext.svelte.js';
   import { controlSizeClasses } from '../utils/controlSizes.js';
   import DatePicker from '../pickers/DatePicker.svelte';
+  import DateTimePicker from '../pickers/DateTimePicker.svelte';
 
   /**
    * @type {{
@@ -33,6 +35,7 @@
    *   dataAutofocus?: boolean,
    *   ariaLabel?: string,
    *   ariaDescribedby?: string,
+   *   ariaInvalid?: boolean,
    *   inputRef?: any,
    *   oninput?: (e?: any) => void,
    *   onchange?: (e?: any) => void,
@@ -72,6 +75,7 @@
     dataAutofocus = false,
     ariaLabel = undefined,
     ariaDescribedby = undefined,
+    ariaInvalid = undefined,
     // Optional ref binding for parent components that need the raw input element
     inputRef = $bindable(null),
     // Event handlers
@@ -84,6 +88,7 @@
     onkeyup = undefined
   } = $props();
   export { className as class };
+  const field = fieldControl(() => ({ id, ariaDescribedby, ariaInvalid, required, ariaLabel }));
 
   // Size variants. Ghost inputs are chrome-less, so they skip control padding.
   const sizeClasses = $derived(variant === 'ghost' ? '' : controlSizeClasses(size));
@@ -111,13 +116,13 @@
   <DatePicker
     bind:value
     bind:inputRef
-    {id}
+    id={field.id}
     {name}
     {min}
     {max}
     {step}
     {disabled}
-    {required}
+    required={field.required}
     {autofocus}
     readonly={readonly}
     {placeholder}
@@ -125,7 +130,10 @@
     class={className}
     {dataTestid}
     {ariaLabel}
-    {ariaDescribedby}
+    ariaDescribedby={field.describedby}
+    ariaInvalid={field.invalid}
+    ariaRequired={field.ariaRequired}
+    ariaLabelledby={field.labelledby}
     {style}
     {title}
     {onclick}
@@ -139,10 +147,21 @@
       onchange?.(synthetic);
     }}
   />
+{:else if type === 'datetime-local'}
+  <DateTimePicker
+    bind:value bind:inputRef id={field.id} {name} {min} {max} {step} {disabled} required={field.required}
+    {autofocus} {readonly} {placeholder} {size} class={className} {dataTestid}
+    {ariaLabel} ariaDescribedby={field.describedby} ariaInvalid={field.invalid} ariaRequired={field.ariaRequired} ariaLabelledby={field.labelledby} {style} {title} {onclick} {onkeyup} {onkeydown} {onblur} {onfocus}
+    onchange={(next) => {
+      const event = { target: { value: next }, currentTarget: { value: next } };
+      oninput?.(event);
+      onchange?.(event);
+    }}
+  />
 {:else}
 <input
   {type}
-  {id}
+  id={field.id}
   {name}
   {pattern}
   {title}
@@ -157,10 +176,12 @@
   data-testid={dataTestid}
   data-autofocus={dataAutofocus || undefined}
   aria-label={ariaLabel}
-  aria-describedby={ariaDescribedby}
+  aria-describedby={field.describedby}
+  aria-invalid={field.invalid}
+  aria-required={field.ariaRequired || undefined}
   {placeholder}
   {disabled}
-  {required}
+  required={field.required}
   {autofocus}
   {min}
   {max}

@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../../components/FormField.svelte';
   import { onMount } from 'svelte';
   import { configurationSets, itemTypes as itemTypesApi } from '../../api/configuration.js';
   import { requestTypes } from '../../api/channels.js';
@@ -157,6 +158,7 @@
       </div>
 
       <div>
+        <FormField class="contents" requiredMark>
         <Label color="default" required class="mb-2">{t('channel.targetWorkspace')}</Label>
         <BasePicker
           id="form-workspace"
@@ -167,12 +169,14 @@
           getLabel={(item) => item.name}
           optionTestid={(option) => `form-workspace-${option.value}`}
         />
+        </FormField>
         <DescriptionText>
           Every response to this form creates a work item in this workspace.
         </DescriptionText>
       </div>
 
       <div>
+        <FormField class="contents" requiredMark>
         <Label color="default" required class="mb-2">{t('forms.createsItemType')}</Label>
         <BasePicker
           id="form-item-type"
@@ -184,6 +188,7 @@
           optionTestid={(option) => `form-item-type-${option.value}`}
           disabled={!formData.workspace_id}
         />
+        </FormField>
         {#if !formData.workspace_id}
           <DescriptionText>
             {t('channel.selectWorkspaceFirst')}

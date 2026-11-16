@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS actions (
 	created_by INTEGER,
 	actor_user_id INTEGER,         -- NULL = run as triggering user; set = impersonate (requires action.set_actor)
 	template_key TEXT,             -- Lineage stamp set when the action was created from a template (registry key)
+	current_revision_id INTEGER,   -- Live immutable definition revision (see action_definition_revisions)
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -23,6 +24,34 @@ CREATE INDEX IF NOT EXISTS idx_actions_workspace_id ON actions(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_actions_is_enabled ON actions(is_enabled);
 CREATE INDEX IF NOT EXISTS idx_actions_trigger_type ON actions(trigger_type);
 CREATE INDEX IF NOT EXISTS idx_actions_created_by ON actions(created_by);
+
+-- Immutable, attributable snapshots of an action's executable definition.
+-- Rows are retained after the action is deleted (no ON DELETE CASCADE) so an
+-- execution log can always be traced back to the definition that ran. The
+-- snapshot captures trigger/config, nodes/config (including future script
+-- source), edges, actor override, enablement, and execution-role restrictions.
+CREATE TABLE IF NOT EXISTS action_definition_revisions (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	action_id INTEGER NOT NULL,
+	workspace_id INTEGER NOT NULL,
+	revision_number INTEGER NOT NULL,
+	source TEXT NOT NULL,              -- create, update, template_apply, baseline, import, restore
+	editor_user_id INTEGER,            -- NULL for baseline/system revisions
+	editor_username TEXT NOT NULL DEFAULT '',
+	editor_source TEXT NOT NULL DEFAULT '',  -- USER, SCIM, SYSTEM
+	change_summary TEXT NOT NULL DEFAULT '',
+	changed_fields TEXT NOT NULL DEFAULT '[]',
+	snapshot TEXT NOT NULL,            -- JSON ActionDefinitionSnapshot
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	UNIQUE (action_id, revision_number),
+	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+	FOREIGN KEY (editor_user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_action_definition_revisions_action_id
+	ON action_definition_revisions(action_id, revision_number DESC);
+CREATE INDEX IF NOT EXISTS idx_action_definition_revisions_workspace_id
+	ON action_definition_revisions(workspace_id, created_at DESC);
 
 -- Optional role allowlist for manual actions. No rows means the action is
 -- available to every workspace editor; one or more rows restrict visibility
@@ -85,6 +114,7 @@ CREATE TABLE IF NOT EXISTS action_execution_logs (
 	completed_at DATETIME,
 	error_message TEXT,
 	execution_trace TEXT,          -- JSON step log
+	definition_revision_id INTEGER, -- Immutable definition revision that ran
 	durable_event_key TEXT,
 	FOREIGN KEY (action_id) REFERENCES actions(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,

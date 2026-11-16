@@ -91,9 +91,11 @@
       suppressCommit = false;
       return;
     }
-    // Focus moving to a control inside the wrapper (save/cancel button, picker)
-    // is not a commit trigger.
+    // Keep editing while focus moves within the editor or its owned popup.
     if (event.relatedTarget && container?.contains(event.relatedTarget)) return;
+    if (event.relatedTarget && Array.from(container?.querySelectorAll('[aria-controls]') || []).some(
+      (control) => document.getElementById(control.getAttribute('aria-controls'))?.contains(event.relatedTarget)
+    )) return;
     void commit();
   }
 

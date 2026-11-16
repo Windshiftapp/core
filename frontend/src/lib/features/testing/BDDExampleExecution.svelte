@@ -210,7 +210,7 @@
               <Badge size="xs">{column}: {row.row[i] ?? ''}</Badge>
             {/each}
           </div>
-          <div class="flex items-center gap-2">
+          <div role="group" aria-label={t('testing.recordResult')} class="flex flex-wrap items-center gap-2">
             {#if saving[row.exampleIndex]}
               <Loader2 class="w-4 h-4 animate-spin" style="color: var(--ds-text-subtle);" />
             {/if}
@@ -315,4 +315,3 @@
     {/if}
   {/if}
 </div>
-

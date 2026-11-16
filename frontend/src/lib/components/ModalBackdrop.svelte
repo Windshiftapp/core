@@ -1,6 +1,7 @@
 <script>
   import { tick } from 'svelte';
   import { portal as portalAction } from '../actions/portal.js';
+  import { createOverlayScope, mountOverlay, overlayOwnsFocus, overlayHasFocusedControl, isFocusEligible, tabStops } from '../utils/overlayScope.js';
 
   let {
     show = $bindable(false),
@@ -8,9 +9,6 @@
     blur = 2,
     extraFilter = '',
     zIndex = 50,
-    // Move the backdrop to <body>. Required when another dialog is itself
-    // portaled: a same-z-index backdrop inside the app root would otherwise
-    // paint underneath the portaled dialog regardless of source order.
     portal = false,
     align = 'center',
     paddingTop = '',
@@ -18,156 +16,97 @@
     closeOnClick = true,
     closeOnEscape = true,
     ariaLabelledBy = undefined,
-    /** CSS selector for the element that should receive focus first. */
-    initialFocus = '[data-autofocus], [autofocus]',
-    /** Called first for every keydown that reaches the backdrop. */
+    ariaLabel = undefined,
+    initialFocus = /** @type {string | false} */ ('[data-autofocus], [autofocus]'),
+    focusOnOpen = true,
+    backdropElement = $bindable(null),
+    class: className = '',
+    dataTestid = undefined,
+    id = undefined,
+    onBackdropClick = undefined,
     onKeydown = undefined,
     onclose = undefined,
     children = undefined,
   } = $props();
 
-  let backdropRef = $state(null);
-  let previouslyFocusedElement = null;
-
+  const scope = createOverlayScope();
+  const instanceId = $props.id();
+  const titleId = `${instanceId}-title`;
+  let headingId = $state(undefined);
+  let validExplicitId = $state(undefined);
   const bgStyle = $derived(`rgba(0, 0, 0, ${opacity})`);
-  const filterStyle = $derived(
-    [blur > 0 ? `blur(${blur}px)` : '', extraFilter].filter(Boolean).join(' ') || 'none'
-  );
+  const filterStyle = $derived([blur > 0 ? `blur(${blur}px)` : '', extraFilter].filter(Boolean).join(' ') || 'none');
+  const layoutClasses = $derived(align === 'center' ? 'flex items-center justify-center p-4'
+    : align === 'top' ? `flex items-start justify-center ${paddingTop}${scrollable ? ' overflow-y-auto' : ''}` : '');
 
-  const layoutClasses = $derived(
-    align === 'center'
-      ? 'flex items-center justify-center p-4'
-      : align === 'top'
-        ? `flex items-start justify-center ${paddingTop}${scrollable ? ' overflow-y-auto' : ''}`
-        : ''
-  );
-
-  const focusableSelector = [
-    'a[href]',
-    'area[href]',
-    'button:not([disabled])',
-    'input:not([disabled]):not([type="hidden"])',
-    'select:not([disabled])',
-    'textarea:not([disabled])',
-    'iframe',
-    'object',
-    'embed',
-    '[contenteditable="true"]',
-    '[tabindex]:not([tabindex="-1"])'
-  ].join(',');
-
-  // Focus management: save focus before opening, put focus into the modal,
-  // trap Tab/Shift+Tab while open, and restore focus on close. This makes
-  // modal workflows efficient for keyboard and screen-reader users instead of
-  // dropping them on the page behind the overlay.
-  $effect(() => {
-    if (show && !previouslyFocusedElement) {
-      previouslyFocusedElement = document.activeElement;
-      void focusInitialElement();
-    }
-    if (!show && previouslyFocusedElement) {
-      previouslyFocusedElement?.focus?.();
-      previouslyFocusedElement = null;
-    }
-  });
-
-  // Some callers conditionally render the entire ModalBackdrop. In that case
-  // the component is destroyed in the same update that closes it, before the
-  // effect above can observe `show === false`. Restore the trigger on teardown
-  // as well so both persistent and conditionally rendered dialogs behave the
-  // same for keyboard users.
-  $effect(() => {
-    return () => {
-      previouslyFocusedElement?.focus?.();
-      previouslyFocusedElement = null;
-    };
-  });
-
-  function getFocusableElements() {
-    if (!backdropRef) return [];
-    return Array.from(backdropRef.querySelectorAll(focusableSelector)).filter((el) => {
-      if (!(el instanceof HTMLElement)) return false;
-      if (el.hasAttribute('disabled') || el.getAttribute('aria-hidden') === 'true') return false;
-      const style = window.getComputedStyle(el);
-      return style.display !== 'none' && style.visibility !== 'hidden' && el.offsetParent !== null;
-    });
+  function resolveName(root) {
+    const explicit = ariaLabelledBy?.split(/\s+/).filter(Boolean);
+    validExplicitId = explicit?.every((id) => document.getElementById(id)) ? ariaLabelledBy : undefined;
+    const heading = [...scope.headings, ...root.querySelectorAll('h1, h2, h3, [data-dialog-title]')]
+      .find((element) => element.closest('[role="dialog"]') === root && element.textContent.trim());
+    if (heading && !heading.id) heading.id = titleId;
+    headingId = heading?.id;
   }
 
-  async function focusInitialElement() {
-    await tick();
-    if (!show || !backdropRef) return;
+  $effect(() => {
+    if (backdropElement) resolveName(backdropElement);
+  });
 
-    const preferred = initialFocus ? backdropRef.querySelector(initialFocus) : null;
-    if (preferred instanceof HTMLElement && !preferred.hasAttribute('disabled')) {
-      preferred.focus();
-      return;
-    }
-
-    const [first] = getFocusableElements();
-    (first || backdropRef)?.focus();
+  function manageOverlay(root) {
+    const teardown = mountOverlay(scope, root, handleKeydown);
+    let mounted = true;
+    resolveName(root);
+    const names = new MutationObserver(() => resolveName(root));
+    names.observe(root, { childList: true, subtree: true, characterData: true });
+    void tick().then(() => {
+      if (!mounted || !focusOnOpen || !overlayOwnsFocus(root) || overlayHasFocusedControl(root)) return;
+      const preferred = typeof initialFocus === 'string' ? root.querySelector(initialFocus) : null;
+      const target = initialFocus === false ? root : isFocusEligible(preferred) ? preferred : tabStops(root)[0] || root;
+      target.focus({ preventScroll: true });
+    });
+    return { destroy() { mounted = false; names.disconnect(); teardown(); } };
   }
 
   function handleClick(event) {
-    // Outside-click dismissal can silently discard typed-in form data, so
-    // creation / editing dialogs opt out (closeOnClick=false) and rely on
-    // their explicit buttons / Escape to close instead.
-    if (closeOnClick && event.target === event.currentTarget) {
-      close();
-    }
+    if (!overlayOwnsFocus(backdropElement) || event.target !== event.currentTarget) return;
+    onBackdropClick?.(event);
+    // Editing dialogs opt out of outside-click dismissal to avoid losing input.
+    if (show && closeOnClick && !event.defaultPrevented) close();
   }
 
   function handleKeydown(event) {
     onKeydown?.(event);
-
-    if (closeOnEscape && event.key === 'Escape') {
+    if (show && !event.defaultPrevented && closeOnEscape && event.key === 'Escape') {
+      event.preventDefault();
       close();
-      return;
-    }
-
-    if (event.key !== 'Tab') return;
-
-    const focusable = getFocusableElements();
-    if (focusable.length === 0) {
-      event.preventDefault();
-      backdropRef?.focus();
-      return;
-    }
-
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    const active = document.activeElement;
-
-    if (event.shiftKey) {
-      if (active === first || !backdropRef?.contains(active)) {
-        event.preventDefault();
-        last.focus();
-      }
-      return;
-    }
-
-    if (active === last || !backdropRef?.contains(active)) {
-      event.preventDefault();
-      first.focus();
     }
   }
 
   function close() {
+    if (!show) return;
     show = false;
     onclose?.();
   }
 </script>
 
 {#if show}
+  <!-- Keyboard dispatch is shared across this root and its owned portals. -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div
     use:portalAction={portal ? document.body : null}
-    bind:this={backdropRef}
-    class="fixed inset-0 {layoutClasses} focus:outline-none"
-    style="z-index: {zIndex}; background-color: {bgStyle}; backdrop-filter: {filterStyle};"
+    bind:this={backdropElement}
+    use:manageOverlay
+    {id}
+    class="fixed inset-0 {layoutClasses} focus:outline-none {className}"
+    style:z-index={zIndex}
+    style:background-color={bgStyle}
+    style:backdrop-filter={filterStyle}
     onclick={handleClick}
-    onkeydown={handleKeydown}
     role="dialog"
     aria-modal="true"
-    aria-labelledby={ariaLabelledBy}
+    aria-labelledby={validExplicitId || (!ariaLabel ? headingId : undefined)}
+    aria-label={!validExplicitId ? ariaLabel : undefined}
+    data-testid={dataTestid}
     tabindex="-1"
   >
     {@render children?.()}

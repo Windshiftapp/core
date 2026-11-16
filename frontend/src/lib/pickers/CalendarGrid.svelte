@@ -14,13 +14,13 @@
     getDayOfWeek,
     getLocalTimeZone,
     parseDate,
-    startOfWeek,
     toCalendar
   } from '@internationalized/date';
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import { untrack } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { resolveWeekStart } from '../stores/calendar.svelte.js';
   import { formatDate } from '../utils/dateFormatter.js';
   import { serverNow } from '../utils/serverClock.js';
 
@@ -30,6 +30,7 @@
     value = '',
     min = undefined,
     max = undefined,
+    step = undefined,
     readonly = false,
     disabled = false,
     dataTestid = undefined,
@@ -62,7 +63,7 @@
   // The calendar is instantiated once per mount; the parent remounts this
   // component when the calendar changes, so these props are read as initial
   // values on purpose.
-  const { intlCalendar, todayValue, selected, minValue, maxValue, weekStartsOn, dayNumber } = untrack(
+  const { intlCalendar, todayValue, selected, minValue, maxValue, dayNumber } = untrack(
     () => {
       const intlCalendar = createIntlCalendar(/** @type {any} */ (calendarId));
       const toDateValue = (ymd) => {
@@ -80,8 +81,6 @@
         selected: toDateValue(value),
         minValue: toDateValue(min),
         maxValue: toDateValue(max),
-        // Saturday for fa/ar, Monday for most of Europe, Sunday for en-US.
-        weekStartsOn: getDayOfWeek(startOfWeek(todayValue, locale), locale),
         dayNumber: new Intl.NumberFormat(locale, { useGrouping: false })
       };
     }
@@ -91,13 +90,13 @@
   const {
     elements: { calendar, heading, grid, cell, prevButton, nextButton },
     states: { months, weekdays, headingValue, value: selectedValue },
-    options: { minValue: minStore, maxValue: maxStore, readonly: readonlyStore, disabled: disabledStore }
+    options: { minValue: minStore, maxValue: maxStore, readonly: readonlyStore, disabled: disabledStore, weekStartsOn: weekStartStore, isDateUnavailable: unavailableStore }
   } = untrack(() =>
     createCalendar({
       locale,
       defaultPlaceholder: selected ?? todayValue,
       defaultValue: selected,
-      weekStartsOn: /** @type {0 | 1 | 2 | 3 | 4 | 5 | 6} */ (weekStartsOn),
+      preventDeselect: true,
       minValue,
       maxValue,
       weekdayFormat: 'short',
@@ -110,6 +109,18 @@
       }
     })
   );
+
+  $effect(() => {
+    const dayStep = Number(step);
+    const base = Date.parse(min || '1970-01-01');
+    $unavailableStore = (date) => dayStep > 0 && (Date.parse(date.toString()) - base) / 86400000 % dayStep !== 0;
+  });
+
+  $effect(() => {
+    // Melt's implementation indexes weekdays relative to the locale, not Sunday.
+    const firstDay = parseDate('2025-01-05').add({ days: resolveWeekStart(locale) });
+    $weekStartStore = /** @type {0 | 1 | 2 | 3 | 4 | 5 | 6} */ (getDayOfWeek(firstDay, locale));
+  });
 
   $effect(() => {
     syncing = true;
@@ -142,6 +153,7 @@
   dir={isRTL ? 'rtl' : 'ltr'}
   class="calendar"
   data-testid={dataTestid}
+  data-calendar-start={$months?.[0]?.value?.toString()}
 >
   <div class="calendar-header">
     <button

@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { confirm } from '../../composables/useConfirm.js';
@@ -85,7 +85,11 @@
     await loadData();
   });
 
+  const controller = new AbortController();
+  onDestroy(() => controller.abort());
+
   async function loadData() {
+    if (controller.signal.aborted) return;
     try {
       loading = true;
       // Global lists exclude local iterations; workspace lists include both scopes.
@@ -93,13 +97,15 @@
         ? { is_global: true }
         : { workspace_id: workspaceId, include_global: true };
       const [iterationsData, typesData] = await Promise.all([
-        iterationsApi.getAll(filters),
-        iterationTypesApi.getAll()
+        iterationsApi.getAll(filters, { signal: controller.signal }),
+        iterationTypesApi.getAll({}, { signal: controller.signal })
       ]);
+      if (controller.signal.aborted) return;
       // Force reactivity by creating new array
       iterations = Array.isArray(iterationsData) ? [...iterationsData] : [];
       iterationTypes = Array.isArray(typesData) ? [...typesData] : [];
     } catch (error) {
+      if (controller.signal.aborted || error?.name === 'AbortError') return;
       console.error('Failed to load iterations:', error);
     } finally {
       loading = false;
@@ -274,7 +280,7 @@
 </script>
 
 <!-- Main container with conditional two-panel layout for global view -->
-<div class="flex h-full min-h-0 overflow-hidden" style="background-color: var(--ds-surface);">
+<div class="flex h-full min-h-0 overflow-hidden" style="background-color: var(--ds-surface);" data-testid="iterations-view">
   <!-- Left Sidebar - Navigation (only in global view) -->
   {#if isGlobalView}
     <IterationNavigation />
@@ -320,7 +326,7 @@
         {:else}
           <IconBuilding class="w-4 h-4" style="color: var(--ds-text-subtle); min-width: 16px;" />
         {/if}
-        <span class="font-medium hover:underline cursor-pointer" dir="auto" style="color: var(--ds-text);">{item.name}</span>
+        <span class="font-medium hover:underline cursor-pointer" dir="auto" style="color: var(--ds-text);" data-testid={`iteration-name-${item.id}`}>{item.name}</span>
       {/snippet}
 
       {#snippet typeCell(item)}

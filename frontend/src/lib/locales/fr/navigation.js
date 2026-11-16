@@ -335,6 +335,8 @@ export default {
   },
 
   workspaceDashboard: {
+    loadError: 'Impossible de charger cette vue d’ensemble.',
+    chartError: 'Impossible de charger les valeurs du graphique. Réessayez pour obtenir les données complètes.',
     overview: 'Aperçu', overviewDescription: 'Métriques clés et statistiques', progress: 'Suivi de la progression', progressDescription: 'Graphiques et chronologies', homepage: 'Page d’accueil', loading: 'Chargement des données de l’espace de travail…', noSectionsHint: 'Choisissez Modifier pour ajouter des sections à la page d’accueil de l’espace de travail',
     customize: 'Personnaliser', doneEditing: 'Terminer la modification', editModeHint: 'Mode modification : ajoutez, renommez, réordonnez ou supprimez des sections et des widgets', weekOf: 'Semaine du {date}',
     widgets: {

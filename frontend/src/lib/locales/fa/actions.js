@@ -64,6 +64,7 @@ export default {
       "transitionItem": "مورد انتقال",
       "roundRobinAssign": "تخصیص نوبتی",
       "createMilestone": "نقطه عطف ایجاد کنید",
+      "executeScript": "اجرای اسکریپت",
       "notifyCustomer": "به مشتری اطلاع دهید",
       "insertCannedResponse": "درج پاسخ آماده",
       "adjustLabels": "برچسب ها را تنظیم کنید"
@@ -225,11 +226,30 @@ export default {
       "completed": "تکمیل شد",
       "failed": "شکست خورد",
       "skipped": "رد شد",
+      "reconciliationRequired": "نیاز به تطبیق",
       "startedAt": "شروع شده در",
       "completedAt": "تکمیل شده در",
       "error": "خطا",
       "details": "جزئیات",
       "viewDetails": "مشاهده جزئیات"
+    },
+    "history": {
+      "title": "تاریخچه تعریف",
+      "noRevisions": "بدون نسخه تعریف",
+      "revision": "نسخه",
+      "source": "منبع",
+      "editor": "ویرایش شده توسط",
+      "changedFields": "فیلدهای تغییر یافته",
+      "changeSummary": "خلاصه",
+      "createdAt": "ثبت شده در",
+      "viewDetails": "مشاهده نسخه",
+      "detailTitle": "نسخه تعریف",
+      "snapshot": "تعریف اجرایی",
+      "nodes": "گره‌ها",
+      "edges": "یال‌ها",
+      "noChangedFields": "تغییر اجرایی وجود ندارد",
+      "system": "سیستم (پایه)",
+      "triggerType": "محرک"
     },
     "trace": {
       "title": "جزئیات اجرا",

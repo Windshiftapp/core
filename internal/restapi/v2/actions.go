@@ -23,6 +23,8 @@ func registerActionRoutes(builder *routeBuilder, actions actionApplication) {
 	builder.Command(http.MethodDelete, "/workspaces/{workspace_id}/actions/{action_id}", AuthAuthenticated, []string{"actions:write"}, deleteAction(actions))
 	builder.JSON(http.MethodPost, "/workspaces/{workspace_id}/actions/{action_id}/execute", http.StatusOK, false, AuthAuthenticated, []string{"actions:write"}, executeAction(actions))
 	builder.Page("/workspaces/{workspace_id}/actions/{action_id}/logs", AuthAuthenticated, []string{"actions:read"}, actionLogs(actions))
+	builder.Page("/workspaces/{workspace_id}/actions/{action_id}/revisions", AuthAuthenticated, []string{"actions:read"}, actionRevisions(actions))
+	builder.Read("/workspaces/{workspace_id}/actions/{action_id}/revisions/{revision_id}", AuthAuthenticated, []string{"actions:read"}, actionRevision(actions))
 }
 
 func listActionTemplates(actions actionApplication) readOperation[[]services.ActionTemplateSummary] {
@@ -166,6 +168,36 @@ func actionLogs(actions actionApplication) pageOperation[*models.ActionExecution
 		}
 		result, total, err := actions.Logs(user.ID, workspaceID, actionID, page.PageSize, page.Offset)
 		return result, page, total, actionError(err)
+	}
+}
+
+func actionRevisions(actions actionApplication) pageOperation[models.ActionDefinitionRevisionSummary] {
+	return func(r *http.Request) ([]models.ActionDefinitionRevisionSummary, Pagination, int, error) {
+		user, workspaceID, actionID, err := actionTarget(r, true)
+		if err != nil {
+			return nil, Pagination{}, 0, err
+		}
+		page, err := ParsePage(r)
+		if err != nil {
+			return nil, Pagination{}, 0, err
+		}
+		result, total, err := actions.ListRevisions(user.ID, workspaceID, actionID, page.PageSize, page.Offset)
+		return result, page, total, actionError(err)
+	}
+}
+
+func actionRevision(actions actionApplication) readOperation[*models.ActionDefinitionRevision] {
+	return func(r *http.Request) (*models.ActionDefinitionRevision, error) {
+		user, workspaceID, actionID, err := actionTarget(r, true)
+		if err != nil {
+			return nil, err
+		}
+		revisionID, err := pathID(r, "revision_id")
+		if err != nil {
+			return nil, err
+		}
+		result, err := actions.GetRevision(user.ID, workspaceID, actionID, revisionID)
+		return result, actionError(err)
 	}
 }
 

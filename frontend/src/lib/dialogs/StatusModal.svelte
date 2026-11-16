@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../components/FormField.svelte';
   import Modal from './Modal.svelte';
   import ModalHeader from './ModalHeader.svelte';
   import DialogFooter from './DialogFooter.svelte';
@@ -78,16 +79,16 @@
             />
           {/if}
 
-          <div class="mb-4">
-            <Label color="default" required class="mb-2">{t('common.category')}</Label>
+          <FormField label={t('common.category')} required>
             <BasePicker
               bind:value={formData.category_id}
               items={categories}
               placeholder={t('categories.selectCategory')}
               getValue={(item) => item.id}
               getLabel={categoryDisplayName}
+              inputTestid="status-modal-category"
             />
-          </div>
+          </FormField>
 
           {#if !isEditing}
             <div class="mb-4">

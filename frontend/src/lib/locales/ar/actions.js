@@ -61,6 +61,7 @@ export default {
       transitionItem: 'نقل العنصر',
       roundRobinAssign: 'تعيين بالتناوب',
       createMilestone: 'إنشاء معلم',
+      executeScript: 'تشغيل البرنامج النصي',
     },
 
     aiUpdated: 'تم تحديث الإجراء بواسطة الذكاء الاصطناعي',
@@ -165,6 +166,7 @@ export default {
       completed: 'مكتمل',
       failed: 'فشل',
       skipped: 'تم تخطيه',
+      reconciliationRequired: 'مطلوب تسوية',
       startedAt: 'بدأ في',
       completedAt: 'اكتمل في',
       error: 'خطأ',

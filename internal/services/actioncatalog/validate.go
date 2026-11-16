@@ -8,10 +8,15 @@ import (
 	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
+	"github.com/grafana/sobek"
 
 	"windshift/internal/models"
 	"windshift/internal/repository/actionutil"
 )
+
+// maxExecuteScriptSourceBytes mirrors the executor's 10 KB source cap so a
+// definition that validates is also one the runtime will accept.
+const maxExecuteScriptSourceBytes = 10240
 
 // ValidationError is one structured grievance against an action definition.
 // Code is a short machine-readable tag clients can switch on; Path points at
@@ -444,7 +449,38 @@ func validateNodeConfigValues(n models.ActionNode) (msg, field string) {
 			}
 		}
 	}
+	// Script source is validated for syntax only; saving never executes it and
+	// never makes a live API call.
+	if n.NodeType == models.ActionNodeExecuteScript {
+		var cfg models.ExecuteScriptNodeConfig
+		if err := json.Unmarshal([]byte(n.NodeConfig), &cfg); err == nil {
+			if strings.TrimSpace(cfg.Source) == "" {
+				return "source is required", "source"
+			}
+			if len(cfg.Source) > maxExecuteScriptSourceBytes {
+				return fmt.Sprintf("source exceeds %d bytes", maxExecuteScriptSourceBytes), "source"
+			}
+			if _, err := sobek.Compile("action_script", "(function() {\n"+cfg.Source+"\n})()", false); err != nil {
+				return fmt.Sprintf("source has a syntax error: %v", err), "source"
+			}
+			if cfg.OutputVariable != "" && !isScriptIdentifier(cfg.OutputVariable) {
+				return fmt.Sprintf("output_variable %q is not a valid identifier", cfg.OutputVariable), "output_variable"
+			}
+		}
+	}
 	return "", ""
+}
+
+func isScriptIdentifier(name string) bool {
+	for i, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r == '_':
+		case i > 0 && r >= '0' && r <= '9':
+		default:
+			return false
+		}
+	}
+	return name != ""
 }
 
 func nodeCapabilityAvailable(caps CapabilityResolver, workspaceID, capabilityID int, nodeType models.ActionNodeType) bool {

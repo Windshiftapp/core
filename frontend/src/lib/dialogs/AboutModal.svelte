@@ -1,4 +1,5 @@
 <script>
+  const dialogId = $props.id();
   import X from '@lucide/svelte/icons/x';
   import Button from '../components/Button.svelte';
   import ModalBackdrop from '../components/ModalBackdrop.svelte';
@@ -34,7 +35,7 @@
 </script>
 
 <!-- shortcut-guard-exempt: informational dialog with no form; the primary button only closes, so there is nothing to submit. -->
-<ModalBackdrop bind:show onclose={close} ariaLabelledBy="desktop-about-title" zIndex={70}>
+<ModalBackdrop bind:show onclose={close} ariaLabelledBy="{dialogId}-title" zIndex={70}>
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
   <div
     role="presentation"
@@ -43,7 +44,7 @@
     onclick={(e) => e.stopPropagation()}
   >
     <div class="flex items-center justify-between border-b px-6 py-4" style="border-color: var(--ds-border);">
-      <h2 id="desktop-about-title" class="text-lg font-semibold">About Windshift</h2>
+      <h2 id="{dialogId}-title" class="text-lg font-semibold">About Windshift</h2>
       <Button variant="ghost" icon={X} onclick={close} title={t('common.close')} />
     </div>
 

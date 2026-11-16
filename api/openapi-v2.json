@@ -18860,6 +18860,11 @@
                       "description": "The creator name value.",
                       "type": "string"
                     },
+                    "current_revision_id": {
+                      "description": "The current revision id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
                     "description": {
                       "description": "The description value.",
                       "type": "string"
@@ -31962,6 +31967,10 @@
                 },
                 "description": "The view state value.",
                 "type": "object"
+              },
+              "week_start": {
+                "description": "The week start value.",
+                "type": "string"
               }
             },
             "required": [
@@ -31972,7 +31981,8 @@
               "due_date_reminders_enabled",
               "saved_filters",
               "tui",
-              "view_state"
+              "view_state",
+              "week_start"
             ],
             "type": "object"
           }
@@ -33443,6 +33453,11 @@
                   "nullable": true,
                   "type": "string"
                 },
+                "definition_revision_id": {
+                  "description": "The definition revision id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
                 "duration_ms": {
                   "description": "The duration ms value.",
                   "nullable": true,
@@ -33559,6 +33574,11 @@
               "creator_name": {
                 "description": "The creator name value.",
                 "type": "string"
+              },
+              "current_revision_id": {
+                "description": "The current revision id value.",
+                "nullable": true,
+                "type": "integer"
               },
               "description": {
                 "description": "The description value.",
@@ -33717,6 +33737,313 @@
         ],
         "type": "object"
       },
+      "GetWorkspacesWorkspaceIdActionsActionIdRevisionsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "action_id": {
+                  "description": "The action id value.",
+                  "type": "integer"
+                },
+                "change_summary": {
+                  "description": "The change summary value.",
+                  "type": "string"
+                },
+                "changed_fields": {
+                  "description": "The changed fields value.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "created_at": {
+                  "description": "The created at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "editor_source": {
+                  "description": "The editor source value.",
+                  "type": "string"
+                },
+                "editor_user_id": {
+                  "description": "The editor user id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "editor_username": {
+                  "description": "The editor username value.",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "The id value.",
+                  "type": "integer"
+                },
+                "revision_number": {
+                  "description": "The revision number value.",
+                  "type": "integer"
+                },
+                "source": {
+                  "description": "The source value.",
+                  "type": "string"
+                },
+                "workspace_id": {
+                  "description": "The workspace id value.",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "action_id",
+                "changed_fields",
+                "created_at",
+                "id",
+                "revision_number",
+                "source",
+                "workspace_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "GetWorkspacesWorkspaceIdActionsActionIdRevisionsRevisionIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "action_id": {
+                "description": "The action id value.",
+                "type": "integer"
+              },
+              "change_summary": {
+                "description": "The change summary value.",
+                "type": "string"
+              },
+              "changed_fields": {
+                "description": "The changed fields value.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "created_at": {
+                "description": "The created at value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "editor_source": {
+                "description": "The editor source value.",
+                "type": "string"
+              },
+              "editor_user_id": {
+                "description": "The editor user id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "editor_username": {
+                "description": "The editor username value.",
+                "type": "string"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "integer"
+              },
+              "revision_number": {
+                "description": "The revision number value.",
+                "type": "integer"
+              },
+              "snapshot": {
+                "additionalProperties": false,
+                "description": "The snapshot value.",
+                "properties": {
+                  "actor_user_id": {
+                    "description": "The actor user id value.",
+                    "nullable": true,
+                    "type": "integer"
+                  },
+                  "allowed_role_ids": {
+                    "description": "The allowed role ids value.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "description": {
+                    "description": "The description value.",
+                    "type": "string"
+                  },
+                  "edges": {
+                    "description": "The edges value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "action_id": {
+                          "description": "The action id value.",
+                          "type": "integer"
+                        },
+                        "created_at": {
+                          "description": "The created at value.",
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        "edge_type": {
+                          "description": "The edge type value.",
+                          "type": "string"
+                        },
+                        "id": {
+                          "description": "The id value.",
+                          "type": "integer"
+                        },
+                        "source_handle": {
+                          "description": "The source handle value.",
+                          "type": "string"
+                        },
+                        "source_node_id": {
+                          "description": "The source node id value.",
+                          "type": "integer"
+                        },
+                        "target_handle": {
+                          "description": "The target handle value.",
+                          "type": "string"
+                        },
+                        "target_node_id": {
+                          "description": "The target node id value.",
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "action_id",
+                        "created_at",
+                        "edge_type",
+                        "id",
+                        "source_node_id",
+                        "target_node_id"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "is_enabled": {
+                    "description": "The is enabled value.",
+                    "type": "boolean"
+                  },
+                  "name": {
+                    "description": "The name value.",
+                    "type": "string"
+                  },
+                  "nodes": {
+                    "description": "The nodes value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "action_id": {
+                          "description": "The action id value.",
+                          "type": "integer"
+                        },
+                        "created_at": {
+                          "description": "The created at value.",
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        "id": {
+                          "description": "The id value.",
+                          "type": "integer"
+                        },
+                        "node_config": {
+                          "description": "The node config value.",
+                          "type": "string"
+                        },
+                        "node_type": {
+                          "description": "The node type value.",
+                          "type": "string"
+                        },
+                        "position_x": {
+                          "description": "The position x value.",
+                          "type": "number"
+                        },
+                        "position_y": {
+                          "description": "The position y value.",
+                          "type": "number"
+                        },
+                        "updated_at": {
+                          "description": "The updated at value.",
+                          "format": "date-time",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "action_id",
+                        "created_at",
+                        "id",
+                        "node_config",
+                        "node_type",
+                        "position_x",
+                        "position_y",
+                        "updated_at"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "trigger_config": {
+                    "description": "The trigger config value.",
+                    "type": "string"
+                  },
+                  "trigger_type": {
+                    "description": "The trigger type value.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "allowed_role_ids",
+                  "edges",
+                  "is_enabled",
+                  "name",
+                  "nodes",
+                  "trigger_type"
+                ],
+                "type": "object"
+              },
+              "source": {
+                "description": "The source value.",
+                "type": "string"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "action_id",
+              "changed_fields",
+              "created_at",
+              "id",
+              "revision_number",
+              "snapshot",
+              "source",
+              "workspace_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "GetWorkspacesWorkspaceIdActionsResult": {
         "additionalProperties": false,
         "properties": {
@@ -33754,6 +34081,11 @@
                 "creator_name": {
                   "description": "The creator name value.",
                   "type": "string"
+                },
+                "current_revision_id": {
+                  "description": "The current revision id value.",
+                  "nullable": true,
+                  "type": "integer"
                 },
                 "description": {
                   "description": "The description value.",
@@ -38529,6 +38861,72 @@
         "required": [
           "data",
           "pagination"
+        ],
+        "type": "object"
+      },
+      "GetWorkspacesWorkspaceIdOverviewChartsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "buckets": {
+                "description": "The buckets value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "completed": {
+                      "description": "The completed value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "created": {
+                      "description": "The created value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "date": {
+                      "description": "The date value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "date"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "completion_definition": {
+                "description": "The completion definition value.",
+                "type": "string"
+              },
+              "from": {
+                "description": "The from value.",
+                "type": "string"
+              },
+              "timezone": {
+                "description": "The timezone value.",
+                "type": "string"
+              },
+              "to": {
+                "description": "The to value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "buckets",
+              "completion_definition",
+              "from",
+              "timezone",
+              "to"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
         ],
         "type": "object"
       },
@@ -49425,6 +49823,11 @@
                     "creator_name": {
                       "description": "The creator name value.",
                       "type": "string"
+                    },
+                    "current_revision_id": {
+                      "description": "The current revision id value.",
+                      "nullable": true,
+                      "type": "integer"
                     },
                     "description": {
                       "description": "The description value.",
@@ -60364,6 +60767,11 @@
             "description": "The view state value.",
             "nullable": true,
             "type": "object"
+          },
+          "week_start": {
+            "description": "The week start value.",
+            "nullable": true,
+            "type": "string"
           }
         },
         "type": "object"
@@ -60537,6 +60945,10 @@
                 },
                 "description": "The view state value.",
                 "type": "object"
+              },
+              "week_start": {
+                "description": "The week start value.",
+                "type": "string"
               }
             },
             "required": [
@@ -60547,7 +60959,8 @@
               "due_date_reminders_enabled",
               "saved_filters",
               "tui",
-              "view_state"
+              "view_state",
+              "week_start"
             ],
             "type": "object"
           }
@@ -60828,6 +61241,11 @@
               "creator_name": {
                 "description": "The creator name value.",
                 "type": "string"
+              },
+              "current_revision_id": {
+                "description": "The current revision id value.",
+                "nullable": true,
+                "type": "integer"
               },
               "description": {
                 "description": "The description value.",
@@ -91522,6 +91940,11 @@
               "creator_name": {
                 "description": "The creator name value.",
                 "type": "string"
+              },
+              "current_revision_id": {
+                "description": "The current revision id value.",
+                "nullable": true,
+                "type": "integer"
               },
               "description": {
                 "description": "The description value.",
@@ -124973,6 +125396,173 @@
         ]
       }
     },
+    "/workspaces/{workspace_id}/actions/{action_id}/revisions": {
+      "get": {
+        "description": "List action definition revisions. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getWorkspacesWorkspaceIdActionsActionIdRevisions",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The action identifier.",
+            "in": "path",
+            "name": "action_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "One-based page number.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Maximum number of resources to return.",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetWorkspacesWorkspaceIdActionsActionIdRevisionsResult"
+                }
+              }
+            },
+            "description": "List action definition revisions response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List action definition revisions",
+        "tags": [
+          "Automation"
+        ],
+        "x-required-scopes": [
+          "actions:read"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/actions/{action_id}/revisions/{revision_id}": {
+      "get": {
+        "description": "Get an action definition revision. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getWorkspacesWorkspaceIdActionsActionIdRevisionsRevisionId",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The action identifier.",
+            "in": "path",
+            "name": "action_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The definition revision identifier.",
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetWorkspacesWorkspaceIdActionsActionIdRevisionsRevisionIdResult"
+                }
+              }
+            },
+            "description": "Get an action definition revision response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get an action definition revision",
+        "tags": [
+          "Automation"
+        ],
+        "x-required-scopes": [
+          "actions:read"
+        ]
+      }
+    },
     "/workspaces/{workspace_id}/agent-runs": {
       "get": {
         "description": "Returns at most 200 visible agent runs in stable newest-first ID order. next_cursor resumes exclusively before the final returned run; private verification runs and unauthorized runs are omitted.",
@@ -128111,6 +128701,106 @@
         ],
         "x-required-scopes": [
           "items:write"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/overview-charts": {
+      "get": {
+        "description": "Returns zero-filled daily counts for the current workspace/collection cohort, without item bodies or pagination. Dates are inclusive UTC calendar dates, at most 366 days. Completion is each item's first recorded transition from a non-completed status to a completed status; creation in a completed status is not inferred. Edits, reopening, and recompletion do not move or duplicate that event. Merged/deleted items are excluded. A collection must belong to this workspace and be visible to the caller; inaccessible scopes return 404. Unrequested series are omitted.",
+        "operationId": "getWorkspacesWorkspaceIdOverviewCharts",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Inclusive UTC date (YYYY-MM-DD).",
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Inclusive UTC date (YYYY-MM-DD).",
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional visible collection belonging to this workspace; its current saved query restricts both series.",
+            "in": "query",
+            "name": "collection_id",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Comma-separated requested series: created, completed, or both. Defaults to both.",
+            "in": "query",
+            "name": "series",
+            "required": false,
+            "schema": {
+              "default": "created,completed",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetWorkspacesWorkspaceIdOverviewChartsResult"
+                }
+              }
+            },
+            "description": "Get date-bounded overview chart counts response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get date-bounded overview chart counts",
+        "tags": [
+          "Workspaces"
+        ],
+        "x-required-scopes": [
+          "items:read"
         ]
       }
     },

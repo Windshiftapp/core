@@ -82,6 +82,7 @@ export default {
       notifyCustomer: 'Notify customer',
       insertCannedResponse: 'Insert canned response',
       adjustLabels: 'Adjust labels',
+      executeScript: 'Run script',
     },
 
     // Toast shown when the AI chat updates the open action via update_action.
@@ -266,11 +267,32 @@ export default {
       completed: 'Completed',
       failed: 'Failed',
       skipped: 'Skipped',
+      reconciliationRequired: 'Reconciliation required',
       startedAt: 'Started At',
       completedAt: 'Completed At',
       error: 'Error',
       details: 'Details',
       viewDetails: 'View Details',
+    },
+
+    // Definition history (immutable revisions)
+    history: {
+      title: 'Definition History',
+      noRevisions: 'No definition revisions',
+      revision: 'Revision',
+      source: 'Source',
+      editor: 'Edited By',
+      changedFields: 'Changed Fields',
+      changeSummary: 'Summary',
+      createdAt: 'Recorded At',
+      viewDetails: 'View Revision',
+      detailTitle: 'Definition Revision',
+      snapshot: 'Executable Definition',
+      nodes: 'Nodes',
+      edges: 'Edges',
+      noChangedFields: 'No executable change',
+      system: 'System (baseline)',
+      triggerType: 'Trigger',
     },
 
     // Execution trace

@@ -1,4 +1,5 @@
 <script>
+  import { brandStyle } from '../../utils/brandStyle.js';
   import { useResizeObserver } from 'runed';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import FileText from '@lucide/svelte/icons/file-text';
@@ -108,9 +109,9 @@
 
 <div
   class="public-form-shell min-h-screen flex flex-col"
-  class:ds-brand-scope={Boolean(brandColor)}
+  class:ds-brand-scope={Boolean(brandStyle(brandColor))}
   data-ds-color-mode={isDarkMode ? 'dark' : 'light'}
-  style={brandColor ? `--ds-brand-color: ${brandColor}` : undefined}
+  style={brandStyle(brandColor)}
   data-testid="public-form-page"
   data-ready={!loading && !error}
 >

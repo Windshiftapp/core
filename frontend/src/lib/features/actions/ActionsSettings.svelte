@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { actions as actionsApi } from '../../api/actions.js';
   import { workspaces } from '../../api/workspaces.js';
   import { t } from '../../stores/i18n.svelte.js';
@@ -10,6 +10,7 @@
   import ActionsManager from './ActionsManager.svelte';
   import ActionFlowEditor from './ActionFlowEditor.svelte';
   import ActionLogs from './ActionLogs.svelte';
+  import ActionHistory from './ActionHistory.svelte';
   import ActionTemplatePicker from './ActionTemplatePicker.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import Button from '../../components/Button.svelte';
@@ -23,6 +24,8 @@
   import UnauthorizedAccess from '../../pages/UnauthorizedAccess.svelte';
 
   let { workspaceId, actionId = 0 } = $props();
+  const readController = new AbortController();
+  onDestroy(() => readController.abort());
 
   // Permission check
   let canManageActions = $derived(workspacePermissions.canManageActions(workspaceId));
@@ -32,6 +35,7 @@
   let loading = $state(true);
   let editingAction = $state(null);
   let viewingLogsAction = $state(null);
+  let viewingHistoryAction = $state(null);
   let showCreateModal = $state(false);
   let showTemplatePicker = $state(false);
   let detailsAction = $state(null);
@@ -143,7 +147,7 @@
     await loadActions();
     // Open the freshly created action in the editor. The URL effect will fetch
     // and hydrate editingAction once the route updates.
-    if (result?.action_id) {
+    if (!readController.signal.aborted && result?.action_id) {
       navigate(`/workspaces/${workspaceId}/actions/${result.action_id}`);
     }
   }
@@ -154,8 +158,9 @@
   });
 
   async function loadActions() {
+    if (readController.signal.aborted) return;
     try {
-      actions = await actionsApi.getAll(workspaceId) || [];
+      actions = await actionsApi.getAll(workspaceId, { signal: readController.signal }) || [];
     } catch (error) {
       if (error?.name === 'AbortError') return;
       console.error('Failed to load actions:', error);
@@ -165,9 +170,11 @@
   }
 
   async function loadStatuses() {
+    if (readController.signal.aborted) return;
     try {
-      statuses = await workspaces.getStatuses(workspaceId) || [];
+      statuses = await workspaces.getStatuses(workspaceId, null, { signal: readController.signal }) || [];
     } catch (error) {
+      if (readController.signal.aborted) return;
       console.error('Failed to load statuses:', error);
       statuses = [];
     }
@@ -196,7 +203,7 @@
       showCreateModal = false;
       successToast(t('common.created'));
       await loadActions();
-      navigate(`/workspaces/${workspaceId}/actions/${newAction.id}`);
+      if (!readController.signal.aborted) navigate(`/workspaces/${workspaceId}/actions/${newAction.id}`);
     } catch (error) {
       console.error('Failed to create action:', error);
       errorToast(t('errors.failedToCreate'));
@@ -237,6 +244,14 @@
     viewingLogsAction = null;
   }
 
+  function handleViewHistory(action) {
+    viewingHistoryAction = action;
+  }
+
+  function handleBackFromHistory() {
+    viewingHistoryAction = null;
+  }
+
   async function handleSaveAction(updatedAction) {
     try {
       await actionsApi.update(workspaceId, updatedAction.id, updatedAction);
@@ -274,6 +289,14 @@
       onBack={handleBackFromLogs}
     />
   </div>
+{:else if viewingHistoryAction}
+  <div class="h-full">
+    <ActionHistory
+      {workspaceId}
+      action={viewingHistoryAction}
+      onBack={handleBackFromHistory}
+    />
+  </div>
 {:else}
   <ActionsManager
     {workspaceId}
@@ -287,6 +310,7 @@
     ontoggle={handleToggle}
     ondelete={handleDelete}
     onviewlogs={handleViewLogs}
+    onviewhistory={handleViewHistory}
   />
 {/if}
 

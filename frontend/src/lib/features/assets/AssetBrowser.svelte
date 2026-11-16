@@ -1019,7 +1019,7 @@
       {/if}
     </div>
     <div class="flex justify-end gap-2 mt-6">
-      <Button variant="outline" type="button" onclick={() => showAssetForm = false} keyboardHint="Esc">{t('common.cancel')}</Button>
+      <Button variant="default" type="button" onclick={() => showAssetForm = false} keyboardHint="Esc">{t('common.cancel')}</Button>
       <Button
         dataTestid="asset-submit"
         type="submit"

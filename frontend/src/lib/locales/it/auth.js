@@ -4,6 +4,19 @@
 
 export default {
   auth: {
+    signInWithPasskey: 'Accedi con una passkey',
+    passkeyProgress: 'Segui le istruzioni per usare la tua passkey…',
+    showPassword: 'Mostra password',
+    hidePassword: 'Nascondi password',
+    usernameRequired: 'Email o nome utente obbligatorio',
+    loginOptionsError: 'Impossibile caricare le opzioni SSO. Riprova.',
+    passwordDisabled: 'L’accesso con password è disabilitato',
+    useSSO: 'Usa il Single Sign-On (SSO) per accedere.',
+    usePasskey: 'Usa una passkey per accedere.',
+    contactAdmin: 'Contatta l’amministratore per ottenere accesso.',
+    passkeyHint: 'Lascia vuoto il nome utente per scegliere una passkey, oppure inseriscilo per una vecchia chiave di sicurezza. Invio senza password usa una passkey.',
+    enrollFirstPasskey: 'Configura la tua prima passkey',
+    enrollmentPasswordHint: 'Usa la password solo per verificare la tua identità e registrare la prima passkey. La sola password non consente l’accesso.',
     login: 'Accedi',
     logout: 'Esci',
     signIn: 'Accedi',
@@ -42,6 +55,9 @@ export default {
   },
 
   users: {
+    weekStart: 'Primo giorno della settimana',
+    weekStartHint: 'Si applica ai calendari di tutta l’app. Automatico segue la lingua e la regione.',
+    calendarPreferencesSaveFailed: 'Lingua e fuso orario salvati, ma non è stato possibile salvare le preferenze del calendario.',
     title: 'Utenti',
     subtitle: 'Gestisci account utente e permessi',
     user: 'Utente',

@@ -1,4 +1,5 @@
 <script>
+  import DatePicker from '../pickers/DatePicker.svelte';
   import Calendar from '@lucide/svelte/icons/calendar';
   import Target from '@lucide/svelte/icons/target';
   import { t } from '../stores/i18n.svelte.js';
@@ -118,8 +119,9 @@
     >
       {#snippet children({ close: closePopover })}
         <div class="p-3">
-          <Input
-            type="date"
+          <DatePicker
+            inline
+            dataTestid="milestone-target-date"
             bind:value={form.values.target_date}
             onchange={() => {
               form.touchField('target_date');

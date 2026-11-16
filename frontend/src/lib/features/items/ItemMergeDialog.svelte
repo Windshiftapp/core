@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../../components/FormField.svelte';
   import Modal from '../../dialogs/Modal.svelte';
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
@@ -138,6 +139,7 @@
   />
   <div class="p-6 space-y-4">
     <div>
+      <FormField class="contents">
       <Label color="default" class="mb-2">{t('items.mergeDuplicateLabel')}</Label>
       <ItemPicker
         bind:value={duplicateId}
@@ -151,6 +153,7 @@
         searchTestid="item-merge-duplicate-search"
         optionTestid={(option) => `item-merge-duplicate-option-${option.value}`}
       />
+      </FormField>
       <DescriptionText>{t('items.mergeHelp')}</DescriptionText>
     </div>
     {#if differentRequester}

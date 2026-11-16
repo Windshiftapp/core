@@ -10,21 +10,20 @@ import (
 	"windshift/internal/models"
 )
 
-// Customer login reuses portal HTTP handlers; keep their legacy errors behind
-// the v2 transport boundary while forwarding cookies and direct JSON success bodies.
-type customerAccessResponse struct {
+// Login HTTP adapters buffer legacy responses before applying the v2 error contract.
+type loginHTTPResponse struct {
 	header http.Header
 	status int
 	body   bytes.Buffer
 }
 
-func (w *customerAccessResponse) Header() http.Header { return w.header }
-func (w *customerAccessResponse) WriteHeader(status int) {
+func (w *loginHTTPResponse) Header() http.Header { return w.header }
+func (w *loginHTTPResponse) WriteHeader(status int) {
 	if w.status == 0 {
 		w.status = status
 	}
 }
-func (w *customerAccessResponse) Write(body []byte) (int, error) {
+func (w *loginHTTPResponse) Write(body []byte) (int, error) {
 	if w.status == 0 {
 		w.status = http.StatusOK
 	}
@@ -48,7 +47,7 @@ func registerCustomerAccessRoutes(b *routeBuilder, deps Deps) {
 			if deps.CustomerAccess == nil {
 				return newError(http.StatusNotFound, "not_found", "Customer login is unavailable")
 			}
-			response := &customerAccessResponse{header: make(http.Header)}
+			response := &loginHTTPResponse{header: make(http.Header)}
 			operation(deps.CustomerAccess, response, r)
 			for key, values := range response.header {
 				for _, value := range values {

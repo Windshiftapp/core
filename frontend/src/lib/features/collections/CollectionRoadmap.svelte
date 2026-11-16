@@ -1,10 +1,9 @@
 <script>
-  import { onMount } from 'svelte';
   import { tick, untrack } from 'svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { items as itemsApi } from '../../api/items.js';
   import { collections } from '../../api/collections.js';
-  import { customFields as customFieldsApi, linkTypes as linkTypesApi, screens } from '../../api/configuration.js';
+  import { linkTypes as linkTypesApi, screens } from '../../api/configuration.js';
   import { createDependencyLoader } from './dependencyLoader.svelte.js';
   import { navigate } from '../../router.js';
   import {
@@ -41,10 +40,12 @@
   import { calendarDate as toCalendarDate, calendarMonthStart, calendarMonthPosition, calendarDateAtPosition, civilDays } from './roadmapCalendar.js';
   import { getAppLocale } from '../../stores/appLocale.svelte.js';
   import { resolveCalendar } from '../../stores/calendar.svelte.js';
+  import { startOfPreferredWeek } from '../../stores/calendar.svelte.js';
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import ItemKey from '../../components/ItemKey.svelte';
   import { SYSTEM_FIELDS } from '../../stores/fieldConfig.js';
   import Button from '../../components/Button.svelte';
+  import StateDisplay from '../../components/StateDisplay.svelte';
   import VirtualRows from '../../components/VirtualRows.svelte';
   import { useRoadmapVirtualRows } from './useRoadmapVirtualRows.svelte';
   import { collectionItemRowKey } from './collectionVirtualRows';
@@ -72,6 +73,10 @@
 
   // State
   let loading = $state(true);
+  let entryError = $state(false);
+  let entryRetry = $state(0);
+  let entryController = new AbortController();
+  let settingsState = $state('idle');
   let currentCollectionName = $state('Default');
 
   // Level-scoped base page plus lazily loaded subtrees.
@@ -311,9 +316,7 @@
     }
     d.setDate(d.getDate() + scrollOffset * zoomConfig.columnDays);
     if (zoom === 'week' || zoom === 'month') {
-      const day = d.getDay();
-      const diff = day === 0 ? -6 : 1 - day;
-      d.setDate(d.getDate() + diff);
+      return startOfPreferredWeek(d, getAppLocale());
     }
     return d;
   });
@@ -694,9 +697,10 @@
   }
 
   // Load config data
-  async function loadConfig() {
+  async function loadConfig(targetWorkspace, targetCollection, signal) {
     try {
-      const config = await collections.getBoardConfiguration(collectionId, workspaceId);
+      const config = await collections.getBoardConfiguration(targetCollection, targetWorkspace, { signal });
+      if (signal.aborted) return;
       boardConfig = config;
       boardConfigId = config.id;
       if (config.roadmap_config) {
@@ -706,28 +710,37 @@
           dependency_link_type_id: config.roadmap_config.dependency_link_type_id || null,
         };
       }
-    } catch {
-      // No config yet
+    } catch (error) {
+      if (signal.aborted || error?.status === 404) return;
+      throw error;
     }
   }
 
-  async function loadReferenceData() {
-    try {
-      const [lt, cf] = await Promise.all([
-        linkTypesApi.getAll(),
-        customFieldsApi.getAll(),
-      ]);
-      linkTypes = lt || [];
-      customFields = cf?.data || cf || [];
+  $effect(() => {
+    if (settingsOpen && !loading && !entryError && settingsState === 'idle') {
+      untrack(() => void loadReferenceData());
+    }
+  });
 
-      // Load screen fields to determine available date fields. The roadmap
-      // is workspace-scoped (not bound to a single item-type), so resolve the
-      // effective edit screen through the workspace's shared config cache.
-      const config = await workspaceDataStore.screenConfig(null);
-      const screenId = config?.edit_screen?.id ?? 1;
-      const screen = await screens.get(screenId);
+  async function loadReferenceData() {
+    const signal = entryController.signal;
+    settingsState = 'loading';
+    try {
+      const [lt, config] = await Promise.all([
+        linkTypesApi.getAll(false, { signal }),
+        workspaceDataStore.screenConfig(null),
+      ]);
+      if (signal.aborted) return;
+      const screen = config?.edit_screen?.fields
+        ? config.edit_screen
+        : await screens.get(config?.edit_screen?.id ?? 1, { signal });
+      if (signal.aborted) return;
+      linkTypes = lt || [];
       screenFields = screen?.fields || [];
+      settingsState = 'loaded';
     } catch (e) {
+      if (signal.aborted) return;
+      settingsState = 'error';
       console.error('Failed to load reference data:', e);
     }
   }
@@ -1108,16 +1121,43 @@
     }
   });
 
-  onMount(async () => {
-    if (workspaceId) {
-      await loadWorkspaceGradient(workspaceId);
-      await workspaceDataStore.initialize(workspaceId);
-    } else {
-      await workspaceDataStore.initializeGlobal();
-    }
-    await Promise.all([loadConfig(), loadReferenceData()]);
-    loading = false;
+  $effect(() => {
+    const targetWorkspace = workspaceId;
+    const targetCollection = collectionId;
+    void entryRetry;
+    const controller = new AbortController();
+    entryController = controller;
+    untrack(() => void loadEntry(targetWorkspace, targetCollection, controller.signal));
+    return () => controller.abort();
   });
+
+  async function loadEntry(targetWorkspace, targetCollection, signal) {
+    loading = true;
+    entryError = false;
+    settingsOpen = false;
+    settingsState = 'idle';
+    boardConfig = null;
+    boardConfigId = null;
+    roadmapConfig = { start_field_id: 'due_date', end_field_id: '', dependency_link_type_id: null };
+    linkTypes = [];
+    screenFields = [];
+    customFields = [];
+    try {
+      await Promise.all([
+        targetWorkspace ? loadWorkspaceGradient(targetWorkspace) : null,
+        targetWorkspace ? workspaceDataStore.initialize(targetWorkspace) : workspaceDataStore.initializeGlobal(),
+        loadConfig(targetWorkspace, targetCollection, signal),
+      ]);
+      if (signal.aborted) return;
+      customFields = workspaceDataStore.customFieldDefinitions ?? [];
+    } catch (error) {
+      if (signal.aborted) return;
+      entryError = true;
+      console.error('Failed to load roadmap:', error);
+    } finally {
+      if (!signal.aborted) loading = false;
+    }
+  }
 </script>
 
 {#if loading}
@@ -1126,10 +1166,10 @@
     contextVars={styles.contextVars}
     contentClass="flex items-center justify-center min-h-screen"
   >
-    <div class="animate-pulse" style="color: var(--ctx-text-subtle, var(--ds-text-subtle));">
-      {t('collections.roadmapSettings')}...
-    </div>
+    <StateDisplay type="loading" />
   </StaticViewBackground>
+{:else if entryError}
+  <StateDisplay type="error" onRetry={() => entryRetry += 1} dataTestid="roadmap-entry-error" />
 {:else}
   <StaticViewBackground
     backgroundStyle={styles.backgroundStyle}
@@ -1168,6 +1208,11 @@
                   data-testid="roadmap-settings-panel"
                 >
                   <div class="flex flex-col gap-3">
+                    {#if settingsState === 'loading'}
+                      <StateDisplay type="loading" dataTestid="roadmap-settings-loading" />
+                    {:else if settingsState === 'error'}
+                      <StateDisplay type="error" onRetry={loadReferenceData} dataTestid="roadmap-settings-error" />
+                    {/if}
                     <div>
                       <div class="block text-xs font-medium mb-1" style="color: var(--ds-text-subtle);">{t('collections.roadmapStartField')}</div>
                       <Select
@@ -1175,7 +1220,7 @@
                         value={roadmapConfig.start_field_id}
                         options={dateFieldOptions}
                         size="small"
-                        disabled={!canConfigure}
+                        disabled={!canConfigure || settingsState !== 'loaded'}
                         portalOwner="roadmap-settings"
                         onchange={onStartFieldChange}
                       />
@@ -1187,7 +1232,7 @@
                         value={roadmapConfig.end_field_id}
                         options={[{ value: '', label: t('collections.roadmapNone') }, ...dateFieldOptions]}
                         size="small"
-                        disabled={!canConfigure}
+                        disabled={!canConfigure || settingsState !== 'loaded'}
                         portalOwner="roadmap-settings"
                         onchange={onEndFieldChange}
                       />
@@ -1199,7 +1244,7 @@
                         value={roadmapConfig.dependency_link_type_id ? String(roadmapConfig.dependency_link_type_id) : ''}
                         options={linkTypeOptions}
                         size="small"
-                        disabled={!canConfigure}
+                        disabled={!canConfigure || settingsState !== 'loaded'}
                         portalOwner="roadmap-settings"
                         onchange={onLinkTypeChange}
                       />

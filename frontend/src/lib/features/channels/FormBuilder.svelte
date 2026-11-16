@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../../components/FormField.svelte';
   import { onMount, onDestroy } from 'svelte';
   import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
   import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
@@ -504,6 +505,7 @@
             </div>
 
             <div>
+              <FormField class="contents" requiredMark>
               <Label color="default" required class="mb-2">{t('channel.targetWorkspace')}</Label>
               <BasePicker
                 id="form-routing-workspace"
@@ -515,9 +517,11 @@
                 optionTestid={(opt) => `form-routing-ws-${opt.value}`}
                 disabled
               />
+              </FormField>
             </div>
 
             <div>
+              <FormField class="contents" requiredMark>
               <Label color="default" required class="mb-2">{t('forms.createsItemType')}</Label>
               <BasePicker
                 id="form-routing-itemtype"
@@ -529,6 +533,7 @@
                 disabled
                 optionTestid={(opt) => `form-routing-it-${opt.value}`}
               />
+              </FormField>
               <DescriptionText>{t('portal.bindingLocked', 'Fixed after creation. Delete and recreate the request type to change it.')}</DescriptionText>
             </div>
 
@@ -702,6 +707,7 @@
                           size="small"
                         />
                         <div>
+                          <FormField class="contents">
                           <Label color="default" class="mb-1">Help text</Label>
                           <Textarea
                             value={field.description ?? ''}
@@ -710,6 +716,7 @@
                             placeholder="Optional instructions shown below the field"
                             size="small"
                           />
+                          </FormField>
                         </div>
                       {/if}
 

@@ -3,7 +3,6 @@
   import StateDisplay from '../components/StateDisplay.svelte';
   import { zammadConnections } from '../api/integrations.js';
   import { statuses as statusesApi } from '../api/workflows.js';
-  import { workspacesStore } from '../stores/workspaces.svelte.js';
   import Plus from '@lucide/svelte/icons/plus';
   import Edit2 from '@lucide/svelte/icons/edit-2';
   import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -14,7 +13,7 @@
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import Input from '../components/Input.svelte';
   import Checkbox from '../components/Checkbox.svelte';
-  import WorkspaceCheckboxList from '../components/WorkspaceCheckboxList.svelte';
+  import WorkspacePicker from '../pickers/WorkspacePicker.svelte';
   import NativeSelect from '../components/NativeSelect.svelte';
   import FormField from '../components/FormField.svelte';
   import AlertBox from '../components/AlertBox.svelte';
@@ -26,7 +25,6 @@
   import { confirm } from '../composables/useConfirm.js';
 
   let connections = $state([]);
-  let workspaces = $state([]);
   let statuses = $state([]);
   let metadataByConnection = $state({});
   let loading = $state(true);
@@ -86,9 +84,8 @@
     loading = true;
     error = '';
     try {
-      [connections, workspaces, statuses] = await Promise.all([
+      [connections, statuses] = await Promise.all([
         zammadConnections.getAll(),
-        workspacesStore.load(),
         statusesApi.getAll(),
       ]);
     } catch (err) {
@@ -258,12 +255,6 @@
       (!connection.oauth_connected || connection.reauthorization_required);
   }
 
-  function toggleWorkspace(id, checked) {
-    form.workspace_ids = checked
-      ? [...new Set([...form.workspace_ids, id])]
-      : form.workspace_ids.filter((workspaceId) => workspaceId !== id);
-  }
-
   function toggleClosedState(id, checked) {
     form.closed_state_ids = checked
       ? [...new Set([...form.closed_state_ids, id])]
@@ -363,8 +354,8 @@
                   {connection.oauth_connected || connection.reauthorization_required ? t('zammad.reauthorizeOAuth') : t('zammad.connectOAuth')}
                 </Button>
               {/if}
-              <Button variant="ghost" size="small" onclick={() => openEdit(connection)} dataTestid={`zammad-connection-edit-${connection.id}`}><Edit2 class="w-4 h-4" /></Button>
-              <Button variant="danger-ghost" size="small" onclick={() => remove(connection)} dataTestid={`zammad-connection-delete-${connection.id}`}><Trash2 class="w-4 h-4" /></Button>
+            <Button variant="ghost" size="small" title={`${t('common.edit')}: ${connection.name}`} onclick={() => openEdit(connection)} dataTestid={`zammad-connection-edit-${connection.id}`}><Edit2 class="w-4 h-4" /></Button>
+            <Button variant="danger-ghost" size="small" title={`${t('common.delete')}: ${connection.name}`} onclick={() => remove(connection)} dataTestid={`zammad-connection-delete-${connection.id}`}><Trash2 class="w-4 h-4" /></Button>
             </div>
           </div>
           {#if metadataByConnection[connection.id]}
@@ -533,11 +524,10 @@
     <Checkbox id="zammad-global" bind:checked={form.applies_to_all_workspaces} label={t('zammad.allWorkspaces')} size="small" />
     {#if !form.applies_to_all_workspaces}
       <FormField label={t('zammad.allowedWorkspaces')} required>
-        <WorkspaceCheckboxList
-          workspaces={workspaces}
-          selected={form.workspace_ids}
-          onToggle={toggleWorkspace}
-          idPrefix="zammad-workspace"
+        <WorkspacePicker
+          bind:value={form.workspace_ids}
+          id="zammad-workspaces"
+          optionTestid={(option) => `zammad-workspace-option-${option.value}`}
         />
       </FormField>
     {/if}

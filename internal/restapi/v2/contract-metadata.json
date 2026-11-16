@@ -2950,6 +2950,46 @@
         ]
       }
     },
+    "/auth/passkey/complete": {
+      "post": {
+        "description": "Complete staff passkey login. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Complete staff passkey login",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/auth/passkey/start": {
+      "post": {
+        "description": "Start staff passkey login. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Start staff passkey login",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
     "/catalogs/global-bootstrap": {
       "get": {
         "description": "Load global reference catalogs. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -12182,6 +12222,115 @@
         ]
       }
     },
+    "/workspaces/{workspace_id}/actions/{action_id}/revisions": {
+      "get": {
+        "description": "List action definition revisions. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "action_id",
+            "In": "path",
+            "Description": "The action identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "page",
+            "In": "query",
+            "Description": "One-based page number.",
+            "Required": false,
+            "Schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "page_size",
+            "In": "query",
+            "Description": "Maximum number of resources to return.",
+            "Required": false,
+            "Schema": {
+              "default": 50,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List action definition revisions",
+        "tags": [
+          "Automation"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/actions/{action_id}/revisions/{revision_id}": {
+      "get": {
+        "description": "Get an action definition revision. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "action_id",
+            "In": "path",
+            "Description": "The action identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "revision_id",
+            "In": "path",
+            "Description": "The definition revision identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Get an action definition revision",
+        "tags": [
+          "Automation"
+        ]
+      }
+    },
     "/workspaces/{workspace_id}/agent-runs": {
       "get": {
         "description": "Returns at most 200 visible agent runs in stable newest-first ID order. next_cursor resumes exclusively before the final returned run; private verification runs and unauthorized runs are omitted.",
@@ -13815,6 +13964,75 @@
         "summary": "Update workspace milestone",
         "tags": [
           "Planning"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/overview-charts": {
+      "get": {
+        "description": "Returns zero-filled daily counts for the current workspace/collection cohort, without item bodies or pagination. Dates are inclusive UTC calendar dates, at most 366 days. Completion is each item's first recorded transition from a non-completed status to a completed status; creation in a completed status is not inferred. Edits, reopening, and recompletion do not move or duplicate that event. Merged/deleted items are excluded. A collection must belong to this workspace and be visible to the caller; inaccessible scopes return 404. Unrequested series are omitted.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "path",
+            "Description": "The workspace identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "from",
+            "In": "query",
+            "Description": "Inclusive UTC date (YYYY-MM-DD).",
+            "Required": true,
+            "Schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "Name": "to",
+            "In": "query",
+            "Description": "Inclusive UTC date (YYYY-MM-DD).",
+            "Required": true,
+            "Schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "Name": "collection_id",
+            "In": "query",
+            "Description": "Optional visible collection belonging to this workspace; its current saved query restricts both series.",
+            "Required": false,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "series",
+            "In": "query",
+            "Description": "Comma-separated requested series: created, completed, or both. Defaults to both.",
+            "Required": false,
+            "Schema": {
+              "default": "created,completed",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Get date-bounded overview chart counts",
+        "tags": [
+          "Workspaces"
         ]
       }
     },

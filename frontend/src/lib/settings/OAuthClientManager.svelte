@@ -325,7 +325,7 @@
 								<RefreshCw class="w-4 h-4" />
 							</Button>
 						{/if}
-						<Button variant="ghost" size="small" onclick={() => openEdit(client)} dataTestid={`oauth-client-edit-${client.id}`}>
+            <Button variant="ghost" size="small" title={`${t('common.edit')}: ${client.name}`} onclick={() => openEdit(client)} dataTestid={`oauth-client-edit-${client.id}`}>
 							<Edit2 class="w-4 h-4" />
 						</Button>
 						<Button variant="danger-ghost" size="small" icon={Trash2} title={t('integrations.oauthClients.deleteClient')} onclick={() => deleteClient(client)} dataTestid={`oauth-client-delete-${client.id}`}></Button>

@@ -30,7 +30,8 @@ export const coverage = {
     }),
 
   // Coverage data
-  getSummary: (id, workspaceId) => fetchV2Data(buildUrl(id, workspaceId, 'summary')),
+  getSummary: (id, workspaceId, requestOptions = {}) =>
+    fetchV2Data(buildUrl(id, workspaceId, 'summary'), requestOptions),
 
   getRequirements: (id, workspaceId, options = {}) => {
     const params = new URLSearchParams();

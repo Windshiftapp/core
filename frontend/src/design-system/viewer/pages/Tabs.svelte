@@ -13,7 +13,7 @@
 <div class="p-8 max-w-6xl">
   <h1 class="text-2xl font-bold mb-2" style="color: var(--ds-text);">Tabs</h1>
   <p class="mb-8" style="color: var(--ds-text-subtle);">
-    Tab navigation component for organizing content into switchable panels.
+    Local tabs use automatic activation: Left/Right (direction-aware), Home and End select and focus a tab. There is one tab stop and a uniquely associated active panel. Tabs includes a bordered panel with 12px vertical tab padding; TabStrip is a compact 8px underline bar. TabNav uses real URL links with 16px vertical padding, native modifier clicks and current-page state—not tab roles. All three scroll horizontally; long labels can wrap within the viewport and focus outlines stay inside the scroll area.
   </p>
 
   <!-- Basic Usage -->

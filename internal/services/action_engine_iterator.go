@@ -41,9 +41,7 @@ func (as *ActionService) runIterator(
 	allEdges []models.ActionEdge,
 	markExecuted func(int),
 ) error {
-	// Run the iterator-specific executor, which populates stepResult.Output.
-	// Currently only related_items is an iterator; future iterators get added
-	// to this switch.
+	// Produce the items before running the body.
 	switch node.NodeType {
 	case models.ActionNodeRelatedItems:
 		if err := as.executeRelatedItems(node, ctx, stepResult); err != nil {
@@ -61,20 +59,18 @@ func (as *ActionService) runIterator(
 	if !ok {
 		return fmt.Errorf("iterator %d: stepResult.Output[\"items\"] has wrong type %T", node.ID, itemsRaw)
 	}
+	delete(stepResult.Output, "items")
+	stepResult.Output["item_count"] = len(items)
 
 	body := iteratorBodyNodes(node.ID, allEdges)
 	if len(body) == 0 {
-		// Nothing downstream — emission is a no-op for this iterator. Strip
-		// the items slice from the step output (it's noisy and not JSON-safe
-		// for trace serialization).
-		delete(stepResult.Output, "items")
-		stepResult.Output["item_count"] = len(items)
 		return nil
 	}
 
-	// Execute body once per item.
 	previousItem := ctx.Item
+	defer func() { ctx.Item = previousItem }()
 	stepResult.Iterations = make([]models.IterationResult, 0, len(items))
+	failed := false
 
 	for _, item := range items {
 		ctx.Item = item
@@ -86,25 +82,21 @@ func (as *ActionService) runIterator(
 			Steps:       bodySteps,
 		})
 
-		if err != nil {
-			ctx.Item = previousItem
+		if errors.Is(err, ErrActionCompletedWithFailedSteps) {
+			// Keep processing other items, but retain the failed outcome.
+			failed = true
+		} else if err != nil {
 			return err
 		}
 	}
 
-	ctx.Item = previousItem
-
-	// Mark every body node as executed so the outer loop doesn't re-run them.
+	// The outer flow must not repeat the body on the trigger item.
 	for nodeID := range body {
 		markExecuted(nodeID)
 	}
-
-	// Replace the items slice with a JSON-friendly summary in the step output
-	// (the slice itself isn't valuable in the trace and wouldn't serialize
-	// cleanly).
-	delete(stepResult.Output, "items")
-	stepResult.Output["item_count"] = len(items)
-
+	if failed {
+		return ErrActionCompletedWithFailedSteps
+	}
 	return nil
 }
 
@@ -167,11 +159,15 @@ func (as *ActionService) runBodyOnce(
 		if errors.Is(err, actionutil.ErrCycleDetected) {
 			return run.Steps, fmt.Errorf("iterator body subgraph: %w", err)
 		}
-		// The body loop only fails on a canceled context; abort the iterator.
 		return run.Steps, err
 	}
 	if run.BudgetExceeded {
 		return run.Steps, errStepBudgetExceeded
+	}
+	for _, step := range run.Steps {
+		if step.Status == models.ActionStatusFailed {
+			return run.Steps, ErrActionCompletedWithFailedSteps
+		}
 	}
 	return run.Steps, nil
 }

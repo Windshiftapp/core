@@ -15,6 +15,8 @@ export default {
     "discardFailed": "حذف پیش‌نویس ممکن نشد.",
     "menu": {
       "startTimerHint": "در صورت وجود، از کار بازشده استفاده می‌کند",
+      "logWork": "ثبت کار",
+      "logWorkHint": "ثبت دستی زمان",
     },
     "timeSpent": "زمان صرف شده",
     "remaining": "باقی مانده است",

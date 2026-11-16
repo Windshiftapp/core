@@ -1,4 +1,5 @@
 <script>
+  const dialogId = $props.id();
   import Clock from '@lucide/svelte/icons/clock';
   import FileText from '@lucide/svelte/icons/file-text';
   import Play from '@lucide/svelte/icons/play';
@@ -153,7 +154,7 @@
   }
 
   function handleKeydown(event) {
-    if (!show) return;
+    if (!show || event.isComposing) return;
     if (matchesShortcut(event, submitShortcut)) {
       event.preventDefault();
       save();
@@ -161,10 +162,8 @@
   }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
-<!-- shortcut-guard-exempt: Cmd+Enter submit is handled via svelte:window onkeydown (matchesShortcut) above, outside the ModalBackdrop block the guard scans. -->
-<ModalBackdrop bind:show onclose={close} ariaLabelledBy="pomodoro-settings-title" zIndex={70} scrollable align="top" paddingTop="pt-8">
+<!-- shortcut-guard-exempt: Cmd+Enter is dispatched by the active overlay through onKeydown. -->
+<ModalBackdrop bind:show onclose={close} onKeydown={handleKeydown} ariaLabelledBy="{dialogId}-title" zIndex={70} scrollable align="top" paddingTop="pt-8">
   <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
   <div
     role="presentation"
@@ -174,7 +173,7 @@
   >
     <div class="flex items-center justify-between border-b px-6 py-4" style="border-color: var(--ds-border);">
       <div>
-        <h2 id="pomodoro-settings-title" class="text-lg font-semibold">{t('time.pomodoro.title')}</h2>
+        <h2 id="{dialogId}-title" class="text-lg font-semibold">{t('time.pomodoro.title')}</h2>
         <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">{t('time.pomodoro.subtitle')}</p>
       </div>
       <Button variant="ghost" icon={X} onclick={close} title={t('common.close')} />

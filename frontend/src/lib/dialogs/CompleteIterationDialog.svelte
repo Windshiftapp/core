@@ -1,4 +1,5 @@
 <script>
+  const dialogId = $props.id();
   import CheckCircle from '@lucide/svelte/icons/check-circle';
   import X from '@lucide/svelte/icons/x';
   import Button from '../components/Button.svelte';
@@ -45,7 +46,7 @@
   });
 
   function handleKeydown(event) {
-    if (!show) return;
+    if (!show || event.isComposing) return;
 
     if (matchesShortcut(event, submitShortcut)) {
       event.preventDefault();
@@ -53,13 +54,9 @@
       return;
     }
 
-    if (event.key === 'Enter' && !event.ctrlKey && !event.metaKey) {
-      const activeElement = document.activeElement;
-      const isOnCancelButton = activeElement?.textContent?.trim() === t('common.cancel');
-      if (!isOnCancelButton) {
+    if (!event.defaultPrevented && event.key === 'Enter' && !event.ctrlKey && !event.metaKey && event.target instanceof HTMLInputElement) {
         event.preventDefault();
         doConfirm();
-      }
     }
   }
 
@@ -84,9 +81,8 @@
   );
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
-<ModalBackdrop bind:show onclose={cancel} ariaLabelledBy="complete-iteration-title" zIndex={70}>
+<!-- shortcut-guard-exempt: Cmd+Enter is dispatched by the active overlay through onKeydown. -->
+<ModalBackdrop bind:show onclose={cancel} onKeydown={handleKeydown} ariaLabelledBy="{dialogId}-title" zIndex={70} portal={true}>
     <div
       role="presentation"
       class="bg-white rounded shadow-xl max-w-md w-full transform transition-all"
@@ -102,7 +98,7 @@
             />
           </div>
           <h3
-            id="complete-iteration-title"
+            id="{dialogId}-title"
             class="text-lg font-medium flex-1"
             style="color: var(--ds-text);"
           >

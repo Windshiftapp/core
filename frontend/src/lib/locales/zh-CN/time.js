@@ -15,6 +15,8 @@ export default {
     'discardFailed': '无法丢弃草稿。',
     'menu': {
       'startTimerHint': '可用时使用当前打开的工作项',
+      'logWork': '记录工作',
+      'logWorkHint': '手动记录工时',
     },
     timeSpent: '已用工时',
     remaining: '剩余',

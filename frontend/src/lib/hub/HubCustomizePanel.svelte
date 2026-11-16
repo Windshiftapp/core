@@ -1,4 +1,5 @@
 <script>
+  let tabPanelElement = $state(null);
   import Palette from '@lucide/svelte/icons/palette';
   import Navigation from '@lucide/svelte/icons/navigation';
   import X from '@lucide/svelte/icons/x';
@@ -27,15 +28,7 @@
   }
 </script>
 
-<!-- Customization Panel Overlay (hide when editing sections so sections are visible) -->
-<ModalBackdrop
-  show={hubStore.showCustomizePanel && hubStore.activeSection !== 'sections'}
-  opacity={0.3}
-  blur={0}
-  align="none"
-  onclose={() => hubStore.showCustomizePanel = false}
-/>
-
+{#snippet customizationPanel()}
 <!-- Customization Slide-in Panel -->
 {#if hubStore.showCustomizePanel}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -58,6 +51,7 @@
 
     <!-- Section Navigation -->
     <TabStrip
+      panelElement={tabPanelElement}
       tabs={[
         { id: 'hero-gradient', label: t('portal.theme', 'Theme'), icon: Palette },
         { id: 'sections', label: t('hub.sections', 'Sections'), icon: Navigation }
@@ -68,7 +62,7 @@
     />
 
     <!-- Panel Content -->
-    <div class="flex-1 overflow-y-auto p-4">
+    <div class="flex-1 overflow-y-auto p-4" bind:this={tabPanelElement}>
       <!-- Hero/Gradient Section -->
       {#if hubStore.activeSection === 'hero-gradient'}
         <div class="space-y-6">
@@ -229,4 +223,15 @@
       </a>
     </div>
   </div>
+{/if}
+{/snippet}
+
+{#if hubStore.showCustomizePanel && hubStore.activeSection !== 'sections'}
+  <ModalBackdrop show={true} opacity={0.3} blur={0} align="none"
+    ariaLabel={t('hub.customizeHub', 'Customize Hub')}
+    onclose={() => hubStore.showCustomizePanel = false}>
+    {@render customizationPanel()}
+  </ModalBackdrop>
+{:else}
+  {@render customizationPanel()}
 {/if}

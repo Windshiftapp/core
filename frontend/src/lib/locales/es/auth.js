@@ -10,6 +10,19 @@
 
 export default {
   auth: {
+    signInWithPasskey: 'Iniciar sesión con una clave de acceso',
+    passkeyProgress: 'Sigue las instrucciones para usar tu clave de acceso…',
+    showPassword: 'Mostrar contraseña',
+    hidePassword: 'Ocultar contraseña',
+    usernameRequired: 'El correo o nombre de usuario es obligatorio',
+    loginOptionsError: 'No se pudieron cargar las opciones SSO. Inténtalo de nuevo.',
+    passwordDisabled: 'El acceso con contraseña está desactivado',
+    useSSO: 'Usa el inicio de sesión único (SSO) para acceder.',
+    usePasskey: 'Usa una clave de acceso para iniciar sesión.',
+    contactAdmin: 'Contacta con tu administrador para obtener acceso.',
+    passkeyHint: 'Deja el usuario vacío para elegir una clave de acceso, o introdúcelo para una llave de seguridad antigua. Intro sin contraseña usa una clave de acceso.',
+    enrollFirstPasskey: 'Configurar tu primera clave de acceso',
+    enrollmentPasswordHint: 'Usa tu contraseña solo para verificar tu identidad y registrar tu primera clave de acceso. La contraseña por sí sola no da acceso.',
     login: 'Iniciar sesión',
     logout: 'Cerrar sesión',
     signIn: 'Iniciar sesión',
@@ -47,6 +60,9 @@ export default {
     invitationLink: 'Enlace de invitación',
   },
   users: {
+    weekStart: 'Primer día de la semana',
+    weekStartHint: 'Se aplica a los calendarios de toda la aplicación. Automático sigue tu idioma y región.',
+    calendarPreferencesSaveFailed: 'Se guardaron el idioma y la zona horaria, pero no las preferencias del calendario.',
     title: 'Usuarios',
     subtitle: 'Administrar cuentas de usuario y permisos',
     user: 'Usuario',

@@ -310,7 +310,7 @@
 
     <!-- Footer -->
     <div class="flex justify-end gap-3 mt-6 pt-4 border-t" style="border-color: var(--ds-border);">
-      <Button variant="outline" onclick={handleClose} disabled={saving}>{t('common.cancel')}</Button>
+      <Button variant="default" onclick={handleClose} disabled={saving}>{t('common.cancel')}</Button>
       <Button onclick={handleSave} loading={saving}>{t('common.save')}</Button>
     </div>
   </div>

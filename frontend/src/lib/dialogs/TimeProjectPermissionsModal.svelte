@@ -142,7 +142,7 @@
       ]}
       bind:activeTab
       onTabChange={() => { showAddForm = false; resetAddForm(); }}
-    />
+    >
 
     <!-- Add Button -->
     <div class="flex justify-end mb-4">
@@ -333,5 +333,6 @@
         {/if}
       </p>
     </div>
+    </TabStrip>
   </div>
 </Modal>

@@ -237,7 +237,7 @@ func createComment(deps Deps) jsonOperation[commentCreateRequest, models.Comment
 		if err := requireCommentPermission(deps, user.ID, item.WorkspaceID, models.PermissionItemComment); err != nil {
 			return models.Comment{}, err
 		}
-		result, err := deps.Comments.Create(services.CreateCommentParams{ItemID: item.ID, AuthorID: user.ID, Content: input.Content, IsPrivate: input.IsPrivate, ActorUserID: user.ID})
+		result, err := deps.Comments.CreateContext(r.Context(), services.CreateCommentParams{ItemID: item.ID, AuthorID: user.ID, Content: input.Content, IsPrivate: input.IsPrivate, ActorUserID: user.ID})
 		if err != nil {
 			return models.Comment{}, commentError(err)
 		}

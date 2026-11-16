@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../components/FormField.svelte';
   import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
   import { emailTemplates } from '../api/email-templates.js';
@@ -283,6 +284,7 @@
   <div class="px-6 py-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="lg:col-span-2 flex flex-col gap-4">
       <div>
+        <FormField class="contents">
         <Label color="default" class="mb-2">{t('settings.emailTemplates.localeLabel')}</Label>
         <BasePicker
           bind:value={selectedLocale}
@@ -291,6 +293,7 @@
           getValue={(item) => item.value}
           getLabel={(item) => item.label}
         />
+        </FormField>
         {#if selectedLocale}
           <p class="text-xs mt-2" style="color: var(--ds-text-subtle);">
             {t('settings.emailTemplates.translationHint')}
@@ -311,21 +314,25 @@
       </div>
 
       <div>
+        <FormField class="contents">
         <Label color="default" class="mb-2">{t('settings.emailTemplates.htmlBody')}</Label>
         <Textarea
           bind:value={formData.html_body}
           rows={14}
           style="font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;"
         />
+        </FormField>
       </div>
 
       <div>
+        <FormField class="contents">
         <Label color="default" class="mb-2">{t('settings.emailTemplates.textBody')}</Label>
         <Textarea
           bind:value={formData.text_body}
           rows={6}
           style="font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;"
         />
+        </FormField>
       </div>
 
       {#if !selectedLocale}

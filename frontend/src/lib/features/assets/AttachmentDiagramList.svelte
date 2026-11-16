@@ -176,7 +176,7 @@
             class="p-1 rounded opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity hover:bg-[var(--ds-background-danger-hovered)]"
             style="color: var(--ds-text-danger);"
             onclick={() => handleDelete(attachment)}
-            title={t('common.delete')}
+            title={`${t('common.delete')}: ${attachment.filename || attachment.id}`}
           >
             <IconTrash class="w-3.5 h-3.5" />
           </button>
@@ -206,7 +206,7 @@
             class="p-1 rounded opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity hover:bg-[var(--ds-background-danger-hovered)]"
             style="color: var(--ds-text-danger);"
             onclick={() => handleDeleteDiagram(diagram)}
-            title={t('common.delete')}
+            title={`${t('common.delete')}: ${diagram.name || t('assets.untitledDiagram')}`}
             data-testid={`item-diagram-delete-${diagram.id}`}
           >
             <IconTrash class="w-3.5 h-3.5" />
@@ -222,7 +222,7 @@
        restore. PDFs render in an iframe; images render at their native size,
        capped to the viewport. -->
   <div use:portal>
-  <ModalBackdrop show={true} onclose={closeLightbox} zIndex={50} opacity={0.85} blur={0}>
+  <ModalBackdrop show={true} ariaLabel={lightbox.original_filename || t('assets.preview')} onclose={closeLightbox} zIndex={50} opacity={0.85} blur={0}>
     <div class="absolute top-4 right-4 flex items-center gap-3">
       <button
         type="button"

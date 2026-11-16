@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import Bolt from '@tabler/icons-svelte-runes/icons/bolt';
   import Code from '@tabler/icons-svelte-runes/icons/code';
   import Message from '@tabler/icons-svelte-runes/icons/message';
@@ -21,6 +21,8 @@
   import { getShortcutDisplay, toHotkeyString } from '../../utils/keyboardShortcuts.js';
 
   let { workspaceId } = $props();
+  const readController = new AbortController();
+  onDestroy(() => readController.abort());
 
   let agents = $state([]);
   let loading = $state(true);
@@ -42,13 +44,15 @@
   onMount(loadAgents);
 
   async function loadAgents() {
+    if (readController.signal.aborted) return;
     loading = true;
     error = '';
     try {
       const [result, recentRuns] = await Promise.all([
-        agentBindings.listCatalog(workspaceId),
-        agentRuns.listForWorkspace(workspaceId, { limit: 100 }).catch(() => []),
+        agentBindings.listCatalog(workspaceId, { signal: readController.signal }),
+        agentRuns.listForWorkspace(workspaceId, { limit: 100 }, { signal: readController.signal }).catch(() => []),
       ]);
+      if (readController.signal.aborted) return;
       agents = Array.isArray(result) ? result : [];
       const nextRecent = {};
       for (const run of recentRuns || []) {
@@ -57,6 +61,7 @@
       }
       recentRunByAgent = nextRecent;
     } catch (err) {
+      if (readController.signal.aborted) return;
       error = err.message || t('workspaceAgents.catalog.loadErrorMessage');
     } finally {
       loading = false;

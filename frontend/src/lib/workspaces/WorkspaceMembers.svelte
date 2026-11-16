@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../components/FormField.svelte';
   import { onMount } from 'svelte';
   import { workspaceRoles } from '../api/workspaces.js';
   import UserPlus from '@lucide/svelte/icons/user-plus';
@@ -560,8 +561,10 @@
 
     <div class="space-y-4">
       <div>
+        <FormField class="contents" requiredMark>
         <Label color="default" required class="mb-2">{t('workspaceMembers.user')}</Label>
         <UserPicker bind:value={selectedUserId} placeholder={t('workspaceMembers.selectUser')} />
+        </FormField>
       </div>
 
       <div>
@@ -616,8 +619,10 @@
 
     <div class="space-y-4">
       <div>
+        <FormField class="contents" requiredMark>
         <Label color="default" required class="mb-2">{t('workspaceMembers.group')}</Label>
         <GroupPicker bind:value={selectedGroupId} placeholder={t('workspaceMembers.selectGroup')} />
+        </FormField>
       </div>
 
       <div>

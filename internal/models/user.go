@@ -113,6 +113,7 @@ type UserPreferences struct {
 
 // UserPreferencesData represents the parsed preferences JSON structure
 type UserPreferencesData struct {
+	WeekStart       string               `json:"week_start,omitempty"`
 	Calendar        string               `json:"calendar,omitempty"`
 	ColorMode       string               `json:"color_mode,omitempty"` // "light", "dark", or "system"
 	ThemeID         *int                 `json:"theme_id,omitempty"`

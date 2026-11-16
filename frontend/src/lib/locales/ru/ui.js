@@ -394,8 +394,8 @@ export default {
       noDataAvailable: 'Нет данных',
       otherSlices: 'Прочие ({count} ещё)',
     },
-    completionChart: { title: 'График завершения', emptyMessage: 'Нет данных о завершении' },
-    createdChart: { title: 'График создания', emptyMessage: 'Нет данных о создании' },
+    completionChart: { title: 'График завершения', emptyMessage: 'Нет данных о завершении', definition: 'Первые зарегистрированные завершения по неделям (UTC). Повторное открытие не учитывается дважды.' },
+    createdChart: { title: 'График создания', emptyMessage: 'Нет данных о создании', definition: 'Созданные за последние семь дней UTC, включая сегодня.' },
     recentItems: {
       loadingText: 'Загрузка недавних элементов…',
       emptyTitle: 'Недавних элементов нет',

@@ -145,7 +145,8 @@ func (h *PortalWebAuthnHandler) StartPortalRegistration(w http.ResponseWriter, r
 	}
 	subject.SetCredentials(existing)
 
-	options, sessionData, err := h.config.WebAuthn().BeginRegistration(subject)
+	options, sessionData, err := h.config.WebAuthn().BeginRegistration(subject,
+		webauthn.WithExclusions(webauthn.Credentials(existing).CredentialDescriptors()))
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

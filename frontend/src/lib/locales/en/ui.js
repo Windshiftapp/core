@@ -475,10 +475,12 @@ export default {
       otherSlices: 'Other ({count} more)',
     },
     completionChart: {
+      definition: 'First recorded completions by week (UTC). Reopening does not count twice.',
       title: 'Completion Chart',
       emptyMessage: 'No completion data available',
     },
     createdChart: {
+      definition: 'Created in the last seven UTC days, including today.',
       title: 'Created Chart',
       emptyMessage: 'No creation data available',
     },

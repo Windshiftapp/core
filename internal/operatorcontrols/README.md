@@ -59,6 +59,10 @@ Read effective controls at `/api/v2/operator-controls` (session) or
 permission. Bearer tokens additionally require `admin:operator-controls:read`.
 The admin page and shell discovery never return relay credentials, storage
 locations or the import admission directory. There is no policy write API.
+Public `/api/features` discovery (also used by shell bootstrap) exposes only
+effective capability denials and mail mode/suspension. Numeric ceilings, AI model
+allowlists, AI feature restrictions and import admission configuration status
+are available only through the authenticated administrator endpoint above.
 
 ## Accounting and failure behavior
 

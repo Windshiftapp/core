@@ -1,9 +1,13 @@
 <script>
   import { createPopover, melt } from '@melt-ui/svelte';
   import { controlSizeClasses } from '../utils/controlSizes.js';
+  import { fieldControl } from '../utils/fieldContext.svelte.js';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import Check from '@lucide/svelte/icons/check';
   import { tick, untrack } from 'svelte';
+  import { derived } from 'svelte/store';
+  import { createOwnedPopup } from '../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
 
   /**
    * @type {{
@@ -17,7 +21,10 @@
    *   menuWidth?: string,
    *   portalOwner?: string,
    *   placeholder?: string,
-   *   ariaLabel?: string,
+    *   ariaLabel?: string,
+    *   ariaDescribedby?: string,
+    *   ariaInvalid?: boolean,
+    *   dataTestid?: string,
    *   onchange?: (e?: any) => void,
    *   onfocus?: (e?: any) => void,
    *   onblur?: (e?: any) => void,
@@ -35,15 +42,23 @@
     portalOwner = undefined,
     placeholder = '',
     ariaLabel = undefined,
+    ariaDescribedby = undefined,
+    ariaInvalid = undefined,
+    dataTestid = undefined,
     onchange = undefined,
     onfocus = undefined,
     onblur = undefined
   } = $props();
+  const instanceId = $props.id();
+  const field = fieldControl(() => ({ id, ariaDescribedby, ariaInvalid, required }));
 
   const {
     elements: { trigger, content },
     states: { open }
   } = createPopover({
+    disableFocusTrap: ownedPopup.withinModal,
+    openFocus: null,
+    closeFocus: ownedPopup.withinModal ? null : undefined,
     forceVisible: true,
     positioning: {
       strategy: 'fixed',
@@ -54,6 +69,9 @@
     },
     portal: 'body'
   });
+  const fieldTrigger = derived(trigger, attributes => Object.defineProperty(
+    { ...attributes, role: 'combobox', 'aria-haspopup': 'listbox' }, 'action', { value: attributes.action }
+  ));
 
   let triggerElement = $state(null);
   let listboxElement = $state(null);
@@ -87,13 +105,12 @@
     value = opt.value;
     onchange?.(opt.value);
     closeDropdown();
-    tick().then(() => triggerElement?.focus());
+    tick().then(() => triggerElement?.focus({ preventScroll: true }));
   }
 
   function optionId(opt, index) {
-    if (!id) return `select-option-${index}`;
-    const safeValue = String(opt.value).replace(/[^A-Za-z0-9_-]/g, '-');
-    return `${id}-option-${safeValue}`;
+    if (id) return `${id}-option-${String(opt.value).replace(/[^A-Za-z0-9_-]/g, '-')}`;
+    return `${field.id ?? instanceId}-option-${index}`;
   }
 
   function scrollToHighlighted() {
@@ -127,11 +144,12 @@
     } else if (e.key === 'Escape' && $open) {
       e.preventDefault();
       closeDropdown();
-      triggerElement?.focus();
+      triggerElement?.focus({ preventScroll: true });
     }
   }
 
   function handleListboxKeydown(e) {
+    if (e.key === 'Tab') return;
     const total = options.length;
     if (total === 0) return;
 
@@ -151,9 +169,7 @@
     } else if (e.key === 'Escape') {
       e.preventDefault();
       closeDropdown();
-      triggerElement?.focus();
-    } else if (e.key === 'Tab') {
-      closeDropdown();
+      triggerElement?.focus({ preventScroll: true });
     } else if (e.key === 'Home') {
       e.preventDefault();
       highlightedIndex = 0;
@@ -170,7 +186,7 @@
   $effect(() => {
     if ($open && !wasOpen) {
       tick().then(() => {
-        listboxElement?.focus();
+        if ($open) listboxElement?.focus({ preventScroll: true });
       });
     } else if (!$open && wasOpen) {
       // Return focus to trigger
@@ -183,12 +199,15 @@
   <!-- Trigger button -->
   <button
     bind:this={triggerElement}
-    use:melt={$trigger}
+    use:melt={$fieldTrigger}
     type="button"
-    {id}
+    id={field.id}
+    data-testid={dataTestid}
+    aria-describedby={field.describedby}
+    aria-invalid={field.invalid}
     {disabled}
     role="combobox"
-    aria-required={required || undefined}
+    aria-required={field.ariaRequired || undefined}
     aria-haspopup="listbox"
     aria-expanded={$open}
     aria-label={ariaLabel}
@@ -213,6 +232,7 @@
 {#if $open}
   <div
     use:melt={$content}
+    use:ownedPopup={{ trigger: () => triggerElement, close: closeDropdown, keepTabStops: false }}
     bind:this={listboxElement}
     data-testid={id ? `${id}-listbox` : undefined}
     data-popover-owner={portalOwner}

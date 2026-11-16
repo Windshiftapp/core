@@ -161,7 +161,7 @@
   $effect(() => {
     currentStep;
     if (keyboardDiv) {
-      tick().then(() => keyboardDiv?.focus());
+      tick().then(() => keyboardDiv?.focus({ preventScroll: true }));
     }
   });
 </script>
@@ -173,7 +173,7 @@
   </div>
   <Modal bind:isOpen={isOpen} maxWidth="max-w-2xl" preventClose={true} noBackdrop={true} zIndexClass="z-50 !items-center !pt-0 setup-modal" dataTestid="setup-modal">
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-    <div bind:this={keyboardDiv} role="dialog" tabindex="0" onkeydown={handleKeyDown} class="outline-none">
+    <div bind:this={keyboardDiv} role="form" tabindex="0" onkeydown={handleKeyDown} class="outline-none">
     <div class="px-6 py-8">
       <!-- Header -->
       <div class="text-center mb-8">

@@ -1,5 +1,9 @@
 <script>
+  import { createOwnedPopup } from '../utils/overlayScope.js';
+  const ownedPopup = createOwnedPopup();
   import { createTooltip, melt } from '@melt-ui/svelte';
+  import { get } from 'svelte/store';
+  import { descriptionIds } from '../utils/fieldContext.svelte.js';
 
   let {
     /** Plain-string tooltip body. Optional — provide this or `tip`. */
@@ -15,12 +19,15 @@
     class: className = '',
     /** Extra classes appended to the popover (padding, max-width, etc.). */
     contentClass = 'px-2 py-1 text-xs',
-    disabled = false
+    disabled = false,
+    /** Supply the actual trigger when the snippet contains several controls. */
+    triggerElement = null
   } = $props();
 
   const {
     elements: { trigger, content: tooltipContent },
-    states: { open }
+    states: { open },
+    ids
   } = createTooltip({
     // svelte-ignore state_referenced_locally
     positioning: {
@@ -30,8 +37,37 @@
     openDelay: delay.open,
     // svelte-ignore state_referenced_locally
     closeDelay: delay.close,
-    disableHoverableContent: true,
+    disableHoverableContent: false,
     forceVisible: true
+  });
+  let wrapper = $state(null);
+  let activeTrigger = $state(null);
+  $effect(() => {
+    if (disabled || !wrapper) return;
+    const node = triggerElement ?? wrapper.querySelector('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])') ?? wrapper;
+    activeTrigger = node;
+    const originalId = node.getAttribute('id');
+    const originalDescription = node.getAttribute('aria-describedby');
+    ids.trigger.set(originalId || get(ids.trigger));
+    const unsubscribe = trigger.subscribe(attributes => {
+      for (const [name, value] of Object.entries(attributes)) {
+        if (name === 'aria-describedby') {
+          const description = descriptionIds(originalDescription, get(open) ? value : undefined);
+          if (description) node.setAttribute(name, description);
+          else node.removeAttribute(name);
+        } else node.setAttribute(name, String(value));
+      }
+    });
+    const action = trigger(node);
+    return () => {
+      action?.destroy?.();
+      unsubscribe();
+      for (const name of ['data-melt-tooltip-trigger', 'data-state']) node.removeAttribute(name);
+      if (originalId) node.id = originalId;
+      else node.removeAttribute('id');
+      if (originalDescription) node.setAttribute('aria-describedby', originalDescription);
+      else node.removeAttribute('aria-describedby');
+    };
   });
 </script>
 
@@ -40,15 +76,16 @@
     {@render children()}
   </span>
 {:else}
-  <span use:melt={$trigger} class="cursor-pointer {className}">
+  <span bind:this={wrapper} class="cursor-pointer {className}">
     {@render children()}
   </span>
 
   {#if $open}
     <div
       use:melt={$tooltipContent}
+      use:ownedPopup={{ trigger: () => activeTrigger, close: () => { $open = false; } }}
       data-testid="tooltip"
-      class="z-[100] rounded-md bg-[#253858] text-white shadow-lg {contentClass}"
+      class="z-[100] rounded-md shadow-lg bg-ds-surface-overlay text-ds-text border border-ds-border {contentClass}"
     >
       {#if tip}
         {@render tip()}

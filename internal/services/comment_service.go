@@ -510,6 +510,17 @@ func (s *CommentService) create(ctx context.Context, params CreateCommentParams)
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	// Script-driven comments carry trusted automation provenance. A private
+	// trigger must not produce a public comment, and an automation-authored
+	// comment must not re-enter the comment_created trigger.
+	var scriptProvenance *ActionScriptProvenance
+	if prov, ok := ActionScriptProvenanceFrom(ctx); ok {
+		scriptProvenance = &prov
+		if prov.TriggerCommentIsPrivate {
+			params.IsPrivate = true
+		}
+		params.SuppressActionEvents = true
+	}
 	// 2. Get item details for notifications and the webhook payload
 	item, err := repository.NewItemRepository(s.db).FindByIDWithDetails(params.ItemID)
 	if err != nil {
@@ -579,6 +590,17 @@ func (s *CommentService) create(ctx context.Context, params CreateCommentParams)
 	}
 	fallback.OccurredAt = now
 	metadata := mergeItemEventMetadata(params.EventMetadata, fallback)
+	if scriptProvenance != nil {
+		ac := scriptProvenance.ActionContext()
+		metadata.SourceKind = "automation"
+		metadata.CorrelationID = ac.ExecutionChainID
+		metadata.Automation = &itemevents.AutomationContext{
+			TriggeredByAction: ac.TriggeredByAction,
+			ExecutionChainID:  ac.ExecutionChainID,
+			CascadeDepth:      ac.CascadeDepth,
+			SourceApplication: ac.SourceApplication,
+		}
+	}
 	// Imported comments are historical. They keep the canonical fact and the
 	// support first-response metric, but must not drive live operational side
 	// effects such as per-comment audit entries or presence tracking.
@@ -745,7 +767,7 @@ func (s *CommentService) create(ctx context.Context, params CreateCommentParams)
 		// its siblings, which is the one unbounded helpdesk loop (WI-1142).
 		if s.actionEvents != nil && !params.SuppressActionEvents {
 			fromCustomer := params.PortalCustomerID != nil
-			s.actionEvents.EmitActionEvent(&models.ActionEvent{
+			event := &models.ActionEvent{
 				EventType:   models.ActionTriggerCommentCreated,
 				WorkspaceID: item.WorkspaceID,
 				ItemID:      params.ItemID,
@@ -756,7 +778,16 @@ func (s *CommentService) create(ctx context.Context, params CreateCommentParams)
 					"comment_is_private":    params.IsPrivate,
 					"comment_from_customer": fromCustomer,
 				},
-			})
+			}
+			if scriptProvenance != nil {
+				ac := scriptProvenance.ActionContext()
+				event.TriggeredByAction = ac.TriggeredByAction
+				event.ExecutionChainID = ac.ExecutionChainID
+				event.CascadeDepth = ac.CascadeDepth
+				event.SourceApplication = ac.SourceApplication
+				event.TriggerCommentIsPrivate = ac.TriggerCommentIsPrivate
+			}
+			s.actionEvents.EmitActionEvent(event)
 		}
 		// Fresh comment activity re-arms item_inactive triggers for the item.
 		if s.inactivityMarks != nil {

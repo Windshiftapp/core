@@ -20,6 +20,8 @@ export default {
     'discardFailed': 'Impossible de supprimer le brouillon.',
     'menu': {
       'startTimerHint': 'Utilise l’élément de travail ouvert si disponible',
+      'logWork': 'Saisir du temps',
+      'logWorkHint': 'Saisir le temps manuellement',
     },
     timeSpent: 'Temps passé',
     remaining: 'Restant',

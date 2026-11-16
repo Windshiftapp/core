@@ -30,25 +30,31 @@ const PLANNING_FIELDS = new Set(['milestones', 'iterations']);
 const MAX_ASSET_CACHE_ENTRIES = 200;
 
 const OPTION_LOADERS = {
-  statuses: (workspaceId) => workspaces.getStatuses(workspaceId),
-  users: (workspaceId) => getAssignableUsers(workspaceId),
-  teams: () => teams.getAll(),
-  milestones: (workspaceId) =>
-    milestones.getAll({ workspace_id: workspaceId, include_global: true }),
-  iterations: (workspaceId) => iterations.getAll({ workspace_id: workspaceId }),
-  priorities: async (workspaceId) => {
-    const workspace = await workspaces.get(workspaceId);
+  statuses: (workspaceId, options) => workspaces.getStatuses(workspaceId, null, options),
+  users: (workspaceId, options) => getAssignableUsers(workspaceId, options),
+  teams: (_workspaceId, options) => teams.getAll({}, options),
+  milestones: (workspaceId, options) =>
+    milestones.getAll({ workspace_id: workspaceId, include_global: true }, options),
+  iterations: (workspaceId, options) => iterations.getAll({ workspace_id: workspaceId }, options),
+  priorities: async (workspaceId, options) => {
+    const workspace = await workspaces.get(workspaceId, options);
+    options.signal.throwIfAborted();
     const configurationSetId = workspace?.configuration_set_id;
-    if (!configurationSetId) return priorities.getAll();
+    if (!configurationSetId) return priorities.getAll({}, options);
 
-    const configuredPriorities = await priorities.getAll({
-      configuration_set_id: configurationSetId,
-    });
-    return configuredPriorities.length > 0 ? configuredPriorities : priorities.getAll();
+    const configuredPriorities = await priorities.getAll(
+      {
+        configuration_set_id: configurationSetId,
+      },
+      options
+    );
+    options.signal.throwIfAborted();
+    return configuredPriorities.length > 0 ? configuredPriorities : priorities.getAll({}, options);
   },
-  projects: (workspaceId) => workspaces.getProjects(workspaceId),
-  portalCustomers: () => portalCustomers.getAll(),
-  customerOrganisations: async () => realCustomers(await customerOrganisations.getAll()),
+  projects: (workspaceId, options) => workspaces.getProjects(workspaceId, options),
+  portalCustomers: (_workspaceId, options) => portalCustomers.getAll({}, options),
+  customerOrganisations: async (_workspaceId, options) =>
+    realCustomers(await customerOrganisations.getAll({}, options)),
 };
 
 /**
@@ -97,6 +103,7 @@ export class CollectionEditorOptionsStore {
   /** @type {Map<string, { value: any, fetchedAt: number }>} */
   #assetCache = new Map();
   #generation = 0;
+  #controller = new AbortController();
 
   get(workspaceId) {
     const id = normalizeWorkspaceId(workspaceId);
@@ -178,7 +185,7 @@ export class CollectionEditorOptionsStore {
     }));
 
     const generation = this.#generation;
-    const promise = Promise.resolve(loader(id))
+    const promise = Promise.resolve(loader(id, { signal: this.#controller.signal }))
       .then((result) => {
         if (generation !== this.#generation) return [];
         const options = Array.isArray(result) ? result : [];
@@ -233,7 +240,9 @@ export class CollectionEditorOptionsStore {
 
     const filters = { cql: cqlQuery || undefined, search: search || undefined };
     const generation = this.#generation;
-    const promise = Promise.resolve(assets.getAll(setId, filters))
+    const promise = Promise.resolve(
+      assets.getAll(setId, filters, { signal: this.#controller.signal })
+    )
       .then((result) => {
         if (generation !== this.#generation) return { assets: [], total: 0 };
         const normalized = {
@@ -295,6 +304,8 @@ export class CollectionEditorOptionsStore {
 
   reset() {
     this.#generation += 1;
+    this.#controller.abort();
+    this.#controller = new AbortController();
     this.#pending.clear();
     this.#assetCache.clear();
     this.byWorkspace = {};

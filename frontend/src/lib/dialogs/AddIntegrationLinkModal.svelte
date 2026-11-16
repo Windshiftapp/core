@@ -1,4 +1,5 @@
 <script>
+  import FormField from '../components/FormField.svelte';
   import { onMount } from 'svelte';
   import Spinner from '../components/Spinner.svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
@@ -148,6 +149,7 @@
         <!-- Provider Selection (if multiple) -->
         {#if providers.length > 1}
           <div>
+            <FormField class="contents" requiredMark>
             <Label color="default" required class="mb-1.5">{t('integrations.selectProvider')}</Label>
             <NativeSelect
               bind:value={selectedProviderId}
@@ -155,6 +157,7 @@
               onchange={resetSearch}
               size="small"
             />
+            </FormField>
           </div>
         {/if}
 
