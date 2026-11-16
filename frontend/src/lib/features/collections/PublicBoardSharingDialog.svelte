@@ -23,6 +23,7 @@
     saving = false,
     onclose = null,
     onsave = null,
+    onbeforesave = null,
   } = $props();
 
   let draftIsPublic = $state(false);
@@ -94,7 +95,7 @@
 
   {#if collectionId}
     <div class="px-6 py-5">
-      <BoardSharingEditor {collectionId} oncancel={close} onsaved={(savedSharing, shouldClose) => {
+      <BoardSharingEditor {collectionId} {onbeforesave} oncancel={close} onsaved={(savedSharing, shouldClose) => {
         onsave?.({ savedSharing });
         if (shouldClose) close();
       }} />

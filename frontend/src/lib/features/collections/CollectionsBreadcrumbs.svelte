@@ -30,6 +30,7 @@
     publicSlug = null,
     publicMilestoneSwimlanes = false,
     onpublicsave = null,
+    onpublicbeforesave = null,
     saving = false,
     slugSaved = false,
     showPublicBoard = false,
@@ -253,6 +254,7 @@
   {saving}
   onclose={closePublicDialog}
   onsave={onpublicsave}
+  onbeforesave={onpublicbeforesave}
 />
 
 <style>

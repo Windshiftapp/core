@@ -318,6 +318,21 @@
     }
   }
 
+  async function preparePublicSharing(revision) {
+    if (!currentCollection) throw new Error('Collection not found.');
+    if (currentCollection.ql_query === qlQuery) return;
+    const collectionId = currentCollection.id;
+    const update = { ql_query: qlQuery, filter_state: rawMode ? null : serializeFilterState() };
+    const updated = await collections.update(collectionId, update);
+    if (currentCollection?.id === collectionId) {
+      currentCollection = { ...currentCollection, ...update, sharing_revision: updated.sharing_revision };
+    }
+    if (updated.sharing_revision !== revision + 1) {
+      throw Object.assign(new Error('Sharing changed while you were editing.'), { status: 409 });
+    }
+    return { revision: updated.sharing_revision };
+  }
+
   async function handlePublicSharingSave({ isPublic, publicSlug, publicMilestoneSwimlanes, savedSharing = null }) {
     if (!currentCollection) return { ok: false, error: 'Collection not found.' };
     if (savedSharing) {
@@ -499,6 +514,7 @@
       {slugSaved}
       saving={savingPublicSharing}
       onpublicsave={handlePublicSharingSave}
+      onpublicbeforesave={preparePublicSharing}
       isPrivate={currentCollection?.is_private || false}
       showPrivacyToggle={canManageCollection}
       onprivacytoggle={handlePrivacyToggle}

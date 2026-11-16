@@ -11,7 +11,7 @@
   import BoardPublicationLocations from './BoardPublicationLocations.svelte';
   import { publicBaseURL } from '../../runtime/contextPath.js';
 
-  let { collectionId, onsaved = null, oncancel = null } = $props();
+  let { collectionId, onsaved = null, oncancel = null, onbeforesave = null } = $props();
   let original = $state(null);
   let draft = $state(null);
   let loading = $state(true);
@@ -39,7 +39,10 @@
       draft = structuredClone(value);
     }).catch(err => { if (current === generation && err.name !== 'AbortError') error = err.message; })
       .finally(() => { if (current === generation) loading = false; });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      if (current === generation) generation++;
+    };
   });
 
   const locked = $derived(!!original?.revoked_at);
@@ -77,6 +80,15 @@
     } catch (err) { if (current === generation) error = err.message; }
     finally { if (current === generation) historyLoading = false; }
   }
+
+  async function savePublication(id) {
+    const current = generation;
+    const publication = { revision: draft.revision, enabled: draft.enabled, standalone_enabled: draft.standalone_enabled, slug: draft.slug || null, milestone_swimlanes: draft.milestone_swimlanes, policy: draft.policy };
+    const prepared = await onbeforesave?.(publication.revision);
+    if (current !== generation) return;
+    if (prepared?.revision != null) publication.revision = prepared.revision;
+    return boardPublications.save(id, publication);
+  }
 </script>
 
 <div class="space-y-5" data-testid="board-sharing-editor">
@@ -103,7 +115,7 @@
     <Checkbox id="public-board-milestone-swimlanes-input" dataTestid="public-board-milestone-swimlanes" label="Milestone swimlanes" checked={draft.milestone_swimlanes} disabled={saving || locked} onchange={value => draft.milestone_swimlanes = value} />
     <div class="flex flex-wrap justify-end gap-2">
       <Button dataTestid="public-board-cancel" disabled={saving} onclick={() => oncancel?.()}>Cancel</Button>
-      <Button variant="primary" dataTestid="public-board-save" loading={saving} disabled={!!invalid || locked} onclick={() => mutate(id => boardPublications.save(id, { revision: draft.revision, enabled: draft.enabled, standalone_enabled: draft.standalone_enabled, slug: draft.slug || null, milestone_swimlanes: draft.milestone_swimlanes, policy: draft.policy }), true)}>Save sharing</Button>
+      <Button variant="primary" dataTestid="public-board-save" loading={saving} disabled={!!invalid || locked} onclick={() => mutate(savePublication, true)}>Save sharing</Button>
     </div>
     {#if original.can_administer}
       <section class="space-y-3 border-t border-ds-border pt-4">
