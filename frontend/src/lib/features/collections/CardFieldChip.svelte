@@ -8,6 +8,7 @@
   import { durationToString } from '../../utils/timeUtils.js';
   import { booleanCustomFieldChecked, isBooleanCustomFieldType } from '../../utils/customFieldTypes.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { objectDisplayName } from '../../utils/systemLabels.js';
 
   // Renders the chip(s) for a single configured board card field. Centralising
   // this here keeps the board configuration surface (CARD_SELECTABLE_FIELDS) and
@@ -77,7 +78,7 @@
     {@const prio = priorities.find(p => p.id === item.priority_id)}
     {#if prio}
       <Chip appearance="metadata" dotColor={prio.color} title="Priority">
-        {prio.name}
+        {objectDisplayName(prio, 'priority')}
       </Chip>
     {/if}
   {:else if cardField.field_identifier === 'due_date' && item.due_date}
@@ -128,7 +129,7 @@
     {@const st = statuses.find(s => s.id === item.status_id)}
     {#if st}
       <Chip appearance="metadata" dotColor={st.color || st.category_color || '#6b7280'} title="Status">
-        {st.name}
+        {objectDisplayName(st, 'status')}
       </Chip>
     {/if}
   {:else if cardField.field_identifier === 'created_at' && item.created_at}

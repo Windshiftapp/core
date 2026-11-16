@@ -2,6 +2,8 @@
 // (id/name shaped). Components that transform their lists first (e.g.
 // ItemDetailSidebar's label/value options) keep their own configs.
 
+import { objectDisplayName } from '../utils/systemLabels.js';
+
 export const milestonePickerConfig = {
   getValue: (item) => item.id,
   getLabel: (item) => item.name,
@@ -22,10 +24,10 @@ export const priorityPickerConfig = {
     source: (priority) => priority.color || '#6b7280',
     size: 'w-2 h-2',
   },
-  primary: { text: (priority) => priority.name },
+  primary: { text: (priority) => objectDisplayName(priority, 'priority') },
   getValue: (priority) => priority.id,
-  getLabel: (priority) => priority.name,
-  searchFields: ['name'],
+  getLabel: (priority) => objectDisplayName(priority, 'priority'),
+  searchFields: ['display_name', 'name'],
 };
 
 export const projectPickerConfig = {
@@ -46,9 +48,9 @@ export function createStatusPickerConfig(statusCategories) {
       },
       size: 'w-2 h-2',
     },
-    primary: { text: (status) => status.name },
+    primary: { text: (status) => objectDisplayName(status, 'status') },
     getValue: (status) => status.id,
-    getLabel: (status) => status.name,
-    searchFields: ['name'],
+    getLabel: (status) => objectDisplayName(status, 'status'),
+    searchFields: ['display_name', 'name'],
   };
 }

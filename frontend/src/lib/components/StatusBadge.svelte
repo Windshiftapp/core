@@ -2,6 +2,7 @@
   import { statusCategoriesStore } from '../stores/statusCategories.svelte.js';
   import { getVisibleColor } from '../utils/colorUtils.js';
   import { themeStore } from '../stores/theme.svelte.js';
+  import { objectDisplayName } from '../utils/systemLabels.js';
 
   let {
     status = null,       // Status object with { name, category_id } or { label, categoryColor }
@@ -41,7 +42,7 @@
   }[size] || 'w-1.5 h-1.5');
 
   // Get display text - supports both name and label properties
-  let displayText = $derived(status?.name || status?.label || '');
+  let displayText = $derived(objectDisplayName(status, 'status') || status?.label || '');
 </script>
 
 {#if status}

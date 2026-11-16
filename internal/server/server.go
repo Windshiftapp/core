@@ -1050,7 +1050,7 @@ func (s *Server) initialize() error {
 	workspaceUsers := services.NewWorkspaceUserResolver(s.db, permService)
 	userHandler.SetWorkspaceUserResolver(workspaceUsers)
 	agentBindingHandler.SetPresenceService(agentPresenceService)
-	workspaceBootstrapHandler := handlers.NewWorkspaceBootstrapHandler(workspaceHandler, userHandler, milestonePlanningService, permService, timeProjectHandler)
+	workspaceBootstrapHandler := handlers.NewWorkspaceBootstrapHandler(workspaceHandler, userHandler, milestonePlanningService, permService, timeProjectHandler).WithObjectTranslations(objectTranslationService)
 	// Secretless access layer (WI-144): brokers a granted credential to a
 	// running job without it ever living on the runner host.
 	runnerBrokerHandler := handlers.NewRunnerBrokerHandler(tokenManager, repository.NewAgentRunRepository(s.db), actionCredentialService, llmManager, &scmCredsAdapter{cr: scmCredResolver})

@@ -6,6 +6,7 @@
   import ItemPicker from './ItemPicker.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
+  import { objectDisplayName } from '../utils/systemLabels.js';
 
   // Props
   let {
@@ -35,11 +36,11 @@
       source: (item) => getIconComponent(item.icon) || AlertCircle
     },
     primary: {
-      text: (item) => item.name
+      text: (item) => objectDisplayName(item, 'priority')
     },
-    searchFields: ['name', 'description'],
+    searchFields: ['display_name', 'name', 'display_description', 'description'],
     getValue: (item) => item.id,
-    getLabel: (item) => item.name
+    getLabel: (item) => objectDisplayName(item, 'priority')
   };
 
   // Reactive: Use provided items or fetch when workspaceId changes

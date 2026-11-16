@@ -1,4 +1,5 @@
 <script>
+  import { objectDisplayName } from '../../utils/systemLabels.js';
   import { createOwnedPopup } from '../../utils/overlayScope.js';
   const ownedPopup = createOwnedPopup();
   import Plus from '@lucide/svelte/icons/plus';
@@ -300,13 +301,13 @@
             onclick={toggleItemTypeDropdown}
             class="!h-6 !px-0.5 !gap-0.5 !rounded-[3px]"
             dataTestid="quick-add-type"
-            title={selectedItemType?.name || t('collections.selectType')}
+            title={objectDisplayName(selectedItemType, 'item_type') || t('collections.selectType')}
           >
             {#if selectedItemType}
               <ItemTypeIcon
                 icon={selectedItemType.icon}
                 color={selectedItemType.color}
-                title={selectedItemType.name}
+                title={objectDisplayName(selectedItemType, 'item_type')}
               />
             {:else}
               <span class="text-xs" style="color: var(--ds-text-subtle);">{t('collections.selectType')}</span>
@@ -331,7 +332,7 @@
                 class="quick-add-option w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors"
               >
                 <ItemTypeIcon {itemType} />
-                <span class="truncate">{itemType.name}</span>
+                <span class="truncate">{objectDisplayName(itemType, 'item_type')}</span>
               </button>
             {/each}
           </div>

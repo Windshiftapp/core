@@ -11,6 +11,7 @@
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import ItemKey from '../../components/ItemKey.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { objectDisplayName } from '../../utils/systemLabels.js';
   import CardFieldChip from './CardFieldChip.svelte';
   import DependencySummary from './DependencySummary.svelte';
   import SLABadge from '../sla/SLABadge.svelte';
@@ -265,7 +266,7 @@
               {itemType}
               icon={item.item_type_icon}
               color={item.item_type_color}
-              title={item.item_type_name || undefined}
+              title={objectDisplayName(itemType, 'item_type') || item.item_type_name || undefined}
               testId={`board-card-type-icon-${item.id}`}
             />
           {/if}

@@ -10080,6 +10080,10 @@
                       "description": "The color value.",
                       "type": "string"
                     },
+                    "display_name": {
+                      "description": "The display name value.",
+                      "type": "string"
+                    },
                     "icon": {
                       "description": "The icon value.",
                       "type": "string"
@@ -10099,6 +10103,7 @@
                   },
                   "required": [
                     "color",
+                    "display_name",
                     "icon",
                     "id",
                     "name",
@@ -10469,6 +10474,10 @@
                         "description": "The color value.",
                         "type": "string"
                       },
+                      "display_name": {
+                        "description": "The display name value.",
+                        "type": "string"
+                      },
                       "icon": {
                         "description": "The icon value.",
                         "type": "string"
@@ -10488,6 +10497,7 @@
                     },
                     "required": [
                       "color",
+                      "display_name",
                       "icon",
                       "id",
                       "name",
@@ -20061,6 +20071,10 @@
                       "description": "The color value.",
                       "type": "string"
                     },
+                    "display_name": {
+                      "description": "The display name value.",
+                      "type": "string"
+                    },
                     "icon": {
                       "description": "The icon value.",
                       "type": "string"
@@ -20080,6 +20094,7 @@
                   },
                   "required": [
                     "color",
+                    "display_name",
                     "icon",
                     "id",
                     "name",
@@ -36885,6 +36900,10 @@
                       "description": "The color value.",
                       "type": "string"
                     },
+                    "display_name": {
+                      "description": "The display name value.",
+                      "type": "string"
+                    },
                     "icon": {
                       "description": "The icon value.",
                       "type": "string"
@@ -36904,6 +36923,7 @@
                   },
                   "required": [
                     "color",
+                    "display_name",
                     "icon",
                     "id",
                     "name",
@@ -51293,6 +51313,10 @@
                       "description": "The color value.",
                       "type": "string"
                     },
+                    "display_name": {
+                      "description": "The display name value.",
+                      "type": "string"
+                    },
                     "icon": {
                       "description": "The icon value.",
                       "type": "string"
@@ -51312,6 +51336,7 @@
                   },
                   "required": [
                     "color",
+                    "display_name",
                     "icon",
                     "id",
                     "name",
@@ -74179,6 +74204,10 @@
                           "description": "The color value.",
                           "type": "string"
                         },
+                        "display_name": {
+                          "description": "The display name value.",
+                          "type": "string"
+                        },
                         "icon": {
                           "description": "The icon value.",
                           "type": "string"
@@ -74198,6 +74227,7 @@
                       },
                       "required": [
                         "color",
+                        "display_name",
                         "icon",
                         "id",
                         "name",
@@ -74593,6 +74623,10 @@
                   "description": "The color value.",
                   "type": "string"
                 },
+                "display_name": {
+                  "description": "The display name value.",
+                  "type": "string"
+                },
                 "icon": {
                   "description": "The icon value.",
                   "type": "string"
@@ -74612,6 +74646,7 @@
               },
               "required": [
                 "color",
+                "display_name",
                 "icon",
                 "id",
                 "name",
@@ -74980,6 +75015,10 @@
                           "description": "The color value.",
                           "type": "string"
                         },
+                        "display_name": {
+                          "description": "The display name value.",
+                          "type": "string"
+                        },
                         "icon": {
                           "description": "The icon value.",
                           "type": "string"
@@ -74999,6 +75038,7 @@
                       },
                       "required": [
                         "color",
+                        "display_name",
                         "icon",
                         "id",
                         "name",

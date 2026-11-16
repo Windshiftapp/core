@@ -1,4 +1,5 @@
 import { GENERIC_SUBTASK_HIERARCHY_LEVEL } from '../../utils/hierarchy.js';
+import { objectDisplayName } from '../../utils/systemLabels.js';
 
 /**
  * Merge configured item types with filtered level counts into the level options
@@ -26,7 +27,7 @@ export function buildHierarchyLevels(itemTypes = [], counts = []) {
     .map((entry) => ({
       ...entry,
       label: entry.types.length
-        ? entry.types.map((type) => type.name).join(', ')
+        ? entry.types.map((type) => objectDisplayName(type, 'item_type')).join(', ')
         : entry.name || `Level ${entry.level}`,
     }))
     .sort((a, b) => a.level - b.level);

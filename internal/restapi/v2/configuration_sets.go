@@ -99,6 +99,9 @@ func registerConfigurationSetRoutes(b *routeBuilder, deps Deps) {
 		if err != nil {
 			return nil, Pagination{}, 0, configurationSetListMeta{}, internalError(err)
 		}
+		if err := localizeCatalog(r, deps.ObjectTranslations, "configuration_set", &sets); err != nil {
+			return nil, Pagination{}, 0, configurationSetListMeta{}, err
+		}
 		return sets, Pagination{Page: page, PageSize: limit}, total, configurationSetListMeta{Total: total}, nil
 	})
 
@@ -110,6 +113,9 @@ func registerConfigurationSetRoutes(b *routeBuilder, deps Deps) {
 		cs, err := deps.ConfigurationSetProvisioning.Get(id)
 		if err != nil {
 			return configurationSetDTO{}, configurationSetMutationError(err)
+		}
+		if err := localizeCatalog(r, deps.ObjectTranslations, "configuration_set", cs); err != nil {
+			return configurationSetDTO{}, err
 		}
 		return *cs, nil
 	})

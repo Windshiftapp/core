@@ -10,7 +10,7 @@
   import { isMenuTriggerEvent } from '../../utils/menuTrigger.js';
 
   let {
-    item, sectionId, workspace, itemTypes, statuses, statusCategories, styles, dragState,
+    item, sectionId, workspace, itemTypes, statuses, priorities = [], statusCategories, styles, dragState,
     backlogRowGap = 2, assignableIterations = [], pendingActionItemIds = new Set(),
     visibleFields = [], onOpenItem, onMoveItemToBoundary, onAssignItemToIteration,
     storyPointsConfiguredForItem = null, storyPointsPendingItemIds = new Set(),
@@ -44,7 +44,7 @@
   {#if dragState.get(item.id)?.closestEdge}
     <DropIndicator edge={dragState.get(item.id)?.closestEdge} gap={backlogRowGap} />
   {/if}
-  <WorkItemRow {item} {workspace} {itemTypes} {statuses} {statusCategories}
+  <WorkItemRow {item} {workspace} {itemTypes} {statuses} {priorities} {statusCategories}
     dataTestid={`backlog-row-${item.id}`}
     onclick={handleRowClick}
     showStatus={visibleFieldSet.has('status')} showPriority={visibleFieldSet.has('priority')}

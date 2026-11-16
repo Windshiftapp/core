@@ -7,6 +7,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import { getStatusCategory } from '../../utils/statusColors.js';
   import { t } from '../../stores/i18n.svelte.js';
+  import { objectDisplayName } from '../../utils/systemLabels.js';
   import EditableField from '../../editors/EditableField.svelte';
   import Avatar from '../../components/Avatar.svelte';
   import Chip from '../../components/Chip.svelte';
@@ -60,32 +61,25 @@
     return formatDateSimple(timestamp);
   });
 
-  // Look up status - supports pre-resolved status_name, status string, or lookup by status_id
+  // Prefer localized catalogs; joined item names remain canonical.
   const status = $derived.by(() => {
-    // If item already has status info from JOIN
+    const resolved = statuses.find(s => s.id === item.status_id);
+    if (resolved) return resolved;
     if (item.status_name) {
-      return { name: item.status_name, id: item.status_id };
+      return { name: item.status_name, builtin_key: item.status_builtin_key, id: item.status_id };
     }
     // If item has status as a string (e.g., from Homepage activity API)
     if (typeof item.status === 'string' && item.status) {
       return { name: item.status, id: null };
     }
-    // Otherwise lookup from statuses array
-    if (item.status_id && statuses.length > 0) {
-      return statuses.find(s => s.id === item.status_id) || null;
-    }
     return null;
   });
 
-  // Look up priority - supports both pre-resolved priority info and lookup by priority_id
   const priority = $derived.by(() => {
-    // If item already has priority info from JOIN
+    const resolved = priorities.find(p => p.id === item.priority_id);
+    if (resolved) return resolved;
     if (item.priority_name) {
-      return { name: item.priority_name, color: item.priority_color, id: item.priority_id };
-    }
-    // Otherwise lookup from priorities array
-    if (item.priority_id && priorities.length > 0) {
-      return priorities.find(p => p.id === item.priority_id) || null;
+      return { name: item.priority_name, builtin_key: item.priority_builtin_key, color: item.priority_color, id: item.priority_id };
     }
     return null;
   });
@@ -127,7 +121,7 @@
           itemType={itemType}
           icon={item.item_type_icon}
           color={item.item_type_color}
-          title={item.item_type_name || undefined}
+          title={objectDisplayName(itemType, 'item_type') || item.item_type_name || undefined}
           testId={`work-item-type-icon-${item.id}`}
         />
       {/if}
@@ -167,7 +161,7 @@
           style="background-color: {priority.color}20; color: {priority.color};"
           data-testid={`work-item-priority-${item.id}`}
         >
-          {priority.name}
+          {objectDisplayName(priority, 'priority')}
         </span>
       {/if}
 
@@ -207,7 +201,7 @@
 
       <!-- Status Badge -->
       {#if showStatus && status}
-        <Lozenge text={status.name.replace(/_/g, ' ')} customBg={statusColor} />
+        <Lozenge text={objectDisplayName(status, 'status')} customBg={statusColor} />
       {/if}
 
       {#if showStoryPoints}

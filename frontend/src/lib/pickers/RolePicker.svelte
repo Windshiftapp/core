@@ -5,6 +5,7 @@
   import { onDestroy, onMount } from 'svelte';
   import Shield from '@lucide/svelte/icons/shield';
   import { t } from '../stores/i18n.svelte.js';
+  import { objectDisplayDescription, objectDisplayName } from '../utils/systemLabels.js';
 
   let {
     value = $bindable(null),
@@ -40,9 +41,9 @@
   {disabled}
   {multiple}
   class={className}
-  searchFields={['name', 'description']}
+   searchFields={['display_name', 'name', 'display_description', 'description']}
   getValue={(role) => role?.id}
-  getLabel={(role) => role?.name ?? ''}
+   getLabel={(role) => objectDisplayName(role, 'workspace_role')}
   onSelect={(item) => onSelect(item)}
   onChange={(roleIDs) => onChange(roleIDs)}
   onCancel={() => onCancel()}
@@ -59,9 +60,9 @@
 
       <!-- Role Info -->
       <div class="flex flex-col min-w-0">
-        <span class="font-medium truncate">{role.name}</span>
+        <span class="font-medium truncate">{objectDisplayName(role, 'workspace_role')}</span>
         {#if role.description}
-          <span class="text-sm truncate" style="color: var(--ds-text-subtle);">{role.description}</span>
+          <span class="text-sm truncate" style="color: var(--ds-text-subtle);">{objectDisplayDescription(role, 'workspace_role')}</span>
         {/if}
       </div>
     </div>

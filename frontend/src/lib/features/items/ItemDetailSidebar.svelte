@@ -74,7 +74,7 @@
     primary: {
       text: (item) => objectDisplayName(item, 'priority')
     },
-    searchFields: ['name'],
+    searchFields: ['display_name', 'name'],
     getValue: (item) => item.id,
     getLabel: (item) => objectDisplayName(item, 'priority')
   };
@@ -87,11 +87,11 @@
       size: 'w-2 h-2'
     },
     primary: {
-      text: (item) => objectDisplayName({ name: item.label, builtin_key: item.builtin_key }, 'status')
+      text: (item) => objectDisplayName({ ...item, name: item.label }, 'status')
     },
-    searchFields: ['label', 'value'],
+    searchFields: ['display_name', 'label', 'value'],
     getValue: (item) => item.id,
-    getLabel: (item) => objectDisplayName({ name: item.label, builtin_key: item.builtin_key }, 'status')
+    getLabel: (item) => objectDisplayName({ ...item, name: item.label }, 'status')
   };
 
   // Project picker configuration
@@ -722,7 +722,7 @@
               <StatusBadge
                 status={{
                   ...selectedStatus,
-                  label: objectDisplayName({ name: selectedStatus.label, builtin_key: selectedStatus.builtin_key }, 'status'),
+                  label: objectDisplayName({ ...selectedStatus, name: selectedStatus.label }, 'status'),
                 }}
               />
             {:else}

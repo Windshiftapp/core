@@ -56,8 +56,8 @@ export function buildDisplayColumns(boardConfig, statuses = []) {
       .map((column) => {
         if (column.status_ids?.length !== 1) return column;
         const status = statuses.find((candidate) => candidate.id === column.status_ids[0]);
-        return status?.builtin_key && status.name === column.name
-          ? { ...column, builtin_key: status.builtin_key }
+        return status && status.name === column.name
+          ? { ...column, builtin_key: status.builtin_key, display_name: status.display_name }
           : column;
       })
       .sort((a, b) => a.display_order - b.display_order);
@@ -65,6 +65,7 @@ export function buildDisplayColumns(boardConfig, statuses = []) {
   return sortStatusesForBoard(statuses).map((status) => ({
     id: status.id,
     name: status.name,
+    display_name: status.display_name,
     builtin_key: status.builtin_key,
     status_ids: [status.id],
     color: categoryColor(status),

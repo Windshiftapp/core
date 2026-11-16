@@ -46,18 +46,18 @@ type itemTemplateApplication interface {
 	Delete(services.AuditActor, int, int) error
 }
 
-func registerScopedCatalogRoutes(builder *routeBuilder, catalog catalogReader, workspaces workspaceApplication, templates itemTemplateApplication) {
+func registerScopedCatalogRoutes(builder *routeBuilder, catalog catalogReader, workspaces workspaceApplication, templates itemTemplateApplication, localizer objectLocalizer) {
 	builder.Page("/workspaces", AuthAuthenticated, []string{"workspaces:read"}, listWorkspaces(catalog))
 	builder.JSON(http.MethodPost, "/workspaces", http.StatusCreated, false, AuthAuthenticated, []string{"workspaces:write"}, createWorkspace(workspaces))
 	builder.Read("/workspace-templates", AuthAuthenticated, []string{"workspaces:read"}, listWorkspaceTemplates(catalog))
 	builder.Read("/workspaces/{workspace_id}", AuthAuthenticated, []string{"workspaces:read"}, getWorkspace(catalog))
 	builder.JSON(http.MethodPatch, "/workspaces/{workspace_id}", http.StatusOK, true, AuthAuthenticated, []string{"workspaces:write"}, updateWorkspace(workspaces))
 	builder.Command(http.MethodDelete, "/workspaces/{workspace_id}", AuthAuthenticated, []string{"workspaces:delete"}, deleteWorkspace(workspaces))
-	builder.Read("/workspaces/{workspace_id}/statuses", AuthAuthenticated, []string{"workspaces:read"}, listWorkspaceStatuses(catalog))
-	builder.Read("/workspaces/{workspace_id}/item-types", AuthAuthenticated, []string{"workspaces:read"}, listWorkspaceItemTypes(catalog))
-	builder.Read("/workspaces/{workspace_id}/workflows", AuthAuthenticated, []string{"workspaces:read"}, listWorkspaceWorkflows(catalog))
-	builder.Read("/workspaces/{workspace_id}/priorities", AuthAuthenticated, []string{"workspaces:read"}, listWorkspacePriorities(catalog))
-	builder.Read("/workspaces/{workspace_id}/effective-config", AuthAuthenticated, []string{"workspaces:read"}, getEffectiveConfig(catalog))
+	builder.Read("/workspaces/{workspace_id}/statuses", AuthAuthenticated, []string{"workspaces:read"}, listWorkspaceStatuses(catalog, localizer))
+	builder.Read("/workspaces/{workspace_id}/item-types", AuthAuthenticated, []string{"workspaces:read"}, listWorkspaceItemTypes(catalog, localizer))
+	builder.Read("/workspaces/{workspace_id}/workflows", AuthAuthenticated, []string{"workspaces:read"}, listWorkspaceWorkflows(catalog, localizer))
+	builder.Read("/workspaces/{workspace_id}/priorities", AuthAuthenticated, []string{"workspaces:read"}, listWorkspacePriorities(catalog, localizer))
+	builder.Read("/workspaces/{workspace_id}/effective-config", AuthAuthenticated, []string{"workspaces:read"}, getEffectiveConfig(catalog, localizer))
 	builder.Read("/workspaces/{workspace_id}/assignable-users", AuthAuthenticated, []string{"users:read"}, listAssignableUsers(catalog))
 	builder.Page("/users", AuthAuthenticated, []string{"users:read"}, listUsers(catalog))
 	builder.Read("/users/{user_id}", AuthAuthenticated, []string{"users:read"}, getUser(catalog))
@@ -309,7 +309,7 @@ func workspaceMutationError(err error) error {
 	}
 }
 
-func listWorkspaceStatuses(catalog catalogReader) readOperation[[]statusDTO] {
+func listWorkspaceStatuses(catalog catalogReader, localizer objectLocalizer) readOperation[[]statusDTO] {
 	return func(r *http.Request) ([]statusDTO, error) {
 		user, workspaceID, err := principalAndWorkspace(r)
 		if err != nil {
@@ -326,6 +326,9 @@ func listWorkspaceStatuses(catalog catalogReader) readOperation[[]statusDTO] {
 		result := make([]statusDTO, len(items))
 		for i := range items {
 			result[i] = statusFromResult(items[i])
+		}
+		if err := localizeCatalog(r, localizer, "status", &result); err != nil {
+			return nil, err
 		}
 		return result, nil
 	}
@@ -374,7 +377,7 @@ func effectiveConfigDTOFromResult(result *services.EffectiveConfigResult) effect
 	return dto
 }
 
-func getEffectiveConfig(catalog catalogReader) readOperation[effectiveConfigDTO] {
+func getEffectiveConfig(catalog catalogReader, localizer objectLocalizer) readOperation[effectiveConfigDTO] {
 	return func(r *http.Request) (effectiveConfigDTO, error) {
 		user, workspaceID, err := principalAndWorkspace(r)
 		if err != nil {
@@ -388,11 +391,22 @@ func getEffectiveConfig(catalog catalogReader) readOperation[effectiveConfigDTO]
 		if err != nil {
 			return effectiveConfigDTO{}, scopedReadError(err, "Workspace was not found")
 		}
-		return effectiveConfigDTOFromResult(result), nil
+		dto := effectiveConfigDTOFromResult(result)
+		if err := localizeCatalog(r, localizer, "priority", &dto.Priorities); err != nil {
+			return effectiveConfigDTO{}, err
+		}
+		for _, screen := range []*screenDTO{dto.EditScreen, dto.ViewScreen} {
+			if screen != nil {
+				if err := localizeCatalog(r, localizer, "screen", screen); err != nil {
+					return effectiveConfigDTO{}, err
+				}
+			}
+		}
+		return dto, nil
 	}
 }
 
-func listWorkspaceItemTypes(catalog catalogReader) readOperation[[]itemTypeDTO] {
+func listWorkspaceItemTypes(catalog catalogReader, localizer objectLocalizer) readOperation[[]itemTypeDTO] {
 	return func(r *http.Request) ([]itemTypeDTO, error) {
 		user, workspaceID, err := principalAndWorkspace(r)
 		if err != nil {
@@ -406,11 +420,14 @@ func listWorkspaceItemTypes(catalog catalogReader) readOperation[[]itemTypeDTO] 
 		for i := range items {
 			result[i] = itemTypeFromResult(items[i])
 		}
+		if err := localizeCatalog(r, localizer, "item_type", &result); err != nil {
+			return nil, err
+		}
 		return result, nil
 	}
 }
 
-func listWorkspaceWorkflows(catalog catalogReader) readOperation[[]workflowDTO] {
+func listWorkspaceWorkflows(catalog catalogReader, localizer objectLocalizer) readOperation[[]workflowDTO] {
 	return func(r *http.Request) ([]workflowDTO, error) {
 		user, workspaceID, err := principalAndWorkspace(r)
 		if err != nil {
@@ -424,11 +441,14 @@ func listWorkspaceWorkflows(catalog catalogReader) readOperation[[]workflowDTO] 
 		for i := range items {
 			result[i] = workflowFromResult(items[i])
 		}
+		if err := localizeCatalog(r, localizer, "workflow", &result); err != nil {
+			return nil, err
+		}
 		return result, nil
 	}
 }
 
-func listWorkspacePriorities(catalog catalogReader) readOperation[[]priorityDTO] {
+func listWorkspacePriorities(catalog catalogReader, localizer objectLocalizer) readOperation[[]priorityDTO] {
 	return func(r *http.Request) ([]priorityDTO, error) {
 		user, workspaceID, err := principalAndWorkspace(r)
 		if err != nil {
@@ -441,6 +461,9 @@ func listWorkspacePriorities(catalog catalogReader) readOperation[[]priorityDTO]
 		result := make([]priorityDTO, len(items))
 		for i := range items {
 			result[i] = priorityFromResult(items[i])
+		}
+		if err := localizeCatalog(r, localizer, "priority", &result); err != nil {
+			return nil, err
 		}
 		return result, nil
 	}

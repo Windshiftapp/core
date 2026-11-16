@@ -27,6 +27,7 @@
   import IterationCellEditor from './IterationCellEditor.svelte';
   import MilestoneCellValue from './MilestoneCellValue.svelte';
   import ItemStatusPicker from '../../pickers/ItemStatusPicker.svelte';
+  import { objectDisplayName } from '../../utils/systemLabels.js';
 
   let {
     item,
@@ -146,7 +147,7 @@
             {itemType}
             icon={item.item_type_icon}
             color={item.item_type_color}
-            title={item.item_type_name || undefined}
+            title={objectDisplayName(itemType, 'item_type') || item.item_type_name || undefined}
             testId={`list-cell-type-icon-${item.id}`}
           />
         {/if}
@@ -218,7 +219,7 @@
               style="color: {selectedPriority.color || 'var(--ds-text-subtle)'};"
             >
               <ColorDot color={selectedPriority.color} />
-              {selectedPriority.name}
+              {objectDisplayName(selectedPriority, 'priority')}
             </span>
           {:else}
             <span
@@ -234,7 +235,7 @@
       {#if selectedPriority}
         <span class="flex items-center gap-2 text-sm" style="color: {selectedPriority.color || 'var(--ds-text-subtle)'};">
           <ColorDot color={selectedPriority.color} />
-          {selectedPriority.name}
+          {objectDisplayName(selectedPriority, 'priority')}
         </span>
       {:else}
         <span class="text-sm" style="color: var(--ds-text-subtle);">-</span>

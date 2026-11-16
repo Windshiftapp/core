@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"windshift/internal/models"
+	"windshift/internal/objecttranslation"
 	"windshift/internal/repository"
 	"windshift/internal/services"
 )
@@ -17,11 +18,12 @@ import (
 // workspace entry. It calls services and repositories directly so the browser
 // pays for one authorized request instead of a fan-out of domain GETs.
 type WorkspaceBootstrapHandler struct {
-	workspace  *WorkspaceHandler
-	users      *UserHandler
-	planning   *services.PlanningService
-	permission *services.PermissionService
-	projects   *TimeProjectHandler
+	workspace    *WorkspaceHandler
+	users        *UserHandler
+	planning     *services.PlanningService
+	permission   *services.PermissionService
+	projects     *TimeProjectHandler
+	translations *objecttranslation.Service
 }
 
 // planningLookaheadLimit queries one row past the returned cap so the response
@@ -41,6 +43,12 @@ type PlanningCompleteness struct {
 	Iterations bool `json:"iterations"`
 }
 
+type workspaceBootstrapItemType struct {
+	services.ItemTypeResult
+	DisplayName        string `json:"display_name"`
+	DisplayDescription string `json:"display_description"`
+}
+
 type WorkspaceBootstrapResponse struct {
 	Workspace              *models.Workspace              `json:"workspace"`
 	HomepageLayout         models.WorkspaceHomepageLayout `json:"homepage_layout"`
@@ -49,11 +57,16 @@ type WorkspaceBootstrapResponse struct {
 	Milestones             []models.Milestone             `json:"milestones"`
 	Iterations             []models.Iteration             `json:"iterations"`
 	Projects               []models.TimeProject           `json:"projects"`
-	ItemTypes              []services.ItemTypeResult      `json:"item_types"`
+	ItemTypes              []workspaceBootstrapItemType   `json:"item_types"`
 	StatusCategories       []models.StatusCategory        `json:"status_categories"`
 	Priorities             []models.Priority              `json:"priorities"`
 	CustomFieldDefinitions []models.CustomFieldDefinition `json:"custom_field_definitions"`
 	PlanningCompleteness   PlanningCompleteness           `json:"planning_completeness"`
+}
+
+func (h *WorkspaceBootstrapHandler) WithObjectTranslations(service *objecttranslation.Service) *WorkspaceBootstrapHandler {
+	h.translations = service
+	return h
 }
 
 func NewWorkspaceBootstrapHandler(
@@ -95,6 +108,19 @@ func (h *WorkspaceBootstrapHandler) Get(w http.ResponseWriter, r *http.Request) 
 		respondInternalError(w, r, err)
 		return
 	}
+	for _, catalog := range []struct {
+		objectType string
+		value      any
+	}{
+		{"status", &response.Statuses},
+		{"status_category", &response.StatusCategories},
+		{"item_type", &response.ItemTypes},
+		{"priority", &response.Priorities},
+	} {
+		if !localizeObjectResponse(w, r, h.translations, catalog.objectType, catalog.value) {
+			return
+		}
+	}
 	respondJSONOK(w, response)
 }
 
@@ -107,7 +133,7 @@ func (h *WorkspaceBootstrapHandler) load(ctx context.Context, userID int, worksp
 		Milestones:             []models.Milestone{},
 		Iterations:             []models.Iteration{},
 		Projects:               []models.TimeProject{},
-		ItemTypes:              []services.ItemTypeResult{},
+		ItemTypes:              []workspaceBootstrapItemType{},
 		StatusCategories:       []models.StatusCategory{},
 		Priorities:             []models.Priority{},
 		CustomFieldDefinitions: []models.CustomFieldDefinition{},
@@ -173,7 +199,10 @@ func (h *WorkspaceBootstrapHandler) load(ctx context.Context, userID int, worksp
 		if err != nil {
 			return err
 		}
-		response.ItemTypes = itemTypes
+		response.ItemTypes = make([]workspaceBootstrapItemType, len(itemTypes))
+		for i, itemType := range itemTypes {
+			response.ItemTypes[i] = workspaceBootstrapItemType{ItemTypeResult: itemType}
+		}
 		response.Priorities = prioritiesToModels(priorities)
 		return nil
 	})

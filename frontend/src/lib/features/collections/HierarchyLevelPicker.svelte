@@ -4,6 +4,7 @@
   import ItemTypeIcon from '../../components/ItemTypeIcon.svelte';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { t } from '../../stores/i18n.svelte.js';
+  import { objectDisplayName } from '../../utils/systemLabels.js';
 
   /**
    * BasePicker variant for the hierarchy level. One option per item-type
@@ -24,7 +25,7 @@
 
   function labelFor(entry) {
     if (entry?.label) return entry.label;
-    return (entry?.types ?? []).map((type) => type.name).join(', ');
+    return (entry?.types ?? []).map((type) => objectDisplayName(type, 'item_type')).join(', ');
   }
 </script>
 
@@ -32,7 +33,7 @@
   <div class="flex items-center gap-2 min-w-0 flex-1">
     <div class="flex items-center gap-1 flex-shrink-0">
       {#each item.types as type (type.id)}
-        <ItemTypeIcon itemType={type} title={type.name} />
+        <ItemTypeIcon itemType={type} />
       {/each}
     </div>
     <div class="flex flex-col min-w-0">
@@ -72,7 +73,7 @@
   >
     <span class="flex items-center gap-1 flex-shrink-0">
       {#each selected?.types ?? [] as type (type.id)}
-        <ItemTypeIcon itemType={type} title={type.name} />
+        <ItemTypeIcon itemType={type} />
       {/each}
     </span>
     <span class="truncate max-w-[16rem]">

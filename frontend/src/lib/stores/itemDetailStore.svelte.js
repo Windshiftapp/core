@@ -139,6 +139,7 @@ class ItemDetailStore {
   milestones = $state([]);
   iterations = $state([]);
   priorities = $state([]);
+  statuses = $state([]);
 
   // Item types
   itemTypes = $state([]);
@@ -222,6 +223,7 @@ class ItemDetailStore {
         id: transition.id,
         value: transition.value,
         label: transition.name,
+        display_name: this.statuses.find((status) => status.id === transition.id)?.display_name,
         builtin_key: transition.builtin_key,
         categoryColor: transition.category_color || null,
         // Screen summary the transition modal opens before moving (WI-1835).
@@ -367,6 +369,7 @@ class ItemDetailStore {
       this.iterations = references?.iterations ?? [];
       this.timeProjects = references?.projects ?? [];
       this.itemTypes = references?.item_types ?? [];
+      this.statuses = references?.statuses ?? [];
       // The loaded-scope priorities are only a valid fallback for the active
       // scope. A null snapshot for a foreign item must not borrow them.
       const referencesInActiveScope =
@@ -1540,6 +1543,7 @@ class ItemDetailStore {
     this.milestones = [];
     this.iterations = [];
     this.priorities = [];
+    this.statuses = [];
     this.itemTypes = [];
     this.currentItemType = null;
     this.currentHierarchyLevel = null;

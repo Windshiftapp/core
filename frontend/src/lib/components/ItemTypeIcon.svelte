@@ -1,5 +1,6 @@
 <script>
   import { itemTypeIconMap } from '../utils/icons.js';
+  import { objectDisplayName } from '../utils/systemLabels.js';
 
   let {
     itemType = null,
@@ -14,7 +15,7 @@
   const resolvedIconName = $derived(String(icon || itemType?.icon || ''));
   const ResolvedIcon = $derived(itemTypeIconMap[resolvedIconName] || itemTypeIconMap.FileText);
   const resolvedColor = $derived(color || itemType?.color || 'var(--ds-icon-subtle, #6b7280)');
-  const resolvedTitle = $derived(title ?? itemType?.name);
+  const resolvedTitle = $derived(title ?? (objectDisplayName(itemType, 'item_type') || undefined));
 </script>
 
 <span

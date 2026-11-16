@@ -838,7 +838,7 @@
                   headerOnly virtualRow={virtual}
                   iteration={entry.section.iteration} items={entry.section.items}
                   collapsed={collapsedSections.has(entry.sectionId)}
-                  {workspace} {itemTypes} {statuses} {statusCategories} {styles} {dragState}
+                  {workspace} {itemTypes} {statuses} {priorities} {statusCategories} {styles} {dragState}
                   isGlobalAdded={addedGlobalIds.has(entry.sectionId)}
                   sectionHighlight={sectionDropHighlight.get(String(entry.sectionId)) || false}
                   onToggleCollapse={toggleCollapse} onStartIteration={startIteration}
@@ -856,7 +856,7 @@
               {:else}
                 <BacklogItemRow virtualRow={virtual} deferred={false}
                   item={entry.item} sectionId={entry.sectionId}
-                  {workspace} {itemTypes} {statuses} {statusCategories} {styles} {dragState}
+                  {workspace} {itemTypes} {statuses} {priorities} {statusCategories} {styles} {dragState}
                   {backlogRowGap} {assignableIterations} {pendingActionItemIds} {visibleFields}
                   onOpenItem={openItem} onMoveItemToBoundary={moveItemToBoundary}
                   onAssignItemToIteration={assignItemToIteration}

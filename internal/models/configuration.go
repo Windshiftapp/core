@@ -191,12 +191,13 @@ type Priority struct {
 
 // PriorityDisplay holds minimal priority data for displaying in configuration sets
 type PriorityDisplay struct {
-	ID         int    `json:"id"`
-	BuiltinKey string `json:"builtin_key,omitempty"`
-	Name       string `json:"name"`
-	Icon       string `json:"icon"`
-	Color      string `json:"color"`
-	SortOrder  int    `json:"sort_order"`
+	ID          int    `json:"id"`
+	BuiltinKey  string `json:"builtin_key,omitempty"`
+	Name        string `json:"name"`
+	DisplayName string `json:"display_name"`
+	Icon        string `json:"icon"`
+	Color       string `json:"color"`
+	SortOrder   int    `json:"sort_order"`
 }
 
 // HierarchyLevel represents a hierarchy level definition

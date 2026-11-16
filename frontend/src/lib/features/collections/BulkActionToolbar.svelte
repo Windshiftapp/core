@@ -1,5 +1,6 @@
 <script>
   import { t } from '../../stores/i18n.svelte.js';
+  import { objectDisplayName } from '../../utils/systemLabels.js';
   import Button from '../../components/Button.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import Modal from '../../dialogs/Modal.svelte';
@@ -54,7 +55,7 @@
     ...priorities.map((priority) => ({
       id: `${menuTestidPrefix}-priority-${priority.id}`,
       testid: `${menuTestidPrefix}-priority-${priority.id}`,
-      title: priority.name,
+      title: objectDisplayName(priority, 'priority'),
       iconDot: true,
       iconColor: priority.color || 'var(--ds-text-subtle)',
       onClick: () => selection.bulkUpdateFields({ priority_id: priority.id }),

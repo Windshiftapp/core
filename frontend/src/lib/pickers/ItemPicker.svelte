@@ -7,6 +7,7 @@
   import { getVisibleColor } from '../utils/colorUtils.js';
   import { formatDateShort } from '../utils/dateFormatter.js';
   import { t } from '../stores/i18n.svelte.js';
+  import { objectDisplayName } from '../utils/systemLabels.js';
 
   let {
     value = $bindable(null),
@@ -46,14 +47,14 @@
   const finalConfig = $derived.by(() => {
     const defaults = {
       icon: null,
-      primary: { text: (item) => item.name || item.label || '' },
+      primary: { text: (item) => objectDisplayName(item) || item.label || '' },
       secondary: null,
       badges: [],
       metadata: [],
-      searchFields: ['name', 'label'],
+      searchFields: ['display_name', 'name', 'label'],
       groupBy: null,
       getValue: (item) => item.id,
-      getLabel: (item) => item.name || item.label || ''
+      getLabel: (item) => objectDisplayName(item) || item.label || ''
     };
     return { ...defaults, ...config };
   });

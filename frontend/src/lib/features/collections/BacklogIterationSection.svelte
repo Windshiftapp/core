@@ -16,6 +16,7 @@
     workspace,
     itemTypes,
     statuses,
+    priorities = [],
     statusCategories,
     styles,
     dragState,
@@ -185,7 +186,7 @@
       {:else}
         <div class="flex flex-col" style={`row-gap: ${backlogRowGap}px;`}>
           {#each items as item (item.id)}
-            <BacklogItemRow {item} {sectionId} {workspace} {itemTypes} {statuses}
+            <BacklogItemRow {item} {sectionId} {workspace} {itemTypes} {statuses} {priorities}
               {statusCategories} {styles} {dragState} {backlogRowGap} {assignableIterations}
               {pendingActionItemIds} {visibleFields} {onOpenItem} {onMoveItemToBoundary}
               {onAssignItemToIteration} {storyPointsConfiguredForItem} {storyPointsPendingItemIds}

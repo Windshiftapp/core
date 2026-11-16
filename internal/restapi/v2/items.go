@@ -142,7 +142,7 @@ type roadmapHierarchyDatesRequest struct {
 	RootIDs []int `json:"root_ids"`
 }
 
-func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationService, detail *services.ItemDetailApplicationService, lifecycle *services.ItemLifecycleService, rollupAccess resourceAccess, rollup storyPointRollupReader, requestTimeout time.Duration) {
+func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationService, detail *services.ItemDetailApplicationService, lifecycle *services.ItemLifecycleService, rollupAccess resourceAccess, rollup storyPointRollupReader, requestTimeout time.Duration, localizer objectLocalizer) {
 	collection := "/items"
 	builder.Page("/items/search", AuthAuthenticated, []string{"items:read"}, searchItems(app, requestTimeout))
 	builder.PageMetadata(collection, AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]models.Item, Pagination, int, itemListMeta, error) {
@@ -265,7 +265,7 @@ func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationServ
 			return services.ItemDetailSummary{}, err
 		}
 		result, err := detail.GetByKey(r.Context(), user.ID, strings.TrimSpace(r.PathValue("workspace_key")), number, r.URL.Query().Get("surface"), excludePersonal(r))
-		return result, itemError(err)
+		return localizeItemDetail(r, localizer, result, err)
 	})
 	builder.Read(collection+"/{item_id}/detail-summary", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) (services.ItemDetailSummary, error) {
 		user, id, err := itemTarget(r)
@@ -273,7 +273,7 @@ func registerItemRoutes(builder *routeBuilder, app *services.ItemApplicationServ
 			return services.ItemDetailSummary{}, err
 		}
 		result, err := detail.Get(r.Context(), user.ID, id, r.URL.Query().Get("surface"), excludePersonal(r))
-		return result, itemError(err)
+		return localizeItemDetail(r, localizer, result, err)
 	})
 	builder.Read(collection+"/story-points/by-assignee", AuthAuthenticated, []string{"items:read"}, func(r *http.Request) ([]repository.StoryPointsByAssigneeRow, error) {
 		user, err := principal(r)

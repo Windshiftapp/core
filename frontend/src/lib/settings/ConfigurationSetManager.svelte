@@ -182,14 +182,14 @@
     if (!workflowId) return t('settings.configSets.none');
     const workflow = workflows.find(w => w.id === workflowId);
     if (!workflow) return t('common.unknown');
-    return workflow.builtin_key ? t('workflows.defaults.default.name') : workflow.name;
+    return objectDisplayName(workflow, 'workflow');
   }
 
   function getNotificationSettingName(notificationSettingId) {
     if (!notificationSettingId) return t('settings.configSets.none');
     const setting = notificationSettings.find(s => s.id === notificationSettingId);
     if (!setting) return t('common.unknown');
-    return setting.builtin_key ? t('settings.configSets.defaults.notifications.name') : setting.name;
+    return objectDisplayName(setting, 'notification_setting');
   }
 
   // Pagination handlers
