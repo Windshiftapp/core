@@ -250,7 +250,7 @@ Run `make help` to see all available targets:
 
 **Development builds:**
 - `make dev-build` - Development binary
-- `make dev` - Full development cycle
+- `./dev.sh` - Start the development server
 
 **Testing:**
 - Test sources and runners live in the adjacent private `core-tests`
@@ -260,4 +260,3 @@ Run `make help` to see all available targets:
 - `make frontend` - Build frontend only
 - `make clean` - Clean build artifacts
 - `make deps` - Update dependencies
-- `make verify-size` - Compare binary sizes with/without tests
