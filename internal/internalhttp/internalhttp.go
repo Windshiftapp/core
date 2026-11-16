@@ -85,13 +85,20 @@ func loadLeafCertificate(certPath string) (*x509.Certificate, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read internal TLS certificate: %w", err)
 	}
-	block, _ := pem.Decode(pemBytes)
-	if block == nil || block.Type != "CERTIFICATE" {
-		return nil, fmt.Errorf("internal TLS certificate %q has no PEM certificate block", certPath)
+	for len(pemBytes) > 0 {
+		var block *pem.Block
+		block, pemBytes = pem.Decode(pemBytes)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" {
+			continue
+		}
+		leaf, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("parse internal TLS certificate: %w", err)
+		}
+		return leaf, nil
 	}
-	leaf, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("parse internal TLS certificate: %w", err)
-	}
-	return leaf, nil
+	return nil, fmt.Errorf("internal TLS certificate %q has no PEM certificate block", certPath)
 }
