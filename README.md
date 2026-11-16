@@ -234,6 +234,7 @@ Windshift supports OIDC single sign-on with any standards-compliant provider. We
 - [Build instructions](BUILD.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Logging configuration](LOGGING.md)
+- [Healthchecks and direct TLS](deploy/healthchecks.md)
 - [Docker backup and restore](deploy/backup-restore.md)
 - [Kubernetes deployment](deploy/kubernetes.md)
 - [Release notes](https://windshift.sh/self-hosting/08-release-notes/) and [GitHub releases](https://github.com/Windshiftapp/core/releases)
