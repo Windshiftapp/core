@@ -12,7 +12,7 @@
  * keys, spread payloads, and variable-built bodies are skipped; those need a
  * browser-surface test.
  *
- * Usage: bun run scripts/check-frontend-v2-fields.mjs
+ * Usage: node scripts/check-frontend-v2-fields.mjs
  */
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';

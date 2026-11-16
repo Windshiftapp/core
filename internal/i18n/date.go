@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-//go:generate bun ../../scripts/generate-i18n-catalog.mjs
+//go:generate node ../../scripts/generate-i18n-catalog.mjs
 
 // dateFormat is the numeric layout set for one locale. The layouts are Go
 // reference-time strings (https://pkg.go.dev/time#pkg-constants) and never
