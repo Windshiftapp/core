@@ -1243,7 +1243,7 @@ func applyParameterCorrections(route *Route) {
 	case "GET /asset-sets/{asset_set_id}/categories":
 		upsertParameter(route, booleanQuery("tree", "Whether to return categories as a hierarchy.", false))
 	case "GET /workspaces/{workspace_id}/test-cases":
-		upsertParameter(route, stringQuery("q", "Case-insensitive test-case search."))
+		upsertParameter(route, stringQuery("q", "Case-insensitive lexical LIKE search across metadata, labels, steps and Gherkin. No semantic similarity ranking; % and _ remain LIKE wildcards."))
 		upsertParameter(route, positiveIDQuery("label_id", "Restricts test cases to one label."))
 		upsertParameter(route, positiveIDQuery("folder_id", "Restricts test cases to one folder; null selects unfiled cases."))
 		upsertParameter(route, booleanQuery("all", "Whether to ignore the folder filter.", false))
@@ -1303,6 +1303,17 @@ func applyParameterCorrections(route *Route) {
 	case "GET /workspaces/{workspace_id}/test-reports/summary":
 		upsertParameter(route, positiveIDQuery("milestone_id", "Restricts the report to one milestone."))
 		upsertParameter(route, integerQuery("days", "Number of recent civil days included in trend calculations.", 365, 30))
+	case "GET /workspaces/{workspace_id}/test-reports/effectiveness":
+		route.Description = "Ranks all workspace cases by observed defect-finding executions, then distinct linked Bugs, then case ID. One execution is one persisted run/case result in [since, until) with an execution timestamp and passed/failed/blocked/skipped status. Findings require a failed result linked to a same-workspace builtin Bug. Rate is findings/executions (0..1), null for zero executions. Milestone filters executions via their plan, not the case population. Missing links are not proof of ineffectiveness. Bounded to 100 cases per page. Permission denials and missing workspaces return the same 404 envelope."
+		upsertParameter(route, positiveIDQuery("milestone_id", "Restricts executions to plans in this milestone; all workspace cases remain visible."))
+		upsertParameter(route, stringQuery("since", "Inclusive RFC3339 execution timestamp; defaults to 30 days before until."))
+		upsertParameter(route, stringQuery("until", "Exclusive RFC3339 execution timestamp; defaults to now; maximum window 366 days."))
+		upsertParameter(route, integerQuery("limit", "Cases per page; maximum 100.", 100, 50))
+		upsertParameter(route, ParameterMetadata{Name: "offset", In: "query", Description: "Nonnegative case offset.", Schema: map[string]any{"type": "integer", "minimum": 0, "default": 0}})
+	case "POST /workspaces/{workspace_id}/test-cases/bulk":
+		route.Description = "Create, update or reversibly archive 1..50 cases. References must belong to this workspace and are checked before any write. Responses contain ordered zero-based per-case results; validation failures may coexist with successes. Each successful mutation is audited. Explicit steps and label_ids replace collections; omitted fields preserve values. Archive sets inactive without deleting history. Removing steps with recorded results is refused. Permission and cross-workspace denials use the same 404 envelope."
+	case "GET /workspaces/{workspace_id}/test-coverage/items/{item_id}":
+		route.Description = "Returns explicit Tests links for the ticket and its direct child criterion items. With no children, basis=item means coarse item-level traceability. Prose is not parsed and a link does not prove adequacy. Only same-workspace non-inactive cases count. Requires test.view and item.view. At most 100 criteria and 50 cases per criterion; totals and truncated disclose omitted data. Missing and inaccessible resources share the 404 envelope."
 	case "DELETE /asset-sets/{asset_set_id}/roles/{assignment_id}":
 		upsertParameter(route, enumQuery("type", "Assignment principal type.", "user", "group"))
 	case "POST /workspaces/{workspace_id}/tickets/import/upload",

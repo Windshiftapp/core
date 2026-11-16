@@ -42368,6 +42368,147 @@
         ],
         "type": "object"
       },
+      "GetWorkspacesWorkspaceIdTestCoverageItemsItemIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "basis": {
+                "description": "The basis value.",
+                "type": "string"
+              },
+              "covered": {
+                "description": "The covered value.",
+                "type": "integer"
+              },
+              "criteria": {
+                "description": "The criteria value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "covered": {
+                      "description": "The covered value.",
+                      "type": "boolean"
+                    },
+                    "item_id": {
+                      "description": "The item id value.",
+                      "type": "integer"
+                    },
+                    "test_cases": {
+                      "description": "The test cases value.",
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "description": "The id value.",
+                            "type": "integer"
+                          },
+                          "status": {
+                            "description": "The status value.",
+                            "type": "string"
+                          },
+                          "title": {
+                            "description": "The title value.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status",
+                          "title"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "title": {
+                      "description": "The title value.",
+                      "type": "string"
+                    },
+                    "total_test_cases": {
+                      "description": "The total test cases value.",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "covered",
+                    "item_id",
+                    "test_cases",
+                    "title",
+                    "total_test_cases"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "item_id": {
+                "description": "The item id value.",
+                "type": "integer"
+              },
+              "item_test_cases": {
+                "description": "The item test cases value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "description": "The id value.",
+                      "type": "integer"
+                    },
+                    "status": {
+                      "description": "The status value.",
+                      "type": "string"
+                    },
+                    "title": {
+                      "description": "The title value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status",
+                    "title"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "item_total_test_cases": {
+                "description": "The item total test cases value.",
+                "type": "integer"
+              },
+              "limitation": {
+                "description": "The limitation value.",
+                "type": "string"
+              },
+              "truncated": {
+                "description": "The truncated value.",
+                "type": "boolean"
+              },
+              "uncovered": {
+                "description": "The uncovered value.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "basis",
+              "covered",
+              "criteria",
+              "item_id",
+              "item_test_cases",
+              "item_total_test_cases",
+              "limitation",
+              "truncated",
+              "uncovered"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "GetWorkspacesWorkspaceIdTestCoverageRequirementsResult": {
         "additionalProperties": false,
         "properties": {
@@ -43213,6 +43354,133 @@
         "required": [
           "data",
           "pagination"
+        ],
+        "type": "object"
+      },
+      "GetWorkspacesWorkspaceIdTestReportsEffectivenessResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "cases": {
+                "description": "The cases value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "blocked": {
+                      "description": "The blocked value.",
+                      "type": "integer"
+                    },
+                    "defect_finding_executions": {
+                      "description": "The defect finding executions value.",
+                      "type": "integer"
+                    },
+                    "defect_finding_rate": {
+                      "description": "The defect finding rate value.",
+                      "nullable": true,
+                      "type": "number"
+                    },
+                    "evidence": {
+                      "description": "The evidence value.",
+                      "type": "string"
+                    },
+                    "executions": {
+                      "description": "The executions value.",
+                      "type": "integer"
+                    },
+                    "failed": {
+                      "description": "The failed value.",
+                      "type": "integer"
+                    },
+                    "linked_defects": {
+                      "description": "The linked defects value.",
+                      "type": "integer"
+                    },
+                    "passed": {
+                      "description": "The passed value.",
+                      "type": "integer"
+                    },
+                    "skipped": {
+                      "description": "The skipped value.",
+                      "type": "integer"
+                    },
+                    "status": {
+                      "description": "The status value.",
+                      "type": "string"
+                    },
+                    "test_case_id": {
+                      "description": "The test case id value.",
+                      "type": "integer"
+                    },
+                    "title": {
+                      "description": "The title value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "blocked",
+                    "defect_finding_executions",
+                    "evidence",
+                    "executions",
+                    "failed",
+                    "linked_defects",
+                    "passed",
+                    "skipped",
+                    "status",
+                    "test_case_id",
+                    "title"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "definition": {
+                "description": "The definition value.",
+                "type": "string"
+              },
+              "limit": {
+                "description": "The limit value.",
+                "type": "integer"
+              },
+              "milestone_id": {
+                "description": "The milestone id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "offset": {
+                "description": "The offset value.",
+                "type": "integer"
+              },
+              "since": {
+                "description": "The since value.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "total": {
+                "description": "The total value.",
+                "type": "integer"
+              },
+              "until": {
+                "description": "The until value.",
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "cases",
+              "definition",
+              "limit",
+              "offset",
+              "since",
+              "total",
+              "until"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
         ],
         "type": "object"
       },
@@ -63482,6 +63750,14 @@
             "nullable": true,
             "type": "string"
           },
+          "label_ids": {
+            "description": "The label ids value.",
+            "items": {
+              "type": "integer"
+            },
+            "nullable": true,
+            "type": "array"
+          },
           "preconditions": {
             "description": "The preconditions value.",
             "nullable": true,
@@ -63501,6 +63777,34 @@
             "description": "The status value.",
             "nullable": true,
             "type": "string"
+          },
+          "steps": {
+            "description": "The steps value.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "description": "The action value.",
+                  "type": "string"
+                },
+                "data": {
+                  "description": "The data value.",
+                  "type": "string"
+                },
+                "expected": {
+                  "description": "The expected value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "action",
+                "data",
+                "expected"
+              ],
+              "type": "object"
+            },
+            "nullable": true,
+            "type": "array"
           },
           "title": {
             "description": "The title value.",
@@ -96427,6 +96731,227 @@
         ],
         "type": "object"
       },
+      "PostWorkspacesWorkspaceIdTestCasesBulkPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "cases": {
+            "description": "The cases value.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "estimated_duration": {
+                  "description": "The estimated duration value.",
+                  "type": "integer"
+                },
+                "folder_id": {
+                  "description": "The folder id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "format": {
+                  "description": "The format value.",
+                  "type": "string"
+                },
+                "gherkin": {
+                  "description": "The gherkin value.",
+                  "type": "string"
+                },
+                "label_ids": {
+                  "description": "The label ids value.",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                "preconditions": {
+                  "description": "The preconditions value.",
+                  "type": "string"
+                },
+                "priority": {
+                  "description": "The priority value.",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "The status value.",
+                  "type": "string"
+                },
+                "steps": {
+                  "description": "The steps value.",
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "action": {
+                        "description": "The action value.",
+                        "type": "string"
+                      },
+                      "data": {
+                        "description": "The data value.",
+                        "type": "string"
+                      },
+                      "expected": {
+                        "description": "The expected value.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "data",
+                      "expected"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "description": "The title value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "operation": {
+            "description": "The operation value.",
+            "type": "string"
+          },
+          "patch": {
+            "additionalProperties": false,
+            "description": "The patch value.",
+            "nullable": true,
+            "properties": {
+              "clear_folder": {
+                "description": "The clear folder value.",
+                "type": "boolean"
+              },
+              "folder_id": {
+                "description": "The folder id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "label_ids": {
+                "description": "The label ids value.",
+                "items": {
+                  "type": "integer"
+                },
+                "nullable": true,
+                "type": "array"
+              },
+              "preconditions": {
+                "description": "The preconditions value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "priority": {
+                "description": "The priority value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "status": {
+                "description": "The status value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "steps": {
+                "description": "The steps value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "action": {
+                      "description": "The action value.",
+                      "type": "string"
+                    },
+                    "data": {
+                      "description": "The data value.",
+                      "type": "string"
+                    },
+                    "expected": {
+                      "description": "The expected value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "data",
+                    "expected"
+                  ],
+                  "type": "object"
+                },
+                "nullable": true,
+                "type": "array"
+              },
+              "title": {
+                "description": "The title value.",
+                "nullable": true,
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "test_case_ids": {
+            "description": "The test case ids value.",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "type": "object"
+      },
+      "PostWorkspacesWorkspaceIdTestCasesBulkResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "results": {
+                "description": "The results value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "description": "The error value.",
+                      "type": "string"
+                    },
+                    "index": {
+                      "description": "The index value.",
+                      "type": "integer"
+                    },
+                    "success": {
+                      "description": "The success value.",
+                      "type": "boolean"
+                    },
+                    "test_case_id": {
+                      "description": "The test case id value.",
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "index",
+                    "success"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "results"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "PostWorkspacesWorkspaceIdTestCasesImportFeaturePayload": {
         "type": "string"
       },
@@ -96701,6 +97226,13 @@
             "description": "The gherkin value.",
             "type": "string"
           },
+          "label_ids": {
+            "description": "The label ids value.",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
           "preconditions": {
             "description": "The preconditions value.",
             "type": "string"
@@ -96713,6 +97245,33 @@
             "description": "The status value.",
             "type": "string"
           },
+          "steps": {
+            "description": "The steps value.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "description": "The action value.",
+                  "type": "string"
+                },
+                "data": {
+                  "description": "The data value.",
+                  "type": "string"
+                },
+                "expected": {
+                  "description": "The expected value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "action",
+                "data",
+                "expected"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
           "title": {
             "description": "The title value.",
             "type": "string"
@@ -96722,9 +97281,11 @@
           "estimated_duration",
           "format",
           "gherkin",
+          "label_ids",
           "preconditions",
           "priority",
           "status",
+          "steps",
           "title"
         ],
         "type": "object"
@@ -132545,7 +133106,7 @@
             }
           },
           {
-            "description": "Case-insensitive test-case search.",
+            "description": "Case-insensitive lexical LIKE search across metadata, labels, steps and Gherkin. No semantic similarity ranking; % and _ remain LIKE wildcards.",
             "in": "query",
             "name": "q",
             "required": false,
@@ -132691,6 +133252,82 @@
           }
         ],
         "summary": "Create test case",
+        "tags": [
+          "Test management"
+        ],
+        "x-required-scopes": [
+          "tests:write"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/test-cases/bulk": {
+      "post": {
+        "description": "Create, update or reversibly archive 1..50 cases. References must belong to this workspace and are checked before any write. Responses contain ordered zero-based per-case results; validation failures may coexist with successes. Each successful mutation is audited. Explicit steps and label_ids replace collections; omitted fields preserve values. Archive sets inactive without deleting history. Removing steps with recorded results is refused. Permission and cross-workspace denials use the same 404 envelope.",
+        "operationId": "postWorkspacesWorkspaceIdTestCasesBulk",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostWorkspacesWorkspaceIdTestCasesBulkPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostWorkspacesWorkspaceIdTestCasesBulkResult"
+                }
+              }
+            },
+            "description": "Bulk create, update or archive test cases response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Bulk create, update or archive test cases",
         "tags": [
           "Test management"
         ],
@@ -134253,6 +134890,73 @@
         ]
       }
     },
+    "/workspaces/{workspace_id}/test-coverage/items/{item_id}": {
+      "get": {
+        "description": "Returns explicit Tests links for the ticket and its direct child criterion items. With no children, basis=item means coarse item-level traceability. Prose is not parsed and a link does not prove adequacy. Only same-workspace non-inactive cases count. Requires test.view and item.view. At most 100 criteria and 50 cases per criterion; totals and truncated disclose omitted data. Missing and inaccessible resources share the 404 envelope.",
+        "operationId": "getWorkspacesWorkspaceIdTestCoverageItemsItemId",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The ticket item identifier.",
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetWorkspacesWorkspaceIdTestCoverageItemsItemIdResult"
+                }
+              }
+            },
+            "description": "Get explicit item test coverage response."
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get explicit item test coverage",
+        "tags": [
+          "Test management"
+        ],
+        "x-required-scopes": [
+          "tests:read"
+        ]
+      }
+    },
     "/workspaces/{workspace_id}/test-coverage/requirements": {
       "get": {
         "description": "List workspace test coverage requirements. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -135784,6 +136488,117 @@
         ],
         "x-required-scopes": [
           "tests:write"
+        ]
+      }
+    },
+    "/workspaces/{workspace_id}/test-reports/effectiveness": {
+      "get": {
+        "description": "Ranks all workspace cases by observed defect-finding executions, then distinct linked Bugs, then case ID. One execution is one persisted run/case result in [since, until) with an execution timestamp and passed/failed/blocked/skipped status. Findings require a failed result linked to a same-workspace builtin Bug. Rate is findings/executions (0..1), null for zero executions. Milestone filters executions via their plan, not the case population. Missing links are not proof of ineffectiveness. Bounded to 100 cases per page. Permission denials and missing workspaces return the same 404 envelope.",
+        "operationId": "getWorkspacesWorkspaceIdTestReportsEffectiveness",
+        "parameters": [
+          {
+            "description": "The workspace identifier.",
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Restricts executions to plans in this milestone; all workspace cases remain visible.",
+            "in": "query",
+            "name": "milestone_id",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Inclusive RFC3339 execution timestamp; defaults to 30 days before until.",
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exclusive RFC3339 execution timestamp; defaults to now; maximum window 366 days.",
+            "in": "query",
+            "name": "until",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Cases per page; maximum 100.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Nonnegative case offset.",
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetWorkspacesWorkspaceIdTestReportsEffectivenessResult"
+                }
+              }
+            },
+            "description": "Get observed test defect effectiveness response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get observed test defect effectiveness",
+        "tags": [
+          "Test management"
+        ],
+        "x-required-scopes": [
+          "tests:read"
         ]
       }
     },

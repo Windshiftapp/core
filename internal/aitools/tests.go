@@ -1,14 +1,5 @@
-// Test-management tools (WI-359): the execution surface — cases, runs,
-// results — mirroring the verbs `ws test` exposes on the CLI and the v1
-// handlers in internal/restapi/v1/handlers/tests.go enforce.
-//
-// Permission model mirrors requireTestWorkspaceUser: every tool checks the
-// acting user's workspace-level test permission (test.view for reads,
-// test.execute for run lifecycle + results) via PermissionService on top of
-// the AccessibleWorkspaceIDs gate. All failures — workspace missing, no
-// access, no test permission — collapse into the same "not found" JSON
-// error so callers can't discriminate existence from authorization
-// (the 404-not-403 convention).
+// Test-management tools share v2 services and enforce workspace test permissions
+// on top of the accessible-workspace gate. Denials use not-found JSON errors.
 package aitools
 
 import (
@@ -32,6 +23,7 @@ type testCaseSummaryDTO struct {
 	ID                int      `json:"id"`
 	WorkspaceID       int      `json:"workspace_id"`
 	Title             string   `json:"title"`
+	Format            string   `json:"format"`
 	FolderID          *int     `json:"folder_id,omitempty"`
 	FolderName        string   `json:"folder_name,omitempty"`
 	Priority          string   `json:"priority,omitempty"`
@@ -50,8 +42,9 @@ type testStepDTO struct {
 
 type testCaseDetailDTO struct {
 	testCaseSummaryDTO
-	Preconditions string        `json:"preconditions,omitempty"`
-	Steps         []testStepDTO `json:"steps"`
+	Preconditions string              `json:"preconditions,omitempty"`
+	Steps         []testStepDTO       `json:"steps"`
+	BDD           *models.TestCaseBDD `json:"bdd,omitempty"`
 }
 
 type testRunDTO struct {
@@ -90,6 +83,7 @@ func testCaseToSummary(tc *models.TestCase) testCaseSummaryDTO {
 		ID:                tc.ID,
 		WorkspaceID:       tc.WorkspaceID,
 		Title:             tc.Title,
+		Format:            tc.Format,
 		FolderID:          tc.FolderID,
 		FolderName:        tc.FolderName,
 		Priority:          tc.Priority,
@@ -159,10 +153,7 @@ func summarizeTestResults(rows []repository.TestResultWithTestCase) testRunResul
 // Permission helpers
 // ----------------------------------------------------------------------------
 
-// hasTestPermission mirrors requireTestWorkspaceUser on the v1 surface:
-// the workspace must be in the caller's accessible set AND the caller must
-// hold the workspace-level test permission. Errors from the permission
-// lookup degrade to "no access" the same way the handler renders 404.
+// Permission lookup failures deny access without exposing workspace existence.
 func hasTestPermission(env *Env, workspaceID int, permission string) bool {
 	if workspaceID <= 0 || !env.HasWorkspaceAccess(workspaceID) {
 		return false
@@ -211,9 +202,13 @@ func testToolError(msg string) map[string]string {
 // ----------------------------------------------------------------------------
 
 type listTestCasesArgs struct {
-	WorkspaceID     int  `json:"workspace_id" jsonschema:"Workspace ID to list test cases from"`
-	FolderID        *int `json:"folder_id,omitempty" jsonschema:"Filter to a single test folder ID"`
-	IncludeArchived bool `json:"include_archived,omitempty" jsonschema:"Include archived test cases"`
+	WorkspaceID     int    `json:"workspace_id" jsonschema:"Workspace ID to list test cases from"`
+	FolderID        *int   `json:"folder_id,omitempty" jsonschema:"Filter to a single test folder ID"`
+	IncludeArchived bool   `json:"include_archived,omitempty" jsonschema:"Include archived test cases"`
+	Query           string `json:"q,omitempty" jsonschema:"Case-insensitive lexical substring search across title, preconditions, steps, Gherkin, priority, status, and labels; not semantic similarity"`
+	LabelID         *int   `json:"label_id,omitempty" jsonschema:"Filter by test label ID"`
+	Limit           int    `json:"limit,omitempty" jsonschema:"Page size: default 50, maximum 100"`
+	Offset          int    `json:"offset,omitempty" jsonschema:"Nonnegative page offset"`
 }
 
 type getTestCaseArgs struct {
@@ -269,16 +264,28 @@ func init() {
 		Access:      AccessRead,
 		Risk:        RiskLow,
 		Scopes:      []string{auth.ScopeTestsRead},
-		Description: "List test cases in a workspace, optionally filtered to one test folder.",
+		Description: "Search test-case summaries with bounded lexical retrieval (not semantic overlap). Defaults to 50 cases across all folders, excluding inactive cases; page using offset and total. Fetch full steps with get_test_case.",
 		Run: func(_ context.Context, env *Env, args listTestCasesArgs) (any, error) {
 			if !hasTestPermission(env, args.WorkspaceID, models.PermissionTestView) {
 				return testToolError("workspace not found"), nil
 			}
-			cases, err := services.NewTestCaseService(env.DB).List(services.TestCaseListParams{
+			if args.Limit == 0 {
+				args.Limit = 50
+			}
+			if args.Limit < 1 || args.Limit > 100 || args.Offset < 0 {
+				return testToolError("limit must be 1..100 and offset must be nonnegative"), nil
+			}
+			if (args.FolderID != nil && *args.FolderID <= 0) || (args.LabelID != nil && *args.LabelID <= 0) {
+				return testToolError("folder_id and label_id must be positive"), nil
+			}
+			caseSvc := services.NewTestCaseService(env.DB)
+			params := services.TestCaseListParams{
 				WorkspaceID: args.WorkspaceID,
 				FolderID:    args.FolderID,
-				All:         args.IncludeArchived,
-			})
+				All:         args.FolderID == nil, ExcludeInactive: !args.IncludeArchived,
+				Search: args.Query, LabelID: args.LabelID, Limit: args.Limit, Offset: args.Offset,
+			}
+			cases, err := caseSvc.List(params)
 			if err != nil {
 				return nil, err
 			}
@@ -286,7 +293,11 @@ func init() {
 			for i := range cases {
 				out = append(out, testCaseToSummary(&cases[i]))
 			}
-			return map[string]any{"test_cases": out, "total": len(out)}, nil
+			total, err := caseSvc.Count(params)
+			if err != nil {
+				return nil, err
+			}
+			return map[string]any{"test_cases": out, "total": total, "limit": args.Limit, "offset": args.Offset, "retrieval": "lexical"}, nil
 		},
 	})
 
@@ -336,6 +347,12 @@ func init() {
 					Data:       step.Data,
 					Expected:   step.Expected,
 				})
+			}
+			if tc.Format == services.TestFormatBDD {
+				detail.BDD, err = caseSvc.GetBDDContent(tc.ID)
+				if err != nil {
+					return nil, err
+				}
 			}
 			return detail, nil
 		},
