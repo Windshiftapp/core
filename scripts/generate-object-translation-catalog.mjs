@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 
-import { writeFile } from 'node:fs/promises';
+import { readdir, writeFile } from 'node:fs/promises';
 
-const locales = ['en', 'de', 'es', 'ar', 'pt-BR', 'ru', 'zh-CN', 'fr'];
+const locales = (
+  await readdir(new URL('../frontend/src/lib/locales/', import.meta.url), { withFileTypes: true })
+)
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort();
 
 const keyMappings = {
   priority: {
