@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/logger"
 	"windshift/internal/models"
 )
 
@@ -40,7 +42,9 @@ const collectionModelSelect = `SELECT c.id, c.name, COALESCE(c.description, ''),
        c.filter_state, c.is_public, c.is_private, c.public_milestone_swimlanes, c.workspace_id, c.category_id, c.created_by,
        c.public_slug, c.created_at, c.updated_at,
        COALESCE(u.first_name || ' ' || u.last_name, ''), COALESCE(u.email, ''),
-       COALESCE(cc.name, ''), COALESCE(cc.color, '')
+       COALESCE(cc.name, ''), COALESCE(cc.color, ''),
+       c.board_enabled, c.board_standalone_enabled, c.board_ever_published, c.sharing_revision,
+       c.public_revoked_at, c.public_revoked_by, c.public_revoke_reason, c.sharing_changed_at, c.sharing_changed_by
 FROM collections c
 LEFT JOIN users u ON c.created_by = u.id
 LEFT JOIN collection_categories cc ON c.category_id = cc.id`
@@ -60,6 +64,8 @@ func scanCollectionModel(scanner collectionModelScanner) (models.Collection, err
 		&publicSlug, &collection.CreatedAt, &collection.UpdatedAt,
 		&collection.CreatorName, &collection.CreatorEmail,
 		&collection.CategoryName, &collection.CategoryColor,
+		&collection.BoardEnabled, &collection.BoardStandaloneEnabled, &collection.BoardEverPublished, &collection.SharingRevision,
+		&collection.PublicRevokedAt, &collection.PublicRevokedBy, &collection.PublicRevokeReason, &collection.SharingChangedAt, &collection.SharingChangedBy,
 	)
 	if err != nil {
 		return models.Collection{}, err
@@ -176,10 +182,10 @@ func (r *CollectionRepository) CreateForImport(collection *models.Collection, us
 	var id int64
 	err := r.db.QueryRow(`
 		INSERT INTO collections
-			(name, description, ql_query, filter_state, is_public, is_private, public_milestone_swimlanes, workspace_id, category_id, created_by, public_slug, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+			(name, description, ql_query, filter_state, is_public, is_private, public_milestone_swimlanes, workspace_id, category_id, created_by, public_slug, board_enabled, board_ever_published, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
 	`, collection.Name, collection.Description, collection.QLQuery, collection.FilterState,
-		collection.IsPublic, collection.IsPrivate, collection.PublicMilestoneSwimlanes, collection.WorkspaceID, collection.CategoryID, userID, collection.PublicSlug).Scan(&id)
+		collection.IsPublic, collection.IsPrivate, collection.PublicMilestoneSwimlanes, collection.WorkspaceID, collection.CategoryID, userID, collection.PublicSlug, collection.IsPublic, collection.IsPublic).Scan(&id)
 	if err != nil {
 		return fmt.Errorf("create imported collection: %w", err)
 	}
@@ -216,23 +222,36 @@ func (r *CollectionRepository) CategoryExists(id int) (bool, error) {
 }
 
 // Create inserts a collection and populates its generated ID and owner.
-func (r *CollectionRepository) Create(collection *models.Collection, userID int) error {
+func (r *CollectionRepository) Create(collection *models.Collection, userID int, auditEvents ...logger.AuditEvent) error {
 	var id int64
-	err := r.db.QueryRow(`
-		INSERT INTO collections (name, description, ql_query, filter_state, is_public, is_private, public_milestone_swimlanes, workspace_id, category_id, created_by, public_slug, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
-	`, collection.Name, collection.Description, collection.QLQuery, collection.FilterState,
-		collection.IsPublic, collection.IsPrivate, collection.PublicMilestoneSwimlanes, collection.WorkspaceID, collection.CategoryID, userID, collection.PublicSlug).Scan(&id)
+	err := database.WithTx(r.db, func(tx database.Tx) error {
+		if err := tx.QueryRow(`
+		 INSERT INTO collections (name, description, ql_query, filter_state, is_public, is_private, public_milestone_swimlanes, workspace_id, category_id, created_by, public_slug, board_enabled, board_ever_published, sharing_changed_at, sharing_changed_by, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+		`, collection.Name, collection.Description, collection.QLQuery, collection.FilterState,
+			collection.IsPublic, collection.IsPrivate, collection.PublicMilestoneSwimlanes, collection.WorkspaceID, collection.CategoryID, userID, collection.PublicSlug, collection.IsPublic, collection.IsPublic, collection.SharingChangedAt, collection.SharingChangedBy).Scan(&id); err != nil {
+			return err
+		}
+		collection.ID = int(id)
+		for _, event := range auditEvents {
+			if err := logger.LogAuditTx(context.Background(), tx, event); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		return fmt.Errorf("create collection: %w", err)
 	}
 	collection.ID = int(id)
 	collection.CreatedBy = &userID
+	collection.BoardEnabled, collection.BoardEverPublished = collection.IsPublic, collection.IsPublic
+	collection.BoardStandaloneEnabled, collection.SharingRevision = true, 1
 	return nil
 }
 
 // Update replaces all editable collection fields.
-func (r *CollectionRepository) Update(id int, collection *models.Collection) error {
+func (r *CollectionRepository) Update(id int, collection *models.Collection, auditEvents ...logger.AuditEvent) error {
 	err := database.WithTx(r.db, func(tx database.Tx) error {
 		// Serialize scope changes with queue creation. Updating only updated_at
 		// locks the row without firing the collection change trigger, which
@@ -248,13 +267,24 @@ func (r *CollectionRepository) Update(id int, collection *models.Collection) err
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`
+		result, err := tx.Exec(`
 			UPDATE collections
-			SET name = ?, description = ?, ql_query = ?, filter_state = ?, is_public = ?, is_private = ?, public_milestone_swimlanes = ?, workspace_id = ?, category_id = ?, public_slug = ?, updated_at = CURRENT_TIMESTAMP
-			WHERE id = ?
+			SET name = ?, description = ?, ql_query = ?, filter_state = ?, is_public = ?, is_private = ?, public_milestone_swimlanes = ?, workspace_id = ?, category_id = ?, public_slug = ?, updated_at = CURRENT_TIMESTAMP,
+			board_enabled = ?, board_standalone_enabled = ?, board_ever_published = board_ever_published OR ?, sharing_revision = sharing_revision + 1,
+			sharing_changed_at = ?, sharing_changed_by = ?
+			WHERE id = ? AND sharing_revision = ?
 		`, collection.Name, collection.Description, collection.QLQuery, collection.FilterState,
-			collection.IsPublic, collection.IsPrivate, collection.PublicMilestoneSwimlanes, collection.WorkspaceID, collection.CategoryID, collection.PublicSlug, id); err != nil {
+			collection.IsPublic, collection.IsPrivate, collection.PublicMilestoneSwimlanes, collection.WorkspaceID, collection.CategoryID, collection.PublicSlug,
+			collection.BoardEnabled, collection.BoardStandaloneEnabled, collection.BoardEnabled, collection.SharingChangedAt, collection.SharingChangedBy, id, collection.SharingRevision)
+		if err != nil {
 			return err
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if affected != 1 {
+			return ErrConflict
 		}
 		// Keep the informational workspace reference on collection-scoped queues
 		// in sync when the collection moves between the workspace and global
@@ -274,11 +304,17 @@ func (r *CollectionRepository) Update(id int, collection *models.Collection) err
 				return err
 			}
 		}
+		for _, event := range auditEvents {
+			if err := logger.LogAuditTx(context.Background(), tx, event); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("update collection %d: %w", id, err)
 	}
+	collection.SharingRevision++
 	return nil
 }
 
@@ -288,10 +324,12 @@ func (r *CollectionRepository) Update(id int, collection *models.Collection) err
 // publish a scope that was never authorized. The bool reports whether the row
 // still matched.
 func (r *CollectionRepository) UpdatePublicSharing(id int, isPublic bool, publicSlug *string, publicMilestoneSwimlanes bool, expectedQuery string, expectedWorkspaceID *int) (bool, error) {
-	query := "UPDATE collections SET is_public = ?, public_slug = ?, public_milestone_swimlanes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-	args := []any{isPublic, publicSlug, publicMilestoneSwimlanes, id}
+	query := `UPDATE collections SET is_public = ?, board_enabled = ?, board_ever_published = board_ever_published OR ?,
+	 board_standalone_enabled = CASE WHEN ? THEN true ELSE board_standalone_enabled END,
+	 public_slug = ?, public_milestone_swimlanes = ?, sharing_revision = sharing_revision + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+	args := []any{isPublic, isPublic, isPublic, isPublic, publicSlug, publicMilestoneSwimlanes, id}
 	if isPublic {
-		query += " AND COALESCE(ql_query, '') = ? AND COALESCE(workspace_id, 0) = COALESCE(?, 0)"
+		query += " AND is_private = false AND public_revoked_at IS NULL AND COALESCE(ql_query, '') = ? AND COALESCE(workspace_id, 0) = COALESCE(?, 0)"
 		args = append(args, expectedQuery, expectedWorkspaceID)
 	}
 	result, err := r.db.ExecWrite(query, args...)

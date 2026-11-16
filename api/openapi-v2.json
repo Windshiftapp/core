@@ -1820,6 +1820,237 @@
         ],
         "type": "object"
       },
+      "GetAdminBoardPublicationsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "can_administer": {
+                  "description": "The can administer value.",
+                  "type": "boolean"
+                },
+                "changed_at": {
+                  "description": "The changed at value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "changed_by": {
+                  "description": "The changed by value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "changed_by_name": {
+                  "description": "The changed by name value.",
+                  "type": "string"
+                },
+                "collection_id": {
+                  "description": "The collection id value.",
+                  "type": "integer"
+                },
+                "enabled": {
+                  "description": "The enabled value.",
+                  "type": "boolean"
+                },
+                "instance_enabled": {
+                  "description": "The instance enabled value.",
+                  "type": "boolean"
+                },
+                "locations": {
+                  "description": "The locations value.",
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "channel_id": {
+                        "description": "The channel id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "effective_policy": {
+                        "additionalProperties": false,
+                        "description": "The effective policy value.",
+                        "properties": {
+                          "mode": {
+                            "description": "The mode value.",
+                            "type": "string"
+                          },
+                          "organisation_ids": {
+                            "description": "The organisation ids value.",
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "required": [
+                          "mode",
+                          "organisation_ids"
+                        ],
+                        "type": "object"
+                      },
+                      "enabled": {
+                        "description": "The enabled value.",
+                        "type": "boolean"
+                      },
+                      "kind": {
+                        "description": "The kind value.",
+                        "type": "string"
+                      },
+                      "label": {
+                        "description": "The label value.",
+                        "type": "string"
+                      },
+                      "url": {
+                        "description": "The url value.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "effective_policy",
+                      "enabled",
+                      "kind",
+                      "label",
+                      "url"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "milestone_swimlanes": {
+                  "description": "The milestone swimlanes value.",
+                  "type": "boolean"
+                },
+                "name": {
+                  "description": "The name value.",
+                  "type": "string"
+                },
+                "organisations": {
+                  "description": "The organisations value.",
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "description": "The id value.",
+                        "type": "integer"
+                      },
+                      "name": {
+                        "description": "The name value.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "owner_active": {
+                  "description": "The owner active value.",
+                  "nullable": true,
+                  "type": "boolean"
+                },
+                "owner_id": {
+                  "description": "The owner id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "owner_name": {
+                  "description": "The owner name value.",
+                  "type": "string"
+                },
+                "policy": {
+                  "additionalProperties": false,
+                  "description": "The policy value.",
+                  "properties": {
+                    "mode": {
+                      "description": "The mode value.",
+                      "type": "string"
+                    },
+                    "organisation_ids": {
+                      "description": "The organisation ids value.",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "organisation_ids"
+                  ],
+                  "type": "object"
+                },
+                "revision": {
+                  "description": "The revision value.",
+                  "type": "integer"
+                },
+                "revoke_reason": {
+                  "description": "The revoke reason value.",
+                  "type": "string"
+                },
+                "revoked_at": {
+                  "description": "The revoked at value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "scope": {
+                  "description": "The scope value.",
+                  "type": "string"
+                },
+                "slug": {
+                  "description": "The slug value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "standalone_enabled": {
+                  "description": "The standalone enabled value.",
+                  "type": "boolean"
+                },
+                "workspace_id": {
+                  "description": "The workspace id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "workspace_name": {
+                  "description": "The workspace name value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "can_administer",
+                "changed_by_name",
+                "collection_id",
+                "enabled",
+                "instance_enabled",
+                "locations",
+                "milestone_swimlanes",
+                "name",
+                "organisations",
+                "owner_name",
+                "policy",
+                "revision",
+                "revoke_reason",
+                "scope",
+                "standalone_enabled",
+                "workspace_name"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "GetAdminObjectTranslationsCanonicalDifferencesResult": {
         "additionalProperties": false,
         "properties": {
@@ -5805,6 +6036,524 @@
         "format": "binary",
         "type": "string"
       },
+      "GetBoardPublicationsCollectionIdHistoryResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "description": "The action value.",
+                  "type": "string"
+                },
+                "actor_id": {
+                  "description": "The actor id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "actor_name": {
+                  "description": "The actor name value.",
+                  "type": "string"
+                },
+                "after": {
+                  "description": "The after value.",
+                  "format": "byte",
+                  "type": "string"
+                },
+                "before": {
+                  "description": "The before value.",
+                  "format": "byte",
+                  "type": "string"
+                },
+                "created_at": {
+                  "description": "The created at value.",
+                  "type": "string"
+                },
+                "id": {
+                  "description": "The id value.",
+                  "type": "integer"
+                },
+                "reason": {
+                  "description": "The reason value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "action",
+                "actor_name",
+                "after",
+                "before",
+                "created_at",
+                "id",
+                "reason"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetBoardPublicationsCollectionIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "can_administer": {
+                "description": "The can administer value.",
+                "type": "boolean"
+              },
+              "changed_at": {
+                "description": "The changed at value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "changed_by": {
+                "description": "The changed by value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "changed_by_name": {
+                "description": "The changed by name value.",
+                "type": "string"
+              },
+              "collection_id": {
+                "description": "The collection id value.",
+                "type": "integer"
+              },
+              "enabled": {
+                "description": "The enabled value.",
+                "type": "boolean"
+              },
+              "instance_enabled": {
+                "description": "The instance enabled value.",
+                "type": "boolean"
+              },
+              "locations": {
+                "description": "The locations value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "channel_id": {
+                      "description": "The channel id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "effective_policy": {
+                      "additionalProperties": false,
+                      "description": "The effective policy value.",
+                      "properties": {
+                        "mode": {
+                          "description": "The mode value.",
+                          "type": "string"
+                        },
+                        "organisation_ids": {
+                          "description": "The organisation ids value.",
+                          "items": {
+                            "type": "integer"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "organisation_ids"
+                      ],
+                      "type": "object"
+                    },
+                    "enabled": {
+                      "description": "The enabled value.",
+                      "type": "boolean"
+                    },
+                    "kind": {
+                      "description": "The kind value.",
+                      "type": "string"
+                    },
+                    "label": {
+                      "description": "The label value.",
+                      "type": "string"
+                    },
+                    "url": {
+                      "description": "The url value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "effective_policy",
+                    "enabled",
+                    "kind",
+                    "label",
+                    "url"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "milestone_swimlanes": {
+                "description": "The milestone swimlanes value.",
+                "type": "boolean"
+              },
+              "name": {
+                "description": "The name value.",
+                "type": "string"
+              },
+              "organisations": {
+                "description": "The organisations value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "description": "The id value.",
+                      "type": "integer"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "owner_active": {
+                "description": "The owner active value.",
+                "nullable": true,
+                "type": "boolean"
+              },
+              "owner_id": {
+                "description": "The owner id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "owner_name": {
+                "description": "The owner name value.",
+                "type": "string"
+              },
+              "policy": {
+                "additionalProperties": false,
+                "description": "The policy value.",
+                "properties": {
+                  "mode": {
+                    "description": "The mode value.",
+                    "type": "string"
+                  },
+                  "organisation_ids": {
+                    "description": "The organisation ids value.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "organisation_ids"
+                ],
+                "type": "object"
+              },
+              "revision": {
+                "description": "The revision value.",
+                "type": "integer"
+              },
+              "revoke_reason": {
+                "description": "The revoke reason value.",
+                "type": "string"
+              },
+              "revoked_at": {
+                "description": "The revoked at value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "scope": {
+                "description": "The scope value.",
+                "type": "string"
+              },
+              "slug": {
+                "description": "The slug value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "standalone_enabled": {
+                "description": "The standalone enabled value.",
+                "type": "boolean"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "workspace_name": {
+                "description": "The workspace name value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "can_administer",
+              "changed_by_name",
+              "collection_id",
+              "enabled",
+              "instance_enabled",
+              "locations",
+              "milestone_swimlanes",
+              "name",
+              "organisations",
+              "owner_name",
+              "policy",
+              "revision",
+              "revoke_reason",
+              "scope",
+              "standalone_enabled",
+              "workspace_name"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetBoardPublicationsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "can_administer": {
+                  "description": "The can administer value.",
+                  "type": "boolean"
+                },
+                "changed_at": {
+                  "description": "The changed at value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "changed_by": {
+                  "description": "The changed by value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "changed_by_name": {
+                  "description": "The changed by name value.",
+                  "type": "string"
+                },
+                "collection_id": {
+                  "description": "The collection id value.",
+                  "type": "integer"
+                },
+                "enabled": {
+                  "description": "The enabled value.",
+                  "type": "boolean"
+                },
+                "instance_enabled": {
+                  "description": "The instance enabled value.",
+                  "type": "boolean"
+                },
+                "locations": {
+                  "description": "The locations value.",
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "channel_id": {
+                        "description": "The channel id value.",
+                        "nullable": true,
+                        "type": "integer"
+                      },
+                      "effective_policy": {
+                        "additionalProperties": false,
+                        "description": "The effective policy value.",
+                        "properties": {
+                          "mode": {
+                            "description": "The mode value.",
+                            "type": "string"
+                          },
+                          "organisation_ids": {
+                            "description": "The organisation ids value.",
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "required": [
+                          "mode",
+                          "organisation_ids"
+                        ],
+                        "type": "object"
+                      },
+                      "enabled": {
+                        "description": "The enabled value.",
+                        "type": "boolean"
+                      },
+                      "kind": {
+                        "description": "The kind value.",
+                        "type": "string"
+                      },
+                      "label": {
+                        "description": "The label value.",
+                        "type": "string"
+                      },
+                      "url": {
+                        "description": "The url value.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "effective_policy",
+                      "enabled",
+                      "kind",
+                      "label",
+                      "url"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "milestone_swimlanes": {
+                  "description": "The milestone swimlanes value.",
+                  "type": "boolean"
+                },
+                "name": {
+                  "description": "The name value.",
+                  "type": "string"
+                },
+                "organisations": {
+                  "description": "The organisations value.",
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "description": "The id value.",
+                        "type": "integer"
+                      },
+                      "name": {
+                        "description": "The name value.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "owner_active": {
+                  "description": "The owner active value.",
+                  "nullable": true,
+                  "type": "boolean"
+                },
+                "owner_id": {
+                  "description": "The owner id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "owner_name": {
+                  "description": "The owner name value.",
+                  "type": "string"
+                },
+                "policy": {
+                  "additionalProperties": false,
+                  "description": "The policy value.",
+                  "properties": {
+                    "mode": {
+                      "description": "The mode value.",
+                      "type": "string"
+                    },
+                    "organisation_ids": {
+                      "description": "The organisation ids value.",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "organisation_ids"
+                  ],
+                  "type": "object"
+                },
+                "revision": {
+                  "description": "The revision value.",
+                  "type": "integer"
+                },
+                "revoke_reason": {
+                  "description": "The revoke reason value.",
+                  "type": "string"
+                },
+                "revoked_at": {
+                  "description": "The revoked at value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "scope": {
+                  "description": "The scope value.",
+                  "type": "string"
+                },
+                "slug": {
+                  "description": "The slug value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "standalone_enabled": {
+                  "description": "The standalone enabled value.",
+                  "type": "boolean"
+                },
+                "workspace_id": {
+                  "description": "The workspace id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "workspace_name": {
+                  "description": "The workspace name value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "can_administer",
+                "changed_by_name",
+                "collection_id",
+                "enabled",
+                "instance_enabled",
+                "locations",
+                "milestone_swimlanes",
+                "name",
+                "organisations",
+                "owner_name",
+                "policy",
+                "revision",
+                "revoke_reason",
+                "scope",
+                "standalone_enabled",
+                "workspace_name"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "GetCatalogsGlobalBootstrapResult": {
         "additionalProperties": false,
         "properties": {
@@ -6219,6 +6968,188 @@
               "priorities",
               "status_categories",
               "statuses"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetChannelsChannelIdBoardPlacementsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "baseline_policy": {
+                  "additionalProperties": false,
+                  "description": "The baseline policy value.",
+                  "nullable": true,
+                  "properties": {
+                    "mode": {
+                      "description": "The mode value.",
+                      "type": "string"
+                    },
+                    "organisation_ids": {
+                      "description": "The organisation ids value.",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "organisation_ids"
+                  ],
+                  "type": "object"
+                },
+                "channel_id": {
+                  "description": "The channel id value.",
+                  "type": "integer"
+                },
+                "collection_id": {
+                  "description": "The collection id value.",
+                  "type": "integer"
+                },
+                "display_order": {
+                  "description": "The display order value.",
+                  "type": "integer"
+                },
+                "effective_policy": {
+                  "additionalProperties": false,
+                  "description": "The effective policy value.",
+                  "nullable": true,
+                  "properties": {
+                    "mode": {
+                      "description": "The mode value.",
+                      "type": "string"
+                    },
+                    "organisation_ids": {
+                      "description": "The organisation ids value.",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "organisation_ids"
+                  ],
+                  "type": "object"
+                },
+                "enabled": {
+                  "description": "The enabled value.",
+                  "type": "boolean"
+                },
+                "id": {
+                  "description": "The id value.",
+                  "type": "string"
+                },
+                "label": {
+                  "description": "The label value.",
+                  "type": "string"
+                },
+                "policy": {
+                  "additionalProperties": false,
+                  "description": "The policy value.",
+                  "properties": {
+                    "mode": {
+                      "description": "The mode value.",
+                      "type": "string"
+                    },
+                    "organisation_ids": {
+                      "description": "The organisation ids value.",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "organisation_ids"
+                  ],
+                  "type": "object"
+                },
+                "revision": {
+                  "description": "The revision value.",
+                  "type": "integer"
+                },
+                "source_name": {
+                  "description": "The source name value.",
+                  "type": "string"
+                },
+                "standalone_enabled": {
+                  "description": "The standalone enabled value.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "channel_id",
+                "collection_id",
+                "display_order",
+                "enabled",
+                "id",
+                "label",
+                "policy",
+                "revision",
+                "standalone_enabled"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "GetChannelsChannelIdExperienceResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "default_module": {
+                "description": "The default module value.",
+                "type": "string"
+              },
+              "modules": {
+                "description": "The modules value.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "navigation": {
+                "description": "The navigation value.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "presentation": {
+                "description": "The presentation value.",
+                "type": "string"
+              },
+              "revision": {
+                "description": "The revision value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "default_module",
+              "modules",
+              "navigation",
+              "presentation",
+              "revision"
             ],
             "type": "object"
           }
@@ -7093,6 +8024,18 @@
           "data": {
             "additionalProperties": false,
             "properties": {
+              "board_enabled": {
+                "description": "The board enabled value.",
+                "type": "boolean"
+              },
+              "board_ever_published": {
+                "description": "The board ever published value.",
+                "type": "boolean"
+              },
+              "board_standalone_enabled": {
+                "description": "The board standalone enabled value.",
+                "type": "boolean"
+              },
               "category_color": {
                 "description": "The category color value.",
                 "type": "string"
@@ -7152,6 +8095,20 @@
                 "description": "The public milestone swimlanes value.",
                 "type": "boolean"
               },
+              "public_revoke_reason": {
+                "description": "The public revoke reason value.",
+                "type": "string"
+              },
+              "public_revoked_at": {
+                "description": "The public revoked at value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "public_revoked_by": {
+                "description": "The public revoked by value.",
+                "nullable": true,
+                "type": "integer"
+              },
               "public_slug": {
                 "description": "The public slug value.",
                 "nullable": true,
@@ -7160,6 +8117,20 @@
               "ql_query": {
                 "description": "The ql query value.",
                 "type": "string"
+              },
+              "sharing_changed_at": {
+                "description": "The sharing changed at value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "sharing_changed_by": {
+                "description": "The sharing changed by value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "sharing_revision": {
+                "description": "The sharing revision value.",
+                "type": "integer"
               },
               "updated_at": {
                 "description": "The updated at value.",
@@ -7172,6 +8143,9 @@
               }
             },
             "required": [
+              "board_enabled",
+              "board_ever_published",
+              "board_standalone_enabled",
               "created_at",
               "description",
               "id",
@@ -7179,7 +8153,9 @@
               "is_public",
               "name",
               "public_milestone_swimlanes",
+              "public_revoke_reason",
               "ql_query",
+              "sharing_revision",
               "updated_at"
             ],
             "type": "object"
@@ -7409,6 +8385,18 @@
             "items": {
               "additionalProperties": false,
               "properties": {
+                "board_enabled": {
+                  "description": "The board enabled value.",
+                  "type": "boolean"
+                },
+                "board_ever_published": {
+                  "description": "The board ever published value.",
+                  "type": "boolean"
+                },
+                "board_standalone_enabled": {
+                  "description": "The board standalone enabled value.",
+                  "type": "boolean"
+                },
                 "category_color": {
                   "description": "The category color value.",
                   "type": "string"
@@ -7468,6 +8456,20 @@
                   "description": "The public milestone swimlanes value.",
                   "type": "boolean"
                 },
+                "public_revoke_reason": {
+                  "description": "The public revoke reason value.",
+                  "type": "string"
+                },
+                "public_revoked_at": {
+                  "description": "The public revoked at value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "public_revoked_by": {
+                  "description": "The public revoked by value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
                 "public_slug": {
                   "description": "The public slug value.",
                   "nullable": true,
@@ -7476,6 +8478,20 @@
                 "ql_query": {
                   "description": "The ql query value.",
                   "type": "string"
+                },
+                "sharing_changed_at": {
+                  "description": "The sharing changed at value.",
+                  "nullable": true,
+                  "type": "string"
+                },
+                "sharing_changed_by": {
+                  "description": "The sharing changed by value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "sharing_revision": {
+                  "description": "The sharing revision value.",
+                  "type": "integer"
                 },
                 "updated_at": {
                   "description": "The updated at value.",
@@ -7488,6 +8504,9 @@
                 }
               },
               "required": [
+                "board_enabled",
+                "board_ever_published",
+                "board_standalone_enabled",
                 "created_at",
                 "description",
                 "id",
@@ -7495,7 +8514,9 @@
                 "is_public",
                 "name",
                 "public_milestone_swimlanes",
+                "public_revoke_reason",
                 "ql_query",
+                "sharing_revision",
                 "updated_at"
               ],
               "type": "object"
@@ -55160,6 +56181,18 @@
           "data": {
             "additionalProperties": false,
             "properties": {
+              "board_enabled": {
+                "description": "The board enabled value.",
+                "type": "boolean"
+              },
+              "board_ever_published": {
+                "description": "The board ever published value.",
+                "type": "boolean"
+              },
+              "board_standalone_enabled": {
+                "description": "The board standalone enabled value.",
+                "type": "boolean"
+              },
               "category_color": {
                 "description": "The category color value.",
                 "type": "string"
@@ -55219,6 +56252,20 @@
                 "description": "The public milestone swimlanes value.",
                 "type": "boolean"
               },
+              "public_revoke_reason": {
+                "description": "The public revoke reason value.",
+                "type": "string"
+              },
+              "public_revoked_at": {
+                "description": "The public revoked at value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "public_revoked_by": {
+                "description": "The public revoked by value.",
+                "nullable": true,
+                "type": "integer"
+              },
               "public_slug": {
                 "description": "The public slug value.",
                 "nullable": true,
@@ -55227,6 +56274,20 @@
               "ql_query": {
                 "description": "The ql query value.",
                 "type": "string"
+              },
+              "sharing_changed_at": {
+                "description": "The sharing changed at value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "sharing_changed_by": {
+                "description": "The sharing changed by value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "sharing_revision": {
+                "description": "The sharing revision value.",
+                "type": "integer"
               },
               "updated_at": {
                 "description": "The updated at value.",
@@ -55239,6 +56300,9 @@
               }
             },
             "required": [
+              "board_enabled",
+              "board_ever_published",
+              "board_standalone_enabled",
               "created_at",
               "description",
               "id",
@@ -55246,7 +56310,9 @@
               "is_public",
               "name",
               "public_milestone_swimlanes",
+              "public_revoke_reason",
               "ql_query",
+              "sharing_revision",
               "updated_at"
             ],
             "type": "object"
@@ -55284,6 +56350,18 @@
           "data": {
             "additionalProperties": false,
             "properties": {
+              "board_enabled": {
+                "description": "The board enabled value.",
+                "type": "boolean"
+              },
+              "board_ever_published": {
+                "description": "The board ever published value.",
+                "type": "boolean"
+              },
+              "board_standalone_enabled": {
+                "description": "The board standalone enabled value.",
+                "type": "boolean"
+              },
               "category_color": {
                 "description": "The category color value.",
                 "type": "string"
@@ -55343,6 +56421,20 @@
                 "description": "The public milestone swimlanes value.",
                 "type": "boolean"
               },
+              "public_revoke_reason": {
+                "description": "The public revoke reason value.",
+                "type": "string"
+              },
+              "public_revoked_at": {
+                "description": "The public revoked at value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "public_revoked_by": {
+                "description": "The public revoked by value.",
+                "nullable": true,
+                "type": "integer"
+              },
               "public_slug": {
                 "description": "The public slug value.",
                 "nullable": true,
@@ -55351,6 +56443,20 @@
               "ql_query": {
                 "description": "The ql query value.",
                 "type": "string"
+              },
+              "sharing_changed_at": {
+                "description": "The sharing changed at value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "sharing_changed_by": {
+                "description": "The sharing changed by value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "sharing_revision": {
+                "description": "The sharing revision value.",
+                "type": "integer"
               },
               "updated_at": {
                 "description": "The updated at value.",
@@ -55363,6 +56469,9 @@
               }
             },
             "required": [
+              "board_enabled",
+              "board_ever_published",
+              "board_standalone_enabled",
               "created_at",
               "description",
               "id",
@@ -55370,7 +56479,9 @@
               "is_public",
               "name",
               "public_milestone_swimlanes",
+              "public_revoke_reason",
               "ql_query",
+              "sharing_revision",
               "updated_at"
             ],
             "type": "object"
@@ -67850,6 +68961,744 @@
         ],
         "type": "object"
       },
+      "PostBoardPublicationsCollectionIdAllowRepublishPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "description": "The reason value.",
+            "type": "string"
+          },
+          "revision": {
+            "description": "The revision value.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reason",
+          "revision"
+        ],
+        "type": "object"
+      },
+      "PostBoardPublicationsCollectionIdAllowRepublishResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "can_administer": {
+                "description": "The can administer value.",
+                "type": "boolean"
+              },
+              "changed_at": {
+                "description": "The changed at value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "changed_by": {
+                "description": "The changed by value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "changed_by_name": {
+                "description": "The changed by name value.",
+                "type": "string"
+              },
+              "collection_id": {
+                "description": "The collection id value.",
+                "type": "integer"
+              },
+              "enabled": {
+                "description": "The enabled value.",
+                "type": "boolean"
+              },
+              "instance_enabled": {
+                "description": "The instance enabled value.",
+                "type": "boolean"
+              },
+              "locations": {
+                "description": "The locations value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "channel_id": {
+                      "description": "The channel id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "effective_policy": {
+                      "additionalProperties": false,
+                      "description": "The effective policy value.",
+                      "properties": {
+                        "mode": {
+                          "description": "The mode value.",
+                          "type": "string"
+                        },
+                        "organisation_ids": {
+                          "description": "The organisation ids value.",
+                          "items": {
+                            "type": "integer"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "organisation_ids"
+                      ],
+                      "type": "object"
+                    },
+                    "enabled": {
+                      "description": "The enabled value.",
+                      "type": "boolean"
+                    },
+                    "kind": {
+                      "description": "The kind value.",
+                      "type": "string"
+                    },
+                    "label": {
+                      "description": "The label value.",
+                      "type": "string"
+                    },
+                    "url": {
+                      "description": "The url value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "effective_policy",
+                    "enabled",
+                    "kind",
+                    "label",
+                    "url"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "milestone_swimlanes": {
+                "description": "The milestone swimlanes value.",
+                "type": "boolean"
+              },
+              "name": {
+                "description": "The name value.",
+                "type": "string"
+              },
+              "organisations": {
+                "description": "The organisations value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "description": "The id value.",
+                      "type": "integer"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "owner_active": {
+                "description": "The owner active value.",
+                "nullable": true,
+                "type": "boolean"
+              },
+              "owner_id": {
+                "description": "The owner id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "owner_name": {
+                "description": "The owner name value.",
+                "type": "string"
+              },
+              "policy": {
+                "additionalProperties": false,
+                "description": "The policy value.",
+                "properties": {
+                  "mode": {
+                    "description": "The mode value.",
+                    "type": "string"
+                  },
+                  "organisation_ids": {
+                    "description": "The organisation ids value.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "organisation_ids"
+                ],
+                "type": "object"
+              },
+              "revision": {
+                "description": "The revision value.",
+                "type": "integer"
+              },
+              "revoke_reason": {
+                "description": "The revoke reason value.",
+                "type": "string"
+              },
+              "revoked_at": {
+                "description": "The revoked at value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "scope": {
+                "description": "The scope value.",
+                "type": "string"
+              },
+              "slug": {
+                "description": "The slug value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "standalone_enabled": {
+                "description": "The standalone enabled value.",
+                "type": "boolean"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "workspace_name": {
+                "description": "The workspace name value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "can_administer",
+              "changed_by_name",
+              "collection_id",
+              "enabled",
+              "instance_enabled",
+              "locations",
+              "milestone_swimlanes",
+              "name",
+              "organisations",
+              "owner_name",
+              "policy",
+              "revision",
+              "revoke_reason",
+              "scope",
+              "standalone_enabled",
+              "workspace_name"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PostBoardPublicationsCollectionIdRevokePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "description": "The reason value.",
+            "type": "string"
+          },
+          "revision": {
+            "description": "The revision value.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reason",
+          "revision"
+        ],
+        "type": "object"
+      },
+      "PostBoardPublicationsCollectionIdRevokeResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "can_administer": {
+                "description": "The can administer value.",
+                "type": "boolean"
+              },
+              "changed_at": {
+                "description": "The changed at value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "changed_by": {
+                "description": "The changed by value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "changed_by_name": {
+                "description": "The changed by name value.",
+                "type": "string"
+              },
+              "collection_id": {
+                "description": "The collection id value.",
+                "type": "integer"
+              },
+              "enabled": {
+                "description": "The enabled value.",
+                "type": "boolean"
+              },
+              "instance_enabled": {
+                "description": "The instance enabled value.",
+                "type": "boolean"
+              },
+              "locations": {
+                "description": "The locations value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "channel_id": {
+                      "description": "The channel id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "effective_policy": {
+                      "additionalProperties": false,
+                      "description": "The effective policy value.",
+                      "properties": {
+                        "mode": {
+                          "description": "The mode value.",
+                          "type": "string"
+                        },
+                        "organisation_ids": {
+                          "description": "The organisation ids value.",
+                          "items": {
+                            "type": "integer"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "organisation_ids"
+                      ],
+                      "type": "object"
+                    },
+                    "enabled": {
+                      "description": "The enabled value.",
+                      "type": "boolean"
+                    },
+                    "kind": {
+                      "description": "The kind value.",
+                      "type": "string"
+                    },
+                    "label": {
+                      "description": "The label value.",
+                      "type": "string"
+                    },
+                    "url": {
+                      "description": "The url value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "effective_policy",
+                    "enabled",
+                    "kind",
+                    "label",
+                    "url"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "milestone_swimlanes": {
+                "description": "The milestone swimlanes value.",
+                "type": "boolean"
+              },
+              "name": {
+                "description": "The name value.",
+                "type": "string"
+              },
+              "organisations": {
+                "description": "The organisations value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "description": "The id value.",
+                      "type": "integer"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "owner_active": {
+                "description": "The owner active value.",
+                "nullable": true,
+                "type": "boolean"
+              },
+              "owner_id": {
+                "description": "The owner id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "owner_name": {
+                "description": "The owner name value.",
+                "type": "string"
+              },
+              "policy": {
+                "additionalProperties": false,
+                "description": "The policy value.",
+                "properties": {
+                  "mode": {
+                    "description": "The mode value.",
+                    "type": "string"
+                  },
+                  "organisation_ids": {
+                    "description": "The organisation ids value.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "organisation_ids"
+                ],
+                "type": "object"
+              },
+              "revision": {
+                "description": "The revision value.",
+                "type": "integer"
+              },
+              "revoke_reason": {
+                "description": "The revoke reason value.",
+                "type": "string"
+              },
+              "revoked_at": {
+                "description": "The revoked at value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "scope": {
+                "description": "The scope value.",
+                "type": "string"
+              },
+              "slug": {
+                "description": "The slug value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "standalone_enabled": {
+                "description": "The standalone enabled value.",
+                "type": "boolean"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "workspace_name": {
+                "description": "The workspace name value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "can_administer",
+              "changed_by_name",
+              "collection_id",
+              "enabled",
+              "instance_enabled",
+              "locations",
+              "milestone_swimlanes",
+              "name",
+              "organisations",
+              "owner_name",
+              "policy",
+              "revision",
+              "revoke_reason",
+              "scope",
+              "standalone_enabled",
+              "workspace_name"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PostChannelsChannelIdBoardPlacementsPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline_policy": {
+            "additionalProperties": false,
+            "description": "The baseline policy value.",
+            "nullable": true,
+            "properties": {
+              "mode": {
+                "description": "The mode value.",
+                "type": "string"
+              },
+              "organisation_ids": {
+                "description": "The organisation ids value.",
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "mode",
+              "organisation_ids"
+            ],
+            "type": "object"
+          },
+          "channel_id": {
+            "description": "The channel id value.",
+            "type": "integer"
+          },
+          "collection_id": {
+            "description": "The collection id value.",
+            "type": "integer"
+          },
+          "display_order": {
+            "description": "The display order value.",
+            "type": "integer"
+          },
+          "effective_policy": {
+            "additionalProperties": false,
+            "description": "The effective policy value.",
+            "nullable": true,
+            "properties": {
+              "mode": {
+                "description": "The mode value.",
+                "type": "string"
+              },
+              "organisation_ids": {
+                "description": "The organisation ids value.",
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "mode",
+              "organisation_ids"
+            ],
+            "type": "object"
+          },
+          "enabled": {
+            "description": "The enabled value.",
+            "type": "boolean"
+          },
+          "id": {
+            "description": "The id value.",
+            "type": "string"
+          },
+          "label": {
+            "description": "The label value.",
+            "type": "string"
+          },
+          "policy": {
+            "additionalProperties": false,
+            "description": "The policy value.",
+            "properties": {
+              "mode": {
+                "description": "The mode value.",
+                "type": "string"
+              },
+              "organisation_ids": {
+                "description": "The organisation ids value.",
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "mode",
+              "organisation_ids"
+            ],
+            "type": "object"
+          },
+          "revision": {
+            "description": "The revision value.",
+            "type": "integer"
+          },
+          "source_name": {
+            "description": "The source name value.",
+            "type": "string"
+          },
+          "standalone_enabled": {
+            "description": "The standalone enabled value.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "channel_id",
+          "collection_id",
+          "display_order",
+          "enabled",
+          "id",
+          "label",
+          "policy",
+          "revision",
+          "standalone_enabled"
+        ],
+        "type": "object"
+      },
+      "PostChannelsChannelIdBoardPlacementsResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "baseline_policy": {
+                "additionalProperties": false,
+                "description": "The baseline policy value.",
+                "nullable": true,
+                "properties": {
+                  "mode": {
+                    "description": "The mode value.",
+                    "type": "string"
+                  },
+                  "organisation_ids": {
+                    "description": "The organisation ids value.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "organisation_ids"
+                ],
+                "type": "object"
+              },
+              "channel_id": {
+                "description": "The channel id value.",
+                "type": "integer"
+              },
+              "collection_id": {
+                "description": "The collection id value.",
+                "type": "integer"
+              },
+              "display_order": {
+                "description": "The display order value.",
+                "type": "integer"
+              },
+              "effective_policy": {
+                "additionalProperties": false,
+                "description": "The effective policy value.",
+                "nullable": true,
+                "properties": {
+                  "mode": {
+                    "description": "The mode value.",
+                    "type": "string"
+                  },
+                  "organisation_ids": {
+                    "description": "The organisation ids value.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "organisation_ids"
+                ],
+                "type": "object"
+              },
+              "enabled": {
+                "description": "The enabled value.",
+                "type": "boolean"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "string"
+              },
+              "label": {
+                "description": "The label value.",
+                "type": "string"
+              },
+              "policy": {
+                "additionalProperties": false,
+                "description": "The policy value.",
+                "properties": {
+                  "mode": {
+                    "description": "The mode value.",
+                    "type": "string"
+                  },
+                  "organisation_ids": {
+                    "description": "The organisation ids value.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "organisation_ids"
+                ],
+                "type": "object"
+              },
+              "revision": {
+                "description": "The revision value.",
+                "type": "integer"
+              },
+              "source_name": {
+                "description": "The source name value.",
+                "type": "string"
+              },
+              "standalone_enabled": {
+                "description": "The standalone enabled value.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "channel_id",
+              "collection_id",
+              "display_order",
+              "enabled",
+              "id",
+              "label",
+              "policy",
+              "revision",
+              "standalone_enabled"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "PostCollectionCategoriesPayload": {
         "additionalProperties": false,
         "properties": {
@@ -68094,6 +69943,18 @@
       "PostCollectionsPayload": {
         "additionalProperties": false,
         "properties": {
+          "board_enabled": {
+            "description": "The board enabled value.",
+            "type": "boolean"
+          },
+          "board_ever_published": {
+            "description": "The board ever published value.",
+            "type": "boolean"
+          },
+          "board_standalone_enabled": {
+            "description": "The board standalone enabled value.",
+            "type": "boolean"
+          },
           "category_color": {
             "description": "The category color value.",
             "type": "string"
@@ -68153,6 +70014,20 @@
             "description": "The public milestone swimlanes value.",
             "type": "boolean"
           },
+          "public_revoke_reason": {
+            "description": "The public revoke reason value.",
+            "type": "string"
+          },
+          "public_revoked_at": {
+            "description": "The public revoked at value.",
+            "nullable": true,
+            "type": "string"
+          },
+          "public_revoked_by": {
+            "description": "The public revoked by value.",
+            "nullable": true,
+            "type": "integer"
+          },
           "public_slug": {
             "description": "The public slug value.",
             "nullable": true,
@@ -68161,6 +70036,20 @@
           "ql_query": {
             "description": "The ql query value.",
             "type": "string"
+          },
+          "sharing_changed_at": {
+            "description": "The sharing changed at value.",
+            "nullable": true,
+            "type": "string"
+          },
+          "sharing_changed_by": {
+            "description": "The sharing changed by value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "sharing_revision": {
+            "description": "The sharing revision value.",
+            "type": "integer"
           },
           "updated_at": {
             "description": "The updated at value.",
@@ -68173,6 +70062,9 @@
           }
         },
         "required": [
+          "board_enabled",
+          "board_ever_published",
+          "board_standalone_enabled",
           "created_at",
           "description",
           "id",
@@ -68180,7 +70072,9 @@
           "is_public",
           "name",
           "public_milestone_swimlanes",
+          "public_revoke_reason",
           "ql_query",
+          "sharing_revision",
           "updated_at"
         ],
         "type": "object"
@@ -68191,6 +70085,18 @@
           "data": {
             "additionalProperties": false,
             "properties": {
+              "board_enabled": {
+                "description": "The board enabled value.",
+                "type": "boolean"
+              },
+              "board_ever_published": {
+                "description": "The board ever published value.",
+                "type": "boolean"
+              },
+              "board_standalone_enabled": {
+                "description": "The board standalone enabled value.",
+                "type": "boolean"
+              },
               "category_color": {
                 "description": "The category color value.",
                 "type": "string"
@@ -68250,6 +70156,20 @@
                 "description": "The public milestone swimlanes value.",
                 "type": "boolean"
               },
+              "public_revoke_reason": {
+                "description": "The public revoke reason value.",
+                "type": "string"
+              },
+              "public_revoked_at": {
+                "description": "The public revoked at value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "public_revoked_by": {
+                "description": "The public revoked by value.",
+                "nullable": true,
+                "type": "integer"
+              },
               "public_slug": {
                 "description": "The public slug value.",
                 "nullable": true,
@@ -68258,6 +70178,20 @@
               "ql_query": {
                 "description": "The ql query value.",
                 "type": "string"
+              },
+              "sharing_changed_at": {
+                "description": "The sharing changed at value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "sharing_changed_by": {
+                "description": "The sharing changed by value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "sharing_revision": {
+                "description": "The sharing revision value.",
+                "type": "integer"
               },
               "updated_at": {
                 "description": "The updated at value.",
@@ -68270,6 +70204,9 @@
               }
             },
             "required": [
+              "board_enabled",
+              "board_ever_published",
+              "board_standalone_enabled",
               "created_at",
               "description",
               "id",
@@ -68277,7 +70214,9 @@
               "is_public",
               "name",
               "public_milestone_swimlanes",
+              "public_revoke_reason",
               "ql_query",
+              "sharing_revision",
               "updated_at"
             ],
             "type": "object"
@@ -98556,6 +100495,627 @@
         ],
         "type": "object"
       },
+      "PutBoardPublicationsCollectionIdPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "description": "The enabled value.",
+            "type": "boolean"
+          },
+          "milestone_swimlanes": {
+            "description": "The milestone swimlanes value.",
+            "type": "boolean"
+          },
+          "policy": {
+            "additionalProperties": false,
+            "description": "The policy value.",
+            "properties": {
+              "mode": {
+                "description": "The mode value.",
+                "type": "string"
+              },
+              "organisation_ids": {
+                "description": "The organisation ids value.",
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "mode",
+              "organisation_ids"
+            ],
+            "type": "object"
+          },
+          "revision": {
+            "description": "The revision value.",
+            "type": "integer"
+          },
+          "slug": {
+            "description": "The slug value.",
+            "nullable": true,
+            "type": "string"
+          },
+          "standalone_enabled": {
+            "description": "The standalone enabled value.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "milestone_swimlanes",
+          "policy",
+          "revision",
+          "standalone_enabled"
+        ],
+        "type": "object"
+      },
+      "PutBoardPublicationsCollectionIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "can_administer": {
+                "description": "The can administer value.",
+                "type": "boolean"
+              },
+              "changed_at": {
+                "description": "The changed at value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "changed_by": {
+                "description": "The changed by value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "changed_by_name": {
+                "description": "The changed by name value.",
+                "type": "string"
+              },
+              "collection_id": {
+                "description": "The collection id value.",
+                "type": "integer"
+              },
+              "enabled": {
+                "description": "The enabled value.",
+                "type": "boolean"
+              },
+              "instance_enabled": {
+                "description": "The instance enabled value.",
+                "type": "boolean"
+              },
+              "locations": {
+                "description": "The locations value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "channel_id": {
+                      "description": "The channel id value.",
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "effective_policy": {
+                      "additionalProperties": false,
+                      "description": "The effective policy value.",
+                      "properties": {
+                        "mode": {
+                          "description": "The mode value.",
+                          "type": "string"
+                        },
+                        "organisation_ids": {
+                          "description": "The organisation ids value.",
+                          "items": {
+                            "type": "integer"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "organisation_ids"
+                      ],
+                      "type": "object"
+                    },
+                    "enabled": {
+                      "description": "The enabled value.",
+                      "type": "boolean"
+                    },
+                    "kind": {
+                      "description": "The kind value.",
+                      "type": "string"
+                    },
+                    "label": {
+                      "description": "The label value.",
+                      "type": "string"
+                    },
+                    "url": {
+                      "description": "The url value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "effective_policy",
+                    "enabled",
+                    "kind",
+                    "label",
+                    "url"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "milestone_swimlanes": {
+                "description": "The milestone swimlanes value.",
+                "type": "boolean"
+              },
+              "name": {
+                "description": "The name value.",
+                "type": "string"
+              },
+              "organisations": {
+                "description": "The organisations value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "description": "The id value.",
+                      "type": "integer"
+                    },
+                    "name": {
+                      "description": "The name value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "owner_active": {
+                "description": "The owner active value.",
+                "nullable": true,
+                "type": "boolean"
+              },
+              "owner_id": {
+                "description": "The owner id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "owner_name": {
+                "description": "The owner name value.",
+                "type": "string"
+              },
+              "policy": {
+                "additionalProperties": false,
+                "description": "The policy value.",
+                "properties": {
+                  "mode": {
+                    "description": "The mode value.",
+                    "type": "string"
+                  },
+                  "organisation_ids": {
+                    "description": "The organisation ids value.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "organisation_ids"
+                ],
+                "type": "object"
+              },
+              "revision": {
+                "description": "The revision value.",
+                "type": "integer"
+              },
+              "revoke_reason": {
+                "description": "The revoke reason value.",
+                "type": "string"
+              },
+              "revoked_at": {
+                "description": "The revoked at value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "scope": {
+                "description": "The scope value.",
+                "type": "string"
+              },
+              "slug": {
+                "description": "The slug value.",
+                "nullable": true,
+                "type": "string"
+              },
+              "standalone_enabled": {
+                "description": "The standalone enabled value.",
+                "type": "boolean"
+              },
+              "workspace_id": {
+                "description": "The workspace id value.",
+                "nullable": true,
+                "type": "integer"
+              },
+              "workspace_name": {
+                "description": "The workspace name value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "can_administer",
+              "changed_by_name",
+              "collection_id",
+              "enabled",
+              "instance_enabled",
+              "locations",
+              "milestone_swimlanes",
+              "name",
+              "organisations",
+              "owner_name",
+              "policy",
+              "revision",
+              "revoke_reason",
+              "scope",
+              "standalone_enabled",
+              "workspace_name"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PutChannelsChannelIdBoardPlacementsPlacementIdPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline_policy": {
+            "additionalProperties": false,
+            "description": "The baseline policy value.",
+            "nullable": true,
+            "properties": {
+              "mode": {
+                "description": "The mode value.",
+                "type": "string"
+              },
+              "organisation_ids": {
+                "description": "The organisation ids value.",
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "mode",
+              "organisation_ids"
+            ],
+            "type": "object"
+          },
+          "channel_id": {
+            "description": "The channel id value.",
+            "type": "integer"
+          },
+          "collection_id": {
+            "description": "The collection id value.",
+            "type": "integer"
+          },
+          "display_order": {
+            "description": "The display order value.",
+            "type": "integer"
+          },
+          "effective_policy": {
+            "additionalProperties": false,
+            "description": "The effective policy value.",
+            "nullable": true,
+            "properties": {
+              "mode": {
+                "description": "The mode value.",
+                "type": "string"
+              },
+              "organisation_ids": {
+                "description": "The organisation ids value.",
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "mode",
+              "organisation_ids"
+            ],
+            "type": "object"
+          },
+          "enabled": {
+            "description": "The enabled value.",
+            "type": "boolean"
+          },
+          "id": {
+            "description": "The id value.",
+            "type": "string"
+          },
+          "label": {
+            "description": "The label value.",
+            "type": "string"
+          },
+          "policy": {
+            "additionalProperties": false,
+            "description": "The policy value.",
+            "properties": {
+              "mode": {
+                "description": "The mode value.",
+                "type": "string"
+              },
+              "organisation_ids": {
+                "description": "The organisation ids value.",
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "mode",
+              "organisation_ids"
+            ],
+            "type": "object"
+          },
+          "revision": {
+            "description": "The revision value.",
+            "type": "integer"
+          },
+          "source_name": {
+            "description": "The source name value.",
+            "type": "string"
+          },
+          "standalone_enabled": {
+            "description": "The standalone enabled value.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "channel_id",
+          "collection_id",
+          "display_order",
+          "enabled",
+          "id",
+          "label",
+          "policy",
+          "revision",
+          "standalone_enabled"
+        ],
+        "type": "object"
+      },
+      "PutChannelsChannelIdBoardPlacementsPlacementIdResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "baseline_policy": {
+                "additionalProperties": false,
+                "description": "The baseline policy value.",
+                "nullable": true,
+                "properties": {
+                  "mode": {
+                    "description": "The mode value.",
+                    "type": "string"
+                  },
+                  "organisation_ids": {
+                    "description": "The organisation ids value.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "organisation_ids"
+                ],
+                "type": "object"
+              },
+              "channel_id": {
+                "description": "The channel id value.",
+                "type": "integer"
+              },
+              "collection_id": {
+                "description": "The collection id value.",
+                "type": "integer"
+              },
+              "display_order": {
+                "description": "The display order value.",
+                "type": "integer"
+              },
+              "effective_policy": {
+                "additionalProperties": false,
+                "description": "The effective policy value.",
+                "nullable": true,
+                "properties": {
+                  "mode": {
+                    "description": "The mode value.",
+                    "type": "string"
+                  },
+                  "organisation_ids": {
+                    "description": "The organisation ids value.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "organisation_ids"
+                ],
+                "type": "object"
+              },
+              "enabled": {
+                "description": "The enabled value.",
+                "type": "boolean"
+              },
+              "id": {
+                "description": "The id value.",
+                "type": "string"
+              },
+              "label": {
+                "description": "The label value.",
+                "type": "string"
+              },
+              "policy": {
+                "additionalProperties": false,
+                "description": "The policy value.",
+                "properties": {
+                  "mode": {
+                    "description": "The mode value.",
+                    "type": "string"
+                  },
+                  "organisation_ids": {
+                    "description": "The organisation ids value.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "organisation_ids"
+                ],
+                "type": "object"
+              },
+              "revision": {
+                "description": "The revision value.",
+                "type": "integer"
+              },
+              "source_name": {
+                "description": "The source name value.",
+                "type": "string"
+              },
+              "standalone_enabled": {
+                "description": "The standalone enabled value.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "channel_id",
+              "collection_id",
+              "display_order",
+              "enabled",
+              "id",
+              "label",
+              "policy",
+              "revision",
+              "standalone_enabled"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "PutChannelsChannelIdExperiencePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "default_module": {
+            "description": "The default module value.",
+            "type": "string"
+          },
+          "modules": {
+            "description": "The modules value.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "navigation": {
+            "description": "The navigation value.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "presentation": {
+            "description": "The presentation value.",
+            "type": "string"
+          },
+          "revision": {
+            "description": "The revision value.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "default_module",
+          "modules",
+          "navigation",
+          "presentation",
+          "revision"
+        ],
+        "type": "object"
+      },
+      "PutChannelsChannelIdExperienceResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "nullable": true,
+            "properties": {
+              "default_module": {
+                "description": "The default module value.",
+                "type": "string"
+              },
+              "modules": {
+                "description": "The modules value.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "navigation": {
+                "description": "The navigation value.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "presentation": {
+                "description": "The presentation value.",
+                "type": "string"
+              },
+              "revision": {
+                "description": "The revision value.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "default_module",
+              "modules",
+              "navigation",
+              "presentation",
+              "revision"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "PutCollectionsCollectionIdBoardConfigurationPayload": {
         "additionalProperties": false,
         "properties": {
@@ -102520,6 +105080,156 @@
         ]
       }
     },
+    "/admin/board-publications": {
+      "get": {
+        "description": "Inventory board publications across all owners. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state. Requires system administrator permission; a publishing permission alone does not grant cross-owner inventory access.",
+        "operationId": "getAdminBoardPublications",
+        "parameters": [
+          {
+            "description": "One-based page number.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Maximum number of resources to return.",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Case-insensitive board name or slug substring.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Restricts publication metadata to this resource.",
+            "in": "query",
+            "name": "workspace_id",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Restricts publication metadata to this resource.",
+            "in": "query",
+            "name": "owner_id",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Restricts publication metadata to this resource.",
+            "in": "query",
+            "name": "organisation_id",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only globally scoped collections.",
+            "in": "query",
+            "name": "global",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Publication state.",
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "enum": [
+                "all",
+                "enabled",
+                "disabled",
+                "revoked"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Board baseline audience mode.",
+            "in": "query",
+            "name": "access_mode",
+            "required": false,
+            "schema": {
+              "enum": [
+                "public",
+                "organisations"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetAdminBoardPublicationsResult"
+                }
+              }
+            },
+            "description": "Inventory board publications across all owners response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Inventory board publications across all owners",
+        "tags": [
+          "Governance"
+        ],
+        "x-required-scopes": [
+          "collections:read"
+        ]
+      }
+    },
     "/admin/object-translations/canonical-differences": {
       "get": {
         "description": "Find canonical translation differences. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope. Writes and deletes affect instance translations only; shipped system translations are preserved.",
@@ -106376,6 +109086,511 @@
         ]
       }
     },
+    "/board-publications": {
+      "get": {
+        "description": "List owned board publications. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "operationId": "getBoardPublications",
+        "parameters": [
+          {
+            "description": "One-based page number.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Maximum number of resources to return.",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Case-insensitive board name or slug substring.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Restricts publication metadata to this resource.",
+            "in": "query",
+            "name": "workspace_id",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Restricts publication metadata to this resource.",
+            "in": "query",
+            "name": "owner_id",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Restricts publication metadata to this resource.",
+            "in": "query",
+            "name": "organisation_id",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only globally scoped collections.",
+            "in": "query",
+            "name": "global",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Publication state.",
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "enum": [
+                "all",
+                "enabled",
+                "disabled",
+                "revoked"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Board baseline audience mode.",
+            "in": "query",
+            "name": "access_mode",
+            "required": false,
+            "schema": {
+              "enum": [
+                "public",
+                "organisations"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetBoardPublicationsResult"
+                }
+              }
+            },
+            "description": "List owned board publications response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List owned board publications",
+        "tags": [
+          "Governance"
+        ],
+        "x-required-scopes": [
+          "collections:read"
+        ]
+      }
+    },
+    "/board-publications/{collection_id}": {
+      "get": {
+        "description": "Read board sharing settings. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "operationId": "getBoardPublicationsCollectionId",
+        "parameters": [
+          {
+            "description": "Positive numeric resource identifier.",
+            "in": "path",
+            "name": "collection_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetBoardPublicationsCollectionIdResult"
+                }
+              }
+            },
+            "description": "Read board sharing settings response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Read board sharing settings",
+        "tags": [
+          "Governance"
+        ],
+        "x-required-scopes": [
+          "collections:read"
+        ]
+      },
+      "put": {
+        "description": "Save board publication and audience atomically. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "operationId": "putBoardPublicationsCollectionId",
+        "parameters": [
+          {
+            "description": "Positive numeric resource identifier.",
+            "in": "path",
+            "name": "collection_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutBoardPublicationsCollectionIdPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PutBoardPublicationsCollectionIdResult"
+                }
+              }
+            },
+            "description": "Save board publication and audience atomically response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ConflictError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Save board publication and audience atomically",
+        "tags": [
+          "Governance"
+        ],
+        "x-required-scopes": [
+          "collections:write"
+        ]
+      }
+    },
+    "/board-publications/{collection_id}/allow-republish": {
+      "post": {
+        "description": "Clear a publication lock without republishing. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "operationId": "postBoardPublicationsCollectionIdAllowRepublish",
+        "parameters": [
+          {
+            "description": "Positive numeric resource identifier.",
+            "in": "path",
+            "name": "collection_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostBoardPublicationsCollectionIdAllowRepublishPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostBoardPublicationsCollectionIdAllowRepublishResult"
+                }
+              }
+            },
+            "description": "Clear a publication lock without republishing response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ConflictError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Clear a publication lock without republishing",
+        "tags": [
+          "Governance"
+        ],
+        "x-required-scopes": [
+          "collections:write"
+        ]
+      }
+    },
+    "/board-publications/{collection_id}/history": {
+      "get": {
+        "description": "Read board sharing and placement audit history. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "operationId": "getBoardPublicationsCollectionIdHistory",
+        "parameters": [
+          {
+            "description": "Positive numeric resource identifier.",
+            "in": "path",
+            "name": "collection_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetBoardPublicationsCollectionIdHistoryResult"
+                }
+              }
+            },
+            "description": "Read board sharing and placement audit history response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Read board sharing and placement audit history",
+        "tags": [
+          "Governance"
+        ],
+        "x-required-scopes": [
+          "collections:read"
+        ]
+      }
+    },
+    "/board-publications/{collection_id}/revoke": {
+      "post": {
+        "description": "Revoke and lock a board publication. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "operationId": "postBoardPublicationsCollectionIdRevoke",
+        "parameters": [
+          {
+            "description": "Positive numeric resource identifier.",
+            "in": "path",
+            "name": "collection_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostBoardPublicationsCollectionIdRevokePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostBoardPublicationsCollectionIdRevokeResult"
+                }
+              }
+            },
+            "description": "Revoke and lock a board publication response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ConflictError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Revoke and lock a board publication",
+        "tags": [
+          "Governance"
+        ],
+        "x-required-scopes": [
+          "collections:write"
+        ]
+      }
+    },
     "/canned-responses/{response_id}": {},
     "/canned-responses/{response_id}/preview": {},
     "/catalogs/global-bootstrap": {
@@ -106420,6 +109635,449 @@
           "item-types:read",
           "statuses:read",
           "priorities:read"
+        ]
+      }
+    },
+    "/channels/{channel_id}/board-placements": {
+      "get": {
+        "description": "List linked board placements and effective audiences. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "operationId": "getChannelsChannelIdBoardPlacements",
+        "parameters": [
+          {
+            "description": "Positive numeric resource identifier.",
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetChannelsChannelIdBoardPlacementsResult"
+                }
+              }
+            },
+            "description": "List linked board placements and effective audiences response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List linked board placements and effective audiences",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "collections:read"
+        ]
+      },
+      "post": {
+        "description": "Link a board publication to a portal. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "operationId": "postChannelsChannelIdBoardPlacements",
+        "parameters": [
+          {
+            "description": "Positive numeric resource identifier.",
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostChannelsChannelIdBoardPlacementsPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostChannelsChannelIdBoardPlacementsResult"
+                }
+              }
+            },
+            "description": "Link a board publication to a portal response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ConflictError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Link a board publication to a portal",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "collections:write"
+        ]
+      }
+    },
+    "/channels/{channel_id}/board-placements/{placement_id}": {
+      "delete": {
+        "description": "Unlink a portal board without deleting its source. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "operationId": "deleteChannelsChannelIdBoardPlacementsPlacementId",
+        "parameters": [
+          {
+            "description": "Positive numeric resource identifier.",
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Resource key resolved within the requested context.",
+            "in": "path",
+            "name": "placement_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Current placement revision; stale revisions return 409.",
+            "in": "query",
+            "name": "revision",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Request completed successfully with no response body."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ConflictError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Unlink a portal board without deleting its source",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "collections:write"
+        ]
+      },
+      "put": {
+        "description": "Update a portal board placement. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "operationId": "putChannelsChannelIdBoardPlacementsPlacementId",
+        "parameters": [
+          {
+            "description": "Positive numeric resource identifier.",
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Resource key resolved within the requested context.",
+            "in": "path",
+            "name": "placement_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutChannelsChannelIdBoardPlacementsPlacementIdPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PutChannelsChannelIdBoardPlacementsPlacementIdResult"
+                }
+              }
+            },
+            "description": "Update a portal board placement response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ConflictError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Update a portal board placement",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "collections:write"
+        ]
+      }
+    },
+    "/channels/{channel_id}/experience": {
+      "get": {
+        "description": "Read portal presentation and capability settings. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "operationId": "getChannelsChannelIdExperience",
+        "parameters": [
+          {
+            "description": "Positive numeric resource identifier.",
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetChannelsChannelIdExperienceResult"
+                }
+              }
+            },
+            "description": "Read portal presentation and capability settings response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Read portal presentation and capability settings",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "collections:read"
+        ]
+      },
+      "put": {
+        "description": "Save revisioned portal experience settings. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "operationId": "putChannelsChannelIdExperience",
+        "parameters": [
+          {
+            "description": "Positive numeric resource identifier.",
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutChannelsChannelIdExperiencePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PutChannelsChannelIdExperienceResult"
+                }
+              }
+            },
+            "description": "Save revisioned portal experience settings response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ConflictError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLargeError"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaTypeError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Save revisioned portal experience settings",
+        "tags": [
+          "Administration"
+        ],
+        "x-required-scopes": [
+          "collections:write"
         ]
       }
     },

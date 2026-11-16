@@ -9,7 +9,7 @@
   import Text from '../components/Text.svelte';
   import LazyMilkdownEditor from '../editors/LazyMilkdownEditor.svelte';
 
-  let { slug, itemKey, onclose } = $props();
+  let { slug, itemKey, onclose, client = publicBoard } = $props();
 
   let item = $state(null);
   let loading = $state(true);
@@ -17,7 +17,7 @@
 
   onMount(async () => {
     try {
-      item = await publicBoard.getItem(slug, itemKey);
+      item = await client.getItem(slug, itemKey);
     } catch (err) {
       error = err.status === 404 ? 'not_found' : 'error';
     } finally {

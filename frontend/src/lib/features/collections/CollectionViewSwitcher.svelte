@@ -10,6 +10,12 @@
   import Globe from '@lucide/svelte/icons/globe';
   import ButtonGroup from '../../components/ButtonGroup.svelte';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
+  import { isSystemAdmin } from '../../stores/permissions.svelte.js';
+  import Modal from '../../dialogs/Modal.svelte';
+  import ModalHeader from '../../dialogs/ModalHeader.svelte';
+  import BoardSharingEditor from './BoardSharingEditor.svelte';
+  let showSharing = $state(false);
+  let savedSlug = $state(undefined);
 
   // Props
   let {
@@ -18,6 +24,9 @@
     activeView = 'board',
     publicSlug = null,
   } = $props();
+
+  $effect(() => { collectionId; savedSlug = undefined; showSharing = false; });
+  const visibleSlug = $derived(savedSlug === undefined ? publicSlug : savedSlug);
 
   // Keep the enabled-views lookup warm; board/backlog hide when disabled.
   $effect(() => {
@@ -107,19 +116,27 @@
       </button>
     {/if}
 
-    {#if publicSlug}
+    {#if collectionId && (isCollectionCreator || $isSystemAdmin)}
+      <button type="button" class={segment} data-testid="board-share" onclick={() => showSharing = true}><Globe class="w-4 h-4" />Share board</button>
+    {/if}
+    {#if visibleSlug}
       <a
-        href="/board/{publicSlug}"
+        href="/board/{visibleSlug}"
         target="_blank"
         rel="noopener noreferrer"
         class={segment}
-        title={t('collections.publicBoard')}
-        onclick={(e) => { e.stopPropagation(); window.open(`/board/${publicSlug}`, '_blank'); e.preventDefault(); }}
+        title="Open shared board"
       >
         <Globe class="w-4 h-4" />
-        {t('collections.publicBoard')}
+        Open shared board
       </a>
     {/if}
   {/snippet}
 </ButtonGroup>
 
+{#if showSharing}
+  <Modal isOpen={true} onclose={() => showSharing = false} maxWidth="max-w-xl" closeOnBackdropClick={false}>
+    <ModalHeader title="Share board" onclose={() => showSharing = false} />
+    <div class="px-6 py-5"><BoardSharingEditor {collectionId} oncancel={() => showSharing = false} onsaved={(value, close) => { savedSlug = value.enabled && value.standalone_enabled && !value.revoked_at ? value.slug : null; if (close) showSharing = false; }} /></div>
+  </Modal>
+{/if}

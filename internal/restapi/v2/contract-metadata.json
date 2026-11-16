@@ -255,6 +255,125 @@
         ]
       }
     },
+    "/admin/board-publications": {
+      "get": {
+        "description": "Inventory board publications across all owners. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state. Requires system administrator permission; a publishing permission alone does not grant cross-owner inventory access.",
+        "parameters": [
+          {
+            "Name": "page",
+            "In": "query",
+            "Description": "One-based page number.",
+            "Required": false,
+            "Schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "page_size",
+            "In": "query",
+            "Description": "Maximum number of resources to return.",
+            "Required": false,
+            "Schema": {
+              "default": 50,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "q",
+            "In": "query",
+            "Description": "Case-insensitive board name or slug substring.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "workspace_id",
+            "In": "query",
+            "Description": "Restricts publication metadata to this resource.",
+            "Required": false,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "owner_id",
+            "In": "query",
+            "Description": "Restricts publication metadata to this resource.",
+            "Required": false,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "organisation_id",
+            "In": "query",
+            "Description": "Restricts publication metadata to this resource.",
+            "Required": false,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "global",
+            "In": "query",
+            "Description": "Only globally scoped collections.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "Name": "state",
+            "In": "query",
+            "Description": "Publication state.",
+            "Required": false,
+            "Schema": {
+              "enum": [
+                "all",
+                "enabled",
+                "disabled",
+                "revoked"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "Name": "access_mode",
+            "In": "query",
+            "Description": "Board baseline audience mode.",
+            "Required": false,
+            "Schema": {
+              "enum": [
+                "public",
+                "organisations"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Inventory board publications across all owners",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
     "/admin/groups": {
       "get": {
         "description": ". Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -2990,6 +3109,277 @@
         ]
       }
     },
+    "/board-publications": {
+      "get": {
+        "description": "List owned board publications. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "parameters": [
+          {
+            "Name": "page",
+            "In": "query",
+            "Description": "One-based page number.",
+            "Required": false,
+            "Schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "page_size",
+            "In": "query",
+            "Description": "Maximum number of resources to return.",
+            "Required": false,
+            "Schema": {
+              "default": 50,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "q",
+            "In": "query",
+            "Description": "Case-insensitive board name or slug substring.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "workspace_id",
+            "In": "query",
+            "Description": "Restricts publication metadata to this resource.",
+            "Required": false,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "owner_id",
+            "In": "query",
+            "Description": "Restricts publication metadata to this resource.",
+            "Required": false,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "organisation_id",
+            "In": "query",
+            "Description": "Restricts publication metadata to this resource.",
+            "Required": false,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "global",
+            "In": "query",
+            "Description": "Only globally scoped collections.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "Name": "state",
+            "In": "query",
+            "Description": "Publication state.",
+            "Required": false,
+            "Schema": {
+              "enum": [
+                "all",
+                "enabled",
+                "disabled",
+                "revoked"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "Name": "access_mode",
+            "In": "query",
+            "Description": "Board baseline audience mode.",
+            "Required": false,
+            "Schema": {
+              "enum": [
+                "public",
+                "organisations"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List owned board publications",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/board-publications/{collection_id}": {
+      "get": {
+        "description": "Read board sharing settings. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "parameters": [
+          {
+            "Name": "collection_id",
+            "In": "path",
+            "Description": "Positive numeric resource identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Read board sharing settings",
+        "tags": [
+          "Governance"
+        ]
+      },
+      "put": {
+        "description": "Save board publication and audience atomically. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "parameters": [
+          {
+            "Name": "collection_id",
+            "In": "path",
+            "Description": "Positive numeric resource identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "409": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Save board publication and audience atomically",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/board-publications/{collection_id}/allow-republish": {
+      "post": {
+        "description": "Clear a publication lock without republishing. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "parameters": [
+          {
+            "Name": "collection_id",
+            "In": "path",
+            "Description": "Positive numeric resource identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "409": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Clear a publication lock without republishing",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/board-publications/{collection_id}/history": {
+      "get": {
+        "description": "Read board sharing and placement audit history. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "parameters": [
+          {
+            "Name": "collection_id",
+            "In": "path",
+            "Description": "Positive numeric resource identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Read board sharing and placement audit history",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/board-publications/{collection_id}/revoke": {
+      "post": {
+        "description": "Revoke and lock a board publication. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "parameters": [
+          {
+            "Name": "collection_id",
+            "In": "path",
+            "Description": "Positive numeric resource identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "409": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Revoke and lock a board publication",
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
     "/catalogs/global-bootstrap": {
       "get": {
         "description": "Load global reference catalogs. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -3003,6 +3393,214 @@
         "summary": "Load global reference catalogs",
         "tags": [
           "Workspace configuration"
+        ]
+      }
+    },
+    "/channels/{channel_id}/board-placements": {
+      "get": {
+        "description": "List linked board placements and effective audiences. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "parameters": [
+          {
+            "Name": "channel_id",
+            "In": "path",
+            "Description": "Positive numeric resource identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List linked board placements and effective audiences",
+        "tags": [
+          "Administration"
+        ]
+      },
+      "post": {
+        "description": "Link a board publication to a portal. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "parameters": [
+          {
+            "Name": "channel_id",
+            "In": "path",
+            "Description": "Positive numeric resource identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "409": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Link a board publication to a portal",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/channels/{channel_id}/board-placements/{placement_id}": {
+      "delete": {
+        "description": "Unlink a portal board without deleting its source. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "parameters": [
+          {
+            "Name": "channel_id",
+            "In": "path",
+            "Description": "Positive numeric resource identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "placement_id",
+            "In": "path",
+            "Description": "Resource key resolved within the requested context.",
+            "Required": true,
+            "Schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "Name": "revision",
+            "In": "query",
+            "Description": "Current placement revision; stale revisions return 409.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "409": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Unlink a portal board without deleting its source",
+        "tags": [
+          "Administration"
+        ]
+      },
+      "put": {
+        "description": "Update a portal board placement. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "parameters": [
+          {
+            "Name": "channel_id",
+            "In": "path",
+            "Description": "Positive numeric resource identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "placement_id",
+            "In": "path",
+            "Description": "Resource key resolved within the requested context.",
+            "Required": true,
+            "Schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "409": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Update a portal board placement",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/channels/{channel_id}/experience": {
+      "get": {
+        "description": "Read portal presentation and capability settings. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "parameters": [
+          {
+            "Name": "channel_id",
+            "In": "path",
+            "Description": "Positive numeric resource identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Read portal presentation and capability settings",
+        "tags": [
+          "Administration"
+        ]
+      },
+      "put": {
+        "description": "Save revisioned portal experience settings. Management is scoped to the collection owner or portal manager; system administrators retain cross-owner sharing governance. Sharing does not grant source editing or requester privileges. Revision conflicts return 409 without changing stored state.",
+        "parameters": [
+          {
+            "Name": "channel_id",
+            "In": "path",
+            "Description": "Positive numeric resource identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "409": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Save revisioned portal experience settings",
+        "tags": [
+          "Administration"
         ]
       }
     },
@@ -9356,6 +9954,168 @@
         "summary": "List page links",
         "tags": [
           "Links"
+        ]
+      }
+    },
+    "/portal/{slug}/boards/{placement_id}": {
+      "get": {
+        "description": "Read a board in its linked portal context. Customer sessions remain bound to the portal. Admission intersects portal policy, board baseline and placement policy on every request. Missing, disabled, revoked, paused or cross-portal placements are masked with 404; a restricted audience without a portal customer session returns 401, and a signed-in customer outside the audience returns 403. Responses are private and non-cacheable. Internal sessions are not board audience evidence.",
+        "parameters": [
+          {
+            "Name": "slug",
+            "In": "path",
+            "Description": "Resource key resolved within the requested context.",
+            "Required": true,
+            "Schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "Name": "placement_id",
+            "In": "path",
+            "Description": "Resource key resolved within the requested context.",
+            "Required": true,
+            "Schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "500": {}
+        },
+        "summary": "Read a board in its linked portal context",
+        "tags": [
+          "API"
+        ]
+      }
+    },
+    "/portal/{slug}/boards/{placement_id}/attachments/{id}/download": {
+      "get": {
+        "description": "Download a visible image in its portal board context. Customer sessions remain bound to the portal. Admission intersects portal policy, board baseline and placement policy on every request. Missing, disabled, revoked, paused or cross-portal placements are masked with 404; a restricted audience without a portal customer session returns 401, and a signed-in customer outside the audience returns 403. Responses are private and non-cacheable. Internal sessions are not board audience evidence.",
+        "parameters": [
+          {
+            "Name": "id",
+            "In": "path",
+            "Description": "Positive numeric resource identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "slug",
+            "In": "path",
+            "Description": "Resource key resolved within the requested context.",
+            "Required": true,
+            "Schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "Name": "placement_id",
+            "In": "path",
+            "Description": "Resource key resolved within the requested context.",
+            "Required": true,
+            "Schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "500": {}
+        },
+        "summary": "Download a visible image in its portal board context",
+        "tags": [
+          "API"
+        ]
+      }
+    },
+    "/portal/{slug}/boards/{placement_id}/items/{key}": {
+      "get": {
+        "description": "Read externally projected board item detail. Customer sessions remain bound to the portal. Admission intersects portal policy, board baseline and placement policy on every request. Missing, disabled, revoked, paused or cross-portal placements are masked with 404; a restricted audience without a portal customer session returns 401, and a signed-in customer outside the audience returns 403. Responses are private and non-cacheable. Internal sessions are not board audience evidence.",
+        "parameters": [
+          {
+            "Name": "slug",
+            "In": "path",
+            "Description": "Resource key resolved within the requested context.",
+            "Required": true,
+            "Schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "Name": "placement_id",
+            "In": "path",
+            "Description": "Resource key resolved within the requested context.",
+            "Required": true,
+            "Schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "Name": "key",
+            "In": "path",
+            "Description": "Resource key resolved within the requested context.",
+            "Required": true,
+            "Schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "500": {}
+        },
+        "summary": "Read externally projected board item detail",
+        "tags": [
+          "API"
+        ]
+      }
+    },
+    "/portal/{slug}/experience": {
+      "get": {
+        "description": "Read the policy-filtered customer experience. Customer sessions remain bound to the portal. Admission intersects portal policy, board baseline and placement policy on every request. Missing, disabled, revoked, paused or cross-portal placements are masked with 404; a restricted audience without a portal customer session returns 401, and a signed-in customer outside the audience returns 403. Responses are private and non-cacheable. Internal sessions are not board audience evidence.",
+        "parameters": [
+          {
+            "Name": "slug",
+            "In": "path",
+            "Description": "Resource key resolved within the requested context.",
+            "Required": true,
+            "Schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "500": {}
+        },
+        "summary": "Read the policy-filtered customer experience",
+        "tags": [
+          "API"
         ]
       }
     },

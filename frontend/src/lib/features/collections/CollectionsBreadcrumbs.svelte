@@ -163,7 +163,7 @@
             size="sm"
             icon={IconWorld}
           >
-            {isPublic ? t('collections.public') : t('collections.publish')}
+            Share board
           </Button>
         {/if}
 

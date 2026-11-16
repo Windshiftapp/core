@@ -55,22 +55,70 @@ func rewritePublicAttachmentURLs(content, slug string) string {
 	)
 }
 
-// PublicBoardHandler serves read-only public board views
+// PublicBoardHandler serves read-only public board views.
 type PublicBoardHandler struct {
 	db                database.Database
 	permissionService *services.PermissionService
 	publicBoardScope  *services.PublicBoardScopeService
 	storage           *blobstore.Store
+	availability      services.PublicBoardAvailability
+}
+
+type portalBoardContextKey struct{}
+type portalBoardContext struct {
+	CollectionID     int
+	AttachmentPrefix string
+}
+
+type publicBoardSource struct {
+	ID                                  int
+	Name, Description, Query, UpdatedAt string
+	Swimlanes                           bool
+}
+
+func (h *PublicBoardHandler) boardSource(r *http.Request) (*publicBoardSource, error) {
+	where, value := `public_slug = ? AND is_public = true AND public_slug IS NOT NULL`, any(r.PathValue("slug"))
+	if placement, ok := r.Context().Value(portalBoardContextKey{}).(portalBoardContext); ok {
+		where, value = `id = ? AND board_enabled = true`, placement.CollectionID
+	}
+	var source publicBoardSource
+	err := h.db.QueryRowContext(r.Context(), `SELECT id, name, COALESCE(description, ''), COALESCE(ql_query, ''), public_milestone_swimlanes, updated_at FROM collections WHERE `+where+` AND is_private = false AND public_revoked_at IS NULL`, value).
+		Scan(&source.ID, &source.Name, &source.Description, &source.Query, &source.Swimlanes, &source.UpdatedAt)
+	return &source, err
+}
+
+func rewriteBoardAttachmentURLs(r *http.Request, content, slug string) string {
+	if placement, ok := r.Context().Value(portalBoardContextKey{}).(portalBoardContext); ok {
+		content = strings.ReplaceAll(content, requestContextPrefix(r)+"/api/attachments/", placement.AttachmentPrefix)
+		return strings.ReplaceAll(content, "/api/attachments/", placement.AttachmentPrefix)
+	}
+	return rewritePublicAttachmentURLs(content, slug)
 }
 
 // NewPublicBoardHandler creates a new PublicBoardHandler
-func NewPublicBoardHandler(db database.Database, permissionService *services.PermissionService, storage *blobstore.Store) *PublicBoardHandler {
-	return &PublicBoardHandler{
+func NewPublicBoardHandler(db database.Database, permissionService *services.PermissionService, storage *blobstore.Store, availability ...services.PublicBoardAvailability) *PublicBoardHandler {
+	h := &PublicBoardHandler{
 		db:                db,
 		permissionService: permissionService,
 		publicBoardScope:  services.NewPublicBoardScopeService(db, permissionService),
 		storage:           storage,
 	}
+	if len(availability) > 0 {
+		h.availability = availability[0]
+	}
+	return h
+}
+
+func (h *PublicBoardHandler) available(w http.ResponseWriter, r *http.Request) bool {
+	if h.availability != nil && !h.availability.PublicBoardsEnabled() {
+		respondNotFound(w, r, "board")
+		return false
+	}
+	return true
+}
+
+func (h *PublicBoardHandler) SetAvailability(availability services.PublicBoardAvailability) {
+	h.availability = availability
 }
 
 func isPublicBoardScopeError(err error) bool {
@@ -131,6 +179,8 @@ type publicBoardResponse struct {
 	UpdatedAt   string              `json:"updated_at"`
 }
 
+type PublicBoardResponse = publicBoardResponse
+
 type publicComment struct {
 	AuthorName   string `json:"author_name"`
 	AuthorAvatar string `json:"author_avatar,omitempty"`
@@ -161,8 +211,13 @@ type publicItemDetail struct {
 	CreatedAt       string          `json:"created_at"`
 }
 
+type PublicBoardItemResponse = publicItemDetail
+
 // GetPublicBoardItem serves a single item detail for a public collection
 func (h *PublicBoardHandler) GetPublicBoardItem(w http.ResponseWriter, r *http.Request) {
+	if !h.available(w, r) {
+		return
+	}
 	slug := r.PathValue("slug")
 	key := r.PathValue("key")
 	if slug == "" || key == "" {
@@ -184,11 +239,7 @@ func (h *PublicBoardHandler) GetPublicBoardItem(w http.ResponseWriter, r *http.R
 	}
 
 	// Validate slug → public collection
-	var collectionID int
-	err = h.db.QueryRow(`
-		SELECT id FROM collections
-		WHERE public_slug = ? AND is_public = true AND is_private = false AND public_slug IS NOT NULL
-	`, slug).Scan(&collectionID)
+	source, err := h.boardSource(r)
 	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "board")
 		return
@@ -197,6 +248,7 @@ func (h *PublicBoardHandler) GetPublicBoardItem(w http.ResponseWriter, r *http.R
 		respondInternalError(w, r, err)
 		return
 	}
+	collectionID := source.ID
 
 	publicItem, err := repository.NewItemRepository(h.db).FindPublicItemByKeyAndNumber(workspaceKey, itemNumber)
 	if err != nil {
@@ -227,14 +279,14 @@ func (h *PublicBoardHandler) GetPublicBoardItem(w http.ResponseWriter, r *http.R
 	labels := h.loadSingleItemLabels(itemID)
 
 	// Load public comments (non-private only)
-	comments, err := h.loadPublicComments(itemID, slug)
+	comments, err := h.loadPublicComments(itemID, slug, r)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	// Rewrite attachment URLs for public access
-	description = rewritePublicAttachmentURLs(description, slug)
+	description = rewriteBoardAttachmentURLs(r, description, slug)
 	descriptionHTML, err := markdown.Render(description)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("render public item description: %w", err))
@@ -275,21 +327,16 @@ func (h *PublicBoardHandler) GetPublicBoardItem(w http.ResponseWriter, r *http.R
 
 // GetPublicBoard serves a read-only board view for a public collection
 func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Request) {
+	if !h.available(w, r) {
+		return
+	}
 	slug := r.PathValue("slug")
 	if slug == "" {
 		respondNotFound(w, r, "board")
 		return
 	}
 
-	// Look up collection by public_slug where is_public = true
-	var collectionID int
-	var collectionName, collectionDescription, qlQuery, updatedAt string
-	var publicMilestoneSwimlanes bool
-	err := h.db.QueryRow(`
-		SELECT id, name, COALESCE(description, ''), COALESCE(ql_query, ''), public_milestone_swimlanes, updated_at
-		FROM collections
-		WHERE public_slug = ? AND is_public = true AND is_private = false AND public_slug IS NOT NULL
-	`, slug).Scan(&collectionID, &collectionName, &collectionDescription, &qlQuery, &publicMilestoneSwimlanes, &updatedAt)
+	source, err := h.boardSource(r)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		respondNotFound(w, r, "board")
@@ -299,6 +346,7 @@ func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Reque
 		respondInternalError(w, r, err)
 		return
 	}
+	collectionID, collectionName, collectionDescription, updatedAt, publicMilestoneSwimlanes := source.ID, source.Name, source.Description, source.UpdatedAt, source.Swimlanes
 
 	// Load board configuration for this collection
 	var boardConfigID int
@@ -734,7 +782,7 @@ func (h *PublicBoardHandler) loadSingleItemLabels(itemID int) []publicLabel {
 	return labels
 }
 
-func (h *PublicBoardHandler) loadPublicComments(itemID int, slug string) ([]publicComment, error) {
+func (h *PublicBoardHandler) loadPublicComments(itemID int, slug string, requests ...*http.Request) ([]publicComment, error) {
 	rows, err := h.db.Query(`
 		SELECT COALESCE(u.first_name || ' ' || u.last_name, pc.name, 'Unknown'),
 		       COALESCE(u.avatar_url, ''),
@@ -756,7 +804,11 @@ func (h *PublicBoardHandler) loadPublicComments(itemID int, slug string) ([]publ
 		if err := rows.Scan(&c.AuthorName, &c.AuthorAvatar, &c.Content, &c.CreatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan comment: %w", err)
 		}
-		c.Content = rewritePublicAttachmentURLs(c.Content, slug)
+		if len(requests) > 0 {
+			c.Content = rewriteBoardAttachmentURLs(requests[0], c.Content, slug)
+		} else {
+			c.Content = rewritePublicAttachmentURLs(c.Content, slug)
+		}
 		comments = append(comments, c)
 	}
 	if err := rows.Err(); err != nil {
@@ -770,6 +822,9 @@ func (h *PublicBoardHandler) loadPublicComments(itemID int, slug string) ([]publ
 
 // DownloadAttachment serves an image attachment for a public board item
 func (h *PublicBoardHandler) DownloadAttachment(w http.ResponseWriter, r *http.Request) {
+	if !h.available(w, r) {
+		return
+	}
 	// Publication and membership are mutable authorization inputs; never cache.
 	w.Header().Set("Cache-Control", "no-store")
 
@@ -787,15 +842,12 @@ func (h *PublicBoardHandler) DownloadAttachment(w http.ResponseWriter, r *http.R
 	}
 
 	// Validate slug → public collection
-	var collectionID int
-	err = h.db.QueryRow(`
-		SELECT id FROM collections
-		WHERE public_slug = ? AND is_public = true AND is_private = false AND public_slug IS NOT NULL
-	`, slug).Scan(&collectionID)
+	source, err := h.boardSource(r)
 	if err != nil {
 		respondNotFound(w, r, "attachment")
 		return
 	}
+	collectionID := source.ID
 
 	// Require an item attachment; legacy rows reuse item_id for other entities.
 	var itemID sql.NullInt64
@@ -804,7 +856,7 @@ func (h *PublicBoardHandler) DownloadAttachment(w http.ResponseWriter, r *http.R
 	var fileSize int64
 	err = h.db.QueryRow(`
 		SELECT item_id, COALESCE(entity_type, 'item'), file_path, mime_type, original_filename, file_size
-		FROM attachments WHERE id = ?
+		FROM attachments WHERE id = ? AND is_internal = false
 	`, attachmentID).Scan(&itemID, &entityType, &filePath, &mimeType, &originalFilename, &fileSize)
 	if err != nil {
 		respondNotFound(w, r, "attachment")

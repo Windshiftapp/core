@@ -3426,6 +3426,22 @@ CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_m
 		SQLite:        "ALTER TABLE user_sessions ADD COLUMN remember_me BOOLEAN NOT NULL DEFAULT false",
 		Postgres:      "ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS remember_me BOOLEAN NOT NULL DEFAULT false",
 	},
+	{
+		Version:       "20261126_board_publication_governance",
+		Name:          "Separate external board publication and standalone availability with durable governance",
+		CheckSQLite:   sqliteColumnCheck("collections", "sharing_revision"),
+		CheckPostgres: pgColumnCheck("collections", "sharing_revision"),
+		SQLite:        boardPublicationMigration,
+		Postgres:      boardPublicationMigration,
+	},
+	{
+		Version:       "20261126_board_portal_placements",
+		Name:          "Add native portal board placements with independently narrower audiences",
+		CheckSQLite:   `SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'board_placements'`,
+		CheckPostgres: `SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'board_placements'`,
+		SQLite:        boardPlacementSchema,
+		Postgres:      boardPlacementSchema,
+	},
 }
 
 const timeWorklogDraftsMigrationSQLite = `

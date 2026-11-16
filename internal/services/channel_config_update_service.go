@@ -384,7 +384,7 @@ func (s *ChannelConfigUpdateService) preparePublicChannelEnable(ctx context.Cont
 	if slug == "" || !channelSlugPattern.MatchString(slug) {
 		return channelConfigInvalid("A valid public slug is required before enabling this channel")
 	}
-	if len(workspaceIDs) == 0 {
+	if len(workspaceIDs) == 0 && (channel.Type != "portal" || config.PortalModuleEnabled("forms")) {
 		return channelConfigInvalid("At least one target workspace is required before enabling this channel")
 	}
 	bad, err := s.channels.repo.FindBadWorkspaceIDs(append([]int(nil), workspaceIDs...))
@@ -405,11 +405,18 @@ func (s *ChannelConfigUpdateService) preparePublicChannelEnable(ctx context.Cont
 			}
 		}
 	}
-	if err := s.validateRequestTypeRoutes(channel.ID, channel.Type, config); err != nil {
-		return err
+	if channel.Type != "portal" || config.PortalModuleEnabled("forms") {
+		if err := s.validateRequestTypeRoutes(channel.ID, channel.Type, config); err != nil {
+			return err
+		}
 	}
 	if channel.Type == "portal" && config.PortalRegistrationMode != "" && config.PortalRegistrationMode != "open" && config.PortalRegistrationMode != "manual" {
 		return channelConfigInvalid("Portal registration mode must be open or manual")
+	}
+	if channel.Type == "portal" {
+		if err := validatePortalExperienceSettings(PortalExperienceSettings{Presentation: config.PortalPresentation, Modules: config.PortalModules, Navigation: config.PortalNavigation, DefaultModule: config.PortalDefaultModule}); err != nil {
+			return channelConfigInvalid(err.Error())
+		}
 	}
 	inUse, err := s.channels.repo.SlugInUse(ctx, channel.Type, slug, channel.ID)
 	if err != nil {
