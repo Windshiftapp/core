@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"windshift/internal/contextkeys"
+	"windshift/internal/operatorcontrols"
 )
 
 // Handler is the v2 transport boundary. Failures are written only by Adapt.
@@ -79,6 +80,20 @@ func Adapt(handler Handler) http.Handler {
 
 func writeError(w http.ResponseWriter, requestID string, err error) {
 	var apiErr *Error
+	var denied *operatorcontrols.DeniedError
+	var limited *operatorcontrols.LimitError
+	switch {
+	case errors.As(err, &denied):
+		err = newError(http.StatusForbidden, "operator_restricted", denied.Error())
+	case errors.As(err, &limited):
+		limitErr := newError(limited.Status(), "operator_limit_exceeded", limited.Error())
+		if limited.Status() == http.StatusTooManyRequests {
+			limitErr.Headers = http.Header{"Retry-After": []string{"60"}}
+		}
+		err = limitErr
+	case errors.Is(err, operatorcontrols.ErrBudgetUnavailable):
+		err = newError(http.StatusServiceUnavailable, "operator_budget_unavailable", err.Error())
+	}
 	if !errors.As(err, &apiErr) {
 		apiErr = internalError(err)
 	}

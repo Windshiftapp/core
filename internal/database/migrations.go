@@ -3419,6 +3419,14 @@ CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_m
 		Postgres:      timeWorklogDraftsMigrationPostgres,
 	},
 	{
+		Version:       "20261113_operator_usage",
+		Name:          "Persist instance-wide operator budget reservations",
+		CheckSQLite:   sqliteTableCheck("operator_usage"),
+		CheckPostgres: pgTableCheck("operator_usage"),
+		SQLite:        operatorUsageSchema,
+		Postgres:      operatorUsageSchema,
+	},
+	{
 		Version:       "20261125_session_remember_me",
 		Name:          "Preserve the session lifetime choice through passkey authentication",
 		CheckSQLite:   sqliteColumnCheck("user_sessions", "remember_me"),

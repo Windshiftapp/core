@@ -12,6 +12,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 )
@@ -276,6 +277,11 @@ func (s *ConditionSetApplicationService) validateTransitions(workflowID int, tra
 			return governanceValidation("transition does not belong to workflow")
 		}
 		for _, condition := range transition.Conditions {
+			if condition.ConditionType == models.ConditionTypeScript {
+				if err := operatorcontrols.From(s.db).Check(operatorcontrols.Scripts); err != nil {
+					return err
+				}
+			}
 			if err := validateConditionInput(condition); err != nil {
 				return err
 			}

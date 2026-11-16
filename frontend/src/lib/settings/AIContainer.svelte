@@ -6,6 +6,8 @@
   import AgentTemplateManager from './AgentTemplateManager.svelte';
   import WorkItemStalenessSettings from './WorkItemStalenessSettings.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { capabilitiesStore } from '../stores/capabilities.svelte.js';
+  import AlertBox from '../components/AlertBox.svelte';
 
   let subtab = $derived($currentRoute.query?.subtab || 'connections');
 
@@ -28,7 +30,11 @@
     {:else if subtab === 'staleness'}
       <WorkItemStalenessSettings />
     {:else}
-      <LLMConnectionManager />
+      {#if capabilitiesStore.operatorAllows('ai_connection_management')}
+        <LLMConnectionManager />
+      {:else}
+        <div data-testid="operator-controls-ai-restricted"><AlertBox variant="info" message={t('operatorControls.restricted', 'This capability is managed by the instance operator.')} /></div>
+      {/if}
     {/if}
   </div>
 </div>

@@ -217,6 +217,7 @@ func (h *RunnerBrokerHandler) ProxyLLM(w http.ResponseWriter, r *http.Request) {
 	pricing := h.llmConns.ModelPricing(llm.ProviderType(cfg.ProviderType), cfg.Model)
 	request.EnablePromptCache = cfg.Protocol == llm.APIContractAnthropic && pricing != nil && pricing.HasCompleteCacheRates()
 	client := llm.NewProviderClient(llm.ConnectionConfig{
+		Controls:     cfg.Controls,
 		ProviderType: llm.ProviderType(cfg.ProviderType), Model: cfg.Model,
 		APIKey: cfg.APIKey, BaseURL: cfg.BaseURL, ProviderConfig: cfg.ProviderConfig,
 		Timeout: llmResponseHeaderTimeout,

@@ -12,6 +12,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/sso"
 )
 
@@ -48,6 +49,9 @@ type SyncResult struct {
 // The supplied context cancels database lookups inside the sync; LDAP-library
 // I/O is unaffected (the upstream client does not accept context).
 func (s *SyncService) SyncUsers(ctx context.Context, config *models.LDAPConfig) (*SyncResult, error) {
+	if err := operatorcontrols.From(s.db).Check(operatorcontrols.LDAP); err != nil {
+		return nil, err
+	}
 	result := &SyncResult{}
 
 	// Create sync status record

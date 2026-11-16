@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 
 	extism "github.com/extism/go-sdk"
@@ -160,6 +161,9 @@ func (m *Manager) cliExecHostFunction(ctx context.Context, plugin *extism.Curren
 // effect immediately. Missing database wiring, absent settings, and read
 // failures all leave this security-sensitive capability disabled.
 func (m *Manager) cliExecEnabled() (bool, error) {
+	if err := operatorcontrols.From(m.db).Check(operatorcontrols.PluginExec); err != nil {
+		return false, err
+	}
 	if m.db == nil {
 		return false, nil
 	}

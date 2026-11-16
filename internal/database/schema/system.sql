@@ -1,5 +1,12 @@
 -- System tables (settings, labels, reviews, plugins, audit, etc.)
 
+CREATE TABLE IF NOT EXISTS operator_usage (
+	resource TEXT NOT NULL,
+	period BIGINT NOT NULL,
+	used BIGINT NOT NULL CHECK (used >= 0),
+	PRIMARY KEY (resource, period)
+);
+
 -- Schema migrations registry. Source of truth for which migrations have
 -- been applied. Paired with internal/database/migrations.go (the Catalog).
 -- The boostrap CREATE in Initialize() makes this table available before

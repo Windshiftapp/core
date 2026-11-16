@@ -4,6 +4,8 @@ import (
 	"embed"
 	"os"
 	"time"
+
+	"windshift/internal/operatorcontrols"
 )
 
 // Config is the fully-resolved runtime configuration for the main windshift
@@ -11,6 +13,7 @@ import (
 // server.New and every handler that previously read env vars directly.
 // last review: ser, 210426
 type Config struct {
+	OperatorPolicy operatorcontrols.Policy
 	// HTTP / network
 	Port              string
 	BaseURL           string

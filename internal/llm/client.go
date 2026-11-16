@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"time"
+
+	"windshift/internal/operatorcontrols"
 )
 
 // DefaultRequestTimeout bounds a single in-product AI operation end to end. It
@@ -53,6 +55,7 @@ func NewClient(cfg Config) Client {
 
 // ConnectionConfig holds configuration for creating a provider-specific client.
 type ConnectionConfig struct {
+	Controls       *operatorcontrols.Controls
 	ProviderType   ProviderType
 	Model          string
 	APIKey         string
@@ -73,7 +76,7 @@ func NewProviderClient(cfg ConnectionConfig) Client {
 		baseURL = provider.BaseURL
 	}
 
-	return newFantasyClient(fantasyClientOptions{
+	return WithOperatorControls(newFantasyClient(fantasyClientOptions{
 		baseURL:        baseURL,
 		model:          cfg.Model,
 		apiKey:         cfg.APIKey,
@@ -83,7 +86,7 @@ func NewProviderClient(cfg ConnectionConfig) Client {
 		timeout:        cfg.Timeout,
 		userAgent:      provider.UserAgent,
 		sessionHeader:  provider.SessionHeader,
-	})
+	}), cfg.Controls, cfg.Model)
 }
 
 // ResolveGenerationProtocol resolves the connection once into the protocol
