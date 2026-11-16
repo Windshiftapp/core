@@ -21,6 +21,7 @@ func init() {
 				return map[string]string{"error": "skill not found"}, nil
 			}
 			if skill := env.Grants.SkillFor(args.SkillID); skill != nil {
+				// Older persisted snapshots can contain unavailable grants.
 				if skill.Error != "" {
 					return map[string]string{"error": "skill activation unavailable"}, nil
 				}

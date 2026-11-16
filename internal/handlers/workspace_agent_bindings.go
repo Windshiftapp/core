@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"windshift/internal/agentskills"
 	"windshift/internal/aitools"
 	"windshift/internal/auth"
 	"windshift/internal/llm"
@@ -1219,10 +1220,10 @@ func sanitizeRepoInputs(repos []createBindingRepoBody) []services.RepoInput {
 	return inputs
 }
 
-// isSkillAttachError reports whether the error came from skill-id
-// validation during binding create/update (bad or foreign ids → 400).
+// isSkillAttachError maps invalid skill attachments or excessive counts to 400.
 func isSkillAttachError(err error) bool {
 	return errors.Is(err, repository.ErrBindingSkillNotInWorkspace) ||
+		errors.Is(err, agentskills.ErrSnapshotTooLarge) ||
 		errors.Is(err, services.ErrBindingSkillsUnavailable)
 }
 

@@ -33,7 +33,9 @@ type SkillGrant struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Body        string `json:"body"`
-	Error       string `json:"error,omitempty"`
+	// Error is retained for unavailable grants persisted by older versions.
+	// New snapshots fail admission instead of creating an unavailable grant.
+	Error string `json:"error,omitempty"`
 }
 
 func (g *RunGrants) SkillFor(id int) *SkillGrant {

@@ -15,13 +15,13 @@ const MaxSnapshotSkills = 32
 var ErrSnapshotTooLarge = errors.New("binding skill snapshot exceeds 32 skills, 256 KiB, or 65536 estimated tokens")
 
 type SnapshotReader interface {
-	ListEnabledForBinding(context.Context, int) ([]*models.WorkspaceAgentSkill, error)
+	ListEnabledForBindingSnapshot(context.Context, int) ([]*models.WorkspaceAgentSkill, error)
 	PageRefsForSkill(context.Context, int) ([]models.SkillPageReference, error)
 }
 
 // SnapshotBinding fails closed for both runtimes rather than silently omitting a required skill.
 func SnapshotBinding(ctx context.Context, reader SnapshotReader, bindingID, workspaceID int) ([]models.SkillGrant, error) {
-	skills, err := reader.ListEnabledForBinding(ctx, bindingID)
+	skills, err := reader.ListEnabledForBindingSnapshot(ctx, bindingID)
 	if err != nil {
 		return nil, fmt.Errorf("list binding skills: %w", err)
 	}
@@ -50,6 +50,18 @@ func SnapshotBinding(ctx context.Context, reader SnapshotReader, bindingID, work
 		}
 	}
 	return grants, nil
+}
+
+// ValidateAttachmentCount counts distinct attachments, including disabled skills.
+func ValidateAttachmentCount(ids []int) error {
+	seen := make(map[int]struct{})
+	for _, id := range ids {
+		seen[id] = struct{}{}
+		if len(seen) > MaxSnapshotSkills {
+			return ErrSnapshotTooLarge
+		}
+	}
+	return nil
 }
 
 // ValidateSnapshot bounds the complete serialized grant set, including metadata and JSON escaping.

@@ -37,6 +37,22 @@ body on demand. Coding and Standard agents use the same RunGrants skill snapshot
 and fail closed on invalid metadata, unreadable saved pages, or oversized content.
 Each run allows at most 32 enabled skills and 256 KiB / 65536 estimated tokens
 for the entire serialized skill grant set, including metadata and JSON escaping.
+New configurations accept at most 32 distinct attached skills, including disabled
+ones. Agent Studio validation checks the enabled snapshot's full aggregate budget
+and saved page readability before allowing Ready; reducing content can restore
+readiness without detaching a skill.
+
+Upgrade/recovery note: older deployments may already have bindings over these
+limits. No attachments are deleted during upgrade, but runs now fail closed rather
+than silently omitting required guidance. Validate existing profiles before their
+next run. A `skill_snapshot_invalid` readiness error points to the skill settings:
+detach or disable excess enabled skills, shorten skill bodies or reviewed saved
+page snapshots, or repair unreadable skills, then validate and activate again.
+Replacement attachment lists must contain at most 32 distinct IDs. Editing the
+source page alone does not shrink its saved snapshot; refresh the skill's reviewed
+page references as well. Runtime validation remains the final guard against skill
+edits after readiness validation.
+
 Private profile tests remain
 read-only and are not a replacement for a real draft/review qualification.
 

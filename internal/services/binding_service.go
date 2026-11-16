@@ -438,6 +438,9 @@ func (s *BindingService) Create(ctx context.Context, req CreateBindingRequest) (
 	if len(req.SkillIDs) > 0 && s.skills == nil {
 		return nil, ErrBindingSkillsUnavailable
 	}
+	if err := agentskills.ValidateAttachmentCount(req.SkillIDs); err != nil {
+		return nil, err
+	}
 	identity, err := s.identity.Resolve(ctx, req.CreatedByUserID, req.ActingUserID, req.WorkspaceID)
 	if err != nil {
 		return nil, err
@@ -627,6 +630,9 @@ func (s *BindingService) UpdateBinding(ctx context.Context, req UpdateBindingReq
 	if len(req.SkillIDs) > 0 && s.skills == nil {
 		return nil, ErrBindingSkillsUnavailable
 	}
+	if err := agentskills.ValidateAttachmentCount(req.SkillIDs); err != nil {
+		return nil, err
+	}
 	repos, err := normalizeRepoInputs(req.Repos)
 	if err != nil {
 		return nil, err
@@ -707,6 +713,9 @@ func (s *BindingService) UpdateAgentConfig(ctx context.Context, workspaceID, bin
 	}
 	if binding.Lifecycle == models.AgentLifecycleArchived {
 		return ErrBindingUnavailable
+	}
+	if err := agentskills.ValidateAttachmentCount(skillIDs); err != nil {
+		return err
 	}
 	var newRunnerImage string
 	if runnerImage != nil {

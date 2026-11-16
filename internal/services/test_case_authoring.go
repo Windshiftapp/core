@@ -2,7 +2,6 @@ package services
 
 import (
 	"database/sql"
-	"errors"
 	"strings"
 	"time"
 
@@ -39,14 +38,48 @@ func (s *TestCaseService) validateAuthoredContent(workspaceID int, format string
 				return &TestManagementValidationError{Msg: "label IDs must be unique"}
 			}
 			seen[id] = true
-			exists, err := s.repo.LabelExists(id, workspaceID)
-			if err != nil {
-				return err
-			}
-			if !exists {
-				return repository.ErrNotFound
-			}
 		}
+		return validateAuthoredLabels(s.db, workspaceID, *labels, false)
+	}
+	return nil
+}
+
+type authoredLabelReader interface {
+	Query(string, ...any) (*sql.Rows, error)
+}
+
+func validateAuthoredLabels(reader authoredLabelReader, workspaceID int, ids []int, lock bool) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
+	args := make([]any, 0, len(ids)+1)
+	args = append(args, workspaceID)
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	query := "SELECT id FROM test_labels WHERE workspace_id = ? AND id IN (" + placeholders + ") ORDER BY id"
+	if lock {
+		query += " FOR KEY SHARE"
+	}
+	rows, err := reader.Query(query, args...)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	count := 0
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		count++
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if count != len(ids) {
+		return repository.ErrNotFound
 	}
 	return nil
 }
@@ -54,20 +87,9 @@ func (s *TestCaseService) validateAuthoredContent(workspaceID int, format string
 // Explicit arrays replace authored steps and labels; omitted arrays preserve them.
 func (s *TestCaseService) writeAuthoredContent(tx database.Tx, workspaceID, caseID int, steps *[]TestStepCreateRequest, labels *[]int) error {
 	if labels != nil {
-		query := "SELECT id FROM test_labels WHERE id = ? AND workspace_id = ?"
 		// SQLite serializes writers; PostgreSQL needs row locks through label insertion.
-		if s.db.GetDriverName() == "postgres" {
-			query += " FOR KEY SHARE"
-		}
-		for _, id := range *labels {
-			var found int
-			err := tx.QueryRow(query, id, workspaceID).Scan(&found)
-			if errors.Is(err, sql.ErrNoRows) {
-				return repository.ErrNotFound
-			}
-			if err != nil {
-				return err
-			}
+		if err := validateAuthoredLabels(tx, workspaceID, *labels, s.db.GetDriverName() == "postgres"); err != nil {
+			return err
 		}
 	}
 	if steps != nil {

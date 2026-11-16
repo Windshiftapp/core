@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"windshift/internal/agentskills"
 	"windshift/internal/agentstudio"
 	"windshift/internal/auth"
 	"windshift/internal/database"
@@ -290,6 +291,9 @@ func (s *BindingService) CreateStudioProfile(ctx context.Context, req CreateStud
 	if req.WorkspaceID <= 0 || req.CreatedByUserID <= 0 {
 		return nil, errors.New("agent profile: workspace and creator are required")
 	}
+	if err := agentskills.ValidateAttachmentCount(req.SkillIDs); err != nil {
+		return nil, err
+	}
 	template, ok := s.prompts.AgentTemplate(strings.TrimSpace(req.TemplateKey))
 	if !ok {
 		return nil, ErrAgentProfileInvalidTemplate
@@ -554,6 +558,12 @@ func (s *BindingService) ValidateStudioProfile(ctx context.Context, workspaceID,
 		})
 	}
 	s.validateProfilePermissions(binding, result)
+	if _, err := s.snapshotBindingSkills(ctx, binding); err != nil {
+		result.Errors = append(result.Errors, ProfileValidationError{
+			Code: "skill_snapshot_invalid", Message: err.Error(), Dependency: "skills",
+			Hint: "In the agent's skill configuration, detach or disable excess skills, shorten their bodies or saved page snapshots, or repair unreadable skills; then validate again. Limits: 32 enabled skills and 256 KiB / 65536 estimated tokens for the serialized set.",
+		})
+	}
 
 	switch binding.ProfileType {
 	case models.AgentProfileStandard:

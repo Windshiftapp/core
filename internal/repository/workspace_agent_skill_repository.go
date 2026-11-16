@@ -154,8 +154,9 @@ func (r *WorkspaceAgentSkillRepository) ListForWorkspace(ctx context.Context, wo
 	return out, rows.Err()
 }
 
-// ListEnabledForBinding reads one overflow sentinel beyond the snapshot skill cap.
-func (r *WorkspaceAgentSkillRepository) ListEnabledForBinding(ctx context.Context, bindingID int) ([]*models.WorkspaceAgentSkill, error) {
+// ListEnabledForBindingSnapshot returns at most MaxSnapshotSkills+1 rows, not a complete list.
+// The extra row lets snapshot validation detect oversized legacy bindings.
+func (r *WorkspaceAgentSkillRepository) ListEnabledForBindingSnapshot(ctx context.Context, bindingID int) ([]*models.WorkspaceAgentSkill, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT s.id, s.workspace_id, s.name, s.description, s.body, s.enabled,
 		       s.created_by_user_id, s.created_at, s.updated_at
@@ -206,6 +207,10 @@ func (r *WorkspaceAgentSkillRepository) SkillIDsForBinding(ctx context.Context, 
 // rejected, so an admin cannot attach a foreign workspace's skill by
 // guessing ids.
 func (r *WorkspaceAgentSkillRepository) ReplaceBindingSkills(ctx context.Context, bindingID, workspaceID int, skillIDs []int) error {
+	if err := agentskills.ValidateAttachmentCount(skillIDs); err != nil {
+		return err
+	}
+	skillIDs = uniqueInts(skillIDs)
 	if len(skillIDs) > 0 {
 		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(skillIDs)), ",")
 		args := make([]any, 0, len(skillIDs)+1)
@@ -220,14 +225,14 @@ func (r *WorkspaceAgentSkillRepository) ReplaceBindingSkills(ctx context.Context
 			args...).Scan(&n); err != nil {
 			return fmt.Errorf("validate skill ids: %w", err)
 		}
-		if n != len(uniqueInts(skillIDs)) {
+		if n != len(skillIDs) {
 			return ErrBindingSkillNotInWorkspace
 		}
 	}
 	if _, err := r.db.ExecWriteContext(ctx, `DELETE FROM workspace_agent_binding_skills WHERE binding_id = ?`, bindingID); err != nil {
 		return fmt.Errorf("clear binding skills: %w", err)
 	}
-	for _, id := range uniqueInts(skillIDs) {
+	for _, id := range skillIDs {
 		if _, err := r.db.ExecWriteContext(ctx, `
 			INSERT INTO workspace_agent_binding_skills (binding_id, skill_id) VALUES (?, ?)
 		`, bindingID, id); err != nil {
