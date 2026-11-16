@@ -559,7 +559,7 @@
           </TableHeaderBar>
 
           <!-- Tree Items -->
-          <div bind:this={treeListElement} style="--divide-color: var(--ds-border); overflow-anchor: none;">
+          <div bind:this={treeListElement} data-testid="tree-rows" data-row-count={treeData.length} style="--divide-color: var(--ds-border); overflow-anchor: none;">
             <VirtualRows items={treeData} getKey={collectionTreeRowKey}
               listElement={treeListElement}
               identity={`tree:${workspaceId ?? ''}:${collectionId ?? ''}:${collectionStore.effectiveSubFilterQL}:${collectionStore.hierarchyLevel ?? ''}`}

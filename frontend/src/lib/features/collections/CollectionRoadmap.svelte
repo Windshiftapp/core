@@ -1443,6 +1443,7 @@
             <div
               class="flex-1 overflow-y-auto overflow-x-hidden tree-scroll"
               data-testid="roadmap-tree-scroll"
+              data-row-count={treeData.length}
               style={`margin-bottom: ${horizontalScrollbarHeight}px; overflow-anchor: none;`}
               bind:this={treeScrollContainer}
               onscroll={syncTreeScroll}
