@@ -104,21 +104,27 @@
     }, SLOW_START_MS);
 
     try {
-      // Initialize i18n (loads user's preferred locale) and instance branding
-      // (public, no auth). Branding drives the browser tab title and the
-      // sidebar text on every surface, including pre-auth.
-      await Promise.all([
-        withBootstrapDeadline(i18n.init()),
-        brandStore.load({ timeout: BOOTSTRAP_TIMEOUT_MS }),
+      // Load locale, branding, and setup together. Apply startup copy and the
+      // title even if the setup request is still pending or has failed.
+      const [, setupComplete] = await Promise.all([
+        Promise.all([
+          withBootstrapDeadline(i18n.init()),
+          brandStore.load({ timeout: BOOTSTRAP_TIMEOUT_MS }),
+        ]).then(() => {
+          if (attempt !== startupAttempt) return;
+          i18nReady = true;
+          if (typeof document !== 'undefined') {
+            document.title = brandStore.siteTitle;
+          }
+        }),
+        checkSetupStatus(),
       ]);
-      i18nReady = true;
-      if (typeof document !== 'undefined') {
-        document.title = brandStore.siteTitle;
-      }
-
-      // Check setup status first
-      await checkSetupStatus();
       if (attempt !== startupAttempt) return;
+
+      setupCompleted = setupComplete;
+      if (!setupCompleted) {
+        showWelcomeAssistant = true;
+      }
 
       // Only initialize auth if setup is completed. A transport error is not a
       // logout: authStore returns it so the startup UI can offer a retry.
@@ -365,10 +371,7 @@
     // behind the vite proxy), making a fresh, unconfigured instance look
     // already set up and silently skipping the setup wizard.
     const status = await setup.getStatus({ timeout: BOOTSTRAP_TIMEOUT_MS });
-    setupCompleted = status.setup_completed;
-    if (!status.setup_completed) {
-      showWelcomeAssistant = true;
-    }
+    return status.setup_completed;
   }
 
   async function loadAndApplyTheme(isAuthenticated, generation) {
