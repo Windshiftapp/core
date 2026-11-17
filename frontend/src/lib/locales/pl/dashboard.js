@@ -109,6 +109,7 @@ export default {
       namePlaceholder: 'Moja otwarta praca',
       promptLabel: 'Co ma pokazywać?',
       promptPlaceholder: 'Elementy, które mam jeszcze do zrobienia, z liczbami i tabelą',
+      chartTypesHint: 'Typy wykresów: słupkowy, liniowy, kołowy lub pierścieniowy, postęp. Także tabela, wskaźnik i strumień aktywności.',
       generate: 'Generuj',
       generating: 'Generowanie...',
       itemQueryLabel: 'Zapytanie o elementy (CQL)',

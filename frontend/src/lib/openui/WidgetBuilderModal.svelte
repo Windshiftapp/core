@@ -29,8 +29,10 @@
   const parser = createParser(widgetLibrary.toJSONSchema());
   const examplePrompts = [
     'My open work, with counts and a table',
-    'Items completed per assignee over the last 30 days',
-    'Overdue items grouped by priority',
+    'Line chart of items created per week',
+    'Bar chart of open items per status',
+    'Pie chart of open items by priority',
+    'Progress bars of completed items per assignee',
   ];
 
   let loading = $state(false);
@@ -341,6 +343,9 @@
             </button>
           {/each}
         </div>
+        <p class="text-xs text-ds-text-subtle" data-testid="widget-builder-chart-types">
+          {t('dashboard.widgetBuilder.chartTypesHint')}
+        </p>
       {:else}
         <p class="text-xs" style="color: var(--ds-text-subtle);" data-testid="widget-builder-ai-unavailable">
           {isEditing

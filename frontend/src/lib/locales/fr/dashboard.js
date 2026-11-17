@@ -109,6 +109,7 @@ export default {
       namePlaceholder: "Mon travail en cours",
       promptLabel: "Que doit-il afficher ?",
       promptPlaceholder: "Mes taches en cours, avec chiffres et tableau",
+      chartTypesHint: "Types de graphique : barres, courbe, camembert ou anneau, progression. Aussi tableau, indicateur et fil d'activité.",
       generate: "Generer",
       generating: "Generation...",
       itemQueryLabel: "Requete elements (CQL)",

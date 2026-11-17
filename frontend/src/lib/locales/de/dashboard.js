@@ -109,6 +109,7 @@ export default {
       namePlaceholder: "Meine offene Arbeit",
       promptLabel: "Was soll es zeigen?",
       promptPlaceholder: "Offene Aufgaben mit Zahlen und Tabelle",
+      chartTypesHint: "Diagrammtypen: Balken, Linie, Kreis oder Donut, Fortschritt. Auch Tabelle, Kennzahl und Aktivitätsverlauf.",
       generate: "Erzeugen",
       generating: "Wird erzeugt...",
       itemQueryLabel: "Element-Abfrage (CQL)",

@@ -109,6 +109,7 @@ export default {
       namePlaceholder: "My open work",
       promptLabel: "What should it show?",
       promptPlaceholder: "Items I still owe, with counts and a table",
+      chartTypesHint: "Chart types: bar, line, pie or donut, progress. Also table, metric, and activity feed.",
       generate: "Generate",
       generating: "Generating...",
       itemQueryLabel: "Item query (CQL)",
