@@ -15,6 +15,7 @@
     onresize = null,
     onresizeend = null,
     oncollapsechange = null,
+    ontoggle = null,
   } = $props();
 
   let isResizing = $state(false);
@@ -22,6 +23,9 @@
   let resizeStartWidth = 0;
   let liveWidth = $state(0);
   let liveCollapsed = $state(false);
+  // A pointerup that never moved is a click, not a drag, and may toggle the
+  // sidebar instead of resizing it.
+  let dragMoved = false;
   /** @type {number | null} */
   let resizePointerId = null;
 
@@ -66,6 +70,7 @@
     liveWidth = clampWidth(width);
     liveCollapsed = canCollapse && collapsed;
     resizePointerId = event.pointerId;
+    dragMoved = false;
     isResizing = true;
     const handle = /** @type {HTMLElement} */ (event.currentTarget);
     handle.setPointerCapture?.(event.pointerId);
@@ -74,6 +79,7 @@
   /** @param {PointerEvent} event */
   function resize(event) {
     if (!isResizing || event.pointerId !== resizePointerId) return;
+    if (Math.abs(event.clientX - resizeStartX) > 3) dragMoved = true;
     const rawWidth = resizeStartWidth + (event.clientX - resizeStartX) * resizeDirection;
     const shouldCollapse = canCollapse && rawWidth < collapseThreshold;
     publish(shouldCollapse ? liveWidth : rawWidth, shouldCollapse);
@@ -88,9 +94,11 @@
       && resizePointerId !== null
       && event.pointerId !== resizePointerId
     ) return;
+    const toggled = !dragMoved && event?.type === 'pointerup';
     isResizing = false;
     resizePointerId = null;
     onresizeend?.(liveWidth, liveCollapsed);
+    if (toggled) ontoggle?.();
   }
 
   /** @param {number} nextWidth @param {boolean} nextCollapsed */
