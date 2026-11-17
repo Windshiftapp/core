@@ -60,7 +60,7 @@
       <div class="state">{t('actions.templates.empty', 'No templates available.')}</div>
     {:else}
       <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">
-        {t('actions.templates.help', 'Apply a shipped automation blueprint to this workspace. Each apply creates a new action you can edit afterwards.')}
+        {t('actions.templates.help', 'Apply a blueprint to this workspace. Each apply creates a new action you can edit.')}
       </p>
       <div class="template-list">
         {#each templates as tmpl (tmpl.key)}

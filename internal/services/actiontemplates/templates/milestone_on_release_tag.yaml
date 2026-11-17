@@ -1,19 +1,17 @@
 key: milestone_on_release_tag
 name: Promote milestone + attach issues when matching tag appears
 description: |
-  When a tag matching the workspace repository's milestone_tag_pattern
-  (default v*) appears, upsert the workspace milestone keyed by
-  {{ref.short}}. An existing milestone created earlier from a release/*
-  branch is promoted to "in-progress" and a milestone_releases row is
-  written; if no prior milestone exists, one is created at that status.
+  When a tag matching the repository's milestone_tag_pattern (default v*)
+  appears, upsert the milestone keyed by {{ref.short}}. A milestone from a
+  release/* branch is promoted to "in-progress" and a milestone_releases
+  row is written; otherwise one is created at that status.
 
-  When the tag has a predecessor (ref.prev_name), the executor walks
-  commits in (prev_tag, this_tag] and auto-attaches any items referenced
-  in their messages (e.g. "WS-42") to the milestone — the "what shipped
-  in this release" view.
+  If the tag has a predecessor (ref.prev_name), the executor walks commits
+  in (prev_tag, this_tag] and auto-attaches items referenced in their
+  messages (e.g. "WS-42") — the "what shipped in this release" view.
 
-  Pair with "Create planning milestone from release branch" if your team
-  cuts a release/* branch before tagging; the upsert key pairs them.
+  Pair with "Create planning milestone from release branch" if you branch
+  before tagging; the upsert key pairs them.
 category: SCM automation
 trigger_type: scm_tag_created
 trigger_config: {}

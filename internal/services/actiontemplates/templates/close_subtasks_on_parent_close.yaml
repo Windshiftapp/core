@@ -1,11 +1,10 @@
 key: close_subtasks_on_parent_close
 name: Close subtasks when parent closes
 description: |
-  When an item moves to a terminal status, recursively close all of its
-  subtasks by transitioning each one to the matching terminal status in
-  its own workflow. Crosses workspace boundaries when the actor has edit
-  permission; descendants in workspaces the actor cannot edit are skipped
-  and logged in the execution trace.
+  When an item reaches a terminal status, recursively transition its
+  subtasks to the matching terminal status in their own workflows. Works
+  across workspaces when the actor can edit; descendants the actor cannot
+  edit are skipped and logged.
 category: Item lifecycle
 trigger_type: status_transition
 trigger_config:

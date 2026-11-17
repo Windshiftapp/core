@@ -31,7 +31,7 @@ export default {
       pickTitle: 'Choose an action template',
       fromTemplate: 'From template',
       empty: 'No templates available.',
-      help: 'Apply a shipped automation blueprint to this workspace. Each apply creates a new action you can edit afterwards.',
+      help: 'Apply a blueprint to this workspace. Each apply creates a new action you can edit.',
       apply: 'Apply',
     },
 

@@ -1,14 +1,14 @@
 key: milestone_on_release_branch
 name: Create planning milestone from release branch
 description: |
-  When a branch matching the workspace repository's milestone_branch_pattern
-  (default release/*) appears, upsert a workspace milestone keyed by
-  {{ref.short}} (so "release/2.0" becomes milestone "2.0"). New milestones
-  start in "planning"; an existing milestone with the same external_key
-  is left alone so repeated pushes don't downgrade an in-progress release.
+  When a branch matching the repository's milestone_branch_pattern (default
+  release/*) appears, upsert a milestone keyed by {{ref.short}} —
+  "release/2.0" becomes "2.0". New milestones start in "planning"; existing
+  ones are left alone, so repeated pushes don't downgrade an in-progress
+  release.
 
-  Pair with "Promote milestone when matching tag appears" so the tag
-  promotes this milestone instead of creating a parallel one.
+  Pair with "Promote milestone when matching tag appears" to promote this
+  milestone instead of creating a parallel one.
 category: SCM automation
 trigger_type: scm_release_branch_created
 trigger_config: {}
