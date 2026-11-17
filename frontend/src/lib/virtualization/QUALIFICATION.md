@@ -67,12 +67,12 @@ folded into this item; the full suite must not be described as green.
 Browser commands executed with user approval outside the restricted sandbox:
 
 ```sh
-E2E_KEEP_ARTIFACTS=1 ../core-tests/run-e2e.sh tests/collection-tree-pagination.spec.ts tests/roadmap-scheduling.spec.ts tests/support-queue.spec.ts
-E2E_KEEP_ARTIFACTS=1 ../core-tests/run-e2e.sh tests/roadmap-scheduling.spec.ts
-E2E_KEEP_ARTIFACTS=1 ../core-tests/run-e2e.sh tests/virtual-rows.spec.ts tests/board-drag-workflow.spec.ts tests/collection-map-swimlanes.spec.ts tests/backlog-story-points-availability.spec.ts tests/collection-roadmap-sse-live.spec.ts
-E2E_KEEP_ARTIFACTS=1 ../core-tests/run-e2e.sh tests/virtual-rows.spec.ts tests/backlog-virtual-drag.spec.ts
-E2E_KEEP_ARTIFACTS=1 ../core-tests/run-e2e.sh tests/backlog-virtual-drag.spec.ts
-E2E_KEEP_ARTIFACTS=1 ../core-tests/run-e2e.sh tests/virtual-rows.spec.ts
+CORE_DIR="$PWD" E2E_KEEP_ARTIFACTS=1 ../core-tests/run-e2e.sh tests/collection-tree-pagination.spec.ts tests/roadmap-scheduling.spec.ts tests/support-queue.spec.ts
+CORE_DIR="$PWD" E2E_KEEP_ARTIFACTS=1 ../core-tests/run-e2e.sh tests/roadmap-scheduling.spec.ts
+CORE_DIR="$PWD" E2E_KEEP_ARTIFACTS=1 ../core-tests/run-e2e.sh tests/virtual-rows.spec.ts tests/board-drag-workflow.spec.ts tests/collection-map-swimlanes.spec.ts tests/backlog-story-points-availability.spec.ts tests/collection-roadmap-sse-live.spec.ts
+CORE_DIR="$PWD" E2E_KEEP_ARTIFACTS=1 ../core-tests/run-e2e.sh tests/virtual-rows.spec.ts tests/backlog-virtual-drag.spec.ts
+CORE_DIR="$PWD" E2E_KEEP_ARTIFACTS=1 ../core-tests/run-e2e.sh tests/backlog-virtual-drag.spec.ts
+CORE_DIR="$PWD" E2E_KEEP_ARTIFACTS=1 ../core-tests/run-e2e.sh tests/virtual-rows.spec.ts
 ```
 
 - Tree pagination and five queue workflows passed in the initial combined run.
