@@ -70,6 +70,10 @@
             <span class="text-sm" style="color: var(--ds-text);">Online</span>
           </div>
           <div class="flex items-center gap-2">
+            <ColorDot color="#22C55E" size="sm" pulse />
+            <span class="text-sm text-ds-text">Active (pulsing)</span>
+          </div>
+          <div class="flex items-center gap-2">
             <ColorDot color="#EAB308" size="sm" />
             <span class="text-sm" style="color: var(--ds-text);">Away</span>
           </div>
@@ -162,6 +166,11 @@
             <td class="p-2"><code>size</code></td>
             <td class="p-2">'xs' | 'sm' | 'md'</td>
             <td class="p-2">'sm'</td>
+          </tr>
+          <tr class="border-b border-ds-border">
+            <td class="p-2"><code>pulse</code></td>
+            <td class="p-2">boolean</td>
+            <td class="p-2">false</td>
           </tr>
           <tr>
             <td class="p-2"><code>class</code></td>

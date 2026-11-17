@@ -2,6 +2,7 @@
   let {
     color = '#9CA3AF',
     size = 'sm', // 'xs', 'sm', 'md'
+    pulse = false, // subtle opacity pulse for live/active states
     class: className = ''
   } = $props();
 
@@ -13,6 +14,6 @@
 </script>
 
 <div
-  class="{sizeClasses} rounded-full flex-shrink-0 {className}"
+  class="{sizeClasses} rounded-full flex-shrink-0 {pulse ? 'motion-safe:animate-pulse' : ''} {className}"
   style="background-color: {color};"
 ></div>

@@ -347,8 +347,11 @@
     <!-- Tab Content -->
     <div class="pt-6" bind:this={tabPanelElement}>
       {#if tab === 'comments'}
-        <ItemAgentRunIndicator itemId={item.id} onOpenLog={() => switchTab('agent-log')} />
-        <Comments itemId={item.id} workspaceId={item.workspace_id} isPersonalWorkspace={workspace?.is_personal} isPortalRequest={!!item.request_type_id} isExternalRequest={isExternalRequest(item)} enableInternalComments={workspace?.internal_comments_enabled} onCommentsLoaded={handleCommentsLoaded} />
+        <Comments itemId={item.id} workspaceId={item.workspace_id} isPersonalWorkspace={workspace?.is_personal} isPortalRequest={!!item.request_type_id} isExternalRequest={isExternalRequest(item)} enableInternalComments={workspace?.internal_comments_enabled} onCommentsLoaded={handleCommentsLoaded}>
+          {#snippet headerLeft()}
+            <ItemAgentRunIndicator itemId={item.id} onOpenLog={() => switchTab('agent-log')} />
+          {/snippet}
+        </Comments>
       {:else if tab === 'details'}
         <div class="grid gap-8" data-testid="item-details-overview">
           <section class="overflow-hidden rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface-raised)]" aria-label={t('items.healthOverview')}>

@@ -31,7 +31,7 @@
 	// Get shortcut configuration (use same as description save)
 	const submitShortcut = getShortcut('description', 'save');
 
-	let { itemId, workspaceId = null, isPersonalWorkspace = false, isPortalRequest = false, isExternalRequest = false, enableInternalComments = false, onCommentsLoaded } = $props();
+	let { itemId, workspaceId = null, isPersonalWorkspace = false, isPortalRequest = false, isExternalRequest = false, enableInternalComments = false, onCommentsLoaded, headerLeft = undefined } = $props();
 
 	let comments = $state([]);
 	let newCommentContent = $state('');
@@ -507,35 +507,38 @@
 		</div>
 	{/if}
 
-	<!-- Sort Toggle + new-comments badge -->
-	{#if comments.length > 1 || newCount > 0}
-		<div class="flex items-center justify-end gap-2 mb-4">
-			{#if newCount > 0}
-				<button
-					onclick={dismissNewBadge}
-					data-testid="new-comments-badge"
-					data-new-count={newCount}
-					class="flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors hover:opacity-80"
-					style="background: var(--ds-info-bg, #dbeafe); color: var(--ds-info-text, #1e40af);"
-					title={t('common.close')}
-				>
-					<ColorDot size="xs" color="currentColor" />
-					{t('comments.newCommentsAvailable', { count: newCount })}
-				</button>
-			{/if}
-			{#if comments.length > 1}
-				<button
-					onclick={toggleSortOrder}
-					data-testid="comments-sort-toggle"
-					class="flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors hover:bg-[var(--ds-bg-subtle)]"
-					style="color: var(--ds-text-subtle);"
-				>
-					<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
-					</svg>
-					{sortOrder === 'oldest' ? t('comments.oldestFirst') : t('comments.newestFirst')}
-				</button>
-			{/if}
+	<!-- Agent status + new-comments badge + sort toggle -->
+	{#if headerLeft || comments.length > 1 || newCount > 0}
+		<div class="flex items-center justify-between gap-2 mb-4">
+			{@render headerLeft?.()}
+			<div class="ml-auto flex items-center gap-2">
+				{#if newCount > 0}
+					<button
+						onclick={dismissNewBadge}
+						data-testid="new-comments-badge"
+						data-new-count={newCount}
+						class="flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors hover:opacity-80"
+						style="background: var(--ds-info-bg, #dbeafe); color: var(--ds-info-text, #1e40af);"
+						title={t('common.close')}
+					>
+						<ColorDot size="xs" color="currentColor" />
+						{t('comments.newCommentsAvailable', { count: newCount })}
+					</button>
+				{/if}
+				{#if comments.length > 1}
+					<button
+						onclick={toggleSortOrder}
+						data-testid="comments-sort-toggle"
+						class="flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors hover:bg-[var(--ds-bg-subtle)]"
+						style="color: var(--ds-text-subtle);"
+					>
+						<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+						</svg>
+						{sortOrder === 'oldest' ? t('comments.oldestFirst') : t('comments.newestFirst')}
+					</button>
+				{/if}
+			</div>
 		</div>
 	{/if}
 

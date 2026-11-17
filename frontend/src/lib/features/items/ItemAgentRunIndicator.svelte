@@ -43,14 +43,15 @@
   {@const running = activeRun.status === 'running'}
   <button
     type="button"
-    class="mb-4 inline-flex items-center gap-1.5 rounded text-xs text-ds-text-subtle transition-colors hover:text-ds-text"
+    class="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors hover:opacity-80 {running ? 'bg-ds-status-success-bg text-ds-status-success-text' : 'bg-ds-status-neutral-bg text-ds-status-neutral-text'}"
     onclick={() => onOpenLog?.()}
     title={t('items.agentLog')}
     data-testid="item-agent-run-indicator"
   >
     <ColorDot
       color={running ? 'var(--ds-status-success-solid)' : 'var(--ds-accent-gray)'}
-      size="sm"
+      size="xs"
+      pulse={running}
     />
     <span>{running ? t('items.agentRunning') : t('items.agentQueued')}</span>
   </button>
