@@ -109,7 +109,7 @@ export default {
       "namePlaceholder": "کار باز من",
       "promptLabel": "چه چیزی را باید نشان دهد؟",
       "promptPlaceholder": "اقلامی که هنوز بدهکارم، با شمارش و جدول",
-      "chartTypesHint": "انواع نمودار: میله‌ای، خطی، دایره‌ای یا دونات، پیشرفت. همچنین جدول، معیار و جریان فعالیت.",
+      "chartTypesHint": "میله‌ای · خطی · دایره‌ای · دونات · پیشرفت",
       "generate": "ایجاد کنید",
       "generating": "در حال تولید...",
       "itemQueryLabel": "پرس و جو مورد (CQL)",

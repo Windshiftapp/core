@@ -109,7 +109,7 @@ export default {
       namePlaceholder: 'Il mio lavoro aperto',
       promptLabel: 'Cosa deve mostrare?',
       promptPlaceholder: 'Elementi che devo ancora completare, con conteggi e una tabella',
-      chartTypesHint: 'Tipi di grafico: barre, linea, torta o ciambella, avanzamento. Inoltre tabella, metrica e flusso attività.',
+      chartTypesHint: 'Barre · Linea · Torta · Ciambella · Avanzamento',
       generate: 'Genera',
       generating: 'Generazione...',
       itemQueryLabel: 'Query sugli elementi (CQL)',

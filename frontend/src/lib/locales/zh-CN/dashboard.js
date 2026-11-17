@@ -109,7 +109,7 @@ export default {
       namePlaceholder: "我的待办工作",
       promptLabel: "它应该显示什么？",
       promptPlaceholder: "我的未完成事项，含计数和表格",
-      chartTypesHint: "图表类型：柱状图、折线图、饼图或环形图、进度。也支持表格、指标和活动动态。",
+      chartTypesHint: "柱状图 · 折线图 · 饼图 · 环形图 · 进度",
       generate: "生成",
       generating: "生成中...",
       itemQueryLabel: "工作项查询 (CQL)",
