@@ -59,6 +59,7 @@ var componentNames = map[string]struct{}{
 	"MetricRow":     {},
 	"NetworkGraph":  {},
 	"PieChart":      {},
+	"ProgressChart": {},
 	"ProgressList":  {},
 	"Section":       {},
 	"Stack":         {},

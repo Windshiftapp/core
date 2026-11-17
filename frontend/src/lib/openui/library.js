@@ -29,6 +29,7 @@ import Metric from './components/Metric.svelte';
 import MetricRow from './components/MetricRow.svelte';
 import NetworkGraph from './components/NetworkGraph.svelte';
 import PieChart from './components/PieChart.svelte';
+import ProgressChart from './components/ProgressChart.svelte';
 import ProgressList from './components/ProgressList.svelte';
 import Section from './components/Section.svelte';
 import Stack from './components/Stack.svelte';
@@ -268,6 +269,23 @@ const ProgressListDef = defineComponent({
   component: ProgressList,
 });
 
+const ProgressChartDef = defineComponent({
+  name: 'ProgressChart',
+  description:
+    'One completion percentage: the completed_query count over the query count. Use it for release or milestone progress.',
+  props: z.object({
+    query,
+    completed_query: z.string().describe('CQL filter for the completed subset of query.'),
+    label: z
+      .string()
+      .optional()
+      .describe('Caption above the percentage, for example the release name.'),
+    limit,
+    entity,
+  }),
+  component: ProgressChart,
+});
+
 const ActivityFeedDef = defineComponent({
   name: 'ActivityFeed',
   description: 'A reverse-chronological list of recently updated items or assets.',
@@ -366,6 +384,7 @@ const contentDefs = [
   BarChartDef,
   LineChartDef,
   PieChartDef,
+  ProgressChartDef,
   ProgressListDef,
   ActivityFeedDef,
   BipartiteListDef,
@@ -436,6 +455,7 @@ export const widgetLibrary = createLibrary({
         'BarChart',
         'LineChart',
         'PieChart',
+        'ProgressChart',
         'ProgressList',
         'ActivityFeed',
       ],
@@ -465,6 +485,7 @@ export const componentNames = [
   'MetricRow',
   'NetworkGraph',
   'PieChart',
+  'ProgressChart',
   'ProgressList',
   'Section',
   'Stack',

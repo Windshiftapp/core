@@ -32,7 +32,7 @@
     'Line chart of items created per week',
     'Bar chart of open items per status',
     'Pie chart of open items by priority',
-    'Progress bars of completed items per assignee',
+    'Release progress as a percentage',
   ];
 
   let loading = $state(false);

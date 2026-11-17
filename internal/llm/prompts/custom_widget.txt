@@ -49,6 +49,7 @@ Data:
 - `LineChart(query?, field?, bucket?, sort?, limit?, metric?, entity?)` — `bucket`: day|week|month, `field` is the date field (default `created_at`)
 - `PieChart(query?, group_by, sort?, limit?, metric?, field?, group_limit?, donut?, entity?, link_mode?)` — share-of-total pie; use it only when the request says pie or donut, otherwise `BarChart` compares better
 - `ProgressList(query?, group_by, sort?, limit?, metric?, field?, group_limit?, entity?, link_mode?)` — share-of-total bars
+- `ProgressChart(query?, completed_query, label?, limit?, entity?)` — one completion percentage: the `completed_query` count over the `query` count. Use it for release or milestone progress; both counts come from the server, so it needs no rows and a small limit is enough.
 - `ActivityFeed(query?, sort?, limit?, entity?)`
 
 Graph (item-to-asset relationships):
@@ -175,6 +176,20 @@ root = Card([
 
 ```
 {"item": {"ql": "createdAt >= -30d", "limit": 1000}}
+```
+
+Release progress as a percentage — completed items over all items in the
+milestone. The label names the release, and the small limit is enough because
+only the server totals are used:
+
+```
+root = Card([
+  ProgressChart("milestone = \"v1.0\"", "milestone = \"v1.0\" AND status_completed = true", "v1.0", 1)
+])
+```
+
+```
+{"item": {"ql": "milestone = \"v1.0\"", "limit": 1}}
 ```
 
 Throughput by status over the last month:
