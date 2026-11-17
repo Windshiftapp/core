@@ -1,4 +1,4 @@
-import { milestones } from '../api/milestones.js';
+import { milestones } from '../api/planning.js';
 import { createEntityStore } from './entityStoreFactory.js';
 
 // Create base store using factory (with set exposed for direct updates)

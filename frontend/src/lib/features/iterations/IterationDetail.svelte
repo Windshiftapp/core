@@ -10,7 +10,7 @@
   import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
   import IconCircleCheck from '@tabler/icons-svelte-runes/icons/circle-check';
   import IterationBurndown from './IterationBurndown.svelte';
-  import { iterations } from '../../api/milestones.js';
+  import { iterations } from '../../api/planning.js';
   import { navigate } from '../../router.js';
   import Button from '../../components/Button.svelte';
   import Lozenge from '../../components/Lozenge.svelte';

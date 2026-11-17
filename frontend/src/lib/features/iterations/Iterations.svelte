@@ -18,7 +18,7 @@
   import { preservePlanningScope } from '../../utils/planningScope.js';
   import IterationNavigation from './IterationNavigation.svelte';
   import { formatDateShort } from '../../utils/dateFormatter.js';
-  import { iterationTypes as iterationTypesApi, iterations as iterationsApi } from '../../api/milestones.js';
+  import { iterationTypes as iterationTypesApi, iterations as iterationsApi } from '../../api/planning.js';
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import { currentRoute, navigate } from '../../router.js';

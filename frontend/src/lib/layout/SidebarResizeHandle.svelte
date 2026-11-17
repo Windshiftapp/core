@@ -4,7 +4,6 @@
     minWidth,
     maxWidth,
     defaultWidth,
-    keyboardStep = 16,
     edge = 'right',
     collapsed = false,
     collapsedWidth = 48,
@@ -33,8 +32,6 @@
     Number.isFinite(collapseThreshold) && collapsedWidth < minWidth
   );
   const resizeDirection = $derived(edge === 'left' ? -1 : 1);
-  const displayedWidth = $derived(collapsed ? collapsedWidth : clampWidth(width));
-  const ariaMinWidth = $derived(canCollapse ? collapsedWidth : minWidth);
 
   $effect(() => {
     if (isResizing) return;
@@ -101,51 +98,14 @@
     if (toggled) ontoggle?.();
   }
 
-  /** @param {number} nextWidth @param {boolean} nextCollapsed */
-  function publishAndCommit(nextWidth, nextCollapsed) {
-    publish(nextWidth, nextCollapsed);
-    onresizeend?.(liveWidth, liveCollapsed);
-  }
-
-  /** @param {KeyboardEvent} event */
-  function resizeWithKeyboard(event) {
-    let nextWidth = liveWidth;
-    let nextCollapsed = liveCollapsed;
-
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-      const physicalDelta = event.key === 'ArrowLeft' ? -keyboardStep : keyboardStep;
-      const widthDelta = physicalDelta * resizeDirection;
-      if (liveCollapsed) {
-        if (widthDelta < 0) return;
-        nextWidth = minWidth;
-        nextCollapsed = false;
-      } else if (canCollapse && liveWidth <= minWidth && widthDelta < 0) {
-        nextCollapsed = true;
-      } else {
-        nextWidth += widthDelta;
-      }
-    } else if (event.key === 'Home') {
-      nextWidth = minWidth;
-      nextCollapsed = canCollapse;
-    } else if (event.key === 'End') {
-      nextWidth = maxWidth;
-      nextCollapsed = false;
-    } else {
-      return;
-    }
-
-    event.preventDefault();
-    publishAndCommit(nextWidth, nextCollapsed);
-  }
-
   function reset() {
-    publishAndCommit(defaultWidth, false);
+    publish(defaultWidth, false);
+    onresizeend?.(liveWidth, liveCollapsed);
   }
 </script>
 
 <svelte:window onblur={finishResize} />
 
-<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
   class="sidebar-resize-handle"
@@ -154,10 +114,6 @@
   role="separator"
   aria-label={label}
   aria-orientation="vertical"
-  aria-valuemin={ariaMinWidth}
-  aria-valuemax={maxWidth}
-  aria-valuenow={displayedWidth}
-  tabindex="0"
   {title}
   data-testid={testId}
   onpointerdown={startResize}
@@ -165,7 +121,6 @@
   onpointerup={finishResize}
   onpointercancel={finishResize}
   onlostpointercapture={finishResize}
-  onkeydown={resizeWithKeyboard}
   ondblclick={reset}
 ></div>
 
@@ -198,14 +153,8 @@
   }
 
   .sidebar-resize-handle:hover::after,
-  .sidebar-resize-handle:focus-visible::after,
   .sidebar-resize-handle--active::after {
     background: var(--ds-border-focused);
-  }
-
-  .sidebar-resize-handle:focus-visible {
-    outline: 2px solid var(--ds-border-focused);
-    outline-offset: -2px;
   }
 
   :global(body.sidebar-resize-active),

@@ -9,6 +9,7 @@
   import UserPicker from '../../pickers/UserPicker.svelte';
   import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
   import ItemKey from '../../components/ItemKey.svelte';
+  import Link from '../../components/Link.svelte';
   import ColorDot from '../../components/ColorDot.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import ListCustomFieldCell from './ListCustomFieldCell.svelte';
@@ -28,6 +29,7 @@
   import MilestoneCellValue from './MilestoneCellValue.svelte';
   import ItemStatusPicker from '../../pickers/ItemStatusPicker.svelte';
   import { objectDisplayName } from '../../utils/systemLabels.js';
+  import { itemModalStore } from '../../stores/itemModalStore.svelte.js';
 
   let {
     item,
@@ -49,6 +51,8 @@
     // the parent-reference chip so the parent context cannot push a row's
     // leading type icon and title past its children's.
     keyBefore = null,
+    // The title opens the item unless the row is selecting instead of opening.
+    titleLink = true,
   } = $props();
 
   // Get the field definition for custom fields
@@ -67,6 +71,19 @@
       ? collectionFieldLinks.getFieldLinks(item.id, fieldDefinition.id, fieldDefinition.options)
       : [],
   );
+
+  // The title opens the item like the board card and the item key. Inline
+  // editing stays in the detail view so a click never starts a rename.
+  let itemHref = $derived.by(() => {
+    const wsId = item?.workspace_id ?? workspace?.id;
+    return item?.id != null && wsId != null ? `/workspaces/${wsId}/items/${item.id}` : null;
+  });
+
+  function openItem(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    itemModalStore.open(item.id, item.workspace_id ?? workspace?.id ?? null);
+  }
 
   async function reloadFieldLinks(change) {
     await collectionFieldLinks.refreshForItems([item.id, ...(change?.itemIds || [])]);
@@ -153,17 +170,15 @@
         {/if}
       {/if}
       <div class="flex-1 min-w-0" data-testid={`workspace-item-title-${item.id}`}>
-        {#if canEdit}
-          <InlineFieldEditor
-            {item}
-            field="title"
-            fieldType="text"
-            placeholder="Enter title..."
-            required={true}
-            maxLines={2}
-            onitemUpdated={(detail) => onitemUpdated?.(detail)}
-            onupdateError={(detail) => onupdateError?.(detail)}
-          />
+        {#if titleLink && itemHref}
+          <Link
+            href={itemHref}
+            onClick={openItem}
+            class="text-sm line-clamp-2 hover:underline text-ds-text"
+            title={item.title}
+          >
+            {item.title}
+          </Link>
         {:else}
           <span class="text-sm line-clamp-2" dir="auto" style="color: var(--ds-text);">{item.title}</span>
         {/if}

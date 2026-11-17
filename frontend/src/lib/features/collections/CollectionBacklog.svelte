@@ -5,7 +5,7 @@
   import { claimVirtualDrop, virtualDropAllowed } from '../../virtualization/virtualDragSession';
   import { onMount } from 'svelte';
   import { items } from '../../api/items.js';
-  import { iterations } from '../../api/milestones.js';
+  import { iterations } from '../../api/planning.js';
   import { t } from '../../stores/i18n.svelte.js';
   import {
     collectionStore,

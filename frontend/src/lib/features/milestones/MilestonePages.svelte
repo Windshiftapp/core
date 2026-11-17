@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { FileText, Plus, Trash2 } from '@lucide/svelte';
-	import { milestones as milestonesApi } from '../../api/milestones.js';
+	import { milestones as milestonesApi } from '../../api/planning.js';
 	import AlertBox from '../../components/AlertBox.svelte';
 	import LinkComponent from '../../components/Link.svelte';
 	import DialogFooter from '../../dialogs/DialogFooter.svelte';

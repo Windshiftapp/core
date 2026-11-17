@@ -107,10 +107,10 @@ func (h *WorkspaceHandler) GetOrCreatePersonalWorkspace(w http.ResponseWriter, r
 				return err
 			}
 			err := tx.QueryRow(`
-				INSERT INTO workspaces (name, key, description, active, time_project_id, is_personal, owner_id, created_at, updated_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+				INSERT INTO workspaces (name, key, description, active, time_project_id, is_personal, owner_id, icon, color, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 				RETURNING id
-			`, workspaceName, candidate, description, true, nil, true, userID, now, now).Scan(&workspace.ID)
+			`, workspaceName, candidate, description, true, nil, true, userID, services.DefaultWorkspaceIcon, services.DefaultWorkspaceColor, now, now).Scan(&workspace.ID)
 			if err == nil {
 				if _, err := tx.Exec("RELEASE SAVEPOINT " + attempt); err != nil {
 					return err
@@ -121,6 +121,8 @@ func (h *WorkspaceHandler) GetOrCreatePersonalWorkspace(w http.ResponseWriter, r
 				workspace.Active = true
 				workspace.IsPersonal = true
 				workspace.OwnerID = &userID
+				workspace.Icon = services.DefaultWorkspaceIcon
+				workspace.Color = services.DefaultWorkspaceColor
 				workspace.CreatedAt = now
 				workspace.UpdatedAt = now
 				changed = true

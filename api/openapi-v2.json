@@ -93848,15 +93848,10 @@
           }
         },
         "required": [
-          "color",
-          "default_view",
           "description",
-          "icon",
-          "is_personal",
           "key",
           "name",
-          "restricted_to_creator",
-          "template_pack"
+          "restricted_to_creator"
         ],
         "type": "object"
       },

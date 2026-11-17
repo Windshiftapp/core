@@ -1,3 +1,5 @@
+// Frontend client for the backend planning domain. Milestones and iterations
+// share global/workspace scope, pagination, and create rules.
 import { fetchAllV2Pages, fetchV2Data } from './core.js';
 import { createCrudClient } from './createCrudClient.js';
 

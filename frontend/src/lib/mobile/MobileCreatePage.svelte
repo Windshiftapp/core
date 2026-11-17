@@ -2,7 +2,7 @@
   import { customFields, itemTemplates, itemTypes as itemTypesApi, priorities as prioritiesApi, screens } from '../api/configuration.js';
   import { labels } from '../api/misc.js';
   import { getAssignableUsers } from '../api/users.js';
-  import { iterations as iterationsApi, milestones as milestonesApi } from '../api/milestones.js';
+  import { iterations as iterationsApi, milestones as milestonesApi } from '../api/planning.js';
   import { time } from '../api/time.js';
   import { items } from '../api/items.js';
   import { currentRoute, navigate } from '../router.js';

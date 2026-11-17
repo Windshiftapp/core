@@ -1,6 +1,6 @@
 <script>
   import ItemPicker from './ItemPicker.svelte';
-  import { milestones as milestonesApi } from '../api/milestones.js';
+  import { milestones as milestonesApi } from '../api/planning.js';
   import { t } from '../stores/i18n.svelte.js';
   import { errorToast } from '../stores/toasts.svelte.js';
   import { milestonesStore } from '../stores/milestones.js';

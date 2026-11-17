@@ -32,7 +32,7 @@
   import { moduleSettings } from '../../stores/moduleSettings.js';
   import { currentRoute } from '../../router.js';
   import { formatDateShort, formatRelativeTime } from '../../utils/dateFormatter.js';
-  import { milestones as milestonesApi } from '../../api/milestones.js';
+  import { milestones as milestonesApi } from '../../api/planning.js';
   import { workspacesStore } from '../../stores/workspaces.svelte.js';
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';

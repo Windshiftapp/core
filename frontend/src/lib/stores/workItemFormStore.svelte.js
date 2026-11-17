@@ -7,7 +7,7 @@ import {
   itemTypes,
   screens,
 } from '../api/configuration.js';
-import { iterations, milestones } from '../api/milestones.js';
+import { iterations, milestones } from '../api/planning.js';
 import { FOREGROUND_READ } from '../api/readScheduler.js';
 import { teams } from '../api/teams.js';
 import { time } from '../api/time.js';

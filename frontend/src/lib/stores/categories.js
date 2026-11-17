@@ -1,4 +1,4 @@
-import { milestoneCategories } from '../api/milestones.js';
+import { milestoneCategories } from '../api/planning.js';
 import { createCategoryStore } from './categoryStoreFactory.js';
 
 // Categories store for milestones

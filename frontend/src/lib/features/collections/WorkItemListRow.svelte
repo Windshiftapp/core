@@ -92,6 +92,7 @@
               {item} {column} {workspace} {canEdit} {statuses} {statusCategories}
               {priorities} {milestones} {iterations} {users} {projects} {itemTypes}
               {customFieldDefinitions} {onitemUpdated} {onupdateError}
+              titleLink={!selectionMode}
             />
           </div>
         {/each}

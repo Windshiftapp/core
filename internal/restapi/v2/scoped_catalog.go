@@ -109,14 +109,14 @@ type workspaceCreateRequest struct {
 	Description         string  `json:"description"`
 	Active              *bool   `json:"active"`
 	TimeProjectID       *int    `json:"time_project_id"`
-	IsPersonal          bool    `json:"is_personal"`
+	IsPersonal          bool    `json:"is_personal,omitempty"`
 	OwnerID             *int    `json:"owner_id"`
-	Icon                string  `json:"icon"`
-	Color               string  `json:"color"`
+	Icon                string  `json:"icon,omitempty"`
+	Color               string  `json:"color,omitempty"`
 	AvatarURL           *string `json:"avatar_url"`
-	DefaultView         string  `json:"default_view"`
+	DefaultView         string  `json:"default_view,omitempty"`
 	TemplateWorkspaceID *int    `json:"template_workspace_id"`
-	TemplatePack        string  `json:"template_pack"`
+	TemplatePack        string  `json:"template_pack,omitempty"`
 	RestrictedToCreator bool    `json:"restricted_to_creator"`
 }
 

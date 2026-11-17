@@ -8,7 +8,7 @@
   import { resolveTransitionScreen } from '../../utils/transitionScreens.js';
   import { collections as collectionsApi } from '../../api/collections.js';
   import { workspaces as workspacesApi } from '../../api/workspaces.js';
-  import { iterations as iterationsApi } from '../../api/milestones.js';
+  import { iterations as iterationsApi } from '../../api/planning.js';
   import { navigate } from '../../router.js';
   import {
     collectionStore,

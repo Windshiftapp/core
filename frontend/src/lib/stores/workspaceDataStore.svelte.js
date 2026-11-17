@@ -1,6 +1,6 @@
 import { catalogs, customFields, itemTypes, priorities } from '../api/configuration.js';
-import { iterations, milestones } from '../api/milestones.js';
 import { labels as labelsApi } from '../api/misc.js';
+import { iterations, milestones } from '../api/planning.js';
 import { BACKGROUND_READ, FOREGROUND_READ } from '../api/readScheduler.js';
 import { getAssignableUsers, getUserDisplayBatch } from '../api/users.js';
 import { statusCategories } from '../api/workflows.js';

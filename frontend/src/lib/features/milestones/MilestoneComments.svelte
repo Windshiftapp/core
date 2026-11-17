@@ -1,6 +1,6 @@
 <script>
 	import { onMount, tick } from 'svelte';
-	import { milestones as milestonesApi } from '../../api/milestones.js';
+	import { milestones as milestonesApi } from '../../api/planning.js';
 	import { authStore } from '../../stores/auth.svelte.js';
 	import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
 	import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';

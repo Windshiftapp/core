@@ -1,6 +1,6 @@
 import { assets } from '../api/assets.js';
 import { priorities } from '../api/configuration.js';
-import { iterations, milestones } from '../api/milestones.js';
+import { iterations, milestones } from '../api/planning.js';
 import { customerOrganisations, portalCustomers } from '../api/portal.js';
 import { teams } from '../api/teams.js';
 import { getAssignableUsers } from '../api/users.js';

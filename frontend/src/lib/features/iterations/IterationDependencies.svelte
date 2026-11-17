@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { ai, llmProviders } from '../../api/ai.js';
-  import { iterations } from '../../api/milestones.js';
+  import { iterations } from '../../api/planning.js';
   import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
   import IconRotate from '@tabler/icons-svelte-runes/icons/rotate';
   import IconCircleCheck from '@tabler/icons-svelte-runes/icons/circle-check';

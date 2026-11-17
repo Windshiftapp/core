@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { navigate, currentRoute } from '../../router.js';
-  import { iterationTypes as iterationTypesApi } from '../../api/milestones.js';
+  import { iterationTypes as iterationTypesApi } from '../../api/planning.js';
   import { getHexFromColorName } from '../../utils/colors.js';
   import { t } from '../../stores/i18n.svelte.js';
   import NavigationSidebar from '../../layout/NavigationSidebar.svelte';

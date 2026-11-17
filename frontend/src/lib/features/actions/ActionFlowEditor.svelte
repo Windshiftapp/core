@@ -11,7 +11,7 @@
   import { toHotkeyString, getShortcutDisplay } from '../../utils/keyboardShortcuts.js';
   import { actionCapabilities } from '../../api/ai.js';
   import { actions } from '../../api/actions.js';
-  import { milestones as milestonesApi } from '../../api/milestones.js';
+  import { milestones as milestonesApi } from '../../api/planning.js';
   import { teams as teamsApi } from '../../api/teams.js';
   import { cannedResponses as cannedResponsesApi, itemTypes as itemTypesApi, linkTypes as linkTypesApi } from '../../api/configuration.js';
   import { statusCategories as statusCategoriesApi } from '../../api/workflows.js';

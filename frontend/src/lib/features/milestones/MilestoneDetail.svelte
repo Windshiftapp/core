@@ -10,7 +10,7 @@
   import MoreHorizontal from '@tabler/icons-svelte-runes/icons/dots';
   import Tag from '@tabler/icons-svelte-runes/icons/tag';
   import ExternalLink from '@tabler/icons-svelte-runes/icons/external-link';
-  import { milestones } from '../../api/milestones.js';
+  import { milestones } from '../../api/planning.js';
   import { navigate } from '../../router.js';
   import Lozenge from '../../components/Lozenge.svelte';
   import Modal from '../../dialogs/Modal.svelte';

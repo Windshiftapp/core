@@ -214,6 +214,14 @@ type CreateWorkspaceParams struct {
 	RestrictedToCreator *bool
 }
 
+// Default workspace appearance. Creation paths that do not choose an icon or
+// color (personal, pack-provisioned, imported) fall back to these so every
+// workspace renders consistently instead of relying on client-side fallbacks.
+const (
+	DefaultWorkspaceIcon  = "Package"
+	DefaultWorkspaceColor = "#3b82f6"
+)
+
 // CreateWorkspaceResult contains the result of creating a workspace. The
 // copy counts stay zero for blank creation.
 type CreateWorkspaceResult struct {
@@ -258,6 +266,12 @@ func (s *WorkspaceService) Create(ctx context.Context, params CreateWorkspacePar
 	key := strings.ToUpper(params.Key)
 	if params.DefaultView == "" {
 		params.DefaultView = "board"
+	}
+	if params.Icon == "" {
+		params.Icon = DefaultWorkspaceIcon
+	}
+	if params.Color == "" {
+		params.Color = DefaultWorkspaceColor
 	}
 
 	started := time.Now()

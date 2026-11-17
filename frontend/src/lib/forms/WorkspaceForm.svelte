@@ -100,18 +100,6 @@
     return formData.name.trim() !== '' && formData.key.trim() !== '';
   }
 
-  export function getFormData() {
-    return {
-      name: formData.name,
-      key: formData.key,
-      description: formData.description || '',
-      active: true,
-      template_workspace_id: formData.template_workspace_id ?? null,
-      template_pack: formData.template_pack || null,
-      restricted_to_creator: formData.restricted_to_creator === true
-    };
-  }
-
   export function reset() {
     formData = {
       name: '',
@@ -122,10 +110,6 @@
       restricted_to_creator: false
     };
     keyManuallyEdited = false;
-  }
-
-  export function isValid() {
-    return formData.name.trim() !== '' && formData.key.trim() !== '';
   }
 </script>
 

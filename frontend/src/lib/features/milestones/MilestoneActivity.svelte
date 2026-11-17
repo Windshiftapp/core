@@ -11,7 +11,7 @@
 		IconCircleMinus,
 		IconHistory
 	} from '@tabler/icons-svelte-runes';
-	import { milestones as milestonesApi } from '../../api/milestones.js';
+	import { milestones as milestonesApi } from '../../api/planning.js';
 	import AlertBox from '../../components/AlertBox.svelte';
 	import Button from '../../components/Button.svelte';
 	import StateDisplay from '../../components/StateDisplay.svelte';

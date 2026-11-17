@@ -1,4 +1,4 @@
-import { milestones as milestonesApi } from '../../api/milestones.js';
+import { milestones as milestonesApi } from '../../api/planning.js';
 
 /** Load test statistics for every visible milestone with one batch request. */
 export async function loadMilestoneTestStatistics(milestones) {

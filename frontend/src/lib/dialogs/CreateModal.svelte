@@ -92,7 +92,6 @@
 
   // Form references
   let milestoneFormRef = $state(null);
-  let workspaceFormRef = $state(null);
   let collectionFormRef = $state(null);
   let nameInputRef = $state(null);
 
@@ -348,12 +347,12 @@
         navigate('/milestones');
         close();
       } else if (selectedType === 'workspace') {
+        // Icon and color are omitted on purpose: the server applies the
+        // workspace defaults so every creation path renders consistently.
         const payload = {
           name: workspaceFormData.name,
           key: workspaceFormData.key,
           description: workspaceFormData.description || '',
-          icon: 'Package',
-          color: '#3b82f6',
           active: true,
           restricted_to_creator: workspaceFormData.restricted_to_creator === true
         };
@@ -644,7 +643,6 @@
           />
         {:else if selectedType === 'workspace'}
           <WorkspaceForm
-            bind:this={workspaceFormRef}
             bind:formData={workspaceFormData}
             templates={workspaceTemplateOptions}
             templatesLoading={workspaceTemplatesLoading}

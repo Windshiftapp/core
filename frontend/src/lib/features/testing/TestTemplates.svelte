@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { tests } from '../../api/tests/index.js';
-  import { milestones as milestonesApi } from '../../api/milestones.js';
+  import { milestones as milestonesApi } from '../../api/planning.js';
   import { writable } from 'svelte/store';
   import { navigate } from '../../router.js';
   import { confirm } from '../../composables/useConfirm.js';

@@ -4,7 +4,7 @@
   import Flag from '@lucide/svelte/icons/flag';
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import { items as itemsApi } from '../api/items.js';
-  import { iterations, milestones } from '../api/milestones.js';
+  import { iterations, milestones } from '../api/planning.js';
   import DueMark from './dashboard/DueMark.svelte';
   import WidgetState from './WidgetState.svelte';
   import { t } from '../stores/i18n.svelte.js';
