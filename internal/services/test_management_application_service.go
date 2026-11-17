@@ -672,6 +672,13 @@ func (s *TestManagementApplicationService) ListSets(userID, workspaceID int) ([]
 	return s.sets.List(workspaceID)
 }
 
+func (s *TestManagementApplicationService) ListSetsPage(userID, workspaceID, limit, offset int) ([]models.TestSet, int, error) {
+	if err := s.require(userID, workspaceID, models.PermissionTestView); err != nil {
+		return nil, 0, err
+	}
+	return s.sets.ListPage(workspaceID, limit, offset)
+}
+
 func (s *TestManagementApplicationService) GetSet(userID, workspaceID, id int) (*models.TestSet, error) {
 	if err := s.require(userID, workspaceID, models.PermissionTestView); err != nil {
 		return nil, err

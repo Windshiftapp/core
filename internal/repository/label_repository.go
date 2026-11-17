@@ -175,8 +175,7 @@ func (r *LabelRepository) ListForItemTx(tx database.Tx, itemID int) ([]models.La
 	return scanLabels(rows)
 }
 
-// ReplaceItemLabels swaps the label set for an item atomically: deletes all
-// existing rows and inserts the new set inside a single transaction.
+// ReplaceItemLabels atomically changes an item's labels, retaining unchanged associations.
 func (r *LabelRepository) ReplaceItemLabels(itemID int, labelIDs []int) error {
 	tx, err := r.db.Begin()
 	if err != nil {
@@ -198,14 +197,54 @@ func (r *LabelRepository) ReplaceItemLabels(itemID int, labelIDs []int) error {
 
 // ReplaceItemLabelsTx swaps an item's labels inside the caller's transaction.
 func (r *LabelRepository) ReplaceItemLabelsTx(ctx context.Context, tx database.Tx, itemID int, labelIDs []int) error {
-	if _, err := tx.ExecWriteContext(ctx, "DELETE FROM item_labels WHERE item_id = ?", itemID); err != nil {
-		return fmt.Errorf("delete labels for item %d: %w", itemID, err)
+	before, err := r.ListForItemTx(tx, itemID)
+	if err != nil {
+		return err
 	}
+	existing := make(map[int]bool, len(before))
+	for _, label := range before {
+		existing[label.ID] = true
+	}
+	target := make(map[int]bool, len(labelIDs))
+	var added, removed []int
 	for _, labelID := range labelIDs {
-		if _, err := tx.ExecWriteContext(ctx,
-			"INSERT INTO item_labels (item_id, label_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
-			itemID, labelID); err != nil {
-			return fmt.Errorf("attach label %d to item %d: %w", labelID, itemID, err)
+		if !existing[labelID] && !target[labelID] {
+			added = append(added, labelID)
+		}
+		target[labelID] = true
+	}
+	for _, label := range before {
+		if !target[label.ID] {
+			removed = append(removed, label.ID)
+		}
+	}
+	return r.ApplyItemLabelDeltaTx(ctx, tx, itemID, added, removed)
+}
+
+// ApplyItemLabelDeltaTx writes only changed associations in bounded batches.
+func (r *LabelRepository) ApplyItemLabelDeltaTx(ctx context.Context, tx database.Tx, itemID int, added, removed []int) error {
+	const batchSize = 400 // At most 800 parameters, including paired inserts.
+	for start := 0; start < len(removed); start += batchSize {
+		batch := removed[start:min(start+batchSize, len(removed))]
+		args := make([]any, 1, len(batch)+1)
+		args[0] = itemID
+		for _, id := range batch {
+			args = append(args, id)
+		}
+		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(batch)), ",")
+		if _, err := tx.ExecWriteContext(ctx, "DELETE FROM item_labels WHERE item_id = ? AND label_id IN ("+placeholders+")", args...); err != nil {
+			return fmt.Errorf("remove labels for item %d: %w", itemID, err)
+		}
+	}
+	for start := 0; start < len(added); start += batchSize {
+		batch := added[start:min(start+batchSize, len(added))]
+		args := make([]any, 0, 2*len(batch))
+		for _, id := range batch {
+			args = append(args, itemID, id)
+		}
+		values := strings.TrimSuffix(strings.Repeat("(?, ?),", len(batch)), ",")
+		if _, err := tx.ExecWriteContext(ctx, "INSERT INTO item_labels (item_id, label_id) VALUES "+values+" ON CONFLICT DO NOTHING", args...); err != nil {
+			return fmt.Errorf("attach labels to item %d: %w", itemID, err)
 		}
 	}
 	return nil

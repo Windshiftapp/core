@@ -113,10 +113,15 @@ type AdminUserRow struct {
 	OwnerUsername  string
 }
 
-// ListAdmin returns every user with the joined agent-owner display fields.
-// Sorted by last_name, first_name. Used by the admin user list — non-admin
-// listing routes through services.UserReadService.ListAll instead.
-func (r *UserRepository) ListAdmin() ([]models.User, error) {
+// ListAdmin pages active and inactive users, ordered by name with an ID tie-breaker.
+func (r *UserRepository) ListAdmin(limit, offset int) ([]models.User, int, error) {
+	var total int
+	if err := r.db.QueryRow("SELECT COUNT(*) FROM users").Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count admin users: %w", err)
+	}
+	if limit <= 0 {
+		limit = total
+	}
 	rows, err := r.db.Query(`
 		SELECT u.id, u.email, u.username, u.first_name, u.last_name, u.is_active, u.avatar_url,
 			u.requires_password_reset, u.timezone, u.language, COALESCE(u.is_agent, false),
@@ -124,10 +129,11 @@ func (r *UserRepository) ListAdmin() ([]models.User, error) {
 			u.created_at, u.updated_at
 		FROM users u
 		LEFT JOIN users o ON o.id = u.agent_owner_user_id
-		ORDER BY u.last_name, u.first_name
-	`)
+		ORDER BY u.last_name, u.first_name, u.id
+		LIMIT ? OFFSET ?
+	`, limit, max(0, offset))
 	if err != nil {
-		return nil, fmt.Errorf("list admin users: %w", err)
+		return nil, 0, fmt.Errorf("list admin users: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -142,7 +148,7 @@ func (r *UserRepository) ListAdmin() ([]models.User, error) {
 			&u.IsActive, &avatarURL, &requiresPasswordReset, &timezone, &language, &u.IsAgent,
 			&ownerID, &ownerFirst, &ownerLast, &ownerUsername,
 			&u.CreatedAt, &u.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan user: %w", err)
+			return nil, 0, fmt.Errorf("scan user: %w", err)
 		}
 		u.AvatarURL = avatarURL.String
 		u.RequiresPasswordReset = requiresPasswordReset.Bool
@@ -167,12 +173,12 @@ func (r *UserRepository) ListAdmin() ([]models.User, error) {
 		users = append(users, u)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate admin users: %w", err)
+		return nil, 0, fmt.Errorf("iterate admin users: %w", err)
 	}
 	if users == nil {
 		users = []models.User{}
 	}
-	return users, nil
+	return users, total, nil
 }
 
 // GetByEmailOrUsernameForAuth returns a user with password fields for login/change-password flows.

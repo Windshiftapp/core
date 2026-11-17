@@ -248,6 +248,9 @@ func (d *InProcessV2Dispatcher) Dispatch(ctx context.Context, bearer string, req
 		httpReq.Header.Set("Content-Type", "application/json")
 	}
 	recorder := newBoundedRecorder(d.maxResponseBytes)
+	if err := ctx.Err(); err != nil {
+		return ScriptAPIResponse{}, err
+	}
 	d.handler.ServeHTTP(recorder, httpReq)
 	status := recorder.status
 	if status == 0 {

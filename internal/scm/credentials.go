@@ -61,8 +61,9 @@ func acquireRefreshLock(key refreshLockKey) func() {
 //   - PAT: workspace-level if set, otherwise the provider's shared PAT.
 //   - GitHub App: provider-level keys plus a workspace-level installation ID.
 type CredentialResolver struct {
-	db         database.Database
-	encryption *sso.SecretEncryption
+	db          database.Database
+	encryption  *sso.SecretEncryption
+	httpClients *HTTPClientPool
 }
 
 // ProviderCredentials contains all credentials needed to create a provider instance
@@ -92,10 +93,11 @@ type ProviderCredentials struct {
 }
 
 // NewCredentialResolver creates a new credential resolver
-func NewCredentialResolver(db database.Database, encryption *sso.SecretEncryption) *CredentialResolver {
+func NewCredentialResolver(db database.Database, encryption *sso.SecretEncryption, pools ...*HTTPClientPool) *CredentialResolver {
 	return &CredentialResolver{
-		db:         db,
-		encryption: encryption,
+		db:          db,
+		encryption:  encryption,
+		httpClients: clientPoolOrNew(pools),
 	}
 }
 
@@ -426,6 +428,7 @@ func (r *CredentialResolver) GetProviderForUser(ctx context.Context, connectionI
 // CreateProvider creates a Provider instance from resolved credentials
 func (r *CredentialResolver) CreateProvider(creds *ProviderCredentials) (Provider, error) {
 	cfg := ProviderConfig{
+		HTTPClientPool:          r.httpClients,
 		ProviderType:            creds.ProviderType,
 		AuthMethod:              creds.AuthMethod,
 		BaseURL:                 creds.BaseURL,
@@ -501,6 +504,7 @@ func (r *CredentialResolver) RefreshOAuthTokenIfNeeded(ctx context.Context, conn
 
 	// Create provider config for token refresh
 	cfg := ProviderConfig{
+		HTTPClientPool:    r.httpClients,
 		ProviderType:      creds.ProviderType,
 		AuthMethod:        models.SCMAuthMethodOAuth,
 		BaseURL:           creds.BaseURL,

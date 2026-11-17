@@ -175,6 +175,15 @@ export default defineConfig({
         codeSplitting: {
           groups: [
             {
+              // Shared sanitizer consumers must not pull in the editor. Keep
+              // Milkdown's remaining dependency graph together: splitting it
+              // creates initialization-order failures in production.
+              name: 'dompurify',
+              test: /node_modules\/dompurify\//,
+              priority: 10,
+              includeDependenciesRecursively: false,
+            },
+            {
               name: 'milkdown',
               test: /@milkdown/,
             },

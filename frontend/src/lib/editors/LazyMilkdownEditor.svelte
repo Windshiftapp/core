@@ -1,5 +1,8 @@
 <script>
   import { onMount } from 'svelte';
+  import Button from '../components/Button.svelte';
+  import StateDisplay from '../components/StateDisplay.svelte';
+  import { t } from '../stores/i18n.svelte.js';
 
   // All props that MilkdownEditor accepts
   let {
@@ -21,22 +24,25 @@
   let MilkdownEditor = $state(null);
   let editorInstance = $state(null);
   let loading = $state(true);
+  let loadError = $state(false);
 
-  // Start loading the editor chunk on mount. The dynamic import is async and
-  // does not block render, and requestIdleCallback can starve under load
-  // (CI, busy pages), leaving the description blank for seconds.
-  onMount(() => {
-    void (async () => {
-      try {
-        const module = await import('./MilkdownEditor.svelte');
-        MilkdownEditor = module.default;
-      } catch (error) {
-        console.error('Failed to load MilkdownEditor:', error);
-      } finally {
-        loading = false;
-      }
-    })();
-  });
+  // Load immediately: idle callbacks can starve on busy pages. A failed chunk
+  // must offer recovery rather than leaving a permanent loading placeholder.
+  async function loadEditor() {
+    loading = true;
+    loadError = false;
+    try {
+      const module = await import('./MilkdownEditor.svelte');
+      MilkdownEditor = module.default;
+    } catch (error) {
+      console.error('Failed to load MilkdownEditor:', error);
+      loadError = true;
+    } finally {
+      loading = false;
+    }
+  }
+
+  onMount(() => { void loadEditor(); });
 
   // Expose methods from the underlying editor
   export function focus() {
@@ -120,10 +126,15 @@
       {testId}
     />
   {/key}
-{:else}
-  <!-- Skeleton placeholder while loading -->
-  <div
-    class="animate-pulse rounded"
-    style="min-height: {compact ? '80px' : '150px'}; background: var(--ds-background-neutral); border: 1px solid var(--ds-border); border-radius: 0.375rem;"
-  ></div>
+{:else if loadError}
+  <StateDisplay type="error" size="sm" dataTestid="milkdown-load-error">
+    {#snippet action()}
+      <!-- Browsers cache failed ESM loads for this document; reload clears them. -->
+      <Button variant="default" onclick={() => window.location.reload()} dataTestid="milkdown-load-reload">
+        {t('common.reload')}
+      </Button>
+    {/snippet}
+  </StateDisplay>
+{:else if loading}
+  <StateDisplay type="loading" size="sm" dataTestid="milkdown-loading" />
 {/if}

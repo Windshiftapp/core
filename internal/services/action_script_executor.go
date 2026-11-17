@@ -14,6 +14,7 @@ import (
 	"github.com/grafana/sobek"
 
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 )
 
 // Budgets for one execute_script node. Source length reuses maxScriptLength
@@ -72,6 +73,7 @@ type ActionScriptWriteMarker interface {
 // partial script side effects as reconciliation-required rather than assume
 // whole-script atomicity.
 type ExecuteScriptExecutor struct {
+	controls   *operatorcontrols.Controls
 	tokens     ActionScriptTokenManager
 	dispatcher ScriptAPIDispatcher
 	marker     ActionScriptWriteMarker
@@ -130,6 +132,11 @@ type scriptRun struct {
 // execute-then-retry fallback: a retry after a runtime error could repeat host
 // side effects.
 func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.ExecutionContext, stepResult *models.StepResult) error {
+	if e != nil {
+		if err := e.controls.Check(operatorcontrols.Scripts); err != nil {
+			return err
+		}
+	}
 	if e == nil || e.tokens == nil {
 		return errors.New("execute_script: token manager is not configured")
 	}
@@ -139,6 +146,11 @@ func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.Exe
 	if ctx == nil {
 		return errors.New("execute_script: execution context is required")
 	}
+	release, err := e.controls.Acquire(actionRequestContext(ctx), "scripts", e.controls.Limits().ConcurrentScripts)
+	if err != nil {
+		return err
+	}
+	defer release()
 	var config models.ExecuteScriptNodeConfig
 	if err := json.Unmarshal([]byte(node.NodeConfig), &config); err != nil {
 		return fmt.Errorf("execute_script: invalid config: %w", err)
@@ -167,6 +179,9 @@ func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.Exe
 	timeoutMs := config.TimeoutMs
 	if timeoutMs <= 0 || timeoutMs > maxScriptAPITimeoutMs {
 		timeoutMs = defaultScriptAPITimeoutMs
+	}
+	if ceiling := e.controls.Limits().ScriptTimeoutMS; ceiling > 0 && timeoutMs > ceiling {
+		timeoutMs = ceiling
 	}
 	maxCalls := config.MaxAPICalls
 	if maxCalls <= 0 || maxCalls > maxScriptAPICalls {
@@ -221,6 +236,14 @@ func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.Exe
 	}()
 
 	output, runErr := runScriptProgram(vm, program, timeoutCtx)
+	if stepResult.Output == nil {
+		stepResult.Output = make(map[string]any)
+	}
+	stepResult.Output["api_calls"] = run.apiCalls
+	stepResult.Output["console"] = run.console
+	if run.consoleCut {
+		stepResult.Output["console_truncated"] = true
+	}
 
 	if run.fatal != nil {
 		return run.fatal
@@ -234,16 +257,8 @@ func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.Exe
 	}
 
 	ctx.Variables[outputVar] = output
-	if stepResult.Output == nil {
-		stepResult.Output = make(map[string]any)
-	}
 	stepResult.Output[outputVar] = output
 	stepResult.Output["result"] = output
-	stepResult.Output["api_calls"] = run.apiCalls
-	stepResult.Output["console"] = run.console
-	if run.consoleCut {
-		stepResult.Output["console_truncated"] = true
-	}
 	return nil
 }
 
@@ -319,6 +334,10 @@ func (r *scriptRun) apiRequest(call sobek.FunctionCall) sobek.Value {
 	if r.fatal != nil {
 		return sobek.Undefined()
 	}
+	if err := r.runCtx.Err(); err != nil {
+		r.fail(err)
+		return sobek.Undefined()
+	}
 	options := call.Argument(0)
 	if scriptValueMissing(options) {
 		panic(r.vm.NewTypeError("windshift.api.request(options) requires an options object"))
@@ -357,6 +376,10 @@ func (r *scriptRun) apiRequest(call sobek.FunctionCall) sobek.Value {
 		r.fail(err)
 		return sobek.Undefined()
 	}
+	if err := r.runCtx.Err(); err != nil {
+		r.fail(err)
+		return sobek.Undefined()
+	}
 
 	// Persist the write-ahead marker and mark the execution non-replayable
 	// before a mutating dispatch. A mutating call can commit a side effect even
@@ -374,6 +397,10 @@ func (r *scriptRun) apiRequest(call sobek.FunctionCall) sobek.Value {
 
 	cred, err := r.ensureCredential()
 	if err != nil {
+		r.fail(err)
+		return sobek.Undefined()
+	}
+	if err := r.runCtx.Err(); err != nil {
 		r.fail(err)
 		return sobek.Undefined()
 	}

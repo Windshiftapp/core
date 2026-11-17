@@ -59,6 +59,7 @@
       'set_status': t('actions.nodes.setStatus'),
       'add_comment': t('actions.nodes.addComment'),
       'notify_user': t('actions.nodes.notifyUser'),
+      'execute_script': t('actions.nodes.executeScript'),
       'condition': t('actions.nodes.condition')
     };
     return labels[nodeType] || nodeType;
@@ -88,6 +89,11 @@
   />
 
   <div class="p-6" data-testid="action-execution-trace">
+    {#if log.status === 'reconciliation_required'}
+      <p class="step-error" data-testid="action-script-reconciliation">
+        {t('actions.logs.reconciliationRequired')}
+      </p>
+    {/if}
     {#if steps.length === 0}
       <EmptyState icon={AlertTriangle} title={t('actions.trace.noSteps')} />
     {:else}
@@ -160,6 +166,21 @@
                   <code class="new-value">{step.output.new_value ?? '-'}</code>
                 </div>
               {/if}
+
+              {#if step.node_type === 'execute_script' && step.output}
+                <div class="script-details">
+                  <p data-testid="action-script-api-calls">{t('actions.trace.apiCalls')}: {step.output.api_calls ?? 0}</p>
+                  {#if Object.hasOwn(step.output, 'result')}
+                    <pre data-testid="action-script-result">{JSON.stringify(step.output.result, null, 2)}</pre>
+                  {/if}
+                  {#if Array.isArray(step.output.console) && step.output.console.length > 0}
+                    <pre data-testid="action-script-console">{step.output.console.join('\n')}</pre>
+                  {/if}
+                  {#if step.output.console_truncated}
+                    <p data-testid="action-script-console-truncated">{t('actions.trace.consoleTruncated')}</p>
+                  {/if}
+                </div>
+              {/if}
             </div>
           </div>
         {/each}
@@ -169,6 +190,24 @@
 </Modal>
 
 <style>
+  .script-details {
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    background-color: var(--ds-surface-sunken);
+    color: var(--ds-text);
+    font-size: 0.8125rem;
+  }
+
+  .script-details pre {
+    margin-top: 0.5rem;
+    max-height: 20rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-family: var(--ds-font-mono);
+  }
+
   .timeline {
     position: relative;
   }

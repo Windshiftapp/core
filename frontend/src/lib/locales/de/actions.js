@@ -247,6 +247,8 @@ export default {
     },
 
     trace: {
+      apiCalls: 'API-Aufrufe',
+      consoleTruncated: 'Konsolenausgabe gekürzt',
       title: 'Ausführungsdetails',
       noSteps: 'Keine Ausführungsschritte aufgezeichnet',
       setStatus: 'Status von "{from}" auf "{to}" geändert',

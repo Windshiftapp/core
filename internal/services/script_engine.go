@@ -43,7 +43,7 @@ func NewScriptEngine(controls ...*operatorcontrols.Controls) *ScriptEngine {
 //
 // The exported Go value is safe to use after this function returns; no sobek.Value
 // escapes the runtime (which is NOT goroutine-safe).
-func (e *ScriptEngine) Execute(ctx context.Context, script string, vars map[string]any, timeoutMs int) (any, error) {
+func (e *ScriptEngine) Execute(ctx context.Context, script string, vars map[string]any, timeoutMs int) (output any, err error) {
 	if err := e.controls.Check(operatorcontrols.Scripts); err != nil {
 		return nil, err
 	}
@@ -91,6 +91,24 @@ func (e *ScriptEngine) Execute(ctx context.Context, script string, vars map[stri
 		case <-done:
 		}
 	}()
+	defer func() {
+		// Exported getters and exception formatting are script execution too.
+		if recovered := recover(); recovered != nil {
+			err = inertScriptPanic(recovered)
+		}
+		if err != nil {
+			output = nil
+			err = inertScriptError(err)
+			var interrupted *sobek.InterruptedError
+			if errors.As(err, &interrupted) && interrupted.Value() == errScriptTimeout {
+				err = fmt.Errorf("script execution timed out after %dms", timeoutMs)
+			} else {
+				err = fmt.Errorf("script execution error: %w", err)
+			}
+		}
+		close(done)
+		<-exited
+	}()
 
 	result, err := vm.RunString(script)
 	// Only retry on non-interrupt errors. An InterruptedError means the
@@ -105,18 +123,8 @@ func (e *ScriptEngine) Execute(ctx context.Context, script string, vars map[stri
 			err = nil
 		}
 	}
-	close(done)
-	<-exited
-
 	if err != nil {
-		// Check if it was a timeout
-		var exception *sobek.InterruptedError
-		if errors.As(err, &exception) {
-			if exception.Value() == errScriptTimeout {
-				return nil, fmt.Errorf("script execution timed out after %dms", timeoutMs)
-			}
-		}
-		return nil, fmt.Errorf("script execution error: %w", err)
+		return nil, err
 	}
 
 	if result == nil || sobek.IsUndefined(result) || sobek.IsNull(result) {

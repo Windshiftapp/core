@@ -3,7 +3,7 @@
   import Tooltip from '../../components/Tooltip.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { formatInstant } from '../../utils/dateFormatter.js';
-  import { onWorkItemRefresh, workItemRefreshTouchesWorkspace } from '../../stores/workItemRefresh.js';
+  import { onWorkItemRefresh, workItemRefreshTouchesItem } from '../../stores/workItemRefresh.js';
   import { getItemSLA, getSLAThresholds, onSLAThresholdsInvalidated } from './slaState.js';
 
   let { itemId = null, workspaceId = null, refreshToken = 0 } = $props();
@@ -39,7 +39,7 @@
 
   $effect(() =>
     onWorkItemRefresh((detail) => {
-      if (!workItemRefreshTouchesWorkspace(detail, workspaceId)) return;
+      if (!workItemRefreshTouchesItem(detail, itemId, workspaceId)) return;
       void load(itemId, workspaceId, refreshToken);
     })
   );

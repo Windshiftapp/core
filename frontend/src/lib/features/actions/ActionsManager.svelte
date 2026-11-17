@@ -133,6 +133,7 @@
         icon={Plus}
         keyboardHint={getShortcutDisplay('actions', 'add')}
         hotkeyConfig={{ key: toHotkeyString('actions', 'add') }}
+        dataTestid="actions-create"
         onclick={handleCreate}
       >
         {t('actions.create')}

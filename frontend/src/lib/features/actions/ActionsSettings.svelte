@@ -429,6 +429,7 @@
       <Button
         variant="primary"
         onclick={createAction}
+        dataTestid="action-create-submit"
         disabled={!newActionName.trim()}
         keyboardHint={submitHint}
       >

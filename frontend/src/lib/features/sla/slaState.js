@@ -1,5 +1,6 @@
 import { BACKGROUND_READ } from '../../api/readScheduler.js';
 import { sla } from '../../api/sla.js';
+import { workItemRefreshTouchesItem } from '../../stores/workItemRefresh.js';
 
 // Item SLA reads are pure and cheap on the server, but a list/board page shows
 // many rows. Cache each item's state briefly and dedupe concurrent reads so a
@@ -21,7 +22,6 @@ const thresholdsCache = new Map();
 const thresholdsPending = new Map();
 /** @type {Set<(workspaceId: number|string|null) => void>} */
 const thresholdListeners = new Set();
-let stateGeneration = 0;
 // Threshold invalidation is per workspace: bumping one workspace must not
 // discard a successful in-flight fetch for another.
 let thresholdEpoch = 0;
@@ -72,18 +72,29 @@ const BATCH_ID_LIMIT = 200;
 
 export async function getItemSLA(itemId, workspaceId = null, { force = false } = {}) {
   if (!itemId) return [];
+  itemId = Number(itemId);
+  if (workspaceId != null) workspaceId = normalizeWorkspaceKey(workspaceId);
   if (force) stateCache.delete(itemId);
   const cached = stateCache.get(itemId);
   const now = Date.now();
-  if (cached && now - cached.at < STATE_TTL_MS) return cached.value;
+  const movedWorkspace = (entry) =>
+    entry.workspaceId != null && workspaceId != null && entry.workspaceId !== workspaceId;
+  if (cached && !movedWorkspace(cached) && now - cached.at < STATE_TTL_MS) return cached.value;
   if (cached) stateCache.delete(itemId);
-  if (inFlight.has(itemId)) return inFlight.get(itemId);
+  const pending = inFlight.get(itemId);
+  if (pending) {
+    if (movedWorkspace(pending)) {
+      pending.invalidated = true;
+      pending.workspaceId = workspaceId;
+    }
+    return pending.promise;
+  }
 
   if (workspaceId && sla?.getItemSLABatch) {
     return enqueueBatchItemSLA(itemId, workspaceId);
   }
   if (!sla?.getItemSLA) return [];
-  return fetchItemSLA(itemId);
+  return fetchItemSLA(itemId, workspaceId);
 }
 
 // enqueueBatchItemSLA collects item ids per workspace and flushes them on the
@@ -102,13 +113,11 @@ function enqueueBatchItemSLA(itemId, workspaceId) {
     resolve = r;
   });
   queue.ids.add(itemId);
-  queue.waiters.set(itemId, { promise, resolve });
+  const entry = { promise, resolve, workspaceId, started: false, invalidated: false };
+  queue.waiters.set(itemId, entry);
   // Claim the in-flight slot so a remount during the flush reuses this read
   // instead of issuing a second batch for the same item.
-  inFlight.set(itemId, promise);
-  promise.finally(() => {
-    if (inFlight.get(itemId) === promise) inFlight.delete(itemId);
-  });
+  inFlight.set(itemId, entry);
   if (!queue.scheduled) {
     queue.scheduled = true;
     queueMicrotask(() => flushBatchItemSLA(workspaceId, queue));
@@ -117,9 +126,9 @@ function enqueueBatchItemSLA(itemId, workspaceId) {
 }
 
 async function flushBatchItemSLA(workspaceId, queue) {
-  pendingByWorkspace.delete(workspaceId);
+  if (pendingByWorkspace.get(workspaceId) === queue) pendingByWorkspace.delete(workspaceId);
   const ids = [...queue.ids];
-  const generation = stateGeneration;
+  for (const entry of queue.waiters.values()) entry.started = true;
   const results = new Map();
   const chunks = [];
   for (let i = 0; i < ids.length; i += BATCH_ID_LIMIT) {
@@ -143,40 +152,34 @@ async function flushBatchItemSLA(workspaceId, queue) {
   for (const itemId of ids) {
     const waiter = queue.waiters.get(itemId);
     if (!waiter) continue;
-    if (!results.has(itemId)) {
-      // Leave the cache untouched so the next mount retries the batch.
-      waiter.resolve([]);
-      continue;
-    }
-    const value = results.get(itemId);
-    if (generation === stateGeneration) {
-      stateCache.set(itemId, { value, at: Date.now() });
-      pruneCache(stateCache);
-    }
-    waiter.resolve(value);
+    waiter.resolve(settleItemSLA(itemId, waiter, results.get(itemId) ?? [], results.has(itemId)));
   }
 }
 
-// fetchItemSLA issues the per-item read and caches the result.
-function fetchItemSLA(itemId) {
-  const generation = stateGeneration;
-  let request;
-  request = sla
+// Keep ownership until the transport settles. Invalidated readers share one
+// replacement read; a stale response never reaches the cache or mounted badges.
+function settleItemSLA(itemId, entry, value, cacheable) {
+  if (inFlight.get(itemId) !== entry) return [];
+  inFlight.delete(itemId);
+  if (entry.invalidated) return getItemSLA(itemId, entry.workspaceId);
+  if (cacheable) {
+    stateCache.set(itemId, { value, at: Date.now(), workspaceId: entry.workspaceId });
+    pruneCache(stateCache);
+  }
+  return value;
+}
+
+function fetchItemSLA(itemId, workspaceId) {
+  const entry = { promise: null, workspaceId, started: true, invalidated: false };
+  entry.promise = sla
     .getItemSLA(itemId, BACKGROUND_READ)
     .then((value) => {
-      if (generation === stateGeneration) {
-        stateCache.set(itemId, { value: value ?? [], at: Date.now() });
-        pruneCache(stateCache);
-      }
-      return value ?? [];
+      return settleItemSLA(itemId, entry, value ?? [], true);
     })
-    .catch(() => [])
-    .finally(() => {
-      if (inFlight.get(itemId) === request) inFlight.delete(itemId);
-    });
+    .catch(() => settleItemSLA(itemId, entry, [], false));
 
-  inFlight.set(itemId, request);
-  return request;
+  inFlight.set(itemId, entry);
+  return entry.promise;
 }
 
 /**
@@ -244,12 +247,15 @@ export async function getSLAThresholds(workspaceId) {
  * Invalidate cached item states only. The board's wall-clock tick and
  * refresh-work-items use this so threshold configuration stays cached.
  */
-export function invalidateSLAState() {
-  stateGeneration++;
-  inFlight.clear();
-  stateCache.clear();
-  // Waiters of an in-flight batch still resolve with the values they fetched.
-  pendingByWorkspace.clear();
+export function invalidateSLAState(detail = {}) {
+  for (const [itemId, entry] of stateCache) {
+    if (workItemRefreshTouchesItem(detail, itemId, entry.workspaceId)) stateCache.delete(itemId);
+  }
+  for (const [itemId, entry] of inFlight) {
+    if (entry.started && workItemRefreshTouchesItem(detail, itemId, entry.workspaceId)) {
+      entry.invalidated = true;
+    }
+  }
 }
 
 /**
@@ -280,10 +286,14 @@ export function onSLAThresholdsInvalidated(listener) {
 
 /** Clear all state and threshold caches, e.g. on session reset. */
 export function resetSLAState() {
-  invalidateSLAState();
+  stateCache.clear();
+  inFlight.clear();
+  pendingByWorkspace.clear();
   invalidateSLAThresholds(null);
 }
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('refresh-work-items', invalidateSLAState);
+  window.addEventListener('refresh-work-items', (event) =>
+    invalidateSLAState(/** @type {CustomEvent} */ (event).detail)
+  );
 }

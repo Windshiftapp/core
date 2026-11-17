@@ -15,15 +15,24 @@ import (
 
 // UserSCMTokenHandler handles user-level SCM OAuth token management
 type UserSCMTokenHandler struct {
-	repo       *repository.UserSCMTokenRepository
-	encryption *sso.SecretEncryption
+	httpClients *scm.HTTPClientPool
+	repo        *repository.UserSCMTokenRepository
+	encryption  *sso.SecretEncryption
 }
 
 // NewUserSCMTokenHandler creates a new user SCM token handler
-func NewUserSCMTokenHandler(repo *repository.UserSCMTokenRepository, encryption *sso.SecretEncryption) *UserSCMTokenHandler {
+func NewUserSCMTokenHandler(repo *repository.UserSCMTokenRepository, encryption *sso.SecretEncryption, pools ...*scm.HTTPClientPool) *UserSCMTokenHandler {
+	var pool *scm.HTTPClientPool
+	if len(pools) > 0 {
+		pool = pools[0]
+	}
+	if pool == nil {
+		pool = scm.NewHTTPClientPool()
+	}
 	return &UserSCMTokenHandler{
-		repo:       repo,
-		encryption: encryption,
+		httpClients: pool,
+		repo:        repo,
+		encryption:  encryption,
 	}
 }
 
@@ -150,6 +159,7 @@ func (h *UserSCMTokenHandler) attemptRemoteRevoke(ctx context.Context, userID, p
 	}
 
 	provider, err := scm.NewProvider(scm.ProviderConfig{
+		HTTPClientPool:    h.httpClients,
 		ProviderType:      info.ProviderType,
 		AuthMethod:        models.SCMAuthMethodOAuth,
 		BaseURL:           info.BaseURL,

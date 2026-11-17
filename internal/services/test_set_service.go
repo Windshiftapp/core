@@ -36,6 +36,10 @@ func (s *TestSetService) List(workspaceID int) ([]models.TestSet, error) {
 	return s.repo.FindAllWithStats(workspaceID)
 }
 
+func (s *TestSetService) ListPage(workspaceID, limit, offset int) ([]models.TestSet, int, error) {
+	return s.repo.FindPageWithStats(workspaceID, limit, offset)
+}
+
 func (s *TestSetService) Get(id, workspaceID int) (*models.TestSet, error) {
 	return s.repo.FindByID(id, workspaceID)
 }

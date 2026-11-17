@@ -68,7 +68,7 @@ func NewGitHubProvider(cfg ProviderConfig) (*GitHubProvider, error) {
 		appID:        cfg.GitHubAppID,
 	}
 	provider.baseProvider = baseProvider{
-		httpClient:          newSCMHTTPClient(30 * time.Second),
+		httpClient:          cfg.httpClient(),
 		setAuthHeader:       provider.setAuthHeader,
 		handleErrorResponse: provider.handleErrorResponse,
 	}

@@ -374,6 +374,7 @@ func (h *SCMProviderHandler) exchangeOAuthCode(ctx context.Context, params oauth
 	switch params.providerType {
 	case models.SCMProviderTypeGitHub:
 		cfg := scm.ProviderConfig{
+			HTTPClientPool:    h.httpClients,
 			ProviderType:      params.providerType,
 			AuthMethod:        models.SCMAuthMethodOAuth,
 			OAuthClientID:     params.clientID,
@@ -397,6 +398,7 @@ func (h *SCMProviderHandler) exchangeOAuthCode(ctx context.Context, params oauth
 
 	case models.SCMProviderTypeGitea:
 		cfg := scm.ProviderConfig{
+			HTTPClientPool:    h.httpClients,
 			ProviderType:      params.providerType,
 			AuthMethod:        models.SCMAuthMethodOAuth,
 			BaseURL:           params.baseURL,
@@ -421,6 +423,7 @@ func (h *SCMProviderHandler) exchangeOAuthCode(ctx context.Context, params oauth
 
 	case models.SCMProviderTypeGitLab:
 		cfg := scm.ProviderConfig{
+			HTTPClientPool:    h.httpClients,
 			ProviderType:      params.providerType,
 			AuthMethod:        models.SCMAuthMethodOAuth,
 			BaseURL:           params.baseURL,
@@ -484,6 +487,7 @@ func (h *SCMProviderHandler) fetchSCMUserInfo(ctx context.Context, providerType 
 	switch providerType {
 	case models.SCMProviderTypeGitHub:
 		cfg := scm.ProviderConfig{
+			HTTPClientPool:   h.httpClients,
 			ProviderType:     providerType,
 			AuthMethod:       models.SCMAuthMethodOAuth,
 			OAuthAccessToken: accessToken,
@@ -504,6 +508,7 @@ func (h *SCMProviderHandler) fetchSCMUserInfo(ctx context.Context, providerType 
 
 	case models.SCMProviderTypeGitea:
 		cfg := scm.ProviderConfig{
+			HTTPClientPool:   h.httpClients,
 			ProviderType:     providerType,
 			AuthMethod:       models.SCMAuthMethodOAuth,
 			BaseURL:          baseURL,
@@ -524,7 +529,7 @@ func (h *SCMProviderHandler) fetchSCMUserInfo(ctx context.Context, providerType 
 		info.avatarURL = scmUser.AvatarURL
 
 	case models.SCMProviderTypeGitLab:
-		cfg := scm.ProviderConfig{ProviderType: providerType, AuthMethod: models.SCMAuthMethodOAuth, BaseURL: baseURL, OAuthAccessToken: accessToken}
+		cfg := scm.ProviderConfig{HTTPClientPool: h.httpClients, ProviderType: providerType, AuthMethod: models.SCMAuthMethodOAuth, BaseURL: baseURL, OAuthAccessToken: accessToken}
 		gitlabProvider, err := scm.NewGitLabProvider(cfg)
 		if err != nil {
 			slog.Warn("failed to create GitLab provider for user info", slog.String("component", "scm"), slog.Any("error", err))

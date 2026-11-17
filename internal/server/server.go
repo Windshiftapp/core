@@ -180,6 +180,7 @@ type Server struct {
 	// integration OAuth surfaces; set during wiring, used to revoke provider
 	// grants when a user is offboarded.
 	secretEncryption    *sso.SecretEncryption
+	scmHTTPClients      *scm.HTTPClientPool
 	issueSyncStopChan   chan struct{}
 	magicLinkStopChan   chan struct{}
 	cleanupStopChan     chan struct{}
@@ -937,12 +938,13 @@ func (s *Server) initialize() error {
 
 	ssoHandler := handlers.NewSSOHandler(s.db, sessionManager, permService, emailVerificationService, s.pluginManager, cfg.Auth.SessionSecret, baseURL, cfg.AllowedHosts, cfg.DisableCSRF, ipExtractor, cfg.UseProxy, additionalProxyList)
 
-	scmProviderHandler := handlers.NewSCMProviderHandler(s.db, cfg.Auth.SessionSecret, baseURL)
+	s.scmHTTPClients = scm.NewHTTPClientPool()
+	scmProviderHandler := handlers.NewSCMProviderHandler(s.db, cfg.Auth.SessionSecret, baseURL, s.scmHTTPClients)
 	s.secretEncryption = scmProviderHandler.GetEncryption()
 	scmWorkspaceRepo := repository.NewSCMWorkspaceRepository(s.db)
-	scmWorkspaceHandler := handlers.NewSCMWorkspaceHandler(scmWorkspaceRepo, scmProviderHandler.GetEncryption(), scmProviderHandler, scm.NewCredentialResolver(s.db, scmProviderHandler.GetEncryption()), permService, baseURL)
-	scmItemLinksHandler := handlers.NewSCMItemLinksHandler(s.db, scmProviderHandler.GetEncryption(), permService, baseURL)
-	userSCMTokenHandler := handlers.NewUserSCMTokenHandler(repository.NewUserSCMTokenRepository(s.db), scmProviderHandler.GetEncryption())
+	scmWorkspaceHandler := handlers.NewSCMWorkspaceHandler(scmWorkspaceRepo, scmProviderHandler.GetEncryption(), scmProviderHandler, scm.NewCredentialResolver(s.db, scmProviderHandler.GetEncryption(), s.scmHTTPClients), permService, baseURL)
+	scmItemLinksHandler := handlers.NewSCMItemLinksHandler(s.db, scmProviderHandler.GetEncryption(), permService, baseURL, s.scmHTTPClients)
+	userSCMTokenHandler := handlers.NewUserSCMTokenHandler(repository.NewUserSCMTokenRepository(s.db), scmProviderHandler.GetEncryption(), s.scmHTTPClients)
 	milestonePlanningService := services.NewPlanningService(s.db)
 	milestonePlanningService.SetSCMWorkspaceRepository(scmWorkspaceRepo)
 
@@ -951,7 +953,7 @@ func (s *Server) initialize() error {
 	agentSecurityRepo := repository.NewAgentSecurityRepository(s.db)
 	agentIdentitySvc, _ := services.NewAgentActingIdentityService(services.NewUserReadService(s.db), agentSecurityRepo)
 	agentBindingRepo := repository.NewWorkspaceAgentBindingRepository(s.db)
-	scmCredResolver := scm.NewCredentialResolver(s.db, scmProviderHandler.GetEncryption())
+	scmCredResolver := scm.NewCredentialResolver(s.db, scmProviderHandler.GetEncryption(), s.scmHTTPClients)
 
 	// AI handlers and agents share embedded or configured prompt overrides.
 	promptStore := llm.NewPromptStore(cfg.LLM.PromptsDir)
@@ -1138,9 +1140,9 @@ func (s *Server) initialize() error {
 	s.todoistSyncScheduler = scheduler.NewTodoistSyncScheduler(s.db, scmProviderHandler.GetEncryption())
 	s.todoistSyncScheduler.Start()
 
-	scmSyncService := scm.NewSyncService(s.db, scmProviderHandler.GetEncryption())
+	scmSyncService := scm.NewSyncService(s.db, scmProviderHandler.GetEncryption(), s.scmHTTPClients)
 
-	issueSyncService := scm.NewIssueSyncService(s.db, scmProviderHandler.GetEncryption())
+	issueSyncService := scm.NewIssueSyncService(s.db, scmProviderHandler.GetEncryption(), s.scmHTTPClients)
 	issueSyncService.SetUserService(services.NewUserReadService(s.db))
 	issueSyncHandler := handlers.NewIssueSyncHandler(issueSyncService, permService, logger.NewAuditor(s.db))
 	issueSyncHandler.SetSyncConfigChanged(func() { s.refreshIssueSyncLoop(issueSyncService) })
@@ -1961,7 +1963,7 @@ func (s *Server) initialize() error {
 	if !cfg.DisableCSRF {
 		v2CSRF = middleware.NewCSRFValidator(csrfOrigins)
 	}
-	planningCredentialResolver := scm.NewCredentialResolver(s.db, scmProviderHandler.GetEncryption())
+	planningCredentialResolver := scm.NewCredentialResolver(s.db, scmProviderHandler.GetEncryption(), s.scmHTTPClients)
 	planningApplication := services.NewPlanningApplicationService(
 		milestonePlanningService,
 		permService,
@@ -2656,6 +2658,9 @@ func isAPIPath(p string) bool {
 
 // cleanup releases all resources.
 func (s *Server) cleanup() {
+	if s.scmHTTPClients != nil {
+		defer s.scmHTTPClients.CloseIdleConnections()
+	}
 	// New also calls cleanup after a partially completed initialize. Signal any
 	// loops already started there, even when Shutdown was never reachable.
 	s.stopBackgroundLoops()
@@ -3147,14 +3152,7 @@ func (a *scmCredsAdapter) tokenFromCreds(ctx context.Context, connectionID int, 
 // the same provider already (it just calls GetInstallationAccessToken
 // internally on the first authenticated request).
 func (a *scmCredsAdapter) mintGitHubAppToken(ctx context.Context, creds *scm.ProviderCredentials) (string, error) {
-	provider, err := scm.NewProvider(scm.ProviderConfig{
-		ProviderType:            creds.ProviderType,
-		AuthMethod:              creds.AuthMethod,
-		BaseURL:                 creds.BaseURL,
-		GitHubAppID:             creds.GitHubAppID,
-		GitHubAppPrivateKey:     creds.GitHubAppPrivateKey,
-		GitHubAppInstallationID: creds.GitHubAppInstallationID,
-	})
+	provider, err := a.cr.CreateProvider(creds)
 	if err != nil {
 		return "", fmt.Errorf("build provider: %w", err)
 	}

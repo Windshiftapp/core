@@ -313,6 +313,7 @@ func (h *SCMProviderHandler) DiscoverGitHubAppInstallations(w http.ResponseWrite
 
 	// Create GitHub provider with App credentials for discovery
 	cfg := scm.ProviderConfig{
+		HTTPClientPool:      h.httpClients,
 		ProviderType:        models.SCMProviderTypeGitHub,
 		AuthMethod:          models.SCMAuthMethodGitHubApp,
 		GitHubAppID:         req.AppID,
@@ -409,6 +410,7 @@ func (h *SCMProviderHandler) RefreshGitHubAppInstallation(w http.ResponseWriter,
 
 	// Create provider and find installation for org
 	cfg := scm.ProviderConfig{
+		HTTPClientPool:      h.httpClients,
 		ProviderType:        models.SCMProviderTypeGitHub,
 		AuthMethod:          models.SCMAuthMethodGitHubApp,
 		GitHubAppID:         ghAppID.String,

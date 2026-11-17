@@ -200,6 +200,8 @@ export default {
       "viewDetails": "상세 정보 보기"
     },
     "trace": {
+      "apiCalls": "API 호출",
+      "consoleTruncated": "콘솔 출력이 잘렸습니다",
       "title": "실행 상세 정보",
       "noSteps": "기록된 실행 단계가 없습니다",
       "setStatus": "상태를 \"{from}\"에서 \"{to}\"(으)로 변경했습니다",

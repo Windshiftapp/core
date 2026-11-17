@@ -729,10 +729,24 @@ type oauthRefreshRotation struct {
 	NewRefreshID int
 }
 
-// rotateRefreshToken atomically claims the presented refresh token, creates
-// its replacement credential pair, links the lineage, and expires the old
-// access token. No credential is returned unless every write commits.
+// rotateRefreshToken prepares credentials before atomically claiming the old
+// refresh token, inserting the replacement pair, linking lineage, and expiring
+// old access. No credential is returned unless every write commits.
 func (h *OAuthHandler) rotateRefreshToken(ctx context.Context, client *oauthClientRow, old *oauthRefreshTokenRow, scopes []string, resource string) (*oauthRefreshRotation, error) {
+	prepared, err := h.tokenManager.PrepareToken(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("mint replacement access token: %w", err)
+	}
+	refreshPlain, err := generateOAuthRefreshToken()
+	if err != nil {
+		return nil, fmt.Errorf("generate replacement refresh token: %w", err)
+	}
+	refreshHash := hashRefreshToken(refreshPlain)
+	scopesJSON, err := json.Marshal(scopes)
+	if err != nil {
+		return nil, fmt.Errorf("marshal replacement scopes: %w", err)
+	}
+
 	tx, err := h.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin refresh rotation: %w", err)
@@ -757,25 +771,17 @@ func (h *OAuthHandler) rotateRefreshToken(ctx context.Context, client *oauthClie
 
 	accessExpiresAt := time.Now().Add(oauthAccessTTL)
 	tokenName := fmt.Sprintf("oauth-%s", client.Slug)
-	access, err := h.tokenManager.CreateTokenInTx(tx, old.AgentID, models.APITokenCreate{
+	access, err := h.tokenManager.CreatePreparedTokenInTx(tx, old.AgentID, models.APITokenCreate{
 		Name:          tokenName,
 		Permissions:   scopes,
 		ExpiresAt:     &accessExpiresAt,
 		OAuthClientID: client.ClientID,
 		OAuthResource: resource,
-	})
+	}, prepared)
 	if err != nil {
 		return nil, fmt.Errorf("mint replacement access token: %w", err)
 	}
 
-	refreshPlain, err := generateOAuthRefreshToken()
-	if err != nil {
-		return nil, fmt.Errorf("generate replacement refresh token: %w", err)
-	}
-	scopesJSON, err := json.Marshal(scopes)
-	if err != nil {
-		return nil, fmt.Errorf("marshal replacement scopes: %w", err)
-	}
 	var newRefreshID int
 	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO oauth_refresh_tokens (
@@ -783,7 +789,7 @@ func (h *OAuthHandler) rotateRefreshToken(ctx context.Context, client *oauthClie
 			scopes, resource_uri, expires_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING id
-	`, hashRefreshToken(refreshPlain), access.APIToken.ID, client.ClientID,
+	`, refreshHash, access.APIToken.ID, client.ClientID,
 		old.UserID, old.AgentID, string(scopesJSON), nullStringOrEmpty(resource),
 		time.Now().Add(oauthRefreshTTL)).Scan(&newRefreshID); err != nil {
 		return nil, fmt.Errorf("record replacement refresh token: %w", err)

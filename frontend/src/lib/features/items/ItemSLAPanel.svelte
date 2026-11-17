@@ -5,7 +5,7 @@
   import Clock from '@lucide/svelte/icons/clock';
   import { t } from '../../stores/i18n.svelte.js';
   import { formatInstant } from '../../utils/dateFormatter.js';
-  import { onWorkItemRefresh, workItemRefreshTouchesWorkspace } from '../../stores/workItemRefresh.js';
+  import { onWorkItemRefresh, workItemRefreshTouchesItem } from '../../stores/workItemRefresh.js';
   import { getItemSLA } from '../sla/slaState.js';
   import { canRunBackgroundSync, onBackgroundSyncAvailable } from '../../utils/backgroundSync.js';
 
@@ -83,14 +83,12 @@
     return () => clearInterval(timer);
   });
 
-  // Item mutations (status, assignee, comments, etc.) are broadcast globally;
-  // refresh the derived SLA state when they happen. Reading through slaState
-  // means the panel and any SLA badges in the same workspace share one batch,
-  // and a burst in another workspace is skipped entirely.
+  // The shared cache invalidates changed items before this debounced refresh.
+  // Panel and badges reuse its read, including mutations during a pending read.
   $effect(() =>
     onWorkItemRefresh((detail) => {
-      if (!workItemRefreshTouchesWorkspace(detail, workspaceId)) return;
-      refreshBackground(true);
+      if (!workItemRefreshTouchesItem(detail, itemId, workspaceId)) return;
+      refreshBackground();
     })
   );
 

@@ -194,6 +194,43 @@ func (r *TestCaseBDDRepository) FindSnapshotsForRun(runID int) ([]models.TestRun
 	return snapshots, nil
 }
 
+// FindSnapshot returns one case's frozen specification within a run.
+func (r *TestCaseBDDRepository) FindSnapshot(runID, testCaseID int) (*models.TestRunCaseSnapshot, error) {
+	var snap models.TestRunCaseSnapshot
+	err := r.db.QueryRow(`
+		SELECT id, run_id, test_case_id, title, COALESCE(preconditions, ''), gherkin, spec, created_at
+		FROM test_run_case_snapshots
+		WHERE run_id = ? AND test_case_id = ?
+	`, runID, testCaseID).Scan(&snap.ID, &snap.RunID, &snap.TestCaseID, &snap.Title,
+		&snap.Preconditions, &snap.Gherkin, &snap.Spec, &snap.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan BDD run snapshot: %w", err)
+	}
+	return &snap, nil
+}
+
+// FindExampleResult returns one example in a workspace-scoped run.
+func (r *TestCaseBDDRepository) FindExampleResult(runID, workspaceID, testCaseID, exampleIndex int) (*models.TestExampleResult, error) {
+	result, err := scanExampleResult(r.db.QueryRow(`
+		SELECT er.id, er.run_id, er.test_case_id, er.example_index, er.row_values,
+		       er.status, COALESCE(er.actual_result, ''), COALESCE(er.notes, ''),
+		       er.executed_at, er.created_at, er.updated_at
+		FROM test_example_results er
+		JOIN test_runs run ON run.id = er.run_id
+		WHERE er.run_id = ? AND run.workspace_id = ? AND er.test_case_id = ? AND er.example_index = ?
+	`, runID, workspaceID, testCaseID, exampleIndex))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 // FindExampleResultsForRun returns every example execution result recorded
 // for a workspace-scoped run.
 func (r *TestCaseBDDRepository) FindExampleResultsForRun(runID, workspaceID int) ([]models.TestExampleResult, error) {

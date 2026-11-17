@@ -172,11 +172,23 @@ func (s *LabelApplicationService) applyItemLabels(actor AuditActor, item *models
 		if !labelSetsDiffer(before, after) {
 			return nil
 		}
-		afterIDs := make([]int, len(after))
-		for i := range after {
-			afterIDs[i] = after[i].ID
+		existing := make(map[int]bool, len(before))
+		for _, label := range before {
+			existing[label.ID] = true
 		}
-		if err := s.labels.ReplaceItemLabelsTx(context.Background(), tx, item.ID, afterIDs); err != nil {
+		var added, removed []int
+		for _, label := range after {
+			if !existing[label.ID] {
+				added = append(added, label.ID)
+			}
+			delete(existing, label.ID)
+		}
+		for _, label := range before {
+			if existing[label.ID] {
+				removed = append(removed, label.ID)
+			}
+		}
+		if err := s.labels.ApplyItemLabelDeltaTx(context.Background(), tx, item.ID, added, removed); err != nil {
 			return err
 		}
 		if err := recordLabelChangeFact(s.db, tx, item, before, after, actor); err != nil {

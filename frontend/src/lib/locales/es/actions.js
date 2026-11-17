@@ -178,6 +178,8 @@ export default {
 
     // Execution trace
     trace: {
+      apiCalls: 'Llamadas a la API',
+      consoleTruncated: 'Salida de consola truncada',
       title: 'Detalles de Ejecución',
       noSteps: 'No se registraron pasos de ejecución',
       setStatus: 'Estado cambiado de "{from}" a "{to}"',

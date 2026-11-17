@@ -695,6 +695,11 @@ func (as *ActionService) executeActionForEvent(executionCtx context.Context, act
 		return err
 	}
 	action = boundAction
+	// Resolve identity from the frozen definition before persisting attribution.
+	if action.ActorUserID != nil && *action.ActorUserID > 0 {
+		effectiveActorID = *action.ActorUserID
+		log.EffectiveActorUserID = &effectiveActorID
+	}
 	if log.ID == 0 {
 		logID, err := as.repo.CreateExecutionLog(log)
 		if err != nil {
@@ -708,14 +713,6 @@ func (as *ActionService) executeActionForEvent(executionCtx context.Context, act
 			)
 		}
 		log.ID = logID
-	}
-
-	// Resolve the effective actor: action.ActorUserID overrides the triggering
-	// user (subject to action.set_actor permission, enforced at CRUD time).
-	// A null override means the action runs under the triggering user's rights.
-	if action.ActorUserID != nil && *action.ActorUserID > 0 {
-		effectiveActorID = *action.ActorUserID
-		log.EffectiveActorUserID = &effectiveActorID
 	}
 
 	if isSCMActionTrigger(action.TriggerType) && effectiveActorID <= 0 {

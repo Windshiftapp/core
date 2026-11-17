@@ -71,6 +71,7 @@ type DurableActionEventRecorder interface {
 // SyncService handles periodic synchronization of SCM repositories
 // to detect PRs, branches, and commits linked to work items
 type SyncService struct {
+	httpClients             *HTTPClientPool
 	db                      database.Database
 	encryption              *sso.SecretEncryption
 	detector                *ItemKeyDetector
@@ -128,12 +129,13 @@ func (s *SyncService) SetContinuationStarter(st PRCommentContinuationStarter) {
 }
 
 // NewSyncService creates a new SCM sync service
-func NewSyncService(db database.Database, encryption *sso.SecretEncryption) *SyncService {
+func NewSyncService(db database.Database, encryption *sso.SecretEncryption, pools ...*HTTPClientPool) *SyncService {
 	return &SyncService{
-		db:         db,
-		encryption: encryption,
-		detector:   NewItemKeyDetector(),
-		healthRepo: repository.NewSCMHealthRepository(db),
+		httpClients: clientPoolOrNew(pools),
+		db:          db,
+		encryption:  encryption,
+		detector:    NewItemKeyDetector(),
+		healthRepo:  repository.NewSCMHealthRepository(db),
 	}
 }
 
@@ -182,7 +184,7 @@ func (s *SyncService) resolveProvider(ctx context.Context, connectionID int) (Pr
 	if s.resolveProviderOverride != nil {
 		return s.resolveProviderOverride(ctx, connectionID)
 	}
-	credResolver := NewCredentialResolver(s.db, s.encryption)
+	credResolver := NewCredentialResolver(s.db, s.encryption, s.httpClients)
 	provider, err := credResolver.GetProviderForConnection(ctx, connectionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create provider: %w", err)
@@ -406,7 +408,7 @@ func (s *SyncService) syncOAuthAgentRepositories(ctx context.Context) error {
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	resolver := NewCredentialResolver(s.db, s.encryption)
+	resolver := NewCredentialResolver(s.db, s.encryption, s.httpClients)
 	type connectionResult struct {
 		checked int
 		errors  []error
@@ -1308,9 +1310,10 @@ func (s *SyncService) getProviderInstance(providerID int) (Provider, error) {
 	}
 
 	cfg := ProviderConfig{
-		ProviderType: providerType,
-		AuthMethod:   authMethod,
-		BaseURL:      baseURL.String,
+		HTTPClientPool: s.httpClients,
+		ProviderType:   providerType,
+		AuthMethod:     authMethod,
+		BaseURL:        baseURL.String,
 	}
 
 	switch authMethod {
@@ -1358,7 +1361,7 @@ func (s *SyncService) refreshItemSCMLink(ctx context.Context, linkID int, userID
 
 	var provider Provider
 	if userID != nil {
-		credResolver := NewCredentialResolver(s.db, s.encryption)
+		credResolver := NewCredentialResolver(s.db, s.encryption, s.httpClients)
 		provider, err = credResolver.GetProviderForUser(ctx, connectionID, *userID)
 		if err != nil {
 			return fmt.Errorf("failed to get provider for user: %w", err)
@@ -1506,7 +1509,7 @@ func (s *SyncService) resolveRepoAndProvider(ctx context.Context, workspaceRepoI
 	}
 
 	// Resolve provider credentials
-	credResolver := NewCredentialResolver(s.db, s.encryption)
+	credResolver := NewCredentialResolver(s.db, s.encryption, s.httpClients)
 	connectionID := s.getConnectionIDForRepo(ctx, workspaceRepoID)
 
 	var provider Provider

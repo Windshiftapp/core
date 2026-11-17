@@ -349,6 +349,8 @@ export default {
     },
 
     trace: {
+      apiCalls: 'Вызовы API',
+      consoleTruncated: 'Вывод консоли усечён',
       title: 'Сведения о выполнении',
       noSteps: 'Шаги выполнения не записаны',
       setStatus: 'Статус изменён с «{from}» на «{to}»',

@@ -2,6 +2,7 @@ package services
 
 import (
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 )
 
 // NodeExecutor runs a single action node. New node types should be added as
@@ -54,6 +55,12 @@ type NodeAPI interface {
 // it twice for the same type replaces the prior registration (last call
 // wins, intentional so tests can swap an executor for a stub).
 func (as *ActionService) RegisterNodeExecutor(e NodeExecutor) {
+	// Bind a private copy to this instance's policy, including alternate service callers.
+	if script, ok := e.(*ExecuteScriptExecutor); ok {
+		bound := *script
+		bound.controls = operatorcontrols.From(as.db)
+		e = &bound
+	}
 	as.nodeExecMu.Lock()
 	defer as.nodeExecMu.Unlock()
 	if as.nodeExecutors == nil {

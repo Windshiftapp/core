@@ -176,6 +176,8 @@ export default {
 
     // Execution trace
     trace: {
+      apiCalls: 'استدعاءات API',
+      consoleTruncated: 'تم اقتطاع مخرجات وحدة التحكم',
       title: 'تفاصيل التنفيذ',
       noSteps: 'لم يتم تسجيل خطوات التنفيذ',
       setStatus: 'تم تغيير الحالة من "{from}" إلى "{to}"',

@@ -212,6 +212,8 @@ export default {
       triggerType: '触发器',
     },
     trace: {
+      apiCalls: 'API 调用',
+      consoleTruncated: '控制台输出已截断',
       title: '执行详情',
       noSteps: '无执行步骤记录',
       setStatus: '将状态从「{from}」更改为「{to}」',

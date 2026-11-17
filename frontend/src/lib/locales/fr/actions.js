@@ -312,6 +312,8 @@ export default {
 
     // Execution trace
     trace: {
+      apiCalls: 'Appels API',
+      consoleTruncated: 'Sortie de console tronquée',
       title: 'Détails de l’exécution',
       noSteps: 'Aucune étape d’exécution enregistrée',
       setStatus: 'Statut modifié de « {from} » à « {to} »',

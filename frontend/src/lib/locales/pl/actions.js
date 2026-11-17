@@ -341,6 +341,8 @@ export default {
 
     // Ślad wykonania
     trace: {
+      apiCalls: 'Wywołania API',
+      consoleTruncated: 'Dane konsoli zostały obcięte',
       title: 'Szczegóły wykonania',
       noSteps: 'Nie zarejestrowano kroków wykonania',
       setStatus: 'Zmieniono status z „{from}” na „{to}”',

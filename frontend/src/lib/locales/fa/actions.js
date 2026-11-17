@@ -317,6 +317,8 @@ export default {
       "triggerType": "محرک"
     },
     "trace": {
+      "apiCalls": "فراخوانی‌های API",
+      "consoleTruncated": "خروجی کنسول کوتاه شده است",
       "title": "جزئیات اجرا",
       "noSteps": "هیچ مرحله اجرایی ثبت نشده است",
       "setStatus": "وضعیت از \"{from}\" به \"{to}\" تغییر کرد",

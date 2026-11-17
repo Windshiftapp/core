@@ -17,16 +17,44 @@ type baseProvider struct {
 	handleErrorResponse func(resp *http.Response) error
 }
 
-// newSCMHTTPClient builds the HTTP client used by every SCM provider. The
-// provider base URL is operator-configured and all requests — including the
-// OAuth token exchange that carries the client secret — go to it, so the
-// client dials through the SSRF-safe dialer: a base URL (or a redirect) that
-// resolves to a loopback/RFC1918/link-local/CGNAT/metadata address is refused
-// before the handshake. Redirect-following is preserved and re-checked per hop.
+// HTTPClientPool owns credential-free HTTP plumbing shared by short-lived
+// providers. The owning service closes idle connections after draining its work.
+type HTTPClientPool struct {
+	client *http.Client
+}
+
+func NewHTTPClientPool() *HTTPClientPool {
+	return &HTTPClientPool{client: newSCMHTTPClient(30 * time.Second)}
+}
+
+func (p *HTTPClientPool) CloseIdleConnections() {
+	p.client.CloseIdleConnections()
+}
+
+func clientPoolOrNew(pools []*HTTPClientPool) *HTTPClientPool {
+	if len(pools) > 0 && pools[0] != nil {
+		return pools[0]
+	}
+	return NewHTTPClientPool()
+}
+
+func (cfg ProviderConfig) httpClient() *http.Client {
+	if cfg.HTTPClientPool != nil {
+		return cfg.HTTPClientPool.client
+	}
+	return newSCMHTTPClient(30 * time.Second)
+}
+
+// newSCMHTTPClient preserves default redirect handling and the shared TLS,
+// proxy and post-resolution SSRF policy for every new connection.
 func newSCMHTTPClient(timeout time.Duration) *http.Client {
+	transport := utils.NewSSRFSafeTransport(timeout)
+	transport.MaxConnsPerHost = 16
+	transport.MaxIdleConnsPerHost = 8
+	transport.MaxIdleConns = 100
 	return &http.Client{
 		Timeout:   timeout,
-		Transport: utils.NewSSRFSafeTransport(timeout),
+		Transport: transport,
 	}
 }
 

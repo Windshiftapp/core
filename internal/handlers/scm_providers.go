@@ -19,9 +19,10 @@ import (
 
 // SCMProviderHandler handles SCM provider management endpoints
 type SCMProviderHandler struct {
-	db         database.Database
-	encryption *sso.SecretEncryption
-	baseURL    string
+	httpClients *scm.HTTPClientPool
+	db          database.Database
+	encryption  *sso.SecretEncryption
+	baseURL     string
 }
 
 // SCMProviderResponse represents a provider for API responses (without secrets)
@@ -50,15 +51,23 @@ type SCMProviderResponse struct {
 // NewSCMProviderHandler creates a new SCM provider handler.
 // sessionSecret: session-signing secret (resolved upstream by config.Load).
 // baseURL: public URL of the application.
-func NewSCMProviderHandler(db database.Database, sessionSecret, baseURL string) *SCMProviderHandler {
+func NewSCMProviderHandler(db database.Database, sessionSecret, baseURL string, pools ...*scm.HTTPClientPool) *SCMProviderHandler {
 	if sessionSecret == "" {
 		slog.Error("NewSCMProviderHandler received empty session secret (config wiring bug)", slog.String("component", "scm"))
 		panic("config: empty session secret passed to NewSCMProviderHandler")
 	}
+	var pool *scm.HTTPClientPool
+	if len(pools) > 0 {
+		pool = pools[0]
+	}
+	if pool == nil {
+		pool = scm.NewHTTPClientPool()
+	}
 	return &SCMProviderHandler{
-		db:         db,
-		encryption: sso.NewSecretEncryption(sessionSecret),
-		baseURL:    baseURL,
+		httpClients: pool,
+		db:          db,
+		encryption:  sso.NewSecretEncryption(sessionSecret),
+		baseURL:     baseURL,
 	}
 }
 
@@ -457,9 +466,10 @@ func (h *SCMProviderHandler) TestProvider(w http.ResponseWriter, r *http.Request
 
 	// Build provider config
 	cfg := scm.ProviderConfig{
-		ProviderType: p.ProviderType,
-		AuthMethod:   p.AuthMethod,
-		BaseURL:      baseURL.String,
+		HTTPClientPool: h.httpClients,
+		ProviderType:   p.ProviderType,
+		AuthMethod:     p.AuthMethod,
+		BaseURL:        baseURL.String,
 	}
 
 	// Decrypt and set credentials based on auth method

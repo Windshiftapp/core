@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
@@ -264,41 +265,96 @@ func (tm *TokenManager) CreateToken(userID int, request models.APITokenCreate) (
 	return tm.createToken(tm.db, userID, request)
 }
 
-// CreateTokenInTx creates an API token inside an existing transaction. It is
-// used when issuing the token is only one part of a larger credential update
-// that must either commit in full or leave no usable credentials behind.
-func (tm *TokenManager) CreateTokenInTx(tx database.Tx, userID int, request models.APITokenCreate) (*models.APITokenResponse, error) {
-	return tm.createToken(tx, userID, request)
+// PreparedToken holds unpersisted credentials. Its fields stay private so callers
+// cannot substitute unhashed material or accidentally serialize the plaintext.
+type PreparedToken struct {
+	token string
+	hash  string
+}
+
+// Bound speculative credential hashing across all token managers in this process.
+// Admission never queues work or holds a database connection.
+var tokenPreparationSlots = make(chan struct{}, 4)
+
+var ErrTokenPreparationBusy = errors.New("token preparation capacity exhausted")
+
+// PrepareToken generates and hashes credentials before a caller opens its write
+// transaction. Overload and cancellation leave no persisted credential behind.
+func (tm *TokenManager) PrepareToken(ctx context.Context) (*PreparedToken, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	select {
+	case tokenPreparationSlots <- struct{}{}:
+		defer func() { <-tokenPreparationSlots }()
+	default:
+		return nil, ErrTokenPreparationBusy
+	}
+	prepared, err := tm.prepareToken()
+	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return prepared, nil
+}
+
+func (tm *TokenManager) prepareToken() (*PreparedToken, error) {
+	token, err := tm.GenerateToken()
+	if err != nil {
+		return nil, err
+	}
+	hash, err := tm.HashToken(token)
+	if err != nil {
+		return nil, err
+	}
+	return &PreparedToken{token: token, hash: hash}, nil
+}
+
+// CreatePreparedTokenInTx rechecks the user inside the credential transaction and
+// persists prehashed material. The caller must commit before exposing the response.
+func (tm *TokenManager) CreatePreparedTokenInTx(tx database.Tx, userID int, request models.APITokenCreate, prepared *PreparedToken) (*models.APITokenResponse, error) {
+	if prepared == nil || prepared.token == "" || prepared.hash == "" {
+		return nil, errors.New("missing prepared token")
+	}
+	if err := checkTokenUser(tx, userID); err != nil {
+		return nil, err
+	}
+	return tm.insertPreparedToken(tx, userID, request, prepared)
 }
 
 type tokenRowStore interface {
 	QueryRow(query string, args ...any) *sql.Row
 }
 
-func (tm *TokenManager) createToken(store tokenRowStore, userID int, request models.APITokenCreate) (*models.APITokenResponse, error) {
+func checkTokenUser(store tokenRowStore, userID int) error {
 	var userActive bool
 	if err := store.QueryRow(`SELECT COALESCE(is_active, false) FROM users WHERE id = ?`, userID).Scan(&userActive); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("user not found")
+			return fmt.Errorf("user not found")
 		}
-		return nil, fmt.Errorf("failed to load token user: %w", err)
+		return fmt.Errorf("failed to load token user: %w", err)
 	}
 	if !userActive {
-		return nil, fmt.Errorf("cannot create token for inactive user")
+		return fmt.Errorf("cannot create token for inactive user")
 	}
+	return nil
+}
 
-	// Generate and hash the token; only the response below exposes its plaintext.
-	token, err := tm.GenerateToken()
+func (tm *TokenManager) createToken(store tokenRowStore, userID int, request models.APITokenCreate) (*models.APITokenResponse, error) {
+	if err := checkTokenUser(store, userID); err != nil {
+		return nil, err
+	}
+	prepared, err := tm.prepareToken()
 	if err != nil {
 		return nil, err
 	}
+	return tm.insertPreparedToken(store, userID, request, prepared)
+}
 
-	tokenHash, err := tm.HashToken(token)
-	if err != nil {
-		return nil, err
-	}
-
-	tokenPrefix := tm.GetTokenPrefix(token)
+func (tm *TokenManager) insertPreparedToken(store tokenRowStore, userID int, request models.APITokenCreate, prepared *PreparedToken) (*models.APITokenResponse, error) {
+	tokenPrefix := tm.GetTokenPrefix(prepared.token)
 
 	permissionsJSON, err := json.Marshal(request.Permissions)
 	if err != nil {
@@ -314,7 +370,7 @@ func (tm *TokenManager) createToken(store tokenRowStore, userID int, request mod
 		)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING id
-	`, userID, request.Name, tokenHash, tokenPrefix, string(permissionsJSON), request.ExpiresAt,
+	`, userID, request.Name, prepared.hash, tokenPrefix, string(permissionsJSON), request.ExpiresAt,
 		request.IsTemporary, nullIfEmpty(request.OAuthClientID), nullIfEmpty(request.OAuthResource)).Scan(&tokenID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create token: %w", err)
@@ -328,7 +384,7 @@ func (tm *TokenManager) createToken(store tokenRowStore, userID int, request mod
 	apiToken.OAuthResource = request.OAuthResource
 
 	return &models.APITokenResponse{
-		Token:    token, // Only returned on creation
+		Token:    prepared.token, // Only returned on creation
 		APIToken: *apiToken,
 	}, nil
 }

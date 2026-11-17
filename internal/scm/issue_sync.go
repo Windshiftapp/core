@@ -22,6 +22,7 @@ import (
 
 // IssueSyncService handles synchronization of GitHub Issues into Windshift items.
 type IssueSyncService struct {
+	httpClients *HTTPClientPool
 	db          database.Database
 	encryption  *sso.SecretEncryption
 	syncMu      sync.Mutex
@@ -38,8 +39,8 @@ func (s *IssueSyncService) SetUserService(us interface {
 }
 
 // NewIssueSyncService creates a new IssueSyncService.
-func NewIssueSyncService(db database.Database, encryption *sso.SecretEncryption) *IssueSyncService {
-	return &IssueSyncService{db: db, encryption: encryption}
+func NewIssueSyncService(db database.Database, encryption *sso.SecretEncryption, pools ...*HTTPClientPool) *IssueSyncService {
+	return &IssueSyncService{db: db, encryption: encryption, httpClients: clientPoolOrNew(pools)}
 }
 
 func (s *IssueSyncService) HasEnabledSyncConfig(ctx context.Context) (bool, error) {
@@ -130,7 +131,7 @@ func (s *IssueSyncService) SyncAll(ctx context.Context) error {
 		return fmt.Errorf("iterate issue sync configs: %w", err)
 	}
 
-	credResolver := &CredentialResolver{db: s.db, encryption: s.encryption}
+	credResolver := NewCredentialResolver(s.db, s.encryption, s.httpClients)
 
 	for _, j := range jobs {
 		provider, err := credResolver.GetProviderForConnection(ctx, j.connectionID)
@@ -448,7 +449,7 @@ func (s *IssueSyncService) PushStatusToGitHub(ctx context.Context, itemID, newSt
 	// is the signal to the next inbound sync to skip one cycle (loopback
 	// prevention), so we only set it if we actually issue the GitHub PATCH.
 	// Setting it earlier and bailing on preflight would wedge the item.
-	credResolver := &CredentialResolver{db: s.db, encryption: s.encryption}
+	credResolver := NewCredentialResolver(s.db, s.encryption, s.httpClients)
 	provider, err := credResolver.GetProviderForConnection(ctx, connectionID)
 	if err != nil {
 		slog.Error("resolve provider for status pushback", "config_id", configID, "error", err)
@@ -515,7 +516,7 @@ func (s *IssueSyncService) PushCommentToGitHub(ctx context.Context, itemID, comm
 		return
 	}
 
-	credResolver := &CredentialResolver{db: s.db, encryption: s.encryption}
+	credResolver := NewCredentialResolver(s.db, s.encryption, s.httpClients)
 	provider, err := credResolver.GetProviderForConnection(ctx, connectionID)
 	if err != nil {
 		slog.Error("resolve provider for comment pushback", "error", err)
@@ -579,7 +580,7 @@ func (s *IssueSyncService) PushCommentUpdateToGitHub(ctx context.Context, commen
 		}
 	}
 
-	credResolver := &CredentialResolver{db: s.db, encryption: s.encryption}
+	credResolver := NewCredentialResolver(s.db, s.encryption, s.httpClients)
 	provider, err := credResolver.GetProviderForConnection(ctx, connectionID)
 	if err != nil {
 		slog.Error("resolve provider for comment update pushback", "error", err)
@@ -978,7 +979,7 @@ func (s *IssueSyncService) TriggerSync(ctx context.Context, configID int) error 
 		config.DefaultPriorityID = &v
 	}
 
-	credResolver := &CredentialResolver{db: s.db, encryption: s.encryption}
+	credResolver := NewCredentialResolver(s.db, s.encryption, s.httpClients)
 	provider, err := credResolver.GetProviderForConnection(ctx, connectionID)
 	if err != nil {
 		return fmt.Errorf("resolve provider: %w", err)
@@ -1173,7 +1174,7 @@ func (s *IssueSyncService) resolveProviderForRepo(ctx context.Context, workspace
 		return nil, "", fmt.Errorf("lookup repo: %w", err)
 	}
 
-	credResolver := &CredentialResolver{db: s.db, encryption: s.encryption}
+	credResolver := NewCredentialResolver(s.db, s.encryption, s.httpClients)
 	provider, err := credResolver.GetProviderForConnection(ctx, connectionID)
 	if err != nil {
 		return nil, "", err

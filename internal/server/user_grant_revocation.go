@@ -45,7 +45,7 @@ func (s *Server) revokeUserRemoteGrants(revocations []services.PendingRemoteRevo
 
 		switch rev.Kind {
 		case services.RevocationKindSCM:
-			revokeSCMGrant(enc, rev, accessToken)
+			revokeSCMGrant(enc, rev, accessToken, s.scmHTTPClients)
 		case services.RevocationKindIntegration:
 			revokeIntegrationGrant(enc, rev, accessToken)
 		default:
@@ -59,7 +59,7 @@ func (s *Server) revokeUserRemoteGrants(revocations []services.PendingRemoteRevo
 
 // revokeSCMGrant asks an SCM provider to revoke the user's OAuth token via
 // the provider's TokenRevoker capability (currently GitHub OAuth Apps).
-func revokeSCMGrant(enc *sso.SecretEncryption, rev services.PendingRemoteRevocation, accessToken string) {
+func revokeSCMGrant(enc *sso.SecretEncryption, rev services.PendingRemoteRevocation, accessToken string, pool *scm.HTTPClientPool) {
 	clientSecret, err := enc.Decrypt(rev.EncryptedClientSecret)
 	if err != nil {
 		slog.Warn("offboarding: failed to decrypt client secret; skipping remote revoke",
@@ -71,6 +71,7 @@ func revokeSCMGrant(enc *sso.SecretEncryption, rev services.PendingRemoteRevocat
 	}
 
 	provider, err := scm.NewProvider(scm.ProviderConfig{
+		HTTPClientPool:    pool,
 		ProviderType:      models.SCMProviderType(rev.ProviderType),
 		AuthMethod:        models.SCMAuthMethodOAuth,
 		BaseURL:           rev.BaseURL,

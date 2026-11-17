@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFileSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -8,13 +9,18 @@ import { gzipSync } from 'node:zlib';
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const defaultIndexPath = path.resolve(scriptDir, '../dist/index.html');
 
-const forbiddenEntryAssets = [
+const optionalLibraryAssets = [
   { name: 'Excalidraw', pattern: /(?:excalidraw|mermaid-to-excalidraw)/i },
   { name: 'Mermaid', pattern: /(?:^|[/_.-])mermaid(?:[/_.-]|$)/i },
   { name: 'Cytoscape', pattern: /(?:^|[/_.-])cytoscape(?:[/_.-]|$)/i },
+  { name: 'Milkdown', pattern: /(?:^|[/_.-])milkdown(?:editor)?(?:[/_.-]|$)/i },
   { name: 'React', pattern: /(?:^|[/_.-])react(?:-dom)?(?:[/_.-]|$)/i },
   { name: 'SvelteFlow', pattern: /(?:svelteflow|xyflow)/i },
   { name: 'D3', pattern: /(?:^|[/_.-])d3(?:[/_.-]|$)/i },
+];
+
+const forbiddenEntryAssets = [
+  ...optionalLibraryAssets,
   { name: 'desktop shell', pattern: /(?:^|\/)MainApp-/i },
   { name: 'mobile shell', pattern: /(?:^|\/)MobileShell-/i },
   { name: 'login dialog', pattern: /(?:^|\/)LoginDialog-/i },
@@ -30,6 +36,45 @@ export const ROOT_SHELL_BUDGET = Object.freeze({
   rawBytes: 50 * 1024,
   gzipBytes: 20 * 1024,
 });
+
+export const DESKTOP_SHELL_CLOSURE_BUDGET = Object.freeze({
+  rawBytes: 1_310_720,
+  gzipBytes: 440_000,
+});
+
+/** Traverse emitted static imports/re-exports once; dynamic imports stay lazy. */
+export function collectStaticClosure(entryAssets, readAsset) {
+  const visited = new Set();
+  const pending = [...entryAssets];
+  while (pending.length) {
+    const asset = pending.pop();
+    if (visited.has(asset)) continue;
+    const source = readAsset(asset);
+    visited.add(asset);
+    const patterns = [
+      /\bimport\s*(?:[\w$*{},\s]+?\s*from\s*)?["']([^"']+)["']/g,
+      /\bexport\s*(?:[\w$*{},\s]+?\s*)?from\s*["']([^"']+)["']/g,
+    ];
+    for (const pattern of patterns) {
+      for (const match of source.matchAll(pattern)) {
+        if (match[1].startsWith('.')) {
+          pending.push(
+            `./${path.posix.normalize(path.posix.join(path.posix.dirname(asset), match[1]))}`
+          );
+        }
+      }
+    }
+  }
+  return [...visited];
+}
+
+export function findForbiddenClosureAssets(assets) {
+  return assets.flatMap((asset) =>
+    optionalLibraryAssets
+      .filter(({ pattern }) => pattern.test(asset))
+      .map(({ name }) => ({ name, asset }))
+  );
+}
 
 /**
  * Return optional feature assets that index.html loads before route-level
@@ -95,7 +140,8 @@ async function main() {
   }
 
   const assetsDir = path.join(path.dirname(indexPath), '_app');
-  const rootChunkNames = (await readdir(assetsDir)).filter((name) => /^App-[^.]+\.js$/.test(name));
+  const assetNames = await readdir(assetsDir);
+  const rootChunkNames = assetNames.filter((name) => /^App-[^.]+\.js$/.test(name));
   if (rootChunkNames.length !== 1) {
     console.error(
       `Expected exactly one emitted root App chunk, found ${rootChunkNames.length}: ${rootChunkNames.join(', ')}`
@@ -124,8 +170,34 @@ async function main() {
   }
 
   console.log(
-    `Entry asset check passed: optional route/graph dependencies remain lazy; root shell ${formatKiB(rootAsset.rawBytes)} raw / ${formatKiB(rootAsset.gzipBytes)} gzip.`
+    `Root shell budget passed: ${formatKiB(rootAsset.rawBytes)} raw / ${formatKiB(rootAsset.gzipBytes)} gzip.`
   );
+
+  const shellNames = assetNames.filter((name) => /^MainApp-[^.]+\.js$/.test(name));
+  if (shellNames.length !== 1)
+    throw new Error(`Expected one MainApp chunk, found ${shellNames.length}`);
+  const readAsset = (asset) => readFileSync(path.join(assetsDir, asset), 'utf8');
+  const closure = collectStaticClosure([`./${shellNames[0]}`], readAsset);
+  const totals = closure.reduce(
+    (total, asset) => {
+      const content = readAsset(asset);
+      total.rawBytes += Buffer.byteLength(content);
+      total.gzipBytes += gzipSync(content).byteLength;
+      return total;
+    },
+    { name: 'desktop shell closure', rawBytes: 0, gzipBytes: 0 }
+  );
+  console.log(
+    `Desktop shell static closure: ${closure.length} chunks, ${totals.rawBytes} B raw / ${totals.gzipBytes} B gzip.`
+  );
+  const leaks = findForbiddenClosureAssets(closure);
+  const overBudget = findRootShellBudgetViolations(totals, DESKTOP_SHELL_CLOSURE_BUDGET);
+  if (leaks.length || overBudget.length) {
+    console.error('Desktop shell static closure regression:', { leaks, overBudget });
+    process.exitCode = 1;
+    return;
+  }
+  console.log('Entry asset check passed: optional route/graph dependencies remain lazy.');
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

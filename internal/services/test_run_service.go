@@ -548,14 +548,11 @@ type exampleContext struct {
 	result *models.TestExampleResult
 }
 
-// requireExampleContext validates that the run, case, snapshot, and example
-// index all line up, and returns the snapshot spec plus the eager example
-// result row.
+// requireExampleContext validates ownership and loads only the requested snapshot and example.
 func (s *TestRunService) requireExampleContext(workspaceID, runID, testCaseID, exampleIndex int) (*exampleContext, error) {
 	if _, err := s.repo.FindByID(runID, workspaceID); err != nil {
 		return nil, err
 	}
-	// The case must belong to the run.
 	var exists int
 	if err := s.db.QueryRow(`
 		SELECT COUNT(*) FROM test_results WHERE run_id = ? AND test_case_id = ?
@@ -566,38 +563,24 @@ func (s *TestRunService) requireExampleContext(workspaceID, runID, testCaseID, e
 		return nil, repository.ErrNotFound
 	}
 
-	snapshots, err := s.bddRepo.FindSnapshotsForRun(runID)
+	snapshot, err := s.bddRepo.FindSnapshot(runID, testCaseID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, &TestManagementValidationError{Msg: "test case is not a BDD case in this run"}
+	}
 	if err != nil {
 		return nil, err
-	}
-	var snapshot *models.TestRunCaseSnapshot
-	for i := range snapshots {
-		if snapshots[i].TestCaseID == testCaseID {
-			snapshot = &snapshots[i]
-			break
-		}
-	}
-	if snapshot == nil {
-		return nil, &TestManagementValidationError{Msg: "test case is not a BDD case in this run"}
 	}
 	var spec gherkin.ScenarioSpec
 	if err := json.Unmarshal([]byte(snapshot.Spec), &spec); err != nil {
 		return nil, fmt.Errorf("run snapshot is unreadable: %w", err)
 	}
 
-	results, err := s.bddRepo.FindExampleResultsForRun(runID, workspaceID)
+	result, err := s.bddRepo.FindExampleResult(runID, workspaceID, testCaseID, exampleIndex)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, &TestManagementValidationError{Msg: "example index does not exist for this scenario outline"}
+	}
 	if err != nil {
 		return nil, err
-	}
-	var result *models.TestExampleResult
-	for i := range results {
-		if results[i].TestCaseID == testCaseID && results[i].ExampleIndex == exampleIndex {
-			result = &results[i]
-			break
-		}
-	}
-	if result == nil {
-		return nil, &TestManagementValidationError{Msg: "example index does not exist for this scenario outline"}
 	}
 	return &exampleContext{spec: &spec, result: result}, nil
 }

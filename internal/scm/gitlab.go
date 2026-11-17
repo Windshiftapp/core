@@ -66,7 +66,7 @@ func NewGitLabProvider(cfg ProviderConfig) (*GitLabProvider, error) {
 		clientSecret: cfg.OAuthClientSecret,
 	}
 	p.baseProvider = baseProvider{
-		httpClient:          newSCMHTTPClient(30 * time.Second),
+		httpClient:          cfg.httpClient(),
 		setAuthHeader:       p.setAuthHeader,
 		handleErrorResponse: p.handleErrorResponse,
 	}

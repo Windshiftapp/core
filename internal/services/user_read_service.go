@@ -159,23 +159,7 @@ func (s *UserReadService) ListByIDs(ctx context.Context, ids []int) ([]models.Us
 
 // ListAdmin returns all users, including inactive users, with stable pagination.
 func (s *UserReadService) ListAdmin(pagination PaginationParams) ([]models.User, int, error) {
-	users, err := repository.NewUserRepository(s.db).ListAdmin()
-	if err != nil {
-		return nil, 0, err
-	}
-	total := len(users)
-	start := pagination.Offset
-	if start < 0 {
-		start = 0
-	}
-	if start > total {
-		start = total
-	}
-	end := total
-	if pagination.Limit > 0 && start+pagination.Limit < end {
-		end = start + pagination.Limit
-	}
-	return users[start:end], total, nil
+	return repository.NewUserRepository(s.db).ListAdmin(pagination.Limit, pagination.Offset)
 }
 
 // UpdateAdmin commits profile and lifecycle changes together, then invalidates

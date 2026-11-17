@@ -239,9 +239,10 @@ type WebhookPayload struct {
 
 // ProviderConfig holds configuration for creating a provider instance
 type ProviderConfig struct {
-	ProviderType models.SCMProviderType
-	AuthMethod   models.SCMAuthMethod
-	BaseURL      string // For self-hosted instances
+	HTTPClientPool *HTTPClientPool
+	ProviderType   models.SCMProviderType
+	AuthMethod     models.SCMAuthMethod
+	BaseURL        string // For self-hosted instances
 
 	// OAuth credentials
 	OAuthClientID     string

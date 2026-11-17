@@ -143,6 +143,8 @@ until their envelope has been qualified externally. Unknown or failed usage
 retains the full reservation; known usage refunds only verified unused units.
 Per-run broker quotas and conversation admission remain separate controls.
 
-Timeout/concurrency ceilings for enabled scripts (`script_timeout_ms`,
-`concurrent_scripts`) are not heap/process isolation. Keep untrusted scripts
-disabled until a separately bounded worker design is available.
+Enabled condition and action scripts share the instance-wide `concurrent_scripts`
+admission pool. `script_timeout_ms` caps both runtimes and action-script REST
+deadlines; node settings can only narrow the ceiling. Permits are released on
+success, error and cancellation. These ceilings are not heap/process isolation.
+Keep untrusted scripts disabled until a separately bounded worker design is available.

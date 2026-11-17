@@ -685,8 +685,8 @@ func registerTestPlanRoutes(builder *routeBuilder, app *services.TestManagementA
 	path := "/workspaces/{workspace_id}/test-plans"
 	builder.WorkspaceCRUD(path, "plan_id", "tests:read", "tests:write", workspaceCRUD[*models.TestSet, testPlanCreate, testPlanPatch]{
 		list: func(_ *http.Request, userID, workspaceID int, page Pagination) ([]*models.TestSet, int, error) {
-			items, err := app.ListSets(userID, workspaceID)
-			return pagePointers(items, page), len(items), err
+			items, total, err := app.ListSetsPage(userID, workspaceID, page.PageSize, page.Offset)
+			return pointerSlice(items), total, err
 		},
 		get: func(_ *http.Request, userID, workspaceID, id int) (*models.TestSet, error) {
 			return app.GetSet(userID, workspaceID, id)

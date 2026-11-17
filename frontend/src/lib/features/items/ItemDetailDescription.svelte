@@ -97,21 +97,19 @@
     onstartEditingDescription?.();
   }
 
-  // The description display is one big click-to-edit target. Links rendered
-  // inside it must keep their native behaviour: entering edit mode re-creates
-  // the editor and removes the anchor, which cancels the pending navigation in
-  // some browsers. Ignore clicks that land on a link so the browser follows it.
-  function isLinkTarget(event) {
-    return !!event.target?.closest?.('a[href]');
+  // Nested links and editor recovery controls own their interactions. Entering
+  // edit mode here would remove them before their action can complete.
+  function isInteractiveTarget(event) {
+    return !!event.target?.closest?.('a[href], button, input, textarea, select');
   }
 
   function handleDescriptionClick(event) {
-    if (isLinkTarget(event)) return;
+    if (isInteractiveTarget(event)) return;
     startEditingDescription();
   }
 
   function handleDescriptionKeydown(event) {
-    if (event.key !== 'Enter' || isLinkTarget(event)) return;
+    if (event.key !== 'Enter' || isInteractiveTarget(event)) return;
     startEditingDescription();
   }
 

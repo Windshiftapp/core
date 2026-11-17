@@ -24,7 +24,35 @@ func NewTestSetRepository(db database.Database) *TestSetRepository {
 // FindAllWithStats returns all test sets for a workspace with aggregated test case
 // counts and run statistics joined in.
 func (r *TestSetRepository) FindAllWithStats(workspaceID int) ([]models.TestSet, error) {
+	return r.findWithStats(workspaceID, 0, 0)
+}
+
+// FindPageWithStats counts matching plans and aggregates only the selected page.
+func (r *TestSetRepository) FindPageWithStats(workspaceID, limit, offset int) ([]models.TestSet, int, error) {
+	if limit <= 0 || offset < 0 {
+		return nil, 0, errors.New("test set page requires a positive limit and nonnegative offset")
+	}
+	var total int
+	if err := r.db.QueryRow(`SELECT COUNT(*) FROM test_sets WHERE workspace_id = ?`, workspaceID).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("failed to count test sets: %w", err)
+	}
+	sets, err := r.findWithStats(workspaceID, limit, offset)
+	return sets, total, err
+}
+
+func (r *TestSetRepository) findWithStats(workspaceID, limit, offset int) ([]models.TestSet, error) {
+	pageClause := ""
+	args := []any{workspaceID}
+	if limit > 0 {
+		pageClause = " LIMIT ? OFFSET ?"
+		args = append(args, limit, offset)
+	}
+	args = append(args, workspaceID)
 	rows, err := r.db.Query(`
+		WITH selected AS (
+			SELECT id FROM test_sets WHERE workspace_id = ?
+			ORDER BY id DESC`+pageClause+`
+		)
 		SELECT
 			ts.id, ts.workspace_id, ts.name, ts.description, ts.milestone_id, ts.created_at, ts.updated_at,
 			m.name as milestone_name,
@@ -39,6 +67,7 @@ func (r *TestSetRepository) FindAllWithStats(workspaceID int) ([]models.TestSet,
 		LEFT JOIN (
 			SELECT set_id, COUNT(*) as count
 			FROM set_test_cases
+			WHERE set_id IN (SELECT id FROM selected)
 			GROUP BY set_id
 		) tc_count ON ts.id = tc_count.set_id
 		LEFT JOIN (
@@ -54,12 +83,12 @@ func (r *TestSetRepository) FindAllWithStats(workspaceID int) ([]models.TestSet,
 				END as last_run_status,
 				MAX(started_at) as last_run_date
 			FROM test_runs
-			WHERE workspace_id = ?
+			WHERE workspace_id = ? AND set_id IN (SELECT id FROM selected)
 			GROUP BY set_id
 		) run_stats ON ts.id = run_stats.set_id
-		WHERE ts.workspace_id = ?
+		WHERE ts.id IN (SELECT id FROM selected)
 		ORDER BY ts.id DESC
-	`, workspaceID, workspaceID)
+	`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query test sets: %w", err)
 	}

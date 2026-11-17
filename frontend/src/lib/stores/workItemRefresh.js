@@ -19,6 +19,7 @@ const RECONCILE_DELAY_MS = 0;
  * @property {number|null} [parentId] Latest parent id in the burst.
  * @property {number[]} itemIds Every item id seen in the burst.
  * @property {number[]} parentIds Every parent id seen in the burst.
+ * @property {object[]} [changes] Individual event scopes, including unknown changes.
  */
 
 /** @type {Set<(detail: WorkItemRefresh) => void>} */
@@ -29,19 +30,22 @@ let timer = null;
 let pending = null;
 
 function emptyDetail() {
-  return { itemIds: [], parentIds: [] };
+  return { itemIds: [], parentIds: [], changes: [] };
 }
 
 function mergeDetail(current, event) {
   const detail = current ?? emptyDetail();
   const next = event?.detail ?? {};
+  detail.changes.push(next);
   if (next.item) detail.item = next.item;
   if (next.itemId != null) detail.itemId = next.itemId;
   if (next.workspaceId != null) detail.workspaceId = next.workspaceId;
   if (next.parentId != null) detail.parentId = next.parentId;
 
-  const itemId = next.itemId ?? next.item?.id;
-  if (itemId != null && !detail.itemIds.includes(itemId)) detail.itemIds.push(itemId);
+  const itemIds = [...(next.itemIds ?? []), next.itemId ?? next.item?.id];
+  for (const itemId of itemIds) {
+    if (itemId != null && !detail.itemIds.includes(itemId)) detail.itemIds.push(itemId);
+  }
   if (next.parentId != null && !detail.parentIds.includes(next.parentId)) {
     detail.parentIds.push(next.parentId);
   }
@@ -102,9 +106,24 @@ export function onWorkItemRefresh(subscriber) {
  * @returns {boolean}
  */
 export function workItemRefreshTouchesWorkspace(detail, workspaceId) {
+  if (detail?.changes) {
+    return detail.changes.some((change) => workItemRefreshTouchesWorkspace(change, workspaceId));
+  }
   const eventWorkspace = detail?.item?.workspace_id ?? detail?.workspaceId ?? null;
   if (eventWorkspace == null || workspaceId == null) return true;
   return Number(eventWorkspace) === Number(workspaceId);
+}
+
+/** Match item mutations, retaining workspace-wide and unknown-change fallbacks. */
+export function workItemRefreshTouchesItem(detail, itemId, workspaceId) {
+  if (detail?.changes) {
+    return detail.changes.some((change) => workItemRefreshTouchesItem(change, itemId, workspaceId));
+  }
+  if (!workItemRefreshTouchesWorkspace(detail, workspaceId)) return false;
+  const ids = [...(detail?.itemIds ?? []), detail?.itemId ?? detail?.item?.id]
+    .map(Number)
+    .filter((id) => Number.isInteger(id) && id > 0);
+  return ids.length === 0 || ids.includes(Number(itemId));
 }
 
 /** Test-only: drop subscribers and any pending reconciliation. */
