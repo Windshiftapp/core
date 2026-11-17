@@ -28,10 +28,10 @@
 
   const parser = createParser(widgetLibrary.toJSONSchema());
   const examplePrompts = [
-    'My open work, with counts and a table',
-    'Line chart of items created per week',
-    'Bar chart of open items per status',
-    'Pie chart of open items by priority',
+    'My open work as a table with a total',
+    'Items created per week as a line chart',
+    'Open items by status as a bar chart',
+    'Open items by priority as a pie chart',
     'Release progress as a percentage',
   ];
 
