@@ -249,6 +249,10 @@ html[data-color-mode="light"],
      ================================================================= */
   --ds-glass-bg: rgba(255, 255, 255, 0.7);
   --ds-glass-bg-subtle: rgba(255, 255, 255, 0.5);
+  /* Content cards carry text, so they use the strong wash: a lone row over a
+     busy gradient needs the extra contrast that stacked board surfaces get for
+     free from layering. */
+  --ds-glass-bg-strong: rgba(255, 255, 255, 0.92);
   /* Glass surfaces in light mode are a white wash (0.7 alpha), and they stack:
      a board swimlane, its column and its cards are three layers of it. A white
      border disappears against that, so the light theme edges glass with the

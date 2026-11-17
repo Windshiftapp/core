@@ -1409,7 +1409,7 @@
         <!-- Split layout: Tree Panel + Resize Handle + Timeline -->
         <div
           class="rounded-lg overflow-hidden flex flex-1 min-h-0 min-w-0 w-full"
-          style="border: 1px solid var(--ctx-border, var(--ds-border)); background-color: var(--ctx-surface, var(--ds-surface)); backdrop-filter: var(--ctx-backdrop, none);"
+          style="border: 1px solid var(--ctx-border, var(--ds-border)); background-color: var(--ctx-surface-strong, var(--ds-surface)); backdrop-filter: var(--ctx-backdrop, none);"
         >
           <!-- Left: Tree Panel -->
           <div
@@ -1519,7 +1519,7 @@
             <div class="shrink-0 overflow-hidden" style="height: 58px;">
               <div style={`width: ${totalWidth}px; transform: translateX(${-timelineScrollLeft}px);`}>
                 <!-- Header row: month/quarter groups -->
-                <div class="relative sticky top-0 z-30" style="height: 29px; border-bottom: 1px solid var(--ctx-border, var(--ds-border)); background-color: var(--ctx-surface, var(--ds-surface));">
+                <div class="relative sticky top-0 z-30" style="height: 29px; border-bottom: 1px solid var(--ctx-border, var(--ds-border)); background-color: var(--ctx-surface-strong, var(--ds-surface));">
                   {#each monthGroups as group}
                     <div
                       class="absolute text-xs font-medium text-center py-1.5 px-1 truncate"
@@ -1531,7 +1531,7 @@
                 </div>
 
                 <!-- Header row: column labels -->
-                <div class="flex sticky top-[29px] z-30" style="height: 29px; border-bottom: 1px solid var(--ctx-border, var(--ds-border)); background-color: var(--ctx-surface, var(--ds-surface));">
+                <div class="flex sticky top-[29px] z-30" style="height: 29px; border-bottom: 1px solid var(--ctx-border, var(--ds-border)); background-color: var(--ctx-surface-strong, var(--ds-surface));">
                   {#each headerLabels as col, i}
                     <div
                       class="flex flex-col items-center justify-center text-center shrink-0"

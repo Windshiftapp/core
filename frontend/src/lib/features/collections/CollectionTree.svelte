@@ -549,7 +549,7 @@
         </div>
 
         <!-- Table Container -->
-        <div class="rounded-xl border shadow-sm overflow-x-auto" style="{styles.glassStyle(12)}">
+        <div class="rounded-xl border shadow-sm overflow-x-auto" style="{styles.tableStyle(12)}">
           <!-- Table Header -->
           <TableHeaderBar columns={gridTemplateColumns} minWidth={gridMinWidth}>
             {#each listColumns as column (column.field_identifier)}

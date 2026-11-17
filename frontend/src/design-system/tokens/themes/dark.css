@@ -249,6 +249,9 @@ html[data-color-mode="dark"],
      ================================================================= */
   --ds-glass-bg: rgba(40, 46, 51, 0.8);
   --ds-glass-bg-subtle: rgba(40, 46, 51, 0.6);
+  /* Content cards carry text, so they use the strong wash for contrast over a
+     busy gradient. See light.css. */
+  --ds-glass-bg-strong: rgba(40, 46, 51, 0.94);
   --ds-glass-border: rgba(255, 255, 255, 0.1);
   --ds-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   --ds-glow-nav: 0 0 15px rgba(87, 157, 255, 0.25);

@@ -264,7 +264,7 @@ export function useGradientStyles() {
       if (blur <= 0) {
         return 'background-color: var(--ds-surface-raised); border-color: var(--ds-glass-border);';
       }
-      return `background-color: var(--ds-glass-bg); backdrop-filter: blur(${blur}px); border-color: var(--ds-glass-border);`;
+      return `background-color: var(--ds-glass-bg-strong); backdrop-filter: blur(${blur}px); border-color: var(--ds-glass-border);`;
     },
 
     /**
@@ -285,7 +285,7 @@ export function useGradientStyles() {
      */
     tableStyle(blur = 12) {
       return hasCustomBackground
-        ? `background-color: var(--ds-glass-bg); backdrop-filter: blur(${blur}px); border-color: var(--ds-glass-border);`
+        ? `background-color: var(--ds-glass-bg-strong); backdrop-filter: blur(${blur}px); border-color: var(--ds-glass-border);`
         : 'background-color: var(--ds-surface-raised); border-color: var(--ds-border);';
     },
 
@@ -309,6 +309,7 @@ export function useGradientStyles() {
         return `${[
           '--ctx-surface: var(--ds-glass-bg)',
           '--ctx-surface-raised: var(--ds-glass-bg)',
+          '--ctx-surface-strong: var(--ds-glass-bg-strong)',
           '--ctx-surface-overlay: var(--ds-glass-bg)',
           '--ctx-surface-info: var(--ds-glass-bg)',
           '--ctx-badge-bg: var(--ds-glass-bg)',
@@ -328,6 +329,7 @@ export function useGradientStyles() {
       return `${[
         '--ctx-surface: var(--ds-surface)',
         '--ctx-surface-raised: var(--ds-surface-raised)',
+        '--ctx-surface-strong: var(--ds-surface)',
         '--ctx-surface-overlay: var(--ds-surface-overlay)',
         '--ctx-surface-info: var(--ds-surface-information)',
         '--ctx-badge-bg: var(--ds-background-neutral)',

@@ -1,7 +1,7 @@
 <script>
   let { href = null, onclick = null, compact = false, dataTestid = undefined, children } = $props();
 
-  const bgStyle = 'backdrop-filter: var(--ctx-backdrop, none); background-color: var(--ctx-surface-raised, var(--ds-surface-card));';
+  const bgStyle = 'backdrop-filter: var(--ctx-backdrop, none); background-color: var(--ctx-surface-strong, var(--ds-surface-card));';
   const borderStyle = 'border-color: var(--ctx-border, transparent);';
 </script>
 
