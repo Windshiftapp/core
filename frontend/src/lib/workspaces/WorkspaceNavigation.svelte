@@ -11,6 +11,7 @@
   import IconChevronRight from '@tabler/icons-svelte-runes/icons/chevron-right';
   import Palette from '@tabler/icons-svelte-runes/icons/palette';
   import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
+  import IconX from '@tabler/icons-svelte-runes/icons/x';
   import Pencil from '@tabler/icons-svelte-runes/icons/pencil';
   import { workspaceViewItems, workspaceOnlyViews, testNavigationItems, visibleWorkspaceSettingsItems, workspaceSettingsViews, workspaceSettingsRoute, collectionSwitchUrl } from '../navigation/workspaceNavigation.js';
   import { viewSettingsStore } from '../stores/viewSettings.svelte.js';
@@ -516,6 +517,7 @@
   {@render resizeHandle()}
 {/snippet}
 
+<div class="workspace-nav-shell group relative flex h-full">
 {#if isCollapsed}
   <!-- Collapsed icon-only sidebar -->
   <ScrollableSidebar
@@ -667,6 +669,23 @@
     </nav>
   </ScrollableSidebar>
 {/if}
+
+  {#if !isCollapsed}
+    <!-- Collapse control on the panel's edge, matching the main navigation's
+         collapse action. Hidden until the sidebar is hovered so the resting
+         surface stays clean. -->
+    <button
+      type="button"
+      class="absolute top-1/2 right-0 z-20 inline-flex h-6 w-6 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border border-ds-border bg-ds-surface-raised text-ds-text-subtle shadow-md opacity-0 pointer-events-none transition-[opacity,background-color,color] group-hover:opacity-100 group-hover:pointer-events-auto hover:bg-ds-background-neutral-hovered hover:text-ds-text focus-visible:opacity-100 focus-visible:pointer-events-auto"
+      aria-label={t('nav.collapse')}
+      title={t('nav.collapse')}
+      data-testid="workspace-nav-close"
+      onclick={() => uiStore.wsSidebarCollapsed = true}
+    >
+      <IconX size={14} />
+    </button>
+  {/if}
+</div>
 
 <style>
   :global(.sidebar-mode-panel) {
