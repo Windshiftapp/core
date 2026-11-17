@@ -96,6 +96,33 @@ export function sourceKey(spec) {
   return JSON.stringify(sortKeys(prune(spec)));
 }
 
+function toSnakeCase(value) {
+  return value.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+}
+
+function toCamelCase(value) {
+  return value.replace(/_([a-z0-9])/g, (_, char) => char.toUpperCase());
+}
+
+function hasKey(target, key) {
+  return Object.hasOwn(target, key);
+}
+
+/**
+ * Read one path segment, accepting either naming convention. Models mix the
+ * CQL field names (`createdAt`) with the normalized row keys (`created_at`),
+ * so a miss on the exact key retries its snake_case and camelCase forms.
+ */
+function readField(target, key) {
+  if (target === null || target === undefined || typeof target !== 'object') return undefined;
+  if (hasKey(target, key)) return target[key];
+  const snake = toSnakeCase(key);
+  if (snake !== key && hasKey(target, snake)) return target[snake];
+  const camel = toCamelCase(key);
+  if (camel !== key && hasKey(target, camel)) return target[camel];
+  return undefined;
+}
+
 /**
  * Resolve a dotted field path on a normalized row. Object values fall back to
  * their `name` so grouping by `status` works on `{id, name}` objects.
@@ -105,7 +132,7 @@ export function fieldValue(row, path) {
   let current = row;
   for (const part of String(path).split('.')) {
     if (current === null || current === undefined) return undefined;
-    current = current[part];
+    current = readField(current, part);
   }
   if (Array.isArray(current)) return current;
   if (current && typeof current === 'object') {

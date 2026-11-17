@@ -68,6 +68,12 @@ Fields: `workspace`, `status`, `statusCategory`, `statusCompleted`, `priority`,
 `assignee`, `team`, `creator`, `reporter`, `milestone`, `iteration`, `project`,
 `labels`, `storyPoints`, and custom fields as `cf_<field name>`.
 
+Those names are only for the `query` string. Component `field`, `group_by`,
+`columns`, and `sort` name fields on the rows the server returns, which are
+lower snake_case: `created_at`, `updated_at`, `due_date`, `completed_at`,
+`story_points`. A line chart's date field is `created_at` or `completed_at`,
+never `createdAt`.
+
 Operators: `=`, `!=`, `<`, `<=`, `>`, `>=`, `~` (contains), `IN`, `NOT IN`,
 `IS NULL`, `IS NOT NULL`. Combine with `AND`, `OR`, `NOT`, and parentheses.
 Functions: `currentUser()`. Relative dates: `-7d`, `-24h`, `-30m`.
@@ -136,7 +142,7 @@ root = Card([
     Metric("Open", "assignee = currentUser() AND status_completed = false"),
     Metric("Overdue", "assignee = currentUser() AND dueDate < 0d")
   ]),
-  ItemsTable("assignee = currentUser() AND status_completed = false", "key,title,priority,dueDate", "", 10)
+  ItemsTable("assignee = currentUser() AND status_completed = false", "key,title,priority,due_date", "", 10)
 ])
 ```
 
@@ -149,12 +155,26 @@ so the table carries it:
 
 ```
 root = Card([
-  ItemsTable("assignee IS NULL AND status_completed = false AND createdAt <= -30d", "key,title,priority,createdAt", "createdAt", 10)
+  ItemsTable("assignee IS NULL AND status_completed = false AND createdAt <= -30d", "key,title,priority,created_at", "created_at", 10)
 ])
 ```
 
 ```
-{"item": {"ql": "assignee IS NULL AND status_completed = false AND createdAt <= -30d", "sort": "createdAt", "limit": 10}}
+{"item": {"ql": "assignee IS NULL AND status_completed = false AND createdAt <= -30d", "sort": "created_at", "limit": 10}}
+```
+
+Opened items over the last month — the line chart buckets on the creation
+date (`created_at`, not `createdAt`); a "closed" line uses `completed_at` the
+same way:
+
+```
+root = Card([
+  LineChart("createdAt >= -30d", "created_at", "week", "", 1000)
+])
+```
+
+```
+{"item": {"ql": "createdAt >= -30d", "limit": 1000}}
 ```
 
 Throughput by status over the last month:
