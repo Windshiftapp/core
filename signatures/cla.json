@@ -127,6 +127,14 @@
       "created_at": "2026-11-09T20:20:35Z",
       "repoId": 1116890888,
       "pullRequestNo": 478
+    },
+    {
+      "name": "luqmanrizal",
+      "id": 40384405,
+      "comment_id": 6937875038,
+      "created_at": "2026-11-17T04:02:22Z",
+      "repoId": 1116890888,
+      "pullRequestNo": 528
     }
   ]
 }
