@@ -693,6 +693,8 @@ export default {
     "agentRerunBusy": "正在运行",
     "agentRerunTitle": "在此项目上再次运行代理",
     "agentRerunFailed": "无法开始新的运行",
+    "agentRunning": "代理运行中…",
+    "agentQueued": "代理排队中…",
     "agentReviewFlagTitle": "需要人工审查",
     "agentReviewFlagBody": "代理误用了工具并且没有恢复 - 其输出可能不可靠。",
     "rollupItemCount": "汇总了 {count} 个项目",

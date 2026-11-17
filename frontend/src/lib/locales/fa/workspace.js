@@ -298,6 +298,8 @@ export default {
     "agentRerunBusy": "اجرا در حال انجام است",
     "agentRerunTitle": "عامل را دوباره روی این مورد اجرا کنید",
     "agentRerunFailed": "اجرای جدید شروع نشد",
+    "agentRunning": "عامل در حال اجراست…",
+    "agentQueued": "عامل در صف است…",
     "agentReviewFlagTitle": "نیاز به بررسی انسانی دارد",
     "agentReviewFlagBody": "عامل از یک ابزار سوء استفاده کرد و بازیابی نشد - خروجی آن ممکن است قابل اعتماد نباشد.",
     "created": "ایجاد شد",

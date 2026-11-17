@@ -199,6 +199,8 @@ export default {
     agentRerunBusy: 'Exécution en cours',
     agentRerunTitle: 'Exécuter à nouveau l’agent sur cet élément',
     agentRerunFailed: 'Impossible de démarrer une nouvelle exécution',
+    agentRunning: 'Agent en cours…',
+    agentQueued: 'Agent en file d’attente…',
     agentReviewFlagTitle: 'Nécessite une révision humaine',
     agentReviewFlagBody: 'L’agent a rencontré une erreur lors de l’utilisation d’un outil et n’a pas pu la corriger. Son résultat peut être peu fiable.',
     created: 'Créé',

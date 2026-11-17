@@ -667,6 +667,8 @@ export default {
     "agentRerunBusy": "Ausführung läuft",
     "agentRerunTitle": "Führen Sie den Agenten für diesen Vorgang erneut aus.",
     "agentRerunFailed": "Es konnte kein neuer Lauf gestartet werden.",
+    "agentRunning": "Agent läuft…",
+    "agentQueued": "Agent in Warteschlange…",
     "agentReviewFlagTitle": "Erfordert eine menschliche Überprüfung.",
     "agentReviewFlagBody": "Der Agent hat ein Tool missbraucht und nicht wiederhergestellt. Die Ausgabe ist möglicherweise nicht zuverlässig.",
     "rollupItemCount": "zusammengefasst über {count} Vorgänge",

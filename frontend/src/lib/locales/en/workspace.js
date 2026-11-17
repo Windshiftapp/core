@@ -290,6 +290,8 @@ export default {
     agentRerunBusy: 'Run in progress',
     agentRerunTitle: 'Run the agent again on this item',
     agentRerunFailed: 'Could not start a new run',
+    agentRunning: 'Agent running…',
+    agentQueued: 'Agent queued…',
     agentReviewFlagTitle: 'Needs human review',
     agentReviewFlagBody: "The agent misused a tool and didn't recover — its output may not be reliable.",
     created: 'Created',

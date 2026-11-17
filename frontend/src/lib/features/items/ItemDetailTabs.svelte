@@ -19,6 +19,7 @@
   import Comments from '../items/Comments.svelte';
   import ItemHistory from '../items/ItemHistory.svelte';
   import ItemAgentLog from '../items/ItemAgentLog.svelte';
+  import ItemAgentRunIndicator from '../items/ItemAgentRunIndicator.svelte';
   import { agentRuns } from '../../api/agentRuns.js';
   import { confirm } from '../../composables/useConfirm.js';
   import { dateOnlyKey, formatDateOnly, formatDueDate, getDaysOverdue, getUserTimezone } from '../../utils/dateFormatter.js';
@@ -346,6 +347,7 @@
     <!-- Tab Content -->
     <div class="pt-6" bind:this={tabPanelElement}>
       {#if tab === 'comments'}
+        <ItemAgentRunIndicator itemId={item.id} onOpenLog={() => switchTab('agent-log')} />
         <Comments itemId={item.id} workspaceId={item.workspace_id} isPersonalWorkspace={workspace?.is_personal} isPortalRequest={!!item.request_type_id} isExternalRequest={isExternalRequest(item)} enableInternalComments={workspace?.internal_comments_enabled} onCommentsLoaded={handleCommentsLoaded} />
       {:else if tab === 'details'}
         <div class="grid gap-8" data-testid="item-details-overview">

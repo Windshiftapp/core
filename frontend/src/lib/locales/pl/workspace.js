@@ -298,6 +298,8 @@ export default {
     agentRerunBusy: 'Uruchomienie w toku',
     agentRerunTitle: 'Uruchom agenta ponownie dla tego elementu',
     agentRerunFailed: 'Nie udało się rozpocząć nowego uruchomienia',
+    agentRunning: 'Agent działa…',
+    agentQueued: 'Agent w kolejce…',
     agentReviewFlagTitle: 'Wymaga przeglądu przez człowieka',
     agentReviewFlagBody: 'Agent nieprawidłowo użył narzędzia i nie odzyskał kontroli — jego wynik może być niewiarygodny.',
     created: 'Utworzono',
