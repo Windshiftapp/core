@@ -30,6 +30,8 @@
   import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
   import CheckSquare from '@lucide/svelte/icons/square-check';
   import Square from '@lucide/svelte/icons/square';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Button from '../../components/Button.svelte';
   import SearchInput from '../../components/SearchInput.svelte';
   import ViewHeader from '../../layout/ViewHeader.svelte';
   import StaticViewBackground from '../../layout/StaticViewBackground.svelte';
@@ -246,6 +248,24 @@
     itemModalStore.open(item.id, item.workspace_id ?? workspaceId);
   }
 
+  // The list view has no inline composer, so the empty state hands off to the
+  // global create modal. Global collections omit the workspace and let the
+  // modal's workspace picker decide.
+  function openCreateItemModal() {
+    window.dispatchEvent(
+      new CustomEvent('show-create-modal', {
+        detail: {
+          type: 'work-item',
+          workspaceId: workspaceId ? Number(workspaceId) : undefined,
+        },
+      })
+    );
+  }
+
+  let canCreateItem = $derived(
+    !workspaceId || workspacePermissions.canCreate(workspaceId)
+  );
+
   const deleteItem = createDeleteItemHandler({
     confirmMessage: (item) => t('collections.confirmDeleteItem', { title: item.title }),
     onDeleted: () => reloadCollection(),
@@ -265,6 +285,18 @@
 
 
 </script>
+
+{#snippet createItemAction()}
+  <!-- shortcut-guard-exempt: empty-state entry point to the global create modal, which owns the create shortcut -->
+  <Button
+    variant="primary"
+    icon={Plus}
+    onclick={openCreateItemModal}
+    dataTestid="list-empty-create-item"
+  >
+    {t('items.createItem')}
+  </Button>
+{/snippet}
 
 {#if loading}
   <div class="p-6">
@@ -347,6 +379,7 @@
           <EmptyState
             title={t('items.noItems')}
             description={t('items.createToStart')}
+            action={canCreateItem ? createItemAction : null}
           />
         {:else}
           <EmptyState
