@@ -105,6 +105,7 @@ export default {
     bulkSelectHint: 'Выберите элементы для массовых действий',
     bulkSetStatus: 'Переместить в',
     bulkSetAssignee: 'Исполнитель',
+    bulkAssigneeHint: 'Показаны только те, кого можно назначить во всех выбранных рабочих пространствах.',
     bulkSetPriority: 'Приоритет',
     bulkLabels: 'Метки',
     bulkLabelsHint: 'Добавить или убрать метки у {count} выбранных элементов',

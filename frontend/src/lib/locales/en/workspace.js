@@ -729,6 +729,7 @@ export default {
     bulkSelectHint: 'Select items to apply bulk actions',
     bulkSetStatus: 'Move to',
     bulkSetAssignee: 'Assignee',
+    bulkAssigneeHint: 'Only people assignable in every selected workspace are listed.',
     bulkSetPriority: 'Priority',
     bulkLabels: 'Labels',
     bulkLabelsHint: 'Add or remove labels on {count} selected items',

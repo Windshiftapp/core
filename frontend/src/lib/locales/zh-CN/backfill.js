@@ -164,6 +164,7 @@ export default {
     "bulkSelectHint": "选择事项以应用批量操作",
     "bulkSetStatus": "移动到",
     "bulkSetAssignee": "经办人",
+    "bulkAssigneeHint": "仅列出可在所有所选工作区中分配的人员。",
     "bulkSetPriority": "优先级",
     "bulkLabels": "标签",
     "bulkLabelsHint": "为 {count} 个所选事项添加或移除标签",

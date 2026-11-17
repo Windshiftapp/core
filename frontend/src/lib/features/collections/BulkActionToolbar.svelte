@@ -7,6 +7,7 @@
   import ModalHeader from '../../dialogs/ModalHeader.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import WorkspaceLabelCombobox from '../../pickers/WorkspaceLabelCombobox.svelte';
+  import UserPicker from '../../pickers/UserPicker.svelte';
 
   // The bottom bulk-action bar shared by the board and list views. Both views
   // pass the same selection object from useItemBulkSelection, so the actions
@@ -29,21 +30,6 @@
       onClick: () => selection.bulkMoveToStatus(target.statusId),
     }))
   );
-
-  let bulkAssigneeMenuItems = $derived([
-    {
-      id: `${menuTestidPrefix}-assignee-none`,
-      testid: `${menuTestidPrefix}-assignee-none`,
-      title: t('common.unassigned'),
-      onClick: () => selection.bulkUpdateFields({ assignee_id: null }),
-    },
-    ...selection.assignableUsers.map((user) => ({
-      id: `${menuTestidPrefix}-assignee-${user.id}`,
-      testid: `${menuTestidPrefix}-assignee-${user.id}`,
-      title: `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim() || user.username,
-      onClick: () => selection.bulkUpdateFields({ assignee_id: user.id }),
-    })),
-  ]);
 
   let bulkPriorityMenuItems = $derived([
     {
@@ -94,17 +80,15 @@
       triggerStyle="color: var(--ds-text); background-color: var(--ds-background-neutral);"
       triggerTestid={`${testidPrefix}-bulk-status`}
     />
-    <DropdownMenu
-      items={bulkAssigneeMenuItems}
-      triggerText={t('collections.bulkSetAssignee')}
-      placement="top-start"
-      maxWidth="max-w-xs"
+    <Button
+      variant="secondary"
+      size="sm"
+      onclick={selection.openBulkAssigneeModal}
       disabled={selection.bulkBusy || !selection.selectedItemsEditable}
-      triggerClass="px-3 py-1.5 rounded text-sm font-medium"
-      triggerStyle="color: var(--ds-text); background-color: var(--ds-background-neutral);"
-      triggerTestid={`${testidPrefix}-bulk-assignee`}
-      onOpen={selection.ensureAssignableUsers}
-    />
+      dataTestid={`${testidPrefix}-bulk-assignee`}
+    >
+      {t('collections.bulkSetAssignee')}
+    </Button>
     <DropdownMenu
       items={bulkPriorityMenuItems}
       triggerText={t('collections.bulkSetPriority')}
@@ -143,6 +127,45 @@
       {t('collections.bulkDone')}
     </Button>
   </div>
+
+  <Modal
+    bind:isOpen={selection.bulkAssigneeModalOpen}
+    maxWidth="max-w-lg"
+    closeOnBackdropClick={false}
+    onclose={() => (selection.bulkAssigneeModalOpen = false)}
+    dataTestid={`${testidPrefix}-bulk-assignee-modal`}
+  >
+    <ModalHeader
+      title={t('collections.bulkSetAssignee')}
+      subtitle={t('collections.bulkSelected', { count: selection.selectedCount })}
+      onclose={() => (selection.bulkAssigneeModalOpen = false)}
+    />
+    <div class="p-6">
+      <UserPicker
+        bind:value={selection.bulkAssigneeId}
+        users={selection.assignableUsers}
+        loading={selection.assignableUsersLoading}
+        showUnassigned={true}
+        unassignedLabel={t('common.unassigned')}
+        placeholder={t('pickers.searchUser')}
+        onSelect={() => (selection.bulkAssigneeChosen = true)}
+      />
+      {#if selection.bulkAssigneeSpansWorkspaces}
+        <p class="mt-2 text-xs text-ds-text-subtle">
+          {t('collections.bulkAssigneeHint')}
+        </p>
+      {/if}
+    </div>
+    <DialogFooter
+      onCancel={() => (selection.bulkAssigneeModalOpen = false)}
+      onConfirm={selection.applyBulkAssignee}
+      confirmLabel={t('common.apply')}
+      loading={selection.bulkBusy}
+      confirmDisabled={!selection.bulkAssigneeChosen}
+      confirmTestid={`${testidPrefix}-bulk-assignee-apply`}
+      cancelTestid={`${testidPrefix}-bulk-assignee-cancel`}
+    />
+  </Modal>
 
   <Modal
     bind:isOpen={selection.bulkLabelsModalOpen}

@@ -690,6 +690,7 @@ export default {
     "bulkSelectHint": "موارد را برای اعمال اقدام‌های انبوه انتخاب کنید",
     "bulkSetStatus": "انتقال به",
     "bulkSetAssignee": "مسئول",
+    "bulkAssigneeHint": "فقط افرادی که در همه فضاهای کاری انتخاب‌شده قابل تخصیص هستند نمایش داده می‌شوند.",
     "bulkSetPriority": "اولویت",
     "bulkLabels": "برچسب ها",
     "bulkLabelsHint": "برچسب‌ها را روی {count} مورد انتخابی اضافه یا حذف کنید",

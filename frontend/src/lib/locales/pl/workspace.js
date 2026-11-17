@@ -743,6 +743,7 @@ export default {
     bulkSelectHint: 'Zaznacz elementy, aby zastosować działania zbiorcze',
     bulkSetStatus: 'Przenieś do',
     bulkSetAssignee: 'Osoba przypisana',
+    bulkAssigneeHint: 'Wyświetlane są tylko osoby, które można przypisać we wszystkich wybranych obszarach roboczych.',
     bulkSetPriority: 'Priorytet',
     bulkLabels: 'Etykiety',
     bulkLabelsHint: 'Dodaj lub usuń etykiety w {count} wybranych elementach',

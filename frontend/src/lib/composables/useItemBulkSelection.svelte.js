@@ -32,9 +32,16 @@ export function useItemBulkSelection({
   let selectionMode = $state(false);
   let selectionAnchorId = $state(null);
   let bulkBusy = $state(false);
+  // Bulk assignee modal. Rosters are loaded per selected workspace and
+  // intersected: POST /items/bulk-update validates the assignee against every
+  // item's workspace and rolls the whole batch back on one mismatch, so only a
+  // user who can act in all selected workspaces is safe to offer.
   let assignableUsers = $state([]);
-  let assignableUsersLoaded = $state(false);
   let assignableUsersLoading = $state(false);
+  const assignableUsersCache = new Map();
+  let bulkAssigneeModalOpen = $state(false);
+  let bulkAssigneeId = $state(null);
+  let bulkAssigneeChosen = $state(false);
 
   let selectedIdSet = $derived(new Set(selectedIds));
   let selectedCount = $derived(selectedIds.length);
@@ -43,6 +50,18 @@ export function useItemBulkSelection({
     selectedItems.length > 0 &&
       selectedItems.every((item) => workspacePermissions.canEdit(item.workspace_id))
   );
+  // The distinct workspaces behind the current selection. A workspace-scoped
+  // view pins one id; a cross-workspace collection falls back to the items.
+  let bulkAssigneeWorkspaceIds = $derived.by(() => {
+    const scope = scopeWorkspaceId();
+    if (scope != null) return [scope];
+    const ids = new Set();
+    for (const item of selectedItems) {
+      if (item.workspace_id != null) ids.add(item.workspace_id);
+    }
+    return [...ids];
+  });
+  let bulkAssigneeSpansWorkspaces = $derived(bulkAssigneeWorkspaceIds.length > 1);
 
   // Drop ids that leave the loaded set so the toolbar never acts on stale rows.
   $effect(() => {
@@ -212,19 +231,54 @@ export function useItemBulkSelection({
     }
   }
 
-  async function ensureAssignableUsers() {
-    if (assignableUsersLoaded || assignableUsersLoading) return;
-    const scopeId = scopeWorkspaceId() ?? selectedItems[0]?.workspace_id;
-    if (!scopeId) return;
+  // Keep only users present in every roster, preserving the first roster's order.
+  function intersectUserRosters(rosters) {
+    if (rosters.length === 0) return [];
+    return rosters.reduce((common, roster) => {
+      const ids = new Set(roster.map((user) => user.id));
+      return common.filter((user) => ids.has(user.id));
+    });
+  }
+
+  async function loadAssignableUsers() {
+    const workspaceIds = bulkAssigneeWorkspaceIds;
+    if (workspaceIds.length === 0) {
+      assignableUsers = [];
+      return;
+    }
     assignableUsersLoading = true;
     try {
-      assignableUsers = (await getAssignableUsers(scopeId)) || [];
-      assignableUsersLoaded = true;
+      const rosters = await Promise.all(
+        workspaceIds.map(async (workspaceId) => {
+          const cached = assignableUsersCache.get(workspaceId);
+          if (cached) return cached;
+          const roster = (await getAssignableUsers(workspaceId)) || [];
+          assignableUsersCache.set(workspaceId, roster);
+          return roster;
+        })
+      );
+      assignableUsers = intersectUserRosters(rosters);
     } catch (error) {
+      assignableUsers = [];
       surfaceError(error, { context: 'Load assignable users', silent: true });
     } finally {
       assignableUsersLoading = false;
     }
+  }
+
+  function openBulkAssigneeModal() {
+    if (bulkBusy || !selectedItemsEditable) return;
+    bulkAssigneeId = null;
+    bulkAssigneeChosen = false;
+    bulkAssigneeModalOpen = true;
+    void loadAssignableUsers();
+  }
+
+  async function applyBulkAssignee() {
+    if (bulkBusy || !bulkAssigneeChosen) return;
+    const assigneeId = bulkAssigneeId;
+    bulkAssigneeModalOpen = false;
+    await bulkUpdateFields({ assignee_id: assigneeId });
   }
 
   return {
@@ -264,6 +318,30 @@ export function useItemBulkSelection({
     get assignableUsers() {
       return assignableUsers;
     },
+    get assignableUsersLoading() {
+      return assignableUsersLoading;
+    },
+    get bulkAssigneeSpansWorkspaces() {
+      return bulkAssigneeSpansWorkspaces;
+    },
+    get bulkAssigneeModalOpen() {
+      return bulkAssigneeModalOpen;
+    },
+    set bulkAssigneeModalOpen(value) {
+      bulkAssigneeModalOpen = value;
+    },
+    get bulkAssigneeId() {
+      return bulkAssigneeId;
+    },
+    set bulkAssigneeId(value) {
+      bulkAssigneeId = value;
+    },
+    get bulkAssigneeChosen() {
+      return bulkAssigneeChosen;
+    },
+    set bulkAssigneeChosen(value) {
+      bulkAssigneeChosen = value;
+    },
     get bulkLabelsModalOpen() {
       return bulkLabelsModalOpen;
     },
@@ -294,6 +372,7 @@ export function useItemBulkSelection({
     bulkUpdateFields,
     openBulkLabelsModal,
     applyBulkLabels,
-    ensureAssignableUsers,
+    openBulkAssigneeModal,
+    applyBulkAssignee,
   };
 }

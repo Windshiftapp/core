@@ -180,6 +180,7 @@ export default {
     "bulkSelectHint": "Vorgänge auswählen, um Massenaktionen anzuwenden",
     "bulkSetStatus": "Verschieben nach",
     "bulkSetAssignee": "Zugewiesen an",
+    "bulkAssigneeHint": "Es werden nur Personen aufgeführt, die in allen ausgewählten Arbeitsbereichen zugewiesen werden können.",
     "bulkSetPriority": "Priorität",
     "bulkLabels": "Labels",
     "bulkLabelsHint": "Labels für {count} ausgewählte Vorgänge hinzufügen oder entfernen",

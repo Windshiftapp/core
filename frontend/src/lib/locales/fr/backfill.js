@@ -192,6 +192,7 @@ export default {
     "bulkSelectHint": "Sélectionnez des éléments pour appliquer des actions groupées",
     "bulkSetStatus": "Déplacer vers",
     "bulkSetAssignee": "Responsable",
+    "bulkAssigneeHint": "Seules les personnes assignables dans tous les espaces de travail sélectionnés sont affichées.",
     "bulkSetPriority": "Priorité",
     "bulkLabels": "Étiquettes",
     "bulkLabelsHint": "Ajouter ou retirer des étiquettes sur {count} éléments sélectionnés",
