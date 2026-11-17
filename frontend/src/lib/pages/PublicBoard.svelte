@@ -276,7 +276,7 @@
           data-testid="public-board-column"
           data-column-name={column.name}
         >
-          <Card variant="flat" padding="none" class="h-full" style="background-color: var(--ds-surface-sunken); border-top: 3px solid {column.color || 'var(--ds-border)'};">
+          <Card variant="flat" padding="none" class="h-full" shadow style="background-color: var(--ds-surface-raised); border-top: 4px solid {column.color || 'var(--ds-border)'};">
             {#snippet header()}
               <div class="column-header">
                 <div class="column-heading">
