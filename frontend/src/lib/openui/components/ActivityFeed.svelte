@@ -22,7 +22,13 @@
               type="button"
               class="block truncate text-left text-sm hover:underline"
               style="color: var(--ds-text);"
-              onclick={() => chart.context?.openItem?.(Number(row.id))}
+              onclick={() => {
+                const workspaceId = Number(row?.workspace_id);
+                chart.context?.openItem?.(
+                  Number(row.id),
+                  Number.isInteger(workspaceId) && workspaceId > 0 ? workspaceId : null
+                );
+              }}
             >
               {row.title}
             </button>

@@ -567,6 +567,17 @@ export function isMainAppFooterView(view) {
   return MAIN_APP_FOOTER_VIEWS.has(resolveMainAppRoute(view).key);
 }
 
+/**
+ * Whether an item in `workspaceId` belongs to the signed-in user's personal
+ * workspace and therefore uses the personal-task surface. Personal workspaces
+ * are per-owner, so only the current user's id can match. Ids may arrive as
+ * numbers or route strings, hence the string comparison.
+ */
+export function isPersonalTaskWorkspace(workspaceId, personalWorkspaceId) {
+  if (workspaceId == null || personalWorkspaceId == null) return false;
+  return String(workspaceId) === String(personalWorkspaceId);
+}
+
 export function resolveEffectiveMainAppView(currentRoute, personalWorkspaceId) {
   if (currentRoute.view !== 'item-detail') return currentRoute.view;
 
@@ -574,7 +585,7 @@ export function resolveEffectiveMainAppView(currentRoute, personalWorkspaceId) {
     ? personalWorkspaceId
     : Number.parseInt(currentRoute.params?.id, 10);
 
-  return personalWorkspaceId && workspaceId === personalWorkspaceId
+  return isPersonalTaskWorkspace(workspaceId, personalWorkspaceId)
     ? 'personal-task-detail'
     : currentRoute.view;
 }

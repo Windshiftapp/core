@@ -24,7 +24,7 @@ const WIDGET_DATA_KEY = Symbol('windshift-openui-widget-data');
  * @property {Record<string, SourceResult>} sources keyed by sourceKey(spec)
  * @property {number|null} [assetSetId] set chosen in the builder for asset queries
  * @property {(spec: object, key: string) => void} [requestSource] fetch a spec the prefetch missed
- * @property {(itemId: number) => void} [openItem]
+ * @property {(itemId: number, workspaceId?: number|null) => void} [openItem]
  * @property {number|null} [workspaceId]
  * @property {string} [locale]
  */

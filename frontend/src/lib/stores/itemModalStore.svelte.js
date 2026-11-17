@@ -1,9 +1,10 @@
 /**
- * Single global work-item detail modal.
+ * Single global item detail modal.
  *
  * Views call `open(itemId, workspaceId)` instead of each mounting their own
- * `<ItemDetail isModal>`. `MainAppOverlays` renders the one host, so two
- * instances can never fight over the shared `itemDetailStore`.
+ * `<ItemDetail isModal>`. `MainAppOverlays` renders the one host and picks the
+ * work-item or personal-task surface from the workspace, so two instances can
+ * never fight over the shared `itemDetailStore`.
  */
 class ItemModalStore {
   itemId = $state(null);

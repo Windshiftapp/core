@@ -17,7 +17,7 @@
    *   assetSetId?: number|null,
    *   workspaceId?: number|null,
    *   requestSource?: ((spec: object, key: string) => void) | null,
-   *   openItem?: ((itemId: number) => void) | null,
+   *   openItem?: ((itemId: number, workspaceId?: number|null) => void) | null,
    *   onParseErrors?: ((errors: Array<object>) => void) | null
    * }}
    */

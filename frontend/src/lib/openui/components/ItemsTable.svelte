@@ -36,7 +36,13 @@
   function openRow(event, row) {
     if (!chart.context?.openItem) return;
     event?.preventDefault?.();
-    chart.context.openItem(Number(row.id));
+    // The workspace travels with the id so the shared item modal can tell a
+    // personal task from a work item.
+    const workspaceId = Number(row?.workspace_id);
+    chart.context.openItem(
+      Number(row.id),
+      Number.isInteger(workspaceId) && workspaceId > 0 ? workspaceId : null
+    );
   }
 
   const columns = $derived(

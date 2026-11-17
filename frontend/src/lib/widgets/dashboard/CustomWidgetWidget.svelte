@@ -161,7 +161,7 @@
     {sources}
     assetSetId={assetSetIdFromQueries(widget.queries)}
     {requestSource}
-    openItem={(itemId) => itemModalStore.open(itemId, null)}
+    openItem={(itemId, workspaceId) => itemModalStore.open(itemId, workspaceId ?? null)}
   />
 {:else}
   <div class="space-y-2" data-testid="custom-widget-loading">
