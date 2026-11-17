@@ -15,7 +15,6 @@
   import DataTable from '../components/DataTable.svelte';
   import SearchInput from '../components/SearchInput.svelte';
   import SelectField from '../components/SelectField.svelte';
-  import TextField from '../components/TextField.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import BoardSharingEditor from '../features/collections/BoardSharingEditor.svelte';
   import ConfirmWithReasonDialog from '../dialogs/ConfirmWithReasonDialog.svelte';
@@ -25,9 +24,6 @@
   let query = $state('');
   let publicationState = $state('all');
   let accessMode = $state('');
-  let workspace = $state('');
-  let owner = $state('');
-  let organisation = $state('');
   let page = $state(1);
   let rows = $state([]);
   let total = $state(0);
@@ -39,7 +35,7 @@
   let refresh = $state(0);
 
   $effect(() => {
-    const filters = { q: query, state: publicationState, access_mode: accessMode, workspace_id: workspace && workspace !== 'global' ? workspace : null, global: workspace === 'global' ? true : null, owner_id: owner || null, organisation_id: organisation || null, page, page_size: 25 };
+    const filters = { q: query, state: publicationState, access_mode: accessMode, page, page_size: 25 };
     const controller = new AbortController();
     const admin = $isSystemAdmin;
     refresh;
@@ -165,9 +161,6 @@
     <SearchInput bind:value={query} on_input={() => (page = 1)} placeholder="Search name or slug" class="min-w-[220px] flex-1 max-w-xs" dataTestid="public-boards-search" />
     <SelectField label="Publication state" value={publicationState} onchange={value => { publicationState = value; page = 1; }} options={[{ value: 'all', label: 'All' }, { value: 'enabled', label: 'Enabled' }, { value: 'disabled', label: 'Disabled' }, { value: 'revoked', label: 'Revoked' }]} dataTestid="public-boards-state" class="w-44" />
     <SelectField label="Audience" value={accessMode} onchange={value => { accessMode = value; page = 1; }} options={[{ value: '', label: 'All audiences' }, { value: 'public', label: 'Unrestricted' }, { value: 'organisations', label: 'Windshift organisations' }]} dataTestid="public-boards-access-mode" class="w-56" />
-    <TextField label="Workspace ID or global" value={workspace} oninput={event => { workspace = event.currentTarget.value; page = 1; }} dataTestid="public-boards-workspace" class="w-48" />
-    <TextField label="Owner ID" type="number" value={owner} oninput={event => { owner = event.currentTarget.value; page = 1; }} dataTestid="public-boards-owner" class="w-32" />
-    <TextField label="Allowed organisation ID" type="number" value={organisation} oninput={event => { organisation = event.currentTarget.value; page = 1; }} dataTestid="public-boards-organisation" class="w-44" />
   </div>
   {#if error}<AlertBox variant="error" message={error} />{/if}
   <DataTable {columns} data={rows} keyField="collection_id" {loading} pagination totalItems={total} pageSize={25} bind:currentPage={page} emptyMessage="No previously published boards" actionItems={buildActionItems} actionTriggerTestid={item => `public-board-actions-${item.collection_id}`} rowAttrs={item => ({ 'data-testid': `public-board-row-${item.collection_id}` })}>
