@@ -204,6 +204,13 @@ func fantasyOpenAIBaseURL(baseURL, endpointPath string) string {
 	for _, suffix := range []string{"/chat/completions", "/responses"} {
 		path = strings.TrimSuffix(path, suffix)
 	}
+	if path == "" || path == "/" {
+		return base
+	}
+	// The SDK appends /chat/completions (or /responses) to whatever base it is
+	// handed, so an API root that already carries its version — a gateway at
+	// https://<host>/v1/unified-model, say — must not receive a second /v1.
+	path = dropDuplicateVersionPrefix(base, path)
 	if path == "" || path == "/" || strings.HasSuffix(base, path) {
 		return base
 	}
