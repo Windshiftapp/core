@@ -24,15 +24,47 @@ type BriefingChange struct {
 	ChangedAt time.Time
 }
 
+// userItemScope returns the SQL predicate and arguments that restrict an item
+// join to the work a user is responsible for: items assigned to them, plus
+// every item in their personal workspaces. The predicate starts with " AND" so
+// callers append it to an existing WHERE clause. It is empty when userID is not
+// positive, which keeps the workspace-wide feed for callers that want it.
+func userItemScope(personalWorkspaceIDs []int, userID int) (clause string, args []any) {
+	if userID <= 0 {
+		return "", nil
+	}
+	clause = " AND (i.assignee_id = ?"
+	args = []any{userID}
+	if pph, pArgs := inPlaceholders(personalWorkspaceIDs); pph != "" {
+		clause += fmt.Sprintf(" OR i.workspace_id IN (%s)", pph)
+		args = append(args, pArgs...)
+	}
+	return clause + ")", args
+}
+
 // RecentItemChanges returns up to limit item-history changes across the given
 // workspaces since the supplied instant, most recent first. Returns nil when
 // no workspaces are supplied.
 func (r *ItemRepository) RecentItemChanges(workspaceIDs []int, since time.Time, limit int) ([]BriefingChange, error) {
+	return r.recentItemChanges(workspaceIDs, nil, 0, since, limit)
+}
+
+// RecentItemChangesForUser is RecentItemChanges restricted to the items the
+// user is responsible for. The briefing uses this form: a workspace-wide feed
+// is identical for every member of a workspace, so users without assigned
+// items would otherwise receive the same recap of someone else's work.
+func (r *ItemRepository) RecentItemChangesForUser(workspaceIDs, personalWorkspaceIDs []int, userID int, since time.Time, limit int) ([]BriefingChange, error) {
+	return r.recentItemChanges(workspaceIDs, personalWorkspaceIDs, userID, since, limit)
+}
+
+func (r *ItemRepository) recentItemChanges(workspaceIDs, personalWorkspaceIDs []int, userID int, since time.Time, limit int) ([]BriefingChange, error) {
 	wsIn, args := inPlaceholders(workspaceIDs)
 	if wsIn == "" {
 		return nil, nil
 	}
 	args = append(args, since)
+	scope, scopeArgs := userItemScope(personalWorkspaceIDs, userID)
+	args = append(args, scopeArgs...)
 	query := fmt.Sprintf(`SELECT ih.field_name, COALESCE(ih.old_value, ''), COALESCE(ih.new_value, ''), ih.changed_at,
 		w.key || '-' || CAST(i.workspace_item_number AS TEXT) as item_key, i.title,
 		COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.username, pc.name, 'System') as changed_by
@@ -41,8 +73,8 @@ func (r *ItemRepository) RecentItemChanges(workspaceIDs []int, since time.Time, 
 		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN users u ON ih.user_id = u.id
 		LEFT JOIN portal_customers pc ON ih.actor_portal_customer_id = pc.id
-		WHERE i.workspace_id IN (%s) AND ih.changed_at >= ?
-		ORDER BY ih.changed_at DESC LIMIT %d`, wsIn, limit)
+		WHERE i.workspace_id IN (%s) AND ih.changed_at >= ?%s
+		ORDER BY ih.changed_at DESC LIMIT %d`, wsIn, scope, limit)
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -75,11 +107,24 @@ type BriefingComment struct {
 // workspaces since the supplied instant, most recent first. Private comments
 // are excluded. Returns nil when no workspaces are supplied.
 func (r *ItemRepository) RecentComments(workspaceIDs []int, since time.Time, limit int) ([]BriefingComment, error) {
+	return r.recentComments(workspaceIDs, nil, 0, since, limit)
+}
+
+// RecentCommentsForUser is RecentComments restricted to the items the user is
+// responsible for. The briefing uses this form so a comment on a colleague's
+// item does not appear as the user's own recap.
+func (r *ItemRepository) RecentCommentsForUser(workspaceIDs, personalWorkspaceIDs []int, userID int, since time.Time, limit int) ([]BriefingComment, error) {
+	return r.recentComments(workspaceIDs, personalWorkspaceIDs, userID, since, limit)
+}
+
+func (r *ItemRepository) recentComments(workspaceIDs, personalWorkspaceIDs []int, userID int, since time.Time, limit int) ([]BriefingComment, error) {
 	wsIn, args := inPlaceholders(workspaceIDs)
 	if wsIn == "" {
 		return nil, nil
 	}
 	args = append(args, since)
+	scope, scopeArgs := userItemScope(personalWorkspaceIDs, userID)
+	args = append(args, scopeArgs...)
 	query := fmt.Sprintf(`SELECT c.content, c.created_at,
 		w.key || '-' || CAST(i.workspace_item_number AS TEXT) as item_key, i.title,
 		COALESCE(u.first_name || ' ' || u.last_name, 'Unknown') as author
@@ -87,8 +132,8 @@ func (r *ItemRepository) RecentComments(workspaceIDs []int, since time.Time, lim
 		JOIN items i ON c.item_id = i.id
 		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN users u ON c.author_id = u.id
-		WHERE i.workspace_id IN (%s) AND c.created_at >= ? AND c.is_private = false
-		ORDER BY c.created_at DESC LIMIT %d`, wsIn, limit)
+		WHERE i.workspace_id IN (%s) AND c.created_at >= ? AND c.is_private = false%s
+		ORDER BY c.created_at DESC LIMIT %d`, wsIn, scope, limit)
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -127,19 +172,14 @@ type BriefingOpenItem struct {
 // in their briefing: items assigned to the user within the accessible
 // workspaces, plus every item in the user's personal workspaces. Ordered by due
 // date ascending with undated items last. Returns nil when no workspaces are
-// supplied.
+// supplied or userID is not positive.
 func (r *ItemRepository) OpenItemsForUser(workspaceIDs, personalWorkspaceIDs []int, userID, limit int) ([]BriefingOpenItem, error) {
 	wsIn, args := inPlaceholders(workspaceIDs)
-	if wsIn == "" {
+	if wsIn == "" || userID <= 0 {
 		return nil, nil
 	}
-	args = append(args, userID)
-
-	personalClause := ""
-	if pph, pArgs := inPlaceholders(personalWorkspaceIDs); pph != "" {
-		personalClause = fmt.Sprintf(" OR i.workspace_id IN (%s)", pph)
-		args = append(args, pArgs...)
-	}
+	scope, scopeArgs := userItemScope(personalWorkspaceIDs, userID)
+	args = append(args, scopeArgs...)
 
 	query := fmt.Sprintf(`SELECT w.key, i.workspace_item_number, i.title,
 		COALESCE(st.name, ''), COALESCE(p.name, ''), COALESCE(CAST(i.due_date AS TEXT), ''),
@@ -153,9 +193,9 @@ func (r *ItemRepository) OpenItemsForUser(workspaceIDs, personalWorkspaceIDs []i
 		LEFT JOIN milestones m ON m.id = im.milestone_id
 		LEFT JOIN iterations iter ON i.iteration_id = iter.id
 		LEFT JOIN status_categories sc ON st.category_id = sc.id
-		WHERE i.workspace_id IN (%s) AND (i.assignee_id = ?%s)
+		WHERE i.workspace_id IN (%s)%s
 		AND COALESCE(sc.is_completed, FALSE) = FALSE
-		ORDER BY i.due_date ASC NULLS LAST LIMIT %d`, wsIn, personalClause, limit)
+		ORDER BY i.due_date ASC NULLS LAST LIMIT %d`, wsIn, scope, limit)
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {

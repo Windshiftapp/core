@@ -278,9 +278,19 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, looku
 		return true
 	}
 
-	// Gather context: recent activity
+	// The user's personal workspaces scope both the recent-activity feed and
+	// the open-items list below, so load them once up front.
+	personalWSIDs, err := workspaceRepo.ListActivePersonalWorkspaceIDs(userID)
+	if err != nil {
+		slog.Warn("briefing: personal workspaces query failed", slog.Int("user_id", userID), slog.Any("error", err))
+		personalWSIDs = nil
+	}
+
+	// Gather context: recent activity on the user's own items. A workspace-wide
+	// feed would be identical for every member of a workspace and let one user's
+	// changes dominate another user's briefing.
 	var activityLines []string
-	changes, err := itemRepo.RecentItemChanges(accessibleWSIDs, yesterdayStart, 50)
+	changes, err := itemRepo.RecentItemChangesForUser(accessibleWSIDs, personalWSIDs, userID, yesterdayStart, 50)
 	if err != nil {
 		slog.Warn("briefing: changes query failed", slog.Int("user_id", userID), slog.Any("error", err))
 	}
@@ -295,9 +305,9 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, looku
 		activityLines = append(activityLines, line)
 	}
 
-	// Gather context: recent comments
+	// Gather context: recent comments on the user's own items.
 	var commentLines []string
-	comments, err := itemRepo.RecentComments(accessibleWSIDs, yesterdayStart, 30)
+	comments, err := itemRepo.RecentCommentsForUser(accessibleWSIDs, personalWSIDs, userID, yesterdayStart, 30)
 	if err != nil {
 		slog.Warn("briefing: comments query failed", slog.Int("user_id", userID), slog.Any("error", err))
 	}
@@ -310,12 +320,6 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, looku
 	}
 
 	// Gather context: assigned open items, plus everything in the user's personal workspaces
-	personalWSIDs, err := workspaceRepo.ListActivePersonalWorkspaceIDs(userID)
-	if err != nil {
-		slog.Warn("briefing: personal workspaces query failed", slog.Int("user_id", userID), slog.Any("error", err))
-		personalWSIDs = nil
-	}
-
 	var itemLines []string
 	openItems, err := itemRepo.OpenItemsForUser(accessibleWSIDs, personalWSIDs, userID, 50)
 	if err != nil {
