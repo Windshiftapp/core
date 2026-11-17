@@ -98,7 +98,7 @@
     variant === 'ghost' ? 'transition-all duration-200' : 'w-full transition-all duration-200',
     variant === 'ghost'
       ? 'border-0 bg-transparent focus:outline-none focus:ring-0'
-      : 'rounded border focus:outline-none focus:ring-2 focus:ring-[var(--ds-border-focused)] focus:ring-opacity-50',
+      : 'rounded border focus:outline-none focus:ring-2 focus:ring-[var(--ds-border-focused)]',
     sizeClasses,
     className
   ));

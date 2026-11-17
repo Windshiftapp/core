@@ -40,7 +40,7 @@
   // Combine all classes
   const allClasses = $derived([
     'w-full rounded border transition-all duration-200 resize-none',
-    'focus:outline-none focus:ring-2 focus:ring-[var(--ds-border-focused)] focus:ring-opacity-50',
+    'focus:outline-none focus:ring-2 focus:ring-[var(--ds-border-focused)]',
     sizeClasses,
     className
   ].filter(Boolean).join(' '));

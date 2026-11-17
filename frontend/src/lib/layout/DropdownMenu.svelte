@@ -360,6 +360,8 @@
             <svelte:element
               this={groupItem.href ? 'a' : 'button'}
               href={groupItem.href || undefined}
+              target={groupItem.href ? groupItem.target || undefined : undefined}
+              rel={groupItem.href ? groupItem.rel || (groupItem.target === '_blank' ? 'noopener noreferrer' : undefined) : undefined}
               type={groupItem.href ? undefined : 'button'}
               data-menu-item
               data-testid={groupItem.testid || undefined}
@@ -415,6 +417,8 @@
           <svelte:element
             this={itemData.href ? 'a' : 'button'}
             href={itemData.href || undefined}
+            target={itemData.href ? itemData.target || undefined : undefined}
+            rel={itemData.href ? itemData.rel || (itemData.target === '_blank' ? 'noopener noreferrer' : undefined) : undefined}
             type={itemData.href ? undefined : 'button'}
             data-menu-item
             data-testid={itemData.testid || undefined}

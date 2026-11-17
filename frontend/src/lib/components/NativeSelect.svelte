@@ -26,7 +26,7 @@
   const classes = $derived(
     cn(
       'w-full rounded border transition-all duration-200',
-      'focus:outline-none focus:ring-2 focus:ring-[var(--ds-border-focused)] focus:ring-opacity-50',
+      'focus:outline-none focus:ring-2 focus:ring-[var(--ds-border-focused)]',
       'disabled:cursor-not-allowed disabled:opacity-50',
       sizeClasses,
       className,

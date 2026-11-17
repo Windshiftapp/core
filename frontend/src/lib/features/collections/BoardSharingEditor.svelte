@@ -19,7 +19,6 @@
   let error = $state('');
   let history = $state(null);
   let historyLoading = $state(false);
-  let reason = $state('');
   let generation = 0;
 
   $effect(() => {
@@ -62,7 +61,6 @@
       original = saved;
       draft = structuredClone(saved);
       history = null;
-      reason = '';
       onsaved?.(saved, close);
     } catch (err) {
       if (current === generation) error = err.status === 409 ? 'Sharing changed while you were editing. Cancel and reopen to load the latest version; your draft has not been saved.' : err.message;
@@ -117,17 +115,6 @@
       <Button dataTestid="public-board-cancel" disabled={saving} onclick={() => oncancel?.()}>Cancel</Button>
       <Button variant="primary" dataTestid="public-board-save" loading={saving} disabled={!!invalid || locked} onclick={() => mutate(savePublication, true)}>Save sharing</Button>
     </div>
-    {#if original.can_administer}
-      <section class="space-y-3 border-t border-ds-border pt-4">
-        {#if locked}
-          <Button dataTestid="public-board-allow-republish" disabled={saving} onclick={() => mutate(id => boardPublications.allowRepublish(id, original.revision))}>Allow re-publish</Button>
-          <DescriptionText>Clearing the lock does not enable publication.</DescriptionText>
-        {:else}
-          <TextField id="public-board-revoke-reason" dataTestid="public-board-revoke-reason" label="Administrative revoke reason" bind:value={reason} disabled={saving} />
-          <Button variant="danger" dataTestid="public-board-revoke" disabled={saving || !reason.trim()} onclick={() => mutate(id => boardPublications.revoke(id, original.revision, reason.trim()))}>Revoke and lock publication</Button>
-        {/if}
-      </section>
-    {/if}
     <Button dataTestid="public-board-history" loading={historyLoading} onclick={loadHistory}>Sharing history</Button>
     {#if history}
       <div class="space-y-3" data-testid="public-board-history-list">
