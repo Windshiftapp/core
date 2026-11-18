@@ -69,8 +69,15 @@ func (g *SQLGenerator) EnableLegacyCustomFieldNameFallback() {
 	g.legacyNameKeyFallback = true
 }
 
-// jsonExtract returns a parameterized DB-specific JSON expression.
+// jsonExtract returns a DB-specific JSON expression for the named field.
+// PostgreSQL binds the name as a parameter, but SQLite has no bind point in
+// the JSON path and inlines it, so callers must pass a name that already
+// passes validCustomFieldNameRegex. An invalid name fails closed to NULL
+// instead of reaching SQL.
 func (g *SQLGenerator) jsonExtract(column, field string) (expr string, args []any) {
+	if !validCustomFieldNameRegex.MatchString(field) {
+		return "NULL", nil
+	}
 	if g.dbDriver == "postgres" {
 		return fmt.Sprintf("%s->>?", column), []any{field}
 	}
@@ -1310,9 +1317,13 @@ func (g *SQLGenerator) mapFieldName(fieldName string) (expr string, args []any, 
 // custom-field value from the given JSON column. When the name resolves through
 // customFieldMap, the numeric ID is inlined into the SQL (lets the Postgres
 // planner match the per-field expression indexes from handlers/custom_fields.go).
-// When the name does not resolve, the generator falls back to parameterized
-// name-based extraction (preserves legacy behavior for callers without a map).
+// Otherwise it falls back to the name-based JSON path; the name must pass
+// validCustomFieldNameRegex because SQLite inlines it into SQL. An invalid name
+// fails closed to NULL.
 func (g *SQLGenerator) extractCustomFieldScalar(column, customFieldName string) (sql string, args []any) {
+	if !validCustomFieldNameRegex.MatchString(customFieldName) {
+		return "NULL", nil
+	}
 	if g.customFieldMap != nil {
 		if info, ok := g.customFieldMap[strings.ToLower(customFieldName)]; ok {
 			idSQL := g.jsonExtractLiteralKey(column, info.ID)
@@ -1905,6 +1916,9 @@ func (g *SQLGenerator) mapAssetFieldName(fieldName string) (expr string, args []
 		// field with the same name always wins.
 		if g.customFieldMap != nil {
 			if _, ok := g.customFieldMap[strings.ToLower(fieldName)]; ok {
+				if !validCustomFieldNameRegex.MatchString(fieldName) {
+					return "", nil, fmt.Errorf("invalid custom field name: %s", fieldName)
+				}
 				sql, args := g.extractCustomFieldScalar(prefix+"a.custom_field_values", fieldName)
 				return sql, args, nil
 			}
@@ -2081,6 +2095,9 @@ func (g *SQLGenerator) mapItemFieldName(fieldName string) (expr string, args []a
 		// field with the same name always wins.
 		if g.customFieldMap != nil {
 			if _, ok := g.customFieldMap[strings.ToLower(fieldName)]; ok {
+				if !validCustomFieldNameRegex.MatchString(fieldName) {
+					return "", nil, fmt.Errorf("invalid custom field name: %s", fieldName)
+				}
 				sql, args := g.extractItemCustomFieldScalar(prefix, fieldName)
 				return sql, args, nil
 			}
