@@ -140,6 +140,7 @@ func recordMappingInStore(store mappingStore, jobID, entityType, jiraID, jiraKey
 		INSERT INTO jira_import_id_mappings (job_id, entity_type, jira_id, jira_key, windshift_id, metadata_json)
 		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT (job_id, entity_type, jira_id) DO UPDATE SET
+			jira_key = excluded.jira_key,
 			windshift_id = excluded.windshift_id,
 			metadata_json = excluded.metadata_json
 	`, jobID, entityType, jiraID, jiraKey, windshiftID, string(metadataJSON)); err != nil {
