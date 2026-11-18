@@ -92,6 +92,13 @@ func DeactivateOwnedAgentsAndTokensTx(tx database.Tx, ownerID int) (DeprovisionC
 		}
 	}
 
+	// Calendar feed tokens are long-lived bearer credentials for scheduled
+	// items; revoke them with the API tokens so a deactivated account cannot
+	// keep reading team-workspace data through an existing feed URL.
+	if _, err := tx.Exec(scopedInQuery(`DELETE FROM calendar_feed_tokens WHERE user_id IN (`, len(userIDs)), scopedInArgs(userIDs)...); err != nil {
+		return cascade, fmt.Errorf("failed to revoke calendar feed tokens: %w", err)
+	}
+
 	// Personal workspace and Todoist sync are per-user baseline state: a
 	// deprovisioned account must not keep them running. SCIM reactivation
 	// restores both — GetOrCreatePersonalWorkspace reactivates on access, and

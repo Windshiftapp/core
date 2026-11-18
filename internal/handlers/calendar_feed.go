@@ -243,12 +243,17 @@ func (h *CalendarFeedHandler) ServeICSFeed(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Look up token and get user
+	// Look up token and require both the token and its owning user to be active.
+	// A deactivated account must not keep reading scheduled items through a
+	// previously issued feed URL.
 	var userID int
-	var isActive bool
+	var tokenActive, userActive bool
 	err = h.db.QueryRow(`
-		SELECT user_id, is_active FROM calendar_feed_tokens WHERE token = ?
-	`, token).Scan(&userID, &isActive)
+		SELECT t.user_id, t.is_active, u.is_active
+		FROM calendar_feed_tokens t
+		JOIN users u ON u.id = t.user_id
+		WHERE t.token = ?
+	`, token).Scan(&userID, &tokenActive, &userActive)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		respondUnauthorized(w, r)
@@ -259,7 +264,7 @@ func (h *CalendarFeedHandler) ServeICSFeed(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if !isActive {
+	if !tokenActive || !userActive {
 		respondUnauthorized(w, r)
 		return
 	}
