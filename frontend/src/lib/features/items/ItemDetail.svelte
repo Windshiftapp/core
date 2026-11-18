@@ -128,7 +128,11 @@ import NativeSelect from '../../components/NativeSelect.svelte';
   // Live updates (WI-484): the stream is coarse, so any change pushes a full
   // reconcile instead of waiting for a poll. Comments, SCM links, and Zammad
   // links are separate components, so the reconcile also nudges them.
-  const liveStream = useItemEventStream(() => itemId, {
+  //
+  // A key route (/workspace/WI/item/123) starts with the workspace item number
+  // in itemId, which is not the global item id. Opening the stream with it
+  // would target the wrong item (or 404); wait for the resolved item instead.
+  const liveStream = useItemEventStream(() => (canonicalizeKeyRoute ? (item?.id ?? null) : itemId), {
     onReconcile: () => {
       window.dispatchEvent(new CustomEvent('item-comments-changed', { detail: { itemId } }));
       window.dispatchEvent(new CustomEvent('item-scm-links-changed', { detail: { itemId } }));
