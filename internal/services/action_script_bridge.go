@@ -238,14 +238,21 @@ func (d *InProcessV2Dispatcher) Dispatch(ctx context.Context, bearer string, req
 	if len(req.Body) > 0 {
 		body = bytes.NewReader(req.Body)
 	}
-	httpReq, err := http.NewRequestWithContext(ctx, strings.ToUpper(req.Method), "http://action-script.internal/rest/api/v2"+normalized, body)
+	method := strings.ToUpper(strings.TrimSpace(req.Method))
+	httpReq, err := http.NewRequestWithContext(ctx, method, "http://action-script.internal/rest/api/v2"+normalized, body)
 	if err != nil {
 		return ScriptAPIResponse{}, fmt.Errorf("build script api request: %w", err)
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+bearer)
 	httpReq.Header.Set("Accept", "application/json")
 	if len(req.Body) > 0 {
-		httpReq.Header.Set("Content-Type", "application/json")
+		// Every v2 PATCH route decodes merge-patch, so a script PATCH must
+		// announce that media type or the handler rejects it before routing.
+		contentType := "application/json"
+		if method == http.MethodPatch {
+			contentType = "application/merge-patch+json"
+		}
+		httpReq.Header.Set("Content-Type", contentType)
 	}
 	recorder := newBoundedRecorder(d.maxResponseBytes)
 	if err := ctx.Err(); err != nil {
