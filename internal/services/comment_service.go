@@ -531,7 +531,7 @@ func (s *CommentService) create(ctx context.Context, params CreateCommentParams)
 	}
 	// A merged duplicate is a read-only redirect: comments belong on the
 	// canonical ticket (WI-1528).
-	if mergedInto, err := repository.NewItemRepository(s.db).MergedIntoItemID(context.Background(), params.ItemID); err == nil && mergedInto != nil {
+	if mergedInto, err := repository.NewItemRepository(s.db).MergedIntoItemID(ctx, params.ItemID); err == nil && mergedInto != nil {
 		return nil, NewServiceError(409, fmt.Sprintf("item %d was merged into item %d; comment on the canonical ticket instead", params.ItemID, *mergedInto))
 	}
 
