@@ -118,9 +118,25 @@ func (r *RequestTypeRepository) GetEmailIntakeForChannel(channelID int) (*models
 }
 
 // FindIDByName returns the exact-name request type within a channel.
+// requestTypeStore is the read/write surface shared by Database and Tx so the
+// import ensure path can run inside one transaction.
+type requestTypeStore interface {
+	QueryRow(query string, args ...any) *sql.Row
+	ExecWrite(query string, args ...any) (sql.Result, error)
+}
+
 func (r *RequestTypeRepository) FindIDByName(channelID int, name string) (int, error) {
+	return findRequestTypeIDByName(r.db, channelID, name)
+}
+
+// FindIDByNameTx is FindIDByName inside the caller's transaction.
+func (r *RequestTypeRepository) FindIDByNameTx(tx database.Tx, channelID int, name string) (int, error) {
+	return findRequestTypeIDByName(tx, channelID, name)
+}
+
+func findRequestTypeIDByName(store requestTypeStore, channelID int, name string) (int, error) {
 	var id int
-	err := r.db.QueryRow(
+	err := store.QueryRow(
 		"SELECT id FROM request_types WHERE channel_id = ? AND name = ?",
 		channelID,
 		name,
@@ -136,7 +152,16 @@ func (r *RequestTypeRepository) FindIDByName(channelID int, name string) (int, e
 
 // UpdateConfig replaces the request type's JSON configuration.
 func (r *RequestTypeRepository) UpdateConfig(id int, config string) error {
-	result, err := r.db.ExecWrite(
+	return updateRequestTypeConfig(r.db, id, config)
+}
+
+// UpdateConfigTx is UpdateConfig inside the caller's transaction.
+func (r *RequestTypeRepository) UpdateConfigTx(tx database.Tx, id int, config string) error {
+	return updateRequestTypeConfig(tx, id, config)
+}
+
+func updateRequestTypeConfig(store requestTypeStore, id int, config string) error {
+	result, err := store.ExecWrite(
 		"UPDATE request_types SET config = ?, updated_at = ? WHERE id = ?",
 		config,
 		time.Now(),
@@ -269,9 +294,18 @@ func (r *RequestTypeRepository) NameExistsInChannel(channelID int, name string, 
 // Create inserts a request_type. Returns ErrDuplicateEntry when the unique
 // (name, channel_id) constraint trips at the DB level.
 func (r *RequestTypeRepository) Create(rt *models.RequestType) (int64, error) {
+	return createRequestType(r.db, rt)
+}
+
+// CreateTx is Create inside the caller's transaction.
+func (r *RequestTypeRepository) CreateTx(tx database.Tx, rt *models.RequestType) (int64, error) {
+	return createRequestType(tx, rt)
+}
+
+func createRequestType(store requestTypeStore, rt *models.RequestType) (int64, error) {
 	now := time.Now()
 	var id int64
-	err := r.db.QueryRow(`
+	err := store.QueryRow(`
 		INSERT INTO request_types (channel_id, name, description, item_type_id, icon, color, display_order, is_active, visibility_group_ids, visibility_org_ids, workspace_id, title_template, kind, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, rt.ChannelID, rt.Name, rt.Description, rt.ItemTypeID, rt.Icon, rt.Color, rt.DisplayOrder, rt.IsActive,
@@ -422,37 +456,46 @@ func (r *RequestTypeRepository) ListFields(requestTypeID int) ([]models.RequestT
 // step_number defaults to 1 when zero on input.
 func (r *RequestTypeRepository) ReplaceFields(requestTypeID int, fields []models.RequestTypeField) error {
 	return database.WithTx(r.db, func(tx database.Tx) error {
-		lock, err := tx.Exec("UPDATE request_types SET updated_at = updated_at WHERE id = ?", requestTypeID)
-		if err != nil {
-			return fmt.Errorf("lock request_type %d fields: %w", requestTypeID, err)
+		return replaceRequestTypeFields(tx, requestTypeID, fields)
+	})
+}
+
+// ReplaceFieldsTx is ReplaceFields inside the caller's transaction.
+func (r *RequestTypeRepository) ReplaceFieldsTx(tx database.Tx, requestTypeID int, fields []models.RequestTypeField) error {
+	return replaceRequestTypeFields(tx, requestTypeID, fields)
+}
+
+func replaceRequestTypeFields(tx database.Tx, requestTypeID int, fields []models.RequestTypeField) error {
+	lock, err := tx.Exec("UPDATE request_types SET updated_at = updated_at WHERE id = ?", requestTypeID)
+	if err != nil {
+		return fmt.Errorf("lock request_type %d fields: %w", requestTypeID, err)
+	}
+	if rows, rowsErr := lock.RowsAffected(); rowsErr != nil {
+		return fmt.Errorf("count locked request_types: %w", rowsErr)
+	} else if rows == 0 {
+		return ErrNotFound
+	}
+	if _, err := tx.Exec("DELETE FROM request_type_fields WHERE request_type_id = ?", requestTypeID); err != nil {
+		return fmt.Errorf("clear fields for request_type %d: %w", requestTypeID, err)
+	}
+	now := time.Now()
+	for _, f := range fields {
+		stepNumber := f.StepNumber
+		if stepNumber == 0 {
+			stepNumber = 1
 		}
-		if rows, rowsErr := lock.RowsAffected(); rowsErr != nil {
-			return fmt.Errorf("count locked request_types: %w", rowsErr)
-		} else if rows == 0 {
-			return ErrNotFound
-		}
-		if _, err := tx.Exec("DELETE FROM request_type_fields WHERE request_type_id = ?", requestTypeID); err != nil {
-			return fmt.Errorf("clear fields for request_type %d: %w", requestTypeID, err)
-		}
-		now := time.Now()
-		for _, f := range fields {
-			stepNumber := f.StepNumber
-			if stepNumber == 0 {
-				stepNumber = 1
-			}
-			if _, err := tx.Exec(`
+		if _, err := tx.Exec(`
 			INSERT INTO request_type_fields (request_type_id, field_identifier, field_type, display_order, is_required,
 			                                  display_name, description, step_number, virtual_field_type, virtual_field_options,
 			                                  created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			`, requestTypeID, f.FieldIdentifier, f.FieldType, f.DisplayOrder, f.IsRequired,
-				f.DisplayName, f.Description, stepNumber, f.VirtualFieldType, f.VirtualFieldOptions,
-				now, now); err != nil {
-				return fmt.Errorf("insert field %q: %w", f.FieldIdentifier, err)
-			}
+			f.DisplayName, f.Description, stepNumber, f.VirtualFieldType, f.VirtualFieldOptions,
+			now, now); err != nil {
+			return fmt.Errorf("insert field %q: %w", f.FieldIdentifier, err)
 		}
-		return nil
-	})
+	}
+	return nil
 }
 
 func encodeIntJSONArray(ids []int) *string {

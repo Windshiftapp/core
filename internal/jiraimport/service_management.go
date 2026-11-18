@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 )
@@ -72,41 +73,55 @@ func (s *Service) EnsureRequestType(
 	requestType *models.RequestType,
 	config models.RequestTypeConfig,
 ) (id int, created bool, err error) {
-	id, err = s.requestTypes.FindIDByName(requestType.ChannelID, requestType.Name)
-	if err == nil {
-		return id, false, nil
-	}
-	if !errors.Is(err, repository.ErrNotFound) {
-		return 0, false, err
-	}
-	id64, err := s.requestTypes.Create(requestType)
-	if err != nil {
-		return 0, false, err
-	}
-	id = int(id64)
-	rawConfig, err := json.Marshal(config)
-	if err != nil {
-		return 0, false, err
-	}
-	if err := s.requestTypes.UpdateConfig(id, string(rawConfig)); err != nil {
-		return 0, false, err
-	}
-	err = s.requestTypes.ReplaceFields(id, []models.RequestTypeField{
-		{
-			FieldIdentifier: "title",
-			FieldType:       "default",
-			DisplayOrder:    1,
-			IsRequired:      true,
-			StepNumber:      1,
-		},
-		{
-			FieldIdentifier: "description",
-			FieldType:       "default",
-			DisplayOrder:    2,
-			StepNumber:      1,
-		},
+	// Create the request type, its config, and its default fields in one
+	// transaction so a mid-way failure cannot leave a partial entity that a
+	// retry silently reuses (WI-1152).
+	err = database.WithTx(s.db, func(tx database.Tx) error {
+		existingID, lookupErr := s.requestTypes.FindIDByNameTx(tx, requestType.ChannelID, requestType.Name)
+		if lookupErr == nil {
+			id = existingID
+			created = false
+			return nil
+		}
+		if !errors.Is(lookupErr, repository.ErrNotFound) {
+			return lookupErr
+		}
+		id64, err := s.requestTypes.CreateTx(tx, requestType)
+		if err != nil {
+			return err
+		}
+		id = int(id64)
+		rawConfig, err := json.Marshal(config)
+		if err != nil {
+			return err
+		}
+		if err := s.requestTypes.UpdateConfigTx(tx, id, string(rawConfig)); err != nil {
+			return err
+		}
+		if err := s.requestTypes.ReplaceFieldsTx(tx, id, []models.RequestTypeField{
+			{
+				FieldIdentifier: "title",
+				FieldType:       "default",
+				DisplayOrder:    1,
+				IsRequired:      true,
+				StepNumber:      1,
+			},
+			{
+				FieldIdentifier: "description",
+				FieldType:       "default",
+				DisplayOrder:    2,
+				StepNumber:      1,
+			},
+		}); err != nil {
+			return err
+		}
+		created = true
+		return nil
 	})
-	return id, err == nil, err
+	if err != nil {
+		return 0, false, err
+	}
+	return id, created, nil
 }
 
 // Request type restriction dispositions recorded in import mapping metadata.

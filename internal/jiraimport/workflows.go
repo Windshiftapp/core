@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 )
@@ -53,115 +54,117 @@ func (s *Service) CreateDetailedWorkflowConfiguration(
 		conditionSetID *int
 		itemTypeIDs    []int
 	}
-	workflows := make([]createdWorkflow, 0, len(definitions))
-	for _, definition := range definitions {
-		var workflowID int
-		if err := s.db.QueryRow(`
-			INSERT INTO workflows (name, description, is_default, created_at, updated_at)
-			VALUES (?, ?, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
-		`, definition.Name, definition.Description).Scan(&workflowID); err != nil {
-			return 0, fmt.Errorf("create workflow %q: %w", definition.Name, err)
-		}
-		var conditionSetID *int
-		needsConditionSet := false
-		for _, edge := range definition.Edges {
-			if edge.ReviewLocked || len(edge.Guards) > 0 {
-				needsConditionSet = true
-				break
+	var configSetID int
+	err := database.WithTx(s.db, func(tx database.Tx) error {
+		workflows := make([]createdWorkflow, 0, len(definitions))
+		for _, definition := range definitions {
+			var workflowID int
+			if err := tx.QueryRowContext(ctx, `
+				INSERT INTO workflows (name, description, is_default, created_at, updated_at)
+				VALUES (?, ?, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+			`, definition.Name, definition.Description).Scan(&workflowID); err != nil {
+				return fmt.Errorf("create workflow %q: %w", definition.Name, err)
 			}
-		}
-		if needsConditionSet {
-			id, err := s.CreateWorkflowReviewConditionSet(workflowID, definition.Name)
-			if err != nil {
-				return 0, err
-			}
-			conditionSetID = &id
-		}
-		for index, edge := range definition.Edges {
-			var transitionID int
-			if err := s.db.QueryRow(`
-				INSERT INTO workflow_transitions
-					(workflow_id, from_status_id, to_status_id, display_order, source_handle, target_handle, created_at)
-				VALUES (?, ?, ?, ?, '', '', CURRENT_TIMESTAMP) RETURNING id
-			`, workflowID, edge.FromStatusID, edge.ToStatusID, index+1).Scan(&transitionID); err != nil {
-				return 0, fmt.Errorf("create workflow %q transition: %w", definition.Name, err)
-			}
-			if conditionSetID == nil {
-				continue
-			}
-			switch {
-			case len(edge.Guards) > 0:
-				if err := s.ApplyWorkflowGuards(*conditionSetID, transitionID, edge.Guards); err != nil {
-					return 0, err
-				}
-			case edge.ReviewLocked:
-				// Counts only (no descriptors): keep the whole transition locked.
-				if err := s.LockWorkflowTransitionForReview(*conditionSetID, transitionID); err != nil {
-					return 0, err
+			var conditionSetID *int
+			needsConditionSet := false
+			for _, edge := range definition.Edges {
+				if edge.ReviewLocked || len(edge.Guards) > 0 {
+					needsConditionSet = true
+					break
 				}
 			}
+			if needsConditionSet {
+				id, err := createWorkflowReviewConditionSet(tx, workflowID, definition.Name)
+				if err != nil {
+					return err
+				}
+				conditionSetID = &id
+			}
+			for index, edge := range definition.Edges {
+				var transitionID int
+				if err := tx.QueryRowContext(ctx, `
+					INSERT INTO workflow_transitions
+						(workflow_id, from_status_id, to_status_id, display_order, source_handle, target_handle, created_at)
+					VALUES (?, ?, ?, ?, '', '', CURRENT_TIMESTAMP) RETURNING id
+				`, workflowID, edge.FromStatusID, edge.ToStatusID, index+1).Scan(&transitionID); err != nil {
+					return fmt.Errorf("create workflow %q transition: %w", definition.Name, err)
+				}
+				if conditionSetID == nil {
+					continue
+				}
+				switch {
+				case len(edge.Guards) > 0:
+					if err := applyWorkflowGuards(tx, *conditionSetID, transitionID, edge.Guards); err != nil {
+						return err
+					}
+				case edge.ReviewLocked:
+					// Counts only (no descriptors): keep the whole transition locked.
+					if err := lockWorkflowTransitionForReview(tx, *conditionSetID, transitionID); err != nil {
+						return err
+					}
+				}
+			}
+			if err := recordMappingInStore(tx, jobID, "workflow", definition.SourceID, definition.Name, workflowID, definition.Metadata); err != nil {
+				return err
+			}
+			workflows = append(workflows, createdWorkflow{id: workflowID, conditionSetID: conditionSetID, itemTypeIDs: definition.ItemTypeIDs})
 		}
-		if err := s.RecordMapping(jobID, "workflow", definition.SourceID, definition.Name, workflowID, definition.Metadata); err != nil {
-			return 0, err
+		defaultIndex := 0
+		for index := range workflows {
+			if len(workflows[index].itemTypeIDs) > len(workflows[defaultIndex].itemTypeIDs) {
+				defaultIndex = index
+			}
 		}
-		workflows = append(workflows, createdWorkflow{id: workflowID, conditionSetID: conditionSetID, itemTypeIDs: definition.ItemTypeIDs})
-	}
-	defaultIndex := 0
-	for index := range workflows {
-		if len(workflows[index].itemTypeIDs) > len(workflows[defaultIndex].itemTypeIDs) {
-			defaultIndex = index
+		defaultWorkflowID := workflows[defaultIndex].id
+		defaultConditionSetID := workflows[defaultIndex].conditionSetID
+		name := projectKey + " Configuration"
+		repo := repository.NewConfigurationSetRepository(s.db)
+		configSetID64, err := repo.Create(tx, &models.ConfigurationSet{
+			Name: name, WorkflowID: &defaultWorkflowID, ConditionSetID: defaultConditionSetID,
+			DifferentiateByItemType: len(workflows) > 1,
+		})
+		if err != nil {
+			return err
 		}
-	}
-	defaultWorkflowID := workflows[defaultIndex].id
-	defaultConditionSetID := workflows[defaultIndex].conditionSetID
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, err
-	}
-	defer func() { _ = tx.Rollback() }()
-	name := projectKey + " Configuration"
-	repo := repository.NewConfigurationSetRepository(s.db)
-	configSetID64, err := repo.Create(tx, &models.ConfigurationSet{
-		Name: name, WorkflowID: &defaultWorkflowID, ConditionSetID: defaultConditionSetID,
-		DifferentiateByItemType: len(workflows) > 1,
+		configSetID = int(configSetID64)
+		var configs []models.ItemTypeConfig
+		for _, workflow := range workflows {
+			for _, itemTypeID := range workflow.itemTypeIDs {
+				config := models.ItemTypeConfig{ItemTypeID: itemTypeID}
+				if workflow.id != defaultWorkflowID {
+					id := workflow.id
+					config.WorkflowID = &id
+				}
+				if workflow.conditionSetID != nil && (defaultConditionSetID == nil || *workflow.conditionSetID != *defaultConditionSetID) {
+					id := *workflow.conditionSetID
+					config.ConditionSetID = &id
+				}
+				configs = append(configs, config)
+			}
+		}
+		if err := repo.SaveItemTypeConfigs(tx, configSetID, configs); err != nil {
+			return err
+		}
+		if err := repo.SaveWorkspaceAssignments(tx, configSetID, []int{workspaceID}); err != nil {
+			return err
+		}
+		return recordMappingInStore(tx, jobID, "configuration_set", "cs-"+projectKey, name, configSetID, nil)
 	})
 	if err != nil {
-		return 0, err
-	}
-	configSetID := int(configSetID64)
-	var configs []models.ItemTypeConfig
-	for _, workflow := range workflows {
-		for _, itemTypeID := range workflow.itemTypeIDs {
-			config := models.ItemTypeConfig{ItemTypeID: itemTypeID}
-			if workflow.id != defaultWorkflowID {
-				id := workflow.id
-				config.WorkflowID = &id
-			}
-			if workflow.conditionSetID != nil && (defaultConditionSetID == nil || *workflow.conditionSetID != *defaultConditionSetID) {
-				id := *workflow.conditionSetID
-				config.ConditionSetID = &id
-			}
-			configs = append(configs, config)
-		}
-	}
-	if err := repo.SaveItemTypeConfigs(tx, configSetID, configs); err != nil {
-		return 0, err
-	}
-	if err := repo.SaveWorkspaceAssignments(tx, configSetID, []int{workspaceID}); err != nil {
-		return 0, err
-	}
-	if err := tx.Commit(); err != nil {
-		return 0, err
-	}
-	if err := s.RecordMapping(jobID, "configuration_set", "cs-"+projectKey, name, configSetID, nil); err != nil {
 		return 0, err
 	}
 	return configSetID, nil
 }
 
 func (s *Service) CreateWorkflowReviewConditionSet(workflowID int, workflowName string) (int, error) {
+	return database.WithTxResult(s.db, func(tx database.Tx) (int, error) {
+		return createWorkflowReviewConditionSet(tx, workflowID, workflowName)
+	})
+}
+
+func createWorkflowReviewConditionSet(store mappingStore, workflowID int, workflowName string) (int, error) {
 	var conditionSetID int
-	err := s.db.QueryRow(`
+	err := store.QueryRow(`
 		INSERT INTO condition_sets (name, description, workflow_id, created_at, updated_at)
 		VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		RETURNING id
@@ -172,15 +175,27 @@ func (s *Service) CreateWorkflowReviewConditionSet(workflowID int, workflowName 
 }
 
 func (s *Service) LockWorkflowTransitionForReview(conditionSetID, transitionID int) error {
-	return s.ApplyWorkflowGuards(conditionSetID, transitionID, []WorkflowGuard{{Kind: "unknown"}})
+	return database.WithTx(s.db, func(tx database.Tx) error {
+		return lockWorkflowTransitionForReview(tx, conditionSetID, transitionID)
+	})
+}
+
+func lockWorkflowTransitionForReview(store mappingStore, conditionSetID, transitionID int) error {
+	return applyWorkflowGuards(store, conditionSetID, transitionID, []WorkflowGuard{{Kind: "unknown"}})
 }
 
 // ApplyWorkflowGuards recreates the mappable guards as Windshift conditions and,
 // when any guard is unmappable, adds a never-passing validator so the transition
 // stays locked for review instead of being silently broadened.
 func (s *Service) ApplyWorkflowGuards(conditionSetID, transitionID int, guards []WorkflowGuard) error {
+	return database.WithTx(s.db, func(tx database.Tx) error {
+		return applyWorkflowGuards(tx, conditionSetID, transitionID, guards)
+	})
+}
+
+func applyWorkflowGuards(store mappingStore, conditionSetID, transitionID int, guards []WorkflowGuard) error {
 	var linkID int
-	if err := s.db.QueryRow(`
+	if err := store.QueryRow(`
 		INSERT INTO condition_set_transitions (condition_set_id, transition_id, logic_mode, created_at)
 		VALUES (?, ?, 'and', CURRENT_TIMESTAMP) RETURNING id
 	`, conditionSetID, transitionID).Scan(&linkID); err != nil {
@@ -202,7 +217,7 @@ func (s *Service) ApplyWorkflowGuards(conditionSetID, transitionID int, guards [
 		if mode == "" {
 			mode = models.ConditionModeCondition
 		}
-		if _, err := s.db.ExecWrite(`
+		if _, err := store.ExecWrite(`
 			INSERT INTO conditions
 				(condition_set_transition_id, condition_type, config, display_order, mode, error_message, created_at)
 			VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -213,7 +228,7 @@ func (s *Service) ApplyWorkflowGuards(conditionSetID, transitionID int, guards [
 	}
 
 	if hasUnmapped {
-		if _, err := s.db.ExecWrite(`
+		if _, err := store.ExecWrite(`
 			INSERT INTO conditions
 				(condition_set_transition_id, condition_type, config, display_order, mode, error_message, created_at)
 			VALUES (?, 'field_value', ?, ?, 'validator', ?, CURRENT_TIMESTAMP)

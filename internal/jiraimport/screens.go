@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"windshift/internal/database"
 	"windshift/internal/repository"
 )
 
@@ -15,37 +16,44 @@ type ScreenField struct {
 }
 
 func (s *Service) EnsureConfiguredScreen(name, description string, fields []ScreenField) (screenID int, created bool, err error) {
-	err = s.db.QueryRow(`SELECT id FROM screens WHERE name = ?`, name).Scan(&screenID)
-	if err == nil {
-		return screenID, false, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return 0, false, err
-	}
-	err = s.db.QueryRow(`
-		INSERT INTO screens (name, description, created_at, updated_at)
-		VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
-	`, name, description).Scan(&screenID)
+	err = database.WithTx(s.db, func(tx database.Tx) error {
+		lookupErr := tx.QueryRow(`SELECT id FROM screens WHERE name = ?`, name).Scan(&screenID)
+		if lookupErr == nil {
+			created = false
+			return nil
+		}
+		if !errors.Is(lookupErr, sql.ErrNoRows) {
+			return lookupErr
+		}
+		if err := tx.QueryRow(`
+			INSERT INTO screens (name, description, created_at, updated_at)
+			VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+		`, name, description).Scan(&screenID); err != nil {
+			return err
+		}
+		for index, field := range fields {
+			if _, err := tx.ExecWrite(`
+				INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width)
+				VALUES (?, ?, ?, ?, ?, 'full')
+			`, screenID, field.Type, field.Identifier, index+1, field.Required); err != nil {
+				return fmt.Errorf("add field to imported Jira screen %q: %w", name, err)
+			}
+			if field.Type == "system" {
+				if _, err := tx.ExecWrite(`
+					INSERT INTO screen_system_fields (screen_id, field_name)
+					VALUES (?, ?) ON CONFLICT(screen_id, field_name) DO NOTHING
+				`, screenID, field.Identifier); err != nil {
+					return err
+				}
+			}
+		}
+		created = true
+		return nil
+	})
 	if err != nil {
 		return 0, false, err
 	}
-	for index, field := range fields {
-		if _, err = s.db.ExecWrite(`
-			INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width)
-			VALUES (?, ?, ?, ?, ?, 'full')
-		`, screenID, field.Type, field.Identifier, index+1, field.Required); err != nil {
-			return 0, false, fmt.Errorf("add field to imported Jira screen %q: %w", name, err)
-		}
-		if field.Type == "system" {
-			if _, err = s.db.ExecWrite(`
-				INSERT INTO screen_system_fields (screen_id, field_name)
-				VALUES (?, ?) ON CONFLICT(screen_id, field_name) DO NOTHING
-			`, screenID, field.Identifier); err != nil {
-				return 0, false, err
-			}
-		}
-	}
-	return screenID, true, nil
+	return screenID, created, nil
 }
 
 func (s *Service) ChoiceFieldOptions(fieldID int) (fieldType, options string, err error) {
