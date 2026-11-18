@@ -1,0 +1,8 @@
+{
+  "GHSA-fc5q-39xc-vjpf": {
+    "package": "picomatch",
+    "title": "picomatch vulnerable to ReDoS through single-branch repeated extglobs",
+    "reason": "No patched release exists: the advisory covers <=4.0.7 and 4.0.7 is the latest published version. It is reached only through @parcel/watcher, an optional file-watch dependency of sass (itself pulled in by @excalidraw/excalidraw), which the shipped bundle never executes.",
+    "review_by": "2026-12-31"
+  }
+}

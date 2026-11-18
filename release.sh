@@ -436,8 +436,10 @@ run_frontend_supply_chain_checks() {
 
     # Audit production dependencies only. Dev-only tools (vite, vitest, ...)
     # never ship in the release artifact, so their advisories must not block it.
+    # The wrapper fails on high/critical advisories except those explicitly
+    # dismissed in scripts/production-audit-allowlist.json.
     log_info "Running npm audit (high severity and above, production deps only)..."
-    npm audit --audit-level=high --omit=dev
+    node scripts/check-production-audit.mjs
 }
 
 run_go_vulnerability_check() {
