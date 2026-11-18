@@ -626,6 +626,7 @@ export default {
     "completeSetupEnter": "راه اندازی کامل (Enter)"
   },
   "createModal": {
+    "noParentOption": "مورد کار جدید (بدون والد)",
     "workItem": "مورد کار",
     "team": "تیم",
     "milestone": "نقطه عطف",

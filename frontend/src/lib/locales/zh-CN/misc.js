@@ -640,6 +640,7 @@ export default {
   },
 
   createModal: {
+    noParentOption: '新建工作项（无父项）',
     workItem: '工作项',
     milestone: '里程碑',
     workspace: '工作区',

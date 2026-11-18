@@ -725,6 +725,7 @@ export default {
   },
 
   createModal: {
+    noParentOption: 'Nowy element pracy (bez elementu nadrzędnego)',
     // Etykiety typów
     workItem: 'Element pracy',
     team: 'Zespół',
