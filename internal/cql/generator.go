@@ -1946,9 +1946,7 @@ func (g *SQLGenerator) mapItemFieldName(fieldName string) (expr string, args []a
 	case "statuscategory", "status_category":
 		return prefix + "sc.name", nil, nil
 	case "statuscompleted", "status_completed":
-		// Integer-typed so the 0/1 QL boolean literal compares on Postgres too;
-		// items without a status category count as not completed.
-		return "(CASE WHEN COALESCE(" + prefix + "sc.is_completed, FALSE) THEN 1 ELSE 0 END)", nil, nil
+		return prefix + "sc.is_completed", nil, nil
 	case "priorityid", "priority_id":
 		return prefix + "i.priority_id", nil, nil
 	case "priority":
