@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"windshift/internal/database"
 	"windshift/internal/itemevents"
@@ -58,25 +59,19 @@ func (s *Service) FindUserByEmail(email string) (UserMapping, error) {
 
 func (s *Service) UniqueImportedUsername(base string) (string, error) {
 	const maxUsernameLength = 32
-	base = strings.TrimSpace(strings.ToLower(base))
+	base = truncateUsername(strings.TrimSpace(strings.ToLower(base)), maxUsernameLength)
 	if base == "" {
 		base = "jira-user"
-	}
-	if len(base) > maxUsernameLength {
-		base = base[:maxUsernameLength]
 	}
 	for suffix := 0; ; suffix++ {
 		candidate := base
 		if suffix > 0 {
 			tail := fmt.Sprintf("-%d", suffix+1)
-			prefixLength := maxUsernameLength - len(tail)
+			prefixLength := maxUsernameLength - utf8.RuneCountInString(tail)
 			if prefixLength < 1 {
 				return "", fmt.Errorf("cannot allocate username suffix")
 			}
-			if len(candidate) > prefixLength {
-				candidate = candidate[:prefixLength]
-			}
-			candidate += tail
+			candidate = truncateUsername(candidate, prefixLength) + tail
 		}
 		exists, err := s.users.UsernameExistsCaseInsensitive(candidate)
 		if err != nil {
@@ -86,6 +81,18 @@ func (s *Service) UniqueImportedUsername(base string) (string, error) {
 			return candidate, nil
 		}
 	}
+}
+
+// truncateUsername cuts a username to at most max runes without splitting a
+// multi-byte rune.
+func truncateUsername(s string, limit int) string {
+	if limit <= 0 {
+		return ""
+	}
+	if utf8.RuneCountInString(s) <= limit {
+		return s
+	}
+	return string([]rune(s)[:limit])
 }
 
 func (s *Service) CreateImportedUser(
@@ -233,10 +240,9 @@ func (s *Service) UpdateImportedItem(itemID int, params services.ItemCreationPar
 	if err != nil {
 		return 0, err
 	}
-	fracIndex, err := repository.GenerateFracIndexForNewItem(tx, s.db.GetDriverName())
-	if err != nil {
-		return 0, fmt.Errorf("generate Jira re-import fractional index: %w", err)
-	}
+	// Preserve the existing ordering: a re-import must not move an item to the
+	// end of the backlog or discard manual reordering done since the first import.
+	fracIndex := original.FracIndex
 	customFieldValues := any(nil)
 	if params.CustomFieldValuesJSON != "" {
 		customFieldValues = params.CustomFieldValuesJSON
