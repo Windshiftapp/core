@@ -560,7 +560,7 @@ func (s *SyncService) syncAttachedReleases(ctx context.Context, provider Provide
 	if err != nil {
 		return err
 	}
-	tags, err := refProvider.ListTags(ctx, owner, repo, time.Time{})
+	tags, err := refProvider.ListTags(ctx, owner, repo, "")
 	if err != nil {
 		return err
 	}
@@ -1590,7 +1590,7 @@ func (s *SyncService) ListReleaseCandidates(ctx context.Context, workspaceRepoID
 		return nil, errors.New("SCM provider does not support releases")
 	}
 
-	tags, err := refProvider.ListTags(ctx, rc.Owner, rc.Repo, time.Time{})
+	tags, err := refProvider.ListTags(ctx, rc.Owner, rc.Repo, "")
 	if err != nil {
 		return nil, fmt.Errorf("list tags: %w", err)
 	}

@@ -556,11 +556,10 @@ func (g *GiteaProvider) ListReleases(ctx context.Context, owner, repo string) ([
 	return releases, nil
 }
 
-// ListTags lists tags for a repository, paginated up to maxTags.
-// Filters by `since` against each tag's commit date.
-func (g *GiteaProvider) ListTags(ctx context.Context, owner, repo string, since time.Time) ([]Tag, error) {
+// ListTags returns tags whose name matches tagPattern. Gitea's tag listing
+// already carries the commit date, so no per-tag commit fetch is needed.
+func (g *GiteaProvider) ListTags(ctx context.Context, owner, repo, tagPattern string) ([]Tag, error) {
 	const perPage = 50
-	const maxTags = 500
 
 	type giteaTag struct {
 		Name   string `json:"name"`
@@ -580,19 +579,10 @@ func (g *GiteaProvider) ListTags(ctx context.Context, owner, repo string, since 
 			return nil, err
 		}
 		for _, t := range raw {
-			created := t.Commit.Created
-			if created.IsZero() {
-				if c, err := g.GetCommit(ctx, owner, repo, t.Commit.SHA); err == nil {
-					created = c.CreatedAt
-				}
-			}
-			if !since.IsZero() && created.Before(since) {
+			if !tagPatternMatches(tagPattern, t.Name) {
 				continue
 			}
-			tags = append(tags, Tag{Name: t.Name, SHA: t.Commit.SHA, CreatedAt: created})
-			if len(tags) >= maxTags {
-				return tags, nil
-			}
+			tags = append(tags, Tag{Name: t.Name, SHA: t.Commit.SHA, CreatedAt: t.Commit.Created})
 		}
 		if len(raw) < perPage {
 			break

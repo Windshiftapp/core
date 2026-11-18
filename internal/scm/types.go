@@ -187,9 +187,8 @@ type Branch struct {
 }
 
 // Tag represents a git tag (lightweight or annotated) from an SCM provider.
-// CreatedAt is the tagger date when available, else the underlying commit's
-// committer date — providers fall back rather than leaving this zero so
-// `since` filtering works consistently.
+// CreatedAt orders tags for prev-tag resolution. Providers populate it from
+// metadata the tag listing already carries, never from a per-tag commit fetch.
 type Tag struct {
 	Name      string    `json:"name"`
 	SHA       string    `json:"sha"` // target commit SHA
@@ -327,11 +326,11 @@ type CommitProvider interface {
 type RefProvider interface {
 	Provider
 
-	// ListTags returns tags whose target commit was created at or after
-	// `since`. Implementations may return all tags and let the caller
-	// filter when the provider has no native cutoff API; the contract is
-	// that no tag *newer than* `since` is ever dropped.
-	ListTags(ctx context.Context, owner, repo string, since time.Time) ([]Tag, error)
+	// ListTags returns tags whose name matches tagPattern, with CreatedAt
+	// populated. An empty pattern returns every tag. Providers apply the
+	// pattern before resolving timestamps, and resolve timestamps in batch
+	// rather than issuing one commit request per tag.
+	ListTags(ctx context.Context, owner, repo, tagPattern string) ([]Tag, error)
 
 	// CompareCommits returns the commits reachable from `head` but not
 	// from `base`, in chronological order (oldest first). Used to list

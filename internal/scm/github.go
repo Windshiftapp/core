@@ -663,60 +663,155 @@ func (g *GitHubProvider) ListBranches(ctx context.Context, owner, repo string) (
 	return branches, nil
 }
 
-// ListTags lists tags for a repository, paginated. Returns tags whose
-// target commit's committer date is at or after `since`. GitHub's
-// /tags endpoint returns lightweight summaries; we fetch each tag's
-// commit to obtain the date, capped at maxTags to keep the work bounded.
-func (g *GitHubProvider) ListTags(ctx context.Context, owner, repo string, since time.Time) ([]Tag, error) {
+// gitHubTagRefsQuery pages a repository's tag refs together with the wrapped
+// commit's authored date, so one request covers up to 100 tags. GitHub's REST
+// /tags endpoint omits the date, which previously forced one commit request
+// per tag.
+const gitHubTagRefsQuery = `
+query($owner: String!, $name: String!, $query: String, $cursor: String) {
+  repository(owner: $owner, name: $name) {
+    refs(refPrefix: "refs/tags/", first: 100, query: $query, after: $cursor) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        name
+        target {
+          oid
+          ... on Commit { authoredDate }
+          ... on Tag {
+            target {
+              ... on Commit { oid authoredDate }
+            }
+          }
+        }
+      }
+    }
+  }
+}`
+
+// ghTagTarget decodes a tag's GraphQL target. A lightweight tag points at a
+// Commit (Oid + AuthoredDate); an annotated tag points at a Tag object whose
+// nested Target is the commit it wraps.
+type ghTagTarget struct {
+	Oid          string       `json:"oid"`
+	AuthoredDate *time.Time   `json:"authoredDate"`
+	Target       *ghTagTarget `json:"target"`
+}
+
+func (t ghTagTarget) commit() (string, time.Time) {
+	if t.Target != nil {
+		return t.Target.commit()
+	}
+	var created time.Time
+	if t.AuthoredDate != nil {
+		created = *t.AuthoredDate
+	}
+	return t.Oid, created
+}
+
+type ghTagRefPage struct {
+	PageInfo struct {
+		HasNextPage bool   `json:"hasNextPage"`
+		EndCursor   string `json:"endCursor"`
+	} `json:"pageInfo"`
+	Nodes []struct {
+		Name   string      `json:"name"`
+		Target ghTagTarget `json:"target"`
+	} `json:"nodes"`
+}
+
+// ListTags returns tags whose name matches tagPattern. An empty pattern
+// returns every tag. Dates arrive in the same batched GraphQL query, so no tag
+// costs an individual commit lookup.
+func (g *GitHubProvider) ListTags(ctx context.Context, owner, repo, tagPattern string) ([]Tag, error) {
 	if err := g.ensureInstallationToken(ctx); err != nil {
 		return nil, err
 	}
 
-	const perPage = 100
-	const maxTags = 500
-
-	type ghTag struct {
-		Name   string `json:"name"`
-		Commit struct {
-			SHA string `json:"sha"`
-		} `json:"commit"`
-	}
+	// Narrow the server-side query to the pattern's literal prefix; the exact
+	// glob match below drops any prefix-adjacent tags.
+	prefix := globLiteralPrefix(tagPattern)
 
 	var tags []Tag
-	for page := 1; ; page++ {
-		reqURL := fmt.Sprintf("%s/repos/%s/tags?page=%d&per_page=%d",
-			g.baseURL, githubRepoPath(owner, repo), page, perPage)
-
-		var ghTags []ghTag
-		if err := g.doJSON(ctx, "GET", reqURL, http.NoBody, http.StatusOK, &ghTags); err != nil {
+	var cursor *string
+	for {
+		page, err := g.listTagRefs(ctx, owner, repo, prefix, cursor)
+		if err != nil {
 			return nil, err
 		}
-		for _, t := range ghTags {
-			created, err := g.tagCommitDate(ctx, owner, repo, t.Commit.SHA)
-			if err != nil {
-				return nil, err
-			}
-			if !since.IsZero() && created.Before(since) {
+		for _, node := range page.Nodes {
+			if !tagPatternMatches(tagPattern, node.Name) {
 				continue
 			}
-			tags = append(tags, Tag{Name: t.Name, SHA: t.Commit.SHA, CreatedAt: created})
-			if len(tags) >= maxTags {
-				return tags, nil
-			}
+			sha, created := node.Target.commit()
+			tags = append(tags, Tag{Name: node.Name, SHA: sha, CreatedAt: created})
 		}
-		if len(ghTags) < perPage {
+		if !page.PageInfo.HasNextPage {
 			break
 		}
+		next := page.PageInfo.EndCursor
+		cursor = &next
 	}
 	return tags, nil
 }
 
-func (g *GitHubProvider) tagCommitDate(ctx context.Context, owner, repo, sha string) (time.Time, error) {
-	c, err := g.GetCommit(ctx, owner, repo, sha)
-	if err != nil {
-		return time.Time{}, err
+func (g *GitHubProvider) listTagRefs(ctx context.Context, owner, repo, queryPrefix string, cursor *string) (*ghTagRefPage, error) {
+	variables := map[string]any{"owner": owner, "name": repo}
+	if queryPrefix != "" {
+		variables["query"] = queryPrefix
 	}
-	return c.CreatedAt, nil
+	if cursor != nil {
+		variables["cursor"] = *cursor
+	}
+	payload, err := json.Marshal(map[string]any{"query": gitHubTagRefsQuery, "variables": variables})
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.graphqlURL(), bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	g.setAuthHeader(req)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, g.handleErrorResponse(resp)
+	}
+
+	var envelope struct {
+		Data struct {
+			Repository *struct {
+				Refs ghTagRefPage `json:"refs"`
+			} `json:"repository"`
+		} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		return nil, err
+	}
+	if len(envelope.Errors) > 0 {
+		return nil, fmt.Errorf("%w: graphql: %s", ErrProviderError, envelope.Errors[0].Message)
+	}
+	if envelope.Data.Repository == nil {
+		return nil, ErrNotFound
+	}
+	return &envelope.Data.Repository.Refs, nil
+}
+
+// graphqlURL derives the GraphQL endpoint from the REST base URL. GitHub
+// Enterprise serves REST under /api/v3 and GraphQL under /api/graphql.
+func (g *GitHubProvider) graphqlURL() string {
+	base := strings.TrimSuffix(g.baseURL, "/")
+	if strings.HasSuffix(base, "/api/v3") {
+		return strings.TrimSuffix(base, "/v3") + "/graphql"
+	}
+	return base + "/graphql"
 }
 
 // CompareCommits returns the commits reachable from `head` but not from

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"windshift/internal/models"
 )
@@ -43,6 +42,32 @@ func matchGlob(pattern, name string) bool {
 		return false
 	}
 	return ok
+}
+
+// tagPatternMatches reports whether a tag name is in scope for a pattern. An
+// empty pattern means "every tag", which matchGlob alone treats as no match.
+func tagPatternMatches(pattern, name string) bool {
+	if pattern == "" {
+		return true
+	}
+	return matchGlob(pattern, name)
+}
+
+// globLiteralPrefix returns the leading literal run of a glob so a provider
+// can narrow a server-side ref query. It returns "" when the pattern contains
+// an escape or starts with a metacharacter, keeping the result a true prefix
+// of every match.
+func globLiteralPrefix(pattern string) string {
+	if strings.Contains(pattern, `\`) {
+		return ""
+	}
+	for i := 0; i < len(pattern); i++ {
+		switch pattern[i] {
+		case '*', '?', '[':
+			return pattern[:i]
+		}
+	}
+	return pattern
 }
 
 // loadMilestonePatterns reads the per-repo tag + branch glob from
@@ -155,26 +180,21 @@ func (s *SyncService) syncTagsAndReleases(
 		return err
 	}
 
-	tags, err := rp.ListTags(ctx, owner, repo, time.Time{})
+	// The provider applies the pattern before resolving tag timestamps, so a
+	// non-matching tag never costs a lookup.
+	tags, err := rp.ListTags(ctx, owner, repo, tagPattern)
 	if err != nil {
 		return fmt.Errorf("list tags: %w", err)
 	}
 
-	// Keep only matching tags; preserve their chronological order so the
-	// "previous tag" lookup is consistent. Tags from providers can come
-	// back in any order; sort by CreatedAt ascending so prev = i-1.
-	matched := make([]Tag, 0, len(tags))
-	for _, t := range tags {
-		if matchGlob(tagPattern, t.Name) {
-			matched = append(matched, t)
-		}
-	}
-	sort.SliceStable(matched, func(i, j int) bool {
-		return matched[i].CreatedAt.Before(matched[j].CreatedAt)
+	// Providers may return tags in any order; sort by CreatedAt ascending so
+	// the "previous tag" lookup is prev = i-1.
+	sort.SliceStable(tags, func(i, j int) bool {
+		return tags[i].CreatedAt.Before(tags[j].CreatedAt)
 	})
 
 	var syncErrs []error
-	for i, t := range matched {
+	for i, t := range tags {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -188,7 +208,7 @@ func (s *SyncService) syncTagsAndReleases(
 		}
 		var prev string
 		if i > 0 {
-			prev = matched[i-1].Name
+			prev = tags[i-1].Name
 		}
 		if err := s.recordRefObservation(
 			ctx,
