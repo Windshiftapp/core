@@ -2438,6 +2438,20 @@ func (h *JiraImportHandler) ensureJiraIterations(ctx context.Context, jobID stri
 					slog.String("project", projectKey),
 					slog.Int("sprintID", sprint.ID),
 					slog.String("sprint", sprint.Name))
+				// Surface the skip in import results instead of only the log, so a
+				// sprint without dates is reported as not imported rather than
+				// silently disappearing (WI-2200).
+				if err := h.recordMapping(jobID, "fidelity_finding", fmt.Sprintf("sprint:%d", sprint.ID),
+					fmt.Sprintf("Jira sprint %q (ID %d) was not imported because it has no usable start or end date.", sprint.Name, sprint.ID),
+					0, map[string]any{
+						"code":             "jira_sprint_missing_dates",
+						"severity":         "warning",
+						"disposition":      "not_imported",
+						"jira_sprint_id":   sprint.ID,
+						"jira_sprint_name": sprint.Name,
+					}); err != nil {
+					return nil, fmt.Errorf("record skipped Jira sprint: %w", err)
+				}
 				continue
 			}
 			result[sprintID] = iterationID
