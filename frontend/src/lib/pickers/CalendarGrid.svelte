@@ -214,6 +214,7 @@
 <style>
   .calendar {
     width: 17.5rem;
+    max-width: 100%;
     padding: 0.5rem;
     color: var(--ds-text);
   }
