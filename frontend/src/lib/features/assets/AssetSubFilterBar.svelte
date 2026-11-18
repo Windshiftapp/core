@@ -3,6 +3,7 @@
   import { QLBuilder } from '../../utils/ql.js';
   import DynamicFilterPopover from '../shared/DynamicFilterPopover.svelte';
   import AssetDynamicFieldFilter from './AssetDynamicFieldFilter.svelte';
+  import { assetCustomFieldIdentifier } from './assetTypeFields.js';
 
   let {
     statuses = [],
@@ -48,7 +49,7 @@
 
   const assetCustomFieldItems = $derived(
     customFields.map((field) => ({
-      id: `cf_${field.field_name || field.name}`,
+      id: assetCustomFieldIdentifier(field),
       name: field.field_name || field.name,
       type: field.field_type,
       description: '',

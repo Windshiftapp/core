@@ -1272,6 +1272,10 @@ export class AssetQLEvaluator extends QLEvaluatorEngine {
     const lowerFieldName = fieldName.toLowerCase();
 
     // Handle custom fields
+    if (lowerFieldName.startsWith('cfid_') && asset.custom_field_values) {
+      const cfId = fieldName.substring(5);
+      return asset.custom_field_values[cfId];
+    }
     if (lowerFieldName.startsWith('cf_') && asset.custom_field_values) {
       const cfName = fieldName.substring(3);
       return asset.custom_field_values[cfName];

@@ -43,3 +43,17 @@ export async function loadAssetTypeFields(types, getFields, options = {}) {
   }
   return fields;
 }
+
+/**
+ * Build the filter-picker identifier for an asset custom field. The stable
+ * numeric id keeps two fields that share a name distinct; the name form is
+ * only a fallback for legacy rows without an id.
+ *
+ * @param {{ custom_field_id?: number, field_name?: string, name?: string }} field
+ * @returns {string}
+ */
+export function assetCustomFieldIdentifier(field) {
+  return field.custom_field_id
+    ? `cfid_${field.custom_field_id}`
+    : `cf_${field.field_name || field.name}`;
+}
