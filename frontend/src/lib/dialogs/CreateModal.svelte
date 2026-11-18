@@ -155,17 +155,21 @@
   function onParentSearchChange(query) {
     resetParentSearch();
     const workspaceId = workItemFormStore.formData.workspace_id;
-    if (!workspaceId || query.trim().length < 2) return;
+    // Read synchronously so the picker re-queries once item types finish loading.
+    const types = workItemFormStore.itemTypes;
+    if (!workspaceId || !types.length) return;
+    // Short or empty input browses the workspace's open items instead of searching.
+    const browsing = query.trim().length < 2;
+    const params = browsing ? { ql: 'statusCompleted = false', limit: 50 } : { query, limit: 20 };
     parentSearchTimer = setTimeout(async () => {
       const controller = new AbortController();
       parentSearchController = controller;
       try {
-        const results = await search.items({ query, workspaceIds: [workspaceId], limit: 20, signal: controller.signal });
+        const results = await search.items({ ...params, workspaceIds: [workspaceId], signal: controller.signal });
         if (controller.signal.aborted) return;
-        const types = workItemFormStore.itemTypes;
         parentSearchResults = (results || [])
           .filter((r) => canHaveChildren(types, types.find((ty) => ty.id === r.item_type_id)))
-          .slice(0, 10);
+          .slice(0, browsing ? 50 : 10);
       } catch (error) {
         if (!controller.signal.aborted) errorToast(error?.message || String(error));
       }
