@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"windshift/internal/models"
 )
@@ -53,6 +54,32 @@ func tagPatternMatches(pattern, name string) bool {
 	return matchGlob(pattern, name)
 }
 
+// applyTagCutoff returns tags at or after since plus the single most recent tag
+// before it, so a caller can still resolve the predecessor of the oldest
+// returned tag. Providers that cannot order refs by date use this instead of a
+// server-side cutoff.
+func applyTagCutoff(tags []Tag, since time.Time) []Tag {
+	if since.IsZero() {
+		return tags
+	}
+	out := make([]Tag, 0, len(tags))
+	var anchor *Tag
+	for _, t := range tags {
+		if t.CreatedAt.Before(since) {
+			if anchor == nil || t.CreatedAt.After(anchor.CreatedAt) {
+				a := t
+				anchor = &a
+			}
+			continue
+		}
+		out = append(out, t)
+	}
+	if anchor != nil {
+		out = append(out, *anchor)
+	}
+	return out
+}
+
 // globLiteralPrefix returns the leading literal run of a glob so a provider
 // can narrow a server-side ref query. It returns "" when the pattern contains
 // an escape or starts with a metacharacter, keeping the result a true prefix
@@ -93,19 +120,28 @@ func (s *SyncService) loadMilestonePatterns(ctx context.Context, repoID int) (ta
 	return tagPattern, branchPattern, nil
 }
 
-// isRefProcessed reports whether (repoID, refType, refName) is already
-// in scm_processed_refs. A row means the ref was baselined or its event was
-// durably admitted, so later syncs must not observe it as new.
-func (s *SyncService) isRefProcessed(ctx context.Context, repoID int, refType, refName string) (bool, error) {
-	var n int
-	err := s.db.QueryRowContext(ctx, `
-		SELECT COUNT(*) FROM scm_processed_refs
-		WHERE workspace_repository_id = ? AND ref_type = ? AND ref_name = ?
-	`, repoID, refType, refName).Scan(&n)
+// loadProcessedRefs returns the ref names already recorded for a repo and ref
+// type. Loading the set once lets a sync check membership in memory instead of
+// issuing a query per ref.
+func (s *SyncService) loadProcessedRefs(ctx context.Context, repoID int, refType string) (map[string]struct{}, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT ref_name FROM scm_processed_refs
+		WHERE workspace_repository_id = ? AND ref_type = ?
+	`, repoID, refType)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	return n > 0, nil
+	defer func() { _ = rows.Close() }()
+
+	seen := make(map[string]struct{})
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		seen[name] = struct{}{}
+	}
+	return seen, rows.Err()
 }
 
 // markRefProcessed inserts the idempotency row for a baseline or a legacy
@@ -170,6 +206,7 @@ func (s *SyncService) syncTagsAndReleases(
 	owner, repo string,
 	repoID, workspaceID int,
 	baseline bool,
+	lastSyncedAt time.Time,
 ) error {
 	rp, ok := provider.(RefProvider)
 	if !ok {
@@ -180,9 +217,17 @@ func (s *SyncService) syncTagsAndReleases(
 		return err
 	}
 
+	// The date stamp bounds the refetch: only tags newer than the last
+	// checkpoint (minus a lookback) are processed. Providers also return the
+	// single tag before the cutoff so prev_tag stays resolvable.
+	var cutoff time.Time
+	if !lastSyncedAt.IsZero() {
+		cutoff = lastSyncedAt.Add(-syncTagLookback)
+	}
+
 	// The provider applies the pattern before resolving tag timestamps, so a
 	// non-matching tag never costs a lookup.
-	tags, err := rp.ListTags(ctx, owner, repo, tagPattern)
+	tags, err := rp.ListTags(ctx, owner, repo, tagPattern, cutoff)
 	if err != nil {
 		return fmt.Errorf("list tags: %w", err)
 	}
@@ -193,17 +238,23 @@ func (s *SyncService) syncTagsAndReleases(
 		return tags[i].CreatedAt.Before(tags[j].CreatedAt)
 	})
 
+	processed, err := s.loadProcessedRefs(ctx, repoID, "tag")
+	if err != nil {
+		return fmt.Errorf("load processed tags: %w", err)
+	}
+
 	var syncErrs []error
 	for i, t := range tags {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		seen, err := s.isRefProcessed(ctx, repoID, "tag", t.Name)
-		if err != nil {
-			syncErrs = append(syncErrs, fmt.Errorf("check processed tag %q: %w", t.Name, err))
+		// A tag older than the cutoff is the predecessor anchor that keeps
+		// prev_tag resolvable for the oldest in-window tag; it was processed in
+		// an earlier sync.
+		if !cutoff.IsZero() && t.CreatedAt.Before(cutoff) {
 			continue
 		}
-		if seen {
+		if _, seen := processed[t.Name]; seen {
 			continue
 		}
 		var prev string
@@ -246,6 +297,10 @@ func (s *SyncService) syncReleaseBranches(
 	if err != nil {
 		return fmt.Errorf("list branches: %w", err)
 	}
+	processed, err := s.loadProcessedRefs(ctx, repoID, "branch")
+	if err != nil {
+		return fmt.Errorf("load processed branches: %w", err)
+	}
 	var syncErrs []error
 	for _, b := range branches {
 		if err := ctx.Err(); err != nil {
@@ -254,12 +309,7 @@ func (s *SyncService) syncReleaseBranches(
 		if !matchGlob(branchPattern, b.Name) {
 			continue
 		}
-		seen, err := s.isRefProcessed(ctx, repoID, "branch", b.Name)
-		if err != nil {
-			syncErrs = append(syncErrs, fmt.Errorf("check processed branch %q: %w", b.Name, err))
-			continue
-		}
-		if seen {
+		if _, seen := processed[b.Name]; seen {
 			continue
 		}
 		if err := s.recordRefObservation(

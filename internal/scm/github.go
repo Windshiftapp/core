@@ -663,23 +663,23 @@ func (g *GitHubProvider) ListBranches(ctx context.Context, owner, repo string) (
 	return branches, nil
 }
 
-// gitHubTagRefsQuery pages a repository's tag refs together with the wrapped
-// commit's authored date, so one request covers up to 100 tags. GitHub's REST
-// /tags endpoint omits the date, which previously forced one commit request
-// per tag.
+// gitHubTagRefsQuery pages a repository's tag refs newest-first by commit date,
+// together with the wrapped commit's date, so one request covers up to 100
+// tags. GitHub's REST /tags endpoint omits the date, which previously forced
+// one commit request per tag.
 const gitHubTagRefsQuery = `
 query($owner: String!, $name: String!, $query: String, $cursor: String) {
   repository(owner: $owner, name: $name) {
-    refs(refPrefix: "refs/tags/", first: 100, query: $query, after: $cursor) {
+    refs(refPrefix: "refs/tags/", first: 100, query: $query, after: $cursor, orderBy: {field: TAG_COMMIT_DATE, direction: DESC}) {
       pageInfo { hasNextPage endCursor }
       nodes {
         name
         target {
           oid
-          ... on Commit { authoredDate }
+          ... on Commit { committedDate }
           ... on Tag {
             target {
-              ... on Commit { oid authoredDate }
+              ... on Commit { oid committedDate }
             }
           }
         }
@@ -689,12 +689,12 @@ query($owner: String!, $name: String!, $query: String, $cursor: String) {
 }`
 
 // ghTagTarget decodes a tag's GraphQL target. A lightweight tag points at a
-// Commit (Oid + AuthoredDate); an annotated tag points at a Tag object whose
+// Commit (Oid + CommittedDate); an annotated tag points at a Tag object whose
 // nested Target is the commit it wraps.
 type ghTagTarget struct {
-	Oid          string       `json:"oid"`
-	AuthoredDate *time.Time   `json:"authoredDate"`
-	Target       *ghTagTarget `json:"target"`
+	Oid           string       `json:"oid"`
+	CommittedDate *time.Time   `json:"committedDate"`
+	Target        *ghTagTarget `json:"target"`
 }
 
 func (t ghTagTarget) commit() (string, time.Time) {
@@ -702,8 +702,8 @@ func (t ghTagTarget) commit() (string, time.Time) {
 		return t.Target.commit()
 	}
 	var created time.Time
-	if t.AuthoredDate != nil {
-		created = *t.AuthoredDate
+	if t.CommittedDate != nil {
+		created = *t.CommittedDate
 	}
 	return t.Oid, created
 }
@@ -721,8 +721,9 @@ type ghTagRefPage struct {
 
 // ListTags returns tags whose name matches tagPattern. An empty pattern
 // returns every tag. Dates arrive in the same batched GraphQL query, so no tag
-// costs an individual commit lookup.
-func (g *GitHubProvider) ListTags(ctx context.Context, owner, repo, tagPattern string) ([]Tag, error) {
+// costs an individual commit lookup. A non-zero since stops pagination once the
+// refs pass it and appends the one tag before it as the predecessor anchor.
+func (g *GitHubProvider) ListTags(ctx context.Context, owner, repo, tagPattern string, since time.Time) ([]Tag, error) {
 	if err := g.ensureInstallationToken(ctx); err != nil {
 		return nil, err
 	}
@@ -732,6 +733,7 @@ func (g *GitHubProvider) ListTags(ctx context.Context, owner, repo, tagPattern s
 	prefix := globLiteralPrefix(tagPattern)
 
 	var tags []Tag
+	var anchor *Tag
 	var cursor *string
 	for {
 		page, err := g.listTagRefs(ctx, owner, repo, prefix, cursor)
@@ -743,13 +745,23 @@ func (g *GitHubProvider) ListTags(ctx context.Context, owner, repo, tagPattern s
 				continue
 			}
 			sha, created := node.Target.commit()
-			tags = append(tags, Tag{Name: node.Name, SHA: sha, CreatedAt: created})
+			tag := Tag{Name: node.Name, SHA: sha, CreatedAt: created}
+			if !since.IsZero() && created.Before(since) {
+				// Refs are newest first: the first tag past the cutoff is the
+				// predecessor anchor for the oldest in-window tag.
+				anchor = &tag
+				break
+			}
+			tags = append(tags, tag)
 		}
-		if !page.PageInfo.HasNextPage {
+		if anchor != nil || !page.PageInfo.HasNextPage {
 			break
 		}
 		next := page.PageInfo.EndCursor
 		cursor = &next
+	}
+	if anchor != nil {
+		tags = append(tags, *anchor)
 	}
 	return tags, nil
 }

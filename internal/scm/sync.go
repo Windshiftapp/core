@@ -35,6 +35,10 @@ const (
 	syncMaxCommits     = 500
 	syncCommitLookback = 24 * time.Hour
 
+	// syncTagLookback widens the tag refetch cutoff so a tag created just
+	// before the last checkpoint, or during a missed sync, is still seen.
+	syncTagLookback = 7 * 24 * time.Hour
+
 	// smartCommitFirstSyncWindow caps how far back smart-commits will fire
 	// when a repo is being synced for the first time (last_synced_at is
 	// null). Without this, connecting an existing repo with hundreds of
@@ -522,7 +526,7 @@ func (s *SyncService) syncRepository(ctx context.Context, provider Provider, rep
 		syncErrs = append(syncErrs, fmt.Errorf("sync release branches: %w", err))
 	}
 
-	if err := s.syncTagsAndReleases(ctx, provider, owner, repo, repoID, workspaceID, baselineRefs); err != nil {
+	if err := s.syncTagsAndReleases(ctx, provider, owner, repo, repoID, workspaceID, baselineRefs, lastSyncedAt); err != nil {
 		syncErrs = append(syncErrs, fmt.Errorf("sync tags: %w", err))
 	}
 	if err := s.syncAttachedReleases(ctx, provider, owner, repo, repoID); err != nil {
@@ -560,7 +564,7 @@ func (s *SyncService) syncAttachedReleases(ctx context.Context, provider Provide
 	if err != nil {
 		return err
 	}
-	tags, err := refProvider.ListTags(ctx, owner, repo, "")
+	tags, err := refProvider.ListTags(ctx, owner, repo, "", time.Time{})
 	if err != nil {
 		return err
 	}
@@ -1590,7 +1594,7 @@ func (s *SyncService) ListReleaseCandidates(ctx context.Context, workspaceRepoID
 		return nil, errors.New("SCM provider does not support releases")
 	}
 
-	tags, err := refProvider.ListTags(ctx, rc.Owner, rc.Repo, "")
+	tags, err := refProvider.ListTags(ctx, rc.Owner, rc.Repo, "", time.Time{})
 	if err != nil {
 		return nil, fmt.Errorf("list tags: %w", err)
 	}

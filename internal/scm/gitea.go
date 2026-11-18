@@ -557,8 +557,9 @@ func (g *GiteaProvider) ListReleases(ctx context.Context, owner, repo string) ([
 }
 
 // ListTags returns tags whose name matches tagPattern. Gitea's tag listing
-// already carries the commit date, so no per-tag commit fetch is needed.
-func (g *GiteaProvider) ListTags(ctx context.Context, owner, repo, tagPattern string) ([]Tag, error) {
+// already carries the commit date, so no per-tag commit fetch is needed. A
+// non-zero since is applied after listing, keeping one predecessor anchor.
+func (g *GiteaProvider) ListTags(ctx context.Context, owner, repo, tagPattern string, since time.Time) ([]Tag, error) {
 	const perPage = 50
 
 	type giteaTag struct {
@@ -588,7 +589,7 @@ func (g *GiteaProvider) ListTags(ctx context.Context, owner, repo, tagPattern st
 			break
 		}
 	}
-	return tags, nil
+	return applyTagCutoff(tags, since), nil
 }
 
 // CompareCommits returns commits reachable from `head` but not `base`,

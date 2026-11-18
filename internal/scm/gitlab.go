@@ -316,8 +316,9 @@ func (g *GitLabProvider) ListCommits(ctx context.Context, owner, repo string, op
 }
 
 // ListTags returns tags whose name matches tagPattern. GitLab's tag listing
-// already carries the commit date, so no per-tag commit fetch is needed.
-func (g *GitLabProvider) ListTags(ctx context.Context, owner, repo, tagPattern string) ([]Tag, error) {
+// already carries the commit date, so no per-tag commit fetch is needed. A
+// non-zero since is applied after listing, keeping one predecessor anchor.
+func (g *GitLabProvider) ListTags(ctx context.Context, owner, repo, tagPattern string, since time.Time) ([]Tag, error) {
 	const perPage = 100
 	var out []Tag
 	webURL := g.projectWebURL(owner, repo)
@@ -337,7 +338,7 @@ func (g *GitLabProvider) ListTags(ctx context.Context, owner, repo, tagPattern s
 			break
 		}
 	}
-	return out, nil
+	return applyTagCutoff(out, since), nil
 }
 
 func (g *GitLabProvider) CompareCommits(ctx context.Context, owner, repo, base, head string) ([]Commit, error) {

@@ -330,7 +330,11 @@ type RefProvider interface {
 	// populated. An empty pattern returns every tag. Providers apply the
 	// pattern before resolving timestamps, and resolve timestamps in batch
 	// rather than issuing one commit request per tag.
-	ListTags(ctx context.Context, owner, repo, tagPattern string) ([]Tag, error)
+	//
+	// A non-zero since is a refetch cutoff: providers return tags at or after
+	// it plus the single most recent matching tag before it, so a caller can
+	// still resolve the predecessor of the oldest returned tag.
+	ListTags(ctx context.Context, owner, repo, tagPattern string, since time.Time) ([]Tag, error)
 
 	// CompareCommits returns the commits reachable from `head` but not
 	// from `base`, in chronological order (oldest first). Used to list
