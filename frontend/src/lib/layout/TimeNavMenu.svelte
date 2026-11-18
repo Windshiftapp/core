@@ -138,7 +138,7 @@
         type: 'regular',
         title: t('time.drafts'),
         badge: String(timeLogStore.draftCount),
-        onClick: () => navigate('/time'),
+        onClick: () => navigate('/time?subtab=drafts'),
         testid: 'time-menu-drafts',
       });
       out.push({ type: 'divider' });

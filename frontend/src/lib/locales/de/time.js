@@ -12,6 +12,8 @@ export default {
     'completeTimeEntry': 'Zeiteintrag abschließen',
     'bookTimeEntry': 'Zeit buchen',
     'drafts': 'Entwürfe',
+    'draftsEmptyTitle': 'Keine Entwürfe',
+    'draftsEmptyHint': 'Unvollständige Zeiteinträge, die du speicherst, erscheinen hier.',
     'draftSaved': 'Als Entwurf gespeichert – später über das Menü „Zeit & Projekte“ abschließen.',
     'timeBooked': 'Zeit erfasst.',
     'draftDiscarded': 'Entwurf verworfen.',
@@ -218,6 +220,7 @@ export default {
       clickToView: 'Klicken Sie hier, um {key}-{number} anzuzeigen',
       budgetExceeded: '- Budget überschritten',
       submitted: 'Eingereicht',
+      worklogsTab: 'Arbeitsprotokolle',
     },
     organizations: {
       title: 'Organisationen',

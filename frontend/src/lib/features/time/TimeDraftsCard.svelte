@@ -1,6 +1,7 @@
 <script>
   import Button from '../../components/Button.svelte';
   import Card from '../../components/Card.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { timeLogStore } from '../../stores/timeLogStore.svelte.js';
@@ -39,12 +40,13 @@
   }
 </script>
 
-{#if timeLogStore.drafts.length > 0}
-  <div data-testid="time-drafts-card">
-    <Card rounded="xl" shadow padding="spacious" class="mb-6 {className}">
-    <h3 class="text-sm font-semibold mb-4 text-ds-text">
-      {t('time.drafts')} ({timeLogStore.drafts.length})
-    </h3>
+<Card rounded="xl" shadow padding="spacious" class="mb-6 {className}" dataTestid="time-drafts-card">
+  {#if timeLogStore.drafts.length === 0}
+    <EmptyState
+      title={t('time.draftsEmptyTitle')}
+      description={t('time.draftsEmptyHint')}
+    />
+  {:else}
     <ul class="space-y-2">
       {#each timeLogStore.drafts as draft (draft.id)}
         <li
@@ -67,6 +69,5 @@
         </li>
       {/each}
     </ul>
-    </Card>
-  </div>
-{/if}
+  {/if}
+</Card>

@@ -8,6 +8,8 @@ export default {
     'completeTimeEntry': '完成时间记录',
     'bookTimeEntry': '记入时间',
     'drafts': '草稿',
+    'draftsEmptyTitle': '暂无草稿',
+    'draftsEmptyHint': '您保存的未完成工时记录会显示在这里。',
     'draftSaved': '已保存为草稿 — 稍后可在“时间与项目”菜单中完成。',
     'timeBooked': '时间已记录。',
     'draftDiscarded': '草稿已丢弃。',
@@ -186,6 +188,7 @@ export default {
       clickToView: '点击查看 {key}-{number}',
       budgetExceeded: '- 预算超支',
       submitted: '提交时间',
+      worklogsTab: '工作日志',
     },
     organizations: {
       title: '组织',

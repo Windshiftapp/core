@@ -13,6 +13,8 @@ export default {
     'completeTimeEntry': 'Terminer la saisie de temps',
     'bookTimeEntry': 'Enregistrer le temps',
     'drafts': 'Brouillons',
+    'draftsEmptyTitle': 'Aucun brouillon',
+    'draftsEmptyHint': 'Les saisies de temps incomplètes que vous enregistrez apparaissent ici.',
     'draftSaved': 'Enregistré comme brouillon — à compléter plus tard depuis le menu Temps et projets.',
     'timeBooked': 'Temps enregistré.',
     'draftDiscarded': 'Brouillon supprimé.',
@@ -214,6 +216,7 @@ export default {
       clickToView: 'Cliquer pour afficher {key}-{number}',
       budgetExceeded: '- budget dépassé',
       submitted: 'Soumis',
+      worklogsTab: 'Journaux de travail',
     },
 
     // Organisations (anciennement Clients)

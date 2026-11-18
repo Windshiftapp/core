@@ -5,7 +5,7 @@
   import Edit from '@lucide/svelte/icons/edit';
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import AlertBox from '../../components/AlertBox.svelte';
-  import { navigate } from '../../router.js';
+  import { currentRoute, navigate } from '../../router.js';
   import { timeEntryStore } from '../../stores/timeEntryStore.svelte.js';
   import { timeLogStore } from '../../stores/timeLogStore.svelte.js';
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
@@ -14,6 +14,7 @@
   import BasePicker from '../../pickers/BasePicker.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import Card from '../../components/Card.svelte';
+  import TabNav from '../../components/TabNav.svelte';
   import TimeTrackingOnboarding from './TimeTrackingOnboarding.svelte';
   import TimeDraftsCard from './TimeDraftsCard.svelte';
   import { toHotkeyString } from '../../utils/keyboardShortcuts.js';
@@ -33,6 +34,16 @@
   let activeProjects = $derived(timeEntryStore.activeProjects);
   let filteredProjects = $derived(timeEntryStore.filteredProjects);
   const canManageProjects = $derived($permissionStore.userPermissionKeys?.has('project.manage') || $isSystemAdmin);
+
+  // The subtab lives in the URL so the Time & Projects menu can deep-link to drafts.
+  const activeTab = $derived($currentRoute.query?.subtab === 'drafts' ? 'drafts' : 'worklogs');
+  const entryTabs = $derived([
+    { id: 'worklogs', label: t('time.entry.worklogsTab') },
+    {
+      id: 'drafts',
+      label: timeLogStore.draftCount > 0 ? `${t('time.drafts')} (${timeLogStore.draftCount})` : t('time.drafts')
+    }
+  ]);
 
   const worklogColumns = $derived([
     { key: 'date', label: t('common.date'), render: (w) => formatDateOnly(dateKeyInZone(w.start_time, getUserTimezone(authStore?.currentUser))) },
@@ -163,6 +174,19 @@
   {/snippet}
 </PageHeader>
 
+<div class="mb-6">
+  <TabNav
+    tabs={entryTabs}
+    basePath="/time"
+    paramName="subtab"
+    defaultTab="worklogs"
+    testidPrefix="time-entry-tab"
+    ariaLabel={t('time.entry.title')}
+  />
+</div>
+
+{#if activeTab === 'worklogs'}
+
 {#if activeProjects.length === 0 && !showOnboarding}
   <AlertBox variant="warning" class="mb-6">
     <p class="font-medium" style="color: var(--ds-text-warning);">{t('time.entry.needProjects')}</p>
@@ -288,11 +312,13 @@
   {/if}
 </Card>
 
+{:else if activeTab === 'drafts'}
+  <!-- Drafts: incomplete entries recovered here or from the Time & Projects menu. -->
+  <TimeDraftsCard />
+{/if}
+
 <!-- Onboarding Modal -->
 {#if showOnboarding && canManageProjects}
   <TimeTrackingOnboarding oncompleted={handleOnboardingCompleted} oncancel={handleOnboardingCancel} />
 {/if}
-
-<!-- Drafts: incomplete entries recovered here or from the Time & Projects menu. -->
-<TimeDraftsCard />
 

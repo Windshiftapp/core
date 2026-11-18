@@ -12,6 +12,8 @@ export default {
     'completeTimeEntry': 'Завершить запись времени',
     'bookTimeEntry': 'Учесть время',
     'drafts': 'Черновики',
+    'draftsEmptyTitle': 'Нет черновиков',
+    'draftsEmptyHint': 'Незавершённые записи времени, которые вы сохраните, появятся здесь.',
     'draftSaved': 'Сохранено как черновик — завершите позже в меню «Время и проекты».',
     'timeBooked': 'Время учтено.',
     'draftDiscarded': 'Черновик удалён.',
@@ -233,6 +235,7 @@ export default {
       clickToView: 'Нажмите, чтобы открыть {key}-{number}',
       budgetExceeded: '— бюджет превышен',
       submitted: 'Отправлено',
+      worklogsTab: 'Рабочие журналы',
     },
 
     organizations: {

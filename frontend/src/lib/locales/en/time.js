@@ -13,6 +13,8 @@ export default {
     completeTimeEntry: 'Complete Time Entry',
     bookTimeEntry: 'Book Time',
     drafts: 'Drafts',
+    draftsEmptyTitle: 'No drafts',
+    draftsEmptyHint: 'Incomplete time entries you save appear here.',
     menu: {
       startTimerHint: 'Uses the open work item when available',
       logWork: 'Log Work',
@@ -242,6 +244,7 @@ export default {
       clickToView: 'Click to view {key}-{number}',
       budgetExceeded: '- budget exceeded',
       submitted: 'Submitted',
+      worklogsTab: 'Worklogs',
     },
 
     // Organizations (formerly Customers)

@@ -8,6 +8,8 @@ export default {
     "completeTimeEntry": "تکمیل ثبت زمان",
     "bookTimeEntry": "ثبت زمان",
     "drafts": "پیش‌نویس‌ها",
+    "draftsEmptyTitle": "هیچ پیش‌نویسی نیست",
+    "draftsEmptyHint": "ورودی‌های زمانی ناقصی که ذخیره می‌کنید اینجا نمایش داده می‌شوند.",
     "draftSaved": "به‌عنوان پیش‌نویس ذخیره شد — بعداً از منوی «زمان و پروژه‌ها» تکمیل کنید.",
     "timeBooked": "زمان ثبت شد.",
     "draftDiscarded": "پیش‌نویس حذف شد.",
@@ -214,7 +216,8 @@ export default {
       "noEntries": "هیچ ورودی زمانی پیدا نشد. ورود اولین بار خود را برای شروع ثبت کنید.",
       "clickToView": "برای مشاهده {key}-{number} کلیک کنید",
       "budgetExceeded": "- بیش از بودجه",
-      "submitted": "ارسال شد"
+      "submitted": "ارسال شد",
+      "worklogsTab": "کارنامه‌ها"
     },
     "organizations": {
       "title": "سازمان ها",

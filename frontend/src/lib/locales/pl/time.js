@@ -13,6 +13,8 @@ export default {
     'completeTimeEntry': 'Dokończ wpis czasu',
     'bookTimeEntry': 'Zaksięguj czas',
     'drafts': 'Szkice',
+    'draftsEmptyTitle': 'Brak szkiców',
+    'draftsEmptyHint': 'Zapisane niekompletne wpisy czasu pojawią się tutaj.',
     'draftSaved': 'Zapisano jako szkic — dokończ później w menu Czas i projekty.',
     'timeBooked': 'Czas został zapisany.',
     'draftDiscarded': 'Szkic odrzucony.',
@@ -242,6 +244,7 @@ export default {
       clickToView: 'Kliknij, aby wyświetlić {key}-{number}',
       budgetExceeded: '- przekroczono budżet',
       submitted: 'Wysłano',
+      worklogsTab: 'Dzienniki pracy',
     },
 
     // Organizacje (dawniej klienci)
