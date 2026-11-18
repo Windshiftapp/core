@@ -706,6 +706,7 @@ export default {
   },
 
   createModal: {
+    noParentOption: 'Nuovo elemento di lavoro (senza padre)',
     // Type labels
     workItem: 'Elemento di lavoro',
     team: 'Team',

@@ -10,8 +10,11 @@
   import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import { packs as packsApi } from '../api/packs.js';
   import { workspaces } from '../api/workspaces.js';
-  import { attachments } from '../api/misc.js';
+  import { attachments, search } from '../api/misc.js';
   import { items } from '../api/items.js';
+  import ItemTypeIcon from '../components/ItemTypeIcon.svelte';
+  import ItemKey from '../components/ItemKey.svelte';
+  import { childItemTypesForParent, canHaveChildren } from '../utils/hierarchy.js';
   import { collections } from '../api/collections.js';
   import X from '@lucide/svelte/icons/x';
   import Target from '@lucide/svelte/icons/target';
@@ -130,6 +133,65 @@
   let collectionCategoryId = $state(null);
   let submitting = $state(false);
 
+  // Parent chosen from the header picker (as opposed to a pre-set parent context).
+  const NO_PARENT = '__none__';
+  let parentPickedHere = $state(false);
+  let parentSearchResults = $state([]);
+  let parentSearchTimer;
+  let parentSearchController;
+  let pickedParent = $state(null);
+  let parentItems = $derived([
+    { id: NO_PARENT, title: t('createModal.noParentOption') },
+    ...(pickedParent && !parentSearchResults.some((r) => r.id === pickedParent.id) ? [pickedParent] : []),
+    ...parentSearchResults
+  ]);
+
+  function resetParentSearch() {
+    clearTimeout(parentSearchTimer);
+    parentSearchController?.abort();
+    parentSearchResults = [];
+  }
+
+  function onParentSearchChange(query) {
+    resetParentSearch();
+    const workspaceId = workItemFormStore.formData.workspace_id;
+    if (!workspaceId || query.trim().length < 2) return;
+    parentSearchTimer = setTimeout(async () => {
+      const controller = new AbortController();
+      parentSearchController = controller;
+      try {
+        const results = await search.items({ query, workspaceIds: [workspaceId], limit: 20, signal: controller.signal });
+        if (controller.signal.aborted) return;
+        const types = workItemFormStore.itemTypes;
+        parentSearchResults = (results || [])
+          .filter((r) => canHaveChildren(types, types.find((ty) => ty.id === r.item_type_id)))
+          .slice(0, 10);
+      } catch (error) {
+        if (!controller.signal.aborted) errorToast(error?.message || String(error));
+      }
+    }, 300);
+  }
+
+  function selectParent(item) {
+    if (item.id === NO_PARENT) {
+      clearPickedParent();
+      return;
+    }
+    const type = workItemFormStore.itemTypes.find((ty) => ty.id === item.item_type_id);
+    pickedParent = item;
+    parentPickedHere = true;
+    workItemFormStore.setParentItem(
+      { id: item.id, title: item.title },
+      childItemTypesForParent(workItemFormStore.itemTypes, type)
+    );
+  }
+
+  function clearPickedParent() {
+    pickedParent = null;
+    parentPickedHere = false;
+    workItemFormStore.setParentItem(null, null);
+  }
+
   // The work-item create endpoint requires item.create in the target
   // workspace (denied with 404), so the picker must only offer workspaces
   // where creation is allowed. Mirrors CollectionBoard's quick-add filter;
@@ -174,6 +236,9 @@
     isOpen = false;
     selectedType = initialType;
     recoverableItemId = null;
+    parentPickedHere = false;
+    pickedParent = null;
+    resetParentSearch();
 
     // Reset work item form store
     workItemFormStore.resetForm();
@@ -541,7 +606,7 @@
     <CreateFormFrame dataTestid="create-modal">
       {#snippet header()}
         <!-- Type Selector FIRST (independent of workspace) -->
-        {#if !workItemFormStore.parentItem && !compactMode}
+        {#if (!workItemFormStore.parentItem || parentPickedHere) && !compactMode}
           <ChipPicker
             value={selectedType}
             items={typeOptions}
@@ -561,7 +626,7 @@
         {/if}
 
         <!-- Workspace Selector (only for work-items) -->
-        {#if selectedType === 'work-item' && !workItemFormStore.parentItem}
+        {#if selectedType === 'work-item' && (!workItemFormStore.parentItem || parentPickedHere)}
           <ChipPicker
             value={workItemFormStore.formData.workspace_id}
             items={creatableWorkspaces}
@@ -574,6 +639,7 @@
             testId="create-workspace-chip"
             onSelect={(workspace) => {
               if (workspace) {
+                if (parentPickedHere && workspace.id !== workItemFormStore.formData.workspace_id) clearPickedParent();
                 workItemFormStore.setWorkspace(workspace);
               }
             }}
@@ -607,13 +673,38 @@
           <ChevronRight size={14} style="color: var(--ds-text-subtle);" />
         {/if}
 
-        <span data-testid="create-modal-heading" class="font-medium" style="color: var(--ds-text);">
-          {#if workItemFormStore.parentItem}
-            {t('createModal.newChildItem')}
-          {:else}
-            {t('createModal.new')} {currentTypeName}
-          {/if}
-        </span>
+        {#if selectedType === 'work-item' && (!workItemFormStore.parentItem || parentPickedHere)}
+          <ChipPicker
+            value={pickedParent?.id ?? null}
+            items={parentItems}
+            getValue={(p) => p.id}
+            getLabel={(p) => p.id === NO_PARENT ? '' : p.title}
+            placeholder={`${t('createModal.new')} ${currentTypeName}`}
+            searchable={true}
+            testId="create-parent-chip"
+            onSearchChange={onParentSearchChange}
+            onSelect={selectParent}
+          >
+            {#snippet itemSnippet({ item })}
+              {#if item.id === NO_PARENT}
+                <span class="font-medium">{item.title}</span>
+              {:else}
+                {@const itemType = workItemFormStore.itemTypes.find((ty) => ty.id === item.item_type_id)}
+                {#if itemType}<ItemTypeIcon {itemType} />{/if}
+                <ItemKey {item} workspace={{ key: item.workspace_key }} clickable={false} />
+                <span class="text-sm truncate">{item.title}</span>
+              {/if}
+            {/snippet}
+          </ChipPicker>
+        {:else}
+          <span data-testid="create-modal-heading" class="font-medium" style="color: var(--ds-text);">
+            {#if workItemFormStore.parentItem}
+              {t('createModal.newChildItem')}
+            {:else}
+              {t('createModal.new')} {currentTypeName}
+            {/if}
+          </span>
+        {/if}
 
         <button
           data-testid="create-modal-close"
