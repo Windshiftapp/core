@@ -34,10 +34,10 @@ func (s *Service) EnsureIterationType(name, color, description string) (int, err
 	return created.GetID(), nil
 }
 
-func (s *Service) EnsureSprintIteration(workspaceID, typeID int, sprint jira.JiraSprint) (int, bool) {
+func (s *Service) EnsureSprintIteration(workspaceID, typeID int, sprint jira.JiraSprint) (iterationID int, created, ok bool) {
 	start, end, ok := sprintDates(sprint)
 	if !ok {
-		return 0, false
+		return 0, false, false
 	}
 	status := "planned"
 	switch strings.ToLower(sprint.State) {
@@ -52,10 +52,10 @@ func (s *Service) EnsureSprintIteration(workspaceID, typeID int, sprint jira.Jir
 	}
 	existing, err := s.planning.FindIterationByName(workspaceID, name)
 	if err == nil {
-		return existing.ID, true
+		return existing.ID, false, true
 	}
 	if !errors.Is(err, repository.ErrNotFound) {
-		return 0, false
+		return 0, false, false
 	}
 	description := strings.TrimSpace(sprint.Goal)
 	if description != "" {
@@ -72,9 +72,9 @@ func (s *Service) EnsureSprintIteration(workspaceID, typeID int, sprint jira.Jir
 		WorkspaceID: &workspaceID,
 	})
 	if err != nil {
-		return 0, false
+		return 0, false, false
 	}
-	return iteration.ID, true
+	return iteration.ID, true, true
 }
 
 func sprintDates(sprint jira.JiraSprint) (start, end string, ok bool) {

@@ -304,6 +304,13 @@ func (s *Service) deleteMapping(jobID string, item mapping, deleted map[string]i
 	case "worklog":
 		tableName = "time_worklogs"
 	case "iteration":
+		reused, err := s.reusedEntity(jobID, item.entityType, item.windshiftID)
+		if err != nil {
+			return false, err
+		}
+		if reused {
+			return false, nil
+		}
 		tableName = "iterations"
 	case "time_project":
 		reused, err := s.reusedWorkspaceTimeProject(jobID, item.windshiftID)

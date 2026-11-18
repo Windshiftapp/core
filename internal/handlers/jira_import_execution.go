@@ -2431,7 +2431,7 @@ func (h *JiraImportHandler) ensureJiraIterations(ctx context.Context, jobID stri
 			}
 			seen[sprintID] = struct{}{}
 
-			iterationID, ok := h.ensureJiraSprintIteration(workspaceID, typeID, sprint)
+			iterationID, created, ok := h.ensureJiraSprintIteration(workspaceID, typeID, sprint)
 			if !ok {
 				slog.Warn("Skipping Jira sprint without usable dates",
 					slog.String("component", "jira"),
@@ -2441,7 +2441,12 @@ func (h *JiraImportHandler) ensureJiraIterations(ctx context.Context, jobID stri
 				continue
 			}
 			result[sprintID] = iterationID
+			action := "create"
+			if !created {
+				action = "reuse_existing"
+			}
 			if err := h.recordMapping(jobID, "iteration", sprintID, sprint.Name, iterationID, map[string]any{
+				"action":          action,
 				"jira_board_id":   board.ID,
 				"jira_board_name": board.Name,
 				"jira_state":      sprint.State,
@@ -2462,7 +2467,7 @@ func (h *JiraImportHandler) ensureIterationType(name, color, description string)
 	return h.imports.EnsureIterationType(name, color, description)
 }
 
-func (h *JiraImportHandler) ensureJiraSprintIteration(workspaceID, typeID int, sprint jira.JiraSprint) (int, bool) {
+func (h *JiraImportHandler) ensureJiraSprintIteration(workspaceID, typeID int, sprint jira.JiraSprint) (iterationID int, created, ok bool) {
 	return h.imports.EnsureSprintIteration(workspaceID, typeID, sprint)
 }
 
