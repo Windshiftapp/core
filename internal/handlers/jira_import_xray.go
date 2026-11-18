@@ -220,7 +220,7 @@ func (h *JiraImportHandler) importXrayTestCase(
 			UpdatedAt:   createdAt,
 		})
 	}
-	return h.imports.CreateXrayTestCase(jiraimport.XrayTestCaseInput{
+	input := jiraimport.XrayTestCaseInput{
 		JobID:   jobID,
 		JiraID:  issue.ID,
 		JiraKey: issue.Key,
@@ -235,7 +235,22 @@ func (h *JiraImportHandler) importXrayTestCase(
 		Steps:        steps,
 		Labels:       labels,
 		XrayTestType: definition.TestTypeName,
-	})
+	}
+
+	// A re-import updates the test case created by the previous import instead
+	// of inserting a new one and orphaning the old.
+	if previous, err := h.findPreviousJiraImportMapping(jobID, "test_case", issue.ID); err != nil {
+		return 0, fmt.Errorf("find previous Xray Test mapping: %w", err)
+	} else if previous != nil {
+		exists, existsErr := h.imports.TestCaseExists(previous.WindshiftID, workspaceID)
+		if existsErr != nil {
+			return 0, existsErr
+		}
+		if exists {
+			return h.imports.UpdateXrayTestCase(previous.WindshiftID, input)
+		}
+	}
+	return h.imports.CreateXrayTestCase(input)
 }
 
 func jiraTestCasePriority(priority *jira.JiraPriority) string {
