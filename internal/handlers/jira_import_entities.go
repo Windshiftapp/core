@@ -1988,6 +1988,12 @@ func (h *JiraImportHandler) importIssueLinks(jobID string) error {
 				linkTypeCache[typeName] = linkTypeID
 			}
 
+			// The target is now imported, so drop any placeholder external link
+			// recorded while it was missing (WI-1174).
+			if err := h.imports.RemoveExternalIssueLink(jobID, info.SourceKey, outwardKey, typeName, "outward"); err != nil {
+				return fmt.Errorf("remove placeholder Jira external link: %w", err)
+			}
+
 			mappingID := fmt.Sprintf("%s-%s-%s", info.SourceKey, typeName, outwardKey)
 			previousMapping, previousErr := h.findPreviousJiraImportMapping(jobID, "link", mappingID)
 			if previousErr != nil {

@@ -446,6 +446,43 @@ func (s *Service) UpsertExternalIssueLink(
 		})
 }
 
+// RemoveExternalIssueLink deletes the placeholder external link (and its
+// mapping) recorded while the target issue had not been imported yet. Called
+// when the real item-to-item link can finally be created (WI-1174).
+func (s *Service) RemoveExternalIssueLink(jobID, itemKey, externalKey, typeName, direction string) error {
+	mappingJiraID := itemKey + ":" + direction + ":" + typeName + ":" + externalKey
+	var mappingJobID string
+	var metadata sql.NullString
+	err := s.db.QueryRow(`
+		SELECT m.job_id, m.metadata_json
+		FROM jira_import_id_mappings m
+		JOIN jira_import_jobs j ON j.id = m.job_id
+		WHERE m.entity_type = 'external_issue_link'
+		  AND m.jira_id = ?
+		  AND j.connection_id = (SELECT connection_id FROM jira_import_jobs WHERE id = ?)
+		ORDER BY m.id DESC
+		LIMIT 1
+	`, mappingJiraID, jobID).Scan(&mappingJobID, &metadata)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("find placeholder Jira external link: %w", err)
+	}
+	if linkID, _ := Metadata(metadata)["integration_link_id"].(string); linkID != "" {
+		if _, err := s.db.ExecWrite(`DELETE FROM item_integration_links WHERE id = ?`, linkID); err != nil {
+			return fmt.Errorf("delete placeholder Jira external link: %w", err)
+		}
+	}
+	if _, err := s.db.ExecWrite(`
+		DELETE FROM jira_import_id_mappings
+		WHERE job_id = ? AND entity_type = 'external_issue_link' AND jira_id = ?
+	`, mappingJobID, mappingJiraID); err != nil {
+		return fmt.Errorf("delete placeholder Jira external link mapping: %w", err)
+	}
+	return nil
+}
+
 // SubresourceBelongsToItem reports whether a previously imported comment,
 // attachment, or worklog is currently owned by the destination item. A partial
 // fork retry must not reuse a mapping owned by the original workspace's item,
