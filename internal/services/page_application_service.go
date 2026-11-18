@@ -83,49 +83,52 @@ func (s *PageApplicationService) ListSummariesAcrossWorkspaces(userID int, works
 	q := strings.TrimSpace(query)
 	rows := make([]PageSummaryRow, 0)
 	seen := make(map[int]bool, len(workspaceIDs))
+	appendPage := func(workspaceID int, page models.Page) {
+		rows = append(rows, PageSummaryRow{
+			WorkspaceID: workspaceID,
+			PageID:      page.ID,
+			ParentID:    page.ParentID,
+			Title:       page.Title,
+			Depth:       page.Depth,
+			IsHome:      page.IsHome,
+			UpdatedAt:   page.UpdatedAt,
+		})
+	}
 	for _, workspaceID := range workspaceIDs {
 		if seen[workspaceID] {
 			continue
 		}
 		seen[workspaceID] = true
-		var pages []models.Page
-		var err error
 		if q == "" {
-			pages, err = s.pages.ListTreeMeta(workspaceID, false)
-		} else {
-			pages, err = s.pages.SearchByKeyword(workspaceID, q, limit)
-		}
-		if err != nil {
-			return nil, err
-		}
-		ids := make([]int, len(pages))
-		for i := range pages {
-			ids[i] = pages[i].ID
-		}
-		visible, err := s.pageAuth.ListVisiblePageIDs(userID, workspaceID, ids)
-		if err != nil {
-			return nil, err
-		}
-		for i := range pages {
-			if !visible[pages[i].ID] {
-				continue
+			pages, err := s.pages.ListTreeMeta(workspaceID, false)
+			if err != nil {
+				return nil, err
 			}
-			rows = append(rows, PageSummaryRow{
-				WorkspaceID: workspaceID,
-				PageID:      pages[i].ID,
-				ParentID:    pages[i].ParentID,
-				Title:       pages[i].Title,
-				Depth:       pages[i].Depth,
-				IsHome:      pages[i].IsHome,
-				UpdatedAt:   pages[i].UpdatedAt,
-			})
+			ids := make([]int, len(pages))
+			for i := range pages {
+				ids[i] = pages[i].ID
+			}
+			visible, err := s.pageAuth.ListVisiblePageIDs(userID, workspaceID, ids)
+			if err != nil {
+				return nil, err
+			}
+			for i := range pages {
+				if visible[pages[i].ID] {
+					appendPage(workspaceID, pages[i])
+				}
+			}
+			continue
 		}
-		if q != "" && len(rows) >= limit {
+		err := s.forEachVisibleSearchMatch(userID, workspaceID, q, func(page models.Page) bool {
+			appendPage(workspaceID, page)
+			return len(rows) < limit
+		})
+		if err != nil {
+			return nil, err
+		}
+		if len(rows) >= limit {
 			break
 		}
-	}
-	if q != "" && len(rows) > limit {
-		rows = rows[:limit]
 	}
 	return rows, nil
 }
@@ -204,25 +207,58 @@ func (s *PageApplicationService) Get(userID, workspaceID, pageID int) (*models.P
 	return page, nil
 }
 
-func (s *PageApplicationService) Search(userID, workspaceID int, query string, limit int) ([]models.Page, error) {
-	pages, err := s.pages.SearchByKeyword(workspaceID, query, limit)
-	if err != nil {
-		return nil, err
-	}
-	ids := make([]int, len(pages))
-	for i := range pages {
-		ids[i] = pages[i].ID
-	}
-	visible, err := s.pageAuth.ListVisiblePageIDs(userID, workspaceID, ids)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]models.Page, 0, len(pages))
-	for i := range pages {
-		if visible[pages[i].ID] {
-			pages[i].Content = ""
-			result = append(result, pages[i])
+// pageSearchBatchSize bounds each candidate batch fetched before ACL
+// filtering. Restricted pages can fill a batch, so callers keep walking
+// batches until they have enough visible results or the matches run out.
+const pageSearchBatchSize = 100
+
+// forEachVisibleSearchMatch walks the keyword-search candidate stream for one
+// workspace in batches and calls visit for each page the user may see. It stops
+// when visit returns false or the candidates are exhausted.
+func (s *PageApplicationService) forEachVisibleSearchMatch(userID, workspaceID int, query string, visit func(models.Page) bool) error {
+	for offset := 0; ; {
+		batch, err := s.pages.SearchByKeywordPage(workspaceID, query, pageSearchBatchSize, offset)
+		if err != nil {
+			return err
 		}
+		if len(batch) == 0 {
+			return nil
+		}
+		offset += len(batch)
+		ids := make([]int, len(batch))
+		for i := range batch {
+			ids[i] = batch[i].ID
+		}
+		visible, err := s.pageAuth.ListVisiblePageIDs(userID, workspaceID, ids)
+		if err != nil {
+			return err
+		}
+		for i := range batch {
+			if !visible[batch[i].ID] {
+				continue
+			}
+			batch[i].Content = ""
+			if !visit(batch[i]) {
+				return nil
+			}
+		}
+		if len(batch) < pageSearchBatchSize {
+			return nil
+		}
+	}
+}
+
+func (s *PageApplicationService) Search(userID, workspaceID int, query string, limit int) ([]models.Page, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	result := make([]models.Page, 0, limit)
+	err := s.forEachVisibleSearchMatch(userID, workspaceID, query, func(page models.Page) bool {
+		result = append(result, page)
+		return len(result) < limit
+	})
+	if err != nil {
+		return nil, err
 	}
 	return result, nil
 }

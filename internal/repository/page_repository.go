@@ -482,9 +482,12 @@ func (r *PageRepository) ArchiveTx(tx database.Tx, pageID, archivedBy int) error
 // SearchByKeyword returns non-archived pages in the workspace whose title or
 // Markdown body contains query, case-insensitively. Title matches sort first.
 // The caller must apply per-page ACLs before returning results to a user.
-func (r *PageRepository) SearchByKeyword(workspaceID int, query string, limit int) ([]models.Page, error) {
+func (r *PageRepository) SearchByKeyword(workspaceID int, query string, limit, offset int) ([]models.Page, error) {
 	if limit <= 0 {
 		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
 	}
 	q := strings.TrimSpace(query)
 	if q == "" {
@@ -507,8 +510,8 @@ func (r *PageRepository) SearchByKeyword(workspaceID int, query string, limit in
 		  CASE WHEN LOWER(title) LIKE LOWER(?) ESCAPE '\' THEN 0 ELSE 1 END,
 		  title ASC,
 		  id ASC
-		LIMIT ?
-	`, workspaceID, like, like, like, limit)
+		LIMIT ? OFFSET ?
+	`, workspaceID, like, like, like, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("search pages by keyword: %w", err)
 	}

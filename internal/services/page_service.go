@@ -925,7 +925,13 @@ func (s *PageService) ListTreeMeta(workspaceID int, includeArchived bool) ([]mod
 // SearchByKeyword delegates to the repository's title-and-body substring
 // search. Permission filtering happens at the handler layer.
 func (s *PageService) SearchByKeyword(workspaceID int, query string, limit int) ([]models.Page, error) {
-	return s.pages.SearchByKeyword(workspaceID, query, limit)
+	return s.pages.SearchByKeyword(workspaceID, query, limit, 0)
+}
+
+// SearchByKeywordPage exposes the offset-aware candidate search so callers can
+// walk past ACL-restricted matches until they have enough visible results.
+func (s *PageService) SearchByKeywordPage(workspaceID int, query string, limit, offset int) ([]models.Page, error) {
+	return s.pages.SearchByKeyword(workspaceID, query, limit, offset)
 }
 
 // ListChildren returns direct children of the given parent (root pages when
