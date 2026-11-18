@@ -277,6 +277,9 @@ type fieldSemantics struct {
 	bareIdentifierValue bool
 	referenceNameField  string
 	workspaceReference  bool
+	// booleanColumn marks fields backed by a real SQL boolean column, whose
+	// literal binding must match the engine (see booleanColumnArg).
+	booleanColumn bool
 }
 
 // fieldSemanticsFor keeps value handling consistent across comparison and IN.
@@ -300,6 +303,8 @@ func fieldSemanticsFor(entityType EntityType, fieldName string) fieldSemantics {
 			return fieldSemantics{referenceNameField: "tp.name"}
 		case "iteration", "iteration_id", "iterationid":
 			return fieldSemantics{referenceNameField: "iter.name"}
+		case "statuscompleted", "status_completed", "inheritproject", "inherit_project", "istask", "is_task":
+			return fieldSemantics{booleanColumn: true}
 		}
 	}
 
@@ -682,6 +687,15 @@ func (g *SQLGenerator) generateComparison(node *ASTNode) (sql string, args []any
 					}
 				}
 			}
+		}
+	}
+
+	// A real boolean column rejects the 0/1 literal on Postgres. Bind a Go bool
+	// for column-backed boolean fields; custom fields keep the JSON text rewrite
+	// above and SLA predicates stay integer-typed in their own expressions.
+	if semantics.booleanColumn && node.Right.Type == NodeLiteral && node.Right.DataType == BOOLEAN {
+		if rightIdx := len(leftOnlyArgs); rightIdx < len(leftArgs) {
+			leftArgs[rightIdx] = g.booleanColumnArg(leftArgs[rightIdx])
 		}
 	}
 
@@ -2111,6 +2125,19 @@ func (g *SQLGenerator) convertLiteral(node *ASTNode) any {
 	default:
 		return node.Value
 	}
+}
+
+// booleanColumnArg adapts an already-converted boolean literal for comparison
+// against a real boolean column. Postgres rejects `boolean_col = 0`, so it binds
+// a Go bool; SQLite stores booleans as integers and keeps the 0/1 literal.
+func (g *SQLGenerator) booleanColumnArg(value any) any {
+	if g.dbDriver != "postgres" {
+		return value
+	}
+	if integer, ok := value.(int64); ok {
+		return integer == 1
+	}
+	return value
 }
 
 // escapeLikePattern escapes the SQL LIKE wildcards (%, _) and the escape
