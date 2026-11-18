@@ -1419,15 +1419,41 @@ func (r *ItemRepository) GetCalendarData(itemID int) (sql.NullString, int, error
 	return data, workspaceID, nil
 }
 
-func (r *ItemRepository) UpdateCalendarData(itemID int, data string, updatedAt time.Time) error {
-	result, err := r.db.ExecWrite("UPDATE items SET calendar_data = ?, updated_at = ? WHERE id = ?", data, updatedAt, itemID)
-	if err != nil {
-		return err
-	}
-	if rows, _ := result.RowsAffected(); rows == 0 {
-		return ErrNotFound
-	}
-	return nil
+// MutateCalendarData reads, transforms, and writes an item's calendar entries
+// inside one transaction, locking the row on PostgreSQL. Concurrent schedule
+// and unschedule requests therefore serialize instead of overwriting each
+// other's entries from a stale read.
+func (r *ItemRepository) MutateCalendarData(ctx context.Context, itemID int, mutate func([]models.CalendarScheduleEntry) ([]models.CalendarScheduleEntry, error)) error {
+	return database.WithTx(r.db, func(tx database.Tx) error {
+		query := "SELECT calendar_data FROM items WHERE id = ?"
+		if r.db.GetDriverName() == "postgres" {
+			query += " FOR UPDATE"
+		}
+		var data sql.NullString
+		if err := tx.QueryRowContext(ctx, query, itemID).Scan(&data); err != nil {
+			return mapItemErr(err, "lock calendar data")
+		}
+		entries := []models.CalendarScheduleEntry{}
+		if data.Valid && data.String != "" {
+			// Legacy rows may hold malformed JSON; treat them as empty so a
+			// schedule can still be written instead of failing the request.
+			if err := json.Unmarshal([]byte(data.String), &entries); err != nil {
+				entries = []models.CalendarScheduleEntry{}
+			}
+		}
+		updated, err := mutate(entries)
+		if err != nil {
+			return err
+		}
+		raw, err := json.Marshal(updated)
+		if err != nil {
+			return fmt.Errorf("encode calendar data for item %d: %w", itemID, err)
+		}
+		if _, err := tx.ExecWriteContext(ctx, "UPDATE items SET calendar_data = ?, updated_at = ? WHERE id = ?", string(raw), time.Now().UTC(), itemID); err != nil {
+			return mapItemErr(err, "update calendar data")
+		}
+		return nil
+	})
 }
 
 var itemCountableColumns = map[string]bool{

@@ -1,8 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -51,14 +50,14 @@ func (h *ItemHandler) ScheduleItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get current calendar data and workspace_id for permission check
-	calendarDataJSON, workspaceID, err := repository.NewItemRepository(h.db).GetCalendarData(id)
+	repo := repository.NewItemRepository(h.db)
+
+	// Check if user has permission to edit items in this workspace.
+	workspaceID, err := repo.GetWorkspaceIDCtx(r.Context(), id)
 	if err != nil {
 		respondNotFound(w, r, "item")
 		return
 	}
-
-	// Check if user has permission to edit items in this workspace
 	canEdit, permErr := h.canEditItem(user.ID, workspaceID)
 	if permErr != nil {
 		respondInternalError(w, r, permErr)
@@ -69,43 +68,32 @@ func (h *ItemHandler) ScheduleItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse existing calendar data
-	var calendarData []models.CalendarScheduleEntry
-	if calendarDataJSON.Valid && calendarDataJSON.String != "" {
-		if err = json.Unmarshal([]byte(calendarDataJSON.String), &calendarData); err != nil {
-			calendarData = []models.CalendarScheduleEntry{}
+	// Replace this user's entry and append the new one in one transaction so a
+	// concurrent schedule for another user is not lost.
+	var newEntry models.CalendarScheduleEntry
+	err = repo.MutateCalendarData(r.Context(), id, func(entries []models.CalendarScheduleEntry) ([]models.CalendarScheduleEntry, error) {
+		filtered := make([]models.CalendarScheduleEntry, 0, len(entries)+1)
+		for _, entry := range entries {
+			if entry.UserID != user.ID {
+				filtered = append(filtered, entry)
+			}
 		}
-	}
-
-	// Remove existing schedule for this user if any
-	filteredData := []models.CalendarScheduleEntry{}
-	for _, entry := range calendarData {
-		if entry.UserID != user.ID {
-			filteredData = append(filteredData, entry)
+		newEntry = models.CalendarScheduleEntry{
+			UserID:          user.ID,
+			WorkspaceID:     req.WorkspaceID,
+			ScheduledDate:   req.ScheduledDate,
+			ScheduledTime:   req.ScheduledTime,
+			DurationMinutes: req.DurationMinutes,
+			Notes:           req.Notes,
+			CreatedAt:       time.Now().UTC().Format(time.RFC3339),
 		}
-	}
-
-	// Add new schedule entry
-	newEntry := models.CalendarScheduleEntry{
-		UserID:          user.ID,
-		WorkspaceID:     req.WorkspaceID,
-		ScheduledDate:   req.ScheduledDate,
-		ScheduledTime:   req.ScheduledTime,
-		DurationMinutes: req.DurationMinutes,
-		Notes:           req.Notes,
-		CreatedAt:       time.Now().UTC().Format(time.RFC3339),
-	}
-	filteredData = append(filteredData, newEntry)
-
-	// Marshal back to JSON
-	updatedJSON, err := json.Marshal(filteredData)
+		return append(filtered, newEntry), nil
+	})
 	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to update calendar data: %w", err))
-		return
-	}
-
-	// Update the database
-	if err := repository.NewItemRepository(h.db).UpdateCalendarData(id, string(updatedJSON), time.Now().UTC()); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			respondNotFound(w, r, "item")
+			return
+		}
 		respondInternalError(w, r, err)
 		return
 	}
@@ -142,14 +130,14 @@ func (h *ItemHandler) UnscheduleItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get current calendar data and workspace_id for permission check
-	calendarDataJSON, workspaceID, err := repository.NewItemRepository(h.db).GetCalendarData(id)
+	repo := repository.NewItemRepository(h.db)
+
+	// Check if user has permission to edit items in this workspace.
+	workspaceID, err := repo.GetWorkspaceIDCtx(r.Context(), id)
 	if err != nil {
 		respondNotFound(w, r, "item")
 		return
 	}
-
-	// Check if user has permission to edit items in this workspace
 	canEdit, err := h.canEditItem(user.ID, workspaceID)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -166,40 +154,28 @@ func (h *ItemHandler) UnscheduleItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse existing calendar data
-	var calendarData []models.CalendarScheduleEntry
-	if calendarDataJSON.Valid && calendarDataJSON.String != "" {
-		if err = json.Unmarshal([]byte(calendarDataJSON.String), &calendarData); err != nil {
-			respondInternalError(w, r, err)
-			return
+	// Remove this user's entry in one transaction so a concurrent schedule for
+	// another user is not lost.
+	err = repo.MutateCalendarData(r.Context(), id, func(entries []models.CalendarScheduleEntry) ([]models.CalendarScheduleEntry, error) {
+		filtered := make([]models.CalendarScheduleEntry, 0, len(entries))
+		found := false
+		for _, entry := range entries {
+			if entry.UserID != userID {
+				filtered = append(filtered, entry)
+			} else {
+				found = true
+			}
 		}
-	}
-
-	// Remove schedule for this user
-	filteredData := []models.CalendarScheduleEntry{}
-	found := false
-	for _, entry := range calendarData {
-		if entry.UserID != userID {
-			filteredData = append(filteredData, entry)
-		} else {
-			found = true
+		if !found {
+			return nil, repository.ErrNotFound
 		}
-	}
-
-	if !found {
+		return filtered, nil
+	})
+	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "schedule")
 		return
 	}
-
-	// Marshal back to JSON
-	updatedJSON, err := json.Marshal(filteredData)
 	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	// Update the database
-	if err := repository.NewItemRepository(h.db).UpdateCalendarData(id, string(updatedJSON), time.Now().UTC()); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
