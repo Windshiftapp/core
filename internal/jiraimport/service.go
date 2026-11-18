@@ -256,15 +256,26 @@ func (s *Service) Workspaces(jobID string) []ImportedWorkspace {
 
 func (s *Service) PreviousImports(projectKeys []string) ([]PreviousImport, error) {
 	requested := projectKeySet(projectKeys)
-	rows, err := s.db.Query(`
+	// Narrow to jobs whose config mentions a requested key before ordering. The
+	// exact overlap check below drops substring false positives, and no row limit
+	// can hide an older overlapping import behind newer unrelated ones.
+	query := `
 		SELECT j.id, j.connection_id, j.status, j.config_json, j.created_at, j.completed_at,
 		       (SELECT COUNT(*) FROM jira_import_id_mappings m WHERE m.job_id = j.id AND m.entity_type = 'workspace'),
 		       (SELECT COUNT(*) FROM jira_import_id_mappings m WHERE m.job_id = j.id AND m.entity_type = 'item')
 		FROM jira_import_jobs j
-		WHERE j.status IN ('completed', 'completed_with_errors', 'timed_out')
-		ORDER BY j.completed_at DESC
-		LIMIT 10
-	`)
+		WHERE j.status IN ('completed', 'completed_with_errors', 'timed_out')`
+	args := make([]any, 0, len(requested))
+	if len(requested) > 0 {
+		clauses := make([]string, 0, len(requested))
+		for key := range requested {
+			clauses = append(clauses, "LOWER(j.config_json) LIKE ?")
+			args = append(args, "%\""+strings.ToLower(key)+"\"%")
+		}
+		query += " AND (" + strings.Join(clauses, " OR ") + ")"
+	}
+	query += " ORDER BY j.completed_at DESC"
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
