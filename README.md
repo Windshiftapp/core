@@ -116,7 +116,7 @@ The built-in MCP server exposes work items, comments, pages, knowledge, tests, t
 
 **Internationalization**
 
-- Twelve built-in languages: English, Deutsch, Español, Français, Italiano, Polski, Português (Brasil), العربية, فارسی, Русский, 简体中文, and 한국어, with right-to-left support for Arabic and Persian.
+- Thirteen built-in languages: English, Deutsch, Español, Français, Italiano, Nederlands, Polski, Português (Brasil), العربية, فارسی, Русский, 简体中文, and 한국어, with right-to-left support for Arabic and Persian.
 
 </details>
 
@@ -178,9 +178,9 @@ The built-in MCP server exposes work items, comments, pages, knowledge, tests, t
 
 ## Language support
 
-<p align="center"><strong>Available in many languages · Disponibile in molte lingue · Dostępne w wielu językach · متوفر بالعديد من اللغات · 支持多种语言<br>Доступно на многих языках · 다양한 언어로 사용 가능</strong></p>
+<p align="center"><strong>Available in many languages · Beschikbaar in het Nederlands · Disponibile in molte lingue · Dostępne w wielu językach · متوفر بالعديد من اللغات · 支持多种语言<br>Доступно на многих языках · 다양한 언어로 사용 가능</strong></p>
 
-Windshift ships with twelve built-in languages: English, Deutsch, Español, Français, Italiano, Polski, Português (Brasil), العربية, فارسی, Русский, 简体中文, and 한국어, including right-to-left support for Arabic and Persian.
+Windshift ships with thirteen built-in languages: English, Deutsch, Español, Français, Italiano, Nederlands, Polski, Português (Brasil), العربية, فارسی, Русский, 简体中文, and 한국어, including right-to-left support for Arabic and Persian.
 
 <p align="center">
   <picture>

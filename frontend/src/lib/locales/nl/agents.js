@@ -1,0 +1,60 @@
+/** Workspace agents and Agent Studio. */
+
+export default {
+  workspaceAgents: {
+    availability: {
+      ready: 'Gereed',
+      offline: 'Offline · werk in wachtrij',
+      needsSetup: 'Instellen vereist',
+      draft: 'Concept',
+      paused: 'Gepauzeerd',
+      invalid: 'Ongeldig',
+      archived: 'Gearchiveerd',
+      unavailable: 'Niet beschikbaar',
+    },
+    types: {
+      standard: 'Standaard',
+      coding: 'Programmeren',
+      legacy: 'Verouderd',
+    },
+    runtimes: {
+      windshift: 'Ingebouwde Windshift-runtime',
+      authorizedRunner: 'Geautoriseerde programmeerrunner',
+      legacyLocal: 'Verouderde lokale runtime',
+    },
+    identities: {
+      workspaceManaged: 'Door werkruimte beheerd',
+      centralizedService: 'Centrale service-identiteit',
+      userOwned: 'Door gebruiker beheerde identiteit',
+    },
+    runStatuses: {
+      queued: 'in wachtrij',
+      running: 'actief',
+      succeeded: 'voltooid',
+      completed: 'voltooid',
+      failed: 'mislukt',
+      cancelled: 'geannuleerd',
+    },
+    catalog: {
+      title: 'Agenten',
+      subtitle: 'Specialisten beschikbaar in deze werkruimte',
+      createAgent: 'Agent aanmaken',
+      searchPlaceholder: 'Agenten zoeken',
+      loading: 'Werkruimte-agenten laden…',
+      loadErrorTitle: 'Agenten konden niet worden geladen',
+      loadErrorMessage: 'Agenten konden niet worden geladen.',
+      emptyTitle: 'Nog geen agenten',
+      emptyAdminDescription: 'Maak een standaard- of programmeerspecialist voor deze werkruimte.',
+      emptyMemberDescription: 'Een werkruimtebeheerder kan hier specialisten toevoegen.',
+      noMatchesTitle: 'Geen overeenkomende agenten',
+      noMatchesDescription: 'Probeer een andere naam, handle, doel of profieltype.',
+      defaultPurpose: 'Een werkruimtespecialist die door je beheerders is geconfigureerd.',
+      ownedBy: 'Eigendom van {name}',
+      modelUnavailable: 'Model niet beschikbaar',
+      standardInteraction: 'Toewijzing, vermeldingen en werkruimtechat',
+      codingInteraction: 'Directe toewijzing en vermeldingen',
+      lastRun: 'Laatste uitvoering: {status}',
+      viewProfileVersion: 'Profiel bekijken · Versie {version}',
+    },
+  },
+};
