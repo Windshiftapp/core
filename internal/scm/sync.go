@@ -496,6 +496,12 @@ func (s *SyncService) syncRepository(ctx context.Context, provider Provider, rep
 
 	slog.Debug("Syncing repository", slog.String("component", "scm"), slog.String("repository", repositoryName), slog.String("workspace", workspaceKey))
 
+	// Checkpoint the sync at its start, not its end. A change that lands while
+	// the sync is listing (a PR merged mid-sync, for example) is observed only
+	// on the next run; an end-time checkpoint would move last_synced_at past
+	// that change and permanently drop its event.
+	syncStartedAt := time.Now().UTC()
+
 	var syncErrs []error
 	if err := s.syncPullRequests(ctx, provider, owner, repo, repoID, workspaceID, workspaceKey, itemKeyPattern, lastSyncedAt); err != nil {
 		syncErrs = append(syncErrs, fmt.Errorf("sync pull requests: %w", err))
@@ -527,9 +533,9 @@ func (s *SyncService) syncRepository(ctx context.Context, provider Provider, rep
 	}
 
 	_, err := s.db.ExecWriteContext(ctx, `
-		UPDATE workspace_repositories SET last_synced_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		UPDATE workspace_repositories SET last_synced_at = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, repoID)
+	`, syncStartedAt, repoID)
 	if err != nil {
 		return fmt.Errorf("update repository sync checkpoint: %w", err)
 	}
@@ -755,6 +761,11 @@ func (s *SyncService) processPullRequest(ctx context.Context, provider Provider,
 	now := time.Now()
 	var itemIDs []int
 	linkedItems := make(map[int]bool) // item ids for which a *new* link was created
+	// liveMerge is set when a stored link transitions to merged during this
+	// run. That transition is new even if MergedAt predates the checkpoint,
+	// which can happen when a merge lands between a sync's PR listing and its
+	// end-of-sync checkpoint write.
+	liveMerge := false
 	var observationErrs []error
 	for _, key := range keys {
 		itemID, err := s.findItemByKey(ctx, workspaceID, key.Prefix, key.Number)
@@ -783,7 +794,10 @@ func (s *SyncService) processPullRequest(ctx context.Context, provider Provider,
 		if created && emitLinked && s.durableActionEvents == nil {
 			linkedItems[itemID] = true
 		}
-		if becameMerged && emitMerged && s.durableActionEvents == nil {
+		if becameMerged && !created {
+			liveMerge = true
+		}
+		if becameMerged && (emitMerged || !created) && s.durableActionEvents == nil {
 			s.emitPRMergedEvent(workspaceID, itemID, repoID, owner, repo, pr)
 		}
 	}
@@ -804,7 +818,7 @@ func (s *SyncService) processPullRequest(ctx context.Context, provider Provider,
 		s.pollPRCommentTriggers(ctx, provider, owner, repo, pr, repoID, workspaceID, itemIDs)
 	}
 
-	if newlyMerged && shouldRunSmartCommits(pr, lastSyncedAt, now) {
+	if liveMerge || (newlyMerged && shouldRunSmartCommits(pr, lastSyncedAt, now)) {
 		s.processSmartCommitsForPR(ctx, provider, owner, repo, pr, repoID, workspaceID, workspaceKey)
 	}
 	return nil
@@ -1214,7 +1228,7 @@ func (s *SyncService) upsertPullRequestSCMLink(
 		if err != nil {
 			return false, false, err
 		}
-		if becameMerged && emitMerged && s.durableActionEvents != nil {
+		if becameMerged && s.durableActionEvents != nil {
 			if err := s.durableActionEvents.EmitActionEventInTx(ctx, tx, mergedEvent); err != nil {
 				return false, false, err
 			}
