@@ -273,7 +273,7 @@ func (h *AuthPolicyHandler) GetAuthPolicyStats(w http.ResponseWriter, r *http.Re
 			JOIN permissions gp ON ggp.permission_id = gp.id
 			WHERE gp.permission_key = 'system.admin'
 			AND g.is_active = true
-		)
+		) AS admins
 	`).Scan(&stats.SystemAdmins); err != nil {
 		slog.Warn("failed to get system admins count", slog.Any("error", err))
 	}
@@ -295,7 +295,7 @@ func (h *AuthPolicyHandler) GetAuthPolicyStats(w http.ResponseWriter, r *http.Re
 			WHERE gp.permission_key = 'system.admin'
 			AND g.is_active = true
 			AND EXISTS(SELECT 1 FROM webauthn_credentials wc WHERE wc.user_id = gm.user_id)
-		)
+		) AS admins
 	`).Scan(&stats.AdminsWithPasskey); err != nil {
 		slog.Warn("failed to get admins with passkey count", slog.Any("error", err))
 	}

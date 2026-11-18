@@ -150,7 +150,7 @@ func (s *ConditionSetApplicationService) Delete(actor AuditActor, id int) error 
 		return err
 	}
 	var count int
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM (SELECT id FROM configuration_sets WHERE condition_set_id = ? UNION ALL SELECT id FROM configuration_set_item_types WHERE condition_set_id = ?)`, id, id).Scan(&count); err != nil {
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM (SELECT id FROM configuration_sets WHERE condition_set_id = ? UNION ALL SELECT id FROM configuration_set_item_types WHERE condition_set_id = ?) AS refs`, id, id).Scan(&count); err != nil {
 		return err
 	}
 	if count > 0 {

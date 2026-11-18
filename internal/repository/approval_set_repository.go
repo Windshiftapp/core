@@ -315,7 +315,7 @@ func (r *ApprovalSetRepository) CountReferencingConfigSets(ctx context.Context, 
 			SELECT id FROM configuration_sets WHERE approval_set_id = ?
 			UNION ALL
 			SELECT id FROM configuration_set_item_types WHERE approval_set_id = ?
-		)
+		) AS refs
 	`, id, id).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("count config-set references: %w", err)
