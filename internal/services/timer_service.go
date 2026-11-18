@@ -353,7 +353,12 @@ func (s *TimerService) stopTimer(userID int, timer *models.ActiveTimer, allowDra
 	nowUnix := time.Now().UTC().Unix()
 
 	bookableProject := s.bookableProject(userID, timer)
-	if bookableProject != nil && timer.Description != "" {
+	// A booked worklog must satisfy the same duration contract as a manually
+	// entered one. Sub-minute and over-limit timers fall through to the draft
+	// path so the user can correct them instead of persisting a worklog that
+	// normal editing rejects.
+	_, durationErr := ValidateWorklogDurationMinutes(durationMinutes)
+	if bookableProject != nil && timer.Description != "" && durationErr == nil {
 		worklogID, err := s.repo.FinalizeTimerBooking(timer.ID, repository.CreateWorklogInput{
 			ProjectID:       *bookableProject,
 			UserID:          userID,
@@ -387,7 +392,7 @@ func (s *TimerService) stopTimer(userID int, timer *models.ActiveTimer, allowDra
 	}
 
 	if !allowDraft {
-		return nil, fmt.Errorf("%w: the timer is missing booking information", ErrTimerValidation)
+		return nil, fmt.Errorf("%w: the timer is not bookable as-is", ErrTimerValidation)
 	}
 
 	// Incomplete: persist a recoverable draft. Keep the project when it still
