@@ -3084,33 +3084,39 @@ func (h *JiraImportHandler) ensureStatuses(_ context.Context, jobID string, mapp
 			categoryID = 3
 		}
 
-		// Check if status already exists by name
-		existing, err := h.imports.FindStatus(m.JiraName)
+		// Check if a status with the same name exists. A same-named status in a
+		// different category is a different status; reusing it would silently
+		// apply the first import's category (WI-1178), so use a category-qualified
+		// name that stays idempotent on re-import.
+		statusName := m.JiraName
+		existing, err := h.imports.FindStatus(statusName)
+		if err == nil && existing.CategoryID != categoryID {
+			statusName = fmt.Sprintf("%s (%s)", m.JiraName, windshiftStatusCategoryName(categoryID))
+			existing, err = h.imports.FindStatus(statusName)
+		}
 		if err == nil {
 			existingID := existing.ID
 			// Status exists, use existing ID
 			for _, jiraID := range m.JiraIDs {
 				result[jiraID] = existingID
 			}
-			if len(m.JiraIDs) > 0 {
-				if err := h.recordMapping(jobID, "status", m.JiraIDs[0], m.JiraName, existingID, map[string]any{
-					"action":      "reuse_existing",
-					"was_created": false,
-				}); err != nil {
-					return nil, fmt.Errorf("record Jira status mapping: %w", err)
-				}
+			if err := h.recordEntityMappings(jobID, "status", m.JiraIDs, statusName, existingID, map[string]any{
+				"action":      "reuse_existing",
+				"was_created": false,
+			}); err != nil {
+				return nil, fmt.Errorf("record Jira status mapping: %w", err)
 			}
 			continue
 		}
 
 		// Create new status using service
 		status := &models.Status{
-			Name:       m.JiraName,
+			Name:       statusName,
 			CategoryID: categoryID,
 		}
 		entity, err := statusSvc.Create(status, nil)
 		if err != nil {
-			slog.Error("Failed to create status", slog.String("component", "jira"), slog.String("status", m.JiraName), slog.Any("error", err))
+			slog.Error("Failed to create status", slog.String("component", "jira"), slog.String("status", statusName), slog.Any("error", err))
 			continue
 		}
 
@@ -3120,13 +3126,11 @@ func (h *JiraImportHandler) ensureStatuses(_ context.Context, jobID string, mapp
 		}
 
 		// Record the mapping
-		if len(m.JiraIDs) > 0 {
-			if err := h.recordMapping(jobID, "status", m.JiraIDs[0], m.JiraName, statusID, map[string]any{
-				"action":      "create",
-				"was_created": true,
-			}); err != nil {
-				return nil, fmt.Errorf("record Jira status mapping: %w", err)
-			}
+		if err := h.recordEntityMappings(jobID, "status", m.JiraIDs, statusName, statusID, map[string]any{
+			"action":      "create",
+			"was_created": true,
+		}); err != nil {
+			return nil, fmt.Errorf("record Jira status mapping: %w", err)
 		}
 	}
 
@@ -3156,13 +3160,11 @@ func (h *JiraImportHandler) ensureItemTypes(_ context.Context, jobID string, map
 			for _, jiraID := range m.JiraIDs {
 				result[jiraID] = existingID
 			}
-			if len(m.JiraIDs) > 0 {
-				if err := h.recordMapping(jobID, "item_type", m.JiraIDs[0], m.JiraName, existingID, map[string]any{
-					"action":      "reuse_existing",
-					"was_created": false,
-				}); err != nil {
-					return nil, fmt.Errorf("record Jira item type mapping: %w", err)
-				}
+			if err := h.recordEntityMappings(jobID, "item_type", m.JiraIDs, m.JiraName, existingID, map[string]any{
+				"action":      "reuse_existing",
+				"was_created": false,
+			}); err != nil {
+				return nil, fmt.Errorf("record Jira item type mapping: %w", err)
 			}
 			continue
 		}
@@ -3186,15 +3188,42 @@ func (h *JiraImportHandler) ensureItemTypes(_ context.Context, jobID string, map
 		}
 
 		// Record the mapping
-		if len(m.JiraIDs) > 0 {
-			if err := h.recordMapping(jobID, "item_type", m.JiraIDs[0], m.JiraName, itemTypeID, map[string]any{
-				"action":      "create",
-				"was_created": true,
-			}); err != nil {
-				return nil, fmt.Errorf("record Jira item type mapping: %w", err)
-			}
+		if err := h.recordEntityMappings(jobID, "item_type", m.JiraIDs, m.JiraName, itemTypeID, map[string]any{
+			"action":      "create",
+			"was_created": true,
+		}); err != nil {
+			return nil, fmt.Errorf("record Jira item type mapping: %w", err)
 		}
 	}
 
 	return result, nil
+}
+
+// recordEntityMappings records one mapping per Jira ID so alias IDs keep
+// provenance instead of only the first.
+func (h *JiraImportHandler) recordEntityMappings(jobID, entityType string, jiraIDs []string, jiraKey string, windshiftID int, metadata map[string]any) error {
+	for _, jiraID := range jiraIDs {
+		if jiraID == "" {
+			continue
+		}
+		if err := h.recordMapping(jobID, entityType, jiraID, jiraKey, windshiftID, metadata); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// windshiftStatusCategoryName labels a category-qualified status name when a
+// same-named status exists in a different category.
+func windshiftStatusCategoryName(categoryID int) string {
+	switch categoryID {
+	case 1:
+		return "To Do"
+	case 2:
+		return "In Progress"
+	case 3:
+		return "Done"
+	default:
+		return fmt.Sprintf("Category %d", categoryID)
+	}
 }
