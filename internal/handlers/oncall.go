@@ -872,11 +872,13 @@ func (h *OnCallHandler) GetPolicy(w http.ResponseWriter, r *http.Request) {
 // teamOnCallUsersValid reports whether every referenced user is a member or
 // admin of the team. Layer members and overrides decide who gets paged, so a
 // user outside the team would receive incident detail for a team they do not
-// belong to. Zero IDs are skipped so optional fields can be omitted.
+// belong to. Non-positive IDs are rejected rather than skipped: the write path
+// inserts every supplied id, and an id of 0 would otherwise fail the foreign
+// key at insert time.
 func (h *OnCallHandler) teamOnCallUsersValid(teamID int, userIDs []int) (bool, error) {
 	for _, userID := range userIDs {
-		if userID == 0 {
-			continue
+		if userID <= 0 {
+			return false, nil
 		}
 		member, err := h.teamRepo.IsTeamMember(teamID, userID)
 		if err != nil {

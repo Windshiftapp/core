@@ -67,7 +67,7 @@ func (s *TicketImportService) Upload(ctx context.Context, userID, workspaceID in
 	if s.attachmentPath == "" {
 		return nil, ErrTicketImportStorageDisabled
 	}
-	staged, _, err := csvimport.StageUpload(s.imports, s.attachmentPath, csvimport.KindTicket, workspaceID, userID, filename, hasHeader, delimiterName, source, 50<<20)
+	staged, _, err := csvimport.StageUploadContext(ctx, s.imports, s.attachmentPath, csvimport.KindTicket, workspaceID, userID, filename, hasHeader, delimiterName, source, 50<<20)
 	if err != nil {
 		return nil, &validation.ValidationError{Field: "file", Message: err.Error()}
 	}

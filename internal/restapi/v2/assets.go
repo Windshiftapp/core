@@ -146,10 +146,11 @@ func registerAssetImportRoutes(builder *routeBuilder, app *services.AssetApplica
 			return newError(http.StatusBadRequest, "invalid_request", "file is required")
 		}
 		defer func() { _ = file.Close() }()
-		// UploadCSV takes no context, so there is no budget to start here; its
-		// database work is bounded once the request context reaches the database
-		// layer (WI-2102).
-		result, err := app.UploadCSV(user.ID, setID, header.Filename, r.FormValue("has_header") != "false", r.FormValue("delimiter"), io.LimitReader(file, maxBody))
+		// The file is fully received; bound the staging database work that
+		// follows instead of charging its transfer time to the budget.
+		ctx, cancel := startDBBudget(r.Context())
+		defer cancel()
+		result, err := app.UploadCSVContext(ctx, user.ID, setID, header.Filename, r.FormValue("has_header") != "false", r.FormValue("delimiter"), io.LimitReader(file, maxBody))
 		if err != nil {
 			return assetError(err)
 		}

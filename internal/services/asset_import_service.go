@@ -126,7 +126,14 @@ func (s *AssetApplicationService) WithImportStorage(path string) *AssetApplicati
 }
 
 func (s *AssetApplicationService) UploadCSV(userID, setID int, filename string, hasHeader bool, delimiterName string, source io.Reader) (AssetCSVUpload, error) {
-	if err := operatorcontrols.From(s.db).CheckImport(context.Background(), "assets"); err != nil {
+	return s.UploadCSVContext(context.Background(), userID, setID, filename, hasHeader, delimiterName, source)
+}
+
+// UploadCSVContext is UploadCSV with the caller's request context, so the
+// staging write observes the configured database budget instead of running
+// unbounded on a deferred multipart route.
+func (s *AssetApplicationService) UploadCSVContext(ctx context.Context, userID, setID int, filename string, hasHeader bool, delimiterName string, source io.Reader) (AssetCSVUpload, error) {
+	if err := operatorcontrols.From(s.db).CheckImport(ctx, "assets"); err != nil {
 		return AssetCSVUpload{}, err
 	}
 	if err := s.require(userID, setID, AssetPermissionKeyAdmin); err != nil {
@@ -135,7 +142,7 @@ func (s *AssetApplicationService) UploadCSV(userID, setID int, filename string, 
 	if s.attachmentPath == "" {
 		return AssetCSVUpload{}, ErrAssetImportStorageDisabled
 	}
-	staged, _, err := csvimport.StageUpload(s.imports, s.attachmentPath, csvimport.KindAsset, setID, userID, filename, hasHeader, delimiterName, source, assetImportMaxBytes)
+	staged, _, err := csvimport.StageUploadContext(ctx, s.imports, s.attachmentPath, csvimport.KindAsset, setID, userID, filename, hasHeader, delimiterName, source, assetImportMaxBytes)
 	if err != nil {
 		return AssetCSVUpload{}, &AssetValidationError{Msg: err.Error()}
 	}

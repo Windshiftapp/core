@@ -15,6 +15,7 @@ import (
 
 	"windshift/internal/models"
 	"windshift/internal/operatorcontrols"
+	"windshift/internal/services/actioncatalog"
 )
 
 // Budgets for one execute_script node. Source length reuses maxScriptLength
@@ -33,18 +34,6 @@ const (
 	maxScriptConsoleEntryBytes    = 1024
 	defaultScriptOutputVariable   = "script_result"
 )
-
-// reservedScriptGlobals are names a script must not shadow: they carry the
-// host identity, the read-only context, or the bindings themselves.
-var reservedScriptGlobals = map[string]bool{
-	"windshift":       true,
-	"console":         true,
-	"context":         true,
-	"item_id":         true,
-	"workspace_id":    true,
-	"actor_user_id":   true,
-	"trigger_user_id": true,
-}
 
 // ActionScriptWriteMarker persists a write-ahead marker before a potentially
 // mutating script request is dispatched. If the worker dies between the commit
@@ -177,8 +166,10 @@ func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.Exe
 	}
 
 	timeoutMs := config.TimeoutMs
-	if timeoutMs <= 0 || timeoutMs > maxScriptAPITimeoutMs {
+	if timeoutMs <= 0 {
 		timeoutMs = defaultScriptAPITimeoutMs
+	} else if timeoutMs > maxScriptAPITimeoutMs {
+		timeoutMs = maxScriptAPITimeoutMs
 	}
 	if ceiling := e.controls.Limits().ScriptTimeoutMS; ceiling > 0 && timeoutMs > ceiling {
 		timeoutMs = ceiling
@@ -697,7 +688,7 @@ func validateScriptOutputVariable(name string) error {
 	if !isScriptIdentifier(name) {
 		return fmt.Errorf("execute_script: output_variable %q is not a valid identifier", name)
 	}
-	if reservedScriptGlobals[name] {
+	if actioncatalog.ReservedScriptGlobals[name] {
 		return fmt.Errorf("execute_script: output_variable %q is reserved", name)
 	}
 	return nil

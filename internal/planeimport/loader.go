@@ -753,20 +753,21 @@ func (l *Loader) ensureTransitions(tx database.Tx) error {
 	if len(l.statusIsNew) == 0 {
 		return nil
 	}
-	var workflowID int
+	var resolvedWorkflow sql.NullInt64
 	err := tx.QueryRow(`
 		SELECT COALESCE(
 			(SELECT cs.workflow_id FROM workspace_configuration_sets wcs
 				JOIN configuration_sets cs ON cs.id = wcs.configuration_set_id
 				WHERE wcs.workspace_id = ? AND cs.workflow_id IS NOT NULL LIMIT 1),
 			(SELECT id FROM workflows WHERE is_default = true ORDER BY id LIMIT 1))`,
-		l.workspaceID).Scan(&workflowID)
-	if err == sql.ErrNoRows {
-		return nil // no workflow configured: the app already allows every transition
-	}
+		l.workspaceID).Scan(&resolvedWorkflow)
 	if err != nil {
 		return fmt.Errorf("resolve effective workflow: %w", err)
 	}
+	if !resolvedWorkflow.Valid {
+		return nil // no workflow configured: the app already allows every transition
+	}
+	workflowID := int(resolvedWorkflow.Int64)
 
 	universe := make([]int, 0, len(l.statusID))
 	seen := map[int]bool{}

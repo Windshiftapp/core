@@ -1,6 +1,7 @@
 package csvimport
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -39,7 +40,13 @@ func NewStore(db database.Database) *Store {
 
 // CreateUpload records a staged upload before a job claims it.
 func (s *Store) CreateUpload(kind string, scopeID, userID int, uploadID string, now time.Time) error {
-	_, err := s.db.ExecWrite(
+	return s.CreateUploadContext(context.Background(), kind, scopeID, userID, uploadID, now)
+}
+
+// CreateUploadContext is CreateUpload bounded by the caller's request budget so
+// staging observes cancellation and the configured database deadline.
+func (s *Store) CreateUploadContext(ctx context.Context, kind string, scopeID, userID int, uploadID string, now time.Time) error {
+	_, err := s.db.ExecWriteContext(ctx,
 		"INSERT INTO import_uploads (id, kind, scope_id, created_by, created_at) VALUES (?, ?, ?, ?, ?)",
 		uploadID, kind, scopeID, userID, now.Unix(),
 	)
@@ -250,9 +257,9 @@ func (s *Store) ReconcileExpired(kind string, now time.Time, rollback func(tx da
 	return count, nil
 }
 
-func notFoundOrWrap(err error, context string) error {
+func notFoundOrWrap(err error, contextLabel string) error {
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrUploadNotFound
 	}
-	return fmt.Errorf("%s: %w", context, err)
+	return fmt.Errorf("%s: %w", contextLabel, err)
 }

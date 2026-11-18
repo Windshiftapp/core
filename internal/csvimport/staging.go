@@ -1,6 +1,7 @@
 package csvimport
 
 import (
+	"context"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -118,6 +119,13 @@ func DetectHeaderMismatch(headers []string, rows [][]string, hasHeader bool) str
 // byte cap, records the upload row, and returns the staged state. The upload
 // directory is removed on any failure.
 func StageUpload(store *Store, storageRoot, kind string, scopeID, userID int, filename string, hasHeader bool, delimiterName string, source io.Reader, maxBytes int64) (staged *StagedUpload, path string, err error) {
+	return StageUploadContext(context.Background(), store, storageRoot, kind, scopeID, userID, filename, hasHeader, delimiterName, source, maxBytes)
+}
+
+// StageUploadContext is StageUpload with the caller's request context, so the
+// upload row write observes the request database budget instead of running
+// unbounded.
+func StageUploadContext(ctx context.Context, store *Store, storageRoot, kind string, scopeID, userID int, filename string, hasHeader bool, delimiterName string, source io.Reader, maxBytes int64) (staged *StagedUpload, path string, err error) {
 	ext := strings.ToLower(filepath.Ext(filename))
 	if ext != ".csv" && ext != ".tsv" {
 		return nil, "", fmt.Errorf("only CSV and TSV files are accepted")
@@ -158,7 +166,7 @@ func StageUpload(store *Store, storageRoot, kind string, scopeID, userID int, fi
 		_ = os.RemoveAll(dir)
 		return nil, "", fmt.Errorf("parse CSV: %v", err)
 	}
-	if err := store.CreateUpload(kind, scopeID, userID, uploadID, nowUTC()); err != nil {
+	if err := store.CreateUploadContext(ctx, kind, scopeID, userID, uploadID, nowUTC()); err != nil {
 		_ = os.RemoveAll(dir)
 		return nil, "", err
 	}

@@ -18,6 +18,19 @@ import (
 // definition that validates is also one the runtime will accept.
 const maxExecuteScriptSourceBytes = 10240
 
+// ReservedScriptGlobals are names an execute_script definition must not shadow
+// with its output_variable: they carry the host identity, the read-only context,
+// or the bindings themselves. The executor enforces the same set at runtime.
+var ReservedScriptGlobals = map[string]bool{
+	"windshift":       true,
+	"console":         true,
+	"context":         true,
+	"item_id":         true,
+	"workspace_id":    true,
+	"actor_user_id":   true,
+	"trigger_user_id": true,
+}
+
 // ValidationError is one structured grievance against an action definition.
 // Code is a short machine-readable tag clients can switch on; Path points at
 // the offending element (`trigger`, `nodes[2].node_config.field_name`,
@@ -463,8 +476,16 @@ func validateNodeConfigValues(n models.ActionNode) (msg, field string) {
 			if _, err := sobek.Compile("action_script", "(function() {\n"+cfg.Source+"\n})()", false); err != nil {
 				return fmt.Sprintf("source has a syntax error: %v", err), "source"
 			}
-			if cfg.OutputVariable != "" && !isScriptIdentifier(cfg.OutputVariable) {
-				return fmt.Sprintf("output_variable %q is not a valid identifier", cfg.OutputVariable), "output_variable"
+			if cfg.OutputVariable != "" {
+				if !isScriptIdentifier(cfg.OutputVariable) {
+					return fmt.Sprintf("output_variable %q is not a valid identifier", cfg.OutputVariable), "output_variable"
+				}
+				if len(cfg.OutputVariable) > 64 {
+					return "output_variable is too long", "output_variable"
+				}
+				if ReservedScriptGlobals[cfg.OutputVariable] {
+					return fmt.Sprintf("output_variable %q is reserved", cfg.OutputVariable), "output_variable"
+				}
 			}
 		}
 	}

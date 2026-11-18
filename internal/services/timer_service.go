@@ -375,7 +375,10 @@ func (s *TimerService) stopTimer(userID int, timer *models.ActiveTimer, allowDra
 			return buildStopResult(timer, endTimeUTC, durationSeconds, durationMinutes, true, &bookedID, nil, metadataVisible), nil
 		}
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, ErrTimerNotFound
+			// A concurrent stop removed the timer between our read and the
+			// finalize. Recover the result that stop recorded instead of
+			// reporting the timer missing.
+			return s.recoverStoppedTimer(userID, timer.ID)
 		}
 		if err != nil {
 			return nil, err
@@ -422,7 +425,10 @@ func (s *TimerService) stopTimer(userID int, timer *models.ActiveTimer, allowDra
 		return buildStopResult(timer, endTimeUTC, durationSeconds, durationMinutes, false, nil, &draft.ID, metadataVisible), nil
 	}
 	if errors.Is(err, repository.ErrNotFound) {
-		return nil, ErrTimerNotFound
+		// A concurrent stop removed the timer between our read and the
+		// finalize. Recover the draft that stop recorded instead of
+		// reporting the timer missing.
+		return s.recoverStoppedTimer(userID, timer.ID)
 	}
 	if err != nil {
 		return nil, err
@@ -706,6 +712,14 @@ func (s *TimerService) BookDraft(userID, id, expectedVersion int, idempotencyKey
 	}
 	if errors.Is(err, repository.ErrConflict) {
 		if _, gerr := s.draftRepo.GetDraft(id, userID); errors.Is(gerr, repository.ErrNotFound) {
+			// A concurrent booking with the same idempotency key may have won
+			// the race and consumed the draft; replay its worklog instead of
+			// reporting the draft missing.
+			if idempotencyKey != "" {
+				if booking, berr := s.draftRepo.GetBooking(userID, idempotencyKey); berr == nil && booking.DraftID != nil && *booking.DraftID == id {
+					return s.worklogs.Get(booking.WorklogID)
+				}
+			}
 			return nil, ErrTimerDraftNotFound
 		}
 		return nil, ErrTimerDraftConflict
