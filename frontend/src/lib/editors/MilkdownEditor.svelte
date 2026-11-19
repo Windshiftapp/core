@@ -788,6 +788,19 @@
     }
   }
 
+  // Serialize the live document. The listener plugin's markdownUpdated callback
+  // is asynchronous, so callers that must observe the latest edit synchronously
+  // (commit-on-outside-click) read the document directly instead of the
+  // bindable content value.
+  export function getMarkdown() {
+    if (!editor) return content || '';
+    try {
+      return editor.action((ctx) => ctx.get(serializerCtx)(ctx.get(editorViewCtx).state.doc));
+    } catch {
+      return content || '';
+    }
+  }
+
   function togglePageLinkPicker() {
     pageLinkPickerOpen = !pageLinkPickerOpen;
     if (pageLinkPickerOpen) {

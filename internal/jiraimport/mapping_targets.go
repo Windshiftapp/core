@@ -141,7 +141,7 @@ func CustomFieldTypesCompatible(targetType, sourceType string) bool {
 	if target == source {
 		return true
 	}
-	textish := func(t string) bool { return t == "text" || t == "textarea" }
+	textish := func(t string) bool { return t == "text" || t == "textarea" || t == "richtext" }
 	return textish(target) && textish(source)
 }
 

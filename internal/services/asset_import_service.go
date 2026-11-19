@@ -335,7 +335,7 @@ func (s *AssetApplicationService) CreateTypeFromImport(userID, setID int, actor 
 	if input.Color == "" {
 		input.Color = "#6b7280"
 	}
-	allowed := map[string]bool{"text": true, "textarea": true, "number": true, "date": true, "select": true, models.CustomFieldTypeBoolean: true, models.CustomFieldTypeCheckbox: true}
+	allowed := map[string]bool{"text": true, "textarea": true, "richtext": true, "number": true, "date": true, "select": true, models.CustomFieldTypeBoolean: true, models.CustomFieldTypeCheckbox: true}
 	fields := make([]repository.ImportTypeFieldInput, len(input.Fields))
 	for i := range input.Fields {
 		field := &input.Fields[i]

@@ -13,6 +13,7 @@
   import Settings from '@lucide/svelte/icons/settings';
   import Type from '@lucide/svelte/icons/type';
   import AlignLeft from '@lucide/svelte/icons/align-left';
+  import FileText from '@lucide/svelte/icons/file-text';
   import ChevronDownCircle from '@lucide/svelte/icons/chevron-down-circle';
   import ListChecks from '@lucide/svelte/icons/list-checks';
   import Hash from '@lucide/svelte/icons/hash';
@@ -95,6 +96,7 @@
   const fieldTypes = [
     { value: 'text', label: 'Single Line Text', icon: Type, iconColor: '#4A90D9' },
     { value: 'textarea', label: 'Multi Line Text', icon: AlignLeft, iconColor: '#5B6ABF' },
+    { value: 'richtext', label: 'Rich Text (Markdown)', icon: FileText, iconColor: '#7C6FD9' },
     { value: 'select', label: 'Single Select', icon: ChevronDownCircle, iconColor: '#E8853D' },
     { value: 'multiselect', label: 'Multi Select', icon: ListChecks, iconColor: '#D46B2F' },
     { value: 'number', label: 'Number', icon: Hash, iconColor: '#4CAF7D' },

@@ -336,9 +336,9 @@ func validateCustomFieldsSchemaCore(fields []models.AssetTypeField, values map[s
 			return &AssetValidationError{Msg: fmt.Sprintf("custom_field_values[%q]: %s", k, err.Error())}
 		}
 		switch f.FieldType {
-		case "text", "textarea":
+		case "text", "textarea", "richtext":
 			if s, ok := v.(string); ok {
-				if f.FieldType == "textarea" {
+				if f.FieldType == "textarea" || f.FieldType == "richtext" {
 					values[k] = sanitize.RichText.Sanitize(s)
 				} else {
 					values[k] = sanitize.PlainTextField.Sanitize(s)
@@ -458,7 +458,7 @@ func coerceAssetFieldValue(f models.AssetTypeField, v any) any {
 			return arr
 		}
 		return v
-	case "select", "date", "text", "textarea":
+	case "select", "date", "text", "textarea", "richtext":
 		return v
 	default:
 		return v
@@ -506,9 +506,9 @@ func (s *AssetService) SanitizeCustomFieldTextValues(assetTypeID int, values map
 			}
 		}
 		switch f.FieldType {
-		case "text", "textarea":
+		case "text", "textarea", "richtext":
 			if s, ok := v.(string); ok {
-				if f.FieldType == "textarea" {
+				if f.FieldType == "textarea" || f.FieldType == "richtext" {
 					values[k] = sanitize.RichText.Sanitize(s)
 				} else {
 					values[k] = sanitize.PlainTextField.Sanitize(s)
@@ -529,7 +529,7 @@ func validateAssetFieldValue(f models.AssetTypeField, v any) error {
 		return nil
 	}
 	switch f.FieldType {
-	case "text", "textarea", "":
+	case "text", "textarea", "richtext", "":
 		// Empty FieldType (unknown legacy types) accept anything stringy.
 		if _, ok := v.(string); !ok {
 			return fmt.Errorf("expected string for %s field", f.FieldType)

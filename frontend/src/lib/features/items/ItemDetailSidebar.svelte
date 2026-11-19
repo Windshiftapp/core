@@ -464,7 +464,7 @@
 
   // Free-form controls hold focus while the user types and only save when the
   // edit is committed (Enter or blur), so partial values are never persisted.
-  const DEFERRED_SAVE_CUSTOM_FIELD_TYPES = new Set(['text', 'textarea', 'number', 'email', 'url']);
+  const DEFERRED_SAVE_CUSTOM_FIELD_TYPES = new Set(['text', 'textarea', 'richtext', 'number', 'email', 'url']);
 
   // Status helpers
   function startEditingStatus() {
@@ -597,29 +597,62 @@
          types stage keystrokes and save on commit (Enter/blur). -->
     {#snippet customFieldRow(fieldDef, screenField, currentValue, fieldEditable)}
       {@const isEditing = editingCustomFields[screenField.field_identifier]}
-      <CustomFieldRenderer
-        field={fieldDef}
-        value={currentValue}
-        label={customFieldLabel}
-        rowTestIdPrefix="item-custom-field"
-        readonly={!isEditing}
-        disabled={!canEdit || !fieldEditable}
-        onStartEdit={() => startEditingCustomField(screenField.field_identifier)}
-        {milestones}
-        {iterations}
-        itemId={item?.id}
-        required={screenField.is_required}
-        onChange={(val) => {
-          editCustomFieldValues[screenField.field_identifier] = val;
-          if (!DEFERRED_SAVE_CUSTOM_FIELD_TYPES.has(fieldDef.field_type)) {
-            onsaveField?.({ field: `custom_field_${screenField.field_identifier}` });
-          }
-        }}
-        onCommit={DEFERRED_SAVE_CUSTOM_FIELD_TYPES.has(fieldDef.field_type)
-          ? (val) => onsaveField?.({ field: `custom_field_${screenField.field_identifier}`, value: val })
-          : null}
-        onCancel={() => oncancelEdit?.({ field: `custom_field_${screenField.field_identifier}` })}
-      />
+      {#if fieldDef.field_type === 'richtext'}
+        <!-- Rich text gets a full-width block so formatted content is readable;
+             the label is the edit affordance, leaving links clickable. -->
+        <div class="px-2 py-1.5" data-testid={`item-custom-field-${fieldDef.id}`}>
+          <button
+            type="button"
+            onclick={() => startEditingCustomField(screenField.field_identifier)}
+            data-testid={`item-custom-field-edit-${fieldDef.id}`}
+            class="mb-1 rounded-sm text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-border-focused disabled:cursor-default"
+            disabled={!canEdit || !fieldEditable}
+          >
+            {@render customFieldLabel(fieldDef.name)}
+          </button>
+          <CustomFieldRenderer
+            field={fieldDef}
+            value={currentValue}
+            readonly={!isEditing}
+            disabled={!canEdit || !fieldEditable}
+            renderRichText
+            {milestones}
+            {iterations}
+            itemId={item?.id}
+            workspaceId={item?.workspace_id}
+            required={screenField.is_required}
+            onChange={(val) => {
+              editCustomFieldValues[screenField.field_identifier] = val;
+            }}
+            onCommit={(val) => onsaveField?.({ field: `custom_field_${screenField.field_identifier}`, value: val })}
+            onCancel={() => oncancelEdit?.({ field: `custom_field_${screenField.field_identifier}` })}
+          />
+        </div>
+      {:else}
+        <CustomFieldRenderer
+          field={fieldDef}
+          value={currentValue}
+          label={customFieldLabel}
+          rowTestIdPrefix="item-custom-field"
+          readonly={!isEditing}
+          disabled={!canEdit || !fieldEditable}
+          onStartEdit={() => startEditingCustomField(screenField.field_identifier)}
+          {milestones}
+          {iterations}
+          itemId={item?.id}
+          required={screenField.is_required}
+          onChange={(val) => {
+            editCustomFieldValues[screenField.field_identifier] = val;
+            if (!DEFERRED_SAVE_CUSTOM_FIELD_TYPES.has(fieldDef.field_type)) {
+              onsaveField?.({ field: `custom_field_${screenField.field_identifier}` });
+            }
+          }}
+          onCommit={DEFERRED_SAVE_CUSTOM_FIELD_TYPES.has(fieldDef.field_type)
+            ? (val) => onsaveField?.({ field: `custom_field_${screenField.field_identifier}`, value: val })
+            : null}
+          onCancel={() => oncancelEdit?.({ field: `custom_field_${screenField.field_identifier}` })}
+        />
+      {/if}
     {/snippet}
     {#if item?.id}
       <ItemSLAPanel itemId={item.id} workspaceId={item.workspace_id} />

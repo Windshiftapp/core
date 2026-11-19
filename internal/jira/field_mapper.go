@@ -39,6 +39,7 @@ type WindshiftFieldType string
 const (
 	FieldTypeText        WindshiftFieldType = "text"
 	FieldTypeTextarea    WindshiftFieldType = "textarea"
+	FieldTypeRichtext    WindshiftFieldType = "richtext"
 	FieldTypeNumber      WindshiftFieldType = "number"
 	FieldTypeSelect      WindshiftFieldType = "select"
 	FieldTypeMultiselect WindshiftFieldType = "multiselect"
@@ -86,7 +87,7 @@ var jiraFieldTypeMap = map[string]WindshiftFieldType{
 
 	// Custom field type keys (full plugin identifiers)
 	"com.atlassian.jira.plugin.system.customfieldtypes:textfield":        FieldTypeText,
-	"com.atlassian.jira.plugin.system.customfieldtypes:textarea":         FieldTypeTextarea,
+	"com.atlassian.jira.plugin.system.customfieldtypes:textarea":         FieldTypeRichtext,
 	"com.atlassian.jira.plugin.system.customfieldtypes:float":            FieldTypeNumber,
 	"com.atlassian.jira.plugin.system.customfieldtypes:numberfield":      FieldTypeNumber,
 	"com.atlassian.jira.plugin.system.customfieldtypes:select":           FieldTypeSelect,

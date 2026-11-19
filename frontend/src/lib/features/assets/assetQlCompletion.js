@@ -79,7 +79,7 @@ export function buildAssetQlCatalog({
           ? ['=', '!=', 'IS NULL', 'IS NOT NULL']
           : ['number', 'date'].includes(type)
             ? ordered
-            : ['text', 'textarea'].includes(type)
+            : ['text', 'textarea', 'richtext'].includes(type)
               ? text
               : equality;
         const name = custom.field_name || custom.name;

@@ -67,7 +67,7 @@ type virtualRequestField struct {
 func IsPublicFormFillableCustomFieldType(fieldType string) bool {
 	switch models.CanonicalCustomFieldType(fieldType) {
 	case "text", "textarea", "select", "multiselect", "number", "date",
-		models.CustomFieldTypeBoolean, "email", "url":
+		models.CustomFieldTypeBoolean, "email", "url", "richtext":
 		return true
 	default:
 		return false

@@ -567,7 +567,7 @@ func extractCustomFieldValueWithOptions(
 		if len(values) > 0 {
 			return strings.Join(values, "\n"), true
 		}
-	case "text", "textarea":
+	case "text", "textarea", "richtext":
 		// Rich-text custom fields carry ADF documents. Render them as Markdown
 		// instead of JSON-marshaling the document so the field reads naturally;
 		// an explicit PreserveRaw mapping keeps the JSON above.
@@ -1188,14 +1188,14 @@ func (h *JiraImportHandler) buildJiraIssueCustomFieldValues(im *jiraImportContex
 	h.collectJiraStructuralMetadata(im, issue, refs, customFieldValues)
 	h.applyJiraCustomFieldMappings(im, issue, customFieldValues)
 
-	// Plain-text-sanitize untrusted imported values except text/textarea fields,
-	// which receive their type-correct policy below.
+	// Plain-text-sanitize untrusted imported values except text/textarea/richtext
+	// fields, which receive their type-correct policy below.
 	fieldTypes, err := validation.CustomFieldTypes(h.db, customFieldValues)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve custom field types: %w", err)
 	}
 	for key, v := range customFieldValues {
-		if ft := fieldTypes[key]; ft == "text" || ft == "textarea" {
+		if ft := fieldTypes[key]; ft == "text" || ft == "textarea" || ft == "richtext" {
 			continue
 		}
 		customFieldValues[key] = sanitizeJiraImportStrings(v)

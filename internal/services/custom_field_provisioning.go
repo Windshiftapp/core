@@ -87,6 +87,7 @@ var errCustomFieldIndexLimit = errors.New("custom field index limit reached")
 var validFieldTypes = map[string]bool{
 	"text":                         true,
 	"textarea":                     true,
+	"richtext":                     true,
 	"select":                       true,
 	"multiselect":                  true,
 	"number":                       true,

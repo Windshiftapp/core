@@ -29,6 +29,8 @@
   import { safeHref } from '../../utils/sanitize';
   import { customFieldLinkHref } from '../../utils/customFieldLinks.js';
   import { booleanCustomFieldChecked, isBooleanCustomFieldType } from '../../utils/customFieldTypes.js';
+  import LazyMilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
+  import { markdownExcerpt } from '../../utils/markdownExcerpt.js';
   import {
     milestonePickerConfig as milestoneConfig,
     iterationPickerConfig as iterationConfig,
@@ -65,6 +67,9 @@
     label = null, rowTestIdPrefix = undefined,
     // Bare display hands layout to the caller: no padding, hover, or rounding.
     bare = false,
+    // Detail views ask for formatted Markdown; dense tables and lists keep the
+    // one-line excerpt. The editor always uses the Markdown editor.
+    renderRichText = false,
     // Self-editing mode: the component owns the display→editor toggle, the way
     // list cells need it. Callers that drive editing externally (item detail
     // sidebar) keep using onStartEdit + readonly and leave this off.
@@ -220,6 +225,8 @@
         return isNaN(num) ? v : num.toString();
       case 'date':
         return formatDateDisplay(v);
+      case 'richtext':
+        return markdownExcerpt(v);
       default:
         return v;
     }
@@ -238,6 +245,9 @@
   // References keep the rich display (avatar, asset tag) inside the row.
   const rowRichDisplay = $derived(['user', 'multi_user', 'asset'].includes(field.field_type));
   const rowValueHref = $derived(rowRichDisplay ? null : customFieldLinkHref(field.field_type, value));
+  // Rich text renders as formatted Markdown only where a caller opts in; rows,
+  // lists, and tables keep a one-line excerpt.
+  const richtextInlineDisplay = $derived(selfEditing || !renderRichText);
 
   // Icon shown when the field is empty but interactive (prompts the user).
   const fieldIcon = $derived.by(() => {
@@ -269,6 +279,7 @@
       case 'multiselect':
       case 'boolean':
       case 'checkbox':
+      case 'richtext':
         return renderDisplayValue();
       default:
         if (Array.isArray(v)) {
@@ -414,6 +425,9 @@
   // Free-form inputs stage keystrokes in a draft so self-editing surfaces
   // commit once (Enter/blur) instead of on every character.
   let draftValue = $state(null);
+  // Live handle to the richtext editor. The editor's markdown listener is
+  // debounced, so commit reads the serialized document directly.
+  let richtextEditorRef = $state(null);
 
   const isSelfEditing = $derived(selfEditing && !disabled && readonly);
   // Booleans edit in place — render the checkbox directly instead of routing
@@ -479,6 +493,38 @@
   function stringifyValue(v) {
     if (v === null || v === undefined) return '';
     return String(v);
+  }
+
+  // Rich text edits through Milkdown, which owns the live document. Stage the
+  // draft locally and commit once on outside click so the sidebar's deferred
+  // save does not fire on every keystroke; self-editing cells only push the
+  // committed value back through onChange.
+  function handleRichtextChange(newValue) {
+    draftValue = newValue;
+    if (!isSelfEditing) onChange(newValue);
+  }
+
+  function commitRichtext() {
+    // The editor's markdownUpdated listener is debounced, so read the live
+    // document rather than the staged draft to avoid losing the last edit.
+    const committed = richtextEditorRef?.getMarkdown?.() ?? draftValue ?? value;
+    const changed = stringifyValue(committed) !== stringifyValue(value);
+    if (isSelfEditing) {
+      if (changed) onChange(committed);
+      exitEditing();
+      return;
+    }
+    // Always-edit form callers (create forms, asset browser, public forms) only
+    // listen to onChange, so publish the live document before submission. The
+    // sidebar still saves through its explicit onCommit.
+    if (changed) onChange(committed);
+    draftValue = null;
+    onCommit?.(committed);
+  }
+
+  function cancelRichtext() {
+    draftValue = null;
+    handleEditorCancel();
   }
 
   // Edit-input keystrokes: free-form fields stage a draft in self-editing
@@ -652,6 +698,14 @@
       </div>
     {:else if field.field_type === 'number'}
       <span class="tabular-nums" style="color: var(--ds-text);">{renderDisplayValue()}</span>
+    {:else if field.field_type === 'richtext'}
+      {#if richtextInlineDisplay}
+        <span class={valueTruncate ? 'block min-w-0 truncate' : ''} dir="auto" style="color: var(--ds-text);">{markdownExcerpt(value)}</span>
+      {:else}
+        <div class="min-w-0 w-full" data-testid={`custom-field-display-${field.id}`}>
+          <LazyMilkdownEditor content={value} readonly={true} showToolbar={false} compact={true} allowImageUpload={false} {workspaceId} testId={`custom-field-input-${field.id}`} />
+        </div>
+      {/if}
     {:else}
       <span class={valueTruncate ? 'block min-w-0 truncate' : ''} dir="auto" style="color: var(--ds-text);">{renderDisplayValue()}</span>
     {/if}
@@ -711,6 +765,34 @@
         autofocus
       />
     {/if}
+  </div>
+{/snippet}
+
+{#snippet richtextEditor()}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="w-full"
+    use:clickOutside
+    onclickOutside={commitRichtext}
+    onkeydown={(event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        cancelRichtext();
+      }
+    }}
+  >
+    <LazyMilkdownEditor
+      bind:this={richtextEditorRef}
+      content={editorValue}
+      placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
+      readonly={false}
+      showToolbar={true}
+      compact={true}
+      allowImageUpload={false}
+      {workspaceId}
+      testId={`custom-field-input-${field.id}`}
+      onContentChange={handleRichtextChange}
+    />
   </div>
 {/snippet}
 
@@ -950,6 +1032,8 @@
       {@render freeTextEditor({ type: 'email' })}
     {:else if field.field_type === 'url'}
       {@render freeTextEditor({ type: 'url' })}
+    {:else if field.field_type === 'richtext'}
+      {@render richtextEditor()}
     {:else}
       {@render freeTextEditor()}
     {/if}
