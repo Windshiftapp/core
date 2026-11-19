@@ -67,6 +67,7 @@ type NotificationManager struct {
 	maxInsertDuration   int64
 	cacheUpdates        int64
 	cacheErrors         int64
+	cacheInvalidations  int64
 	cacheBytesWritten   int64
 	maxCacheEntryBytes  int64
 	cacheUpdateDuration int64
@@ -304,7 +305,6 @@ func (nm *NotificationManager) AddNotificationsContext(ctx context.Context, noti
 		return []models.Notification{}, nil
 	}
 	candidates := append([]models.Notification(nil), notifications...)
-	userIDs := make([]int, len(candidates))
 	now := time.Now()
 	for i := range candidates {
 		if err := validateNotificationAuthorizationScope(candidates[i]); err != nil {
@@ -315,16 +315,13 @@ func (nm *NotificationManager) AddNotificationsContext(ctx context.Context, noti
 		if candidates[i].Timestamp.IsZero() {
 			candidates[i].Timestamp = now
 		}
-		userIDs[i] = candidates[i].UserID
 	}
 
-	unlockUsers := nm.lockUsers(userIDs)
 	startedAt := time.Now()
 	ctx, cancel := context.WithTimeout(ctx, notificationInsertTimeout)
 	defer cancel()
 	tx, err := nm.db.BeginTx(ctx, nil)
 	if err != nil {
-		unlockUsers()
 		atomic.AddInt64(&nm.insertErrors, 1)
 		return nil, fmt.Errorf("begin notification insert: %w", err)
 	}
@@ -334,14 +331,12 @@ func (nm *NotificationManager) AddNotificationsContext(ctx context.Context, noti
 		end := min(start+nm.insertChunkSize, len(candidates))
 		inserted, err := insertNotificationChunk(ctx, tx, candidates[start:end])
 		if err != nil {
-			unlockUsers()
 			atomic.AddInt64(&nm.insertErrors, 1)
 			return nil, err
 		}
 		stored = append(stored, inserted...)
 	}
 	if err := tx.Commit(); err != nil {
-		unlockUsers()
 		atomic.AddInt64(&nm.insertErrors, 1)
 		return nil, fmt.Errorf("commit notification insert: %w", err)
 	}
@@ -352,32 +347,27 @@ func (nm *NotificationManager) AddNotificationsContext(ctx context.Context, noti
 	atomic.StoreInt64(&nm.lastInsertDuration, int64(duration))
 	updateNotificationMaximum(&nm.maxInsertDuration, int64(duration))
 
-	byUser := make(map[int][]models.Notification)
+	affectedUsers := make([]int, 0, len(stored))
+	seenUsers := make(map[int]struct{}, len(stored))
 	for _, notification := range stored {
-		byUser[notification.UserID] = append(byUser[notification.UserID], notification)
-	}
-	for userID := range byUser {
-		services.PublishUserChange(userID)
-	}
-	for userID, additions := range byUser {
-		cache, ok := nm.cacheSnapshot(userID)
-		if !ok {
+		if _, ok := seenUsers[notification.UserID]; ok {
 			continue
 		}
-		sort.SliceStable(additions, func(i, j int) bool {
-			if additions[i].Timestamp.Equal(additions[j].Timestamp) {
-				return additions[i].ID > additions[j].ID
-			}
-			return additions[i].Timestamp.After(additions[j].Timestamp)
-		})
-		cache.Notifications = append(additions, cache.Notifications...)
-		if len(cache.Notifications) > notificationCachePageSize {
-			cache.Notifications = cache.Notifications[:notificationCachePageSize]
-			cache.Complete = false
-		}
-		if err := nm.setCacheSnapshot(userID, cache); err != nil {
-			slog.Warn("failed to update notification cache after insert", "component", "notifications", "user_id", userID, "error", err)
-			_ = nm.cache.Delete(nm.getCacheKey(userID))
+		seenUsers[notification.UserID] = struct{}{}
+		affectedUsers = append(affectedUsers, notification.UserID)
+	}
+	for _, userID := range affectedUsers {
+		services.PublishUserChange(userID)
+	}
+	// The DB transaction above runs lock-free; only this short cache
+	// invalidation needs the per-user locks. A reader is therefore never blocked
+	// for the duration of an insert, while the lock still orders invalidation
+	// with a reader's read-modify-write so a stale page cannot be repopulated
+	// after the committed rows are visible.
+	unlockUsers := nm.lockUsers(affectedUsers)
+	for _, userID := range affectedUsers {
+		if err := nm.cache.Delete(nm.getCacheKey(userID)); err == nil {
+			atomic.AddInt64(&nm.cacheInvalidations, 1)
 		}
 	}
 	unlockUsers()
@@ -917,6 +907,7 @@ func (nm *NotificationManager) GetStats() map[string]int64 {
 		"max_insert_duration_ms":   time.Duration(atomic.LoadInt64(&nm.maxInsertDuration)).Milliseconds(),
 		"cache_updates":            atomic.LoadInt64(&nm.cacheUpdates),
 		"cache_errors":             atomic.LoadInt64(&nm.cacheErrors),
+		"cache_invalidations":      atomic.LoadInt64(&nm.cacheInvalidations),
 		"cache_bytes_written":      atomic.LoadInt64(&nm.cacheBytesWritten),
 		"max_cache_entry_bytes":    atomic.LoadInt64(&nm.maxCacheEntryBytes),
 		"cache_update_duration_ms": time.Duration(atomic.LoadInt64(&nm.cacheUpdateDuration)).Milliseconds(),
