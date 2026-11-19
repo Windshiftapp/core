@@ -68,7 +68,7 @@ import (
 type planningReleaseProviderAdapter struct {
 	provider interface {
 		scm.ReleaseProvider
-		ListTags(context.Context, string, string, time.Time) ([]scm.Tag, error)
+		ListTags(context.Context, string, string, string, time.Time) ([]scm.Tag, error)
 	}
 }
 
@@ -96,7 +96,7 @@ func (a planningReleaseProviderAdapter) ListReleases(ctx context.Context, owner,
 }
 
 func (a planningReleaseProviderAdapter) ListTags(ctx context.Context, owner, repo string) ([]services.ExternalTag, error) {
-	tags, err := a.provider.ListTags(ctx, owner, repo, time.Time{})
+	tags, err := a.provider.ListTags(ctx, owner, repo, "", time.Time{})
 	if err != nil {
 		return nil, err
 	}
@@ -1975,7 +1975,7 @@ func (s *Server) initialize() error {
 			}
 			releaseProvider, ok := provider.(interface {
 				scm.ReleaseProvider
-				ListTags(context.Context, string, string, time.Time) ([]scm.Tag, error)
+				ListTags(context.Context, string, string, string, time.Time) ([]scm.Tag, error)
 			})
 			if !ok {
 				return nil, errors.New("SCM provider does not support releases")
