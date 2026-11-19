@@ -344,6 +344,12 @@ func validateCustomFieldsSchemaCore(fields []models.AssetTypeField, values map[s
 					values[k] = sanitize.PlainTextField.Sanitize(s)
 				}
 			}
+		case "money":
+			normalized, err := validation.NormalizeMoneyValue(k, f.Options, v)
+			if err != nil {
+				return &AssetValidationError{Msg: fmt.Sprintf("custom_field_values[%q]: %s", k, err.Error())}
+			}
+			values[k] = normalized
 		}
 	}
 

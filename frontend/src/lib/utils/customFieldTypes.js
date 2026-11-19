@@ -32,6 +32,26 @@ export function isRichTextCustomFieldType(fieldType) {
   return fieldType === 'richtext';
 }
 
+// Money values are objects ({ amount, currency }) rather than bare numbers, so
+// the currency travels with the value on items, assets, and customer records.
+export function isMoneyCustomFieldType(fieldType) {
+  return fieldType === 'money';
+}
+
+// Format a stored money value, falling back to the given currency when the
+// value omits one (pinned fields or legacy data). Returns '' for an empty value.
+export function moneyFieldAmount(value) {
+  if (value && typeof value === 'object') {
+    const raw = value.amount;
+    if (raw === null || raw === undefined || (typeof raw === 'string' && raw.trim() === '')) {
+      return '';
+    }
+    const amount = Number(raw);
+    return Number.isFinite(amount) ? amount : '';
+  }
+  return '';
+}
+
 // Read compatibility for historical asset/import values. Write paths still
 // emit only actual booleans from the shared Checkbox component.
 export function booleanCustomFieldChecked(raw) {

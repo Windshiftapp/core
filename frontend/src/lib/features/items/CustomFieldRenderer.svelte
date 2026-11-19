@@ -16,9 +16,11 @@
   import Mail from '@lucide/svelte/icons/mail';
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import CheckSquare from '@lucide/svelte/icons/square-check';
+  import Banknote from '@lucide/svelte/icons/banknote';
   import ColorDot from '../../components/ColorDot.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import Input from '../../components/Input.svelte';
+  import Select from '../../components/Select.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import TruncatedFieldValue from '../../components/TruncatedFieldValue.svelte';
   import { onDestroy } from 'svelte';
@@ -29,6 +31,8 @@
   import { safeHref } from '../../utils/sanitize';
   import { customFieldLinkHref } from '../../utils/customFieldLinks.js';
   import { booleanCustomFieldChecked, isBooleanCustomFieldType } from '../../utils/customFieldTypes.js';
+  import { DEFAULT_CURRENCY, currencyOptions, formatMoney } from '../../utils/money.js';
+  import { brandStore } from '../../stores/brand.svelte.js';
   import LazyMilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import { markdownExcerpt } from '../../utils/markdownExcerpt.js';
   import {
@@ -115,6 +119,56 @@
 
   const assetConfig = $derived(parseAssetConfig());
   const isMultiAssetField = $derived(field.field_type === 'asset' && assetConfig.multi === true);
+
+  // Money values carry their own currency as { amount, currency }. A field may
+  // pin one currency through its options; otherwise each value picks one and
+  // defaults to the instance currency.
+  const moneyPinnedCurrency = $derived.by(() => {
+    try {
+      const code = fieldOptionsObject(field.options)?.currency;
+      return typeof code === 'string' && /^[A-Za-z]{3}$/.test(code.trim())
+        ? code.trim().toUpperCase()
+        : '';
+    } catch {
+      return '';
+    }
+  });
+
+  function moneyAmount(raw) {
+    if (raw && typeof raw === 'object') {
+      const amount = /** @type {any} */ (raw).amount;
+      if (amount === null || amount === undefined || (typeof amount === 'string' && amount.trim() === '')) {
+        return '';
+      }
+      const n = Number(amount);
+      return Number.isFinite(n) ? n : '';
+    }
+    return '';
+  }
+
+  function moneyCurrency(raw) {
+    if (raw && typeof raw === 'object') {
+      const code = /** @type {any} */ (raw).currency;
+      if (typeof code === 'string' && code.trim()) return code.trim().toUpperCase();
+    }
+    return moneyPinnedCurrency || brandStore.currency || DEFAULT_CURRENCY;
+  }
+
+  function emitMoney(amount, currency) {
+    const value = amount === '' || amount === null || amount === undefined ? null : Number(amount);
+    if (value === null || !Number.isFinite(value)) {
+      onChange('');
+      return;
+    }
+    onChange({ amount: value, currency });
+  }
+
+  function handleMoneyKeydown(event) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      handleEditorCancel();
+    }
+  }
   function assetID(asset) {
     if (!asset) return null;
     const raw = asset && typeof asset === 'object' ? asset.id : asset;
@@ -223,6 +277,10 @@
       case 'number':
         const num = parseFloat(v);
         return isNaN(num) ? v : num.toString();
+      case 'money': {
+        const amount = moneyAmount(v);
+        return amount === '' ? '' : formatMoney(amount, moneyCurrency(v));
+      }
       case 'date':
         return formatDateDisplay(v);
       case 'richtext':
@@ -234,6 +292,7 @@
 
 	function hasDisplayValue() {
 	  if (value === null || value === undefined || value === '') return false;
+	  if (field.field_type === 'money' && moneyAmount(value) === '') return false;
 	  return !((field.field_type === 'multiselect' || field.field_type === 'multi_milestone') && Array.isArray(value) && value.length === 0);
 	}
 
@@ -260,6 +319,7 @@
       customerorganisation: Building2,
       email: Mail,
       url: ExternalLink,
+      money: Banknote,
     }[field.field_type] ?? null;
   });
 
@@ -280,6 +340,7 @@
       case 'boolean':
       case 'checkbox':
       case 'richtext':
+      case 'money':
         return renderDisplayValue();
       default:
         if (Array.isArray(v)) {
@@ -698,6 +759,8 @@
       </div>
     {:else if field.field_type === 'number'}
       <span class="tabular-nums" style="color: var(--ds-text);">{renderDisplayValue()}</span>
+    {:else if field.field_type === 'money'}
+      <span class="tabular-nums" style="color: var(--ds-text);">{renderDisplayValue()}</span>
     {:else if field.field_type === 'richtext'}
       {#if richtextInlineDisplay}
         <span class={valueTruncate ? 'block min-w-0 truncate' : ''} dir="auto" style="color: var(--ds-text);">{markdownExcerpt(value)}</span>
@@ -763,6 +826,37 @@
         {disabled}
         required={isRequired}
         autofocus
+      />
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet moneyEditor()}
+  <div class="flex items-center gap-2" use:clickOutside onclickOutside={handleEditorCancel}>
+    <Input
+      type="number"
+      step="any"
+      value={moneyAmount(editorValue)}
+      dataTestid={`custom-field-input-${field.id}`}
+      oninput={(e) => emitMoney(e.target.value, moneyCurrency(editorValue))}
+      class="flex-1 px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-ds-background-input border border-ds-border rounded text-ds-text tabular-nums"
+      placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
+      onkeydown={handleMoneyKeydown}
+      {disabled}
+      required={isRequired}
+      autofocus
+    />
+    {#if moneyPinnedCurrency}
+      <span class="text-sm tabular-nums" style="color: var(--ds-text-subtle);">{moneyPinnedCurrency}</span>
+    {:else}
+      <Select
+        value={moneyCurrency(editorValue)}
+        options={currencyOptions()}
+        dataTestid={`custom-field-currency-${field.id}`}
+        onchange={(code) => emitMoney(moneyAmount(editorValue), code)}
+        class="w-36"
+        size="small"
+        {disabled}
       />
     {/if}
   </div>
@@ -1034,6 +1128,8 @@
       {@render freeTextEditor({ type: 'url' })}
     {:else if field.field_type === 'richtext'}
       {@render richtextEditor()}
+    {:else if field.field_type === 'money'}
+      {@render moneyEditor()}
     {:else}
       {@render freeTextEditor()}
     {/if}
