@@ -415,6 +415,11 @@ func (p *PostgresDB) GetDB() *sql.DB {
 	return p.db
 }
 
+// NamedPools exposes the single shared PostgreSQL pool.
+func (p *PostgresDB) NamedPools() []NamedPool {
+	return []NamedPool{{Name: "shared", DB: p.db}}
+}
+
 // InstanceID distinguishes database pools created during this process.
 func (p *PostgresDB) InstanceID() uint64 {
 	return p.instanceID
@@ -428,7 +433,11 @@ func (p *PostgresDB) GetDriverName() string {
 // Query executes a query that returns rows
 func (p *PostgresDB) Query(query string, args ...any) (*sql.Rows, error) {
 	query = ConvertPlaceholders(query)
-	return p.db.Query(query, args...)
+	rows, err := p.db.Query(query, args...)
+	if err == nil {
+		ObserveRequestQuerySuccess()
+	}
+	return rows, err
 }
 
 // QueryRow executes a query that returns at most one row
@@ -440,13 +449,21 @@ func (p *PostgresDB) QueryRow(query string, args ...any) *sql.Row {
 // Exec executes a query that doesn't return rows
 func (p *PostgresDB) Exec(query string, args ...any) (sql.Result, error) {
 	query = ConvertPlaceholders(query)
-	return p.db.Exec(query, args...)
+	result, err := p.db.Exec(query, args...)
+	if err == nil {
+		ObserveRequestQuerySuccess()
+	}
+	return result, err
 }
 
 // QueryContext executes a query with context that returns rows
 func (p *PostgresDB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	query = ConvertPlaceholders(query)
-	return p.db.QueryContext(ctx, query, args...)
+	rows, err := p.db.QueryContext(ctx, query, args...)
+	if err == nil {
+		ObserveRequestQuerySuccess()
+	}
+	return rows, err
 }
 
 // QueryRowContext executes a query with context that returns at most one row
@@ -458,21 +475,33 @@ func (p *PostgresDB) QueryRowContext(ctx context.Context, query string, args ...
 // ExecContext executes a query with context that doesn't return rows
 func (p *PostgresDB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	query = ConvertPlaceholders(query)
-	return p.db.ExecContext(ctx, query, args...)
+	result, err := p.db.ExecContext(ctx, query, args...)
+	if err == nil {
+		ObserveRequestQuerySuccess()
+	}
+	return result, err
 }
 
 // ExecWrite explicitly executes a write query
 // For PostgreSQL, this is the same as Exec since MVCC handles concurrency
 func (p *PostgresDB) ExecWrite(query string, args ...any) (sql.Result, error) {
 	query = ConvertPlaceholders(query)
-	return p.db.Exec(query, args...)
+	result, err := p.db.Exec(query, args...)
+	if err == nil {
+		ObserveRequestQuerySuccess()
+	}
+	return result, err
 }
 
 // ExecWriteContext explicitly executes a write query with context
 // For PostgreSQL, this is the same as ExecContext since MVCC handles concurrency
 func (p *PostgresDB) ExecWriteContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	query = ConvertPlaceholders(query)
-	return p.db.ExecContext(ctx, query, args...)
+	result, err := p.db.ExecContext(ctx, query, args...)
+	if err == nil {
+		ObserveRequestQuerySuccess()
+	}
+	return result, err
 }
 
 // Begin starts a new transaction (returns wrapped transaction)

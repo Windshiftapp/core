@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"sync/atomic"
+	"time"
 )
 
 var databaseInstanceCounter atomic.Uint64
@@ -23,6 +24,13 @@ const (
 // value. URL schemes are normalized before a Database is constructed.
 func IsPostgresDriver(name string) bool {
 	return name == driverPostgres
+}
+
+// NamedPool pairs a logical connection-pool role with its *sql.DB. SQLite
+// exposes separate reader and writer pools; PostgreSQL has one shared pool.
+type NamedPool struct {
+	Name string
+	DB   *sql.DB
 }
 
 // Database is the main interface that all database implementations must satisfy
@@ -74,6 +82,11 @@ type Database interface {
 
 	// GetDB returns the underlying *sql.DB for legacy compatibility
 	GetDB() *sql.DB
+
+	// NamedPools returns the process-local connection pools keyed by role
+	// ("reader"/"writer" for SQLite, "shared" for PostgreSQL) so diagnostics
+	// and metrics can report them separately.
+	NamedPools() []NamedPool
 
 	// GetDriverName returns the database driver name ("sqlite" or "postgres")
 	GetDriverName() string
@@ -127,6 +140,7 @@ type Tx interface {
 // transaction is rolled back. This eliminates the repeated
 // begin/defer-rollback/commit boilerplate across service methods.
 func WithTx(db Database, fn func(tx Tx) error) error {
+	start := time.Now()
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -140,6 +154,7 @@ func WithTx(db Database, fn func(tx Tx) error) error {
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
+	ObserveRequestTransaction(time.Since(start))
 
 	return nil
 }
@@ -147,6 +162,7 @@ func WithTx(db Database, fn func(tx Tx) error) error {
 // WithTxResult runs fn inside a transaction and returns a value along with
 // any error. Like WithTx but for operations that produce a result.
 func WithTxResult[T any](db Database, fn func(tx Tx) (T, error)) (T, error) {
+	start := time.Now()
 	tx, err := db.Begin()
 	if err != nil {
 		var zero T
@@ -164,6 +180,7 @@ func WithTxResult[T any](db Database, fn func(tx Tx) (T, error)) (T, error) {
 		var zero T
 		return zero, fmt.Errorf("failed to commit transaction: %w", err)
 	}
+	ObserveRequestTransaction(time.Since(start))
 
 	return result, nil
 }

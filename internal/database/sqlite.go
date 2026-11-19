@@ -106,6 +106,15 @@ func (s *SQLiteDB) GetDB() *sql.DB {
 	return s.DB.DB
 }
 
+// NamedPools exposes the SQLite reader and writer pools separately so
+// diagnostics and metrics do not report only the reader pool.
+func (s *SQLiteDB) NamedPools() []NamedPool {
+	return []NamedPool{
+		{Name: "reader", DB: s.DB.DB},
+		{Name: "writer", DB: s.writeConn},
+	}
+}
+
 // GetDriverName returns the database driver name
 func (s *SQLiteDB) GetDriverName() string {
 	return "sqlite"
@@ -113,7 +122,11 @@ func (s *SQLiteDB) GetDriverName() string {
 
 // Query executes a query that returns rows
 func (s *SQLiteDB) Query(query string, args ...any) (*sql.Rows, error) {
-	return s.DB.Query(query, toUTCArgs(args)...)
+	rows, err := s.DB.Query(query, toUTCArgs(args)...)
+	if err == nil {
+		ObserveRequestQuerySuccess()
+	}
+	return rows, err
 }
 
 // QueryRow executes a query that returns at most one row.
@@ -131,7 +144,11 @@ func (s *SQLiteDB) QueryRow(query string, args ...any) *sql.Row {
 // Exec executes a query that doesn't return rows
 // Always uses write connection for safety (all Exec operations are writes)
 func (s *SQLiteDB) Exec(query string, args ...any) (sql.Result, error) {
-	return s.writeConn.Exec(query, toUTCArgs(args)...)
+	result, err := s.writeConn.Exec(query, toUTCArgs(args)...)
+	if err == nil {
+		ObserveRequestQuerySuccess()
+	}
+	return result, err
 }
 
 // QueryContext executes a query with context that returns rows.
@@ -140,10 +157,17 @@ func (s *SQLiteDB) Exec(query string, args ...any) (sql.Result, error) {
 // serialization. Mirrors QueryRowContext, which already applies isWriteQuery.
 func (s *SQLiteDB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	args = toUTCArgs(args)
+	var rows *sql.Rows
+	var err error
 	if isWriteQuery(query) {
-		return s.writeConn.QueryContext(ctx, query, args...)
+		rows, err = s.writeConn.QueryContext(ctx, query, args...)
+	} else {
+		rows, err = s.DB.QueryContext(ctx, query, args...)
 	}
-	return s.DB.QueryContext(ctx, query, args...)
+	if err == nil {
+		ObserveRequestQuerySuccess()
+	}
+	return rows, err
 }
 
 // QueryRowContext executes a query with context that returns at most one row.
@@ -160,17 +184,29 @@ func (s *SQLiteDB) QueryRowContext(ctx context.Context, query string, args ...an
 // ExecContext executes a query with context that doesn't return rows
 // Always uses write connection for safety (all Exec operations are writes)
 func (s *SQLiteDB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return s.writeConn.ExecContext(ctx, query, toUTCArgs(args)...)
+	result, err := s.writeConn.ExecContext(ctx, query, toUTCArgs(args)...)
+	if err == nil {
+		ObserveRequestQuerySuccess()
+	}
+	return result, err
 }
 
 // ExecWrite explicitly executes a write query using the dedicated write connection
 func (s *SQLiteDB) ExecWrite(query string, args ...any) (sql.Result, error) {
-	return s.writeConn.Exec(query, toUTCArgs(args)...)
+	result, err := s.writeConn.Exec(query, toUTCArgs(args)...)
+	if err == nil {
+		ObserveRequestQuerySuccess()
+	}
+	return result, err
 }
 
 // ExecWriteContext explicitly executes a write query with context using the dedicated write connection
 func (s *SQLiteDB) ExecWriteContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return s.writeConn.ExecContext(ctx, query, toUTCArgs(args)...)
+	result, err := s.writeConn.ExecContext(ctx, query, toUTCArgs(args)...)
+	if err == nil {
+		ObserveRequestQuerySuccess()
+	}
+	return result, err
 }
 
 // Begin starts a new transaction (returns wrapped transaction)

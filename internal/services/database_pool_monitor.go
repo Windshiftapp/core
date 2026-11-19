@@ -107,15 +107,17 @@ func (m *DatabasePoolMonitor) run() {
 
 func (m *DatabasePoolMonitor) sample() {
 	for _, stats := range m.source.PoolStats() {
+		key := stats.Key()
 		m.mu.Lock()
-		state := m.states[stats.Name]
+		state := m.states[key]
 		next, event := evaluateDatabasePoolSample(state, stats, m.config)
-		m.states[stats.Name] = next
+		m.states[key] = next
 		m.mu.Unlock()
 
 		slog.Debug("database pool sample",
 			"component", "database_pool",
 			"pool", stats.Name,
+			"role", stats.Role,
 			"driver", stats.Driver,
 			"open_connections", stats.OpenConnections,
 			"in_use", stats.InUse,

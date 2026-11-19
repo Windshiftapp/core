@@ -14,6 +14,7 @@ import (
 // Wait and close counters are cumulative since the pool was created.
 type DatabasePoolStats struct {
 	Name               string
+	Role               string
 	Driver             string
 	MaxOpenConnections int
 	OpenConnections    int
@@ -26,12 +27,21 @@ type DatabasePoolStats struct {
 	MaxLifetimeClosed  int64
 }
 
+// Key uniquely identifies a pool within the process for alert state.
+func (s DatabasePoolStats) Key() string {
+	if s.Role == "" {
+		return s.Name
+	}
+	return s.Name + "/" + s.Role
+}
+
 // RequestQueryOutcomeStats is the repository-layer projection of request-owned
 // query terminal outcomes.
 type RequestQueryOutcomeStats struct {
 	Canceled  uint64 `json:"canceled"`
 	Deadlines uint64 `json:"deadlines"`
 	Errors    uint64 `json:"errors"`
+	Successes uint64 `json:"successes"`
 }
 
 // DatabaseCapacityBudget records the replica-aware PostgreSQL connection
@@ -97,20 +107,26 @@ func (r *DatabaseDiagnosticsRepository) PoolStats() []DatabasePoolStats {
 	snapshots := make([]DatabasePoolStats, 0, len(names))
 	for _, name := range names {
 		db := pools[name]
-		stats := db.GetDB().Stats()
-		snapshots = append(snapshots, DatabasePoolStats{
-			Name:               name,
-			Driver:             db.GetDriverName(),
-			MaxOpenConnections: stats.MaxOpenConnections,
-			OpenConnections:    stats.OpenConnections,
-			InUse:              stats.InUse,
-			Idle:               stats.Idle,
-			WaitCount:          stats.WaitCount,
-			WaitDurationMillis: stats.WaitDuration.Milliseconds(),
-			MaxIdleClosed:      stats.MaxIdleClosed,
-			MaxIdleTimeClosed:  stats.MaxIdleTimeClosed,
-			MaxLifetimeClosed:  stats.MaxLifetimeClosed,
-		})
+		for _, pool := range db.NamedPools() {
+			if pool.DB == nil {
+				continue
+			}
+			stats := pool.DB.Stats()
+			snapshots = append(snapshots, DatabasePoolStats{
+				Name:               name,
+				Role:               pool.Name,
+				Driver:             db.GetDriverName(),
+				MaxOpenConnections: stats.MaxOpenConnections,
+				OpenConnections:    stats.OpenConnections,
+				InUse:              stats.InUse,
+				Idle:               stats.Idle,
+				WaitCount:          stats.WaitCount,
+				WaitDurationMillis: stats.WaitDuration.Milliseconds(),
+				MaxIdleClosed:      stats.MaxIdleClosed,
+				MaxIdleTimeClosed:  stats.MaxIdleTimeClosed,
+				MaxLifetimeClosed:  stats.MaxLifetimeClosed,
+			})
+		}
 	}
 	return snapshots
 }
@@ -122,7 +138,13 @@ func (r *DatabaseDiagnosticsRepository) RequestQueryStats() RequestQueryOutcomeS
 		Canceled:  stats.Canceled,
 		Deadlines: stats.Deadlines,
 		Errors:    stats.Errors,
+		Successes: stats.Successes,
 	}
+}
+
+// RequestTransactionStats returns process-local committed-transaction counters.
+func (r *DatabaseDiagnosticsRepository) RequestTransactionStats() database.RequestTransactionStats {
+	return database.RequestTransactionStatsSnapshot()
 }
 
 // LoadPostgresCapacityBudget reads the server capacity and calculates the

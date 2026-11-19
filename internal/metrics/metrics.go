@@ -100,9 +100,18 @@ func New(db database.Database, bearerToken string) *Metrics {
 		scmPollDuration,
 		slaInlineDuration,
 	)
+	if db != nil {
+		// One collector per physical pool so SQLite reader/writer pressure is
+		// not collapsed into a single series.
+		for _, pool := range db.NamedPools() {
+			if pool.DB == nil {
+				continue
+			}
+			registry.MustRegister(collectors.NewDBStatsCollector(pool.DB, "windshift_"+pool.Name))
+		}
+	}
 	if db != nil && db.GetDB() != nil {
 		registry.MustRegister(
-			collectors.NewDBStatsCollector(db.GetDB(), "windshift"),
 			newDomainCollector(db),
 			newSLAJobCollector(db),
 			newEmailCollector(db),

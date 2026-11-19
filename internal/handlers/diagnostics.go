@@ -535,6 +535,7 @@ func (h *DiagnosticsHandler) GetSessionValidationCache(w http.ResponseWriter, r 
 // DatabasePoolSnapshot is the HTTP representation of database pool state.
 type DatabasePoolSnapshot struct {
 	Name                   string  `json:"name"`
+	Role                   string  `json:"role"`
 	Driver                 string  `json:"driver"`
 	MaxOpenConnections     int     `json:"max_open_connections"`
 	OpenConnections        int     `json:"open_connections"`
@@ -592,6 +593,7 @@ func (h *DiagnosticsHandler) GetDatabasePool(w http.ResponseWriter, r *http.Requ
 		}
 		snapshot := DatabasePoolSnapshot{
 			Name:                   poolStats.Name,
+			Role:                   poolStats.Role,
 			Driver:                 poolStats.Driver,
 			MaxOpenConnections:     poolStats.MaxOpenConnections,
 			OpenConnections:        poolStats.OpenConnections,
@@ -610,7 +612,9 @@ func (h *DiagnosticsHandler) GetDatabasePool(w http.ResponseWriter, r *http.Requ
 			healthy = false
 		}
 		pools = append(pools, snapshot)
-		if snapshot.Name == "main" {
+		// pool is the primary pool for a registered database: the SQLite reader
+		// (or the PostgreSQL shared pool), never the SQLite writer.
+		if snapshot.Name == "main" && snapshot.Role != "writer" {
 			copyOfSnapshot := snapshot
 			mainPool = &copyOfSnapshot
 		}
@@ -654,6 +658,7 @@ func (h *DiagnosticsHandler) GetDatabasePool(w http.ResponseWriter, r *http.Requ
 			SystemBytes:    memory.Sys,
 		},
 		"request_query_outcomes": h.databaseDiagRepo.RequestQueryStats(),
+		"request_transactions":   h.databaseDiagRepo.RequestTransactionStats(),
 		"instance":               hostname,
 		"sampled_at":             time.Now().UTC(),
 		"healthy":                healthy,
