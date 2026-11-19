@@ -155,6 +155,7 @@ type Server struct {
 	workflowService              *services.WorkflowService
 	actionService                *services.ActionService
 	assetActionService           *services.AssetActionService
+	sideEffectDispatcher         *services.SideEffectDispatcher
 	eventEngine                  *events.Engine
 	approvalEscalationSweeper    *services.ApprovalEscalationSweeper
 	incidentEscalationSweeper    *services.IncidentEscalationSweeper
@@ -533,9 +534,6 @@ func (s *Server) initialize() error {
 		services.DefaultNotificationServiceConfig(),
 		notificationAssetPermissions,
 	)
-	if err := services.PrepareDurableNotificationEngine(context.Background(), s.eventEngine, s.notificationService); err != nil {
-		return fmt.Errorf("prepare durable notification consumers: %w", err)
-	}
 
 	smtpSender := smtp.NewNotificationSMTPSender(s.db)
 	s.notificationScheduler = scheduler.NewNotificationScheduler(s.db, smtpSender, cfg.Notification.BatchInterval, s.notificationService)
@@ -593,18 +591,27 @@ func (s *Server) initialize() error {
 	s.actionService = services.NewActionService(s.db, services.DefaultActionServiceConfig(), chainStore)
 	s.actionService.SetNotificationService(s.notificationService)
 	s.actionService.SetPermissionService(permService)
-	if err := services.PrepareDurableActionEngine(context.Background(), s.eventEngine, s.actionService); err != nil {
-		return fmt.Errorf("prepare durable action consumers: %w", err)
-	}
 	slog.Info("action service initialized")
 
 	s.assetActionService = services.NewAssetActionService(s.db, services.DefaultActionServiceConfig(), chainStore)
 	s.assetActionService.SetNotificationService(s.notificationService)
 	s.assetActionService.SetPermissionService(permService)
-	if err := services.PrepareDurableAssetActionEngine(context.Background(), s.eventEngine, s.assetActionService); err != nil {
-		return fmt.Errorf("prepare durable asset action consumers: %w", err)
-	}
 	slog.Info("asset action service initialized")
+
+	// The side-effect dispatcher owns the shared automation lane and builds the
+	// per-transaction staging buffer both lanes publish through. Canonical item
+	// and asset facts are staged by their recorders and published once after the
+	// outer commit; the durable consumers are retired below.
+	dispatcher, err := services.NewSideEffectDispatcher(
+		s.db, s.notificationService, s.actionService, s.assetActionService,
+		services.DefaultSideEffectBudget(),
+	)
+	if err != nil {
+		return fmt.Errorf("create side-effect dispatcher: %w", err)
+	}
+	s.sideEffectDispatcher = dispatcher
+	database.SetTxEffectsFactory(dispatcher.NewTransactionEffects)
+	slog.Info("side-effect dispatcher initialized")
 
 	// Determine base URL — cfg.BaseURL is already resolved by config.Load
 	// from the --base-url flag or BASE_URL env; only the localhost fallback
@@ -1339,7 +1346,7 @@ func (s *Server) initialize() error {
 		slaClock = s.slaTestClock
 	}
 	s.slaEngine.SetClock(slaClock)
-	s.slaEngine.SetSideEffectEmitter(services.NewSLASideEffectEmitter(s.db))
+	s.slaEngine.SetSideEffectEmitter(services.NewSLASideEffectEmitter())
 	s.slaEngine.SetInlineObserver(s.metrics)
 	s.slaLoop = sla.NewLoop(repository.NewSLARepository(s.db), s.slaEngine, slaClock, nil, sla.LoopConfig{})
 	s.slaEngine.SetJobOwner(s.slaLoop.Owner())
@@ -1808,6 +1815,7 @@ func (s *Server) initialize() error {
 				s.eventEngine.Store(),
 				repository.NewSCMHealthRepository(s.db),
 				repository.NewChannelRepository(s.db),
+				s.sideEffectDispatcher,
 			),
 			AgentSecurity: handlers.NewAgentSecurityHandler(
 				agentSecurityRepo,
@@ -2286,6 +2294,21 @@ func (s *Server) initialize() error {
 		MaxHeaderBytes:      1 << 20,
 		MaxHeaderValueCount: maxRequestHeaderValueCount,
 	}
+	if err := services.DeactivateRetiredConsumers(context.Background(), s.eventEngine.Store()); err != nil {
+		return fmt.Errorf("deactivate retired domain event consumers: %w", err)
+	}
+	// Account for and remove abandoned retired work in bounded batches. The
+	// pass is resumable: a large backlog is drained over later startups and
+	// never marks unfinished work successful.
+	if _, err := services.RunRetiredCleanup(context.Background(), s.db, services.RetiredConsumerKeys(), services.RetiredCleanupOptions{
+		BatchSize:  200,
+		MaxBatches: 10,
+	}); err != nil {
+		slog.Warn("retired side-effect cleanup did not complete", slog.String("component", "sideeffects"), slog.Any("error", err))
+	}
+	if s.sideEffectDispatcher != nil {
+		s.sideEffectDispatcher.Start(context.Background())
+	}
 	if err := s.eventEngine.Start(context.Background()); err != nil {
 		return fmt.Errorf("start domain event engine: %w", err)
 	}
@@ -2602,6 +2625,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		}
 	}
 
+	if s.sideEffectDispatcher != nil {
+		slog.Info("draining side-effect automation lane")
+		s.sideEffectDispatcher.Shutdown(ctx)
+	}
+
 	if s.notificationService != nil {
 		slog.Info("stopping notification service")
 		_ = s.notificationService.Close()
@@ -2664,6 +2692,11 @@ func (s *Server) cleanup() {
 	// New also calls cleanup after a partially completed initialize. Signal any
 	// loops already started there, even when Shutdown was never reachable.
 	s.stopBackgroundLoops()
+	if s.sideEffectDispatcher != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		s.sideEffectDispatcher.Shutdown(ctx)
+		cancel()
+	}
 	if s.databasePoolMonitor != nil {
 		s.databasePoolMonitor.Stop()
 	}

@@ -56,6 +56,7 @@ type DiagnosticsHandler struct {
 	eventStore          *domainevents.Store
 	scmHealthRepo       *repository.SCMHealthRepository
 	channelRepo         *repository.ChannelRepository
+	sideEffectStats     sideEffectDiagnostics
 }
 
 // NewDiagnosticsHandler creates a new diagnostics handler.
@@ -82,6 +83,7 @@ func NewDiagnosticsHandler(
 	eventStore *domainevents.Store,
 	scmHealthRepo *repository.SCMHealthRepository,
 	channelRepo *repository.ChannelRepository,
+	sideEffectStats sideEffectDiagnostics,
 ) *DiagnosticsHandler {
 	return &DiagnosticsHandler{
 		controls:            operatorcontrols.From(settingsRepo),
@@ -107,6 +109,7 @@ func NewDiagnosticsHandler(
 		eventStore:          eventStore,
 		scmHealthRepo:       scmHealthRepo,
 		channelRepo:         channelRepo,
+		sideEffectStats:     sideEffectStats,
 	}
 }
 

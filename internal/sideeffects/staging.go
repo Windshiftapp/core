@@ -7,6 +7,13 @@ import (
 	"time"
 )
 
+// FactStager accepts canonical domain facts for staged publication. A
+// transaction's effects accumulator implements it so recorders can stage a
+// fact without knowing which lanes will receive it.
+type FactStager interface {
+	StageFact(candidate Candidate)
+}
+
 // StagingConfig configures a transaction-owned staging buffer. Every field is
 // required: a zero or negative limit is rejected rather than treated as
 // unlimited.

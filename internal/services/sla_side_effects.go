@@ -5,46 +5,40 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
-	"windshift/internal/actionevents"
 	"windshift/internal/database"
-	"windshift/internal/events"
 	"windshift/internal/models"
 )
 
-// SLASideEffectEmitter turns a breach or warning into the existing
-// notification and automation compatibility events. It appends inside the
-// caller's transaction and only when a subscription or rule references the
-// SLA trigger, so the durable engine gains no new consumer key.
-type SLASideEffectEmitter struct {
-	store *events.Store
-}
+// SLASideEffectEmitter turns a breach or warning into notification and
+// automation candidates staged on the caller's transaction. They publish only
+// after the outer SLA job commits, so a rolled-back lifecycle update emits
+// nothing. It stages only when a subscription or rule references the trigger.
+type SLASideEffectEmitter struct{}
 
 // NewSLASideEffectEmitter constructs the emitter.
-func NewSLASideEffectEmitter(db database.Database) *SLASideEffectEmitter {
-	return &SLASideEffectEmitter{store: events.NewStore(db)}
+func NewSLASideEffectEmitter() *SLASideEffectEmitter {
+	return &SLASideEffectEmitter{}
 }
 
-// EmitBreach emits the notification and automation events for a breach. The
-// event occurrence time is the promised deadline, not the firing time.
+// EmitBreach emits the notification and automation events for a breach.
 func (e *SLASideEffectEmitter) EmitBreach(ctx context.Context, tx database.Tx, cycle *models.ItemSLACycle) error {
-	occurredAt := time.Now().UTC()
-	if cycle.BreachedAt != nil {
-		occurredAt = *cycle.BreachedAt
-	}
-	return e.emit(ctx, tx, cycle, "", models.EventSLABreached, string(models.ActionTriggerSLABreached), occurredAt)
+	return e.emit(ctx, tx, cycle, "", models.EventSLABreached, string(models.ActionTriggerSLABreached))
 }
 
 // EmitWarning emits the notification and automation events for a warning
 // threshold.
 func (e *SLASideEffectEmitter) EmitWarning(ctx context.Context, tx database.Tx, cycle *models.ItemSLACycle, thresholdKey string) error {
-	return e.emit(ctx, tx, cycle, thresholdKey, models.EventSLAWarning, string(models.ActionTriggerSLAWarning), time.Now().UTC())
+	return e.emit(ctx, tx, cycle, thresholdKey, models.EventSLAWarning, string(models.ActionTriggerSLAWarning))
 }
 
-func (e *SLASideEffectEmitter) emit(ctx context.Context, tx database.Tx, cycle *models.ItemSLACycle, thresholdKey, notificationEvent, actionTrigger string, occurredAt time.Time) error {
+func (e *SLASideEffectEmitter) emit(ctx context.Context, tx database.Tx, cycle *models.ItemSLACycle, thresholdKey, notificationEvent, actionTrigger string) error {
 	if cycle == nil || cycle.ItemID == 0 {
+		return nil
+	}
+	// Imported cycles are historical; they must never drive live output.
+	if cycle.Origin == models.SLAOriginImport {
 		return nil
 	}
 	var workspaceID, itemNumber int
@@ -67,7 +61,7 @@ func (e *SLASideEffectEmitter) emit(ctx context.Context, tx database.Tx, cycle *
 		return err
 	}
 	if notificationEnabled {
-		if err := e.appendNotification(ctx, tx, cycle, workspaceID, itemNumber, workspaceKey, title, metricName, thresholdKey, notificationEvent, occurredAt); err != nil {
+		if err := e.appendNotification(tx, cycle, workspaceID, itemNumber, workspaceKey, title, metricName, thresholdKey, notificationEvent); err != nil {
 			return err
 		}
 	}
@@ -77,7 +71,7 @@ func (e *SLASideEffectEmitter) emit(ctx context.Context, tx database.Tx, cycle *
 		return err
 	}
 	if actionEnabled {
-		if err := e.appendAction(ctx, tx, cycle, workspaceID, itemNumber, workspaceKey, title, metricName, thresholdKey, actionTrigger, occurredAt); err != nil {
+		if err := e.appendAction(tx, cycle, workspaceID, itemNumber, workspaceKey, title, metricName, thresholdKey, actionTrigger); err != nil {
 			return err
 		}
 	}
@@ -106,7 +100,7 @@ func (e *SLASideEffectEmitter) actionConfigured(ctx context.Context, tx database
 	return exists, nil
 }
 
-func (e *SLASideEffectEmitter) appendNotification(ctx context.Context, tx database.Tx, cycle *models.ItemSLACycle, workspaceID, itemNumber int, workspaceKey, title, metricName, thresholdKey, eventType string, occurredAt time.Time) error {
+func (e *SLASideEffectEmitter) appendNotification(tx database.Tx, cycle *models.ItemSLACycle, workspaceID, itemNumber int, workspaceKey, title, metricName, thresholdKey, eventType string) error {
 	itemKey := fmt.Sprintf("%s-%d", workspaceKey, itemNumber)
 	notificationEvent := &NotificationEvent{
 		EventType:   eventType,
@@ -126,23 +120,15 @@ func (e *SLASideEffectEmitter) appendNotification(ctx context.Context, tx databa
 	if thresholdKey != "" {
 		notificationEvent.TemplateData["sla.threshold"] = thresholdKey
 	}
-	input, err := actionevents.NewSideEffectEvent(actionevents.SideEffectInput{
-		Payload: notificationEvent, WorkspaceID: &workspaceID,
-		AggregateType: "notification_item", AggregateID: strconv.Itoa(cycle.ItemID),
-		EventType: DurableNotificationRequestedEvent,
-		ActorKind: slaCycleActorKind(cycle), SourceKind: slaCycleSourceKind(cycle),
-	})
-	if err != nil {
-		return fmt.Errorf("encode SLA notification event: %w", err)
+	stager, ok := database.TxEffectsOf(tx).(notificationEventStager)
+	if !ok {
+		return nil
 	}
-	input.OccurredAt = occurredAt
-	if _, err := e.store.Append(ctx, tx, input); err != nil {
-		return fmt.Errorf("append SLA notification event: %w", err)
-	}
+	stager.StageNotificationEvent(notificationEvent)
 	return nil
 }
 
-func (e *SLASideEffectEmitter) appendAction(ctx context.Context, tx database.Tx, cycle *models.ItemSLACycle, workspaceID, itemNumber int, workspaceKey, title, metricName, thresholdKey, trigger string, occurredAt time.Time) error {
+func (e *SLASideEffectEmitter) appendAction(tx database.Tx, cycle *models.ItemSLACycle, workspaceID, itemNumber int, workspaceKey, title, metricName, thresholdKey, trigger string) error {
 	newValues := map[string]any{
 		"metric_id":        cycle.MetricID,
 		"cycle_id":         cycle.ID,
@@ -162,19 +148,11 @@ func (e *SLASideEffectEmitter) appendAction(ctx context.Context, tx database.Tx,
 		ItemID:      cycle.ItemID,
 		NewValues:   newValues,
 	}
-	input, err := actionevents.NewSideEffectEvent(actionevents.SideEffectInput{
-		Payload: actionEvent, WorkspaceID: &workspaceID,
-		AggregateType: "action_item", AggregateID: strconv.Itoa(cycle.ItemID),
-		EventType: DurableActionRequestedEvent,
-		ActorKind: slaCycleActorKind(cycle), SourceKind: slaCycleSourceKind(cycle),
-	})
-	if err != nil {
-		return fmt.Errorf("encode SLA action event: %w", err)
+	stager, ok := database.TxEffectsOf(tx).(actionEventStager)
+	if !ok {
+		return nil
 	}
-	input.OccurredAt = occurredAt
-	if _, err := e.store.Append(ctx, tx, input); err != nil {
-		return fmt.Errorf("append SLA action event: %w", err)
-	}
+	stager.StageActionEvent(actionEvent)
 	return nil
 }
 
@@ -183,20 +161,4 @@ func slaOutcomeLabel(eventType string) string {
 		return "warning"
 	}
 	return "breached"
-}
-
-// slaCycleActorKind and slaCycleSourceKind preserve the cycle's import origin
-// on the side-effect event so an imported SLA can never drive live output.
-func slaCycleActorKind(cycle *models.ItemSLACycle) string {
-	if cycle.Origin == models.SLAOriginImport {
-		return "import"
-	}
-	return "system"
-}
-
-func slaCycleSourceKind(cycle *models.ItemSLACycle) string {
-	if cycle.Origin == models.SLAOriginImport {
-		return "import"
-	}
-	return "sla"
 }

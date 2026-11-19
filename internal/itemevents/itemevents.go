@@ -462,6 +462,9 @@ func (r *Recorder) CreatedBatch(ctx context.Context, tx database.Tx, records []C
 	if err != nil {
 		return nil, err
 	}
+	for _, event := range appended {
+		stageFact(tx, event)
+	}
 	facts := make([]RecordedFact, len(records))
 	for i, record := range records {
 		facts[i] = RecordedFact{
@@ -516,6 +519,9 @@ func (r *Recorder) UpdatedBatch(ctx context.Context, tx database.Tx, records []U
 	appended, err := r.store.AppendBatch(ctx, tx, inputs)
 	if err != nil {
 		return nil, err
+	}
+	for _, event := range appended {
+		stageFact(tx, event)
 	}
 	facts := make([]RecordedFact, len(records))
 	for i, record := range records {
@@ -736,6 +742,7 @@ func (r *Recorder) appendNoObserve(ctx context.Context, tx database.Tx, eventTyp
 	if err != nil {
 		return nil, fmt.Errorf("append %s for item %d: %w", eventType, itemID, err)
 	}
+	stageFact(tx, event)
 	return event, nil
 }
 

@@ -8,8 +8,14 @@ import (
 // SQLiteTx wraps a *sql.Tx for SQLite (no placeholder conversion needed)
 // last review: ser, 210426
 type SQLiteTx struct {
-	tx *sql.Tx
+	tx      *sql.Tx
+	effects TxEffects
 }
+
+// TxEffects returns the accumulator attached to this transaction, or nil.
+func (t *SQLiteTx) TxEffects() TxEffects { return t.effects }
+
+func (t *SQLiteTx) setTxEffects(effects TxEffects) { t.effects = effects }
 
 // NewSQLiteTx creates a new SQLite transaction wrapper
 func NewSQLiteTx(tx *sql.Tx) Tx {
@@ -66,8 +72,14 @@ func (t *SQLiteTx) Rollback() error {
 
 // PostgresTx wraps a *sql.Tx for PostgreSQL with placeholder conversion
 type PostgresTx struct {
-	tx *sql.Tx
+	tx      *sql.Tx
+	effects TxEffects
 }
+
+// TxEffects returns the accumulator attached to this transaction, or nil.
+func (t *PostgresTx) TxEffects() TxEffects { return t.effects }
+
+func (t *PostgresTx) setTxEffects(effects TxEffects) { t.effects = effects }
 
 // NewPostgresTx creates a new PostgreSQL transaction wrapper
 func NewPostgresTx(tx *sql.Tx) Tx {
