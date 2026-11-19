@@ -96,7 +96,13 @@
   }
 
   export function getMarkdown() {
-    return editorInstance?.getMarkdown?.() ?? '';
+    // While the lazy chunk is loading or failed, the inner editor is absent.
+    // Return the current content so an outside-click commit cannot read the
+    // unavailability as an empty document and clear the field.
+    if (editorInstance?.getMarkdown) {
+      return editorInstance.getMarkdown();
+    }
+    return content || '';
   }
 </script>
 

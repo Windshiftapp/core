@@ -508,11 +508,16 @@
     // The editor's markdownUpdated listener is debounced, so read the live
     // document rather than the staged draft to avoid losing the last edit.
     const committed = richtextEditorRef?.getMarkdown?.() ?? draftValue ?? value;
+    const changed = stringifyValue(committed) !== stringifyValue(value);
     if (isSelfEditing) {
-      if (stringifyValue(committed) !== stringifyValue(value)) onChange(committed);
+      if (changed) onChange(committed);
       exitEditing();
       return;
     }
+    // Always-edit form callers (create forms, asset browser, public forms) only
+    // listen to onChange, so publish the live document before submission. The
+    // sidebar still saves through its explicit onCommit.
+    if (changed) onChange(committed);
     draftValue = null;
     onCommit?.(committed);
   }
