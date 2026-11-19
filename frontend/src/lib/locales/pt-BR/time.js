@@ -231,7 +231,7 @@ export default {
     customerOptional: 'Cliente (Opcional)',
     none: 'Nenhum',
     categoryOptional: 'Categoria (Opcional)',
-    hourlyRate: 'Tarifa por Hora (R$)',
+    hourlyRate: 'Tarifa por Hora',
     maxHours: 'Horas Maximas',
     maxHoursPlaceholder: 'Sem limite',
     maxHoursHint: 'Orcamento opcional para relatorios',

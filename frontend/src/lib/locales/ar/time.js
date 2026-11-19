@@ -248,7 +248,7 @@ export default {
     customerOptional: 'العميل (اختياري)',
     none: 'لا شيء',
     categoryOptional: 'الفئة (اختياري)',
-    hourlyRate: 'السعر بالساعة ($)',
+    hourlyRate: 'السعر بالساعة',
     maxHours: 'الحد الأقصى للساعات',
     maxHoursPlaceholder: 'بدون حد',
     maxHoursHint: 'ميزانية اختيارية للتقارير',

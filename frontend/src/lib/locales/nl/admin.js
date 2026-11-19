@@ -93,6 +93,11 @@ export default {
       siteTitle: 'Sitetitel',
       preview: 'Voorbeeld',
       saved: 'Algemene instellingen opgeslagen',
+      regional: 'Regionaal',
+      currency: 'Valuta',
+      currencyDescription:
+        'De valuta die wordt gebruikt om geldbedragen zoals uurtarieven in de tijdregistratie te formatteren.',
+      currencyPreview: 'Voorbeeld: {amount}',
     },
 
     // Admin settings

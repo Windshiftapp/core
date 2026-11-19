@@ -5,20 +5,28 @@
   import Button from '../components/Button.svelte';
   import Panel from '../components/Panel.svelte';
   import TextField from '../components/TextField.svelte';
+  import SelectField from '../components/SelectField.svelte';
+  import DescriptionText from '../components/DescriptionText.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import { generalSettings } from '../api/admin.js';
   import { brandStore } from '../stores/brand.svelte.js';
   import { t } from '../stores/i18n.svelte.js';
   import { successToast, surfaceError } from '../stores/toasts.svelte.js';
+  import { DEFAULT_CURRENCY, currencyOptions, formatMoney } from '../utils/money.js';
 
   let loading = $state(true);
   let saving = $state(false);
   let siteTitle = $state('');
+  let currency = $state(DEFAULT_CURRENCY);
+
+  const currencySelectOptions = $derived(currencyOptions());
+  const currencyPreview = $derived(formatMoney(1234.5, currency));
 
   onMount(async () => {
     try {
       const settings = await generalSettings.get();
       siteTitle = settings.site_title || '';
+      currency = settings.currency || DEFAULT_CURRENCY;
     } catch (err) {
       surfaceError(err, { context: 'loadGeneralSettings' });
     } finally {
@@ -29,8 +37,9 @@
   async function save() {
     saving = true;
     try {
-      const updated = await generalSettings.update({ site_title: siteTitle });
+      const updated = await generalSettings.update({ site_title: siteTitle, currency });
       siteTitle = updated.site_title || '';
+      currency = updated.currency || DEFAULT_CURRENCY;
       await brandStore.reload();
       if (typeof document !== 'undefined') {
         document.title = brandStore.siteTitle;
@@ -87,6 +96,30 @@
             {siteTitle || 'Windshift'}
           </span>
         </div>
+      </div>
+
+      <div class="mt-8 pt-6 border-t border-ds-border">
+        <h2 class="text-base font-semibold mb-1 text-ds-text">
+          {t('settings.generalSettings.regional', 'Regional')}
+        </h2>
+        <p class="text-sm mb-4 text-ds-text-subtle">
+          {t(
+            'settings.generalSettings.currencyDescription',
+            'The currency used to format monetary values such as time-tracking hourly rates.'
+          )}
+        </p>
+
+        <SelectField
+          label={t('settings.generalSettings.currency', 'Currency')}
+          id="general-currency"
+          options={currencySelectOptions}
+          bind:value={currency}
+          dataTestid="general-currency"
+        />
+
+        <DescriptionText as="div">
+          {t('settings.generalSettings.currencyPreview', { amount: currencyPreview })}
+        </DescriptionText>
       </div>
 
       <div class="mt-4 flex justify-end">

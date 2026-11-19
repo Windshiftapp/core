@@ -247,7 +247,7 @@ export default {
     "customerOptional": "고객(선택 사항)",
     "none": "없음",
     "categoryOptional": "카테고리(선택 사항)",
-    "hourlyRate": "시간당 단가($)",
+    "hourlyRate": "시간당 단가",
     "maxHours": "최대 시간",
     "maxHoursPlaceholder": "제한 없음",
     "maxHoursHint": "보고용 예산(선택 사항)",

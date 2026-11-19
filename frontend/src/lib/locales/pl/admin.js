@@ -75,6 +75,11 @@ export default {
       siteTitle: 'Tytuł witryny',
       preview: 'Podgląd',
       saved: 'Ustawienia ogólne zapisane',
+      regional: 'Regionalne',
+      currency: 'Waluta',
+      currencyDescription:
+        'Waluta używana do formatowania kwot, takich jak stawki godzinowe w ewidencji czasu pracy.',
+      currencyPreview: 'Podgląd: {amount}',
     },
 
     // Ustawienia administracyjne

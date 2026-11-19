@@ -3,6 +3,7 @@
   import Label from '../components/Label.svelte';
   import IconSelector from '../pickers/IconSelector.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { brandStore } from '../stores/brand.svelte.js';
   import { isNoCustomer } from '../utils/customerLabel.js';
   import DescriptionText from '../components/DescriptionText.svelte';
 	import TextField from '../components/TextField.svelte';
@@ -86,6 +87,7 @@
   <div class="mt-6">
     <TextField
       label={t('timeProject.hourlyRate')}
+      helper={t('timeProject.hourlyRateHelper', { currency: brandStore.currency })}
       type="number"
       min="0"
       step="0.01"

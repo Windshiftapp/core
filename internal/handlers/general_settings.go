@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	"golang.org/x/text/currency"
+
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -18,6 +20,14 @@ const SiteTitleSettingKey = "site_title"
 
 // DefaultSiteTitle is returned when the site_title setting is absent.
 const DefaultSiteTitle = "Windshift"
+
+// CurrencySettingKey is the system_settings key holding the instance-wide ISO
+// 4217 currency code used to format monetary values such as time-tracking rates.
+const CurrencySettingKey = "currency"
+
+// DefaultCurrency is the ISO 4217 code used when the currency setting is absent
+// or no longer recognized.
+const DefaultCurrency = "USD"
 
 // GeneralSettingsHandler owns instance-wide general configuration. The site
 // title is its first field; the surface is meant to grow.
@@ -35,12 +45,14 @@ func NewGeneralSettingsHandler(settings *repository.SystemSettingRepository, the
 // GeneralSettings is the admin read/write shape for general configuration.
 type GeneralSettings struct {
 	SiteTitle string `json:"site_title"`
+	Currency  string `json:"currency"`
 }
 
 // BrandingResponse is the public, render-facing projection of instance
-// branding. It carries only logos, layout, and the title.
+// branding. It carries only logos, layout, title, and the display currency.
 type BrandingResponse struct {
 	SiteTitle       string `json:"site_title"`
+	Currency        string `json:"currency"`
 	BrandLayout     string `json:"brand_layout"`
 	LogoURL         string `json:"logo_url,omitempty"`
 	LogoURLDark     string `json:"logo_url_dark,omitempty"`
@@ -58,14 +70,35 @@ func (h *GeneralSettingsHandler) siteTitle() string {
 	return DefaultSiteTitle
 }
 
-// GetSettings returns the admin general configuration.
-func (h *GeneralSettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
-	respondJSONOK(w, GeneralSettings{SiteTitle: h.siteTitle()})
+// currency reads the persisted ISO 4217 code, falling back to the default when
+// the setting is absent or no longer recognized.
+func (h *GeneralSettingsHandler) currency() string {
+	if value, ok, err := h.settings.GetValue(CurrencySettingKey); err == nil && ok {
+		if normalized, err := normalizeCurrency(value); err == nil {
+			return normalized
+		}
+	}
+	return DefaultCurrency
 }
 
-// UpdateSettings persists the admin general configuration.
+// normalizeCurrency uppercases and validates an ISO 4217 code.
+func normalizeCurrency(code string) (string, error) {
+	unit, err := currency.ParseISO(strings.TrimSpace(code))
+	if err != nil {
+		return "", err
+	}
+	return unit.String(), nil
+}
+
+// GetSettings returns the admin general configuration.
+func (h *GeneralSettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
+	respondJSONOK(w, GeneralSettings{SiteTitle: h.siteTitle(), Currency: h.currency()})
+}
+
+// UpdateSettings persists the admin general configuration. An omitted currency
+// keeps the stored value; a present currency must be a valid ISO 4217 code.
 func (h *GeneralSettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
-	settings, ok := decodeJSON[GeneralSettings](w, r)
+	settings, fields, ok := decodeJSONWithFields[GeneralSettings](w, r)
 	if !ok {
 		return
 	}
@@ -75,6 +108,19 @@ func (h *GeneralSettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.R
 		settings.SiteTitle = DefaultSiteTitle
 	}
 
+	currentCurrency := h.currency()
+	incomingCurrency := settings.Currency
+	settings.Currency = currentCurrency
+	_, currencyPresent := fields["currency"]
+	if currencyPresent {
+		normalized, err := normalizeCurrency(incomingCurrency)
+		if err != nil {
+			respondValidationError(w, r, "currency must be a valid ISO 4217 code")
+			return
+		}
+		settings.Currency = normalized
+	}
+
 	if err := h.settings.Upsert(
 		SiteTitleSettingKey, settings.SiteTitle,
 		"string", "Instance site title", "branding",
@@ -82,10 +128,23 @@ func (h *GeneralSettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.R
 		respondInternalError(w, r, err)
 		return
 	}
+	if currencyPresent {
+		if err := h.settings.Upsert(
+			CurrencySettingKey, settings.Currency,
+			"string", "Instance currency (ISO 4217)", "branding",
+		); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+	}
 
 	currentUser := utils.GetCurrentUser(r)
 	if currentUser != nil {
-		h.auditor.Log(r, currentUser, logger.ActionGeneralSettingsUpdate, logger.ResourceGeneralSettings, nil, "site_title")
+		resourceName := "site_title"
+		if currencyPresent {
+			resourceName = "site_title,currency"
+		}
+		h.auditor.Log(r, currentUser, logger.ActionGeneralSettingsUpdate, logger.ResourceGeneralSettings, nil, resourceName)
 	}
 	respondJSONOK(w, settings)
 }
@@ -95,6 +154,7 @@ func (h *GeneralSettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.R
 func (h *GeneralSettingsHandler) GetBranding(w http.ResponseWriter, r *http.Request) {
 	response := BrandingResponse{
 		SiteTitle:   h.siteTitle(),
+		Currency:    h.currency(),
 		BrandLayout: models.BrandLayoutMarkText,
 	}
 

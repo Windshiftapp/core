@@ -92,6 +92,11 @@ export default {
         'The product name shown in the browser tab, the sidebar, and on the login and setup screens.',
       siteTitle: 'Site title',
       preview: 'Preview',
+      regional: 'Regional',
+      currency: 'Currency',
+      currencyDescription:
+        'The currency used to format monetary values such as time-tracking hourly rates.',
+      currencyPreview: 'Preview: {amount}',
       saved: 'General settings saved',
     },
 

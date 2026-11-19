@@ -74,6 +74,11 @@ export default {
       siteTitle: 'Seitentitel',
       preview: 'Vorschau',
       saved: 'Allgemeine Einstellungen gespeichert',
+      regional: 'Regionale Einstellungen',
+      currency: 'Währung',
+      currencyDescription:
+        'Die Währung, in der Geldbeträge wie Stundensätze in der Zeiterfassung formatiert werden.',
+      currencyPreview: 'Vorschau: {amount}',
     },
     admin: 'Administration',
     systemSettings: 'Systemeinstellungen',

@@ -74,6 +74,11 @@ export default {
       siteTitle: 'Titre du site',
       preview: 'Aperçu',
       saved: 'Paramètres généraux enregistrés',
+      regional: 'Régional',
+      currency: 'Devise',
+      currencyDescription:
+        'La devise utilisée pour formater les montants monétaires, comme les taux horaires du suivi du temps.',
+      currencyPreview: 'Aperçu : {amount}',
     },
 
     // Admin settings

@@ -23,6 +23,8 @@
   import { customerDisplayName, isNoCustomer } from '../../utils/customerLabel.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
+  import { brandStore } from '../../stores/brand.svelte.js';
+  import { formatHourlyRate } from '../../utils/money.js';
   import { confirm } from '../../composables/useConfirm.js';
 
   let activeTab = $state('projects');
@@ -435,7 +437,7 @@
     {#snippet rate(project)}
       {#if project.hourly_rate > 0}
         <span class="text-sm" style="color: var(--ds-text);">
-          ${project.hourly_rate.toFixed(2)}/hr
+          {formatHourlyRate(project.hourly_rate, brandStore.currency)}
         </span>
       {:else}
         <span class="text-sm" style="color: var(--ds-text-subtle);">-</span>

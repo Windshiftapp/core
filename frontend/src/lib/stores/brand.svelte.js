@@ -1,10 +1,13 @@
 import { branding as brandingApi } from '../api/misc.js';
 import { APP_NAME } from '../constants.js';
+import { DEFAULT_CURRENCY } from '../utils/money.js';
 import { surfaceError } from './toasts.svelte.js';
 
-// Instance branding (site title + active theme logos), hydrated at boot from
-// the public /branding endpoint so it is available before authentication.
+// Instance branding (site title + active theme logos + display currency),
+// hydrated at boot from the public /branding endpoint so it is available
+// before authentication.
 let siteTitle = $state(APP_NAME);
+let currency = $state(DEFAULT_CURRENCY);
 let brandLayout = $state('mark_text');
 let logoURL = $state('');
 let logoURLDark = $state('');
@@ -17,6 +20,7 @@ let loadPromise = null;
 function hydrate(value) {
   if (!value) return;
   siteTitle = value.site_title || APP_NAME;
+  currency = value.currency || DEFAULT_CURRENCY;
   brandLayout = value.brand_layout || 'mark_text';
   logoURL = value.logo_url || '';
   logoURLDark = value.logo_url_dark || '';
@@ -80,6 +84,9 @@ export function resolveBrandLockup(
 export const brandStore = {
   get siteTitle() {
     return siteTitle;
+  },
+  get currency() {
+    return currency;
   },
   get brandLayout() {
     return brandLayout;

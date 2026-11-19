@@ -280,7 +280,7 @@ export default {
     customerOptional: 'Cliente (facoltativo)',
     none: 'Nessuno',
     categoryOptional: 'Categoria (facoltativa)',
-    hourlyRate: 'Tariffa oraria ($)',
+    hourlyRate: 'Tariffa oraria',
     maxHours: 'Ore massime',
     maxHoursPlaceholder: 'Nessun limite',
     maxHoursHint: 'Budget facoltativo per i report',

@@ -12,6 +12,8 @@
   import AlertBox from '../../components/AlertBox.svelte';
   import Label from '../../components/Label.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import { brandStore } from '../../stores/brand.svelte.js';
+  import { currencySymbol } from '../../utils/money.js';
   import DescriptionText from '../../components/DescriptionText.svelte';
 	import TextareaField from '../../components/TextareaField.svelte';
 	import TextField from '../../components/TextField.svelte';
@@ -40,6 +42,9 @@
 
   let createdCustomer = $state(null);
   let createdProject = $state(null);
+
+  // Wider abbreviations such as CHF need more room than a single-glyph symbol.
+  const hourlyRateSymbol = $derived(currencySymbol(brandStore.currency));
 
   async function createCustomer() {
     if (!customerData.name.trim()) {
@@ -283,14 +288,14 @@
             <div>
               <Label for="hourly_rate" class="mb-2">{t('time.projects.hourlyRateOptional')}</Label>
               <div class="relative">
-                <span class="absolute left-3 top-1/2 transform -translate-y-1/2" style="color: var(--ds-text-subtle);">$</span>
+                <span class="absolute left-3 top-1/2 transform -translate-y-1/2" style="color: var(--ds-text-subtle);">{hourlyRateSymbol}</span>
                 <Input
                   id="hourly_rate"
                   type="number"
                   bind:value={projectData.hourly_rate}
                   min="0"
                   step="0.01"
-                  class="pl-8"
+                  class={hourlyRateSymbol.length > 1 ? 'pl-12' : 'pl-8'}
                   size="small"
                   placeholder="0.00"
                 />
