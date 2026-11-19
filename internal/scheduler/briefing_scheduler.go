@@ -27,6 +27,9 @@ import (
 // deliberately modest.
 const briefingConcurrency = 8
 
+// briefingShutdownTimeout bounds how long Stop waits for an in-flight run.
+const briefingShutdownTimeout = 30 * time.Second
+
 const dailyBriefingMaxTokens = 5000
 
 // BriefingScheduler generates daily briefings for all users in the background.
@@ -41,6 +44,7 @@ type BriefingScheduler struct {
 	runRepo         *repository.SchedulerRunRepository
 	ticker          *time.Ticker
 	stopChan        chan struct{}
+	loopWG          sync.WaitGroup
 	mu              sync.RWMutex
 	running         bool
 
@@ -78,15 +82,18 @@ func (bs *BriefingScheduler) Start() {
 	bs.running = true
 	slog.Info("briefing scheduler started", slog.String("component", "scheduler"), slog.String("interval", "6h"))
 
-	go bs.schedulerLoop(bs.ticker, bs.stopChan)
+	bs.loopWG.Add(1)
+	go func() {
+		defer bs.loopWG.Done()
+		bs.schedulerLoop(bs.ticker, bs.stopChan)
+	}()
 }
 
 // Stop stops the briefing scheduler.
 func (bs *BriefingScheduler) Stop() {
 	bs.mu.Lock()
-	defer bs.mu.Unlock()
-
 	if !bs.running {
+		bs.mu.Unlock()
 		return
 	}
 
@@ -96,6 +103,22 @@ func (bs *BriefingScheduler) Stop() {
 		bs.ticker = nil
 	}
 	close(bs.stopChan)
+	bs.mu.Unlock()
+
+	// Join the in-flight run with a bounded wait. Canceling the run context
+	// aborts in-flight LLM calls, so the join is normally prompt.
+	done := make(chan struct{})
+	go func() {
+		bs.loopWG.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(briefingShutdownTimeout):
+		slog.Warn("briefing scheduler shutdown timed out waiting for in-flight generation",
+			slog.String("component", "scheduler"),
+			slog.Duration("timeout", briefingShutdownTimeout))
+	}
 	slog.Info("briefing scheduler stopped", slog.String("component", "scheduler"))
 }
 
@@ -184,39 +207,58 @@ func (bs *BriefingScheduler) generateAllBriefings(stop <-chan struct{}) {
 	// claims a slot before generating and releases it on return. This replaces
 	// the old serial loop + 3s sleep between users, which scaled linearly and
 	// spent most of its wall-clock asleep.
+	// Cancel generation as soon as the scheduler stops so in-flight LLM calls
+	// are aborted instead of running to their own timeout.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		select {
+		case <-stop:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
 	var (
 		wg       sync.WaitGroup
 		failMu   sync.Mutex
 		failures int
 	)
-	sem := make(chan struct{}, briefingConcurrency)
-	for _, u := range users {
+	// A fixed worker pool bounds goroutine admission. The previous version
+	// spawned one goroutine per user before the semaphore, so a large instance
+	// created thousands of blocked goroutines per tick.
+	userCh := make(chan models.User)
+	for i := 0; i < briefingConcurrency; i++ {
 		wg.Add(1)
-		go func(u models.User) {
+		go func() {
 			defer wg.Done()
-			select {
-			case sem <- struct{}{}:
-			case <-stop:
-				// Server shutting down — stop dispatching new work.
-				return
-			}
-			defer func() { <-sem }()
-
-			ok := func() (succeeded bool) {
-				defer func() {
-					if r := recover(); r != nil {
-						slog.Error("panic in briefing generation", slog.Int("user_id", u.ID), slog.Any("panic", r))
-					}
+			for u := range userCh {
+				ok := func() (succeeded bool) {
+					defer func() {
+						if r := recover(); r != nil {
+							slog.Error("panic in briefing generation", slog.Int("user_id", u.ID), slog.Any("panic", r))
+						}
+					}()
+					return bs.generateBriefingForUser(ctx, llmClient, lookups, itemRepo, workspaceRepo, u, regenerate, now)
 				}()
-				return bs.generateBriefingForUser(llmClient, lookups, itemRepo, workspaceRepo, u, regenerate, now)
-			}()
-			if !ok {
-				failMu.Lock()
-				failures++
-				failMu.Unlock()
+				if !ok {
+					failMu.Lock()
+					failures++
+					failMu.Unlock()
+				}
 			}
-		}(u)
+		}()
 	}
+dispatch:
+	for _, u := range users {
+		select {
+		case userCh <- u:
+		case <-stop:
+			// Server shutting down — stop dispatching new work.
+			break dispatch
+		}
+	}
+	close(userCh)
 	wg.Wait()
 
 	// Recovered panics count as failures in the scheduler result.
@@ -227,8 +269,9 @@ func (bs *BriefingScheduler) generateAllBriefings(stop <-chan struct{}) {
 
 // generateBriefingForUser returns false only for generation or storage failure.
 // Shared lookups and the tick time are injected. A leased per-user/day claim
-// deduplicates instances and self-heals after a crashed holder.
-func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, lookups *repository.NameMaps, itemRepo *repository.ItemRepository, workspaceRepo *repository.WorkspaceRepository, u models.User, regenerate bool, nowUTC time.Time) bool {
+// deduplicates instances and self-heals after a crashed holder. ctx is the
+// scheduler run context; canceling it aborts in-flight LLM generation.
+func (bs *BriefingScheduler) generateBriefingForUser(ctx context.Context, llmClient llm.Client, lookups *repository.NameMaps, itemRepo *repository.ItemRepository, workspaceRepo *repository.WorkspaceRepository, u models.User, regenerate bool, nowUTC time.Time) bool {
 	userID := u.ID
 	firstName := u.FirstName
 	// Compute briefing boundaries in the user's timezone, not the server's.
@@ -406,10 +449,10 @@ func (bs *BriefingScheduler) generateBriefingForUser(llmClient llm.Client, looku
 	userPrompt := fmt.Sprintf("Good morning %s! Today is %s (%s timezone).\n\nHere is your project data:\n\n%s",
 		firstName, nowLocal.Format("Monday, January 2, 2006"), timezone, strings.Join(contextParts, "\n\n"))
 
-	ctx, cancel := context.WithTimeout(context.Background(), llm.DefaultRequestTimeout)
+	llmCtx, cancel := context.WithTimeout(ctx, llm.DefaultRequestTimeout)
 	defer cancel()
 
-	resp, err := llmClient.Complete(ctx, dailyBriefingCompletionRequest(systemPrompt, userPrompt))
+	resp, err := llmClient.Complete(llmCtx, dailyBriefingCompletionRequest(systemPrompt, userPrompt))
 
 	durationMs := time.Since(start).Milliseconds()
 
