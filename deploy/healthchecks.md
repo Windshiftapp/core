@@ -2,7 +2,9 @@
 
 Run `windshift healthcheck` to probe the internal listener's `/readyz` endpoint.
 The command exits successfully only when the endpoint returns HTTP 200; an
-unready database or attachment backend makes it fail.
+unready database makes it fail. Unreachable attachment storage (for example an
+S3 outage) is reported as `degraded` but keeps `/readyz` at HTTP 200, so the
+instance stays in rotation and can still serve requests.
 
 The default target is `http://127.0.0.1:${PORT:-8080}/readyz`. Set
 `WINDSHIFT_CONTEXT_PATH` for prefixed deployments; for example, `/windshift`

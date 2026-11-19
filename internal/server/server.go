@@ -723,8 +723,8 @@ func (s *Server) initialize() error {
 	} else {
 		slog.Info("attachments disabled (no attachment path specified)")
 	}
-	// Readiness (/readyz) reports attachment reachability; liveness (/healthz)
-	// intentionally does not depend on it.
+	// Readiness (/readyz) reports attachment reachability as degraded without
+	// failing; liveness (/healthz) intentionally does not depend on it.
 	healthHandler.SetAttachmentProbe(attachmentStorage)
 	// Item deletion removes attachment blobs through the configured backend.
 	services.SetItemAttachmentBlobRemover(attachmentStorage)

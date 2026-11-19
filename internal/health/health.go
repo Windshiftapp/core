@@ -19,9 +19,10 @@ type Pinger interface {
 	PingContext(context.Context) error
 }
 
-// AttachmentProbe is the attachment-storage capability required by the
-// readiness probe. Disabled storage is reported as healthy. Implementations own
-// the short-lived result cache.
+// AttachmentProbe is the attachment-storage capability reported by the
+// readiness probe. Disabled storage is reported as healthy, and an unreachable
+// backend is reported as degraded without failing the probe. Implementations
+// own the short-lived result cache.
 type AttachmentProbe interface {
 	Enabled() bool
 	CachedHealthCheck(context.Context) error
@@ -79,11 +80,13 @@ func (h *Handler) Liveness(w http.ResponseWriter, _ *http.Request) {
 }
 
 // Readiness reports whether the application can reach its database and
-// attachment storage. A failure here removes the replica from traffic without
-// restarting it.
+// attachment storage. The database is the only hard dependency: a failure
+// there removes the replica from traffic. Attachment storage (for example an
+// S3 outage) degrades the response instead, because the instance can still
+// serve requests without it.
 //
 // @Summary      Check server readiness
-// @Description  Reports whether Windshift can serve requests, reach its database, and reach attachment storage. Public; no authentication required.
+// @Description  Reports whether Windshift can serve requests and reach its database. Attachment storage is reported as `degraded` rather than failing the probe when it is unreachable. Public; no authentication required.
 // @Tags         operations
 // @Produce      json
 // @Success      200  {object}  readinessResponse
@@ -104,13 +107,13 @@ func (h *Handler) Readiness(w http.ResponseWriter, r *http.Request) {
 	}
 
 	attachmentStatus, attachmentOK := h.attachmentStatus(ctx)
+	status := "ready"
 	if !attachmentOK {
-		writeUnavailable(w, "ok", attachmentStatus)
-		return
+		status = "degraded"
 	}
 
 	writeJSON(w, http.StatusOK, readinessResponse{
-		Status:      "ready",
+		Status:      status,
 		Database:    "ok",
 		Attachments: attachmentStatus,
 	})
@@ -128,7 +131,7 @@ func (h *Handler) attachmentStatus(ctx context.Context) (string, bool) {
 		return "disabled", true
 	}
 	if err := probe.CachedHealthCheck(ctx); err != nil {
-		return "unavailable", false
+		return "degraded", false
 	}
 	return "ok", true
 }

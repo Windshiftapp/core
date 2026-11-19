@@ -14044,7 +14044,7 @@
     },
     "/readyz": {
       "get": {
-        "description": "Reports whether Windshift can serve requests, reach its database, and reach attachment storage. Public; no authentication required.",
+        "description": "Reports whether Windshift can serve requests and reach its database. Attachment storage is reported as `degraded` rather than failing the probe when it is unreachable. Public; no authentication required.",
         "responses": {
           "200": {
             "content": {

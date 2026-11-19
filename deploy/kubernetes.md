@@ -96,7 +96,9 @@ The Deployment uses the server's built-in endpoints:
 - liveness: `GET /healthz`
 - readiness and startup: `GET /readyz`
 
-Both are public and honor `WINDSHIFT_CONTEXT_PATH`.
+Both are public and honor `WINDSHIFT_CONTEXT_PATH`. Readiness returns HTTP 200
+while attachment storage is unreachable and marks the response `degraded`; only
+the database fails the probe.
 
 ### PostgreSQL
 
