@@ -97,12 +97,14 @@
 
   const canManage = $derived($permissionStore.userPermissionKeys?.has('customers.manage') || $isSystemAdmin);
 
-  let customerCounts = $derived(
-    customerOrganisations.reduce((acc, org) => {
-      acc[org.id] = portalCustomers.filter(c => c.customer_organisation_id === org.id).length;
-      return acc;
-    }, {})
-  );
+  let customerCounts = $derived.by(() => {
+    const counts = {};
+    for (const customer of portalCustomers) {
+      const orgId = customer.customer_organisation_id;
+      if (orgId) counts[orgId] = (counts[orgId] || 0) + 1;
+    }
+    return counts;
+  });
 
   let selectedOrg = $derived(
     selectedOrgId !== null ? customerOrganisations.find(o => o.id === selectedOrgId) : null
@@ -192,7 +194,13 @@
   async function handleCustomerDrop(customerId, targetOrgId) {
     try {
       await portalCustomersApi.updateOrganisation(customerId, targetOrgId);
-      await loadPortalCustomers();
+      // Patch the moved customer in place; a full directory reload is wasteful
+      // and can drop the current search/page position (WI-2122).
+      portalCustomers = portalCustomers.map((customer) =>
+        customer.id === customerId
+          ? { ...customer, customer_organisation_id: targetOrgId }
+          : customer
+      );
     } catch (err) {
       console.error('Failed to update customer organisation:', err);
       errorToast(t('workspaces.customers.failedToAssignCustomer'));
