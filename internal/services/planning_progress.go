@@ -2,11 +2,11 @@ package services
 
 import (
 	"cmp"
+	"context"
 	"fmt"
 	"slices"
 	"strings"
 
-	"windshift/internal/models"
 	"windshift/internal/repository"
 )
 
@@ -80,43 +80,34 @@ func (s *PlanningService) buildProgressReport(filters repository.ItemFilters, wo
 		return acc, nil
 	}
 
-	statuses, err := s.statuses.List()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list statuses: %w", err)
-	}
-	statusByID := make(map[int]models.Status, len(statuses))
-	for _, st := range statuses {
-		statusByID[st.ID] = st
-	}
-
 	breakdownMap := make(map[string]*StatusBreakdown)
 
-	for offset := 0; ; offset += progressPageSize {
-		items, total, err := s.items.FindAllWithDetails(repository.ItemListParams{
+	// Keyset pages over a report-specific narrow read: no count query, no OFFSET
+	// rescan, and no description/custom-field/calendar payload.
+	var afterNumber, afterID int
+	for {
+		rows, more, err := s.items.ListProgressItems(context.Background(), repository.ItemListParams{
 			WorkspaceIDs: workspaceIDs,
 			Filters:      filters,
-			Pagination:   repository.PaginationParams{Limit: progressPageSize, Offset: offset},
-			SortBy:       "key",
-			SortAsc:      true,
-		})
+		}, afterNumber, afterID, progressPageSize)
 		if err != nil {
 			return nil, fmt.Errorf("failed to query progress items: %w", err)
 		}
 
-		for _, item := range items {
+		for _, item := range rows {
 			categoryName := "No Status"
 			categoryBuiltinKey := ""
 			categoryColor := "#9ca3af"
 			statusColor := ""
 			isCompleted := false
-			if item.StatusID != nil {
-				if st, ok := statusByID[*item.StatusID]; ok {
-					categoryName = st.CategoryName
-					categoryBuiltinKey = st.CategoryBuiltinKey
-					categoryColor = st.CategoryColor
-					statusColor = st.CategoryColor
-					isCompleted = st.IsCompleted
-				}
+			if item.CategoryName.Valid {
+				categoryName = item.CategoryName.String
+				categoryBuiltinKey = item.CategoryBuiltinKey
+				categoryColor = item.CategoryColor
+				isCompleted = item.IsCompleted.Valid && item.IsCompleted.Bool
+			}
+			if item.StatusID != nil && item.CategoryName.Valid {
+				statusColor = categoryColor
 			}
 
 			if _, exists := breakdownMap[categoryName]; !exists {
@@ -135,14 +126,14 @@ func (s *PlanningService) buildProgressReport(filters repository.ItemFilters, wo
 				WorkspaceID:        item.WorkspaceID,
 				WorkspaceKey:       item.WorkspaceKey,
 				ItemNumber:         item.WorkspaceItemNumber,
-				StatusName:         item.StatusName,
+				StatusName:         item.StatusName.String,
 				StatusBuiltinKey:   item.StatusBuiltinKey,
 				StatusColor:        statusColor,
-				PriorityName:       item.PriorityName,
+				PriorityName:       item.PriorityName.String,
 				PriorityBuiltinKey: item.PriorityBuiltinKey,
 				PriorityColor:      item.PriorityColor,
-				AssigneeName:       item.AssigneeName,
-				AssigneeAvatar:     item.AssigneeAvatar,
+				AssigneeName:       item.AssigneeName.String,
+				AssigneeAvatar:     item.AssigneeAvatar.String,
 			})
 			acc.TotalItems++
 			if isCompleted {
@@ -150,9 +141,12 @@ func (s *PlanningService) buildProgressReport(filters repository.ItemFilters, wo
 			}
 		}
 
-		if len(items) == 0 || offset+len(items) >= total {
+		if !more || len(rows) == 0 {
 			break
 		}
+		last := rows[len(rows)-1]
+		afterNumber = last.WorkspaceItemNumber
+		afterID = last.ID
 	}
 
 	acc.StatusBreakdown = make([]StatusBreakdown, 0, len(breakdownMap))
