@@ -274,6 +274,8 @@ export default {
     categoryOptional: 'Catégorie (facultative)',
     hourlyRate: 'Taux horaire',
     hourlyRateHelper: 'Les montants sont affichés en {currency}.',
+    currency: 'Devise',
+    currencyInherit: "Par défaut de l'instance ({currency})",
     maxHours: 'Heures max',
     maxHoursPlaceholder: 'Aucune limite',
     maxHoursHint: 'Budget optionnel pour les rapports',

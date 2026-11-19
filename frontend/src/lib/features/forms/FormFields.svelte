@@ -65,7 +65,7 @@
     </div>
   {/if}
 
-  {#each currentStepFields.filter((field) => field.field_type === 'custom') as field}
+  {#each currentStepFields.filter((field) => field.field_type === 'custom') as field (field.field_identifier)}
     {@const fieldDefinition = getCustomFieldDefinition(field.field_identifier)}
     {#if fieldDefinition}
       <div>

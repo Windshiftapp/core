@@ -17,6 +17,7 @@
   import ChevronDownCircle from '@lucide/svelte/icons/chevron-down-circle';
   import ListChecks from '@lucide/svelte/icons/list-checks';
   import Hash from '@lucide/svelte/icons/hash';
+  import Banknote from '@lucide/svelte/icons/banknote';
   import Calendar from '@lucide/svelte/icons/calendar';
   import User from '@lucide/svelte/icons/user';
   import Repeat from '@lucide/svelte/icons/repeat';
@@ -51,6 +52,7 @@
   import DescriptionText from '../components/DescriptionText.svelte';
   import { customFieldFormData, customFieldUpdatePayload, linkingFieldOptions, loadCustomFieldsOverview } from './customFieldsData.js';
   import { BOOLEAN_CUSTOM_FIELD_TYPE, canonicalCustomFieldType, isBooleanCustomFieldType } from '../utils/customFieldTypes.js';
+  import { currencyOptions } from '../utils/money.js';
 	import TextField from '../components/TextField.svelte';
 	import SelectField from '../components/SelectField.svelte';
 	import TextareaField from '../components/TextareaField.svelte';
@@ -100,6 +102,7 @@
     { value: 'select', label: 'Single Select', icon: ChevronDownCircle, iconColor: '#E8853D' },
     { value: 'multiselect', label: 'Multi Select', icon: ListChecks, iconColor: '#D46B2F' },
     { value: 'number', label: 'Number', icon: Hash, iconColor: '#4CAF7D' },
+    { value: 'money', label: 'Money', icon: Banknote, iconColor: '#2F9E8F' },
     { value: 'date', label: 'Date', icon: Calendar, iconColor: '#9B6DB7' },
     { value: 'user', label: 'User', icon: User, iconColor: '#5BA4C9' },
     { value: 'multi_user', label: 'Multi User', icon: User, iconColor: '#4D9DC5' },
@@ -124,6 +127,9 @@
   let assetQlQuery = $state('');
   let assetMulti = $state(false);
   let assetSets = $state([]);
+
+  // Money field configuration: '' accepts a per-value currency.
+  let moneyCurrency = $state('');
 
   // Linking field configuration
   let linkingLinkTypeId = $state(null);
@@ -255,6 +261,18 @@
       assetMulti = false;
     }
 
+    // Parse money field config
+    if (field.field_type === 'money' && field.options) {
+      try {
+        const config = fieldOptionsObject(field.options);
+        moneyCurrency = typeof config.currency === 'string' ? config.currency : '';
+      } catch (e) {
+        moneyCurrency = '';
+      }
+    } else {
+      moneyCurrency = '';
+    }
+
     // Parse linking field config
     if (field.field_type === 'linking' && field.options) {
       try {
@@ -294,6 +312,7 @@
     assetSetId = null;
     assetQlQuery = '';
     assetMulti = false;
+    moneyCurrency = '';
     indexedItems = false;
     indexedAssets = false;
     linkingLinkTypeId = null;
@@ -416,6 +435,9 @@
         });
       } else if (formData.field_type === 'linking') {
         data.options = JSON.stringify(processedConfig.linkingOptions);
+      } else if (formData.field_type === 'money') {
+        // An empty options string means the field accepts per-value currencies.
+        data.options = moneyCurrency ? JSON.stringify({ currency: moneyCurrency }) : '';
       }
 
       let saveResult = null;
@@ -498,6 +520,7 @@
   const isMilestoneField = $derived(formData.field_type === 'milestone' || formData.field_type === 'multi_milestone');
   const isDateField = $derived(formData.field_type === 'date');
   const isAssetField = $derived(formData.field_type === 'asset');
+  const isMoneyField = $derived(formData.field_type === 'money');
   const isPortalCustomerField = $derived(formData.field_type === 'portalcustomer');
   const isCustomerOrganisationField = $derived(formData.field_type === 'customerorganisation');
   const isLinkingField = $derived(formData.field_type === 'linking');
@@ -916,6 +939,23 @@
           <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
             Optional: Filter assets shown to users. Leave empty to show all assets in the set.
           </p>
+        </div>
+      {/if}
+
+      {#if isMoneyField}
+        <div class="mt-6">
+          <SelectField
+            label={"Currency"}
+            id="money-currency"
+            options={[
+              { value: '', label: 'Any currency (chosen per value)' },
+              ...currencyOptions()
+            ]}
+            bind:value={moneyCurrency}
+          />
+          <DescriptionText>
+            Pin the field to one currency, or let each value choose. Amounts render with their own currency, so money fields work on items, assets, and customer records alike.
+          </DescriptionText>
         </div>
       {/if}
 

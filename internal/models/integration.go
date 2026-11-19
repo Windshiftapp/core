@@ -324,14 +324,17 @@ type TimeProjectCategory struct {
 
 // TimeProject represents a time tracking project
 type TimeProject struct {
-	ID           int            `json:"id"`
-	CustomerID   *int           `json:"customer_id,omitempty"` // Now optional
-	CategoryID   *int           `json:"category_id,omitempty"` // Link to project category
-	Name         string         `json:"name"`
-	Description  string         `json:"description"`
-	Status       string         `json:"status"` // Active, On Hold, Completed, Archived
-	Color        string         `json:"color,omitempty"`
-	HourlyRate   float64        `json:"hourly_rate"`
+	ID          int     `json:"id"`
+	CustomerID  *int    `json:"customer_id,omitempty"` // Now optional
+	CategoryID  *int    `json:"category_id,omitempty"` // Link to project category
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Status      string  `json:"status"` // Active, On Hold, Completed, Archived
+	Color       string  `json:"color,omitempty"`
+	HourlyRate  float64 `json:"hourly_rate"`
+	// Currency is the ISO 4217 code for HourlyRate. Empty inherits the
+	// instance-wide currency setting.
+	Currency     string         `json:"currency,omitempty"`
 	Settings     map[string]any `json:"settings,omitempty"` // Flexible JSON attributes (e.g., max_hours)
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`

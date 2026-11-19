@@ -60,7 +60,7 @@ func (h *TimeProjectHandler) GetByCustomer(w http.ResponseWriter, r *http.Reques
 		projects[i] = models.TimeProject{
 			ID: detail.ID, CustomerID: detail.CustomerID, CategoryID: detail.CategoryID,
 			Name: detail.Name, Description: detail.Description, Status: detail.Status,
-			Color: detail.Color, HourlyRate: detail.HourlyRate, Settings: detail.Settings,
+			Color: detail.Color, HourlyRate: detail.HourlyRate, Currency: detail.Currency, Settings: detail.Settings,
 			CreatedAt: detail.CreatedAt, UpdatedAt: detail.UpdatedAt, CustomerName: detail.CustomerName,
 			CustomerBuiltinKey: detail.CustomerBuiltinKey,
 			CategoryName:       detail.CategoryName, CategoryColor: detail.CategoryColor, TotalHours: detail.TotalHours,

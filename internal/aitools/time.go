@@ -27,6 +27,7 @@ type timeProjectDTO struct {
 	CustomerName string  `json:"customer_name,omitempty"`
 	CategoryName string  `json:"category_name,omitempty"`
 	HourlyRate   float64 `json:"hourly_rate,omitempty"`
+	Currency     string  `json:"currency,omitempty"`
 }
 
 type listTimeProjectsOut struct {
@@ -190,6 +191,7 @@ func init() {
 					ID: project.ID, Name: project.Name, Status: project.Status,
 					Description: project.Description, CustomerName: project.CustomerName,
 					CategoryName: project.CategoryName, HourlyRate: project.HourlyRate,
+					Currency: project.Currency,
 				})
 			}
 			return out, nil

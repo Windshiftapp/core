@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS time_projects (
 	status TEXT DEFAULT 'Active',
 	color TEXT,
 	hourly_rate REAL DEFAULT 0,
+	-- ISO 4217 code for hourly_rate; empty means "use the instance currency".
+	currency TEXT NOT NULL DEFAULT '',
 	settings TEXT,
 	active BOOLEAN DEFAULT TRUE,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

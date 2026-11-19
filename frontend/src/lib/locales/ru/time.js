@@ -289,6 +289,8 @@ export default {
     categoryOptional: 'Категория (необязательно)',
     hourlyRate: 'Почасовая ставка',
     hourlyRateHelper: 'Суммы отображаются в {currency}.',
+    currency: 'Валюта',
+    currencyInherit: 'По умолчанию экземпляра ({currency})',
     maxHours: 'Максимум часов',
     maxHoursPlaceholder: 'Без ограничения',
     maxHoursHint: 'Необязательный лимит времени для отчётов',

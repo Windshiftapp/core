@@ -299,6 +299,8 @@ export default {
     categoryOptional: 'Kategoria (opcjonalnie)',
     hourlyRate: 'Stawka godzinowa',
     hourlyRateHelper: 'Kwoty są wyświetlane w {currency}.',
+    currency: 'Waluta',
+    currencyInherit: 'Domyślna instancji ({currency})',
     maxHours: 'Maksymalna liczba godzin',
     maxHoursPlaceholder: 'Bez limitu',
     maxHoursHint: 'Opcjonalny budżet do raportowania',

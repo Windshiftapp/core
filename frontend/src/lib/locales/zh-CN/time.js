@@ -238,6 +238,8 @@ export default {
     categoryOptional: '分类（可选）',
     hourlyRate: '时薪',
     hourlyRateHelper: '金额以 {currency} 显示。',
+    currency: '货币',
+    currencyInherit: '实例默认（{currency}）',
     maxHours: '最大工时',
     maxHoursPlaceholder: '无限制',
     maxHoursHint: '用于报告的可选预算',

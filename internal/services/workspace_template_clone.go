@@ -662,6 +662,12 @@ func acceptTemplateCustomFieldValue(def repository.TemplateCustomFieldDef, value
 	case "number":
 		n, ok := value.(float64)
 		return n, ok
+	case "money":
+		normalized, err := validation.NormalizeMoneyValue("money", def.Options, value)
+		if err != nil || normalized == nil {
+			return nil, false
+		}
+		return normalized, true
 	case models.CustomFieldTypeBoolean, models.CustomFieldTypeCheckbox:
 		b, ok := value.(bool)
 		return b, ok

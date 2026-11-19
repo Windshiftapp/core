@@ -10,6 +10,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/money"
 	"windshift/internal/sanitize"
 )
 
@@ -57,6 +58,12 @@ func ValidateAndNormalizeCustomFieldValues(db database.Database, cfv map[string]
 			cfv[fieldKey] = sanitizeTextValue(def.FieldType, raw)
 		case "number":
 			normalized, err := normalizeNumberValue(fieldKey, raw)
+			if err != nil {
+				return err
+			}
+			cfv[fieldKey] = normalized
+		case "money":
+			normalized, err := NormalizeMoneyValue(fieldKey, def.Options, raw)
 			if err != nil {
 				return err
 			}
@@ -184,6 +191,103 @@ func ensureMilestonesExist(db database.Database, fieldKey string, ids []int) err
 		}
 	}
 	return nil
+}
+
+// moneyFieldOptions is the stored configuration for a money custom field. An
+// empty currency lets each value carry its own code.
+type moneyFieldOptions struct {
+	Currency string `json:"currency"`
+}
+
+// NormalizeMoneyValue validates a money custom-field value into
+// {"amount": float64, "currency": "XXX"}. Empty values normalize to nil. A
+// pinned field accepts an omitted or matching currency and rejects a different
+// one; an unpinned field requires a valid ISO 4217 code.
+func NormalizeMoneyValue(fieldKey, optionsJSON string, raw any) (any, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	if s, ok := raw.(string); ok && strings.TrimSpace(s) == "" {
+		return nil, nil
+	}
+	obj, ok := raw.(map[string]any)
+	if !ok {
+		return nil, &ValidationError{
+			Field:   "custom_field_values." + fieldKey,
+			Message: fmt.Sprintf("money value must be an object with amount and currency, got %T", raw),
+		}
+	}
+
+	pinned, err := moneyFieldPinnedCurrency(fieldKey, optionsJSON)
+	if err != nil {
+		return nil, err
+	}
+	amount, err := normalizeNumberValue(fieldKey, obj["amount"])
+	if err != nil {
+		return nil, err
+	}
+	if amount == nil {
+		return nil, nil
+	}
+
+	currency := ""
+	if rawCurrency, ok := obj["currency"]; ok && rawCurrency != nil {
+		if s, ok := rawCurrency.(string); ok {
+			currency = strings.TrimSpace(s)
+		}
+	}
+	switch {
+	case pinned != "":
+		if currency != "" && !strings.EqualFold(currency, pinned) {
+			return nil, &ValidationError{
+				Field:   "custom_field_values." + fieldKey,
+				Message: fmt.Sprintf("currency must be %s for this field", pinned),
+			}
+		}
+		currency = pinned
+	case currency == "":
+		return nil, &ValidationError{
+			Field:   "custom_field_values." + fieldKey,
+			Message: "money value requires a currency",
+		}
+	}
+
+	normalized, err := money.Normalize(currency)
+	if err != nil {
+		return nil, &ValidationError{
+			Field:   "custom_field_values." + fieldKey,
+			Message: "currency must be a valid ISO 4217 code",
+		}
+	}
+	return map[string]any{"amount": amount, "currency": normalized}, nil
+}
+
+// moneyFieldPinnedCurrency returns the currency a money field is pinned to, or
+// "" when it accepts a per-value currency. Malformed options are a validation
+// error so a broken definition cannot silently accept any currency.
+func moneyFieldPinnedCurrency(fieldKey, optionsJSON string) (string, error) {
+	if strings.TrimSpace(optionsJSON) == "" {
+		return "", nil
+	}
+	var opts moneyFieldOptions
+	if err := json.Unmarshal([]byte(optionsJSON), &opts); err != nil {
+		return "", &ValidationError{
+			Field:   "custom_field_values." + fieldKey,
+			Message: "money field options are invalid",
+		}
+	}
+	code := strings.TrimSpace(opts.Currency)
+	if code == "" {
+		return "", nil
+	}
+	normalized, err := money.Normalize(code)
+	if err != nil {
+		return "", &ValidationError{
+			Field:   "custom_field_values." + fieldKey,
+			Message: "money field currency must be a valid ISO 4217 code",
+		}
+	}
+	return normalized, nil
 }
 
 func normalizeNumberValue(fieldKey string, raw any) (any, error) {
