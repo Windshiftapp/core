@@ -3,13 +3,14 @@
     header,
     body,
     footer,
+    maxWidth = 'max-w-lg',
     class: className = '',
     dataTestid = undefined,
   } = $props();
 </script>
 
 <div
-  class="mx-4 mb-8 flex w-full max-w-lg flex-col rounded-lg shadow-2xl {className}"
+  class="mx-4 mb-8 flex w-full {maxWidth} flex-col rounded-lg shadow-2xl {className}"
   style="background-color: var(--ds-surface-raised);"
   data-testid={dataTestid}
 >

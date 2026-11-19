@@ -6,6 +6,7 @@
   import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { shouldNavigateAfterCreate } from '../stores/navigationConfig.svelte.js';
   import { workItemFormStore } from '../stores/workItemFormStore.svelte.js';
+  import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
   import { permissionStore, isSystemAdmin } from '../stores/permissions.svelte.js';
   import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import { packs as packsApi } from '../api/packs.js';
@@ -28,7 +29,7 @@
   import CreateFormFrame from '../forms/CreateFormFrame.svelte';
   import ChipPicker from '../pickers/ChipPicker.svelte';
   import { getShortcut, matchesShortcut, getDisplayString } from '../utils/keyboardShortcuts.js';
-  import { errorToast } from '../stores/toasts.svelte.js';
+  import { errorToast, surfaceError } from '../stores/toasts.svelte.js';
   import { showCreatedItemToast } from '../utils/createdItemToast.js';
   import { runWithConcurrency } from '../utils/concurrency.js';
 
@@ -77,7 +78,7 @@
 
   let {
     isOpen = $bindable(false),
-    compactMode = false,
+    lockedType = null,
     initialType = 'work-item',
     initialWorkspaceId = null,
     initialParentContext = null,
@@ -87,7 +88,7 @@
   } = $props();
 
   // svelte-ignore state_referenced_locally
-  let selectedType = $state(initialType);
+  let selectedType = $state(lockedType || initialType);
 
   // Set once item creation commits so a failed post-create step can be retried
   // without creating a duplicate.
@@ -140,11 +141,58 @@
   let parentSearchTimer;
   let parentSearchController;
   let pickedParent = $state(null);
+  // Workspace-bound item types for the candidate filter: only parents whose
+  // children this workspace's configuration set actually binds are offered.
+  let parentCandidateTypes = $state([]);
+  const parentCandidateTypesByWorkspace = new Map();
   let parentItems = $derived([
     { id: NO_PARENT, title: t('createModal.noParentOption') },
     ...(pickedParent && !parentSearchResults.some((r) => r.id === pickedParent.id) ? [pickedParent] : []),
     ...parentSearchResults
   ]);
+
+  // A candidate's own type is read from the global catalog so its hierarchy
+  // level is known even when the workspace does not bind it; its child
+  // candidates always come from the workspace-bound set.
+  function parentTypeOf(item, catalog = workItemFormStore.itemTypes) {
+    return catalog.find((ty) => ty.id === item.item_type_id);
+  }
+
+  async function loadParentCandidateTypes(workspaceId) {
+    const id = Number(workspaceId);
+    if (!Number.isInteger(id) || id <= 0) {
+      parentCandidateTypes = [];
+      return;
+    }
+    if (parentCandidateTypesByWorkspace.has(id)) {
+      parentCandidateTypes = parentCandidateTypesByWorkspace.get(id);
+      return;
+    }
+    try {
+      const snapshot = await workspaceDataStore.getReferenceSnapshot(id);
+      const types = snapshot?.item_types ?? [];
+      parentCandidateTypesByWorkspace.set(id, types);
+      if (Number(workItemFormStore.formData.workspace_id) === id) parentCandidateTypes = types;
+    } catch (error) {
+      // Keep the picker usable when the workspace reference read fails.
+      surfaceError(error, { silent: true, context: 'loadParentCandidateTypes' });
+      if (Number(workItemFormStore.formData.workspace_id) === id) {
+        parentCandidateTypes = workItemFormStore.itemTypes;
+      }
+    }
+  }
+
+  // Re-resolve the bound types whenever the target workspace changes.
+  $effect(() => {
+    const workspaceId = workItemFormStore.formData.workspace_id;
+    if (!workspaceId) {
+      parentCandidateTypes = [];
+      return;
+    }
+    // The loader reads the shared store's state; keep that out of this effect's
+    // dependencies so only the target workspace re-triggers a load.
+    untrack(() => void loadParentCandidateTypes(workspaceId));
+  });
 
   function resetParentSearch() {
     clearTimeout(parentSearchTimer);
@@ -155,9 +203,11 @@
   function onParentSearchChange(query) {
     resetParentSearch();
     const workspaceId = workItemFormStore.formData.workspace_id;
-    // Read synchronously so the picker re-queries once item types finish loading.
-    const types = workItemFormStore.itemTypes;
-    if (!workspaceId || !types.length) return;
+    // Read both synchronously so the picker re-queries once the bound types and
+    // the global catalog finish loading.
+    const types = parentCandidateTypes;
+    const catalog = workItemFormStore.itemTypes;
+    if (!workspaceId || !types.length || !catalog.length) return;
     // Short or empty input browses the workspace's open items instead of searching.
     const browsing = query.trim().length < 2;
     const params = browsing ? { ql: 'statusCompleted = false', limit: 50 } : { query, limit: 20 };
@@ -168,7 +218,7 @@
         const results = await search.items({ ...params, workspaceIds: [workspaceId], signal: controller.signal });
         if (controller.signal.aborted) return;
         parentSearchResults = (results || [])
-          .filter((r) => canHaveChildren(types, types.find((ty) => ty.id === r.item_type_id)))
+          .filter((r) => canHaveChildren(types, parentTypeOf(r, catalog)))
           .slice(0, browsing ? 50 : 10);
       } catch (error) {
         if (!controller.signal.aborted) errorToast(error?.message || String(error));
@@ -181,12 +231,11 @@
       clearPickedParent();
       return;
     }
-    const type = workItemFormStore.itemTypes.find((ty) => ty.id === item.item_type_id);
     pickedParent = item;
     parentPickedHere = true;
     workItemFormStore.setParentItem(
       { id: item.id, title: item.title },
-      childItemTypesForParent(workItemFormStore.itemTypes, type)
+      childItemTypesForParent(parentCandidateTypes, parentTypeOf(item))
     );
   }
 
@@ -238,7 +287,7 @@
 
   function close() {
     isOpen = false;
-    selectedType = initialType;
+    selectedType = lockedType || initialType;
     recoverableItemId = null;
     parentPickedHere = false;
     pickedParent = null;
@@ -514,9 +563,10 @@
     }
   });
 
-  // Sync selectedType when initialType prop changes (e.g. before modal opens)
+  // Sync selectedType when the opening type changes (e.g. before modal opens).
+  // A locked type always wins so the pinned surface cannot drift.
   $effect(() => {
-    selectedType = initialType;
+    selectedType = lockedType || initialType;
   });
 
   // Apply opening context without overwriting later workspace selections.
@@ -540,10 +590,11 @@
     }
   });
 
-  // Force work-item type when compact mode is enabled
+  // A locked type pins the modal to a single object type. The type switcher
+  // and parent picker stay hidden so the surface stays minimal.
   $effect(() => {
-    if (compactMode && selectedType !== 'work-item') {
-      selectedType = 'work-item';
+    if (lockedType && selectedType !== lockedType) {
+      selectedType = lockedType;
     }
   });
 
@@ -607,10 +658,10 @@
 
 <!-- shortcut-guard-exempt: Cmd+Enter is dispatched by the active overlay through onKeydown. -->
 <ModalBackdrop bind:show={isOpen} onKeydown={handleKeydown} initialFocus='input:not([type="hidden"]):not([tabindex="-1"])' opacity={0.4} align="top" paddingTop="pt-16" scrollable zIndex={60} closeOnClick={false} onclose={close}>
-    <CreateFormFrame dataTestid="create-modal">
+    <CreateFormFrame dataTestid="create-modal" maxWidth="max-w-xl">
       {#snippet header()}
         <!-- Type Selector FIRST (independent of workspace) -->
-        {#if (!workItemFormStore.parentItem || parentPickedHere) && !compactMode}
+        {#if (!workItemFormStore.parentItem || parentPickedHere) && !lockedType}
           <ChipPicker
             value={selectedType}
             items={typeOptions}
@@ -677,7 +728,7 @@
           <ChevronRight size={14} style="color: var(--ds-text-subtle);" />
         {/if}
 
-        {#if selectedType === 'work-item' && (!workItemFormStore.parentItem || parentPickedHere)}
+        {#if selectedType === 'work-item' && (!workItemFormStore.parentItem || parentPickedHere) && !lockedType}
           <ChipPicker
             value={pickedParent?.id ?? null}
             items={parentItems}
