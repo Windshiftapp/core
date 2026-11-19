@@ -7,6 +7,7 @@ export const search = {
 
     // Text search
     if (params.query) searchParams.append('q', params.query);
+    if (params.ql) searchParams.append('ql', params.ql);
 
     // Multiple workspace IDs
     if (params.workspaceIds && params.workspaceIds.length > 0) {

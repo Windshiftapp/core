@@ -706,6 +706,7 @@ export default {
   },
 
   createModal: {
+    noParentOption: 'Nouvel élément de travail (sans parent)',
     // Type labels
     workItem: 'Élément de travail',
     milestone: 'Jalon',

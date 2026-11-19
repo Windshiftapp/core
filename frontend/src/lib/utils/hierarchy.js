@@ -15,6 +15,10 @@ export function childItemTypesForParent(itemTypes, parentType) {
   return (itemTypes || []).filter((type) => canItemTypeBeChildOf(type, parentType));
 }
 
+export function canHaveChildren(itemTypes, parentType) {
+  return childItemTypesForParent(itemTypes, parentType).length > 0;
+}
+
 /**
  * Child types for a parent whose own type is unknown (for example a level-0
  * item whose type is not bound to the workspace configuration set). The parent

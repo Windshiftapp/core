@@ -516,6 +516,7 @@ export default {
     completeSetupEnter: 'Einrichtung abschließen (Enter)',
   },
   createModal: {
+    noParentOption: 'Neuer Vorgang (ohne übergeordneten Vorgang)',
     workItem: 'Vorgang',
     milestone: 'Meilenstein',
     workspace: 'Arbeitsbereich',

@@ -23,6 +23,7 @@
     triggerSnippet = null,
     itemSnippet = null,
     onSelect = () => {},
+    onSearchChange = null,
     testId = null
   } = $props();
 
@@ -67,7 +68,7 @@
 
   // Filter items when searchable
   let filteredItems = $derived.by(() => {
-    if (!searchable || !searchTerm.trim()) return items;
+    if (onSearchChange || !searchable || !searchTerm.trim()) return items;
     const term = searchTerm.toLowerCase();
     return items.filter(item =>
       searchFields.some(field => {
@@ -84,6 +85,10 @@
   $effect(() => {
     void filteredItems;
     revealedCount = maxVisibleOptions;
+  });
+
+  $effect(() => {
+    onSearchChange?.(searchTerm);
   });
 
   // Focus input when popover opens, reset state

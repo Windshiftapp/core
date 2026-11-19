@@ -6,12 +6,16 @@
   import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { shouldNavigateAfterCreate } from '../stores/navigationConfig.svelte.js';
   import { workItemFormStore } from '../stores/workItemFormStore.svelte.js';
+  import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
   import { permissionStore, isSystemAdmin } from '../stores/permissions.svelte.js';
   import { workspacePermissions } from '../stores/workspacePermissions.svelte.js';
   import { packs as packsApi } from '../api/packs.js';
   import { workspaces } from '../api/workspaces.js';
-  import { attachments } from '../api/misc.js';
+  import { attachments, search } from '../api/misc.js';
   import { items } from '../api/items.js';
+  import ItemTypeIcon from '../components/ItemTypeIcon.svelte';
+  import ItemKey from '../components/ItemKey.svelte';
+  import { childItemTypesForParent, canHaveChildren } from '../utils/hierarchy.js';
   import { collections } from '../api/collections.js';
   import X from '@lucide/svelte/icons/x';
   import Target from '@lucide/svelte/icons/target';
@@ -25,7 +29,7 @@
   import CreateFormFrame from '../forms/CreateFormFrame.svelte';
   import ChipPicker from '../pickers/ChipPicker.svelte';
   import { getShortcut, matchesShortcut, getDisplayString } from '../utils/keyboardShortcuts.js';
-  import { errorToast } from '../stores/toasts.svelte.js';
+  import { errorToast, surfaceError } from '../stores/toasts.svelte.js';
   import { showCreatedItemToast } from '../utils/createdItemToast.js';
   import { runWithConcurrency } from '../utils/concurrency.js';
 
@@ -74,7 +78,7 @@
 
   let {
     isOpen = $bindable(false),
-    compactMode = false,
+    lockedType = null,
     initialType = 'work-item',
     initialWorkspaceId = null,
     initialParentContext = null,
@@ -84,7 +88,7 @@
   } = $props();
 
   // svelte-ignore state_referenced_locally
-  let selectedType = $state(initialType);
+  let selectedType = $state(lockedType || initialType);
 
   // Set once item creation commits so a failed post-create step can be retried
   // without creating a duplicate.
@@ -130,6 +134,117 @@
   let collectionCategoryId = $state(null);
   let submitting = $state(false);
 
+  // Parent chosen from the header picker (as opposed to a pre-set parent context).
+  const NO_PARENT = '__none__';
+  let parentPickedHere = $state(false);
+  let parentSearchResults = $state([]);
+  let parentSearchTimer;
+  let parentSearchController;
+  let pickedParent = $state(null);
+  // Workspace-bound item types for the candidate filter: only parents whose
+  // children this workspace's configuration set actually binds are offered.
+  let parentCandidateTypes = $state([]);
+  const parentCandidateTypesByWorkspace = new Map();
+  let parentItems = $derived([
+    { id: NO_PARENT, title: t('createModal.noParentOption') },
+    ...(pickedParent && !parentSearchResults.some((r) => r.id === pickedParent.id) ? [pickedParent] : []),
+    ...parentSearchResults
+  ]);
+
+  // A candidate's own type is read from the global catalog so its hierarchy
+  // level is known even when the workspace does not bind it; its child
+  // candidates always come from the workspace-bound set.
+  function parentTypeOf(item, catalog = workItemFormStore.itemTypes) {
+    return catalog.find((ty) => ty.id === item.item_type_id);
+  }
+
+  async function loadParentCandidateTypes(workspaceId) {
+    const id = Number(workspaceId);
+    if (!Number.isInteger(id) || id <= 0) {
+      parentCandidateTypes = [];
+      return;
+    }
+    if (parentCandidateTypesByWorkspace.has(id)) {
+      parentCandidateTypes = parentCandidateTypesByWorkspace.get(id);
+      return;
+    }
+    try {
+      const snapshot = await workspaceDataStore.getReferenceSnapshot(id);
+      const types = snapshot?.item_types ?? [];
+      parentCandidateTypesByWorkspace.set(id, types);
+      if (Number(workItemFormStore.formData.workspace_id) === id) parentCandidateTypes = types;
+    } catch (error) {
+      // Keep the picker usable when the workspace reference read fails.
+      surfaceError(error, { silent: true, context: 'loadParentCandidateTypes' });
+      if (Number(workItemFormStore.formData.workspace_id) === id) {
+        parentCandidateTypes = workItemFormStore.itemTypes;
+      }
+    }
+  }
+
+  // Re-resolve the bound types whenever the target workspace changes.
+  $effect(() => {
+    const workspaceId = workItemFormStore.formData.workspace_id;
+    if (!workspaceId) {
+      parentCandidateTypes = [];
+      return;
+    }
+    // The loader reads the shared store's state; keep that out of this effect's
+    // dependencies so only the target workspace re-triggers a load.
+    untrack(() => void loadParentCandidateTypes(workspaceId));
+  });
+
+  function resetParentSearch() {
+    clearTimeout(parentSearchTimer);
+    parentSearchController?.abort();
+    parentSearchResults = [];
+  }
+
+  function onParentSearchChange(query) {
+    resetParentSearch();
+    const workspaceId = workItemFormStore.formData.workspace_id;
+    // Read both synchronously so the picker re-queries once the bound types and
+    // the global catalog finish loading.
+    const types = parentCandidateTypes;
+    const catalog = workItemFormStore.itemTypes;
+    if (!workspaceId || !types.length || !catalog.length) return;
+    // Short or empty input browses the workspace's open items instead of searching.
+    const browsing = query.trim().length < 2;
+    const params = browsing ? { ql: 'statusCompleted = false', limit: 50 } : { query, limit: 20 };
+    parentSearchTimer = setTimeout(async () => {
+      const controller = new AbortController();
+      parentSearchController = controller;
+      try {
+        const results = await search.items({ ...params, workspaceIds: [workspaceId], signal: controller.signal });
+        if (controller.signal.aborted) return;
+        parentSearchResults = (results || [])
+          .filter((r) => canHaveChildren(types, parentTypeOf(r, catalog)))
+          .slice(0, browsing ? 50 : 10);
+      } catch (error) {
+        if (!controller.signal.aborted) errorToast(error?.message || String(error));
+      }
+    }, 300);
+  }
+
+  function selectParent(item) {
+    if (item.id === NO_PARENT) {
+      clearPickedParent();
+      return;
+    }
+    pickedParent = item;
+    parentPickedHere = true;
+    workItemFormStore.setParentItem(
+      { id: item.id, title: item.title },
+      childItemTypesForParent(parentCandidateTypes, parentTypeOf(item))
+    );
+  }
+
+  function clearPickedParent() {
+    pickedParent = null;
+    parentPickedHere = false;
+    workItemFormStore.setParentItem(null, null);
+  }
+
   // The work-item create endpoint requires item.create in the target
   // workspace (denied with 404), so the picker must only offer workspaces
   // where creation is allowed. Mirrors CollectionBoard's quick-add filter;
@@ -172,8 +287,11 @@
 
   function close() {
     isOpen = false;
-    selectedType = initialType;
+    selectedType = lockedType || initialType;
     recoverableItemId = null;
+    parentPickedHere = false;
+    pickedParent = null;
+    resetParentSearch();
 
     // Reset work item form store
     workItemFormStore.resetForm();
@@ -445,9 +563,10 @@
     }
   });
 
-  // Sync selectedType when initialType prop changes (e.g. before modal opens)
+  // Sync selectedType when the opening type changes (e.g. before modal opens).
+  // A locked type always wins so the pinned surface cannot drift.
   $effect(() => {
-    selectedType = initialType;
+    selectedType = lockedType || initialType;
   });
 
   // Apply opening context without overwriting later workspace selections.
@@ -471,10 +590,11 @@
     }
   });
 
-  // Force work-item type when compact mode is enabled
+  // A locked type pins the modal to a single object type. The type switcher
+  // and parent picker stay hidden so the surface stays minimal.
   $effect(() => {
-    if (compactMode && selectedType !== 'work-item') {
-      selectedType = 'work-item';
+    if (lockedType && selectedType !== lockedType) {
+      selectedType = lockedType;
     }
   });
 
@@ -538,10 +658,10 @@
 
 <!-- shortcut-guard-exempt: Cmd+Enter is dispatched by the active overlay through onKeydown. -->
 <ModalBackdrop bind:show={isOpen} onKeydown={handleKeydown} initialFocus='input:not([type="hidden"]):not([tabindex="-1"])' opacity={0.4} align="top" paddingTop="pt-16" scrollable zIndex={60} closeOnClick={false} onclose={close}>
-    <CreateFormFrame dataTestid="create-modal">
+    <CreateFormFrame dataTestid="create-modal" maxWidth="max-w-xl">
       {#snippet header()}
         <!-- Type Selector FIRST (independent of workspace) -->
-        {#if !workItemFormStore.parentItem && !compactMode}
+        {#if (!workItemFormStore.parentItem || parentPickedHere) && !lockedType}
           <ChipPicker
             value={selectedType}
             items={typeOptions}
@@ -561,7 +681,7 @@
         {/if}
 
         <!-- Workspace Selector (only for work-items) -->
-        {#if selectedType === 'work-item' && !workItemFormStore.parentItem}
+        {#if selectedType === 'work-item' && (!workItemFormStore.parentItem || parentPickedHere)}
           <ChipPicker
             value={workItemFormStore.formData.workspace_id}
             items={creatableWorkspaces}
@@ -574,6 +694,7 @@
             testId="create-workspace-chip"
             onSelect={(workspace) => {
               if (workspace) {
+                if (parentPickedHere && workspace.id !== workItemFormStore.formData.workspace_id) clearPickedParent();
                 workItemFormStore.setWorkspace(workspace);
               }
             }}
@@ -607,13 +728,38 @@
           <ChevronRight size={14} style="color: var(--ds-text-subtle);" />
         {/if}
 
-        <span data-testid="create-modal-heading" class="font-medium" style="color: var(--ds-text);">
-          {#if workItemFormStore.parentItem}
-            {t('createModal.newChildItem')}
-          {:else}
-            {t('createModal.new')} {currentTypeName}
-          {/if}
-        </span>
+        {#if selectedType === 'work-item' && (!workItemFormStore.parentItem || parentPickedHere) && !lockedType}
+          <ChipPicker
+            value={pickedParent?.id ?? null}
+            items={parentItems}
+            getValue={(p) => p.id}
+            getLabel={(p) => p.id === NO_PARENT ? '' : p.title}
+            placeholder={`${t('createModal.new')} ${currentTypeName}`}
+            searchable={true}
+            testId="create-parent-chip"
+            onSearchChange={onParentSearchChange}
+            onSelect={selectParent}
+          >
+            {#snippet itemSnippet({ item })}
+              {#if item.id === NO_PARENT}
+                <span class="font-medium">{item.title}</span>
+              {:else}
+                {@const itemType = workItemFormStore.itemTypes.find((ty) => ty.id === item.item_type_id)}
+                {#if itemType}<ItemTypeIcon {itemType} />{/if}
+                <ItemKey {item} workspace={{ key: item.workspace_key }} clickable={false} />
+                <span class="text-sm truncate">{item.title}</span>
+              {/if}
+            {/snippet}
+          </ChipPicker>
+        {:else}
+          <span data-testid="create-modal-heading" class="font-medium" style="color: var(--ds-text);">
+            {#if workItemFormStore.parentItem}
+              {t('createModal.newChildItem')}
+            {:else}
+              {t('createModal.new')} {currentTypeName}
+            {/if}
+          </span>
+        {/if}
 
         <button
           data-testid="create-modal-close"

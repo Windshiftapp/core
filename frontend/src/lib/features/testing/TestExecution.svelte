@@ -916,6 +916,7 @@ import { parseScenarioSpec, flattenExamples } from './bddSpec.js';
                         variant="default"
                         size="small"
                         icon={IconPlus}
+                        dataTestid="test-execution-create-issue"
                       >
                         {t('testing.createNewIssue')}
                       </Button>
@@ -1022,7 +1023,7 @@ import { parseScenarioSpec, flattenExamples } from './bddSpec.js';
 <!-- Create Item Modal -->
 <CreateModal
   bind:isOpen={showCreateModal}
-  compactMode={true}
+  lockedType="work-item"
   oncreated={handleItemCreated}
 />
 

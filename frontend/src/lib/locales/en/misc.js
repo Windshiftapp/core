@@ -711,6 +711,7 @@ export default {
   },
 
   createModal: {
+    noParentOption: 'New work item (no parent)',
     // Type labels
     workItem: 'Work Item',
     team: 'Team',
