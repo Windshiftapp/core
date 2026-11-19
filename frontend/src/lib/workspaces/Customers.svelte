@@ -47,8 +47,39 @@
   let orgSearch = $state('');
   let customerSearch = $state('');
 
-  // Pagination
-  let displayLimit = $state(15);
+  // Pagination (server-side; the directory can exceed the legacy 500 cap)
+  const customerPageSize = 15;
+  let customerTotal = $state(0);
+  let loadingCustomers = $state(false);
+  let customerCounts = $state({});
+  let unassignedCount = $state(0);
+
+  let filteredOrganisations = $derived(
+    customerOrganisations.filter(org =>
+      org.name.toLowerCase().includes(orgSearch.toLowerCase())
+    )
+  );
+
+  let hasMoreCustomers = $derived(portalCustomers.length < customerTotal);
+
+  const canManage = $derived($permissionStore.userPermissionKeys?.has('customers.manage') || $isSystemAdmin);
+
+  let selectedOrg = $derived(
+    selectedOrgId !== null ? customerOrganisations.find(o => o.id === selectedOrgId) : null
+  );
+
+  // Reload the first page whenever the selected organisation or search changes.
+  let customerQueryKey = null;
+  $effect(() => {
+    const key = `${selectedOrgId ?? 'unassigned'}\u0000${customerSearch}`;
+    if (customerQueryKey === null) {
+      customerQueryKey = key;
+      return;
+    }
+    if (key === customerQueryKey) return;
+    customerQueryKey = key;
+    loadPortalCustomers({ reset: true });
+  });
 
   // Drag and drop tracking
   let setupElements = new Map();
@@ -65,61 +96,10 @@
     custom_field_values: {}
   });
 
-  // Derived state
-  let filteredOrganisations = $derived(
-    customerOrganisations.filter(org =>
-      org.name.toLowerCase().includes(orgSearch.toLowerCase())
-    )
-  );
-
-  let unassignedCount = $derived(
-    portalCustomers.filter(c => !c.customer_organisation_id).length
-  );
-
-  let filteredCustomers = $derived(
-    portalCustomers
-      .filter(c => {
-        if (selectedOrgId === null) {
-          return !c.customer_organisation_id;
-        }
-        return c.customer_organisation_id === selectedOrgId;
-      })
-      .filter(c => {
-        if (!customerSearch) return true;
-        const search = customerSearch.toLowerCase();
-        return c.name.toLowerCase().includes(search) ||
-               c.email.toLowerCase().includes(search);
-      })
-  );
-
-  let displayedCustomers = $derived(filteredCustomers.slice(0, displayLimit));
-  let hasMoreCustomers = $derived(filteredCustomers.length > displayLimit);
-
-  const canManage = $derived($permissionStore.userPermissionKeys?.has('customers.manage') || $isSystemAdmin);
-
-  let customerCounts = $derived.by(() => {
-    const counts = {};
-    for (const customer of portalCustomers) {
-      const orgId = customer.customer_organisation_id;
-      if (orgId) counts[orgId] = (counts[orgId] || 0) + 1;
-    }
-    return counts;
-  });
-
-  let selectedOrg = $derived(
-    selectedOrgId !== null ? customerOrganisations.find(o => o.id === selectedOrgId) : null
-  );
-
-  // Reset pagination when org changes
-  $effect(() => {
-    selectedOrgId;
-    displayLimit = 15;
-  });
-
   // Setup drag and drop after rendering (track both customers and orgs)
   $effect(() => {
     // Track dependencies
-    const _customers = displayedCustomers;
+    const _customers = portalCustomers;
     const _orgs = filteredOrganisations;
 
     if (typeof document !== 'undefined') {
@@ -131,7 +111,8 @@
   });
 
   onMount(async () => {
-    await Promise.all([loadOrganisations(), loadPortalCustomers(), loadCustomFields()]);
+    await Promise.all([loadOrganisations(), loadCustomFields()]);
+    await loadPortalCustomers({ reset: true });
     loading = false;
   });
 
@@ -172,12 +153,53 @@
     );
   }
 
-  async function loadPortalCustomers() {
+  async function loadPortalCustomers({ reset = false } = {}) {
+    loadingCustomers = true;
     try {
-      portalCustomers = await portalCustomersApi.getAll();
+      const params = { limit: customerPageSize, offset: reset ? 0 : portalCustomers.length };
+      if (customerSearch) params.search = customerSearch;
+      if (selectedOrgId === null) {
+        params.unassigned = 'true';
+      } else {
+        params.organisation_id = selectedOrgId;
+      }
+      const result = await portalCustomersApi.getAll(params);
+      if (Array.isArray(result)) {
+        // Legacy array contract (no `limit`); keep the previous behavior.
+        portalCustomers = reset ? result : [...portalCustomers, ...result];
+        customerTotal = portalCustomers.length;
+        return;
+      }
+      const page = result?.customers ?? [];
+      portalCustomers = reset ? page : [...portalCustomers, ...page];
+      customerTotal = result?.total ?? portalCustomers.length;
+      if (result?.counts) {
+        customerCounts = result.counts.organisations ?? {};
+        unassignedCount = result.counts.unassigned ?? 0;
+      }
     } catch (err) {
       console.error('Failed to load portal customers:', err);
       error = t('workspaces.customers.failedToLoadCustomers');
+    } finally {
+      loadingCustomers = false;
+    }
+  }
+
+  // Keep the navigation counts in sync after a local move without re-reading
+  // the directory.
+  function adjustCustomerCount(fromOrgId, toOrgId) {
+    const from = fromOrgId ?? 'unassigned';
+    const to = toOrgId ?? 'unassigned';
+    if (from === to) return;
+    if (from === 'unassigned') {
+      unassignedCount = Math.max(0, unassignedCount - 1);
+    } else {
+      customerCounts = { ...customerCounts, [from]: Math.max(0, (customerCounts[from] || 0) - 1) };
+    }
+    if (to === 'unassigned') {
+      unassignedCount += 1;
+    } else {
+      customerCounts = { ...customerCounts, [to]: (customerCounts[to] || 0) + 1 };
     }
   }
 
@@ -188,19 +210,20 @@
   }
 
   function loadMoreCustomers() {
-    displayLimit += 15;
+    if (loadingCustomers || !hasMoreCustomers) return;
+    loadPortalCustomers({ reset: false });
   }
 
   async function handleCustomerDrop(customerId, targetOrgId) {
+    const customer = portalCustomers.find((c) => c.id === customerId);
+    const previousOrgId = customer?.customer_organisation_id ?? null;
     try {
       await portalCustomersApi.updateOrganisation(customerId, targetOrgId);
-      // Patch the moved customer in place; a full directory reload is wasteful
-      // and can drop the current search/page position (WI-2122).
-      portalCustomers = portalCustomers.map((customer) =>
-        customer.id === customerId
-          ? { ...customer, customer_organisation_id: targetOrgId }
-          : customer
-      );
+      // The customer left the current view; drop it locally instead of
+      // reloading the whole directory (WI-2122).
+      portalCustomers = portalCustomers.filter((c) => c.id !== customerId);
+      customerTotal = Math.max(0, customerTotal - 1);
+      adjustCustomerCount(previousOrgId, targetOrgId);
     } catch (err) {
       console.error('Failed to update customer organisation:', err);
       errorToast(t('workspaces.customers.failedToAssignCustomer'));
@@ -411,7 +434,7 @@
   style="background-color: var(--ds-surface);"
   data-testid="portal-customers-page"
   data-ready={!loading && !error}
-  data-total-customers={portalCustomers.length}
+  data-total-customers={customerTotal}
 >
   <!-- Sidebar Navigation -->
   <CustomerOrganisationNavigation
@@ -440,14 +463,14 @@
         {portalCustomerFields}
         {canManage}
         onBack={() => navigate('/organizations')}
-        onCustomerUpdated={() => loadPortalCustomers()}
+        onCustomerUpdated={() => loadPortalCustomers({ reset: true })}
       />
     {:else}
       <OrganisationDetail
         organisation={selectedOrg}
-        customers={displayedCustomers}
-        filteredCount={filteredCustomers.length}
-        bind:displayLimit
+        customers={portalCustomers}
+        filteredCount={customerTotal}
+        loadedCount={portalCustomers.length}
         bind:customerSearch
         {canManage}
         {showCreateModal}

@@ -35,7 +35,7 @@
     organisation = null,
     customers = [],
     filteredCount = 0,
-    displayLimit = $bindable(15),
+    loadedCount = 0,
     customerSearch = $bindable(''),
     canManage = false,
     showCreateModal = false,
@@ -310,7 +310,7 @@
       {#if hasMoreCustomers}
         <div class="p-4 border-t text-center" style="border-color: var(--ds-border);">
           <Button variant="default" onclick={onLoadMore}>
-            {t('workspaces.customers.loadMore', { count: filteredCount - displayLimit })}
+            {t('workspaces.customers.loadMore', { count: Math.max(0, filteredCount - loadedCount) })}
           </Button>
         </div>
       {/if}

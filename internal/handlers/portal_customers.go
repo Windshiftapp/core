@@ -188,11 +188,39 @@ func (h *PortalCustomersHandler) loadPortalCustomerWithRoles(id int64) (models.P
 	return c, nil
 }
 
-// GetPortalCustomers returns a list of all portal customers
+// GetPortalCustomers returns portal customers. With a positive `limit` it
+// returns a bounded, searchable page plus total and per-organisation counts;
+// without one it preserves the legacy bounded array contract.
 func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("GetPortalCustomers called", slog.String("component", "portal"))
 
-	rows, err := h.db.Query(portalCustomerBaseQuery + " ORDER BY pc.created_at DESC LIMIT 500")
+	query := r.URL.Query()
+	limit := 0
+	if parsed, err := strconv.Atoi(strings.TrimSpace(query.Get("limit"))); err == nil && parsed > 0 {
+		limit = min(parsed, 500)
+	}
+	offset := 0
+	if parsed, err := strconv.Atoi(strings.TrimSpace(query.Get("offset"))); err == nil && parsed > 0 {
+		offset = parsed
+	}
+	search := strings.TrimSpace(query.Get("search"))
+	orgID := 0
+	if parsed, err := strconv.Atoi(strings.TrimSpace(query.Get("organisation_id"))); err == nil && parsed > 0 {
+		orgID = parsed
+	}
+	unassigned := query.Get("unassigned") == "true" || query.Get("unassigned") == "1"
+
+	where, filterArgs := portalCustomerListWhere(search, orgID, unassigned)
+	sqlQuery := portalCustomerBaseQuery + where + " ORDER BY pc.created_at DESC"
+	queryArgs := append([]any(nil), filterArgs...)
+	if limit > 0 {
+		sqlQuery += " LIMIT ? OFFSET ?"
+		queryArgs = append(queryArgs, limit, offset)
+	} else {
+		sqlQuery += " LIMIT 500"
+	}
+
+	rows, err := h.db.Query(sqlQuery, queryArgs...)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -242,7 +270,89 @@ func (h *PortalCustomersHandler) GetPortalCustomers(w http.ResponseWriter, r *ht
 		customers = []models.PortalCustomer{}
 	}
 
-	respondJSONOK(w, customers)
+	if limit <= 0 {
+		respondJSONOK(w, customers)
+		return
+	}
+
+	total, err := h.countPortalCustomers(where, filterArgs)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	counts, err := h.portalCustomerCounts()
+	if err != nil {
+		slog.Warn("failed to load portal customer counts", slog.String("component", "portal"), slog.Any("error", err))
+		counts = map[string]any{"organisations": map[string]int64{}, "unassigned": int64(0)}
+	}
+	respondJSONOK(w, map[string]any{
+		"customers": customers,
+		"total":     total,
+		"counts":    counts,
+	})
+}
+
+// portalCustomerListWhere builds the optional filter for the customer
+// directory. Search matches name or email; organisation_id and unassigned are
+// mutually exclusive.
+func portalCustomerListWhere(search string, orgID int, unassigned bool) (whereClause string, args []any) {
+	clauses := make([]string, 0, 2)
+	args = make([]any, 0, 2)
+	if search != "" {
+		clauses = append(clauses, "(LOWER(pc.name) LIKE LOWER(?) OR LOWER(pc.email) LIKE LOWER(?))")
+		like := "%" + search + "%"
+		args = append(args, like, like)
+	}
+	if unassigned {
+		clauses = append(clauses, "pc.customer_organisation_id IS NULL")
+	} else if orgID > 0 {
+		clauses = append(clauses, "pc.customer_organisation_id = ?")
+		args = append(args, orgID)
+	}
+	if len(clauses) == 0 {
+		return "", args
+	}
+	return " WHERE " + strings.Join(clauses, " AND "), args
+}
+
+func (h *PortalCustomersHandler) countPortalCustomers(where string, args []any) (int, error) {
+	var total int
+	if err := h.db.QueryRow("SELECT COUNT(*) FROM portal_customers pc"+where, args...).Scan(&total); err != nil {
+		return 0, fmt.Errorf("count portal customers: %w", err)
+	}
+	return total, nil
+}
+
+// portalCustomerCounts returns the per-organisation and unassigned customer
+// counts used by the directory navigation, independent of the current page.
+func (h *PortalCustomersHandler) portalCustomerCounts() (map[string]any, error) {
+	rows, err := h.db.Query(`
+		SELECT customer_organisation_id, COUNT(*)
+		FROM portal_customers
+		GROUP BY customer_organisation_id
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("count portal customers by organisation: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	organisations := map[string]int64{}
+	var unassigned int64
+	for rows.Next() {
+		var orgID sql.NullInt64
+		var count int64
+		if err := rows.Scan(&orgID, &count); err != nil {
+			return nil, err
+		}
+		if orgID.Valid {
+			organisations[strconv.FormatInt(orgID.Int64, 10)] = count
+		} else {
+			unassigned = count
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return map[string]any{"organisations": organisations, "unassigned": unassigned}, nil
 }
 
 // GetPortalCustomer returns a single portal customer by ID
