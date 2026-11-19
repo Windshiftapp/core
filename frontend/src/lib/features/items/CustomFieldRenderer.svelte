@@ -154,17 +154,47 @@
     return moneyPinnedCurrency || brandStore.currency || DEFAULT_CURRENCY;
   }
 
-  function emitMoney(amount, currency) {
-    const value = amount === '' || amount === null || amount === undefined ? null : Number(amount);
-    if (value === null || !Number.isFinite(value)) {
-      onChange('');
+  // Stage the amount and currency together. Keeping them in one draft means a
+  // partially typed amount is never committed and a currency chosen before the
+  // amount survives the empty intermediate state.
+  function currentMoneyValue() {
+    const raw = draftValue !== null ? draftValue : value;
+    return { amount: moneyAmount(raw), currency: moneyCurrency(raw) };
+  }
+
+  function stageMoney(amount, currency) {
+    draftValue = { amount, currency };
+  }
+
+  function committedMoney() {
+    const { amount, currency } = currentMoneyValue();
+    return amount === '' ? '' : { amount: Number(amount), currency };
+  }
+
+  // Compare money values structurally; null, undefined, and '' all mean empty.
+  function moneyComparable(raw) {
+    return raw === null || raw === undefined || raw === '' ? '' : JSON.stringify(raw);
+  }
+
+  // Money commits as a whole on Enter or when the editor loses focus. The
+  // sidebar defers the save to this commit so typing never persists a partial
+  // amount, and forms receive the value before submit.
+  function commitMoney() {
+    const committed = committedMoney();
+    if (isSelfEditing) {
+      if (moneyComparable(committed) !== moneyComparable(value)) onChange(committed);
+      exitEditing();
       return;
     }
-    onChange({ amount: value, currency });
+    onChange(committed);
+    onCommit?.(committed);
   }
 
   function handleMoneyKeydown(event) {
-    if (event.key === 'Escape') {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitMoney();
+    } else if (event.key === 'Escape') {
       event.preventDefault();
       handleEditorCancel();
     }
@@ -515,6 +545,14 @@
     draftValue = null;
   }
 
+  // Drop a staged draft whenever the editor is hidden so reopening starts from
+  // the stored value. Forms keep their editor mounted, so this only fires for
+  // the self-editing and externally-driven surfaces.
+  $effect(() => {
+    const visible = readonly ? editorOpen : true;
+    if (!visible) draftValue = null;
+  });
+
   function handleActivate() {
     if (disabled) return;
     if (onStartEdit) {
@@ -832,13 +870,13 @@
 {/snippet}
 
 {#snippet moneyEditor()}
-  <div class="flex items-center gap-2" use:clickOutside onclickOutside={handleEditorCancel}>
+  <div class="flex items-center gap-2" use:clickOutside onclickOutside={commitMoney}>
     <Input
       type="number"
       step="any"
       value={moneyAmount(editorValue)}
       dataTestid={`custom-field-input-${field.id}`}
-      oninput={(e) => emitMoney(e.target.value, moneyCurrency(editorValue))}
+      oninput={(e) => stageMoney(e.target.value, moneyCurrency(editorValue))}
       class="flex-1 px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-ds-background-input border border-ds-border rounded text-ds-text tabular-nums"
       placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
       onkeydown={handleMoneyKeydown}
@@ -853,7 +891,7 @@
         value={moneyCurrency(editorValue)}
         options={currencyOptions()}
         dataTestid={`custom-field-currency-${field.id}`}
-        onchange={(code) => emitMoney(moneyAmount(editorValue), code)}
+        onchange={(code) => stageMoney(moneyAmount(editorValue), code)}
         class="w-36"
         size="small"
         {disabled}

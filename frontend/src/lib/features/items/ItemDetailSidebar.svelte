@@ -464,7 +464,7 @@
 
   // Free-form controls hold focus while the user types and only save when the
   // edit is committed (Enter or blur), so partial values are never persisted.
-  const DEFERRED_SAVE_CUSTOM_FIELD_TYPES = new Set(['text', 'textarea', 'richtext', 'number', 'email', 'url']);
+  const DEFERRED_SAVE_CUSTOM_FIELD_TYPES = new Set(['text', 'textarea', 'richtext', 'number', 'money', 'email', 'url']);
 
   // Status helpers
   function startEditingStatus() {

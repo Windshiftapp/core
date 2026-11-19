@@ -245,6 +245,10 @@ func ValidateAndSeparateRequestFields(ctx context.Context, db database.Database,
 
 	virtualFields := make(map[string]virtualRequestField)
 	configuredCustomFieldIDs := make(map[string]bool)
+	// Required custom fields are re-checked after normalization: a non-empty
+	// object can normalize to nil (a money value without an amount), which the
+	// pre-normalization blank check cannot see.
+	requiredCustomFieldIDs := make(map[string]bool)
 	rows, err := db.QueryContext(ctx, `
 		SELECT rtf.field_identifier, rtf.field_type, rtf.is_required,
 		       COALESCE(rtf.virtual_field_type, ''), COALESCE(rtf.virtual_field_options, ''),
@@ -307,6 +311,7 @@ func ValidateAndSeparateRequestFields(ctx context.Context, db database.Database,
 				if models.IsBooleanCustomFieldType(customFieldType) {
 					continue
 				}
+				requiredCustomFieldIDs[fieldID] = true
 				if customFields == nil || IsBlankSubmittedField(customFields[fieldID]) {
 					return nil, fmt.Errorf("field %s is required", fieldID)
 				}
@@ -345,6 +350,11 @@ func ValidateAndSeparateRequestFields(ctx context.Context, db database.Database,
 	}
 	if err := validation.ValidateAndNormalizeCustomFieldValues(db, result.CustomFieldValues); err != nil {
 		return nil, err
+	}
+	for fieldID := range requiredCustomFieldIDs {
+		if IsBlankSubmittedField(result.CustomFieldValues[fieldID]) {
+			return nil, fmt.Errorf("field %s is required", fieldID)
+		}
 	}
 
 	return result, nil
