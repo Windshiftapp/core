@@ -164,6 +164,8 @@
 
   function stageMoney(amount, currency) {
     draftValue = { amount, currency };
+    // A new edit makes the next commit meaningful again.
+    moneyCommitted = false;
   }
 
   function committedMoney() {
@@ -176,11 +178,30 @@
     return raw === null || raw === undefined || raw === '' ? '' : JSON.stringify(raw);
   }
 
-  // Money commits as a whole on Enter or when the editor loses focus. The
-  // sidebar defers the save to this commit so typing never persists a partial
-  // amount, and forms receive the value before submit.
+  // True when target is inside the editor or one of its owned popups. The
+  // currency listbox is portaled to the body, so containment alone is not
+  // enough; its trigger owns it through aria-controls/aria-owns.
+  function moneyEditorContains(node, target) {
+    if (!node || !target) return false;
+    if (node.contains(target)) return true;
+    const controls = [node, ...node.querySelectorAll('[aria-controls], [aria-owns]')];
+    return controls.some((control) =>
+      `${control.getAttribute('aria-controls') ?? ''} ${control.getAttribute('aria-owns') ?? ''}`
+        .split(/\s+/)
+        .filter(Boolean)
+        .some((id) => node.ownerDocument.getElementById(id)?.contains(target))
+    );
+  }
+
+  // Money commits as a whole on Enter, when focus leaves the compound editor,
+  // or on an outside click. The sidebar defers its save to this commit so
+  // typing never persists a partial amount, and forms receive the value before
+  // submit. The flag collapses the blur+click pair into one commit.
   function commitMoney() {
+    if (moneyCommitted) return;
+    moneyCommitted = true;
     const committed = committedMoney();
+    draftValue = null;
     if (isSelfEditing) {
       if (moneyComparable(committed) !== moneyComparable(value)) onChange(committed);
       exitEditing();
@@ -188,6 +209,11 @@
     }
     onChange(committed);
     onCommit?.(committed);
+  }
+
+  function handleMoneyFocusOut(event) {
+    if (moneyEditorContains(event.currentTarget, event.relatedTarget)) return;
+    commitMoney();
   }
 
   function handleMoneyKeydown(event) {
@@ -516,6 +542,11 @@
   // Free-form inputs stage keystrokes in a draft so self-editing surfaces
   // commit once (Enter/blur) instead of on every character.
   let draftValue = $state(null);
+  // Collapses the focus-out and outside-click events of one money edit into a
+  // single commit, and tracks the field id so an unkeyed each block that reuses
+  // this renderer for another field does not leak the previous draft.
+  let moneyCommitted = false;
+  let lastMoneyFieldId = null;
   // Live handle to the richtext editor. The editor's markdown listener is
   // debounced, so commit reads the serialized document directly.
   let richtextEditorRef = $state(null);
@@ -545,12 +576,17 @@
     draftValue = null;
   }
 
-  // Drop a staged draft whenever the editor is hidden so reopening starts from
-  // the stored value. Forms keep their editor mounted, so this only fires for
-  // the self-editing and externally-driven surfaces.
+  // Drop a staged draft whenever the editor is hidden or reused for a different
+  // field, so reopening or switching steps starts from the stored value. Forms
+  // keep their editor mounted, so the field-id check is what protects them.
   $effect(() => {
     const visible = readonly ? editorOpen : true;
-    if (!visible) draftValue = null;
+    const fieldId = field.id;
+    if (!visible || fieldId !== lastMoneyFieldId) {
+      draftValue = null;
+      moneyCommitted = false;
+    }
+    lastMoneyFieldId = fieldId;
   });
 
   function handleActivate() {
@@ -870,7 +906,13 @@
 {/snippet}
 
 {#snippet moneyEditor()}
-  <div class="flex items-center gap-2" use:clickOutside onclickOutside={commitMoney}>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="flex items-center gap-2"
+    use:clickOutside
+    onclickOutside={commitMoney}
+    onfocusout={handleMoneyFocusOut}
+  >
     <Input
       type="number"
       step="any"
