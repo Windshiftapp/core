@@ -656,7 +656,7 @@ func acceptTemplateCustomFieldValue(def repository.TemplateCustomFieldDef, value
 		return nil, false
 	}
 	switch def.FieldType {
-	case "text", "textarea", "date":
+	case "text", "textarea", "richtext", "date":
 		s, ok := value.(string)
 		return s, ok
 	case "number":

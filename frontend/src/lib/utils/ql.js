@@ -930,6 +930,7 @@ export class QLBuilder {
     switch (fieldType) {
       case 'text':
       case 'textarea':
+      case 'richtext':
       case 'select':
       case 'enum':
         // String values need quotes

@@ -115,7 +115,7 @@ func CustomFieldCompletion(fieldType string) (valueType string, operators []stri
 		return "boolean", slices.Clone(booleanOperators)
 	case "date":
 		return "date", slices.Clone(orderedOperators)
-	case "text", "textarea":
+	case "text", "textarea", "richtext":
 		return "string", slices.Clone(textOperators)
 	default:
 		return "string", slices.Clone(equalityOperators)

@@ -26,6 +26,12 @@ export function defaultCustomFieldValue(fieldType) {
   return '';
 }
 
+// Rich text and plain multi-line text both store Markdown-shaped strings, but
+// only rich text is rendered and edited as Markdown.
+export function isRichTextCustomFieldType(fieldType) {
+  return fieldType === 'richtext';
+}
+
 // Read compatibility for historical asset/import values. Write paths still
 // emit only actual booleans from the shared Checkbox component.
 export function booleanCustomFieldChecked(raw) {

@@ -367,7 +367,7 @@
                 >
                   {labelFor(field)}
                 </Label>
-                {#if kind === 'textarea'}
+                {#if kind === 'textarea' || kind === 'richtext'}
                   <Textarea
                     id={`wsf-${field.field_identifier}`}
                     value={valueFor(field)}

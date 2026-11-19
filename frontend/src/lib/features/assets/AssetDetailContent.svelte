@@ -96,6 +96,7 @@
             {value}
             readonly
             noPadding
+            renderRichText
           />
         </div>
       {/if}

@@ -94,6 +94,10 @@
       editorInstance.insertMarkdown(markdown);
     }
   }
+
+  export function getMarkdown() {
+    return editorInstance?.getMarkdown?.() ?? '';
+  }
 </script>
 
 {#if MilkdownEditor}

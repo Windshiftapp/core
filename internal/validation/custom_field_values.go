@@ -53,7 +53,7 @@ func ValidateAndNormalizeCustomFieldValues(db database.Database, cfv map[string]
 					Message: fmt.Sprintf("boolean value must be true, false, or empty; got %T", raw),
 				}
 			}
-		case "text", "textarea":
+		case "text", "textarea", "richtext":
 			cfv[fieldKey] = sanitizeTextValue(def.FieldType, raw)
 		case "number":
 			normalized, err := normalizeNumberValue(fieldKey, raw)
@@ -299,12 +299,14 @@ func CustomFieldTypes(db database.Database, cfv map[string]any) (map[string]stri
 }
 
 // sanitizeTextValue applies the matching text policy; non-strings pass through.
+// textarea and richtext both store Markdown, so they share the rich-text policy;
+// text is a single-line plain label.
 func sanitizeTextValue(fieldType string, raw any) any {
 	s, ok := raw.(string)
 	if !ok {
 		return raw
 	}
-	if fieldType == "textarea" {
+	if fieldType == "textarea" || fieldType == "richtext" {
 		return sanitize.RichText.Sanitize(s)
 	}
 	return sanitize.PlainTextField.Sanitize(s)

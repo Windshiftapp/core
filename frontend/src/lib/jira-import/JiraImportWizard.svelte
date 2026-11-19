@@ -299,7 +299,7 @@
     const target = canonical(targetType);
     const source = canonical(sourceType);
     if (target === source) return true;
-    const textish = (type) => type === 'text' || type === 'textarea';
+    const textish = (type) => type === 'text' || type === 'textarea' || type === 'richtext';
     return textish(target) && textish(source);
   }
 
