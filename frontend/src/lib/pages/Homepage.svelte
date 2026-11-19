@@ -265,7 +265,7 @@
 />
 
 <div
-  class="min-h-full w-full"
+  class="min-h-screen w-full"
   class:view-dot-grid={!homepageStore.hasCustomBackground}
   style="{homepageStore.backgroundStyle} background-attachment: fixed;"
   data-testid="homepage"
