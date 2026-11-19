@@ -299,6 +299,8 @@ export default {
     categoryOptional: 'Category (Optional)',
     hourlyRate: 'Hourly Rate',
     hourlyRateHelper: 'Amounts are shown in {currency}.',
+    currency: 'Currency',
+    currencyInherit: 'Instance default ({currency})',
     maxHours: 'Max Hours',
     maxHoursPlaceholder: 'No limit',
     maxHoursHint: 'Optional budget for reporting',

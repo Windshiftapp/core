@@ -10,6 +10,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/money"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 )
@@ -37,6 +38,7 @@ type TimeProjectPatch struct {
 	Status        *string
 	Color         *string
 	HourlyRate    *float64
+	Currency      *string
 	SettingsSet   bool
 	Settings      map[string]any
 }
@@ -285,6 +287,9 @@ func (s *TimeProjectApplicationService) PatchProject(actor AuditActor, id int, p
 	if patch.HourlyRate != nil {
 		project.HourlyRate = *patch.HourlyRate
 	}
+	if patch.Currency != nil {
+		project.Currency = *patch.Currency
+	}
 	if patch.SettingsSet {
 		project.Settings = patch.Settings
 	}
@@ -454,6 +459,15 @@ func (s *TimeProjectApplicationService) prepareProject(project *models.TimeProje
 	if project.Name == "" {
 		return &TimeProjectValidationError{Message: "project name is required"}
 	}
+	// An empty currency inherits the instance setting; anything else must be a
+	// recognized ISO 4217 code so formatting never falls back silently.
+	if strings.TrimSpace(project.Currency) == "" {
+		project.Currency = ""
+	} else if normalized, err := money.Normalize(project.Currency); err != nil {
+		return &TimeProjectValidationError{Message: "currency must be a valid ISO 4217 code"}
+	} else {
+		project.Currency = normalized
+	}
 	customerID, err := s.resolveCustomerID(project.CustomerID)
 	if err != nil {
 		return err
@@ -504,7 +518,7 @@ func timeProjectModel(detail repository.TimeProjectDetail) models.TimeProject {
 	return models.TimeProject{
 		ID: detail.ID, CustomerID: detail.CustomerID, CategoryID: detail.CategoryID,
 		Name: detail.Name, Description: detail.Description, Status: detail.Status,
-		Color: detail.Color, HourlyRate: detail.HourlyRate, Settings: detail.Settings,
+		Color: detail.Color, HourlyRate: detail.HourlyRate, Currency: detail.Currency, Settings: detail.Settings,
 		CreatedAt: detail.CreatedAt, UpdatedAt: detail.UpdatedAt,
 		CustomerBuiltinKey: detail.CustomerBuiltinKey,
 	}

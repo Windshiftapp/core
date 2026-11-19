@@ -4,6 +4,7 @@
   import IconSelector from '../pickers/IconSelector.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { brandStore } from '../stores/brand.svelte.js';
+  import { currencyOptions } from '../utils/money.js';
   import { isNoCustomer } from '../utils/customerLabel.js';
   import DescriptionText from '../components/DescriptionText.svelte';
 	import TextField from '../components/TextField.svelte';
@@ -21,6 +22,7 @@
       status: 'Active',
       color: '',
       hourly_rate: 0,
+      currency: '',
       settings: { max_hours: '' }
     }),
     customers = [],
@@ -84,14 +86,23 @@
     </div>
   </div>
 
-  <div class="mt-6">
+  <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
     <TextField
       label={t('timeProject.hourlyRate')}
-      helper={t('timeProject.hourlyRateHelper', { currency: brandStore.currency })}
+      helper={t('timeProject.hourlyRateHelper', { currency: formData.currency || brandStore.currency })}
       type="number"
       min="0"
       step="0.01"
       bind:value={formData.hourly_rate}
+    />
+    <SelectField
+      label={t('timeProject.currency')}
+      id="time-project-currency"
+      options={[
+        { value: '', label: t('timeProject.currencyInherit', { currency: brandStore.currency }) },
+        ...currencyOptions()
+      ]}
+      bind:value={formData.currency}
     />
   </div>
 

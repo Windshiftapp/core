@@ -362,7 +362,7 @@ func (h *WorkspaceBootstrapHandler) listProjects(ctx context.Context, userID int
 		projects = append(projects, models.TimeProject{
 			ID: project.ID, CustomerID: project.CustomerID, CategoryID: project.CategoryID,
 			Name: project.Name, Description: project.Description, Status: project.Status,
-			Color: project.Color, HourlyRate: project.HourlyRate, Settings: project.Settings,
+			Color: project.Color, HourlyRate: project.HourlyRate, Currency: project.Currency, Settings: project.Settings,
 			CreatedAt: project.CreatedAt, UpdatedAt: project.UpdatedAt,
 			CustomerName: project.CustomerName, CategoryName: project.CategoryName,
 			CategoryColor: project.CategoryColor, TotalHours: project.TotalHours,

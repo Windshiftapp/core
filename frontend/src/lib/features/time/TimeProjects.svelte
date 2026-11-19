@@ -24,7 +24,7 @@
   import { errorToast } from '../../stores/toasts.svelte.js';
   import { permissionStore, isSystemAdmin } from '../../stores/permissions.svelte.js';
   import { brandStore } from '../../stores/brand.svelte.js';
-  import { formatHourlyRate } from '../../utils/money.js';
+  import { formatHourlyRate, resolveDisplayCurrency } from '../../utils/money.js';
   import { confirm } from '../../composables/useConfirm.js';
 
   let activeTab = $state('projects');
@@ -50,6 +50,7 @@
     status: 'Active',
     color: '',
     hourly_rate: 0,
+    currency: '',
     settings: { max_hours: '' }
   });
 
@@ -106,6 +107,7 @@
       status: project.status || 'Active',
       color: project.color || '',
       hourly_rate: project.hourly_rate,
+      currency: project.currency || '',
       settings: { max_hours: project.settings?.max_hours || '' }
     };
     showCreateForm = true;
@@ -120,6 +122,7 @@
       status: 'Active',
       color: '',
       hourly_rate: 0,
+      currency: '',
       settings: { max_hours: '' }
     };
   }
@@ -437,7 +440,7 @@
     {#snippet rate(project)}
       {#if project.hourly_rate > 0}
         <span class="text-sm" style="color: var(--ds-text);">
-          {formatHourlyRate(project.hourly_rate, brandStore.currency)}
+          {formatHourlyRate(project.hourly_rate, resolveDisplayCurrency(project.currency, brandStore.currency))}
         </span>
       {:else}
         <span class="text-sm" style="color: var(--ds-text-subtle);">-</span>

@@ -299,6 +299,8 @@ export default {
     categoryOptional: 'Categorie (optioneel)',
     hourlyRate: 'Uurtarief',
     hourlyRateHelper: 'Bedragen worden weergegeven in {currency}.',
+    currency: 'Valuta',
+    currencyInherit: 'Instantie-standaard ({currency})',
     maxHours: 'Max. uren',
     maxHoursPlaceholder: 'Geen limiet',
     maxHoursHint: 'Optioneel budget voor rapportage',

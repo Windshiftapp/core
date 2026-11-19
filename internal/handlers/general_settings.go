@@ -5,10 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"golang.org/x/text/currency"
-
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/money"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 	"windshift/internal/utils"
@@ -27,7 +26,7 @@ const CurrencySettingKey = "currency"
 
 // DefaultCurrency is the ISO 4217 code used when the currency setting is absent
 // or no longer recognized.
-const DefaultCurrency = "USD"
+const DefaultCurrency = money.Default
 
 // GeneralSettingsHandler owns instance-wide general configuration. The site
 // title is its first field; the surface is meant to grow.
@@ -74,20 +73,11 @@ func (h *GeneralSettingsHandler) siteTitle() string {
 // the setting is absent or no longer recognized.
 func (h *GeneralSettingsHandler) currency() string {
 	if value, ok, err := h.settings.GetValue(CurrencySettingKey); err == nil && ok {
-		if normalized, err := normalizeCurrency(value); err == nil {
+		if normalized, err := money.Normalize(value); err == nil {
 			return normalized
 		}
 	}
 	return DefaultCurrency
-}
-
-// normalizeCurrency uppercases and validates an ISO 4217 code.
-func normalizeCurrency(code string) (string, error) {
-	unit, err := currency.ParseISO(strings.TrimSpace(code))
-	if err != nil {
-		return "", err
-	}
-	return unit.String(), nil
 }
 
 // GetSettings returns the admin general configuration.
@@ -113,7 +103,7 @@ func (h *GeneralSettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.R
 	settings.Currency = currentCurrency
 	_, currencyPresent := fields["currency"]
 	if currencyPresent {
-		normalized, err := normalizeCurrency(incomingCurrency)
+		normalized, err := money.Normalize(incomingCurrency)
 		if err != nil {
 			respondValidationError(w, r, "currency must be a valid ISO 4217 code")
 			return

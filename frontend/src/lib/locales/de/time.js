@@ -283,6 +283,8 @@ export default {
     categoryOptional: 'Kategorie (Optional)',
     hourlyRate: 'Stundensatz',
     hourlyRateHelper: 'Beträge werden in {currency} angezeigt.',
+    currency: 'Währung',
+    currencyInherit: 'Instanz-Standard ({currency})',
     maxHours: 'Max. Stunden',
     maxHoursPlaceholder: 'Kein Limit',
     maxHoursHint: 'Optionales Budget für Berichte',
