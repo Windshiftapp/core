@@ -7,6 +7,7 @@
 
 <p align="center">
   <a href="https://windshift.sh/download"><img src="https://img.shields.io/badge/download-latest-2e7dbd?style=flat-square" alt="Download"></a>
+  <a href="https://sandbox.demo.windshift.app/try-demo"><img src="https://img.shields.io/badge/demo-live-2e7dbd?style=flat-square" alt="Live demo"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-2e7dbd?style=flat-square" alt="AGPL-3.0 License"></a>
   <a href="https://windshift.sh/docs"><img src="https://img.shields.io/badge/docs-windshift.sh-2e7dbd?style=flat-square" alt="Documentation"></a>
   <a href="https://matrix.to/#/%23windshift:matrix.org"><img src="https://img.shields.io/badge/matrix-%23windshift-2e7dbd?style=flat-square" alt="Matrix chat"></a>
@@ -190,6 +191,10 @@ Windshift ships with thirteen built-in languages: English, Deutsch, Español, Fr
 </p>
 
 ## Get started
+
+Try it without installing: the [live sandbox](https://sandbox.demo.windshift.app/try-demo)
+opens a seeded Windshift instance in the browser. No install, no signup, and it
+resets nightly.
 
 Run the official Docker image:
 
