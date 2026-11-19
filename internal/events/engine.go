@@ -444,6 +444,11 @@ func (e *Engine) processOne(ctx context.Context) (bool, error) {
 	keys := e.eligibleHandlerKeys()
 	for _, consumerKey := range keys {
 		delivery, err := e.store.Claim(ctx, consumerKey, e.owner, e.now(), e.config.LeaseDuration)
+		if errors.Is(err, ErrLeaseLost) {
+			// A concurrent worker won the lease after bounded reselection; try
+			// the next consumer instead of failing the tick.
+			continue
+		}
 		if err != nil {
 			return false, err
 		}

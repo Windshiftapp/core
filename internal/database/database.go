@@ -259,13 +259,11 @@ func NewDB(dataSourceName string, readConns, writeConns int) (*DB, error) {
 		}
 	}
 
-	// Set connection pool settings for SQLite (configured via --max-read-conns)
-	readIdle := readConns / 10
-	if readIdle < 1 {
-		readIdle = 1
-	}
+	// Set connection pool settings for SQLite (configured via --max-read-conns).
+	// Keep the reader pool warm: a small idle cap made the pool close and reopen
+	// connections continuously under load, re-running the pragmas on each reopen.
 	db.SetMaxOpenConns(readConns)
-	db.SetMaxIdleConns(readIdle)
+	db.SetMaxIdleConns(readConns)
 	// Match the Postgres pool: retire idle and long-lived connections so a
 	// connection that outlives a file swap or schema change is not reused.
 	db.SetConnMaxLifetime(30 * time.Minute)
