@@ -659,6 +659,7 @@ func (h *DiagnosticsHandler) GetDatabasePool(w http.ResponseWriter, r *http.Requ
 		},
 		"request_query_outcomes": h.databaseDiagRepo.RequestQueryStats(),
 		"request_transactions":   h.databaseDiagRepo.RequestTransactionStats(),
+		"comment_sync":           services.CommentSyncStats(),
 		"instance":               hostname,
 		"sampled_at":             time.Now().UTC(),
 		"healthy":                healthy,

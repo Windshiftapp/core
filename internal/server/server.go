@@ -2682,6 +2682,11 @@ func (s *Server) cleanup() {
 	if s.zammadSyncScheduler != nil {
 		s.zammadSyncScheduler.Stop()
 	}
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		services.ShutdownCommentSync(ctx)
+		cancel()
+	}
 	// Stop rate limiters
 	if s.loginRateLimiter != nil {
 		s.loginRateLimiter.Stop()

@@ -826,12 +826,13 @@ func (s *CommentService) create(ctx context.Context, params CreateCommentParams)
 	PublishItemChange(params.ItemID)
 
 	if s.issueSync != nil && !params.IsPrivate && !params.SuppressNotifications && params.AuthorID > 0 {
-		//nolint:gosec // The GitHub push intentionally outlives the request.
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			s.issueSync.PushCommentToGitHub(ctx, params.ItemID, int(commentID), params.AuthorID, params.Content)
-		}()
+		issueSync := s.issueSync
+		itemID := params.ItemID
+		authorID := params.AuthorID
+		content := params.Content
+		enqueueCommentSync(func(ctx context.Context) {
+			issueSync.PushCommentToGitHub(ctx, itemID, int(commentID), authorID, content)
+		})
 	}
 
 	// 9. Return created comment
@@ -1291,11 +1292,13 @@ func (s *CommentService) UpdateWithEffects(params UpdateCommentParams) (*models.
 		s.webhookSender.DispatchEvent("comment.updated", item)
 	}
 	if s.issueSync != nil && !updated.IsPrivate && before.AuthorID != nil {
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			s.issueSync.PushCommentUpdateToGitHub(ctx, params.CommentID, *before.AuthorID, params.Content)
-		}()
+		issueSync := s.issueSync
+		commentID := params.CommentID
+		authorID := *before.AuthorID
+		content := params.Content
+		enqueueCommentSync(func(ctx context.Context) {
+			issueSync.PushCommentUpdateToGitHub(ctx, commentID, authorID, content)
+		})
 	}
 	return updated, nil
 }
