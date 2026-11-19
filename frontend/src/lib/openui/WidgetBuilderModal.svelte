@@ -27,13 +27,7 @@
   let { isOpen = $bindable(false), widgetId = null, workspaceId = null, onclose = null, onsaved = null } = $props();
 
   const parser = createParser(widgetLibrary.toJSONSchema());
-  const examplePrompts = [
-    'My open work as a table with a total',
-    'Items created per week as a line chart',
-    'Open items by status as a bar chart',
-    'Open items by priority as a pie chart',
-    'Release progress as a percentage',
-  ];
+  const examplePrompts = ['My open work as a table with a total'];
 
   let loading = $state(false);
   let saving = $state(false);

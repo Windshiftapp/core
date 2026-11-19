@@ -275,6 +275,7 @@ func itemListSelectClause(omitDescriptions bool) string {
 		st.name as status_name, COALESCE(st.builtin_key, '') as status_builtin_key, sc.color as status_color,
 		pri.name as priority_name, COALESCE(pri.builtin_key, '') as priority_builtin_key, pri.icon as priority_icon, pri.color as priority_color,
 		COALESCE(%s, i.created_at) as status_since,
+		COALESCE(sc.is_completed, FALSE) as status_is_completed,
 		i.team_id, i.incident_id, team.name as team_name, team.color as team_color, team.avatar_url as team_avatar
 	`, descriptionExpr, cql.CurrentStatusTransitionAtExpr(""))
 }
@@ -1029,6 +1030,7 @@ func scanItemRow(scanner interface{ Scan(dest ...any) error }, extra ...any) (mo
 	var itemTypeID, parentID, parentWorkspaceItemNumber, iterationID, projectID, timeProjectID, assigneeID, creatorID, statusID, priorityID sql.NullInt64
 	var dueDate, startDate, endDate sql.NullTime
 	var statusSince sql.NullString
+	var statusCompleted bool
 	var teamID, incidentID sql.NullInt64
 	var itemTypeName, itemTypeBuiltinKey, itemTypeIcon, itemTypeColor, parentTitle, iterationName, iterationEndDate, projectName, timeProjectName sql.NullString
 	var teamName, teamColor, teamAvatar sql.NullString
@@ -1042,13 +1044,13 @@ func scanItemRow(scanner interface{ Scan(dest ...any) error }, extra ...any) (mo
 	// populated, so scan through a nullable and fall back to updated_at.
 	var lastActiveAt sql.NullTime
 
-	dest := make([]any, 0, 57+len(extra))
+	dest := make([]any, 0, 58+len(extra))
 	dest = append(dest,
 		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
 		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &iterationID, &projectID, &inheritProject, &timeProjectID, &assigneeID, &creatorID, &customFieldValuesJSON, &calendarDataJSON, &parentID,
 		&storyPoints, &estimateMinutes, &fracIndex, &item.CreatedAt, &item.UpdatedAt, &lastActiveAt, &item.WorkspaceName, &item.WorkspaceKey, &itemTypeName, &itemTypeBuiltinKey, &itemTypeIcon, &itemTypeColor, &parentTitle, &parentWorkspaceItemNumber, &iterationName, &iterationEndDate, &projectName, &timeProjectName,
 		&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail, &statusName, &statusBuiltinKey, &statusColor, &priorityName, &priorityBuiltinKey, &priorityIcon, &priorityColor,
-		&statusSince,
+		&statusSince, &statusCompleted,
 		&teamID, &incidentID, &teamName, &teamColor, &teamAvatar,
 	)
 	if err := scanner.Scan(append(dest, extra...)...); err != nil {
@@ -1086,6 +1088,11 @@ func scanItemRow(scanner interface{ Scan(dest ...any) error }, extra ...any) (mo
 	if statusSince.Valid {
 		if t, ok := parseDBTime(statusSince.String); ok {
 			item.StatusSince = &t
+			// status_since is the transition into the current status, so it is
+			// the completion time when that status is in a completed category.
+			if statusCompleted {
+				item.CompletedAt = &t
+			}
 		}
 	}
 	if storyPoints.Valid {

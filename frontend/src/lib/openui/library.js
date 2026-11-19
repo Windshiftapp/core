@@ -205,10 +205,31 @@ const BarChartDef = defineComponent({
   component: BarChart,
 });
 
+const lineSeries = z
+  .object({
+    query: z
+      .string()
+      .optional()
+      .describe('CQL filter for the second line. Defaults to the chart query.'),
+    field: z
+      .string()
+      .optional()
+      .describe('Date field to bucket the second line on. Defaults to the chart field.'),
+    metric: z.enum(['count', 'sum']).optional().describe('Defaults to the chart metric.'),
+    label: z.string().optional().describe('Legend label for the second line.'),
+    color: z.string().optional().describe('Line color, for example "#22c55e".'),
+    dashed: z.boolean().optional().describe('Draw the line dashed.'),
+    sort,
+    limit,
+  })
+  .describe(
+    'Optional second line on the same time axis, for example opened vs closed. Give it its own query to compare two filters.'
+  );
+
 const LineChartDef = defineComponent({
   name: 'LineChart',
   description:
-    'A trend over time. Buckets rows by a date field in the browser; set sort only when the request asks for an order, and give it a generous limit.',
+    'A trend over time. Buckets rows by a date field in the browser; set sort only when the request asks for an order, and give it a generous limit. Pass series2 to draw a second line on the same axis.',
   props: z.object({
     query,
     field: z.string().optional().describe('Date field to bucket on. Defaults to "created_at".'),
@@ -217,6 +238,8 @@ const LineChartDef = defineComponent({
     limit,
     metric: z.enum(['count', 'sum']).optional().describe('Defaults to count.'),
     entity,
+    label: z.string().optional().describe('Legend label for the first line.'),
+    series2: lineSeries.optional(),
   }),
   component: LineChart,
 });

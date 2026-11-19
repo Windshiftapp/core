@@ -46,7 +46,7 @@ Data:
 - `ItemsTable(query?, columns?, sort?, limit?, entity?)` — `columns` is a comma-separated field list
 - `ItemList(query?, sort?, limit?, entity?)`
 - `BarChart(query?, group_by, sort?, limit?, metric?, field?, group_limit?, entity?, link_mode?)`
-- `LineChart(query?, field?, bucket?, sort?, limit?, metric?, entity?)` — `bucket`: day|week|month, `field` is the date field (default `created_at`)
+- `LineChart(query?, field?, bucket?, sort?, limit?, metric?, entity?, label?, series2?)` — `bucket`: day|week|month, `field` is the date field (default `created_at`), `label` names the first line in the legend. `series2` is an object `{query?, field?, metric?, label?, color?, dashed?, sort?, limit?}` that draws a second line on the same time axis; give it its own `query` to compare two filters (for example opened vs closed) and its own `field` when the two lines bucket on different dates. Both lines share the chart's `bucket`.
 - `PieChart(query?, group_by, sort?, limit?, metric?, field?, group_limit?, donut?, entity?, link_mode?)` — share-of-total pie; use it only when the request says pie or donut, otherwise `BarChart` compares better
 - `ProgressList(query?, group_by, sort?, limit?, metric?, field?, group_limit?, entity?, link_mode?)` — share-of-total bars
 - `ProgressChart(query?, completed_query, label?, limit?, entity?)` — one completion percentage: the `completed_query` count over the `query` count. Use it for release or milestone progress; both counts come from the server, so it needs no rows and a small limit is enough.
@@ -100,7 +100,9 @@ request instead of one per block:
 
 At most one item slot and one asset slot. Omit a slot entirely when the program
 does not use it. Keep the `ql`, `sort`, and `limit` identical to what the
-program passes to its data components.
+program passes to its data components. A `LineChart` `series2` with its own
+query is fetched automatically, so it is not repeated in the queries block;
+put the first line's query there.
 
 ## Rules
 
@@ -164,18 +166,19 @@ root = Card([
 {"item": {"ql": "assignee IS NULL AND status_completed = false AND createdAt <= -30d", "sort": "created_at", "limit": 10}}
 ```
 
-Opened items over the last month — the line chart buckets on the creation
-date (`created_at`, not `createdAt`); a "closed" line uses `completed_at` the
-same way:
+Opened vs closed items over the last month — one chart with two lines on the
+same week axis. The first line buckets on the creation date (`created_at`, not
+`createdAt`); the second filters to completed items and buckets on
+`completed_at`:
 
 ```
 root = Card([
-  LineChart("createdAt >= -30d", "created_at", "week", "", 1000)
+  LineChart("createdAt >= -30d AND status_completed = false", "created_at", "week", "", 1000, "count", "item", "Opened", { query: "createdAt >= -30d AND status_completed = true", field: "completed_at", label: "Closed", color: "#22c55e" })
 ])
 ```
 
 ```
-{"item": {"ql": "createdAt >= -30d", "limit": 1000}}
+{"item": {"ql": "createdAt >= -30d AND status_completed = false", "limit": 1000}}
 ```
 
 Release progress as a percentage — completed items over all items in the

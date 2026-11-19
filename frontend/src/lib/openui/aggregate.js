@@ -67,6 +67,26 @@ export function bucketByDate(rows, field, unit = 'week', { metric = 'count', sum
     .map(([key, value]) => ({ label: key, value }));
 }
 
+/**
+ * Align several bucketed series onto one sorted time axis. Each input is
+ * `Array<{label, value}>`; a bucket missing from a series counts as zero so
+ * every line shares the same x-axis.
+ *
+ * @param {Array<Array<{label: string, value: number}>>} series
+ * @returns {{ labels: string[], values: number[][] }}
+ */
+export function alignBuckets(series) {
+  const lists = series ?? [];
+  const labels = [
+    ...new Set(lists.flatMap((list) => (list ?? []).map((bucket) => bucket.label))),
+  ].sort();
+  const values = lists.map((list) => {
+    const byLabel = new Map((list ?? []).map((bucket) => [bucket.label, bucket.value]));
+    return labels.map((label) => byLabel.get(label) ?? 0);
+  });
+  return { labels, values };
+}
+
 /** Snap a date to the start of its bucket, in local time. */
 export function bucketStart(date, unit) {
   const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
