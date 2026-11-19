@@ -315,28 +315,30 @@ func (g *GitLabProvider) ListCommits(ctx context.Context, owner, repo string, op
 	return out, nil
 }
 
-func (g *GitLabProvider) ListTags(ctx context.Context, owner, repo string, since time.Time) ([]Tag, error) {
-	const perPage, maxTags = 100, 500
+// ListTags returns tags whose name matches tagPattern. GitLab's tag listing
+// already carries the commit date, so no per-tag commit fetch is needed. A
+// non-zero since is applied after listing, keeping one predecessor anchor.
+func (g *GitLabProvider) ListTags(ctx context.Context, owner, repo, tagPattern string, since time.Time) ([]Tag, error) {
+	const perPage = 100
 	var out []Tag
 	webURL := g.projectWebURL(owner, repo)
-	for page := 1; len(out) < maxTags; page++ {
+	for page := 1; ; page++ {
 		var raw []gitLabTag
 		reqURL := g.projectAPIURL(owner, repo, fmt.Sprintf("/repository/tags?page=%d&per_page=%d", page, perPage))
 		if err := g.doJSON(ctx, http.MethodGet, reqURL, http.NoBody, http.StatusOK, &raw); err != nil {
 			return nil, err
 		}
 		for _, tag := range raw {
-			created := tag.Commit.CommittedDate
-			if !since.IsZero() && created.Before(since) {
+			if !tagPatternMatches(tagPattern, tag.Name) {
 				continue
 			}
-			out = append(out, Tag{Name: tag.Name, SHA: tag.Target, URL: webURL + "/-/tags/" + url.PathEscape(tag.Name), CreatedAt: created})
+			out = append(out, Tag{Name: tag.Name, SHA: tag.Target, URL: webURL + "/-/tags/" + url.PathEscape(tag.Name), CreatedAt: tag.Commit.CommittedDate})
 		}
 		if len(raw) < perPage {
 			break
 		}
 	}
-	return out, nil
+	return applyTagCutoff(out, since), nil
 }
 
 func (g *GitLabProvider) CompareCommits(ctx context.Context, owner, repo, base, head string) ([]Commit, error) {
