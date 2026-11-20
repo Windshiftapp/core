@@ -17,6 +17,8 @@
   import Textarea from '../../components/Textarea.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import { buildChatContext } from './chatContext.js';
+  import { buildConversationOptions } from './conversationOptions.js';
+  import { workspacesStore } from '../../stores/workspaces.svelte.js';
 
   let {
     isOpen = $bindable(false),
@@ -64,26 +66,15 @@
   const activeStandardAgent = $derived(
     chatStore.availableAgents.find((agent) => agent.id === chatStore.agentProfileId) || null
   );
-  const conversationOptions = $derived.by(() => {
-    const options = [{ value: 'general', label: 'General' }];
-    if (!canUseStandard) return options;
-    for (const session of chatStore.sessions) {
-      const agent = chatStore.availableAgents.find(
-        (candidate) => candidate.id === session.agent_profile_id
-      );
-      options.push({
-        value: `session:${session.id}`,
-        label: session.title || agent?.name || 'Standard agent chat',
-      });
-    }
-    for (const agent of chatStore.availableAgents) {
-      options.push({
-        value: `new:${agent.id}`,
-        label: `New chat · ${agent.name || `@${agent.handle}`}`,
-      });
-    }
-    return options;
-  });
+  const conversationOptions = $derived(
+    buildConversationOptions({
+      sessions: chatStore.sessions,
+      agents: chatStore.availableAgents,
+      workspaceId,
+      canChatIn: (id) => workspacePermissions.canEdit(id),
+      workspaceName: (id) => $workspacesStore.allWorkspaces.find((ws) => ws.id === id)?.name,
+    })
+  );
 
   function startResize(event, type) {
     isResizing = true;
@@ -297,7 +288,7 @@
       </div>
     </div>
 
-    {#if canUseStandard && conversationOptions.length > 1}
+    {#if conversationOptions.length > 1}
       <div class="flex items-center gap-2 border-b px-4 py-2" style="border-color: var(--ds-border);">
         <Select
           id="agent-chat-conversation"
@@ -309,15 +300,17 @@
           disabled={chatStore.loading || chatStore.conversationLoading}
         />
         {#if chatStore.sessionType === 'standard'}
-          <Button
-            variant="ghost"
-            size="small"
-            icon={IconPlus}
-            title="New chat with this agent"
-            onclick={() => chatStore.startStandardConversation(workspaceId)}
-            dataTestid="agent-chat-new"
-            class="!px-2"
-          />
+          {#if canUseStandard}
+            <Button
+              variant="ghost"
+              size="small"
+              icon={IconPlus}
+              title="New chat with this agent"
+              onclick={() => chatStore.startStandardConversation(workspaceId)}
+              dataTestid="agent-chat-new"
+              class="!px-2"
+            />
+          {/if}
           <Button
             variant="ghost"
             size="small"

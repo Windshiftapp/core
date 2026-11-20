@@ -133,35 +133,23 @@ async function prepareWorkspaceOptions(workspaceId, allowStandard) {
     return;
   }
 
-  if (key === 'all') {
-    availableAgents = [];
-    try {
-      const sessionResult = await ai.listSessions();
-      sessions = (Array.isArray(sessionResult) ? sessionResult : []).filter(
-        (session) =>
-          session.session_type === 'standard' && session.workspace_id && !session.archived_at
-      );
-    } catch (err) {
-      console.error('Failed to load agent conversations:', err);
-      sessions = [];
-    }
-    return;
-  }
-
+  const allWorkspaces = key === 'all';
   try {
     const [sessionResult, agentResult] = await Promise.all([
       ai.listSessions(),
-      ai.listAvailableStandardAgents(normalizedWorkspaceId),
+      allWorkspaces ? [] : ai.listAvailableStandardAgents(normalizedWorkspaceId),
     ]);
     sessions = (Array.isArray(sessionResult) ? sessionResult : []).filter(
       (session) =>
         session.session_type === 'standard' &&
-        Number(session.workspace_id) === normalizedWorkspaceId &&
-        !session.archived_at
+        !session.archived_at &&
+        (allWorkspaces
+          ? Boolean(session.workspace_id)
+          : Number(session.workspace_id) === normalizedWorkspaceId)
     );
     availableAgents = Array.isArray(agentResult) ? agentResult : [];
   } catch (err) {
-    console.error('Failed to load workspace agent conversations:', err);
+    console.error('Failed to load agent conversations:', err);
     sessions = [];
     availableAgents = [];
   }
