@@ -643,6 +643,7 @@
         .use(imageBlockComponent)  // Enable image resizing
         .use(mentionDecorationPlugin)  // Add mention chip decorations
         .use(taskListPlugin)           // Render/toggle GFM task-list checkboxes
+        .use(toggleTaskListCommand)    // Task List toolbar command
         .use(linkSanitizerPlugin);     // Sanitize dangerous URL schemes in links/images
 
       if (enableDiagrams) {

@@ -108,6 +108,19 @@ function isMarkerClick(li, event) {
   return event.clientX < boundary;
 }
 
+/**
+ * Apply a checkbox toggle and keep keyboard focus on the marker. Changing the
+ * list item's markup makes ProseMirror replace the focused <li>, so focus is
+ * restored to the replacement to preserve the Tab sequence.
+ */
+function applyToggle(view, found, marker) {
+  const hadFocus = marker === document.activeElement;
+  view.dispatch(flipTaskChecked(view.state, found));
+  if (!hadFocus) return;
+  const replacement = view.nodeDOM(found.pos);
+  if (replacement instanceof HTMLElement) replacement.focus();
+}
+
 export const taskListPlugin = $prose(() => {
   return new Plugin({
     key: taskListPluginKey,
@@ -134,7 +147,7 @@ export const taskListPlugin = $prose(() => {
           if (!found) return false;
           // Keep the caret where it was instead of selecting on click.
           event.preventDefault();
-          view.dispatch(flipTaskChecked(view.state, found));
+          applyToggle(view, found, li);
           return true;
         },
       },
@@ -149,7 +162,7 @@ export const taskListPlugin = $prose(() => {
         const found = taskListItemFromEvent(view, target);
         if (!found) return false;
         event.preventDefault();
-        view.dispatch(flipTaskChecked(view.state, found));
+        applyToggle(view, found, target);
         return true;
       },
     },
