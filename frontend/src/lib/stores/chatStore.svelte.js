@@ -20,6 +20,9 @@ let workspaceOptionsKey = '';
 let historyLoaded = $state(false);
 let historyPromise = null;
 let historyAfterMessageId = $state(0);
+// Set once a conversation has been started or loaded, so reopening the panel
+// resumes it instead of starting over.
+let conversationStarted = false;
 
 function messageID(messagesToInspect) {
   return messagesToInspect.reduce(
@@ -86,6 +89,7 @@ async function startNewGeneralChat() {
     error = '';
     itemKeyMap = {};
     historyLoaded = true;
+    conversationStarted = true;
   } catch (err) {
     error = err.message || 'Conversation could not be started';
   } finally {
@@ -108,10 +112,34 @@ async function loadSession(session) {
     error = '';
     itemKeyMap = {};
     historyLoaded = true;
+    conversationStarted = true;
   } catch (err) {
     error = err.message || 'Conversation could not be loaded';
   } finally {
     conversationLoading = false;
+  }
+}
+
+/**
+ * Called each time the chat panel opens. The first open starts a fresh general
+ * chat; later opens keep whatever conversation the user last had. An agent
+ * chat survives only where it can still be used: the backend rejects a turn
+ * outside its workspace or without edit there, so it falls back to general.
+ *
+ * @param {number} workspaceId the route's workspace, 0 off workspace routes
+ * @param {boolean} allowStandard user can use agent chats in that workspace
+ * @param {(workspaceId: number) => boolean} canChatIn user may chat in a workspace
+ */
+async function resumeConversation(workspaceId, allowStandard, canChatIn) {
+  await prepareWorkspaceOptions(workspaceId, allowStandard);
+  if (!conversationStarted) {
+    await startNewGeneralChat();
+    return;
+  }
+  if (sessionType !== 'standard') return;
+  const current = sessions.find((session) => session.id === sessionId);
+  if (!current || !canChatIn(Number(current.workspace_id))) {
+    await startNewGeneralChat();
   }
 }
 
@@ -423,6 +451,7 @@ export const chatStore = {
   loadGeneralHistory,
   startNewGeneralChat,
   prepareWorkspaceOptions,
+  resumeConversation,
   selectConversation,
   startStandardConversation,
   archiveCurrentSession,

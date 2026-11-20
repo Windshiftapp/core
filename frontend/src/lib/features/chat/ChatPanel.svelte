@@ -156,10 +156,10 @@
     if (initializedForOpen) return;
     initializedForOpen = true;
     chatStore.loadConnections();
-    void (async () => {
-      await chatStore.startNewGeneralChat();
-      await chatStore.prepareWorkspaceOptions(workspaceId, canUseStandard);
-    })();
+    // Resume the last conversation rather than starting over on every open.
+    void chatStore.resumeConversation(workspaceId, canUseStandard, (id) =>
+      workspacePermissions.canEdit(id)
+    );
   });
 
   function handleClose() {

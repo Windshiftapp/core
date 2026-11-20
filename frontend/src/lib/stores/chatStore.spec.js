@@ -6,6 +6,7 @@ vi.mock('../api/ai.js', () => ({
     listAvailableStandardAgents: vi.fn(),
     getGeneralSession: vi.fn(),
     getSessionMessages: vi.fn(),
+    chat: vi.fn(),
   },
   llmProviders: { getEnabled: vi.fn() },
 }));
@@ -31,7 +32,59 @@ beforeEach(async () => {
   vi.mocked(ai.listAvailableStandardAgents).mockReset().mockResolvedValue([]);
   vi.mocked(ai.getGeneralSession).mockReset().mockResolvedValue({ id: 9 });
   vi.mocked(ai.getSessionMessages).mockReset().mockResolvedValue([]);
+  vi.mocked(ai.chat).mockReset().mockResolvedValue({ answer: 'hello', session_id: 9 });
   ({ chatStore } = await import('./chatStore.svelte.js'));
+});
+
+describe('chatStore.resumeConversation', () => {
+  const anyWorkspace = () => true;
+
+  it('starts a fresh general chat on the first open', async () => {
+    await chatStore.resumeConversation(0, false, anyWorkspace);
+    expect(ai.getGeneralSession).toHaveBeenCalledTimes(1);
+    expect(chatStore.sessionType).toBe('general');
+    expect(chatStore.sessions.map((s) => s.id)).toEqual([1, 2]);
+  });
+
+  it('keeps the general chat messages when reopened', async () => {
+    await chatStore.resumeConversation(0, false, anyWorkspace);
+    await chatStore.sendMessage('hi');
+    await chatStore.resumeConversation(0, false, anyWorkspace);
+    expect(ai.getGeneralSession).toHaveBeenCalledTimes(1);
+    expect(chatStore.messages.map((m) => m.content)).toEqual(['hi', 'hello']);
+  });
+
+  it('keeps the selected agent chat when reopened', async () => {
+    await chatStore.resumeConversation(0, false, anyWorkspace);
+    await chatStore.selectConversation('session:1', 0);
+    await chatStore.resumeConversation(0, false, anyWorkspace);
+    expect(chatStore.sessionType).toBe('standard');
+    expect(chatStore.sessionId).toBe(1);
+    expect(ai.getGeneralSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps an agent chat when reopened inside its own workspace', async () => {
+    await chatStore.resumeConversation(0, false, anyWorkspace);
+    await chatStore.selectConversation('session:1', 0);
+    await chatStore.resumeConversation(1, true, anyWorkspace);
+    expect(chatStore.sessionId).toBe(1);
+    expect(chatStore.sessionType).toBe('standard');
+  });
+
+  it('falls back to general when reopened in another workspace', async () => {
+    await chatStore.resumeConversation(0, false, anyWorkspace);
+    await chatStore.selectConversation('session:2', 0);
+    await chatStore.resumeConversation(1, true, anyWorkspace);
+    expect(chatStore.sessionType).toBe('general');
+    expect(chatStore.sessionId).toBe(9);
+  });
+
+  it('falls back to general when the user can no longer chat in that workspace', async () => {
+    await chatStore.resumeConversation(0, false, anyWorkspace);
+    await chatStore.selectConversation('session:1', 0);
+    await chatStore.resumeConversation(0, false, (id) => id !== 1);
+    expect(chatStore.sessionType).toBe('general');
+  });
 });
 
 describe('chatStore.prepareWorkspaceOptions', () => {
