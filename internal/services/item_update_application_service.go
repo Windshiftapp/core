@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -432,12 +433,12 @@ func (s *ItemUpdateApplicationService) invalidateEffectiveProjectSubtree(itemID 
 	if s.hierarchy == nil {
 		return
 	}
-	descendants, err := s.hierarchy.GetDescendants(itemID, 0)
+	descendantIDs, err := s.hierarchy.GetDescendantIDsContext(context.Background(), itemID, 0)
 	if err != nil {
 		slog.Warn("failed to load descendants for cache invalidation", slog.Int("item_id", itemID), slog.Any("error", err))
 		return
 	}
-	for i := range descendants {
-		_ = s.itemCache.InvalidateItemHierarchy(descendants[i].ID, nil)
+	for _, descendantID := range descendantIDs {
+		_ = s.itemCache.InvalidateItemHierarchy(descendantID, nil)
 	}
 }

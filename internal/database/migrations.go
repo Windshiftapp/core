@@ -3486,6 +3486,25 @@ CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_m
 			CREATE INDEX IF NOT EXISTS idx_items_workspace_frac_index_active ON items(workspace_id, frac_index) WHERE merged_into_item_id IS NULL;
 		`,
 	},
+	{
+		// The board's Bubble Mode sorts by the null-safe recency expression,
+		// which the narrower (workspace_id, last_active_at) index cannot supply:
+		// both engines fall back to a workspace scan plus a temporary sort. The
+		// partial expression index matches the exact ORDER BY, so page selection
+		// becomes an ordered index search, and it replaces the index it supersedes.
+		Version:       "20261129_items_workspace_activity_index",
+		Name:          "Index the active item list by workspace recency",
+		CheckSQLite:   sqliteIndexCheck("idx_items_workspace_activity_active"),
+		CheckPostgres: pgIndexCheck("idx_items_workspace_activity_active"),
+		SQLite: `
+			DROP INDEX IF EXISTS idx_items_workspace_last_active;
+			CREATE INDEX IF NOT EXISTS idx_items_workspace_activity_active ON items(workspace_id, COALESCE(last_active_at, updated_at, created_at), id) WHERE merged_into_item_id IS NULL;
+		`,
+		Postgres: `
+			DROP INDEX IF EXISTS idx_items_workspace_last_active;
+			CREATE INDEX IF NOT EXISTS idx_items_workspace_activity_active ON items(workspace_id, COALESCE(last_active_at, updated_at, created_at), id) WHERE merged_into_item_id IS NULL;
+		`,
+	},
 }
 
 // domainEventClaimableIndexMigration adds the partial index the claim query

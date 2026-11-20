@@ -860,33 +860,46 @@ func (s *ItemCRUDService) GetWithEffectiveProject(id int) (*models.Item, error) 
 	if err != nil {
 		return nil, err
 	}
+	if err := s.ApplyEffectiveProject(item); err != nil {
+		return nil, err
+	}
+	return item, nil
+}
+
+// ApplyEffectiveProject resolves and attaches the effective project and its
+// display name to an already-loaded item. Callers that already read the item
+// for authorization use it instead of paying for a second joined detail SELECT.
+func (s *ItemCRUDService) ApplyEffectiveProject(item *models.Item) error {
+	if item == nil {
+		return nil
+	}
 
 	// Resolve the effective project through the shared cache when one is wired,
 	// so a repeat read does not re-walk the parent chain. The cache and the
 	// uncached path share ResolveEffectiveProject as the single source of truth.
-	effectiveProjectID, inheritanceMode, err := s.resolveEffectiveProject(id)
+	effectiveProjectID, inheritanceMode, err := s.resolveEffectiveProject(item.ID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	item.EffectiveProjectID = effectiveProjectID
 	item.ProjectInheritanceMode = inheritanceMode
 
 	// Populate the effective project name when one resolved.
-	if item.EffectiveProjectID != nil {
-		if item.ProjectID != nil && *item.ProjectID == *item.EffectiveProjectID {
-			item.EffectiveProjectName = item.ProjectName
-		} else {
-			var name sql.NullString
-			if err := s.db.QueryRow("SELECT name FROM time_projects WHERE id = ?", *item.EffectiveProjectID).Scan(&name); err != nil {
-				slog.Warn("failed to look up project name", slog.Any("error", err))
-			}
-			if name.Valid {
-				item.EffectiveProjectName = name.String
-			}
-		}
+	if item.EffectiveProjectID == nil {
+		return nil
 	}
-
-	return item, nil
+	if item.ProjectID != nil && *item.ProjectID == *item.EffectiveProjectID {
+		item.EffectiveProjectName = item.ProjectName
+		return nil
+	}
+	var name sql.NullString
+	if err := s.db.QueryRow("SELECT name FROM time_projects WHERE id = ?", *item.EffectiveProjectID).Scan(&name); err != nil {
+		slog.Warn("failed to look up project name", slog.Any("error", err))
+	}
+	if name.Valid {
+		item.EffectiveProjectName = name.String
+	}
+	return nil
 }
 
 // resolveEffectiveProject returns (effective_project_id, mode, error) for an

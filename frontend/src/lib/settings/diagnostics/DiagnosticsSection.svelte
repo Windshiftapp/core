@@ -31,19 +31,45 @@
 
   let interval;
 
+  // Automatic refreshes coalesce: an in-flight load already reflects current
+  // state, so a tick that lands while loading would only add duplicate work.
   function refresh() {
+    if (loading) return;
     onLoad?.();
   }
 
-  onMount(() => {
-    refresh();
-    if (refreshInterval) {
-      interval = setInterval(refresh, refreshInterval);
+  function startInterval() {
+    if (!refreshInterval || interval) return;
+    interval = setInterval(refresh, refreshInterval);
+  }
+
+  function stopInterval() {
+    if (!interval) return;
+    clearInterval(interval);
+    interval = undefined;
+  }
+
+  // A hidden tab has no observer, so pause polling and refresh once when it
+  // becomes visible again.
+  function handleVisibility() {
+    if (document.visibilityState === 'hidden') {
+      stopInterval();
+      return;
     }
+    refresh();
+    startInterval();
+  }
+
+  onMount(() => {
+    document.addEventListener('visibilitychange', handleVisibility);
+    if (document.visibilityState === 'hidden') return;
+    refresh();
+    startInterval();
   });
 
   onDestroy(() => {
-    if (interval) clearInterval(interval);
+    stopInterval();
+    document.removeEventListener('visibilitychange', handleVisibility);
   });
 </script>
 

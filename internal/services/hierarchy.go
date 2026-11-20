@@ -137,6 +137,16 @@ func (h *HierarchyService) CountDescendants(itemID int) (int, error) {
 	return h.repo.CountDescendants(itemID)
 }
 
+// GetDescendantIDsContext returns only the IDs of an item's descendants,
+// capped at maxDepth. Cache invalidation uses it to avoid hydrating full rows
+// just to evict by ID.
+func (h *HierarchyService) GetDescendantIDsContext(ctx context.Context, itemID, maxDepth int) ([]int, error) {
+	if maxDepth <= 0 || maxDepth > maxHierarchyDepth {
+		maxDepth = maxHierarchyDepth
+	}
+	return h.repo.GetDescendantIDsWithMaxDepthContext(ctx, itemID, maxDepth)
+}
+
 // CountDescendantsContext is the request-aware form of CountDescendants.
 func (h *HierarchyService) CountDescendantsContext(ctx context.Context, itemID int) (int, error) {
 	return h.repo.CountDescendantsContext(ctx, itemID)
