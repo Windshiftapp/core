@@ -185,6 +185,7 @@ export default {
     inlineCode: '行内代码',
     bulletList: '无序列表',
     numberedList: '有序列表',
+    taskList: '任务列表',
     insertImage: '插入图片',
     userNotFound: '未找到用户',
     multipleUsersMatch: '多个用户匹配',

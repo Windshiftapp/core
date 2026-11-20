@@ -17,6 +17,7 @@
   import Code from '@lucide/svelte/icons/code';
   import List from '@lucide/svelte/icons/list';
   import ListOrdered from '@lucide/svelte/icons/list-ordered';
+  import ListChecks from '@lucide/svelte/icons/list-checks';
   import Strikethrough from '@lucide/svelte/icons/strikethrough';
   import ImageIcon from '@lucide/svelte/icons/image';
   import IconGraph from '@tabler/icons-svelte-runes/icons/graph';
@@ -33,6 +34,7 @@
   import { linkSanitizerPlugin } from './milkdown-link-sanitizer.js';
   import { imageBlockerPlugin } from './milkdown-image-blocker.js';
   import { rewriteBreakHTML } from './milkdown-hardbreak.js';
+  import { taskListPlugin, toggleTaskListCommand } from './milkdown-task-list.js';
   import { excalidrawBlock } from './milkdown-excalidraw-block.svelte.js';
   import PageDiagramModal from '../features/pages/PageDiagramModal.svelte';
   import { highlightCodeBlocks } from './code-highlight.js';
@@ -162,6 +164,10 @@
 
   function toggleOrderedList() {
     if (editor) editor.action(callCommand(wrapInOrderedListCommand.key));
+  }
+
+  function toggleTaskList() {
+    if (editor) editor.action(callCommand(toggleTaskListCommand.key));
   }
 
   // Mention handling functions
@@ -636,6 +642,7 @@
         .use(upload)  // Include upload in main chain per docs
         .use(imageBlockComponent)  // Enable image resizing
         .use(mentionDecorationPlugin)  // Add mention chip decorations
+        .use(taskListPlugin)           // Render/toggle GFM task-list checkboxes
         .use(linkSanitizerPlugin);     // Sanitize dangerous URL schemes in links/images
 
       if (enableDiagrams) {
@@ -957,6 +964,13 @@
         {#snippet children()}
           <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleOrderedList} aria-label={t('editors.numberedList')}>
             <ListOrdered size={14} />
+          </button>
+        {/snippet}
+      </Tooltip>
+      <Tooltip content={t('editors.taskList')} placement="bottom">
+        {#snippet children()}
+          <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleTaskList} aria-label={t('editors.taskList')} data-testid="milkdown-toggle-task-list">
+            <ListChecks size={14} />
           </button>
         {/snippet}
       </Tooltip>
@@ -1373,15 +1387,61 @@
   }
 
   /* GFM: Task lists */
-  :global(.milkdown-editor .ProseMirror .task-list-item) {
-    display: flex;
-    align-items: flex-start;
+  :global(.milkdown-editor .ProseMirror li[data-item-type='task']) {
+    position: relative;
     list-style: none;
+    padding-left: 1.5rem;
   }
 
-  :global(.milkdown-editor .ProseMirror .task-list-item input[type="checkbox"]) {
-    margin-right: 0.5rem;
-    margin-top: 0.25rem;
+  :global(.milkdown-editor .ProseMirror li[data-item-type='task']::before) {
+    content: '';
+    position: absolute;
+    top: 0.3rem;
+    left: 0;
+    box-sizing: border-box;
+    width: 1rem;
+    height: 1rem;
+    border: 1px solid var(--ds-border);
+    border-radius: 0.25rem;
+    background: var(--ds-surface);
+  }
+
+  :global(.milkdown-editor .ProseMirror li[data-item-type='task']::after) {
+    content: '';
+    position: absolute;
+    top: 0.48rem;
+    left: 0.34rem;
+    width: 0.3rem;
+    height: 0.55rem;
+    border: solid var(--ds-text-inverse);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+    opacity: 0;
+  }
+
+  :global(.milkdown-editor .ProseMirror li[data-item-type='task'][data-checked='true']::before) {
+    border-color: var(--ds-interactive);
+    background: var(--ds-interactive);
+  }
+
+  :global(.milkdown-editor .ProseMirror li[data-item-type='task'][data-checked='true']::after) {
+    opacity: 1;
+  }
+
+  :global(.milkdown-editor .ProseMirror li[data-item-type='task']:focus-visible) {
+    outline: none;
+  }
+
+  :global(.milkdown-editor .ProseMirror li[data-item-type='task']:focus-visible::before) {
+    outline: 2px solid var(--ds-border-focused);
+    outline-offset: 1px;
+  }
+
+  :global(.milkdown-editor.readonly .ProseMirror li[data-item-type='task']::before) {
+    cursor: default;
+  }
+
+  :global(.milkdown-editor:not(.readonly) .ProseMirror li[data-item-type='task']::before) {
     cursor: pointer;
   }
 

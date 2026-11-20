@@ -255,6 +255,7 @@ export default {
     inlineCode: 'Inline-Code',
     bulletList: 'Aufzählungsliste',
     numberedList: 'Nummerierte Liste',
+    taskList: 'Aufgabenliste',
     insertImage: 'Bild einfügen',
     userNotFound: 'Benutzer nicht gefunden',
     multipleUsersMatch: 'Mehrere Benutzer stimmen überein',
