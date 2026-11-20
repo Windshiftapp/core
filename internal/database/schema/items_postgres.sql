@@ -120,6 +120,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_items_frac_index ON items(frac_index);
 CREATE INDEX IF NOT EXISTS idx_items_workspace_frac_index ON items(workspace_id, frac_index);
 CREATE INDEX IF NOT EXISTS idx_items_workspace_parent_frac_index ON items(workspace_id, parent_id, frac_index);
 
+-- Active (unmerged) item indexes. Every list and count filters out merged
+-- duplicates, so the partial predicate keeps those rows out of the hot-path
+-- indexes and makes the workspace count and the ranked page selection
+-- index-only instead of scanning the items table.
+CREATE INDEX IF NOT EXISTS idx_items_workspace_id_active ON items(workspace_id) WHERE merged_into_item_id IS NULL;
+CREATE INDEX IF NOT EXISTS idx_items_workspace_frac_index_active ON items(workspace_id, frac_index) WHERE merged_into_item_id IS NULL;
+
 -- Durable singleton coordination state for the 0.8.5 global rank
 -- normalization. The 'legacy' phase stays admitted here only so databases
 -- converted by the retired 0.8.5 checkpoint converter still load; the

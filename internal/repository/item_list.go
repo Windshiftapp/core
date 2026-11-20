@@ -383,7 +383,7 @@ func (r *ItemRepository) FindAllWithDetailsPageContext(ctx context.Context, para
 	// rows. Keeping the page IDs in a CTE means only the requested rows pay for
 	// descriptions, hierarchy/status enrichment, and the correlated status
 	// transition lookup.
-	pageQuery := "WITH page_items AS (SELECT i.id " + pagePlan.pageFromClause + pagePlan.pageWhereClause + orderByClause + fmt.Sprintf(" LIMIT %d OFFSET %d", fetchLimit, offset) + ") "
+	pageQuery := "WITH page_items AS (" + itemListPageIDQuery(pagePlan, orderByClause, fetchLimit, offset) + ") "
 	fullQuery := pageQuery + selectClause + fromClause + " JOIN page_items page ON page.id = i.id" + orderByClause
 	rows, err := pageQueryer.QueryContext(ctx, fullQuery, pagePlan.pageArgs...)
 	if err != nil {
@@ -415,6 +415,13 @@ func (r *ItemRepository) FindAllWithDetailsPageContext(ctx context.Context, para
 	return page, nil
 }
 
+// itemListPageIDQuery selects the ordered page IDs before hydration. Keeping
+// it separate lets the query-plan regression assert the same SQL the list path
+// runs.
+func itemListPageIDQuery(plan itemListPagePlan, orderByClause string, limit, offset int) string {
+	return "SELECT i.id " + plan.pageFromClause + plan.pageWhereClause + orderByClause + fmt.Sprintf(" LIMIT %d OFFSET %d", limit, offset)
+}
+
 // FindIDPageContext returns one ordered item-ID page using the same filters,
 // access scope, count, and sorting contract as the full item list.
 func (r *ItemRepository) FindIDPageContext(ctx context.Context, params ItemListParams) (ItemIDPage, error) {
@@ -441,9 +448,7 @@ func (r *ItemRepository) FindIDPageContext(ctx context.Context, params ItemListP
 		limit = 1000
 	}
 	offset := max(params.Pagination.Offset, 0)
-	query := "SELECT i.id " + plan.pageFromClause + plan.pageWhereClause +
-		r.buildOrderByClause(params.SortBy, params.SortAsc) +
-		fmt.Sprintf(" LIMIT %d OFFSET %d", limit, offset)
+	query := itemListPageIDQuery(plan, r.buildOrderByClause(params.SortBy, params.SortAsc), limit, offset)
 
 	rows, err := r.db.QueryContext(ctx, query, plan.pageArgs...)
 	if err != nil {
