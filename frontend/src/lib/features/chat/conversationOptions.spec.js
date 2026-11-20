@@ -28,6 +28,15 @@ describe('buildConversationOptions', () => {
     ]);
   });
 
+  it('drops sessions from other workspaces inside a workspace', () => {
+    const other = { id: 2, title: 'Other Bot', agent_profile_id: 2, workspace_id: 2 };
+    expect(
+      buildConversationOptions({ ...base, workspaceId: 1, sessions: [session, other] }).map(
+        (o) => o.value
+      )
+    ).toEqual(['general', 'session:1']);
+  });
+
   it('falls back to the bare title when the workspace name is unknown', () => {
     expect(buildConversationOptions({ ...base, workspaceName: () => undefined })[1].label).toBe(
       'Guide Bot'

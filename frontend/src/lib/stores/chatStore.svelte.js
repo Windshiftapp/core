@@ -150,6 +150,8 @@ async function prepareWorkspaceOptions(workspaceId, allowStandard) {
     availableAgents = Array.isArray(agentResult) ? agentResult : [];
   } catch (err) {
     console.error('Failed to load agent conversations:', err);
+    // Forget the key so the next open retries instead of keeping the picker hidden.
+    workspaceOptionsKey = '';
     sessions = [];
     availableAgents = [];
   }

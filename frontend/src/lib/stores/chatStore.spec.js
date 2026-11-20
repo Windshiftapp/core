@@ -57,6 +57,16 @@ describe('chatStore.prepareWorkspaceOptions', () => {
     expect(chatStore.sessions.map((s) => s.id)).toEqual([1, 2]);
   });
 
+  it('retries the session list on the next open after a failed load', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(ai.listSessions).mockRejectedValueOnce(new Error('network'));
+    await chatStore.prepareWorkspaceOptions(0, false);
+    expect(chatStore.sessions).toEqual([]);
+    await chatStore.prepareWorkspaceOptions(0, false);
+    expect(ai.listSessions).toHaveBeenCalledTimes(2);
+    expect(chatStore.sessions.map((s) => s.id)).toEqual([1, 2]);
+  });
+
   it('keeps sessions empty in a workspace the user cannot edit', async () => {
     await chatStore.prepareWorkspaceOptions(1, false);
     expect(chatStore.sessions).toEqual([]);

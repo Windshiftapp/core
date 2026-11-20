@@ -26,6 +26,9 @@ export function buildConversationOptions({
   const options = [{ value: 'general', label: 'General' }];
   for (const session of sessions) {
     if (!canChatIn(session.workspace_id)) continue;
+    // Inside a workspace the backend rejects turns for another workspace's
+    // session, so never offer one even if a stale list slipped through.
+    if (workspaceId && session.workspace_id !== workspaceId) continue;
     const agent = agents.find((candidate) => candidate.id === session.agent_profile_id);
     let label = session.title || agent?.name || 'Standard agent chat';
     if (!workspaceId) {
