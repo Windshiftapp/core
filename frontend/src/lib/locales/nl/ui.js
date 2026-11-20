@@ -246,6 +246,7 @@ export default {
     inlineCode: 'Inline code',
     bulletList: 'Opsomming',
     numberedList: 'Genummerde lijst',
+    taskList: 'Takenlijst',
     insertImage: 'Afbeelding invoegen',
     userNotFound: 'Gebruiker niet gevonden',
     multipleUsersMatch: 'Meerdere gebruikers komen overeen',

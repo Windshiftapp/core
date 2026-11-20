@@ -250,6 +250,7 @@ export default {
     inlineCode: 'Code en ligne',
     bulletList: 'Liste à puces',
     numberedList: 'Liste numérotée',
+    taskList: 'Liste de tâches',
     insertImage: 'Insérer une image',
     userNotFound: 'Utilisateur introuvable',
     multipleUsersMatch: 'Plusieurs utilisateurs correspondent',

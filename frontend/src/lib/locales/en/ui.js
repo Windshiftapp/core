@@ -246,6 +246,7 @@ export default {
     inlineCode: 'Inline Code',
     bulletList: 'Bullet List',
     numberedList: 'Numbered List',
+    taskList: 'Task List',
     insertImage: 'Insert Image',
     userNotFound: 'User not found',
     multipleUsersMatch: 'Multiple users match',
