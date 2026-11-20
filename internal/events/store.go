@@ -420,6 +420,10 @@ func (s *Store) ActiveConsumerKeys(ctx context.Context) ([]string, error) {
 // the periodic safety rescan stays bounded (WI-1770). Callers advance the
 // cursor from the gate's highest visible event id once a scan is exhaustive, so
 // this statement does not read MAX(id) itself.
+//
+// The scan is driven by the consumer's explicit subscriptions so the planner
+// can seek idx_domain_events_type_id and skip unrelated event types. A
+// wildcard subscription subsumes the explicit set and scans every type.
 func (s *Store) reconcileConsumer(
 	ctx context.Context,
 	consumerKey string,
@@ -430,12 +434,26 @@ func (s *Store) reconcileConsumer(
 	if limit <= 0 {
 		return 0, errors.New("reconcile limit must be positive")
 	}
+	eventTypes, wildcard, err := s.consumerEventTypes(ctx, consumerKey)
+	if err != nil {
+		return 0, err
+	}
+	if !wildcard && len(eventTypes) == 0 {
+		return 0, nil
+	}
 	args := []any{afterID, consumerKey}
+	typeCount := 0
+	if !wildcard {
+		typeCount = len(eventTypes)
+		for _, eventType := range eventTypes {
+			args = append(args, eventType)
+		}
+	}
 	if !since.IsZero() {
 		args = append(args, since)
 	}
-	query := reconcileConsumerQuery(s.db.GetDriverName(), !since.IsZero())
 	args = append(args, limit)
+	query := reconcileConsumerQuery(s.db.GetDriverName(), !since.IsZero(), typeCount)
 	result, err := s.db.ExecWriteContext(ctx, query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("reconcile domain event deliveries for %q: %w", consumerKey, err)
@@ -445,6 +463,37 @@ func (s *Store) reconcileConsumer(
 		return 0, fmt.Errorf("read reconciled delivery count for %q: %w", consumerKey, err)
 	}
 	return created, nil
+}
+
+// consumerEventTypes returns the consumer's explicit subscriptions and whether
+// it also subscribes to every event type. The rows come back ordered by the
+// primary key, so the built query is stable across calls.
+func (s *Store) consumerEventTypes(ctx context.Context, consumerKey string) (eventTypes []string, wildcard bool, err error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT event_type
+		FROM domain_event_subscriptions
+		WHERE consumer_key = ?
+		ORDER BY event_type
+	`, consumerKey)
+	if err != nil {
+		return nil, false, fmt.Errorf("load domain event subscriptions for %q: %w", consumerKey, err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var eventType string
+		if err := rows.Scan(&eventType); err != nil {
+			return nil, false, fmt.Errorf("scan domain event subscription for %q: %w", consumerKey, err)
+		}
+		if eventType == "*" {
+			wildcard = true
+			continue
+		}
+		eventTypes = append(eventTypes, eventType)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, fmt.Errorf("iterate domain event subscriptions for %q: %w", consumerKey, err)
+	}
+	return eventTypes, wildcard, nil
 }
 
 // GateResult is the answer of the once-per-tick gate statement.
@@ -543,8 +592,11 @@ func (s *Store) Gate(ctx context.Context, minCursor int64, now time.Time) (GateR
 // reconcileConsumerQuery builds the delivery-insertion statement. withSince
 // adds the recorded_at lower bound the bounded safety rescan relies on so the
 // planner can use idx_domain_events_recorded_at instead of scanning the full
-// retained history (WI-1770).
-func reconcileConsumerQuery(driver string, withSince bool) string {
+// retained history (WI-1770). eventTypeCount is the number of explicit
+// subscriptions to filter on; a positive count lets the planner seek
+// idx_domain_events_type_id and skip unrelated event types (WI-2285). Zero
+// means the consumer has a wildcard subscription and scans every type.
+func reconcileConsumerQuery(driver string, withSince bool, eventTypeCount int) string {
 	recordedAtFilter := ""
 	orderBy := "ORDER BY e.id"
 	if withSince {
@@ -552,6 +604,11 @@ func reconcileConsumerQuery(driver string, withSince bool) string {
 		// Ordering by the window column lets the planner range-scan
 		// idx_domain_events_recorded_at instead of walking the whole id range.
 		orderBy = "ORDER BY e.recorded_at, e.id"
+	}
+	eventTypeFilter := ""
+	if eventTypeCount > 0 {
+		placeholders := strings.TrimSuffix(strings.Repeat("?,", eventTypeCount), ",")
+		eventTypeFilter = "\n\t\t  AND e.event_type IN (" + placeholders + ")"
 	}
 	query := `
 		INSERT INTO domain_event_deliveries (
@@ -563,12 +620,7 @@ func reconcileConsumerQuery(driver string, withSince bool) string {
 		JOIN domain_events e
 		  ON e.id > ? AND e.id >= c.start_event_id
 		WHERE c.consumer_key = ?
-		  AND c.is_active = true` + recordedAtFilter + `
-		  AND EXISTS (
-			SELECT 1 FROM domain_event_subscriptions subscription
-			WHERE subscription.consumer_key = c.consumer_key
-			  AND subscription.event_type IN (e.event_type, '*')
-		  )
+		  AND c.is_active = true` + eventTypeFilter + recordedAtFilter + `
 		  AND e.aggregate_sequence > COALESCE((
 			SELECT stream.completed_sequence
 			FROM domain_event_consumer_streams stream
