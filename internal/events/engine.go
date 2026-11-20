@@ -320,14 +320,16 @@ func (e *Engine) tick(ctx context.Context) (int64, error) {
 	// the lowest cursor, so the only case the gate cannot name is a late-committed
 	// event whose id is below every cursor — which is what the safety scan is for.
 	// On a safety tick scan the consumers the engine already knows as well.
+	// Cursors are kept only for consumers that still admit events. Prune before
+	// the safety scan names its targets: otherwise a retired consumer's cursor
+	// keeps it in the target set and the reconcile statement opens a writer
+	// transaction that inserts nothing.
+	e.pruneCursors(gate.ActiveKeys)
+
 	targets := gate.ScanKeys
 	if safety {
 		targets = unionKeys(targets, e.knownKeys())
 	}
-	// Cursors are kept only for consumers that still admit events, so an idle
-	// tick prunes a consumer that went inactive instead of holding its cursor
-	// until the next scan.
-	e.pruneCursors(gate.ActiveKeys)
 	e.setWorkKeys(gate.ScanKeys, gate.ClaimKeys)
 
 	var total int64
