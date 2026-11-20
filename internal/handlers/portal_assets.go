@@ -525,11 +525,29 @@ func (h *PortalHandler) resolvePortalAsset(
 	return nil, nil
 }
 
+// assetFieldOptions is the stored configuration for an asset custom field.
+type assetFieldOptions struct {
+	AssetSetID int    `json:"asset_set_id"`
+	QLQuery    string `json:"ql_query"`
+	// CQLQuery is a legacy alias older fields still carry; the picker honors
+	// it, so the server must too.
+	CQLQuery string `json:"cql_query"`
+}
+
+// query resolves the configured filter. ql_query is canonical; cql_query is the
+// legacy fallback.
+func (o assetFieldOptions) query() string {
+	if strings.TrimSpace(o.QLQuery) != "" {
+		return o.QLQuery
+	}
+	return o.CQLQuery
+}
+
 // portalAssetFieldValueIDs extracts every asset id from a submitted asset
-// custom-field value: an id, an object carrying one, or an array of either.
-// Flattening arrays regardless of the field's arity means a malformed array on
-// a single-value field still has all of its ids authorized.
-func portalAssetFieldValueIDs(value any) []int {
+// custom-field value: an id, an object carrying one, or an array of either. It
+// fails on any malformed entry so a nonblank value with no valid id cannot pass
+// required-field validation and be stored unchanged.
+func portalAssetFieldValueIDs(value any) ([]int, error) {
 	entries := []any{value}
 	if arr, ok := value.([]any); ok {
 		entries = arr
@@ -540,37 +558,51 @@ func portalAssetFieldValueIDs(value any) []int {
 		if object, ok := entry.(map[string]any); ok {
 			raw = object["id"]
 		}
-		switch v := raw.(type) {
-		case float64:
-			if v > 0 && v == float64(int(v)) {
-				ids = append(ids, int(v))
-			}
-		case int:
-			if v > 0 {
-				ids = append(ids, v)
-			}
-		case int64:
-			if v > 0 {
-				ids = append(ids, int(v))
-			}
-		case json.Number:
-			if parsed, err := v.Int64(); err == nil && parsed > 0 {
-				ids = append(ids, int(parsed))
-			}
-		case string:
-			if parsed, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && parsed > 0 {
-				ids = append(ids, parsed)
-			}
+		id, ok := portalAssetID(raw)
+		if !ok {
+			return nil, fmt.Errorf("asset reference %v is invalid", entry)
+		}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("asset reference is empty")
+	}
+	return ids, nil
+}
+
+// portalAssetID coerces one asset reference to a positive integer id.
+func portalAssetID(raw any) (int, bool) {
+	switch v := raw.(type) {
+	case float64:
+		if v > 0 && v == float64(int(v)) {
+			return int(v), true
+		}
+	case int:
+		if v > 0 {
+			return v, true
+		}
+	case int64:
+		if v > 0 {
+			return int(v), true
+		}
+	case json.Number:
+		if parsed, err := v.Int64(); err == nil && parsed > 0 {
+			return int(parsed), true
+		}
+	case string:
+		if parsed, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && parsed > 0 {
+			return parsed, true
 		}
 	}
-	return ids
+	return 0, false
 }
 
 // validatePortalAssetCustomFields rejects asset custom-field values that
-// reference an id outside the field's configured asset set or a set the
-// administrator has not exposed to portals. It is an authorization gate, not a
-// normalizer: the stored value keeps the shape the form submitted.
-func (h *PortalHandler) validatePortalAssetCustomFields(ctx context.Context, values map[string]any) error {
+// reference an id outside the field's configured asset set, a set the
+// administrator has not exposed to portals, or an asset the field's own query
+// excludes. It is an authorization gate, not a normalizer: the stored value
+// keeps the shape the form submitted.
+func (h *PortalHandler) validatePortalAssetCustomFields(ctx context.Context, portalCustomerID, customerOrgID *int, values map[string]any) error {
 	if len(values) == 0 {
 		return nil
 	}
@@ -591,7 +623,7 @@ func (h *PortalHandler) validatePortalAssetCustomFields(ctx context.Context, val
 	}
 	defer func() { _ = rows.Close() }()
 
-	assetSetByField := make(map[string]int)
+	assetFields := make(map[string]assetFieldOptions)
 	for rows.Next() {
 		var id int
 		var fieldType, options string
@@ -601,35 +633,41 @@ func (h *PortalHandler) validatePortalAssetCustomFields(ctx context.Context, val
 		if models.CanonicalCustomFieldType(fieldType) != "asset" {
 			continue
 		}
-		var opts struct {
-			AssetSetID int `json:"asset_set_id"`
+		var opts assetFieldOptions
+		if err := json.Unmarshal([]byte(options), &opts); err != nil {
+			return fmt.Errorf("field %d has invalid asset options", id)
 		}
-		if err := json.Unmarshal([]byte(options), &opts); err != nil || opts.AssetSetID <= 0 {
-			continue
+		if opts.AssetSetID <= 0 {
+			return fmt.Errorf("field %d has no asset set configured", id)
 		}
-		assetSetByField[strconv.Itoa(id)] = opts.AssetSetID
+		assetFields[strconv.Itoa(id)] = opts
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("iterate asset field definitions: %w", err)
 	}
-	if len(assetSetByField) == 0 {
-		return nil
-	}
 
 	assetRepo := repository.NewAssetRepository(h.db)
 	for key, value := range values {
-		fieldSetID, ok := assetSetByField[key]
+		opts, ok := assetFields[key]
 		if !ok {
 			continue
 		}
-		enabled, err := assetRepo.IsSetPortalEnabled(fieldSetID)
+		enabled, err := assetRepo.IsSetPortalEnabled(opts.AssetSetID)
 		if err != nil {
 			return fmt.Errorf("check asset field %s portal access: %w", key, err)
 		}
 		if !enabled {
 			return fmt.Errorf("field %s references an unavailable asset", key)
 		}
-		for _, assetID := range portalAssetFieldValueIDs(value) {
+		submitted, err := portalAssetFieldValueIDs(value)
+		if err != nil {
+			return fmt.Errorf("field %s: %w", key, err)
+		}
+		cqlSQL, cqlArgs, err := h.portalAssetCQLSQL(ctx, opts.AssetSetID, opts.query(), portalCustomerID, customerOrgID)
+		if err != nil {
+			return fmt.Errorf("resolve asset field %s filter: %w", key, err)
+		}
+		for _, assetID := range submitted {
 			setID, err := assetRepo.GetAssetSetID(assetID)
 			if errors.Is(err, repository.ErrNotFound) {
 				return fmt.Errorf("field %s references an unavailable asset", key)
@@ -637,7 +675,19 @@ func (h *PortalHandler) validatePortalAssetCustomFields(ctx context.Context, val
 			if err != nil {
 				return fmt.Errorf("resolve asset field %s: %w", key, err)
 			}
-			if setID != fieldSetID {
+			if setID != opts.AssetSetID {
+				return fmt.Errorf("field %s references an unavailable asset", key)
+			}
+			if cqlSQL == "" {
+				continue
+			}
+			filterSQL := cqlSQL + " AND a.id = ?"
+			filterArgs := append(append([]any{}, cqlArgs...), assetID)
+			matches, err := assetRepo.ListPortalReportAssets(ctx, opts.AssetSetID, filterSQL, filterArgs, 1, 0, nil)
+			if err != nil {
+				return fmt.Errorf("resolve asset field %s: %w", key, err)
+			}
+			if len(matches) == 0 {
 				return fmt.Errorf("field %s references an unavailable asset", key)
 			}
 		}
@@ -853,10 +903,7 @@ func (h *PortalHandler) searchPortalAssetField(w http.ResponseWriter, r *http.Re
 		respondJSONOK(w, map[string]any{"assets": []any{}})
 		return
 	}
-	var options struct {
-		AssetSetID int    `json:"asset_set_id"`
-		QLQuery    string `json:"ql_query"`
-	}
+	var options assetFieldOptions
 	if err := json.Unmarshal([]byte(field.Options), &options); err != nil || options.AssetSetID <= 0 {
 		respondJSONOK(w, map[string]any{"assets": []any{}})
 		return
@@ -878,7 +925,7 @@ func (h *PortalHandler) searchPortalAssetField(w http.ResponseWriter, r *http.Re
 	if portalCustomerID != nil {
 		customerOrgID = h.getPortalCustomerOrgID(ctx, *portalCustomerID)
 	}
-	cqlSQL, cqlArgs, err := h.portalAssetCQLSQL(ctx, options.AssetSetID, options.QLQuery, portalCustomerID, customerOrgID)
+	cqlSQL, cqlArgs, err := h.portalAssetCQLSQL(ctx, options.AssetSetID, options.query(), portalCustomerID, customerOrgID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

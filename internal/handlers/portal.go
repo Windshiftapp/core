@@ -796,9 +796,13 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 
 	// Asset custom fields reference assets in an administrator-exposed set,
 	// which the generic custom-field validator cannot authorize. Reject ids
-	// outside the field's configured set or a set without a portal grant
-	// before creating the item.
-	if err := h.validatePortalAssetCustomFields(ctx, validationResult.CustomFieldValues); err != nil {
+	// outside the field's configured set, a set without a portal grant, or an
+	// asset the field's own query excludes before creating the item.
+	var customerOrgID *int
+	if portalCustomerID != nil {
+		customerOrgID = h.getPortalCustomerOrgID(ctx, *portalCustomerID)
+	}
+	if err := h.validatePortalAssetCustomFields(ctx, portalCustomerID, customerOrgID, validationResult.CustomFieldValues); err != nil {
 		respondValidationError(w, r, err.Error())
 		return
 	}
