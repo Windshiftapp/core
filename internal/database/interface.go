@@ -145,19 +145,15 @@ func WithTx(db Database, fn func(tx Tx) error) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	AttachTxEffects(tx, NewTxEffects())
 	defer func() { _ = tx.Rollback() }()
 
 	if err := fn(tx); err != nil {
-		discardTxEffects(tx)
 		return err
 	}
 
 	if err := tx.Commit(); err != nil {
-		discardTxEffects(tx)
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
-	publishTxEffects(tx)
 	ObserveRequestTransaction(time.Since(start))
 
 	return nil
@@ -172,22 +168,18 @@ func WithTxResult[T any](db Database, fn func(tx Tx) (T, error)) (T, error) {
 		var zero T
 		return zero, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	AttachTxEffects(tx, NewTxEffects())
 	defer func() { _ = tx.Rollback() }()
 
 	result, err := fn(tx)
 	if err != nil {
 		var zero T
-		discardTxEffects(tx)
 		return zero, err
 	}
 
 	if err := tx.Commit(); err != nil {
 		var zero T
-		discardTxEffects(tx)
 		return zero, fmt.Errorf("failed to commit transaction: %w", err)
 	}
-	publishTxEffects(tx)
 	ObserveRequestTransaction(time.Since(start))
 
 	return result, nil

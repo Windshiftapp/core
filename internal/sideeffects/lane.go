@@ -206,7 +206,7 @@ func (l *Lane) Start(ctx context.Context) {
 // the candidate was admitted and, when it was not, why.
 func (l *Lane) TryAdmit(candidate Candidate) (bool, DropReason) {
 	now := l.clock()
-	reservation, reason := l.reserve(candidate.size())
+	reservation, reason := l.reserve(candidate.size(), true)
 	if reason != "" {
 		return false, reason
 	}
@@ -215,16 +215,23 @@ func (l *Lane) TryAdmit(candidate Candidate) (bool, DropReason) {
 	return l.publishOwned(cloneCandidate(candidate, now), reservation)
 }
 
-// reserve checks the lane's limits and reserves budget without waiting.
-func (l *Lane) reserve(size int64) (*reservation, DropReason) {
+// reserve checks the lane's limits and reserves budget without waiting. When
+// record is true it also counts the rejection in the lane's diagnostics;
+// staging callers record it themselves so a per-transaction drop is visible
+// after the staging buffer is discarded.
+func (l *Lane) reserve(size int64, record bool) (*reservation, DropReason) {
 	l.emitMu.RLock()
 	defer l.emitMu.RUnlock()
 	if l.closed {
-		l.recordDrop(DropClosed)
+		if record {
+			l.recordDrop(DropClosed)
+		}
 		return nil, DropClosed
 	}
 	if !l.budget.tryReserve(size) {
-		l.recordDrop(DropFull)
+		if record {
+			l.recordDrop(DropFull)
+		}
 		return nil, DropFull
 	}
 	return &reservation{lane: l, bytes: size}, ""
@@ -235,14 +242,9 @@ func (l *Lane) reserve(size int64) (*reservation, DropReason) {
 // a candidate that never reaches TryAdmit.
 func (l *Lane) reserveForStaging(candidate Candidate, now time.Time) (*reservation, DropReason) {
 	if reason := l.checkLimits(candidate, now); reason != "" {
-		l.recordDrop(reason)
 		return nil, reason
 	}
-	reservation, reason := l.reserve(candidate.size())
-	if reason != "" {
-		return nil, reason
-	}
-	return reservation, ""
+	return l.reserve(candidate.size(), false)
 }
 
 // publishOwned enqueues an immutable candidate whose budget is already

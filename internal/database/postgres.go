@@ -510,7 +510,9 @@ func (p *PostgresDB) Begin() (Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewPostgresTx(tx), nil
+	wrapped := NewPostgresTx(tx)
+	AttachTxEffects(wrapped, NewTxEffects())
+	return wrapped, nil
 }
 
 // BeginTx starts a new transaction with options (returns wrapped transaction)
@@ -519,7 +521,9 @@ func (p *PostgresDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, erro
 	if err != nil {
 		return nil, err
 	}
-	return NewPostgresTx(tx), nil
+	wrapped := NewPostgresTx(tx)
+	AttachTxEffects(wrapped, NewTxEffects())
+	return wrapped, nil
 }
 
 // Close closes the database connection

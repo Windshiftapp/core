@@ -2,7 +2,9 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,23 +28,43 @@ const (
 	envelopeKindFact        = "fact"
 	envelopeKindAction      = "action"
 	envelopeKindAssetAction = "asset_action"
+	envelopeKindSLA         = "sla"
 )
 
+// SLAOccurrence is the minimal committed description of an SLA warning or
+// breach. The emitter stages it without touching the database; the lane worker
+// enriches it, so an enrichment failure can never roll back the lifecycle
+// update that produced it.
+type SLAOccurrence struct {
+	EventType      string
+	Trigger        string
+	CycleID        int64
+	ItemID         int
+	MetricID       int
+	ThresholdKey   string
+	BreachedAt     *time.Time
+	ElapsedMs      int64
+	GoalDurationMs int64
+}
+
 // notificationEnvelope carries either an already-built notification event
-// (approvals, reminders, SLA) or a canonical fact to convert in the worker.
+// (approvals, reminders), a canonical fact to convert in the worker, or an SLA
+// occurrence to enrich in the worker.
 type notificationEnvelope struct {
 	Kind  string             `json:"kind"`
 	Event *NotificationEvent `json:"event,omitempty"`
 	Fact  *events.Event      `json:"fact,omitempty"`
+	SLA   *SLAOccurrence     `json:"sla,omitempty"`
 }
 
-// automationEnvelope carries a canonical fact, an SCM observation, or an SLA
-// action trigger for the shared automation lane.
+// automationEnvelope carries a canonical fact, an SCM observation, an SLA
+// occurrence, or an asset action trigger for the shared automation lane.
 type automationEnvelope struct {
 	Kind        string                   `json:"kind"`
 	Fact        *events.Event            `json:"fact,omitempty"`
 	Action      *models.ActionEvent      `json:"action,omitempty"`
 	AssetAction *models.AssetActionEvent `json:"asset_action,omitempty"`
+	SLA         *SLAOccurrence           `json:"sla,omitempty"`
 }
 
 // actionEventStager stages a workspace action trigger inside the caller's
@@ -51,10 +73,10 @@ type actionEventStager interface {
 	StageActionEvent(event *models.ActionEvent)
 }
 
-// notificationEventStager stages a notification event inside the caller's
-// transaction. SLA jobs use it.
-type notificationEventStager interface {
-	StageNotificationEvent(event *NotificationEvent)
+// slaOccurrenceStager stages a minimal SLA warning or breach inside the caller's
+// transaction. Enrichment happens in the worker.
+type slaOccurrenceStager interface {
+	StageSLAOccurrence(occurrence SLAOccurrence)
 }
 
 // RetiredConsumerKeys lists the durable subscriptions replaced by the
@@ -270,6 +292,12 @@ type transactionEffects struct {
 func (e *transactionEffects) Publish() { e.staging.Publish() }
 func (e *transactionEffects) Discard() { e.staging.Discard() }
 
+// Mark and RollbackTo let a savepoint owner discard only the candidates staged
+// after its mark when it rolls back a SQL suffix.
+func (e *transactionEffects) Mark() int { return e.staging.Mark() }
+
+func (e *transactionEffects) RollbackTo(mark int) int { return e.staging.RollbackTo(mark) }
+
 // StageFact routes a canonical fact to every eligible lane. A fact may feed
 // both lanes; each lane has an independent budget.
 func (e *transactionEffects) StageFact(candidate sideeffects.Candidate) {
@@ -293,19 +321,67 @@ func (e *transactionEffects) StageActionEvent(event *models.ActionEvent) {
 	}
 	e.stage(e.automationLane, automationEnvelope{Kind: envelopeKindAction, Action: event}, sideeffects.Candidate{
 		EventType: string(event.EventType),
-		Key:       stableSCMEventKey(event),
+		Key:       stableActionEventKey(event),
 	})
 }
 
-// StageNotificationEvent stages an SLA warning or breach for the notification
-// lane inside the caller's transaction.
-func (e *transactionEffects) StageNotificationEvent(event *NotificationEvent) {
-	if event == nil || e.notificationLane == nil {
-		return
+// stableActionEventKey returns the idempotency key for a staged action trigger.
+// SCM observations use their provider identity; SLA occurrences use the cycle,
+// metric, and threshold so two warnings on one item stay distinct.
+func stableActionEventKey(event *models.ActionEvent) string {
+	if isSLAActionTrigger(event.EventType) {
+		return stableSLAEventKey(event)
 	}
-	e.stage(e.notificationLane, notificationEnvelope{Kind: envelopeKindEvent, Event: event}, sideeffects.Candidate{
-		EventType: event.EventType,
-	})
+	return stableSCMEventKey(event)
+}
+
+func isSLAActionTrigger(trigger models.ActionTriggerType) bool {
+	switch trigger {
+	case models.ActionTriggerSLAWarning, models.ActionTriggerSLABreached:
+		return true
+	default:
+		return false
+	}
+}
+
+// stableSLAEventKey identifies one SLA occurrence. It hashes the cycle, metric,
+// and threshold key so a later warning or breach for the same item is not
+// mistaken for the occurrence that already executed.
+func stableSLAEventKey(event *models.ActionEvent) string {
+	identity := fmt.Sprintf("%s\x00%d\x00%d\x00%v\x00%v\x00%v",
+		event.EventType, event.WorkspaceID, event.ItemID,
+		event.NewValues["metric_id"], event.NewValues["cycle_id"], event.NewValues["threshold_key"],
+	)
+	sum := sha256.Sum256([]byte(identity))
+	return "sla-action-" + hex.EncodeToString(sum[:])
+}
+
+// stableSLAOccurrenceKey identifies a staged SLA occurrence before enrichment.
+func stableSLAOccurrenceKey(occurrence SLAOccurrence) string {
+	identity := fmt.Sprintf("%s\x00%d\x00%d\x00%d\x00%s",
+		occurrence.Trigger, occurrence.ItemID, occurrence.MetricID, occurrence.CycleID, occurrence.ThresholdKey,
+	)
+	sum := sha256.Sum256([]byte(identity))
+	return "sla-action-" + hex.EncodeToString(sum[:])
+}
+
+// StageSLAOccurrence stages a minimal SLA warning or breach for both lanes
+// inside the caller's transaction. The worker enriches it, so the SLA job's
+// commit never depends on item, metric, or configuration reads.
+func (e *transactionEffects) StageSLAOccurrence(occurrence SLAOccurrence) {
+	key := stableSLAOccurrenceKey(occurrence)
+	if e.notificationLane != nil {
+		e.stage(e.notificationLane, notificationEnvelope{Kind: envelopeKindSLA, SLA: &occurrence}, sideeffects.Candidate{
+			EventType: occurrence.EventType,
+			Key:       key,
+		})
+	}
+	if e.automationLane != nil {
+		e.stage(e.automationLane, automationEnvelope{Kind: envelopeKindSLA, SLA: &occurrence}, sideeffects.Candidate{
+			EventType: occurrence.Trigger,
+			Key:       key,
+		})
+	}
 }
 
 func (e *transactionEffects) stage(lane *sideeffects.Lane, envelope any, candidate sideeffects.Candidate) {
@@ -340,6 +416,11 @@ func (d *SideEffectDispatcher) handleAutomationCandidate(ctx context.Context, ca
 			return errors.New("automation candidate missing action event")
 		}
 		return d.runWorkspaceActions(ctx, candidate.Key, envelope.Action)
+	case envelopeKindSLA:
+		if envelope.SLA == nil {
+			return errors.New("automation candidate missing SLA occurrence")
+		}
+		return d.runSLAOccurrence(ctx, candidate.Key, *envelope.SLA)
 	case envelopeKindAssetAction:
 		if envelope.AssetAction == nil {
 			return errors.New("automation candidate missing asset action event")
@@ -369,6 +450,20 @@ func (d *SideEffectDispatcher) runAutomationFact(ctx context.Context, event even
 		return err
 	}
 	return d.runWorkspaceActions(ctx, event.Key, actionEvent)
+}
+
+// runSLAOccurrence enriches a staged SLA occurrence in the worker and runs its
+// automatic trigger. The enrichment happens after the SLA job committed, so a
+// missing item, metric, or configuration only drops the side effect.
+func (d *SideEffectDispatcher) runSLAOccurrence(ctx context.Context, key string, occurrence SLAOccurrence) error {
+	event, err := buildSLAActionEvent(ctx, d.db, occurrence)
+	if err != nil {
+		return err
+	}
+	if event == nil {
+		return nil
+	}
+	return d.runWorkspaceActions(ctx, key, event)
 }
 
 // runWorkspaceActions matches cached actions once and executes each unfinished

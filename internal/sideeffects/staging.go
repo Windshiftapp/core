@@ -93,21 +93,21 @@ func (s *Staging) Stage(lane *Lane, candidate Candidate) (bool, DropReason) {
 
 	size := candidate.size()
 	if s.countUsed >= s.cfg.MaxEvents || s.byteUsed+size > s.cfg.MaxBytes {
-		s.recordDrop(DropStagingLimit)
+		s.drop(lane, DropStagingLimit)
 		return false, DropStagingLimit
 	}
 	if len(candidate.Payload) > s.cfg.MaxPayloadBytes {
-		s.recordDrop(DropOversized)
+		s.drop(lane, DropOversized)
 		return false, DropOversized
 	}
 	now := s.clock()
 	if !candidate.OccurredAt.IsZero() && now.Sub(candidate.OccurredAt) > s.cfg.MaxEventAge {
-		s.recordDrop(DropExpired)
+		s.drop(lane, DropExpired)
 		return false, DropExpired
 	}
 	reservation, reason := lane.reserveForStaging(candidate, now)
 	if reason != "" {
-		s.recordDrop(reason)
+		s.drop(lane, reason)
 		return false, reason
 	}
 	s.entries = append(s.entries, &stagedEntry{
@@ -231,6 +231,16 @@ func (s *Staging) recordDrop(reason DropReason) {
 		s.dropped = make(map[DropReason]int64)
 	}
 	s.dropped[reason]++
+}
+
+// drop counts a rejection on the staging buffer and on the target lane, so a
+// per-transaction drop remains visible in the lane's cumulative diagnostics
+// after the staging buffer is discarded.
+func (s *Staging) drop(lane *Lane, reason DropReason) {
+	s.recordDrop(reason)
+	if lane != nil {
+		lane.recordDrop(reason)
+	}
 }
 
 // String renders the drop reason for diagnostics and tests.

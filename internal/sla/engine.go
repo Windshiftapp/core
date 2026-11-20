@@ -154,6 +154,13 @@ func (e *Engine) ObserveItemFacts(ctx context.Context, tx database.Tx, facts []i
 
 func (e *Engine) observeWorkspace(ctx context.Context, tx database.Tx, workspaceID, generation int, facts []itemevents.RecordedFact) error {
 	savepoint := "sla_observe_" + strconv.Itoa(workspaceID)
+	// A rollback to this savepoint must also release side-effect candidates
+	// staged inside it, not just the SQL suffix.
+	staging, _ := database.TxEffectsOf(tx).(database.TxEffectsStaging)
+	mark := 0
+	if staging != nil {
+		mark = staging.Mark()
+	}
 	if _, err := tx.Exec("SAVEPOINT " + savepoint); err != nil {
 		return fmt.Errorf("open SLA savepoint: %w", err)
 	}
@@ -161,6 +168,9 @@ func (e *Engine) observeWorkspace(ctx context.Context, tx database.Tx, workspace
 	if err != nil {
 		_, _ = tx.Exec("ROLLBACK TO SAVEPOINT " + savepoint)
 		_, _ = tx.Exec("RELEASE SAVEPOINT " + savepoint)
+		if staging != nil {
+			staging.RollbackTo(mark)
+		}
 		return err
 	}
 	if _, releaseErr := tx.Exec("RELEASE SAVEPOINT " + savepoint); releaseErr != nil {

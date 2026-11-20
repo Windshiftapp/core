@@ -49,6 +49,11 @@ func (ns *NotificationService) handleLaneCandidate(ctx context.Context, candidat
 			return errors.New("notification candidate missing fact")
 		}
 		return ns.processFact(ctx, envelope.Fact)
+	case envelopeKindSLA:
+		if envelope.SLA == nil {
+			return errors.New("notification candidate missing SLA occurrence")
+		}
+		return ns.processSLAOccurrence(ctx, *envelope.SLA)
 	default:
 		return fmt.Errorf("unknown notification candidate kind %q", envelope.Kind)
 	}
@@ -68,4 +73,18 @@ func (ns *NotificationService) processFact(ctx context.Context, event *events.Ev
 		}
 	}
 	return nil
+}
+
+// processSLAOccurrence enriches a staged SLA occurrence in the worker and
+// dispatches the resulting rule-based notification. Enrichment happens after
+// the SLA job committed, so a missing item or metric only drops the effect.
+func (ns *NotificationService) processSLAOccurrence(ctx context.Context, occurrence SLAOccurrence) error {
+	event, err := buildSLANotificationEvent(ctx, ns.db, occurrence)
+	if err != nil {
+		return err
+	}
+	if event == nil {
+		return nil
+	}
+	return ns.processEventWithKey(ctx, event, "")
 }

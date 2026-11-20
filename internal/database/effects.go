@@ -3,8 +3,8 @@ package database
 import "sync"
 
 // TxEffects accumulates best-effort side effects staged during one
-// transaction. The transaction owner (WithTx / WithTxResult) publishes them
-// after a successful commit and discards them on rollback or a failed commit.
+// transaction. The transaction publishes them after a successful commit and
+// discards them on rollback or a failed commit.
 //
 // The interface is deliberately generic: the database package does not know
 // what a side effect is. A process installs one factory at startup; without a
@@ -19,11 +19,41 @@ type TxEffects interface {
 	Discard()
 }
 
-// txEffectsHolder is implemented by concrete transaction wrappers so effects
-// can travel with the transaction without widening the Tx interface.
-type txEffectsHolder interface {
-	TxEffects() TxEffects
-	setTxEffects(TxEffects)
+// TxEffectsStaging is implemented by accumulators that can scope staged
+// candidates to a savepoint. A savepoint owner records a mark before the
+// SAVEPOINT and calls RollbackTo after ROLLBACK TO SAVEPOINT so candidates
+// staged in the rolled-back suffix are released.
+type TxEffectsStaging interface {
+	Mark() int
+	RollbackTo(mark int) int
+}
+
+// txEffectState owns one transaction's accumulator and guarantees exactly one
+// of Publish or Discard runs, even when a rollback follows a commit or a
+// callback panics during unwinding.
+type txEffectState struct {
+	effects TxEffects
+	done    bool
+}
+
+func (s *txEffectState) TxEffects() TxEffects { return s.effects }
+
+func (s *txEffectState) setTxEffects(effects TxEffects) { s.effects = effects }
+
+func (s *txEffectState) publish() {
+	if s.effects == nil || s.done {
+		return
+	}
+	s.done = true
+	s.effects.Publish()
+}
+
+func (s *txEffectState) discard() {
+	if s.effects == nil || s.done {
+		return
+	}
+	s.done = true
+	s.effects.Discard()
 }
 
 var (
@@ -68,17 +98,9 @@ func TxEffectsOf(tx Tx) TxEffects {
 	return nil
 }
 
-// publishTxEffects publishes a transaction's staged effects after commit.
-func publishTxEffects(tx Tx) {
-	if effects := TxEffectsOf(tx); effects != nil {
-		effects.Publish()
-	}
-}
-
-// discardTxEffects discards a transaction's staged effects after rollback or a
-// failed commit.
-func discardTxEffects(tx Tx) {
-	if effects := TxEffectsOf(tx); effects != nil {
-		effects.Discard()
-	}
+// txEffectsHolder is implemented by concrete transaction wrappers so effects
+// can travel with the transaction without widening the Tx interface.
+type txEffectsHolder interface {
+	TxEffects() TxEffects
+	setTxEffects(TxEffects)
 }
