@@ -53,7 +53,7 @@ func (ns *NotificationService) handleLaneCandidate(ctx context.Context, candidat
 		if envelope.SLA == nil {
 			return errors.New("notification candidate missing SLA occurrence")
 		}
-		return ns.processSLAOccurrence(ctx, *envelope.SLA)
+		return ns.processSLAOccurrence(ctx, *envelope.SLA, candidate.Key)
 	default:
 		return fmt.Errorf("unknown notification candidate kind %q", envelope.Kind)
 	}
@@ -78,7 +78,10 @@ func (ns *NotificationService) processFact(ctx context.Context, event *events.Ev
 // processSLAOccurrence enriches a staged SLA occurrence in the worker and
 // dispatches the resulting rule-based notification. Enrichment happens after
 // the SLA job committed, so a missing item or metric only drops the effect.
-func (ns *NotificationService) processSLAOccurrence(ctx context.Context, occurrence SLAOccurrence) error {
+// eventKey is the occurrence's stable key; it becomes the per-rule/per-recipient
+// delivery key so a duplicate admission of one deadline cannot create a second
+// inbox row, while a re-armed deadline gets its own.
+func (ns *NotificationService) processSLAOccurrence(ctx context.Context, occurrence SLAOccurrence, eventKey string) error {
 	event, err := buildSLANotificationEvent(ctx, ns.db, occurrence)
 	if err != nil {
 		return err
@@ -86,5 +89,5 @@ func (ns *NotificationService) processSLAOccurrence(ctx context.Context, occurre
 	if event == nil {
 		return nil
 	}
-	return ns.processEventWithKey(ctx, event, "")
+	return ns.processEventWithKey(ctx, event, eventKey)
 }
