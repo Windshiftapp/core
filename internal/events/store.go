@@ -1023,15 +1023,27 @@ func (s *Store) StatsFiltered(
 	aggregateType, aggregateID := "event.aggregate_type", "event.aggregate_id"
 	args := []any{now.UTC(), now.UTC(), filter.ConsumerKey, filter.ConsumerKey}
 	if filter.WorkspaceID != nil {
+		// An explicit consumer equality lets the planner seek that consumer's
+		// deliveries; the generic `? = '' OR` form scans every event in the
+		// workspace even when the consumer has no deliveries.
+		consumerPredicate := "(? = '' OR queued.consumer_key = ?)"
+		consumerArgs := []any{filter.ConsumerKey, filter.ConsumerKey}
+		if filter.ConsumerKey != "" {
+			consumerPredicate = "queued.consumer_key = ?"
+			consumerArgs = []any{filter.ConsumerKey}
+		}
 		deliveryTable = `(
 			SELECT queued.*, queued_event.aggregate_type, queued_event.aggregate_id
 			FROM domain_event_deliveries queued
 			JOIN domain_events queued_event ON queued_event.id = queued.event_id
 			WHERE queued_event.workspace_id = ?
-			  AND (? = '' OR queued.consumer_key = ?)
+			  AND ` + consumerPredicate + `
 		) delivery`
 		aggregateType, aggregateID = "delivery.aggregate_type", "delivery.aggregate_id"
-		args = []any{now.UTC(), now.UTC(), workspaceID, filter.ConsumerKey, filter.ConsumerKey, filter.ConsumerKey, filter.ConsumerKey}
+		args = make([]any, 0, 3+len(consumerArgs)+2)
+		args = append(args, now.UTC(), now.UTC(), workspaceID)
+		args = append(args, consumerArgs...)
+		args = append(args, filter.ConsumerKey, filter.ConsumerKey)
 	}
 
 	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(`

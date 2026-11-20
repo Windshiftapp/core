@@ -505,13 +505,17 @@ func (r *ItemRepository) FindByIDWithWorkspaceStatusContext(ctx context.Context,
 		return nil, fmt.Errorf("failed to find item with details: %w", err)
 	}
 
-	// Attach milestones once so callers receive complete item details.
+	// Attach milestones once so callers receive complete item details. A failed
+	// lookup must surface: a caller that cannot distinguish it from "no
+	// milestones" would silently return a partial item.
 	holder := []models.Item{item}
-	if err := NewMilestoneAttachRepository(r.db).LoadForItemsContext(ctx, holder); err == nil {
-		item = holder[0]
-	} else if ctx.Err() != nil {
-		return nil, ctx.Err()
+	if err := NewMilestoneAttachRepository(r.db).LoadForItemsContext(ctx, holder); err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, fmt.Errorf("attach milestones for item %d: %w", id, err)
 	}
+	item = holder[0]
 
 	return &ItemWithWorkspaceStatus{Item: &item, WorkspaceActive: workspaceActive}, nil
 }

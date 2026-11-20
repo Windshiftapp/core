@@ -30,12 +30,19 @@
   } = $props();
 
   let interval;
+  let inFlight = false;
 
-  // Automatic refreshes coalesce: an in-flight load already reflects current
-  // state, so a tick that lands while loading would only add duplicate work.
-  function refresh() {
-    if (loading) return;
-    onLoad?.();
+  // Coalesce overlapping refreshes without relying on the caller's loading
+  // indicator: callers may mount with loading already true and still need the
+  // first request to run.
+  async function refresh() {
+    if (inFlight) return;
+    inFlight = true;
+    try {
+      await onLoad?.();
+    } finally {
+      inFlight = false;
+    }
   }
 
   function startInterval() {
