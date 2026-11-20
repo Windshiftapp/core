@@ -434,6 +434,13 @@ var Catalog = []Migration{
 		`,
 		SQLite:   eventsSchema,
 		Postgres: eventsSchemaPostgres,
+		// The canonical schema gained the claimable-delivery index in place, so
+		// this already-applied migration's checksum changed. ReconcileChecksum
+		// advances the stored checksum instead of failing every existing
+		// database; the index itself is created by
+		// 20261127_domain_event_claimable_index on existing databases and is part
+		// of the base schema on fresh installs.
+		ReconcileChecksum: true,
 	},
 	{
 		Version: "20260827_durable_action_consumer",
