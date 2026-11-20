@@ -214,12 +214,14 @@ func (h *AssetReportHandler) requirePortalOwner(w http.ResponseWriter, r *http.R
 
 // availableFieldsForAssetReport offers the create-screen fields an asset-report
 // form can bind. Asset reports only run on portal channels, where asset custom
-// fields are resolvable through the portal's own asset endpoints.
+// fields are resolvable through the portal's own asset endpoints. Multi-asset
+// fields are excluded: their list values are not expressible in report CQL
+// substitution.
 func (h *AssetReportHandler) availableFieldsForAssetReport(ar *models.AssetReport) ([]AvailableField, error) {
 	if ar.ItemTypeID == nil {
-		return availableCreateFields(h.screenRepo, ar.WorkspaceID, 0, true)
+		return availableCreateFields(h.screenRepo, ar.WorkspaceID, 0, true, true)
 	}
-	return availableCreateFields(h.screenRepo, ar.WorkspaceID, *ar.ItemTypeID, true)
+	return availableCreateFields(h.screenRepo, ar.WorkspaceID, *ar.ItemTypeID, true, true)
 }
 
 // validateAssetReportFormBinding applies the same workspace and item-type

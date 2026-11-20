@@ -38,7 +38,7 @@ type virtualFieldOption struct {
 // management picker on the same result prevents a direct API caller from
 // binding a custom field the target create screen does not expose or the
 // public form cannot render.
-func availableCreateFields(screenRepo *repository.ScreenRepository, workspaceID *int, itemTypeID int, allowAssets bool) ([]AvailableField, error) {
+func availableCreateFields(screenRepo *repository.ScreenRepository, workspaceID *int, itemTypeID int, allowAssets, excludeMultiAsset bool) ([]AvailableField, error) {
 	fields := []AvailableField{
 		{Identifier: "title", Name: "Title", Type: "default"},
 		{Identifier: "description", Name: "Description", Type: "default"},
@@ -64,6 +64,9 @@ func availableCreateFields(screenRepo *repository.ScreenRepository, workspaceID 
 			continue
 		}
 		if !fillable(field.CustomFieldType) {
+			continue
+		}
+		if excludeMultiAsset && services.IsMultiAssetField(field.CustomFieldOptions) {
 			continue
 		}
 		fields = append(fields, AvailableField{

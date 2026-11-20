@@ -94,6 +94,22 @@ func PublicFormFillableCustomFieldType(allowAssets bool) func(string) bool {
 	return IsPublicFormFillableCustomFieldType
 }
 
+// IsMultiAssetField reports whether an asset custom field's stored options
+// select multiple assets. Multi-asset values are lists the report CQL
+// substitution cannot express, so asset report forms exclude them.
+func IsMultiAssetField(options string) bool {
+	if strings.TrimSpace(options) == "" {
+		return false
+	}
+	var opts struct {
+		Multi bool `json:"multi"`
+	}
+	if err := json.Unmarshal([]byte(options), &opts); err != nil {
+		return false
+	}
+	return opts.Multi
+}
+
 func normalizeVirtualFieldValue(fieldID string, field virtualRequestField, raw any) (any, error) {
 	switch field.fieldType {
 	case "text":
@@ -155,7 +171,7 @@ func normalizeVirtualFieldValue(fieldID string, field virtualRequestField, raw a
 // may be used when creating an item of itemTypeID in workspaceID. Public form
 // schemas and submissions both use this list so stale or forged field rows do
 // not expose or write fields outside the effective create screen.
-func AllowedCreateScreenCustomFieldIdentifiers(db database.Database, workspaceID, itemTypeID int, allowAssets bool) (map[string]struct{}, error) {
+func AllowedCreateScreenCustomFieldIdentifiers(db database.Database, workspaceID, itemTypeID int, allowAssets, excludeMultiAsset bool) (map[string]struct{}, error) {
 	allowed := make(map[string]struct{})
 	if workspaceID <= 0 || itemTypeID <= 0 {
 		return allowed, nil
@@ -179,10 +195,16 @@ func AllowedCreateScreenCustomFieldIdentifiers(db database.Database, workspaceID
 	}
 	fillable := PublicFormFillableCustomFieldType(allowAssets)
 	for _, field := range fields {
-		if field.FieldType == "custom" && field.FieldIdentifier != "" && field.FieldName != "" &&
-			fillable(field.CustomFieldType) {
-			allowed[field.FieldIdentifier] = struct{}{}
+		if field.FieldType != "custom" || field.FieldIdentifier == "" || field.FieldName == "" {
+			continue
 		}
+		if !fillable(field.CustomFieldType) {
+			continue
+		}
+		if excludeMultiAsset && IsMultiAssetField(field.CustomFieldOptions) {
+			continue
+		}
+		allowed[field.FieldIdentifier] = struct{}{}
 	}
 	return allowed, nil
 }
@@ -230,7 +252,7 @@ func allowedRequestTypeCustomFieldIdentifiers(ctx context.Context, db database.D
 	if !served {
 		return map[string]struct{}{}, nil
 	}
-	return AllowedCreateScreenCustomFieldIdentifiers(db, effectiveWorkspaceID, itemTypeID, channelType == "portal")
+	return AllowedCreateScreenCustomFieldIdentifiers(db, effectiveWorkspaceID, itemTypeID, channelType == "portal", false)
 }
 
 // ValidateAndSeparateRequestFields validates request type fields and separates virtual from custom fields.

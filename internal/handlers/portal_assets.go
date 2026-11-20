@@ -263,10 +263,17 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 		}
 		// Asset fields carry a reference the picker scoped to a granted set and
 		// the field's own query. Validate the submitted reference with the same
-		// policy before substituting it into the report query.
-		submitted := make(map[string]any, len(formValues))
-		for identifier, value := range formValues {
-			submitted[identifier] = value
+		// policy before substituting it into the report query. Only custom fields
+		// bound to this report are candidates: a virtual field with a numeric
+		// identifier must not be looked up as a global custom-field id.
+		submitted := make(map[string]any, len(fields))
+		for _, f := range fields {
+			if f.FieldType != "custom" {
+				continue
+			}
+			if value, ok := formValues[f.FieldIdentifier]; ok {
+				submitted[f.FieldIdentifier] = value
+			}
 		}
 		if err := h.validatePortalAssetCustomFields(ctx, portalCustomerID, customerOrgID, submitted); err != nil {
 			respondValidationError(w, r, err.Error())
@@ -1214,7 +1221,7 @@ func (h *PortalHandler) loadAssetReportFields(assetReportID int) ([]models.Asset
 	}
 	allowedCustomFieldIDs := make(map[string]struct{})
 	if report.ItemTypeID != nil && report.WorkspaceID != nil {
-		allowedCustomFieldIDs, err = services.AllowedCreateScreenCustomFieldIdentifiers(h.db, *report.WorkspaceID, *report.ItemTypeID, true)
+		allowedCustomFieldIDs, err = services.AllowedCreateScreenCustomFieldIdentifiers(h.db, *report.WorkspaceID, *report.ItemTypeID, true, true)
 		if err != nil {
 			return nil, err
 		}

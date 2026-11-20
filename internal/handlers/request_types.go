@@ -217,7 +217,7 @@ func (h *RequestTypeHandler) availableFieldsForRequestType(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	return availableCreateFields(h.screenRepo, rt.WorkspaceID, rt.ItemTypeID, channel.Type == "portal")
+	return availableCreateFields(h.screenRepo, rt.WorkspaceID, rt.ItemTypeID, channel.Type == "portal", false)
 }
 
 // validateRequestTypeRouting requires an inbound portal/form channel, a pinned
