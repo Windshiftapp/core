@@ -38,10 +38,12 @@ const (
 type SLAOccurrence struct {
 	EventType      string
 	Trigger        string
+	WorkspaceID    int
 	CycleID        int64
 	ItemID         int
 	MetricID       int
 	ThresholdKey   string
+	FiredAt        time.Time
 	BreachedAt     *time.Time
 	ElapsedMs      int64
 	GoalDurationMs int64
@@ -101,7 +103,11 @@ func DeactivateRetiredConsumers(ctx context.Context, store *events.Store) error 
 	if store == nil {
 		return nil
 	}
-	for _, key := range RetiredConsumerKeys() {
+	keys := RetiredConsumerKeys()
+	// Replay stays unavailable for retired work even while a bounded cleanup
+	// pass leaves historical deliveries behind.
+	events.SetRetiredConsumers(keys)
+	for _, key := range keys {
 		if err := store.SetConsumerActive(ctx, key, false); err != nil && !errors.Is(err, events.ErrConsumerMissing) {
 			return fmt.Errorf("deactivate retired consumer %s: %w", key, err)
 		}
@@ -357,9 +363,13 @@ func stableSLAEventKey(event *models.ActionEvent) string {
 }
 
 // stableSLAOccurrenceKey identifies a staged SLA occurrence before enrichment.
+// It includes the firing deadline so a re-goaled cycle that breaches twice gets
+// a distinct key for each deadline, while a duplicate observation of one
+// deadline stays deduplicated.
 func stableSLAOccurrenceKey(occurrence SLAOccurrence) string {
-	identity := fmt.Sprintf("%s\x00%d\x00%d\x00%d\x00%s",
-		occurrence.Trigger, occurrence.ItemID, occurrence.MetricID, occurrence.CycleID, occurrence.ThresholdKey,
+	identity := fmt.Sprintf("%s\x00%d\x00%d\x00%d\x00%d\x00%s\x00%d",
+		occurrence.Trigger, occurrence.WorkspaceID, occurrence.ItemID, occurrence.MetricID,
+		occurrence.CycleID, occurrence.ThresholdKey, occurrence.FiredAt.UTC().UnixNano(),
 	)
 	sum := sha256.Sum256([]byte(identity))
 	return "sla-action-" + hex.EncodeToString(sum[:])

@@ -23,17 +23,19 @@ func NewSLASideEffectEmitter() *SLASideEffectEmitter {
 	return &SLASideEffectEmitter{}
 }
 
-// EmitBreach stages the breach occurrence.
-func (e *SLASideEffectEmitter) EmitBreach(ctx context.Context, tx database.Tx, cycle *models.ItemSLACycle) error {
-	return e.stage(tx, cycle, "", models.EventSLABreached, string(models.ActionTriggerSLABreached))
+// EmitBreach stages the breach occurrence. workspaceID is the item's
+// workspace at commit time; deadline distinguishes re-armed breaches on the
+// same cycle.
+func (e *SLASideEffectEmitter) EmitBreach(ctx context.Context, tx database.Tx, cycle *models.ItemSLACycle, workspaceID int, deadline time.Time) error {
+	return e.stage(tx, cycle, workspaceID, "", models.EventSLABreached, string(models.ActionTriggerSLABreached), deadline)
 }
 
 // EmitWarning stages the warning occurrence.
-func (e *SLASideEffectEmitter) EmitWarning(ctx context.Context, tx database.Tx, cycle *models.ItemSLACycle, thresholdKey string) error {
-	return e.stage(tx, cycle, thresholdKey, models.EventSLAWarning, string(models.ActionTriggerSLAWarning))
+func (e *SLASideEffectEmitter) EmitWarning(ctx context.Context, tx database.Tx, cycle *models.ItemSLACycle, workspaceID int, thresholdKey string, deadline time.Time) error {
+	return e.stage(tx, cycle, workspaceID, thresholdKey, models.EventSLAWarning, string(models.ActionTriggerSLAWarning), deadline)
 }
 
-func (e *SLASideEffectEmitter) stage(tx database.Tx, cycle *models.ItemSLACycle, thresholdKey, eventType, trigger string) error {
+func (e *SLASideEffectEmitter) stage(tx database.Tx, cycle *models.ItemSLACycle, workspaceID int, thresholdKey, eventType, trigger string, firedAt time.Time) error {
 	if cycle == nil || cycle.ItemID == 0 {
 		return nil
 	}
@@ -48,10 +50,12 @@ func (e *SLASideEffectEmitter) stage(tx database.Tx, cycle *models.ItemSLACycle,
 	stager.StageSLAOccurrence(SLAOccurrence{
 		EventType:      eventType,
 		Trigger:        trigger,
+		WorkspaceID:    workspaceID,
 		CycleID:        cycle.ID,
 		ItemID:         cycle.ItemID,
 		MetricID:       cycle.MetricID,
 		ThresholdKey:   thresholdKey,
+		FiredAt:        firedAt,
 		BreachedAt:     cycle.BreachedAt,
 		ElapsedMs:      cycle.ElapsedMs,
 		GoalDurationMs: cycle.GoalDurationMs,
@@ -87,16 +91,20 @@ func loadSLAOccurrenceTarget(ctx context.Context, db database.Database, occurren
 }
 
 // buildSLANotificationEvent enriches an SLA occurrence into a rule-based
-// notification event. It returns nil when the item or metric no longer exists.
+// notification event. It returns nil when the item or metric no longer exists,
+// or when the item has moved since the lifecycle fact was committed.
 func buildSLANotificationEvent(ctx context.Context, db database.Database, occurrence SLAOccurrence) (*NotificationEvent, error) {
 	target, err := loadSLAOccurrenceTarget(ctx, db, occurrence)
 	if err != nil || target == nil {
 		return nil, err
 	}
+	if itemMoved(occurrence, target) {
+		return nil, nil
+	}
 	itemKey := fmt.Sprintf("%s-%d", target.workspaceKey, target.itemNumber)
 	event := &NotificationEvent{
 		EventType:   occurrence.EventType,
-		WorkspaceID: target.workspaceID,
+		WorkspaceID: occurrence.WorkspaceID,
 		ItemID:      occurrence.ItemID,
 		Title:       fmt.Sprintf("SLA %s: %s", slaOutcomeLabel(occurrence.EventType), target.metricName),
 		TemplateData: map[string]any{
@@ -115,11 +123,16 @@ func buildSLANotificationEvent(ctx context.Context, db database.Database, occurr
 	return event, nil
 }
 
-// buildSLAActionEvent enriches an SLA occurrence into an automatic trigger.
+// buildSLAActionEvent enriches an SLA occurrence into an automatic trigger. It
+// returns nil when the item or metric no longer exists, or when the item has
+// moved since the lifecycle fact was committed.
 func buildSLAActionEvent(ctx context.Context, db database.Database, occurrence SLAOccurrence) (*models.ActionEvent, error) {
 	target, err := loadSLAOccurrenceTarget(ctx, db, occurrence)
 	if err != nil || target == nil {
 		return nil, err
+	}
+	if itemMoved(occurrence, target) {
+		return nil, nil
 	}
 	newValues := map[string]any{
 		"metric_id":        occurrence.MetricID,
@@ -136,10 +149,17 @@ func buildSLAActionEvent(ctx context.Context, db database.Database, occurrence S
 	}
 	return &models.ActionEvent{
 		EventType:   models.ActionTriggerType(occurrence.Trigger),
-		WorkspaceID: target.workspaceID,
+		WorkspaceID: occurrence.WorkspaceID,
 		ItemID:      occurrence.ItemID,
 		NewValues:   newValues,
 	}, nil
+}
+
+// itemMoved reports whether the item's current workspace differs from the
+// workspace recorded on the committed occurrence. A moved item must not route
+// the old workspace's effect into the destination's rules.
+func itemMoved(occurrence SLAOccurrence, target *slaOccurrenceTarget) bool {
+	return occurrence.WorkspaceID != 0 && target.workspaceID != occurrence.WorkspaceID
 }
 
 func slaOutcomeLabel(eventType string) string {

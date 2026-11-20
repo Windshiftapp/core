@@ -265,6 +265,8 @@ func (h *DiagnosticsHandler) changeDomainEventDelivery(w http.ResponseWriter, r 
 			respondNotFound(w, r, "Domain event")
 		case errors.Is(err, events.ErrDeliveryState):
 			respondConflict(w, r, "Domain event delivery is not in terminal failure state")
+		case errors.Is(err, events.ErrConsumerRetired):
+			respondConflict(w, r, "Domain event consumer is retired and no longer accepts replay")
 		default:
 			respondInternalError(w, r, err)
 		}

@@ -446,7 +446,7 @@ func (e *Engine) completeCycle(ctx context.Context, tx database.Tx, config *comp
 				// breach, so it must request the same notification/action
 				// side effects a due breach job would have delivered.
 				if e.sideEffects != nil {
-					if err := e.sideEffects.EmitBreach(ctx, tx, cycle); err != nil {
+					if err := e.sideEffects.EmitBreach(ctx, tx, cycle, workspaceID, breachedAt); err != nil {
 						return err
 					}
 				}
@@ -512,7 +512,7 @@ func (e *Engine) recordOverdueBreach(ctx context.Context, tx database.Tx, worksp
 		return err
 	}
 	if e.sideEffects != nil {
-		if err := e.sideEffects.EmitBreach(ctx, tx, cycle); err != nil {
+		if err := e.sideEffects.EmitBreach(ctx, tx, cycle, workspaceID, deadline); err != nil {
 			return err
 		}
 	}

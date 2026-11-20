@@ -16,8 +16,8 @@ import (
 // for a breach or warning. It is optional; without it the durable state and
 // lifecycle history still advance.
 type SideEffectEmitter interface {
-	EmitBreach(ctx context.Context, tx database.Tx, cycle *models.ItemSLACycle) error
-	EmitWarning(ctx context.Context, tx database.Tx, cycle *models.ItemSLACycle, thresholdKey string) error
+	EmitBreach(ctx context.Context, tx database.Tx, cycle *models.ItemSLACycle, workspaceID int, deadline time.Time) error
+	EmitWarning(ctx context.Context, tx database.Tx, cycle *models.ItemSLACycle, workspaceID int, thresholdKey string, deadline time.Time) error
 }
 
 // SetSideEffectEmitter installs the breach/warning side-effect emitter.
@@ -117,11 +117,12 @@ func (e *Engine) runBreachJob(ctx context.Context, job models.SLAJob) error {
 		if err := e.repo.DeleteJobsForCycleKind(ctx, tx, cycle.ID, models.SLAJobWarning); err != nil {
 			return err
 		}
-		if err := e.appendLifecycle(ctx, tx, e.workspaceForItemTx(ctx, tx, cycle.ItemID), cycle, eventBreached, deadline); err != nil {
+		workspaceID = e.workspaceForItemTx(ctx, tx, cycle.ItemID)
+		if err := e.appendLifecycle(ctx, tx, workspaceID, cycle, eventBreached, deadline); err != nil {
 			return err
 		}
 		if e.sideEffects != nil {
-			if err := e.sideEffects.EmitBreach(ctx, tx, cycle); err != nil {
+			if err := e.sideEffects.EmitBreach(ctx, tx, cycle, workspaceID, deadline); err != nil {
 				return err
 			}
 		}
@@ -231,11 +232,12 @@ func (e *Engine) runWarningJob(ctx context.Context, job models.SLAJob) error {
 		if !fired {
 			return e.retireClaimedJob(ctx, tx, job)
 		}
-		if err := e.appendLifecycle(ctx, tx, e.workspaceForItemTx(ctx, tx, cycle.ItemID), cycle, eventWarning, firedAt); err != nil {
+		workspaceID := e.workspaceForItemTx(ctx, tx, cycle.ItemID)
+		if err := e.appendLifecycle(ctx, tx, workspaceID, cycle, eventWarning, firedAt); err != nil {
 			return err
 		}
 		if e.sideEffects != nil {
-			if err := e.sideEffects.EmitWarning(ctx, tx, cycle, job.ThresholdKey); err != nil {
+			if err := e.sideEffects.EmitWarning(ctx, tx, cycle, workspaceID, job.ThresholdKey, *job.DeadlineAt); err != nil {
 				return err
 			}
 		}

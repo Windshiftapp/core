@@ -27,6 +27,9 @@ var (
 	ErrEventMissing     = errors.New("domain event not found")
 	ErrConsumerMissing  = errors.New("domain event consumer not found")
 	ErrConsumerContract = errors.New("domain event consumer contract cannot change after delivery begins")
+	// ErrConsumerRetired rejects operator replay for a consumer whose durable
+	// transport has been replaced.
+	ErrConsumerRetired = errors.New("domain event consumer is retired")
 )
 
 // Event is an immutable persisted domain fact.
