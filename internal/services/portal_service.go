@@ -915,17 +915,23 @@ func (s *PortalService) collectVisibleChannelCustomFieldIDs(ctx context.Context,
 	if err := rtRows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate channel request types: %w", err)
 	}
+	// Portal channels can resolve asset custom fields through their own asset
+	// endpoints; public form channels cannot.
+	allowAssets := channelType == "portal"
 	for _, route := range visibleRTRoutes {
-		if err := s.collectBoundCustomFieldIDs(ctx, cfIDs, "request_type", route.id, route.workspaceID, route.itemTypeID); err != nil {
+		if err := s.collectBoundCustomFieldIDs(ctx, cfIDs, "request_type", route.id, route.workspaceID, route.itemTypeID, allowAssets); err != nil {
 			return nil, err
 		}
 	}
 
 	// Visible form-mode asset reports → their custom-typed configured fields.
+	// The portal grant is checked inside the query so it needs no second read
+	// connection while this cursor is open.
 	arRows, err := s.db.QueryContext(ctx, `
 		SELECT ar.id, ar.item_type_id, ar.workspace_id, ar.visibility_group_ids, ar.visibility_org_ids
 		FROM asset_reports ar
 		WHERE ar.channel_id = ? AND ar.is_active = true AND ar.run_mode = 'form'
+		  AND EXISTS (SELECT 1 FROM asset_set_portal_access aspa WHERE aspa.set_id = ar.asset_set_id)
 	`, channelID)
 	if err != nil {
 		return nil, fmt.Errorf("list channel asset reports: %w", err)
@@ -952,7 +958,7 @@ func (s *PortalService) collectVisibleChannelCustomFieldIDs(ctx context.Context,
 		return nil, fmt.Errorf("iterate channel asset reports: %w", err)
 	}
 	for _, route := range visibleARRoutes {
-		if err := s.collectBoundCustomFieldIDs(ctx, cfIDs, "asset_report", route.id, route.workspaceID, route.itemTypeID); err != nil {
+		if err := s.collectBoundCustomFieldIDs(ctx, cfIDs, "asset_report", route.id, route.workspaceID, route.itemTypeID, true); err != nil {
 			return nil, err
 		}
 	}
@@ -963,8 +969,8 @@ func (s *PortalService) collectVisibleChannelCustomFieldIDs(ctx context.Context,
 // collectBoundCustomFieldIDs admits only custom fields present on the route's
 // effective create screen. This keeps legacy or forged field rows from
 // exposing definitions outside the portal/form workspace configuration.
-func (s *PortalService) collectBoundCustomFieldIDs(ctx context.Context, out map[int]struct{}, ownerType string, ownerID, workspaceID, itemTypeID int) error {
-	createScreenID, err := repository.NewScreenRepository(s.db).GetCreateScreenID(workspaceID, itemTypeID)
+func (s *PortalService) collectBoundCustomFieldIDs(ctx context.Context, out map[int]struct{}, ownerType string, ownerID, workspaceID, itemTypeID int, allowAssets bool) error {
+	createScreenID, err := repository.NewScreenRepository(s.db).GetEffectiveCreateScreenID(workspaceID, itemTypeID)
 	if err != nil || createScreenID == nil {
 		return err
 	}
@@ -972,10 +978,11 @@ func (s *PortalService) collectBoundCustomFieldIDs(ctx context.Context, out map[
 	if err != nil {
 		return err
 	}
+	fillable := PublicFormFillableCustomFieldType(allowAssets)
 	allowed := make(map[string]struct{}, len(screenFields))
 	for _, field := range screenFields {
 		if field.FieldType == "custom" && field.FieldName != "" &&
-			IsPublicFormFillableCustomFieldType(field.CustomFieldType) {
+			fillable(field.CustomFieldType) {
 			allowed[field.FieldIdentifier] = struct{}{}
 		}
 	}

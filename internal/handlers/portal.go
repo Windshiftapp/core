@@ -150,7 +150,11 @@ func (h *PortalHandler) getPortalCustomerID(ctx context.Context, r *http.Request
 		}
 	}
 
-	// Fall back to internal user session (backward compatible)
+	// Fall back to internal user session (backward compatible). A handler
+	// without a session manager has no internal identity to resolve.
+	if h.sessionManager == nil {
+		return nil, fmt.Errorf("authentication required")
+	}
 	sessionToken, err := h.sessionManager.GetSessionFromRequest(r)
 	if err != nil {
 		return nil, fmt.Errorf("authentication required")
@@ -790,6 +794,18 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 
 	validationResult, err := services.ValidateAndSeparateRequestFields(ctx, h.db, submission.RequestTypeID, submission.Title, submission.Description, submission.CustomFields)
 	if err != nil {
+		respondValidationError(w, r, err.Error())
+		return
+	}
+
+	// Asset custom fields reference assets in an administrator-exposed set,
+	// which the generic custom-field validator cannot authorize. Reject ids
+	// outside the field's configured set, a set without a portal grant, or an
+	// asset the field's own query excludes before creating the item. The filter
+	// identity matches the picker (including a linked customer on an internal
+	// session); item attribution still uses getAuthFromContext.
+	filterCustomerID, filterOrgID := h.portalAssetFilterIdentity(ctx, r, channel.ID)
+	if err := h.validatePortalAssetCustomFields(ctx, filterCustomerID, filterOrgID, validationResult.CustomFieldValues); err != nil {
 		respondValidationError(w, r, err.Error())
 		return
 	}

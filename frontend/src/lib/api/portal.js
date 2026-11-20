@@ -131,6 +131,19 @@ export const portal = {
   // Get custom fields used by this portal's request types (portal-authenticated)
   getCustomFields: (slug) => fetchAPI(`/portal/${slug}/custom-fields`),
 
+  // Search assets exposed to the portal. Pass `fieldId` for an asset custom
+  // field: the server loads that field's admin-configured asset set and
+  // ql_query (the caller never supplies CQL). `assetSetId` is the report-scoped
+  // fallback. `query` narrows by title/description.
+  searchAssets: (slug, { fieldId = null, query = '', assetSetId = null, limit = 20 } = {}) => {
+    const params = new URLSearchParams();
+    if (fieldId) params.set('field_id', String(fieldId));
+    if (query) params.set('q', query);
+    if (assetSetId) params.set('asset_set_id', String(assetSetId));
+    if (limit) params.set('limit', String(limit));
+    return fetchAPI(`/portal/${slug}/assets/search?${params.toString()}`);
+  },
+
   // Portal-side approvals — list pending approvals for the active customer (or
   // internal user with a customer link), open a single request, and decide.
   getMyApprovals: (slug, status = 'pending') =>

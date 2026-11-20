@@ -103,6 +103,14 @@
     return field.display_name || field.field_label || field.field_name || field.field_identifier;
   }
 
+  // Asset custom fields resolve their options through the portal's asset
+  // search, which evaluates the field's ql_query against the set the
+  // administrator exposed to portals.
+  function loadAssetOptions(assetSetId, _cqlQuery, search, fieldId) {
+    if (!portalSlug) return Promise.resolve({ assets: [], total: 0 });
+    return portal.searchAssets(portalSlug, { fieldId, assetSetId, query: search });
+  }
+
   function parseSelectOptions(optionsJson) {
     try {
       const parsed = typeof optionsJson === 'string' ? JSON.parse(optionsJson) : optionsJson;
@@ -249,6 +257,7 @@
                       onChange={(val) => (values[field.field_identifier] = val)}
                       milestones={[]}
                       {isDarkMode}
+                      {loadAssetOptions}
                     />
                   {:else}
                     <CustomFieldRenderer
@@ -258,6 +267,7 @@
                       onChange={(val) => (values[field.field_identifier] = val)}
                       milestones={[]}
                       {isDarkMode}
+                      {loadAssetOptions}
                     />
                   {/if}
                 </div>

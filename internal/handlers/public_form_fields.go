@@ -38,7 +38,7 @@ type virtualFieldOption struct {
 // management picker on the same result prevents a direct API caller from
 // binding a custom field the target create screen does not expose or the
 // public form cannot render.
-func availableCreateFields(screenRepo *repository.ScreenRepository, workspaceID *int, itemTypeID int) ([]AvailableField, error) {
+func availableCreateFields(screenRepo *repository.ScreenRepository, workspaceID *int, itemTypeID int, allowAssets, excludeMultiAsset bool) ([]AvailableField, error) {
 	fields := []AvailableField{
 		{Identifier: "title", Name: "Title", Type: "default"},
 		{Identifier: "description", Name: "Description", Type: "default"},
@@ -47,7 +47,7 @@ func availableCreateFields(screenRepo *repository.ScreenRepository, workspaceID 
 		return fields, nil
 	}
 
-	createScreenID, err := screenRepo.GetCreateScreenID(*workspaceID, itemTypeID)
+	createScreenID, err := screenRepo.GetEffectiveCreateScreenID(*workspaceID, itemTypeID)
 	if err != nil {
 		return nil, err
 	}
@@ -58,11 +58,15 @@ func availableCreateFields(screenRepo *repository.ScreenRepository, workspaceID 
 	if err != nil {
 		return nil, err
 	}
+	fillable := services.PublicFormFillableCustomFieldType(allowAssets)
 	for _, field := range screenFields {
 		if field.FieldType != "custom" || field.FieldIdentifier == "" || field.FieldName == "" {
 			continue
 		}
-		if !services.IsPublicFormFillableCustomFieldType(field.CustomFieldType) {
+		if !fillable(field.CustomFieldType) {
+			continue
+		}
+		if excludeMultiAsset && services.IsMultiAssetField(field.CustomFieldOptions) {
 			continue
 		}
 		fields = append(fields, AvailableField{

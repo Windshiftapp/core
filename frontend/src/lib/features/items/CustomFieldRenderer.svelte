@@ -1091,6 +1091,7 @@
               assetConfig.asset_set_id,
               assetConfig.cql_query || assetConfig.ql_query || '',
               search,
+              field.id,
             )
           : null}
         onSelect={(asset) => {

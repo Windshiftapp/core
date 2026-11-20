@@ -276,6 +276,14 @@
     applyPrefill(prefill);
   }
 
+  // Asset custom fields resolve their options through the portal's asset
+  // search, which evaluates the field's ql_query against the set the
+  // administrator exposed to portals.
+  function loadAssetOptions(assetSetId, _cqlQuery, search, fieldId) {
+    if (!portalSlug) return Promise.resolve({ assets: [], total: 0 });
+    return portal.searchAssets(portalSlug, { fieldId, assetSetId, query: search });
+  }
+
   function validateCurrentStep() {
     const message = validateFormStep({
       fields,
@@ -501,6 +509,7 @@
             bind:customFieldValues
             {isDarkMode}
             idPrefix="request"
+            {loadAssetOptions}
           />
 
           <!-- Staged attachments (last step only). Uploads happen after the
