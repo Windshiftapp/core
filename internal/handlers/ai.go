@@ -39,6 +39,12 @@ type AIHandler struct {
 	// llmUsage meters each chat turn's token/cost against its own agent_runs
 	// row, so the model's identity and the turn's spend outlive the response.
 	llmUsage *repository.LLMUsageRepository
+	// releaseNotesItemLimit caps how many completed work items the release-notes
+	// generator sends to the model. Zero keeps defaultReleaseNotesItemLimit.
+	releaseNotesItemLimit int
+	// releaseNotesTokenBudget caps the release-notes input size in estimated
+	// tokens. Zero keeps defaultReleaseNotesTokenBudget.
+	releaseNotesTokenBudget int
 }
 
 // NewAIHandler creates a new AI handler.

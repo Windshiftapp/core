@@ -277,9 +277,11 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 			AllowPublicRoutes: parseBoolEnv("PLUGIN_PUBLIC_ROUTES"),
 		},
 		LLM: LLMConfig{
-			Endpoint:      os.Getenv("LLM_ENDPOINT"),
-			ProvidersFile: resolvedLLMProviders,
-			PromptsDir:    resolvedAIPromptsDir,
+			Endpoint:                os.Getenv("LLM_ENDPOINT"),
+			ProvidersFile:           resolvedLLMProviders,
+			PromptsDir:              resolvedAIPromptsDir,
+			ReleaseNotesItemLimit:   parseIntEnv("AI_RELEASE_NOTES_ITEM_LIMIT", 0),
+			ReleaseNotesTokenBudget: parseIntEnv("AI_RELEASE_NOTES_TOKEN_BUDGET", 0),
 		},
 		CodingAgent: CodingAgentConfig{
 			Enabled:  codingAgentEnabled,

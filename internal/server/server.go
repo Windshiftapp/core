@@ -1622,6 +1622,8 @@ func (s *Server) initialize() error {
 		pageDiagramService,
 	)
 	aiHandler.SetConversationDependencies(commentService, approvalService)
+	aiHandler.SetReleaseNotesItemLimit(cfg.LLM.ReleaseNotesItemLimit)
+	aiHandler.SetReleaseNotesTokenBudget(cfg.LLM.ReleaseNotesTokenBudget)
 	conversationRepo := repository.NewAgentConversationRepository(s.db)
 	if _, err := conversationRepo.FailInterruptedRuns(context.Background()); err != nil {
 		return fmt.Errorf("repair interrupted agent conversations: %w", err)

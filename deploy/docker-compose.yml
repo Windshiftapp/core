@@ -83,6 +83,10 @@ services:
       # - POSTGRES_CONNECTION_HEADROOM=10
       # --- LLM (uncomment when using llm service) ---
       # - LLM_ENDPOINT=http://llm:8081
+      # Optional: cap the completed work items included in AI-generated release
+      # notes (default 200) and the estimated input token budget (default 128000).
+      # - AI_RELEASE_NOTES_ITEM_LIMIT=200
+      # - AI_RELEASE_NOTES_TOKEN_BUDGET=128000
       # --- Coding agents (uncomment the windshift-runner service + coding-agent
       #     network below). Windshift orchestrates only — it queues runs and
       #     serves the runner pool; agents execute on the windshift-runner host,

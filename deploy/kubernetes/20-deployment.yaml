@@ -69,6 +69,13 @@ spec:
               value: /data/plugins
             - name: AI_PROMPTS_DIR
               value: /data/prompts
+            # Optional: cap the completed work items included in AI-generated
+            # release notes (default 200) and the estimated input token budget
+            # (default 128000).
+            # - name: AI_RELEASE_NOTES_ITEM_LIMIT
+            #   value: "200"
+            # - name: AI_RELEASE_NOTES_TOKEN_BUDGET
+            #   value: "128000"
             # SQLite and some parsers need a writable /tmp; the root filesystem
             # is read-only, so it is an emptyDir.
             - name: TMPDIR

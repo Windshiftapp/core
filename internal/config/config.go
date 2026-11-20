@@ -220,6 +220,13 @@ type LLMConfig struct {
 	Endpoint      string
 	ProvidersFile string
 	PromptsDir    string
+	// ReleaseNotesItemLimit caps how many completed work items the release-notes
+	// generator sends to the model (AI_RELEASE_NOTES_ITEM_LIMIT). Zero keeps the
+	// server default.
+	ReleaseNotesItemLimit int
+	// ReleaseNotesTokenBudget caps the estimated token size of the release-notes
+	// input (AI_RELEASE_NOTES_TOKEN_BUDGET). Zero keeps the server default.
+	ReleaseNotesTokenBudget int
 }
 
 // CodingAgentConfig configures the coding-agent harness (WI-89). The harness is
