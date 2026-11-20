@@ -1393,14 +1393,17 @@
   :global(.milkdown-editor .ProseMirror li[data-item-type='task']) {
     position: relative;
     list-style: none;
-    padding-left: 1.5rem;
   }
 
+  /* Draw the box in the list's marker gutter. Keeping the item text at the
+     same position as a bullet item means converting a bullet into a task does
+     not move the caret (WebKit restores the selection late, so fast typing
+     could otherwise land before the reflow). */
   :global(.milkdown-editor .ProseMirror li[data-item-type='task']::before) {
     content: '';
     position: absolute;
     top: 0.3rem;
-    left: 0;
+    left: -1.25rem;
     box-sizing: border-box;
     width: 1rem;
     height: 1rem;
@@ -1413,7 +1416,7 @@
     content: '';
     position: absolute;
     top: 0.48rem;
-    left: 0.34rem;
+    left: -0.91rem;
     width: 0.3rem;
     height: 0.55rem;
     border: solid var(--ds-text-inverse);
