@@ -206,7 +206,10 @@ func (s *ActionInactivitySweeper) staleOpenItems(actionID, workspaceID int, item
 	} else {
 		editActivity := `strftime('%Y-%m-%dT%H:%M:%fZ', i.updated_at)`
 		commentActivity := `(SELECT MAX(strftime('%Y-%m-%dT%H:%M:%fZ', c.created_at)) FROM comments c WHERE c.item_id = i.id)`
-		lastActivityExpr = fmt.Sprintf(`MAX(%s, COALESCE(%s, %s))`, editActivity, commentActivity, editActivity)
+		// SQLite's scalar MAX is NULL when any argument is NULL, and
+		// items.updated_at is nullable. The COALESCE swap keeps the later of the
+		// timestamps that actually exist, so a dated comment still counts.
+		lastActivityExpr = fmt.Sprintf(`MAX(COALESCE(%s, %s), COALESCE(%s, %s))`, editActivity, commentActivity, commentActivity, editActivity)
 		markExpr = `strftime('%Y-%m-%dT%H:%M:%fZ', m.last_activity_at)`
 	}
 

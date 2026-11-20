@@ -57,9 +57,10 @@ func (s *ItemCRUDService) GetByID(id int) (*models.Item, error) {
 	return s.repo.FindByIDWithDetails(id)
 }
 
-// GetByIDWithWorkspaceStatus retrieves an item with workspace active status for permission checks
-func (s *ItemCRUDService) GetByIDWithWorkspaceStatus(id int) (*repository.ItemWithWorkspaceStatus, error) {
-	return s.repo.FindByIDWithWorkspaceStatus(id)
+// GetByIDWithWorkspaceStatus retrieves an item with workspace active status
+// for permission checks, honoring request cancellation.
+func (s *ItemCRUDService) GetByIDWithWorkspaceStatus(ctx context.Context, id int) (*repository.ItemWithWorkspaceStatus, error) {
+	return s.repo.FindByIDWithWorkspaceStatusContext(ctx, id)
 }
 
 // GetByIDBasic retrieves an item by ID without joins

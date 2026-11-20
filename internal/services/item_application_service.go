@@ -733,7 +733,7 @@ func (s *ItemApplicationService) Get(ctx context.Context, userID, itemID int, tr
 }
 
 func (s *ItemApplicationService) GetWithOptions(ctx context.Context, userID, itemID int, options ItemReadOptions) (*models.Item, error) {
-	result, err := s.crud.GetByIDWithWorkspaceStatus(itemID)
+	result, err := s.crud.GetByIDWithWorkspaceStatus(ctx, itemID)
 	if err != nil {
 		return nil, err
 	}

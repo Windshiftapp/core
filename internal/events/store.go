@@ -1023,27 +1023,32 @@ func (s *Store) StatsFiltered(
 	aggregateType, aggregateID := "event.aggregate_type", "event.aggregate_id"
 	args := []any{now.UTC(), now.UTC(), filter.ConsumerKey, filter.ConsumerKey}
 	if filter.WorkspaceID != nil {
-		// An explicit consumer equality lets the planner seek that consumer's
-		// deliveries; the generic `? = '' OR` form scans every event in the
-		// workspace even when the consumer has no deliveries.
-		consumerPredicate := "(? = '' OR queued.consumer_key = ?)"
-		consumerArgs := []any{filter.ConsumerKey, filter.ConsumerKey}
-		if filter.ConsumerKey != "" {
-			consumerPredicate = "queued.consumer_key = ?"
-			consumerArgs = []any{filter.ConsumerKey}
-		}
-		deliveryTable = `(
-			SELECT queued.*, queued_event.aggregate_type, queued_event.aggregate_id
-			FROM domain_event_deliveries queued
-			JOIN domain_events queued_event ON queued_event.id = queued.event_id
-			WHERE queued_event.workspace_id = ?
-			  AND ` + consumerPredicate + `
-		) delivery`
 		aggregateType, aggregateID = "delivery.aggregate_type", "delivery.aggregate_id"
-		args = make([]any, 0, 3+len(consumerArgs)+2)
-		args = append(args, now.UTC(), now.UTC(), workspaceID)
-		args = append(args, consumerArgs...)
-		args = append(args, filter.ConsumerKey, filter.ConsumerKey)
+		if filter.ConsumerKey != "" {
+			// Drive from the consumer's deliveries and look events up by primary
+			// key. A plain inner join lets the planner scan every event in the
+			// workspace instead; the cross/lateral form pins the join order.
+			from := "domain_event_deliveries queued CROSS JOIN domain_events queued_event ON queued_event.id = queued.event_id"
+			if database.IsPostgresDriver(s.db.GetDriverName()) {
+				from = "domain_event_deliveries queued CROSS JOIN LATERAL (SELECT * FROM domain_events WHERE id = queued.event_id OFFSET 0) queued_event"
+			}
+			deliveryTable = `(
+				SELECT queued.*, queued_event.aggregate_type, queued_event.aggregate_id
+				FROM ` + from + `
+				WHERE queued_event.workspace_id = ? AND queued.consumer_key = ?
+			) delivery`
+			args = make([]any, 0, 6)
+			args = append(args, now.UTC(), now.UTC(), workspaceID, filter.ConsumerKey, filter.ConsumerKey, filter.ConsumerKey)
+		} else {
+			deliveryTable = `(
+				SELECT queued.*, queued_event.aggregate_type, queued_event.aggregate_id
+				FROM domain_event_deliveries queued
+				JOIN domain_events queued_event ON queued_event.id = queued.event_id
+				WHERE queued_event.workspace_id = ?
+			) delivery`
+			args = make([]any, 0, 5)
+			args = append(args, now.UTC(), now.UTC(), workspaceID, filter.ConsumerKey, filter.ConsumerKey)
+		}
 	}
 
 	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(`
