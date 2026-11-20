@@ -20,6 +20,12 @@ const maxStoredErrorBytes = 4096
 
 const maxAppendBatchSize = 1000
 
+// maxClaimLeaseRetries bounds reselection when a concurrent claimant wins the
+// lease between the read snapshot and the fenced UPDATE. This can only happen
+// when the selection does not hold the row (SQLite); PostgreSQL's locking read
+// claims the row for the duration of the transaction.
+const maxClaimLeaseRetries = 3
+
 // Store owns durable event and delivery persistence.
 type Store struct {
 	db database.Database
@@ -467,10 +473,8 @@ type GateResult struct {
 // due backlog instead: at 10M due rows SQLite took 6.7 s and split two ways
 // still 3.0 s, while the probes stayed at 0.4 ms.
 //
-// The pending/retry probe rides idx_domain_event_deliveries_runnable
-// (consumer_key, state, next_attempt_at); the lease probe rides
-// idx_domain_event_deliveries_lease. Both indexes already exist, so the gate
-// needs no schema change.
+// The eligibility probe rides idx_domain_event_deliveries_claimable
+// (consumer_key, next_attempt_at) WHERE state IN ('pending','retry','leased').
 const gateSQL = `
 	SELECT 1 AS gate_kind, CAST(NULL AS TEXT) AS consumer_key, CAST(COALESCE(MAX(id), 0) AS INTEGER) AS event_id
 	FROM domain_events
@@ -483,19 +487,11 @@ const gateSQL = `
 	SELECT 3, consumer.consumer_key, CAST(NULL AS INTEGER)
 	FROM domain_event_consumers consumer
 	WHERE consumer.is_active = true
-	  AND (
-		EXISTS (
-			SELECT 1 FROM domain_event_deliveries delivery
-			WHERE delivery.consumer_key = consumer.consumer_key
-			  AND delivery.state IN ('pending', 'retry')
-			  AND delivery.next_attempt_at <= ?
-		)
-		OR EXISTS (
-			SELECT 1 FROM domain_event_deliveries delivery
-			WHERE delivery.consumer_key = consumer.consumer_key
-			  AND delivery.state = 'leased'
-			  AND delivery.lease_expires_at <= ?
-		)
+	  AND EXISTS (
+		SELECT 1 FROM domain_event_deliveries delivery
+		WHERE delivery.consumer_key = consumer.consumer_key
+		  AND delivery.state IN ('pending', 'retry', 'leased')
+		  AND delivery.next_attempt_at <= ?
 	  )
 	UNION ALL
 	SELECT 4, consumer.consumer_key, CAST(NULL AS INTEGER)
@@ -512,7 +508,7 @@ const gateSQL = `
 // whenever a claim happens.
 func (s *Store) Gate(ctx context.Context, minCursor int64, now time.Time) (GateResult, error) {
 	var result GateResult
-	rows, err := s.db.QueryContext(ctx, gateSQL, minCursor, now.UTC(), now.UTC())
+	rows, err := s.db.QueryContext(ctx, gateSQL, minCursor, now.UTC())
 	if err != nil {
 		return result, fmt.Errorf("gate domain event work: %w", err)
 	}
@@ -595,21 +591,28 @@ func reconcileConsumerQuery(driver string, withSince bool) string {
 }
 
 // claimQuery builds the claim SELECT for one dialect. FOR UPDATE OF delivery
-// SKIP LOCKED is PostgreSQL-only; SQLite has no locking clause, so this branch
-// must stay. The claim still runs inside a transaction in both dialects.
+// SKIP LOCKED is PostgreSQL-only; SQLite has no locking clause. On SQLite the
+// SELECT runs on a read-only snapshot (see claimSelectTx) and the fenced lease
+// UPDATE is what actually claims the row.
+//
+// The predicate orders claimable rows by next_attempt_at across pending, retry,
+// and leased so it can ride idx_domain_event_deliveries_claimable without a temp
+// sort. The consumers lookup is an uncorrelated EXISTS rather than a join: a
+// join lets the planner drive from domain_event_consumers, which reintroduces
+// the ORDER BY temp B-tree.
 func claimQuery(driver string) string {
 	query := `
 		SELECT delivery.event_id, delivery.attempt_count
 		FROM domain_event_deliveries delivery
 		JOIN domain_events event ON event.id = delivery.event_id
-		JOIN domain_event_consumers consumer
-		  ON consumer.consumer_key = delivery.consumer_key
 		WHERE delivery.consumer_key = ?
-		  AND consumer.is_active = true
-		  AND (
-			(delivery.state IN ('pending', 'retry') AND delivery.next_attempt_at <= ?)
-			OR (delivery.state = 'leased' AND delivery.lease_expires_at <= ?)
+		  AND EXISTS (
+			SELECT 1 FROM domain_event_consumers consumer
+			WHERE consumer.consumer_key = ?
+			  AND consumer.is_active = true
 		  )
+		  AND delivery.state IN ('pending', 'retry', 'leased')
+		  AND delivery.next_attempt_at <= ?
 		  AND NOT EXISTS (
 			SELECT 1
 			FROM domain_event_deliveries earlier_delivery
@@ -620,13 +623,32 @@ func claimQuery(driver string) string {
 			  AND earlier_event.aggregate_sequence < event.aggregate_sequence
 			  AND earlier_delivery.state NOT IN ('completed', 'skipped')
 		  )
-		ORDER BY delivery.next_attempt_at, event.id
+		ORDER BY delivery.next_attempt_at, delivery.event_id
 		LIMIT 1
 	`
 	if driver == "postgres" {
 		return query + " FOR UPDATE OF delivery SKIP LOCKED"
 	}
 	return query
+}
+
+// claimSelectTx opens the transaction used to find a claimable delivery. SQLite
+// routes BeginTx to the single write connection under _txlock=immediate, so a
+// SELECT there holds the write lock for the whole (potentially O(n)) claim and
+// starves item writes. Read from the reader pool instead. PostgreSQL keeps a
+// locking read on its shared pool so concurrent workers skip each other's rows;
+// the second return value reports whether the lease UPDATE can share the same
+// transaction.
+func (s *Store) claimSelectTx(ctx context.Context) (database.Tx, bool, error) {
+	if database.IsPostgresDriver(s.db.GetDriverName()) {
+		tx, err := s.db.BeginTx(ctx, nil)
+		return tx, true, err
+	}
+	tx, err := s.db.GetDB().BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, false, err
+	}
+	return database.NewSQLiteTx(tx), false, nil
 }
 
 // Claim leases the next causally eligible delivery for one consumer.
@@ -644,36 +666,72 @@ func (s *Store) Claim(
 		return nil, errors.New("lease duration must be positive")
 	}
 
-	tx, err := s.db.BeginTx(ctx, nil)
+	query := claimQuery(s.db.GetDriverName())
+	for attempt := 0; ; attempt++ {
+		delivery, err := s.claimOnce(ctx, query, consumerKey, owner, now, leaseDuration)
+		if err == nil {
+			return delivery, nil
+		}
+		if !errors.Is(err, ErrLeaseLost) || attempt >= maxClaimLeaseRetries {
+			return nil, err
+		}
+	}
+}
+
+// claimOnce selects one candidate and fences its lease. The fenced UPDATE is
+// the authority: a row can be leased by a concurrent claimant after the
+// snapshot, in which case rows != 1 reports ErrLeaseLost for a bounded reselect.
+func (s *Store) claimOnce(
+	ctx context.Context,
+	query string,
+	consumerKey string,
+	owner string,
+	now time.Time,
+	leaseDuration time.Duration,
+) (*Delivery, error) {
+	selectTx, leaseInSelectTx, err := s.claimSelectTx(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin domain event claim: %w", err)
 	}
-	defer func() { _ = tx.Rollback() }()
-
-	query := claimQuery(s.db.GetDriverName())
+	defer func() { _ = selectTx.Rollback() }()
 
 	var eventID int64
 	var previousAttempts int
-	if err := tx.QueryRowContext(ctx, query, consumerKey, now.UTC(), now.UTC()).Scan(&eventID, &previousAttempts); err != nil {
+	if err := selectTx.QueryRowContext(ctx, query, consumerKey, consumerKey, now.UTC()).Scan(&eventID, &previousAttempts); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("select domain event delivery for %q: %w", consumerKey, err)
 	}
+	event, err := scanEvent(selectTx.QueryRowContext(ctx, eventSelectSQL+" WHERE id = ?", eventID))
+	if err != nil {
+		return nil, fmt.Errorf("load domain event delivery for %q: %w", consumerKey, err)
+	}
+
+	leaseTx := selectTx
+	if !leaseInSelectTx {
+		// The SELECT ran on the reader pool; the lease UPDATE needs the writer.
+		if err := selectTx.Rollback(); err != nil {
+			return nil, fmt.Errorf("close domain event claim snapshot: %w", err)
+		}
+		leaseTx, err = s.db.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("begin domain event claim: %w", err)
+		}
+		defer func() { _ = leaseTx.Rollback() }()
+	}
 
 	token := uuid.New().String()
 	expiresAt := now.UTC().Add(leaseDuration)
-	result, err := tx.ExecContext(ctx, `
+	result, err := leaseTx.ExecContext(ctx, `
 		UPDATE domain_event_deliveries
 		SET state = 'leased', attempt_count = attempt_count + 1,
-		    lease_owner = ?, lease_token = ?, lease_expires_at = ?,
+		    lease_owner = ?, lease_token = ?, lease_expires_at = ?, next_attempt_at = ?,
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE event_id = ? AND consumer_key = ?
-		  AND (
-			(state IN ('pending', 'retry') AND next_attempt_at <= ?)
-			OR (state = 'leased' AND lease_expires_at <= ?)
-		  )
-	`, owner, token, expiresAt, eventID, consumerKey, now.UTC(), now.UTC())
+		  AND state IN ('pending', 'retry', 'leased')
+		  AND next_attempt_at <= ?
+	`, owner, token, expiresAt, expiresAt, eventID, consumerKey, now.UTC())
 	if err != nil {
 		return nil, fmt.Errorf("lease domain event delivery: %w", err)
 	}
@@ -684,12 +742,7 @@ func (s *Store) Claim(
 	if rows != 1 {
 		return nil, ErrLeaseLost
 	}
-
-	event, err := scanEvent(tx.QueryRowContext(ctx, eventSelectSQL+" WHERE id = ?", eventID))
-	if err != nil {
-		return nil, fmt.Errorf("load leased domain event: %w", err)
-	}
-	if err := tx.Commit(); err != nil {
+	if err := leaseTx.Commit(); err != nil {
 		return nil, fmt.Errorf("commit domain event lease: %w", err)
 	}
 	return &Delivery{
@@ -742,10 +795,10 @@ func (s *Store) Renew(ctx context.Context, delivery Delivery, now time.Time, lea
 	expiresAt := now.UTC().Add(leaseDuration)
 	result, err := s.db.ExecWriteContext(ctx, `
 		UPDATE domain_event_deliveries
-		SET lease_expires_at = ?, updated_at = CURRENT_TIMESTAMP
+		SET lease_expires_at = ?, next_attempt_at = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE event_id = ? AND consumer_key = ? AND state = 'leased'
 		  AND lease_owner = ? AND lease_token = ? AND lease_expires_at > ?
-	`, expiresAt, delivery.Event.ID, delivery.ConsumerKey, delivery.LeaseOwner, delivery.LeaseToken, now.UTC())
+	`, expiresAt, expiresAt, delivery.Event.ID, delivery.ConsumerKey, delivery.LeaseOwner, delivery.LeaseToken, now.UTC())
 	if err != nil {
 		return time.Time{}, fmt.Errorf("renew domain event delivery lease: %w", err)
 	}

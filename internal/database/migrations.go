@@ -3460,7 +3460,27 @@ CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_m
 		SQLite:   `ALTER TABLE time_projects ADD COLUMN currency TEXT NOT NULL DEFAULT ''`,
 		Postgres: `ALTER TABLE time_projects ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT ''`,
 	},
+	{
+		Version:       "20261127_domain_event_claimable_index",
+		Name:          "Add a partial claimable-delivery index and align leased eligibility",
+		CheckSQLite:   sqliteIndexCheck("idx_domain_event_deliveries_claimable"),
+		CheckPostgres: pgIndexCheck("idx_domain_event_deliveries_claimable"),
+		SQLite:        domainEventClaimableIndexMigration,
+		Postgres:      domainEventClaimableIndexMigration,
+	},
 }
+
+// domainEventClaimableIndexMigration adds the partial index the claim query
+// orders by, and makes next_attempt_at the single eligibility time for leased
+// rows so the claim can use that index across pending, retry, and leased.
+const domainEventClaimableIndexMigration = `
+CREATE INDEX IF NOT EXISTS idx_domain_event_deliveries_claimable
+	ON domain_event_deliveries(consumer_key, next_attempt_at, event_id)
+	WHERE state IN ('pending', 'retry', 'leased');
+UPDATE domain_event_deliveries
+	SET next_attempt_at = lease_expires_at
+	WHERE state = 'leased' AND lease_expires_at IS NOT NULL AND next_attempt_at < lease_expires_at;
+`
 
 const timeWorklogDraftsMigrationSQLite = `
 CREATE TABLE IF NOT EXISTS time_worklog_drafts (

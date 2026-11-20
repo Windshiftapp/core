@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS domain_event_deliveries (
 	state TEXT NOT NULL DEFAULT 'pending'
 		CHECK (state IN ('pending', 'leased', 'retry', 'failed', 'completed', 'skipped')),
 	attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
-	next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, -- earliest eligible time; lease expiry while leased
 	lease_owner TEXT,
 	lease_token TEXT,
 	lease_expires_at TIMESTAMPTZ,
@@ -92,6 +92,11 @@ CREATE TABLE IF NOT EXISTS domain_event_deliveries (
 
 CREATE INDEX IF NOT EXISTS idx_domain_event_deliveries_runnable
 	ON domain_event_deliveries(consumer_key, state, next_attempt_at, event_id);
+-- Claimable deliveries are ordered by next_attempt_at across pending, retry,
+-- and leased states, so a partial index serves the claim without a temp sort.
+CREATE INDEX IF NOT EXISTS idx_domain_event_deliveries_claimable
+	ON domain_event_deliveries(consumer_key, next_attempt_at, event_id)
+	WHERE state IN ('pending', 'retry', 'leased');
 CREATE INDEX IF NOT EXISTS idx_domain_event_deliveries_lease
 	ON domain_event_deliveries(state, lease_expires_at);
 CREATE INDEX IF NOT EXISTS idx_domain_event_deliveries_state
