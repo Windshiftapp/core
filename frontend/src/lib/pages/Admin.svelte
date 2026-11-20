@@ -147,12 +147,15 @@
     adminNavigationOpen = true;
     await tick();
     // The drawer and the field (transition-all) reveal themselves through
-    // nested visibility transitions, and a hidden field cannot take focus, so
-    // wait a few frames at most until it shows.
-    for (let frame = 0; frame < 30; frame++) {
-      if (!adminNavigationOpen) return;
-      if (searchInput?.checkVisibility?.({ visibilityProperty: true })) break;
-      await new Promise((resolve) => requestAnimationFrame(resolve));
+    // nested visibility transitions, and a hidden field cannot take focus.
+    // Only poll where the browser can actually report visibility; otherwise
+    // fall back to focusing right away instead of burning the whole timeout.
+    if (typeof searchInput?.checkVisibility === 'function') {
+      for (let frame = 0; frame < 30; frame++) {
+        if (!adminNavigationOpen) return;
+        if (searchInput?.checkVisibility({ visibilityProperty: true })) break;
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
     }
     searchInput?.focus();
   }
