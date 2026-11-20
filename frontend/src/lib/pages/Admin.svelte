@@ -146,6 +146,14 @@
   async function openAdminNavigation() {
     adminNavigationOpen = true;
     await tick();
+    // The drawer and the field (transition-all) reveal themselves through
+    // nested visibility transitions, and a hidden field cannot take focus, so
+    // wait a few frames at most until it shows.
+    for (let frame = 0; frame < 30; frame++) {
+      if (!adminNavigationOpen) return;
+      if (searchInput?.checkVisibility?.({ visibilityProperty: true })) break;
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
     searchInput?.focus();
   }
 
@@ -334,7 +342,7 @@
         <IconSearch size={16} stroke={1.5} class="absolute left-3 top-1/2 transform -translate-y-1/2" style="color: var(--ds-icon-subtle);" aria-hidden="true" />
         <Input
           id="admin-search"
-          bind:this={searchInput}
+          bind:inputRef={searchInput}
           bind:value={searchQuery}
           onkeydown={handleSearchKeydown}
           type="search"
