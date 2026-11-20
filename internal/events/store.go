@@ -1013,7 +1013,45 @@ func (s *Store) StatsFiltered(
 	now time.Time,
 ) ([]ConsumerStats, error) {
 	workspaceID := nullableInt(filter.WorkspaceID)
-	rows, err := s.db.QueryContext(ctx, `
+
+	// Unscoped diagnostics join deliveries directly so a consumer filter
+	// restricts the scan before aggregation. A workspace-scoped read needs the
+	// event's workspace, so it filters a derived delivery set and pushes the
+	// same consumer predicate inside it; otherwise the derived set materializes
+	// every retained delivery even when the caller asked for one consumer.
+	deliveryTable := "domain_event_deliveries delivery"
+	aggregateType, aggregateID := "event.aggregate_type", "event.aggregate_id"
+	args := []any{now.UTC(), now.UTC(), filter.ConsumerKey, filter.ConsumerKey}
+	if filter.WorkspaceID != nil {
+		aggregateType, aggregateID = "delivery.aggregate_type", "delivery.aggregate_id"
+		if filter.ConsumerKey != "" {
+			// Drive from the consumer's deliveries and look events up by primary
+			// key. A plain inner join lets the planner scan every event in the
+			// workspace instead; the cross/lateral form pins the join order.
+			from := "domain_event_deliveries queued CROSS JOIN domain_events queued_event ON queued_event.id = queued.event_id"
+			if database.IsPostgresDriver(s.db.GetDriverName()) {
+				from = "domain_event_deliveries queued CROSS JOIN LATERAL (SELECT * FROM domain_events WHERE id = queued.event_id OFFSET 0) queued_event"
+			}
+			deliveryTable = `(
+				SELECT queued.*, queued_event.aggregate_type, queued_event.aggregate_id
+				FROM ` + from + `
+				WHERE queued_event.workspace_id = ? AND queued.consumer_key = ?
+			) delivery`
+			args = make([]any, 0, 6)
+			args = append(args, now.UTC(), now.UTC(), workspaceID, filter.ConsumerKey, filter.ConsumerKey, filter.ConsumerKey)
+		} else {
+			deliveryTable = `(
+				SELECT queued.*, queued_event.aggregate_type, queued_event.aggregate_id
+				FROM domain_event_deliveries queued
+				JOIN domain_events queued_event ON queued_event.id = queued.event_id
+				WHERE queued_event.workspace_id = ?
+			) delivery`
+			args = make([]any, 0, 5)
+			args = append(args, now.UTC(), now.UTC(), workspaceID, filter.ConsumerKey, filter.ConsumerKey)
+		}
+	}
+
+	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(`
 		SELECT consumer.consumer_key, consumer.is_active,
 		       COALESCE(SUM(CASE WHEN delivery.state = 'pending' THEN 1 ELSE 0 END), 0),
 		       COALESCE(SUM(CASE WHEN delivery.state = 'leased' THEN 1 ELSE 0 END), 0),
@@ -1023,24 +1061,19 @@ func (s *Store) StatsFiltered(
 		       COALESCE(SUM(CASE WHEN delivery.state = 'retry' THEN delivery.attempt_count ELSE 0 END), 0),
 		       COALESCE(SUM(CASE WHEN delivery.state = 'failed' THEN 1 ELSE 0 END), 0),
 		       COUNT(DISTINCT CASE WHEN delivery.state = 'failed'
-		                           THEN CAST(LENGTH(delivery.aggregate_type) AS TEXT) || ':' ||
-		                                delivery.aggregate_type || delivery.aggregate_id END),
+		                           THEN CAST(LENGTH(%s) AS TEXT) || ':' ||
+		                                %s || %s END),
 		       COALESCE(SUM(CASE WHEN delivery.state = 'completed' THEN 1 ELSE 0 END), 0),
 		       COALESCE(SUM(CASE WHEN delivery.state = 'skipped' THEN 1 ELSE 0 END), 0),
 		       MIN(CASE WHEN delivery.state IN ('pending', 'leased', 'retry', 'failed')
 		                THEN event.recorded_at END)
 		FROM domain_event_consumers consumer
-		LEFT JOIN (
-			SELECT queued.*, queued_event.aggregate_type, queued_event.aggregate_id
-			FROM domain_event_deliveries queued
-			JOIN domain_events queued_event ON queued_event.id = queued.event_id
-			WHERE (CAST(? AS INTEGER) IS NULL OR queued_event.workspace_id = ?)
-		) delivery ON delivery.consumer_key = consumer.consumer_key
+		LEFT JOIN %s ON delivery.consumer_key = consumer.consumer_key
 		LEFT JOIN domain_events event ON event.id = delivery.event_id
 		WHERE (? = '' OR consumer.consumer_key = ?)
 		GROUP BY consumer.consumer_key, consumer.is_active
 		ORDER BY consumer.consumer_key
-	`, now.UTC(), now.UTC(), workspaceID, workspaceID, filter.ConsumerKey, filter.ConsumerKey)
+	`, aggregateType, aggregateType, aggregateID, deliveryTable), args...)
 	if err != nil {
 		return nil, fmt.Errorf("query domain event stats: %w", err)
 	}

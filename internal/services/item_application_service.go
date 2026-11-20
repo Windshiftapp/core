@@ -733,7 +733,7 @@ func (s *ItemApplicationService) Get(ctx context.Context, userID, itemID int, tr
 }
 
 func (s *ItemApplicationService) GetWithOptions(ctx context.Context, userID, itemID int, options ItemReadOptions) (*models.Item, error) {
-	result, err := s.crud.GetByIDWithWorkspaceStatus(itemID)
+	result, err := s.crud.GetByIDWithWorkspaceStatus(ctx, itemID)
 	if err != nil {
 		return nil, err
 	}
@@ -764,12 +764,14 @@ func (s *ItemApplicationService) GetWithOptions(ctx context.Context, userID, ite
 		}
 	}
 
-	item, err := s.crud.GetWithEffectiveProject(itemID)
-	if err != nil {
+	item := result.Item
+	if err := s.crud.ApplyEffectiveProject(item); err != nil {
 		return nil, err
 	}
 	items := []models.Item{*item}
-	if err := s.enrich(ctx, userID, items); err != nil {
+	// FindByIDWithWorkspaceStatus already attached milestones to the authorized
+	// item, so enrich must not repeat that lookup.
+	if err := s.enrichWithMilestones(ctx, userID, items, false); err != nil {
 		return nil, err
 	}
 	item = &items[0]
@@ -2148,12 +2150,12 @@ func (s *ItemApplicationService) invalidateHierarchy(itemID int) {
 		return
 	}
 	_ = s.cache.InvalidateItemHierarchy(itemID, nil)
-	descendants, err := s.hierarchy.GetDescendants(itemID, 0)
+	descendantIDs, err := s.hierarchy.GetDescendantIDsContext(context.Background(), itemID, 0)
 	if err != nil {
 		return
 	}
-	for i := range descendants {
-		_ = s.cache.InvalidateItemHierarchy(descendants[i].ID, nil)
+	for _, descendantID := range descendantIDs {
+		_ = s.cache.InvalidateItemHierarchy(descendantID, nil)
 	}
 }
 
@@ -2419,11 +2421,21 @@ func (s *ItemApplicationService) relatedItemVisible(userID, itemID int) bool {
 }
 
 func (s *ItemApplicationService) enrich(ctx context.Context, userID int, items []models.Item) error {
+	return s.enrichWithMilestones(ctx, userID, items, true)
+}
+
+// enrichWithMilestones decorates items and, when loadMilestones is set, owns
+// the milestone lookup. A caller whose items already carry milestones passes
+// false so a single detail read loads them exactly once.
+func (s *ItemApplicationService) enrichWithMilestones(ctx context.Context, userID int, items []models.Item, loadMilestones bool) error {
 	NewTimePermissionService(s.db, s.perm).MaskInaccessibleProjectNamesContext(ctx, userID, items)
 	MaskInaccessibleRelatedWorkItems(userID, items, s.perm)
 	s.decorateItemKeys(userID, items)
 	if err := repository.NewLabelRepository(s.db).LoadForItemsContext(ctx, items); err != nil {
 		return err
+	}
+	if !loadMilestones {
+		return nil
 	}
 	return repository.NewMilestoneAttachRepository(s.db).LoadForItemsContext(ctx, items)
 }

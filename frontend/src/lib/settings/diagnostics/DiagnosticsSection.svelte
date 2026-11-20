@@ -30,20 +30,53 @@
   } = $props();
 
   let interval;
+  let inFlight = false;
 
-  function refresh() {
-    onLoad?.();
+  // Coalesce overlapping refreshes without relying on the caller's loading
+  // indicator: callers may mount with loading already true and still need the
+  // first request to run.
+  async function refresh() {
+    if (inFlight) return;
+    inFlight = true;
+    try {
+      await onLoad?.();
+    } finally {
+      inFlight = false;
+    }
+  }
+
+  function startInterval() {
+    if (!refreshInterval || interval) return;
+    interval = setInterval(refresh, refreshInterval);
+  }
+
+  function stopInterval() {
+    if (!interval) return;
+    clearInterval(interval);
+    interval = undefined;
+  }
+
+  // A hidden tab has no observer, so pause polling and refresh once when it
+  // becomes visible again.
+  function handleVisibility() {
+    if (document.visibilityState === 'hidden') {
+      stopInterval();
+      return;
+    }
+    refresh();
+    startInterval();
   }
 
   onMount(() => {
+    document.addEventListener('visibilitychange', handleVisibility);
+    if (document.visibilityState === 'hidden') return;
     refresh();
-    if (refreshInterval) {
-      interval = setInterval(refresh, refreshInterval);
-    }
+    startInterval();
   });
 
   onDestroy(() => {
-    if (interval) clearInterval(interval);
+    stopInterval();
+    document.removeEventListener('visibilitychange', handleVisibility);
   });
 </script>
 

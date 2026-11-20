@@ -40,18 +40,25 @@ func (r *ActionTriggerMarkRepository) MarkFor(actionID, itemID int) (time.Time, 
 }
 
 // Upsert records that actionID fired for itemID while the item's last
-// activity was at lastActivityAt.
-func (r *ActionTriggerMarkRepository) Upsert(actionID, itemID int, lastActivityAt time.Time) error {
+// activity was at lastActivityAt. It reports whether this call wrote the mark:
+// a concurrent sweep that already recorded the same activity leaves the row
+// untouched and returns false, so only one replica emits.
+func (r *ActionTriggerMarkRepository) Upsert(actionID, itemID int, lastActivityAt time.Time) (bool, error) {
 	now := time.Now()
-	_, err := r.db.ExecWrite(`
+	result, err := r.db.ExecWrite(`
 		INSERT INTO action_trigger_marks (action_id, item_id, last_activity_at, marked_at)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT(action_id, item_id) DO UPDATE SET last_activity_at = excluded.last_activity_at, marked_at = excluded.marked_at
+		WHERE action_trigger_marks.last_activity_at < excluded.last_activity_at
 	`, actionID, itemID, lastActivityAt, now)
 	if err != nil {
-		return fmt.Errorf("upsert action trigger mark (action %d, item %d): %w", actionID, itemID, err)
+		return false, fmt.Errorf("upsert action trigger mark (action %d, item %d): %w", actionID, itemID, err)
 	}
-	return nil
+	written, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("read action trigger mark result (action %d, item %d): %w", actionID, itemID, err)
+	}
+	return written > 0, nil
 }
 
 // ClearItemMarks removes every mark for an item after new activity, re-arming

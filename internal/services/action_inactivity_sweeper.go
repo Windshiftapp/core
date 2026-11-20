@@ -134,7 +134,7 @@ func (s *ActionInactivitySweeper) sweepAction(action *models.Action, now time.Ti
 	// (driver-bound timestamps vs CURRENT_TIMESTAMP defaults) stay ordered.
 	cutoff := normalizeSweepTimestamp(now.Add(-time.Duration(config.InactiveHours) * time.Hour))
 
-	items, err := s.staleOpenItems(action.WorkspaceID, config.ItemTypeID, cutoff, s.config.BatchSize)
+	items, err := s.staleOpenItems(action.ID, action.WorkspaceID, config.ItemTypeID, cutoff, s.config.BatchSize)
 	if err != nil {
 		slog.Warn("inactivity sweep query failed",
 			slog.String("component", "actions"), slog.Int("action_id", action.ID), slog.Any("error", err))
@@ -149,20 +149,13 @@ func (s *ActionInactivitySweeper) sweepAction(action *models.Action, now time.Ti
 				slog.String("component", "actions"), slog.Int("item_id", item.ID), slog.String("value", item.LastActivity))
 			continue
 		}
-		if mark, err := s.marks.MarkFor(action.ID, item.ID); err == nil {
-			if !lastActivity.After(mark) {
-				continue // already fired for this stale period
-			}
-		} else if err != repository.ErrNotFound {
-			slog.Warn("inactivity sweep mark lookup failed",
-				slog.String("component", "actions"), slog.Int("action_id", action.ID),
-				slog.Int("item_id", item.ID), slog.Any("error", err))
-			continue
-		}
-		if err := s.marks.Upsert(action.ID, item.ID, lastActivity); err != nil {
+		if wrote, err := s.marks.Upsert(action.ID, item.ID, lastActivity); err != nil {
 			slog.Warn("inactivity sweep could not record mark",
 				slog.String("component", "actions"), slog.Int("action_id", action.ID),
 				slog.Int("item_id", item.ID), slog.Any("error", err))
+			continue
+		} else if !wrote {
+			// A concurrent sweep already recorded this activity; only the writer emits.
 			continue
 		}
 		s.emitter.EmitActionEvent(&models.ActionEvent{
@@ -193,14 +186,31 @@ type staleOpenItem struct {
 
 // staleOpenItems returns open, unmerged items in the workspace whose last
 // activity (the later of items.updated_at and the newest comment) precedes
-// the normalized cutoff string.
-func (s *ActionInactivitySweeper) staleOpenItems(workspaceID int, itemTypeID *int, cutoff string, limit int) ([]staleOpenItem, error) {
-	lastActivityInner := `COALESCE((SELECT MAX(c.created_at) FROM comments c WHERE c.item_id = i.id), i.updated_at)`
+// the normalized cutoff string. Items already marked as fired for actionID are
+// excluded before the limit, so a run of marked rows cannot starve later
+// eligible items out of the batch.
+func (s *ActionInactivitySweeper) staleOpenItems(actionID, workspaceID int, itemTypeID *int, cutoff string, limit int) ([]staleOpenItem, error) {
+	// Normalize each timestamp before taking the later one. SQLite can store the
+	// edit and comment timestamps in different text shapes (a driver-bound value
+	// with a "T" versus a CURRENT_TIMESTAMP default with a space), and comparing
+	// the raw text would pick the wrong instant. The normalized UTC strings are
+	// fixed-width, so both MAX/GREATEST and the later string comparisons below
+	// are chronological.
 	var lastActivityExpr string
+	var markExpr string
 	if database.IsPostgresDriver(s.db.GetDriverName()) {
-		lastActivityExpr = fmt.Sprintf(`to_char(%s AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`, lastActivityInner)
+		editActivity := `to_char(i.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`
+		commentActivity := `(SELECT MAX(to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')) FROM comments c WHERE c.item_id = i.id)`
+		lastActivityExpr = fmt.Sprintf(`GREATEST(%s, COALESCE(%s, %s))`, editActivity, commentActivity, editActivity)
+		markExpr = `to_char(m.last_activity_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`
 	} else {
-		lastActivityExpr = fmt.Sprintf(`strftime('%%Y-%%m-%%dT%%H:%%M:%%fZ', %s)`, lastActivityInner)
+		editActivity := `strftime('%Y-%m-%dT%H:%M:%fZ', i.updated_at)`
+		commentActivity := `(SELECT MAX(strftime('%Y-%m-%dT%H:%M:%fZ', c.created_at)) FROM comments c WHERE c.item_id = i.id)`
+		// SQLite's scalar MAX is NULL when any argument is NULL, and
+		// items.updated_at is nullable. The COALESCE swap keeps the later of the
+		// timestamps that actually exist, so a dated comment still counts.
+		lastActivityExpr = fmt.Sprintf(`MAX(COALESCE(%s, %s), COALESCE(%s, %s))`, editActivity, commentActivity, commentActivity, editActivity)
+		markExpr = `strftime('%Y-%m-%dT%H:%M:%fZ', m.last_activity_at)`
 	}
 
 	query := fmt.Sprintf(`
@@ -208,12 +218,14 @@ func (s *ActionInactivitySweeper) staleOpenItems(workspaceID int, itemTypeID *in
 		FROM items i
 		JOIN statuses st ON i.status_id = st.id
 		JOIN status_categories sc ON st.category_id = sc.id
+		LEFT JOIN action_trigger_marks m ON m.action_id = ? AND m.item_id = i.id
 		WHERE i.workspace_id = ?
 		  AND sc.is_completed = false
 		  AND i.merged_into_item_id IS NULL
 		  AND %s <= ?
-	`, lastActivityExpr, lastActivityExpr)
-	args := []any{workspaceID, cutoff}
+		  AND (m.last_activity_at IS NULL OR %s > %s)
+	`, lastActivityExpr, lastActivityExpr, lastActivityExpr, markExpr)
+	args := []any{actionID, workspaceID, cutoff}
 	if itemTypeID != nil {
 		query += " AND i.item_type_id = ?"
 		args = append(args, *itemTypeID)
