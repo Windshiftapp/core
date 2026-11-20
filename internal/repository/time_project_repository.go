@@ -34,6 +34,7 @@ type TimeProjectDetail struct {
 	Status             string
 	Color              string
 	HourlyRate         float64
+	Currency           string         // ISO 4217 code; empty inherits the instance setting
 	Settings           map[string]any // parsed settings JSON; nil when empty
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
@@ -45,7 +46,7 @@ type TimeProjectDetail struct {
 }
 
 const timeProjectDetailSelect = `SELECT tp.id, tp.customer_id, tp.category_id, tp.name, COALESCE(tp.description, ''),
-       tp.status, COALESCE(tp.color, ''), tp.hourly_rate, COALESCE(tp.settings, ''),
+       tp.status, COALESCE(tp.color, ''), tp.hourly_rate, COALESCE(tp.currency, ''), COALESCE(tp.settings, ''),
        tp.created_at, tp.updated_at,
        COALESCE(co.name, ''), COALESCE(co.builtin_key, ''), COALESCE(tpc.name, ''), COALESCE(tpc.color, ''),
        (SELECT COALESCE(SUM(duration_minutes), 0) / 60.0 FROM time_worklogs WHERE project_id = tp.id) as total_hours
@@ -58,7 +59,7 @@ func scanTimeProjectDetail(scan func(dest ...any) error) (TimeProjectDetail, err
 	var settingsStr sql.NullString
 	var totalHours sql.NullFloat64
 	err := scan(&p.ID, &p.CustomerID, &p.CategoryID, &p.Name, &p.Description,
-		&p.Status, &p.Color, &p.HourlyRate, &settingsStr, &p.CreatedAt, &p.UpdatedAt, &p.CustomerName,
+		&p.Status, &p.Color, &p.HourlyRate, &p.Currency, &settingsStr, &p.CreatedAt, &p.UpdatedAt, &p.CustomerName,
 		&p.CustomerBuiltinKey, &p.CategoryName, &p.CategoryColor, &totalHours)
 	if err != nil {
 		return p, err
@@ -188,9 +189,9 @@ func insertTimeProject(queryRow func(string, ...any) *sql.Row, project *models.T
 	}
 	var id int
 	err = queryRow(`INSERT INTO time_projects
-  (customer_id, category_id, name, description, status, color, hourly_rate, settings, created_at, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`, project.CustomerID, project.CategoryID,
-		project.Name, project.Description, project.Status, project.Color, project.HourlyRate, settings, now, now).Scan(&id)
+  (customer_id, category_id, name, description, status, color, hourly_rate, currency, settings, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`, project.CustomerID, project.CategoryID,
+		project.Name, project.Description, project.Status, project.Color, project.HourlyRate, project.Currency, settings, now, now).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("create time project: %w", err)
 	}
@@ -224,10 +225,10 @@ func (r *TimeProjectRepository) Update(id int, project *models.TimeProject) erro
 	_, err = r.db.ExecWrite(`
 		UPDATE time_projects
 		SET customer_id = ?, category_id = ?, name = ?, description = ?, status = ?, color = ?,
-		    hourly_rate = ?, settings = ?, updated_at = ?
+		    hourly_rate = ?, currency = ?, settings = ?, updated_at = ?
 		WHERE id = ?
 	`, project.CustomerID, project.CategoryID, project.Name, project.Description, project.Status,
-		project.Color, project.HourlyRate, settings, now, id)
+		project.Color, project.HourlyRate, project.Currency, settings, now, id)
 	if err != nil {
 		return fmt.Errorf("update time project %d: %w", id, err)
 	}

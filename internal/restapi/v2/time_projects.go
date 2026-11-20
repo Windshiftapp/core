@@ -82,6 +82,7 @@ type timeProjectDTO struct {
 	Status             string         `json:"status"`
 	Color              string         `json:"color"`
 	HourlyRate         float64        `json:"hourly_rate"`
+	Currency           string         `json:"currency"`
 	Settings           map[string]any `json:"settings"`
 	CustomerName       string         `json:"customer_name"`
 	CustomerBuiltinKey string         `json:"customer_builtin_key,omitempty"`
@@ -110,6 +111,7 @@ type timeProjectCreateRequest struct {
 	Status      string         `json:"status"`
 	Color       string         `json:"color"`
 	HourlyRate  float64        `json:"hourly_rate"`
+	Currency    string         `json:"currency"`
 	Settings    map[string]any `json:"settings"`
 }
 
@@ -121,6 +123,7 @@ type timeProjectPatchRequest struct {
 	Status      Optional[string]         `json:"status"`
 	Color       Optional[string]         `json:"color"`
 	HourlyRate  Optional[float64]        `json:"hourly_rate"`
+	Currency    Optional[string]         `json:"currency"`
 	Settings    Optional[map[string]any] `json:"settings"`
 }
 
@@ -257,7 +260,7 @@ func createTimeProject(projects timeProjectApplication) jsonOperation[timeProjec
 		project, err := projects.CreateProject(auditActor(r, user), models.TimeProject{
 			CustomerID: input.CustomerID, CategoryID: input.CategoryID, Name: input.Name,
 			Description: input.Description, Status: input.Status, Color: input.Color,
-			HourlyRate: input.HourlyRate, Settings: input.Settings,
+			HourlyRate: input.HourlyRate, Currency: input.Currency, Settings: input.Settings,
 		})
 		if err != nil {
 			return timeProjectDTO{}, timeProjectError(err)
@@ -281,7 +284,8 @@ func patchTimeProject(projects timeProjectApplication) jsonOperation[timeProject
 			CategoryIDSet: input.CategoryID.Set, CategoryID: optionalNullableInt(input.CategoryID),
 			Name: optionalValue(input.Name), Description: optionalValue(input.Description),
 			Status: optionalValue(input.Status), Color: optionalValue(input.Color),
-			HourlyRate: optionalValue(input.HourlyRate), SettingsSet: input.Settings.Set,
+			HourlyRate: optionalValue(input.HourlyRate), Currency: optionalValue(input.Currency),
+			SettingsSet: input.Settings.Set,
 		}
 		if input.Settings.Set && !input.Settings.Null {
 			patch.Settings = input.Settings.Value
@@ -552,7 +556,8 @@ func timeProjectFromRepository(project repository.TimeProjectDetail) timeProject
 	return timeProjectDTO{
 		ID: project.ID, CustomerID: project.CustomerID, CategoryID: project.CategoryID,
 		Name: project.Name, Description: project.Description, Status: project.Status,
-		Color: project.Color, HourlyRate: project.HourlyRate, Settings: project.Settings,
+		Color: project.Color, HourlyRate: project.HourlyRate, Currency: project.Currency,
+		Settings:     project.Settings,
 		CustomerName: project.CustomerName, CustomerBuiltinKey: project.CustomerBuiltinKey,
 		CategoryName:  project.CategoryName,
 		CategoryColor: project.CategoryColor, TotalHours: project.TotalHours,

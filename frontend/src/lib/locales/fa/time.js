@@ -265,6 +265,8 @@ export default {
     "categoryOptional": "دسته (اختیاری)",
     "hourlyRate": "نرخ ساعتی",
     "hourlyRateHelper": "مبالغ به {currency} نمایش داده می‌شوند.",
+    "currency": "واحد پول",
+    "currencyInherit": "پیش‌فرض نمونه ({currency})",
     "maxHours": "حداکثر ساعت",
     "maxHoursPlaceholder": "بدون محدودیت",
     "maxHoursHint": "بودجه اختیاری برای گزارش",

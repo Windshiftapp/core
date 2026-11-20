@@ -6,7 +6,9 @@
   import { formatDate, formatDateOnly, formatDateShort, formatStatusAge } from '../../utils/dateFormatter.js';
   import { resolveOptionLabel, resolveOptionLabels } from '../../utils/optionUtils.js';
   import { durationToString } from '../../utils/timeUtils.js';
-  import { booleanCustomFieldChecked, isBooleanCustomFieldType } from '../../utils/customFieldTypes.js';
+  import { booleanCustomFieldChecked, isBooleanCustomFieldType, moneyFieldAmount } from '../../utils/customFieldTypes.js';
+  import { formatMoney } from '../../utils/money.js';
+  import { brandStore } from '../../stores/brand.svelte.js';
   import { t } from '../../stores/i18n.svelte.js';
   import { objectDisplayName } from '../../utils/systemLabels.js';
 
@@ -183,6 +185,13 @@
       <Chip appearance="metadata" title={customFieldDef.name}>
 		{Number.isFinite(numericValue) ? numericValue : String(customFieldValue)}
       </Chip>
+    {:else if customFieldDef.field_type === 'money'}
+      {@const amount = moneyFieldAmount(customFieldValue)}
+      {#if amount !== ''}
+        <Chip appearance="metadata" title={customFieldDef.name}>
+          {formatMoney(amount, /** @type {any} */ (customFieldValue)?.currency || brandStore.currency)}
+        </Chip>
+      {/if}
     {:else if customFieldDef.field_type === 'user' && customFieldUserNames.length > 0}
       <Chip appearance="metadata" title={customFieldDef.name}>
         {customFieldUserNames[0]}

@@ -16,9 +16,11 @@
   import Mail from '@lucide/svelte/icons/mail';
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import CheckSquare from '@lucide/svelte/icons/square-check';
+  import Banknote from '@lucide/svelte/icons/banknote';
   import ColorDot from '../../components/ColorDot.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import Input from '../../components/Input.svelte';
+  import Select from '../../components/Select.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import TruncatedFieldValue from '../../components/TruncatedFieldValue.svelte';
   import { onDestroy } from 'svelte';
@@ -29,6 +31,8 @@
   import { safeHref } from '../../utils/sanitize';
   import { customFieldLinkHref } from '../../utils/customFieldLinks.js';
   import { booleanCustomFieldChecked, isBooleanCustomFieldType } from '../../utils/customFieldTypes.js';
+  import { DEFAULT_CURRENCY, currencyOptions, formatMoney } from '../../utils/money.js';
+  import { brandStore } from '../../stores/brand.svelte.js';
   import LazyMilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import { markdownExcerpt } from '../../utils/markdownExcerpt.js';
   import {
@@ -115,6 +119,112 @@
 
   const assetConfig = $derived(parseAssetConfig());
   const isMultiAssetField = $derived(field.field_type === 'asset' && assetConfig.multi === true);
+
+  // Money values carry their own currency as { amount, currency }. A field may
+  // pin one currency through its options; otherwise each value picks one and
+  // defaults to the instance currency.
+  const moneyPinnedCurrency = $derived.by(() => {
+    try {
+      const code = fieldOptionsObject(field.options)?.currency;
+      return typeof code === 'string' && /^[A-Za-z]{3}$/.test(code.trim())
+        ? code.trim().toUpperCase()
+        : '';
+    } catch {
+      return '';
+    }
+  });
+
+  function moneyAmount(raw) {
+    if (raw && typeof raw === 'object') {
+      const amount = /** @type {any} */ (raw).amount;
+      if (amount === null || amount === undefined || (typeof amount === 'string' && amount.trim() === '')) {
+        return '';
+      }
+      const n = Number(amount);
+      return Number.isFinite(n) ? n : '';
+    }
+    return '';
+  }
+
+  function moneyCurrency(raw) {
+    if (raw && typeof raw === 'object') {
+      const code = /** @type {any} */ (raw).currency;
+      if (typeof code === 'string' && code.trim()) return code.trim().toUpperCase();
+    }
+    return moneyPinnedCurrency || brandStore.currency || DEFAULT_CURRENCY;
+  }
+
+  // Stage the amount and currency together. Keeping them in one draft means a
+  // partially typed amount is never committed and a currency chosen before the
+  // amount survives the empty intermediate state.
+  function currentMoneyValue() {
+    const raw = draftValue !== null ? draftValue : value;
+    return { amount: moneyAmount(raw), currency: moneyCurrency(raw) };
+  }
+
+  function stageMoney(amount, currency) {
+    draftValue = { amount, currency };
+    // A new edit makes the next commit meaningful again.
+    moneyCommitted = false;
+  }
+
+  function committedMoney() {
+    const { amount, currency } = currentMoneyValue();
+    return amount === '' ? '' : { amount: Number(amount), currency };
+  }
+
+  // Compare money values structurally; null, undefined, and '' all mean empty.
+  function moneyComparable(raw) {
+    return raw === null || raw === undefined || raw === '' ? '' : JSON.stringify(raw);
+  }
+
+  // True when target is inside the editor or one of its owned popups. The
+  // currency listbox is portaled to the body, so containment alone is not
+  // enough; its trigger owns it through aria-controls/aria-owns.
+  function moneyEditorContains(node, target) {
+    if (!node || !target) return false;
+    if (node.contains(target)) return true;
+    const controls = [node, ...node.querySelectorAll('[aria-controls], [aria-owns]')];
+    return controls.some((control) =>
+      `${control.getAttribute('aria-controls') ?? ''} ${control.getAttribute('aria-owns') ?? ''}`
+        .split(/\s+/)
+        .filter(Boolean)
+        .some((id) => node.ownerDocument.getElementById(id)?.contains(target))
+    );
+  }
+
+  // Money commits as a whole on Enter, when focus leaves the compound editor,
+  // or on an outside click. The sidebar defers its save to this commit so
+  // typing never persists a partial amount, and forms receive the value before
+  // submit. The flag collapses the blur+click pair into one commit.
+  function commitMoney() {
+    if (moneyCommitted) return;
+    moneyCommitted = true;
+    const committed = committedMoney();
+    draftValue = null;
+    if (isSelfEditing) {
+      if (moneyComparable(committed) !== moneyComparable(value)) onChange(committed);
+      exitEditing();
+      return;
+    }
+    onChange(committed);
+    onCommit?.(committed);
+  }
+
+  function handleMoneyFocusOut(event) {
+    if (moneyEditorContains(event.currentTarget, event.relatedTarget)) return;
+    commitMoney();
+  }
+
+  function handleMoneyKeydown(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitMoney();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      handleEditorCancel();
+    }
+  }
   function assetID(asset) {
     if (!asset) return null;
     const raw = asset && typeof asset === 'object' ? asset.id : asset;
@@ -223,6 +333,10 @@
       case 'number':
         const num = parseFloat(v);
         return isNaN(num) ? v : num.toString();
+      case 'money': {
+        const amount = moneyAmount(v);
+        return amount === '' ? '' : formatMoney(amount, moneyCurrency(v));
+      }
       case 'date':
         return formatDateDisplay(v);
       case 'richtext':
@@ -234,6 +348,7 @@
 
 	function hasDisplayValue() {
 	  if (value === null || value === undefined || value === '') return false;
+	  if (field.field_type === 'money' && moneyAmount(value) === '') return false;
 	  return !((field.field_type === 'multiselect' || field.field_type === 'multi_milestone') && Array.isArray(value) && value.length === 0);
 	}
 
@@ -260,6 +375,7 @@
       customerorganisation: Building2,
       email: Mail,
       url: ExternalLink,
+      money: Banknote,
     }[field.field_type] ?? null;
   });
 
@@ -280,6 +396,7 @@
       case 'boolean':
       case 'checkbox':
       case 'richtext':
+      case 'money':
         return renderDisplayValue();
       default:
         if (Array.isArray(v)) {
@@ -425,6 +542,11 @@
   // Free-form inputs stage keystrokes in a draft so self-editing surfaces
   // commit once (Enter/blur) instead of on every character.
   let draftValue = $state(null);
+  // Collapses the focus-out and outside-click events of one money edit into a
+  // single commit, and tracks the field id so an unkeyed each block that reuses
+  // this renderer for another field does not leak the previous draft.
+  let moneyCommitted = false;
+  let lastMoneyFieldId = null;
   // Live handle to the richtext editor. The editor's markdown listener is
   // debounced, so commit reads the serialized document directly.
   let richtextEditorRef = $state(null);
@@ -453,6 +575,19 @@
     editorOpen = false;
     draftValue = null;
   }
+
+  // Drop a staged draft whenever the editor is hidden or reused for a different
+  // field, so reopening or switching steps starts from the stored value. Forms
+  // keep their editor mounted, so the field-id check is what protects them.
+  $effect(() => {
+    const visible = readonly ? editorOpen : true;
+    const fieldId = field.id;
+    if (!visible || fieldId !== lastMoneyFieldId) {
+      draftValue = null;
+      moneyCommitted = false;
+    }
+    lastMoneyFieldId = fieldId;
+  });
 
   function handleActivate() {
     if (disabled) return;
@@ -698,6 +833,8 @@
       </div>
     {:else if field.field_type === 'number'}
       <span class="tabular-nums" style="color: var(--ds-text);">{renderDisplayValue()}</span>
+    {:else if field.field_type === 'money'}
+      <span class="tabular-nums" style="color: var(--ds-text);">{renderDisplayValue()}</span>
     {:else if field.field_type === 'richtext'}
       {#if richtextInlineDisplay}
         <span class={valueTruncate ? 'block min-w-0 truncate' : ''} dir="auto" style="color: var(--ds-text);">{markdownExcerpt(value)}</span>
@@ -763,6 +900,43 @@
         {disabled}
         required={isRequired}
         autofocus
+      />
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet moneyEditor()}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="flex items-center gap-2"
+    use:clickOutside
+    onclickOutside={commitMoney}
+    onfocusout={handleMoneyFocusOut}
+  >
+    <Input
+      type="number"
+      step="any"
+      value={moneyAmount(editorValue)}
+      dataTestid={`custom-field-input-${field.id}`}
+      oninput={(e) => stageMoney(e.target.value, moneyCurrency(editorValue))}
+      class="flex-1 px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-ds-background-input border border-ds-border rounded text-ds-text tabular-nums"
+      placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
+      onkeydown={handleMoneyKeydown}
+      {disabled}
+      required={isRequired}
+      autofocus
+    />
+    {#if moneyPinnedCurrency}
+      <span class="text-sm tabular-nums" style="color: var(--ds-text-subtle);">{moneyPinnedCurrency}</span>
+    {:else}
+      <Select
+        value={moneyCurrency(editorValue)}
+        options={currencyOptions()}
+        dataTestid={`custom-field-currency-${field.id}`}
+        onchange={(code) => stageMoney(moneyAmount(editorValue), code)}
+        class="w-36"
+        size="small"
+        {disabled}
       />
     {/if}
   </div>
@@ -1034,6 +1208,8 @@
       {@render freeTextEditor({ type: 'url' })}
     {:else if field.field_type === 'richtext'}
       {@render richtextEditor()}
+    {:else if field.field_type === 'money'}
+      {@render moneyEditor()}
     {:else}
       {@render freeTextEditor()}
     {/if}

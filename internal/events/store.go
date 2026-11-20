@@ -855,6 +855,11 @@ func (s *Store) Replay(
 	if strings.TrimSpace(reason) == "" {
 		return errors.New("replay domain event delivery: reason is required")
 	}
+	// A retired consumer cannot handle the delivery; replaying it would only
+	// rewrite its abandonment state.
+	if IsRetiredConsumer(consumerKey) {
+		return fmt.Errorf("replay domain event delivery: %w", ErrConsumerRetired)
+	}
 	return s.changeFailedDelivery(ctx, eventID, consumerKey, operator, reason, now, "replay")
 }
 

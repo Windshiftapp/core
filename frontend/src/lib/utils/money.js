@@ -95,6 +95,17 @@ export function currencyOptions(locale = getAppLocale()) {
     });
 }
 
+/**
+ * Resolve the currency a value should render in: an explicit 3-letter code when
+ * present, otherwise the instance currency, otherwise USD. Used where a stored
+ * value (e.g. a time project) may inherit the instance-wide setting.
+ */
+export function resolveDisplayCurrency(valueCurrency, instanceCurrency = DEFAULT_CURRENCY) {
+  const candidate = typeof valueCurrency === 'string' ? valueCurrency.trim() : '';
+  if (/^[A-Za-z]{3}$/.test(candidate)) return candidate.toUpperCase();
+  return resolveCurrency(instanceCurrency);
+}
+
 /** Format an amount in the given currency, falling back to USD on a bad code. */
 export function formatMoney(amount, currency = DEFAULT_CURRENCY, locale = getAppLocale()) {
   const value = Number(amount);

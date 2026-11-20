@@ -12,6 +12,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/money"
 	"windshift/internal/repository"
 	"windshift/internal/sanitize"
 )
@@ -91,6 +92,7 @@ var validFieldTypes = map[string]bool{
 	"select":                       true,
 	"multiselect":                  true,
 	"number":                       true,
+	"money":                        true,
 	"milestone":                    true,
 	"multi_milestone":              true,
 	"date":                         true,
@@ -449,6 +451,14 @@ func (s *CustomFieldProvisioningService) validateAndNormalize(cf *models.CustomF
 		}
 	}
 
+	if cf.FieldType == "money" {
+		normalized, err := normalizeMoneyFieldOptions(cf.Options)
+		if err != nil {
+			return nil, nil, NewServiceError(400, err.Error())
+		}
+		cf.Options = normalized
+	}
+
 	if models.IsBooleanCustomFieldType(cf.FieldType) && strings.TrimSpace(cf.Options) != "" {
 		return nil, nil, NewServiceError(400, "Checkbox fields do not support options")
 	}
@@ -474,6 +484,34 @@ func (s *CustomFieldProvisioningService) validateAndNormalize(cf *models.CustomF
 	)
 
 	return linkingOpts, warnings, nil
+}
+
+// normalizeMoneyFieldOptions validates and canonicalizes a money field's
+// optional pinned currency. It returns "" when the field accepts per-value
+// currencies.
+func normalizeMoneyFieldOptions(optionsJSON string) (string, error) {
+	if strings.TrimSpace(optionsJSON) == "" {
+		return "", nil
+	}
+	var opts struct {
+		Currency string `json:"currency"`
+	}
+	if err := json.Unmarshal([]byte(optionsJSON), &opts); err != nil {
+		return "", fmt.Errorf("money field options are invalid")
+	}
+	code := strings.TrimSpace(opts.Currency)
+	if code == "" {
+		return "", nil
+	}
+	normalized, err := money.Normalize(code)
+	if err != nil {
+		return "", fmt.Errorf("money field currency must be a valid ISO 4217 code")
+	}
+	encoded, err := json.Marshal(map[string]string{"currency": normalized})
+	if err != nil {
+		return "", fmt.Errorf("encode money field options: %w", err)
+	}
+	return string(encoded), nil
 }
 
 // customFieldLinkingOptions holds parsed options for linking custom fields

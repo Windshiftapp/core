@@ -31654,6 +31654,10 @@
                 "description": "The created at value.",
                 "type": "string"
               },
+              "currency": {
+                "description": "The currency value.",
+                "type": "string"
+              },
               "customer_builtin_key": {
                 "description": "The customer builtin key value.",
                 "type": "string"
@@ -31709,6 +31713,7 @@
               "category_name",
               "color",
               "created_at",
+              "currency",
               "customer_name",
               "description",
               "hourly_rate",
@@ -31894,6 +31899,10 @@
                   "description": "The created at value.",
                   "type": "string"
                 },
+                "currency": {
+                  "description": "The currency value.",
+                  "type": "string"
+                },
                 "customer_builtin_key": {
                   "description": "The customer builtin key value.",
                   "type": "string"
@@ -31949,6 +31958,7 @@
                 "category_name",
                 "color",
                 "created_at",
+                "currency",
                 "customer_name",
                 "description",
                 "hourly_rate",
@@ -47249,6 +47259,10 @@
                   "description": "The created at value.",
                   "type": "string"
                 },
+                "currency": {
+                  "description": "The currency value.",
+                  "type": "string"
+                },
                 "customer_builtin_key": {
                   "description": "The customer builtin key value.",
                   "type": "string"
@@ -47304,6 +47318,7 @@
                 "category_name",
                 "color",
                 "created_at",
+                "currency",
                 "customer_name",
                 "description",
                 "hourly_rate",
@@ -61599,6 +61614,11 @@
             "nullable": true,
             "type": "string"
           },
+          "currency": {
+            "description": "The currency value.",
+            "nullable": true,
+            "type": "string"
+          },
           "customer_id": {
             "description": "The customer id value.",
             "nullable": true,
@@ -61662,6 +61682,10 @@
                 "description": "The created at value.",
                 "type": "string"
               },
+              "currency": {
+                "description": "The currency value.",
+                "type": "string"
+              },
               "customer_builtin_key": {
                 "description": "The customer builtin key value.",
                 "type": "string"
@@ -61717,6 +61741,7 @@
               "category_name",
               "color",
               "created_at",
+              "currency",
               "customer_name",
               "description",
               "hourly_rate",
@@ -92529,6 +92554,10 @@
             "description": "The color value.",
             "type": "string"
           },
+          "currency": {
+            "description": "The currency value.",
+            "type": "string"
+          },
           "customer_id": {
             "description": "The customer id value.",
             "nullable": true,
@@ -92560,6 +92589,7 @@
         },
         "required": [
           "color",
+          "currency",
           "description",
           "hourly_rate",
           "name",
@@ -92743,6 +92773,10 @@
                 "description": "The created at value.",
                 "type": "string"
               },
+              "currency": {
+                "description": "The currency value.",
+                "type": "string"
+              },
               "customer_builtin_key": {
                 "description": "The customer builtin key value.",
                 "type": "string"
@@ -92798,6 +92832,7 @@
               "category_name",
               "color",
               "created_at",
+              "currency",
               "customer_name",
               "description",
               "hourly_rate",

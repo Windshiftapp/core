@@ -3451,6 +3451,16 @@ CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_m
 		Postgres:      boardPlacementSchema,
 	},
 	{
+		Version:       "20261127_time_project_currency",
+		Name:          "Allow a time project to bill in its own currency",
+		CheckSQLite:   sqliteColumnCheck("time_projects", "currency"),
+		CheckPostgres: pgColumnCheck("time_projects", "currency"),
+		// Empty currency inherits the instance setting, matching the existing
+		// single-currency behavior for projects that never set one.
+		SQLite:   `ALTER TABLE time_projects ADD COLUMN currency TEXT NOT NULL DEFAULT ''`,
+		Postgres: `ALTER TABLE time_projects ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT ''`,
+	},
+	{
 		Version:       "20261127_domain_event_claimable_index",
 		Name:          "Add a partial claimable-delivery index and align leased eligibility",
 		CheckSQLite:   sqliteIndexCheck("idx_domain_event_deliveries_claimable"),
