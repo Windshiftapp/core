@@ -1,4 +1,5 @@
 <script>
+  import { untrack } from 'svelte';
   import { currentRoute, navigate } from '../router.js';
   import LinkComponent from '../components/Link.svelte';
   import LazyRootView from '../components/LazyRootView.svelte';
@@ -18,6 +19,16 @@
 
   // Keep the URL and the rendered surface in sync: `/manage` and unknown tabs
   // fall back to the first surface the user can actually use.
+  // The shell stays mounted across sections (#542), so a new section would
+  // otherwise open at the previous one's scroll position.
+  let contentEl = $state(null);
+  $effect(() => {
+    void activeItem?.id;
+    untrack(() => {
+      if (contentEl) contentEl.scrollTop = 0;
+    });
+  });
+
   $effect(() => {
     if (items.length === 0) return;
     if (!activeItem) {
@@ -82,7 +93,7 @@
     </ScrollableSidebar>
 
     <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      <div class="delegated-admin-content min-w-0 flex-1 overflow-y-auto px-6 py-6 lg:px-16 lg:py-12">
+      <div bind:this={contentEl} class="delegated-admin-content min-w-0 flex-1 overflow-y-auto px-6 py-6 lg:px-16 lg:py-12">
         {#if activeItem}
           {#key activeItem.id}
             <LazyRootView

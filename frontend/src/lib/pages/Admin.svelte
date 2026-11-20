@@ -1,5 +1,5 @@
 <script>
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { currentRoute, navigate } from '../router.js';
   import Input from '../components/Input.svelte';
   import LazyRootView from '../components/LazyRootView.svelte';
@@ -146,6 +146,17 @@
   async function openAdminNavigation() {
     adminNavigationOpen = true;
     await tick();
+    // The drawer and the field (transition-all) reveal themselves through
+    // nested visibility transitions, and a hidden field cannot take focus.
+    // Only poll where the browser can actually report visibility; otherwise
+    // fall back to focusing right away instead of burning the whole timeout.
+    if (typeof searchInput?.checkVisibility === 'function') {
+      for (let frame = 0; frame < 30; frame++) {
+        if (!adminNavigationOpen) return;
+        if (searchInput?.checkVisibility({ visibilityProperty: true })) break;
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+    }
     searchInput?.focus();
   }
 
@@ -280,6 +291,17 @@
   // Total button count for validation
   const totalButtons = $derived(filteredGroups.reduce((count, group) => count + group.items.length, 0));
 
+  // The shell stays mounted across sections (#542), so a new section would
+  // otherwise open at the previous one's scroll position.
+  let adminContentEl = $state(null);
+  $effect(() => {
+    void adminComponentKey;
+    void activePluginItem?.id;
+    untrack(() => {
+      if (adminContentEl) adminContentEl.scrollTop = 0;
+    });
+  });
+
   function switchTab(tab) {
     navigate(`/admin/${tab}`);
   }
@@ -323,7 +345,7 @@
         <IconSearch size={16} stroke={1.5} class="absolute left-3 top-1/2 transform -translate-y-1/2" style="color: var(--ds-icon-subtle);" aria-hidden="true" />
         <Input
           id="admin-search"
-          bind:this={searchInput}
+          bind:inputRef={searchInput}
           bind:value={searchQuery}
           onkeydown={handleSearchKeydown}
           type="search"
@@ -457,7 +479,7 @@
     {#if activePluginItem}
       {@const pluginName = activePluginItem.pluginData?.pluginName || 'unknown'}
       {@const iframeSrc = `/api/plugins/${pluginName}/assets/${activePluginItem.pluginData?.component || 'index.html'}`}
-      <div class="admin-content px-16 py-12 pb-0 flex-1 min-w-0 overflow-y-auto">
+      <div bind:this={adminContentEl} class="admin-content px-16 py-12 pb-0 flex-1 min-w-0 overflow-y-auto">
         <div class="plugin-component-container">
           <IframePluginLoader pluginName={activePluginItem.label} src={iframeSrc} />
         </div>
@@ -466,7 +488,7 @@
       {#if isNestedComponent}
         {@render activeAdminComponent()}
       {:else}
-        <div class="admin-content px-16 py-12 pb-0 flex-1 min-w-0 overflow-y-auto">
+        <div bind:this={adminContentEl} class="admin-content px-16 py-12 pb-0 flex-1 min-w-0 overflow-y-auto">
           <div class="min-w-0 pr-0 pl-0">
             {@render activeAdminComponent()}
           </div>
