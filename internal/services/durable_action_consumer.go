@@ -150,6 +150,9 @@ func PrepareDurableActionEngine(ctx context.Context, engine *events.Engine, acti
 	if engine == nil || actions == nil {
 		return errors.New("domain event engine and action service are required")
 	}
+	// The durable ingress is opt-in: production uses the in-memory lane, while
+	// the legacy test harness installs the durable transport explicitly.
+	actions.durableIngress = NewDurableActionIngress(actions.db)
 	cutover, err := actions.durableIngress.CurrentCanonicalItemsCutover(ctx)
 	if err != nil {
 		return err

@@ -17,6 +17,7 @@ import (
 	"windshift/internal/database"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/sideeffects"
 )
 
 // NotificationManager interface for adding notifications. AddNotification
@@ -71,8 +72,11 @@ type RuleCache struct {
 type NotificationServiceConfig struct {
 	RefreshInterval     time.Duration // How often to refresh rules cache
 	EventBufferSize     int           // Hard bound for queued events
+	EventBufferBytes    int64         // Hard bound for retained event bytes
 	EventWorkers        int           // Bounded concurrent event processors
 	EventProcessTimeout time.Duration // Deadline for one event
+	MaxPayloadBytes     int           // Largest single admitted payload
+	MaxEventAge         time.Duration // Oldest event the lane will execute
 	ShutdownTimeout     time.Duration // Deadline used by Close
 }
 
@@ -81,15 +85,13 @@ func DefaultNotificationServiceConfig() NotificationServiceConfig {
 	return NotificationServiceConfig{
 		RefreshInterval:     5 * time.Minute,
 		EventBufferSize:     1000,
+		EventBufferBytes:    8 << 20,
 		EventWorkers:        4,
 		EventProcessTimeout: 15 * time.Second,
+		MaxPayloadBytes:     256 << 10,
+		MaxEventAge:         5 * time.Minute,
 		ShutdownTimeout:     20 * time.Second,
 	}
-}
-
-type queuedNotificationEvent struct {
-	event      *NotificationEvent
-	enqueuedAt time.Time
 }
 
 // UserNotificationBatch is a set of unread notifications destined for one
@@ -160,32 +162,27 @@ type NotificationService struct {
 	cacheMu   sync.RWMutex
 
 	// Event processing
-	eventChan      chan queuedNotificationEvent
+	lane           *sideeffects.Lane
 	cacheStop      chan struct{}
-	emitMu         sync.RWMutex
 	closeOnce      sync.Once
-	closed         bool
-	workerCtx      context.Context
-	workerCancel   context.CancelFunc
 	processEventFn func(context.Context, *NotificationEvent) error
 	durableIngress *DurableNotificationIngress
 	wg             sync.WaitGroup
+
+	// canonicalFacts is set when the transaction-effects dispatcher is wired.
+	// Canonical item notifications then come from staged facts, so the legacy
+	// coordinator's direct emits are no-ops. Standalone embeddings leave it
+	// false and process every emitted event in memory.
+	canonicalFacts bool
 
 	// recipientEligible lets the scheduler hold recipients back (per-user SMTP
 	// failure cooldown) before they claim a per-tick slot. nil admits all.
 	recipientEligible func(email string) bool
 
 	// Statistics
-	eventsProcessed  int64
-	eventsDropped    int64
-	eventsQueued     int64
-	activeWorkers    int64
-	maxActiveWorkers int64
-	lastQueueWaitNS  int64
-	maxQueueWaitNS   int64
-	cacheHits        int64
-	cacheMisses      int64
-	errors           int64
+	cacheHits   int64
+	cacheMisses int64
+	errors      int64
 }
 
 // UnreadEmailBatches resolves one current workspace scope per recipient, then
@@ -696,16 +693,24 @@ func NewNotificationService(db database.Database, notificationManager Notificati
 	if config.EventBufferSize <= 0 {
 		config.EventBufferSize = defaults.EventBufferSize
 	}
+	if config.EventBufferBytes <= 0 {
+		config.EventBufferBytes = defaults.EventBufferBytes
+	}
 	if config.EventWorkers <= 0 {
 		config.EventWorkers = defaults.EventWorkers
 	}
 	if config.EventProcessTimeout <= 0 {
 		config.EventProcessTimeout = defaults.EventProcessTimeout
 	}
+	if config.MaxPayloadBytes <= 0 {
+		config.MaxPayloadBytes = defaults.MaxPayloadBytes
+	}
+	if config.MaxEventAge <= 0 {
+		config.MaxEventAge = defaults.MaxEventAge
+	}
 	if config.ShutdownTimeout <= 0 {
 		config.ShutdownTimeout = defaults.ShutdownTimeout
 	}
-	workerCtx, workerCancel := context.WithCancel(context.Background()) //nolint:gosec // retained and called by CloseContext
 	var assetPermissionChecker AssetSetPermissionChecker
 	if len(assetPermissions) > 0 {
 		assetPermissionChecker = assetPermissions[0]
@@ -723,23 +728,34 @@ func NewNotificationService(db database.Database, notificationManager Notificati
 			PersonalWorkspaces:  make(map[int]bool),
 			LastRefreshed:       time.Time{},
 		},
-		eventChan:    make(chan queuedNotificationEvent, config.EventBufferSize),
-		cacheStop:    make(chan struct{}),
-		workerCtx:    workerCtx,
-		workerCancel: workerCancel,
+		cacheStop: make(chan struct{}),
 	}
+
+	lane, err := sideeffects.NewLane(sideeffects.LaneConfig{
+		Name:             "notifications",
+		Capacity:         config.EventBufferSize,
+		ByteCapacity:     config.EventBufferBytes,
+		MaxPayloadBytes:  config.MaxPayloadBytes,
+		MaxEventAge:      config.MaxEventAge,
+		Workers:          config.EventWorkers,
+		ExecutionTimeout: config.EventProcessTimeout,
+		Handler:          sideeffects.HandlerFunc(service.handleLaneCandidate),
+	})
+	if err != nil {
+		panic(fmt.Sprintf("notification lane configuration is invalid: %v", err))
+	}
+	service.lane = lane
 
 	// Load initial cache
 	if err := service.refreshRuleCache(); err != nil {
 		slog.Warn("failed to load initial notification rule cache", slog.String("component", "notifications"), slog.Any("error", err))
 	}
 
-	// Start a fixed event worker pool plus the independent cache refresher.
-	service.wg.Add(config.EventWorkers + 1)
-	for workerID := 0; workerID < config.EventWorkers; workerID++ {
-		go service.eventProcessor(workerID)
-	}
+	// The bounded lane runs the fixed worker pool; the cache refresher is
+	// independent of it.
+	service.wg.Add(1)
 	go service.cacheRefresher()
+	lane.Start(context.Background())
 
 	slog.Debug("notification service initialized", slog.String("component", "notifications"), slog.Duration("refresh_interval", config.RefreshInterval), slog.Int("event_workers", config.EventWorkers), slog.Int("event_buffer_size", config.EventBufferSize))
 
@@ -1024,74 +1040,40 @@ func (ns *NotificationService) RollbackNotificationsSent(notificationIDs []int) 
 	return ns.notificationManager.RollbackNotificationsSent(notificationIDs)
 }
 
-// EmitEvent durably admits an event when the domain event engine is installed.
-// The bounded in-memory path remains available to standalone embeddings.
+// EmitEvent admits an event to the bounded in-memory notification lane. When
+// the durable engine is installed (tests and legacy embeddings) it journals
+// the event instead.
 func (ns *NotificationService) EmitEvent(event *NotificationEvent) {
 	ns.TryEmitEvent(event)
 }
 
-// TryEmitEvent reports whether the event was durably admitted or queued.
+// TryEmitEvent reports whether the event was admitted to the memory lane or
+// durably journaled.
 func (ns *NotificationService) TryEmitEvent(event *NotificationEvent) bool {
 	if event == nil {
-		atomic.AddInt64(&ns.eventsDropped, 1)
 		atomic.AddInt64(&ns.errors, 1)
 		return false
 	}
-	slog.Debug("queuing event", slog.String("component", "notifications"), slog.String("event_type", event.EventType), slog.Int("workspace_id", event.WorkspaceID), slog.Int("actor_user_id", event.ActorUserID), slog.Int("item_id", event.ItemID))
 	if ns.durableIngress != nil {
 		if err := ns.durableIngress.Emit(context.Background(), event); err != nil {
 			slog.Error("failed to admit durable notification event", "event_type", event.EventType, "error", err)
-			atomic.AddInt64(&ns.eventsDropped, 1)
 			atomic.AddInt64(&ns.errors, 1)
 			return false
 		}
-		atomic.AddInt64(&ns.eventsQueued, 1)
 		return true
 	}
-
-	ns.emitMu.RLock()
-	defer ns.emitMu.RUnlock()
-	if ns.closed {
-		atomic.AddInt64(&ns.eventsDropped, 1)
-		return false
-	}
-	select {
-	case ns.eventChan <- queuedNotificationEvent{event: event, enqueuedAt: time.Now()}:
-		atomic.AddInt64(&ns.eventsQueued, 1)
-		slog.Debug("event queued successfully", slog.String("component", "notifications"), slog.String("event_type", event.EventType), slog.Int("item_id", event.ItemID))
+	// Canonical item notifications are derived from staged canonical facts when
+	// the dispatcher is wired. The legacy coordinator still calls this for them;
+	// treat it as a no-op so the effect is not delivered twice.
+	if ns.durableIngress == nil && ns.canonicalFacts && isCanonicalItemNotification(event.EventType) {
 		return true
-	default:
-		slog.Warn("event channel full, dropping event", slog.String("component", "notifications"), slog.String("event_type", event.EventType), slog.Int("workspace_id", event.WorkspaceID))
-		atomic.AddInt64(&ns.eventsDropped, 1)
+	}
+	admitted := ns.admitEnvelope(notificationEnvelope{Kind: envelopeKindEvent, Event: event}, event.EventType, "")
+	if !admitted {
+		slog.Warn("notification lane dropped event", slog.String("component", "notifications"), slog.String("event_type", event.EventType), slog.Int("workspace_id", event.WorkspaceID))
 		atomic.AddInt64(&ns.errors, 1)
-		return false
 	}
-}
-
-// eventProcessor runs as one member of the fixed worker pool.
-func (ns *NotificationService) eventProcessor(workerID int) {
-	defer ns.wg.Done()
-	for queued := range ns.eventChan {
-		wait := time.Since(queued.enqueuedAt)
-		atomic.StoreInt64(&ns.lastQueueWaitNS, int64(wait))
-		updateNotificationServiceMaximum(&ns.maxQueueWaitNS, int64(wait))
-		active := atomic.AddInt64(&ns.activeWorkers, 1)
-		updateNotificationServiceMaximum(&ns.maxActiveWorkers, active)
-		ctx, cancel := context.WithTimeout(ns.workerCtx, ns.config.EventProcessTimeout)
-		processEvent := ns.processEvent
-		if ns.processEventFn != nil {
-			processEvent = ns.processEventFn
-		}
-		err := processEvent(ctx, queued.event)
-		cancel()
-		atomic.AddInt64(&ns.activeWorkers, -1)
-		if err != nil {
-			slog.Error("failed to process notification event", slog.String("component", "notifications"), slog.Int("worker_id", workerID), slog.String("event_type", queued.event.EventType), slog.Any("error", err))
-			atomic.AddInt64(&ns.errors, 1)
-		} else {
-			atomic.AddInt64(&ns.eventsProcessed, 1)
-		}
-	}
+	return admitted
 }
 
 // cacheRefresher runs in background and periodically refreshes the rule cache
@@ -1114,8 +1096,12 @@ func (ns *NotificationService) cacheRefresher() {
 	}
 }
 
-// processEvent processes a single notification event
+// processEvent processes a single notification event. The test hook lets
+// callers observe dispatch without running the rule engine.
 func (ns *NotificationService) processEvent(ctx context.Context, event *NotificationEvent) error {
+	if ns.processEventFn != nil {
+		return ns.processEventFn(ctx, event)
+	}
 	return ns.processEventWithKey(ctx, event, "")
 }
 
@@ -1758,49 +1744,55 @@ func (ns *NotificationService) Close() error {
 	return ns.CloseContext(ctx)
 }
 
-// CloseContext stops accepting events, drains the bounded queue, and reports
-// any work that remains when the caller deadline expires.
+// CloseContext stops accepting events, drains the bounded lane to the caller
+// deadline, then discards queued work and stops the cache refresher.
 func (ns *NotificationService) CloseContext(ctx context.Context) error {
 	slog.Debug("closing notification service", slog.String("component", "notifications"))
-	ns.closeOnce.Do(func() {
-		ns.emitMu.Lock()
-		ns.closed = true
-		close(ns.eventChan)
-		close(ns.cacheStop)
-		ns.emitMu.Unlock()
-	})
+	ns.closeOnce.Do(func() { close(ns.cacheStop) })
+	var laneErr error
+	if ns.lane != nil {
+		laneErr = ns.lane.Shutdown(ctx)
+	}
 	done := make(chan struct{})
 	go func() {
 		ns.wg.Wait()
 		close(done)
 	}()
-
 	select {
 	case <-done:
-		ns.workerCancel()
-		slog.Debug("notification service closed successfully", slog.String("component", "notifications"))
-		return nil
-	case <-ctx.Done():
-		ns.workerCancel()
-		return fmt.Errorf("notification service shutdown with %d queued and %d active: %w", len(ns.eventChan), atomic.LoadInt64(&ns.activeWorkers), ctx.Err())
+		return laneErr
+	case <-time.After(2 * time.Second):
+		return fmt.Errorf("notification cache refresher did not stop")
 	}
 }
 
-// GetStats returns service statistics
+// GetStats returns service statistics.
 func (ns *NotificationService) GetStats() map[string]int64 {
 	ns.cacheMu.RLock()
 	lastRefreshed := ns.ruleCache.LastRefreshed
 	ns.cacheMu.RUnlock()
 
+	var admitted, processed, dropped, queued, active int64
+	var lastWait, maxWait time.Duration
+	if ns.lane != nil {
+		stats := ns.lane.Stats()
+		admitted = stats.Admitted
+		processed = stats.Processed
+		dropped = sumDropReasons(stats.Dropped)
+		queued = int64(stats.Queued)
+		active = int64(stats.Active)
+		lastWait = stats.LastQueueWait
+		maxWait = stats.MaxQueueWait
+	}
 	return map[string]int64{
-		"events_queued":      atomic.LoadInt64(&ns.eventsQueued),
-		"events_processed":   atomic.LoadInt64(&ns.eventsProcessed),
-		"events_dropped":     atomic.LoadInt64(&ns.eventsDropped),
-		"pending_events":     int64(len(ns.eventChan)),
-		"active_workers":     atomic.LoadInt64(&ns.activeWorkers),
-		"max_active_workers": atomic.LoadInt64(&ns.maxActiveWorkers),
-		"last_queue_wait_ms": time.Duration(atomic.LoadInt64(&ns.lastQueueWaitNS)).Milliseconds(),
-		"max_queue_wait_ms":  time.Duration(atomic.LoadInt64(&ns.maxQueueWaitNS)).Milliseconds(),
+		"events_queued":      admitted,
+		"events_processed":   processed,
+		"events_dropped":     dropped,
+		"pending_events":     queued,
+		"active_workers":     active,
+		"max_active_workers": int64(ns.config.EventWorkers),
+		"last_queue_wait_ms": lastWait.Milliseconds(),
+		"max_queue_wait_ms":  maxWait.Milliseconds(),
 		"cache_hits":         atomic.LoadInt64(&ns.cacheHits),
 		"cache_misses":       atomic.LoadInt64(&ns.cacheMisses),
 		"errors":             atomic.LoadInt64(&ns.errors),
@@ -1808,13 +1800,13 @@ func (ns *NotificationService) GetStats() map[string]int64 {
 	}
 }
 
-func updateNotificationServiceMaximum(target *int64, value int64) {
-	for {
-		previous := atomic.LoadInt64(target)
-		if value <= previous || atomic.CompareAndSwapInt64(target, previous, value) {
-			return
-		}
+// sumDropReasons totals a lane's drop counters for aggregate diagnostics.
+func sumDropReasons(dropped map[sideeffects.DropReason]int64) int64 {
+	var total int64
+	for _, count := range dropped {
+		total += count
 	}
+	return total
 }
 
 // ForceRefreshCache manually refreshes the notification rule cache

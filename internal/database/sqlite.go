@@ -215,7 +215,9 @@ func (s *SQLiteDB) Begin() (Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewSQLiteTx(tx), nil
+	wrapped := NewSQLiteTx(tx)
+	AttachTxEffects(wrapped, NewTxEffects())
+	return wrapped, nil
 }
 
 // BeginTx starts a new transaction with options (returns wrapped transaction)
@@ -224,7 +226,9 @@ func (s *SQLiteDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error)
 	if err != nil {
 		return nil, err
 	}
-	return NewSQLiteTx(tx), nil
+	wrapped := NewSQLiteTx(tx)
+	AttachTxEffects(wrapped, NewTxEffects())
+	return wrapped, nil
 }
 
 // Close closes the database connection
