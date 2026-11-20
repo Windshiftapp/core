@@ -534,13 +534,14 @@ type assetFieldOptions struct {
 	CQLQuery string `json:"cql_query"`
 }
 
-// query resolves the configured filter. ql_query is canonical; cql_query is the
-// legacy fallback.
+// query resolves the configured filter. cql_query is the legacy alias the
+// shared picker still prefers; ql_query is the canonical key for newly written
+// fields. Both are honored so an unedited legacy field keeps its restriction.
 func (o assetFieldOptions) query() string {
-	if strings.TrimSpace(o.QLQuery) != "" {
-		return o.QLQuery
+	if strings.TrimSpace(o.CQLQuery) != "" {
+		return o.CQLQuery
 	}
-	return o.CQLQuery
+	return o.QLQuery
 }
 
 // portalAssetFieldValueIDs extracts every asset id from a submitted asset
