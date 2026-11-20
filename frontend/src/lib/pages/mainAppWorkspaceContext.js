@@ -53,12 +53,23 @@ export function getMainAppWorkspaceRedirect(currentRoute, activeWorkspace) {
   return `${base}/${activeWorkspace.default_view || 'board'}`;
 }
 
+// Route params that only pick a section inside a shell that stays mounted
+// (sidebar + content pane). The shell swaps its own content for these, so
+// they must not change the navigation identity: remounting the shell resets
+// its sidebar scroll and state on every section click (#542).
+const SHELL_SECTION_PARAMS = {
+  admin: ['tab', 'categoryId', 'type'],
+  'delegated-admin': ['tab'],
+  'team-detail': ['section'],
+};
+
 export function mainAppNavigationIdentity(route, personalWorkspaceId) {
   const context = resolveMainAppWorkspaceContext(route, personalWorkspaceId);
   const params = route.params ?? {};
   const collectionId = context.kind === 'global-collection' ? params.id : params.collectionId;
+  const sectionParams = SHELL_SECTION_PARAMS[route.view] ?? [];
   const entities = Object.entries(params)
-    .filter(([key]) => key !== 'id' && key !== 'collectionId')
+    .filter(([key]) => key !== 'id' && key !== 'collectionId' && !sectionParams.includes(key))
     .sort(([a], [b]) => a.localeCompare(b));
   return JSON.stringify([
     context.kind,

@@ -1,5 +1,5 @@
 <script>
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { currentRoute, navigate } from '../router.js';
   import Input from '../components/Input.svelte';
   import LazyRootView from '../components/LazyRootView.svelte';
@@ -280,6 +280,17 @@
   // Total button count for validation
   const totalButtons = $derived(filteredGroups.reduce((count, group) => count + group.items.length, 0));
 
+  // The shell stays mounted across sections (#542), so a new section would
+  // otherwise open at the previous one's scroll position.
+  let adminContentEl = $state(null);
+  $effect(() => {
+    void adminComponentKey;
+    void activePluginItem?.id;
+    untrack(() => {
+      if (adminContentEl) adminContentEl.scrollTop = 0;
+    });
+  });
+
   function switchTab(tab) {
     navigate(`/admin/${tab}`);
   }
@@ -457,7 +468,7 @@
     {#if activePluginItem}
       {@const pluginName = activePluginItem.pluginData?.pluginName || 'unknown'}
       {@const iframeSrc = `/api/plugins/${pluginName}/assets/${activePluginItem.pluginData?.component || 'index.html'}`}
-      <div class="admin-content px-16 py-12 pb-0 flex-1 min-w-0 overflow-y-auto">
+      <div bind:this={adminContentEl} class="admin-content px-16 py-12 pb-0 flex-1 min-w-0 overflow-y-auto">
         <div class="plugin-component-container">
           <IframePluginLoader pluginName={activePluginItem.label} src={iframeSrc} />
         </div>
@@ -466,7 +477,7 @@
       {#if isNestedComponent}
         {@render activeAdminComponent()}
       {:else}
-        <div class="admin-content px-16 py-12 pb-0 flex-1 min-w-0 overflow-y-auto">
+        <div bind:this={adminContentEl} class="admin-content px-16 py-12 pb-0 flex-1 min-w-0 overflow-y-auto">
           <div class="min-w-0 pr-0 pl-0">
             {@render activeAdminComponent()}
           </div>
