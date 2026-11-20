@@ -20,6 +20,9 @@ let workspaceOptionsKey = '';
 let historyLoaded = $state(false);
 let historyPromise = null;
 let historyAfterMessageId = $state(0);
+// Set once a conversation has been started or loaded, so reopening the panel
+// resumes it instead of starting over.
+let conversationStarted = false;
 
 function messageID(messagesToInspect) {
   return messagesToInspect.reduce(
@@ -86,6 +89,7 @@ async function startNewGeneralChat() {
     error = '';
     itemKeyMap = {};
     historyLoaded = true;
+    conversationStarted = true;
   } catch (err) {
     error = err.message || 'Conversation could not be started';
   } finally {
@@ -108,6 +112,7 @@ async function loadSession(session) {
     error = '';
     itemKeyMap = {};
     historyLoaded = true;
+    conversationStarted = true;
   } catch (err) {
     error = err.message || 'Conversation could not be loaded';
   } finally {
@@ -115,13 +120,39 @@ async function loadSession(session) {
   }
 }
 
+/**
+ * Called each time the chat panel opens. The first open starts a fresh general
+ * chat; later opens keep whatever conversation the user last had. An agent
+ * chat survives only where it can still be used: the backend rejects a turn
+ * outside its workspace or without edit there, so it falls back to general.
+ *
+ * @param {number} workspaceId the route's workspace, 0 off workspace routes
+ * @param {boolean} allowStandard user can use agent chats in that workspace
+ * @param {(workspaceId: number) => boolean} canChatIn user may chat in a workspace
+ */
+async function resumeConversation(workspaceId, allowStandard, canChatIn) {
+  await prepareWorkspaceOptions(workspaceId, allowStandard);
+  if (!conversationStarted) {
+    await startNewGeneralChat();
+    return;
+  }
+  if (sessionType !== 'standard') return;
+  const current = sessions.find((session) => session.id === sessionId);
+  if (!current || !canChatIn(Number(current.workspace_id))) {
+    await startNewGeneralChat();
+  }
+}
+
 async function prepareWorkspaceOptions(workspaceId, allowStandard) {
   const normalizedWorkspaceId = Number(workspaceId) || 0;
-  const key = allowStandard && normalizedWorkspaceId ? String(normalizedWorkspaceId) : 'general';
+  // Off workspace routes ('all') the picker offers the user's existing agent
+  // chats from every workspace; agents and new chats stay workspace-scoped.
+  let key = 'all';
+  if (normalizedWorkspaceId) key = allowStandard ? String(normalizedWorkspaceId) : 'none';
   if (workspaceOptionsKey === key) return;
   workspaceOptionsKey = key;
 
-  if (!allowStandard || !normalizedWorkspaceId) {
+  if (key === 'none') {
     sessions = [];
     availableAgents = [];
     if (sessionType === 'standard') {
@@ -130,20 +161,25 @@ async function prepareWorkspaceOptions(workspaceId, allowStandard) {
     return;
   }
 
+  const allWorkspaces = key === 'all';
   try {
     const [sessionResult, agentResult] = await Promise.all([
       ai.listSessions(),
-      ai.listAvailableStandardAgents(normalizedWorkspaceId),
+      allWorkspaces ? [] : ai.listAvailableStandardAgents(normalizedWorkspaceId),
     ]);
     sessions = (Array.isArray(sessionResult) ? sessionResult : []).filter(
       (session) =>
         session.session_type === 'standard' &&
-        Number(session.workspace_id) === normalizedWorkspaceId &&
-        !session.archived_at
+        !session.archived_at &&
+        (allWorkspaces
+          ? Boolean(session.workspace_id)
+          : Number(session.workspace_id) === normalizedWorkspaceId)
     );
     availableAgents = Array.isArray(agentResult) ? agentResult : [];
   } catch (err) {
-    console.error('Failed to load workspace agent conversations:', err);
+    console.error('Failed to load agent conversations:', err);
+    // Forget the key so the next open retries instead of keeping the picker hidden.
+    workspaceOptionsKey = '';
     sessions = [];
     availableAgents = [];
   }
@@ -415,6 +451,7 @@ export const chatStore = {
   loadGeneralHistory,
   startNewGeneralChat,
   prepareWorkspaceOptions,
+  resumeConversation,
   selectConversation,
   startStandardConversation,
   archiveCurrentSession,
