@@ -277,10 +277,11 @@
   }
 
   // Asset custom fields resolve their options through the portal's asset
-  // search, which is scoped to the assets this visitor can see.
-  function loadAssetOptions(assetSetId, _cqlQuery, search) {
+  // search, which evaluates the field's ql_query against the set the
+  // administrator exposed to portals.
+  function loadAssetOptions(assetSetId, _cqlQuery, search, fieldId) {
     if (!portalSlug) return Promise.resolve({ assets: [], total: 0 });
-    return portal.searchAssets(portalSlug, { assetSetId, query: search });
+    return portal.searchAssets(portalSlug, { fieldId, assetSetId, query: search });
   }
 
   function validateCurrentStep() {
