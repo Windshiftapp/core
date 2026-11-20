@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -86,6 +87,7 @@ type SSOStatusResponse struct {
 	ProviderName string                  `json:"provider_name,omitempty"`
 	ProviderSlug string                  `json:"provider_slug,omitempty"`
 	Providers    []SSOStatusProviderInfo `json:"providers,omitempty"`
+	NativeS256   bool                    `json:"native_s256,omitempty"`
 }
 
 // SSOProviderResponse represents a provider for API responses (without secrets)
@@ -289,6 +291,7 @@ func (h *SSOHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		ProviderName: defaultProvider.Name,
 		ProviderSlug: defaultProvider.Slug,
 		Providers:    providerInfos,
+		NativeS256:   true,
 	})
 }
 
@@ -327,6 +330,15 @@ func (h *SSOHandler) StartLogin(w http.ResponseWriter, r *http.Request) {
 	// stored verbatim in the state row and detected again in Callback.
 	if !isValidRedirectURI(redirectAfterLogin) && !isValidNativeRedirectURI(redirectAfterLogin) {
 		redirectAfterLogin = "/"
+	}
+	query := r.URL.Query()
+	if query.Has("native_challenge") || query.Has("native_state") {
+		binding := nativeSSOBinding{challenge: query.Get("native_challenge"), state: query.Get("native_state")}
+		if redirectAfterLogin != nativeRedirectURI || !binding.valid() {
+			respondBadRequest(w, r, "invalid native sign-in request")
+			return
+		}
+		redirectAfterLogin = binding.redirectRecord()
 	}
 
 	rememberMe := ssoRememberMeFromRequest(r)
@@ -496,15 +508,6 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 			slog.String("provider", provider.Slug),
 			slog.Bool("remember_me", rememberMe),
 		)
-		// A native (desktop/iOS) flow is identified by its custom-scheme
-		// redirect target, stored in StartLogin. Web flows keep the existing
-		// relative-path coercion; the native target is left intact so the
-		// branch below can hand back a one-time code instead of a cookie.
-		nativeFlow := isValidNativeRedirectURI(storedRedirectURI)
-		if !nativeFlow && (storedRedirectURI == "" || !isValidRedirectURI(storedRedirectURI)) {
-			storedRedirectURI = "/"
-		}
-
 		// Extract claims
 		claims, err := h.oidcService.ExtractClaims(tokens, attributeMap)
 		if err != nil {
@@ -556,14 +559,19 @@ func (h *SSOHandler) completeSSOLogin(w http.ResponseWriter, r *http.Request, pr
 		h.redirectWithError(w, r, "Failed to create session")
 		return
 	}
-	if isValidNativeRedirectURI(redirectURI) {
-		code, err := h.issueNativeAuthCode(session.Token, session.ExpiresAt)
+	binding, bound := parseNativeSSOBinding(redirectURI)
+	if bound || isValidNativeRedirectURI(redirectURI) {
+		code, err := h.issueNativeAuthCode(session.Token, session.ExpiresAt, binding.challenge)
 		if err != nil {
 			loginLogger.Error("failed to issue native auth code", "error", err)
 			h.redirectWithError(w, r, "Failed to complete sign-in")
 			return
 		}
-		http.Redirect(w, r, nativeRedirectURI+"?code="+url.QueryEscape(code), http.StatusFound) // #nosec G710 -- fixed scheme and opaque code
+		query := url.Values{"code": {code}}
+		if bound {
+			query.Set("state", binding.state)
+		}
+		http.Redirect(w, r, nativeRedirectURI+"?"+query.Encode(), http.StatusFound) // #nosec G710 -- fixed callback and encoded parameters
 		return
 	}
 	if !isValidRedirectURI(redirectURI) {
@@ -582,16 +590,14 @@ func (h *SSOHandler) completeSSOLogin(w http.ResponseWriter, r *http.Request, pr
 // within seconds of receiving the custom-scheme callback.
 const nativeAuthCodeTTL = 2 * time.Minute
 
-// issueNativeAuthCode persists a single-use code bound to a freshly created
-// session and returns it. The desktop/native app redeems it at
-// /api/auth/native/exchange for the encoded session cookie value.
-func (h *SSOHandler) issueNativeAuthCode(sessionToken string, sessionExpiresAt time.Time) (string, error) {
+// issueNativeAuthCode stores the lookup key and returns the code for the callback.
+func (h *SSOHandler) issueNativeAuthCode(sessionToken string, sessionExpiresAt time.Time, challenge string) (string, error) {
 	code, err := randomOpaqueCode()
 	if err != nil {
 		return "", err
 	}
 	expires := time.Now().Add(nativeAuthCodeTTL)
-	if err := repository.NewNativeAuthRepository(h.db).Store(code, sessionToken, sessionExpiresAt, expires); err != nil {
+	if err := repository.NewNativeAuthRepository(h.db).Store(nativeAuthLookupKey(code, challenge), sessionToken, sessionExpiresAt, expires); err != nil {
 		return "", err
 	}
 	return code, nil
@@ -599,7 +605,8 @@ func (h *SSOHandler) issueNativeAuthCode(sessionToken string, sessionExpiresAt t
 
 // nativeExchangeRequest is the payload the native app POSTs to redeem its code.
 type nativeExchangeRequest struct {
-	Code string `json:"code"`
+	Code     string `json:"code"`
+	Verifier string `json:"code_verifier"`
 }
 
 // nativeExchangeResponse hands the app everything it needs to write the session
@@ -626,7 +633,19 @@ func (h *SSOHandler) NativeExchange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	row, err := repository.NewNativeAuthRepository(h.db).Consume(req.Code, time.Now())
+	// Raw codes exist only for the legacy desktop exchange; never query a
+	// caller-supplied storage key or fall back from a verifier-bound lookup.
+	rawCode, codeErr := hex.DecodeString(req.Code)
+	if codeErr != nil || len(rawCode) != 24 || (req.Verifier != "" && !validNativeSSOValue(req.Verifier)) {
+		respondBadRequest(w, r, "invalid or expired code")
+		return
+	}
+	var challenge string
+	if req.Verifier != "" {
+		digest := sha256.Sum256([]byte(req.Verifier))
+		challenge = base64.RawURLEncoding.EncodeToString(digest[:])
+	}
+	row, err := repository.NewNativeAuthRepository(h.db).Consume(nativeAuthLookupKey(req.Code, challenge), time.Now())
 	if errors.Is(err, repository.ErrNotFound) {
 		respondBadRequest(w, r, "invalid or expired code")
 		return
@@ -643,6 +662,7 @@ func (h *SSOHandler) NativeExchange(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("native auth code exchanged", slog.String("component", "sso"))
+	w.Header().Set("Cache-Control", "no-store")
 	respondJSONOK(w, nativeExchangeResponse{
 		CookieName:  auth.SessionCookieName,
 		CookieValue: value,
