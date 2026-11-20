@@ -925,38 +925,28 @@ func (s *PortalService) collectVisibleChannelCustomFieldIDs(ctx context.Context,
 	}
 
 	// Visible form-mode asset reports → their custom-typed configured fields.
+	// The portal grant is checked inside the query so it needs no second read
+	// connection while this cursor is open.
 	arRows, err := s.db.QueryContext(ctx, `
-		SELECT ar.id, ar.asset_set_id, ar.item_type_id, ar.workspace_id, ar.visibility_group_ids, ar.visibility_org_ids
+		SELECT ar.id, ar.item_type_id, ar.workspace_id, ar.visibility_group_ids, ar.visibility_org_ids
 		FROM asset_reports ar
 		WHERE ar.channel_id = ? AND ar.is_active = true AND ar.run_mode = 'form'
+		  AND EXISTS (SELECT 1 FROM asset_set_portal_access aspa WHERE aspa.set_id = ar.asset_set_id)
 	`, channelID)
 	if err != nil {
 		return nil, fmt.Errorf("list channel asset reports: %w", err)
 	}
 	var visibleARRoutes []visibleRoute
-	var routeErr error
 	func() {
 		defer arRows.Close()
-		assetRepo := repository.NewAssetRepository(s.db)
 		for arRows.Next() {
-			var id, assetSetID int
+			var id int
 			var itemTypeID, workspaceID *int
 			var groups, orgs sql.NullString
-			if err := arRows.Scan(&id, &assetSetID, &itemTypeID, &workspaceID, &groups, &orgs); err != nil {
+			if err := arRows.Scan(&id, &itemTypeID, &workspaceID, &groups, &orgs); err != nil {
 				continue
 			}
 			if !isAdmin && !portalRowVisible(groups, orgs, userGroupIDs, customerOrgID) {
-				continue
-			}
-			// The report's own set must still carry a portal grant. Without this
-			// check a revoked grant hides the report but leaves the fields it
-			// references exposed as picker options.
-			enabled, err := assetRepo.IsSetPortalEnabled(assetSetID)
-			if err != nil {
-				routeErr = fmt.Errorf("check asset report %d portal access: %w", id, err)
-				return
-			}
-			if !enabled {
 				continue
 			}
 			if itemTypeID != nil && workspaceID != nil && containsInt(channelConfig.PortalWorkspaceIDs, *workspaceID) {
@@ -964,9 +954,6 @@ func (s *PortalService) collectVisibleChannelCustomFieldIDs(ctx context.Context,
 			}
 		}
 	}()
-	if routeErr != nil {
-		return nil, routeErr
-	}
 	if err := arRows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate channel asset reports: %w", err)
 	}

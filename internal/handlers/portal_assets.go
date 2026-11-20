@@ -261,6 +261,17 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 				}
 			}
 		}
+		// Asset fields carry a reference the picker scoped to a granted set and
+		// the field's own query. Validate the submitted reference with the same
+		// policy before substituting it into the report query.
+		submitted := make(map[string]any, len(formValues))
+		for identifier, value := range formValues {
+			submitted[identifier] = value
+		}
+		if err := h.validatePortalAssetCustomFields(ctx, portalCustomerID, customerOrgID, submitted); err != nil {
+			respondValidationError(w, r, err.Error())
+			return
+		}
 		cqlQuery = substituteFormFields(cqlQuery, formValues)
 	}
 
@@ -876,6 +887,19 @@ func (h *PortalHandler) SearchPortalAssets(w http.ResponseWriter, r *http.Reques
 	respondJSONOK(w, map[string]any{"assets": assets})
 }
 
+// portalAssetFilterIdentity resolves the portal customer and organisation used
+// by asset CQL context functions. It accepts a linked customer from an internal
+// session, matching the picker, so read and write paths evaluate the same
+// currentUser()/currentCustomer()/currentOrganisation(). Request attribution
+// keeps using getAuthFromContext.
+func (h *PortalHandler) portalAssetFilterIdentity(ctx context.Context, r *http.Request, channelID int) (portalCustomerID, customerOrgID *int) {
+	portalCustomerID, _ = h.getPortalCustomerID(ctx, r, channelID)
+	if portalCustomerID != nil {
+		customerOrgID = h.getPortalCustomerOrgID(ctx, *portalCustomerID)
+	}
+	return portalCustomerID, customerOrgID
+}
+
 // searchPortalAssetField resolves picker options for an asset custom field. The
 // field must be exposed on this portal and its set must carry a portal grant;
 // the field's ql_query is evaluated server-side with the portal context so a
@@ -921,11 +945,7 @@ func (h *PortalHandler) searchPortalAssetField(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	portalCustomerID, _ := h.getPortalCustomerID(ctx, r, channel.ID)
-	var customerOrgID *int
-	if portalCustomerID != nil {
-		customerOrgID = h.getPortalCustomerOrgID(ctx, *portalCustomerID)
-	}
+	portalCustomerID, customerOrgID := h.portalAssetFilterIdentity(ctx, r, channel.ID)
 	cqlSQL, cqlArgs, err := h.portalAssetCQLSQL(ctx, options.AssetSetID, options.query(), portalCustomerID, customerOrgID)
 	if err != nil {
 		respondInternalError(w, r, err)
