@@ -117,15 +117,33 @@ async function loadSession(session) {
 
 async function prepareWorkspaceOptions(workspaceId, allowStandard) {
   const normalizedWorkspaceId = Number(workspaceId) || 0;
-  const key = allowStandard && normalizedWorkspaceId ? String(normalizedWorkspaceId) : 'general';
+  // Off workspace routes ('all') the picker offers the user's existing agent
+  // chats from every workspace; agents and new chats stay workspace-scoped.
+  let key = 'all';
+  if (normalizedWorkspaceId) key = allowStandard ? String(normalizedWorkspaceId) : 'none';
   if (workspaceOptionsKey === key) return;
   workspaceOptionsKey = key;
 
-  if (!allowStandard || !normalizedWorkspaceId) {
+  if (key === 'none') {
     sessions = [];
     availableAgents = [];
     if (sessionType === 'standard') {
       await loadGeneralHistory();
+    }
+    return;
+  }
+
+  if (key === 'all') {
+    availableAgents = [];
+    try {
+      const sessionResult = await ai.listSessions();
+      sessions = (Array.isArray(sessionResult) ? sessionResult : []).filter(
+        (session) =>
+          session.session_type === 'standard' && session.workspace_id && !session.archived_at
+      );
+    } catch (err) {
+      console.error('Failed to load agent conversations:', err);
+      sessions = [];
     }
     return;
   }
