@@ -515,6 +515,132 @@ func (h *PortalHandler) resolvePortalAsset(
 	return nil, nil
 }
 
+// portalAssetFieldValueIDs extracts every asset id from a submitted asset
+// custom-field value: an id, an object carrying one, or an array of either.
+// Flattening arrays regardless of the field's arity means a malformed array on
+// a single-value field still has all of its ids authorized.
+func portalAssetFieldValueIDs(value any) []int {
+	entries := []any{value}
+	if arr, ok := value.([]any); ok {
+		entries = arr
+	}
+	ids := make([]int, 0, len(entries))
+	for _, entry := range entries {
+		raw := entry
+		if object, ok := entry.(map[string]any); ok {
+			raw = object["id"]
+		}
+		switch v := raw.(type) {
+		case float64:
+			if v > 0 && v == float64(int(v)) {
+				ids = append(ids, int(v))
+			}
+		case int:
+			if v > 0 {
+				ids = append(ids, v)
+			}
+		case int64:
+			if v > 0 {
+				ids = append(ids, int(v))
+			}
+		case json.Number:
+			if parsed, err := v.Int64(); err == nil && parsed > 0 {
+				ids = append(ids, int(parsed))
+			}
+		case string:
+			if parsed, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && parsed > 0 {
+				ids = append(ids, parsed)
+			}
+		}
+	}
+	return ids
+}
+
+// validatePortalAssetCustomFields rejects asset custom-field values that
+// reference an id outside the field's configured asset set or invisible to the
+// submitting visitor. It is an authorization gate, not a normalizer: the
+// stored value keeps the shape the form submitted.
+func (h *PortalHandler) validatePortalAssetCustomFields(ctx context.Context, r *http.Request, channel models.Channel, config models.ChannelConfig, portalCustomerID, customerOrgID *int, values map[string]any) error {
+	if len(values) == 0 {
+		return nil
+	}
+	ids := make([]any, 0, len(values))
+	for key := range values {
+		if _, err := strconv.Atoi(key); err == nil {
+			ids = append(ids, key)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
+	rows, err := h.db.QueryContext(ctx, "SELECT id, field_type, COALESCE(options, '') FROM custom_field_definitions WHERE id IN ("+placeholders+")", ids...)
+	if err != nil {
+		return fmt.Errorf("load asset field definitions: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	assetSetByField := make(map[string]int)
+	for rows.Next() {
+		var id int
+		var fieldType, options string
+		if err := rows.Scan(&id, &fieldType, &options); err != nil {
+			return fmt.Errorf("scan asset field definition: %w", err)
+		}
+		if models.CanonicalCustomFieldType(fieldType) != "asset" {
+			continue
+		}
+		var opts struct {
+			AssetSetID int `json:"asset_set_id"`
+		}
+		if err := json.Unmarshal([]byte(options), &opts); err != nil || opts.AssetSetID <= 0 {
+			continue
+		}
+		assetSetByField[strconv.Itoa(id)] = opts.AssetSetID
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate asset field definitions: %w", err)
+	}
+	if len(assetSetByField) == 0 {
+		return nil
+	}
+
+	vc := h.getPortalVisibilityContext(ctx, r, channel.ID)
+	reportsBySet, err := h.portalExposedSetReports(channel, config, vc)
+	if err != nil {
+		return err
+	}
+
+	assetRepo := repository.NewAssetRepository(h.db)
+	for key, value := range values {
+		fieldSetID, ok := assetSetByField[key]
+		if !ok {
+			continue
+		}
+		for _, assetID := range portalAssetFieldValueIDs(value) {
+			setID, err := assetRepo.GetAssetSetID(assetID)
+			if errors.Is(err, repository.ErrNotFound) {
+				return fmt.Errorf("field %s references an unavailable asset", key)
+			}
+			if err != nil {
+				return fmt.Errorf("resolve asset field %s: %w", key, err)
+			}
+			if setID != fieldSetID {
+				return fmt.Errorf("field %s references an unavailable asset", key)
+			}
+			asset, err := h.resolvePortalAsset(ctx, reportsBySet, assetID, portalCustomerID, customerOrgID)
+			if err != nil {
+				return fmt.Errorf("resolve asset field %s: %w", key, err)
+			}
+			if asset == nil {
+				return fmt.Errorf("field %s references an unavailable asset", key)
+			}
+		}
+	}
+	return nil
+}
+
 // portalAssetAccess carries the resolved portal context shared by the asset
 // read endpoints: the visible reports grouped by set, and the current
 // customer identity used by CQL context functions.
@@ -636,6 +762,14 @@ func (h *PortalHandler) SearchPortalAssets(w http.ResponseWriter, r *http.Reques
 			limit = parsed
 		}
 	}
+	// Optional set scope lets an asset custom field stay inside its configured
+	// set. The set must still be exposed through a visible report below.
+	requestedSetID := 0
+	if raw := r.URL.Query().Get("asset_set_id"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			requestedSetID = parsed
+		}
+	}
 
 	access, cancel, ok := h.portalAssetRequestContext(w, r)
 	if !ok {
@@ -645,7 +779,14 @@ func (h *PortalHandler) SearchPortalAssets(w http.ResponseWriter, r *http.Reques
 
 	setIDs := make([]int, 0, len(access.reportsBySet))
 	for setID := range access.reportsBySet {
+		if requestedSetID > 0 && setID != requestedSetID {
+			continue
+		}
 		setIDs = append(setIDs, setID)
+	}
+	if len(setIDs) == 0 {
+		respondJSONOK(w, map[string]any{"assets": []any{}})
+		return
 	}
 	matches, err := repository.NewAssetRepository(h.db).Search(query, setIDs, limit)
 	if err != nil {
@@ -901,7 +1042,7 @@ func (h *PortalHandler) loadAssetReportFields(assetReportID int) ([]models.Asset
 	}
 	allowedCustomFieldIDs := make(map[string]struct{})
 	if report.ItemTypeID != nil && report.WorkspaceID != nil {
-		allowedCustomFieldIDs, err = services.AllowedCreateScreenCustomFieldIdentifiers(h.db, *report.WorkspaceID, *report.ItemTypeID)
+		allowedCustomFieldIDs, err = services.AllowedCreateScreenCustomFieldIdentifiers(h.db, *report.WorkspaceID, *report.ItemTypeID, true)
 		if err != nil {
 			return nil, err
 		}

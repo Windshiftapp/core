@@ -17,6 +17,9 @@
     customFieldValues = $bindable({}),
     isDarkMode = false,
     idPrefix = 'form',
+    // Resolves asset picker options for asset custom fields. The portal passes
+    // a loader backed by its own asset search; public forms leave it null.
+    loadAssetOptions = null,
   } = $props();
 
   let currentStepFields = $derived(
@@ -82,6 +85,7 @@
           required={field.is_required}
           milestones={[]}
           {isDarkMode}
+          {loadAssetOptions}
         />
         {#if field.description}
           <p class="mt-1 text-xs" style="color: var(--ds-text-subtle);">{field.description}</p>

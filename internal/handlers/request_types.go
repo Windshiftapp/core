@@ -209,8 +209,15 @@ func (h *RequestTypeHandler) channelServedWorkspaceIDs(ctx context.Context, chan
 	}
 }
 
-func (h *RequestTypeHandler) availableFieldsForRequestType(rt *models.RequestType) ([]AvailableField, error) {
-	return availableCreateFields(h.screenRepo, rt.WorkspaceID, rt.ItemTypeID)
+// availableFieldsForRequestType resolves the create-screen fields offered to
+// the form builder. Portal channels may bind asset custom fields because the
+// portal resolves them through its own asset endpoints; public forms may not.
+func (h *RequestTypeHandler) availableFieldsForRequestType(ctx context.Context, rt *models.RequestType) ([]AvailableField, error) {
+	channel, err := h.channelService.GetByID(ctx, rt.ChannelID)
+	if err != nil {
+		return nil, err
+	}
+	return availableCreateFields(h.screenRepo, rt.WorkspaceID, rt.ItemTypeID, channel.Type == "portal")
 }
 
 // validateRequestTypeRouting requires an inbound portal/form channel, a pinned
@@ -638,7 +645,7 @@ func (h *RequestTypeHandler) UpdateFields(w http.ResponseWriter, r *http.Request
 	}
 	// The legacy GetFields response cannot surface sanitization warnings.
 	_ = sanitizeRequestTypeFields(fields)
-	available, err := h.availableFieldsForRequestType(rt)
+	available, err := h.availableFieldsForRequestType(r.Context(), rt)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -697,7 +704,7 @@ func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	fields, err := h.availableFieldsForRequestType(rt)
+	fields, err := h.availableFieldsForRequestType(r.Context(), rt)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

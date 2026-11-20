@@ -794,6 +794,18 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Asset custom fields reference portal-visible assets, which the generic
+	// custom-field validator cannot authorize. Reject ids outside the field's
+	// configured set or hidden from this visitor before creating the item.
+	var customerOrgID *int
+	if portalCustomerID != nil {
+		customerOrgID = h.getPortalCustomerOrgID(ctx, *portalCustomerID)
+	}
+	if err := h.validatePortalAssetCustomFields(ctx, r, channel, config, portalCustomerID, customerOrgID, validationResult.CustomFieldValues); err != nil {
+		respondValidationError(w, r, err.Error())
+		return
+	}
+
 	// Title fallback: when the request type hides the title field from the
 	// form, render its title_template. Items have a NOT NULL title, so we
 	// reject when the template is missing or renders to empty.

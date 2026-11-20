@@ -74,6 +74,26 @@ func IsPublicFormFillableCustomFieldType(fieldType string) bool {
 	}
 }
 
+// IsPortalFormFillableCustomFieldType is the portal's allowlist. It adds
+// reference types the portal can resolve through its own authenticated asset
+// endpoints; unauthenticated public forms stay on the narrower list.
+func IsPortalFormFillableCustomFieldType(fieldType string) bool {
+	if models.CanonicalCustomFieldType(fieldType) == "asset" {
+		return true
+	}
+	return IsPublicFormFillableCustomFieldType(fieldType)
+}
+
+// PublicFormFillableCustomFieldType selects the allowlist for the owning
+// channel: the portal list when assets are resolvable, the public list
+// otherwise.
+func PublicFormFillableCustomFieldType(allowAssets bool) func(string) bool {
+	if allowAssets {
+		return IsPortalFormFillableCustomFieldType
+	}
+	return IsPublicFormFillableCustomFieldType
+}
+
 func normalizeVirtualFieldValue(fieldID string, field virtualRequestField, raw any) (any, error) {
 	switch field.fieldType {
 	case "text":
@@ -135,7 +155,7 @@ func normalizeVirtualFieldValue(fieldID string, field virtualRequestField, raw a
 // may be used when creating an item of itemTypeID in workspaceID. Public form
 // schemas and submissions both use this list so stale or forged field rows do
 // not expose or write fields outside the effective create screen.
-func AllowedCreateScreenCustomFieldIdentifiers(db database.Database, workspaceID, itemTypeID int) (map[string]struct{}, error) {
+func AllowedCreateScreenCustomFieldIdentifiers(db database.Database, workspaceID, itemTypeID int, allowAssets bool) (map[string]struct{}, error) {
 	allowed := make(map[string]struct{})
 	if workspaceID <= 0 || itemTypeID <= 0 {
 		return allowed, nil
@@ -149,7 +169,7 @@ func AllowedCreateScreenCustomFieldIdentifiers(db database.Database, workspaceID
 	}
 
 	screenRepo := repository.NewScreenRepository(db)
-	createScreenID, err := screenRepo.GetCreateScreenID(workspaceID, itemTypeID)
+	createScreenID, err := screenRepo.GetEffectiveCreateScreenID(workspaceID, itemTypeID)
 	if err != nil || createScreenID == nil {
 		return allowed, err
 	}
@@ -157,9 +177,10 @@ func AllowedCreateScreenCustomFieldIdentifiers(db database.Database, workspaceID
 	if err != nil {
 		return nil, err
 	}
+	fillable := PublicFormFillableCustomFieldType(allowAssets)
 	for _, field := range fields {
 		if field.FieldType == "custom" && field.FieldIdentifier != "" && field.FieldName != "" &&
-			IsPublicFormFillableCustomFieldType(field.CustomFieldType) {
+			fillable(field.CustomFieldType) {
 			allowed[field.FieldIdentifier] = struct{}{}
 		}
 	}
@@ -209,7 +230,7 @@ func allowedRequestTypeCustomFieldIdentifiers(ctx context.Context, db database.D
 	if !served {
 		return map[string]struct{}{}, nil
 	}
-	return AllowedCreateScreenCustomFieldIdentifiers(db, effectiveWorkspaceID, itemTypeID)
+	return AllowedCreateScreenCustomFieldIdentifiers(db, effectiveWorkspaceID, itemTypeID, channelType == "portal")
 }
 
 // ValidateAndSeparateRequestFields validates request type fields and separates virtual from custom fields.
