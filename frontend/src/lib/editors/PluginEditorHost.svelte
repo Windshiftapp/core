@@ -46,6 +46,15 @@
     nativeEditor?.clear?.();
   }
 
+  export function getMarkdown() {
+    // The bindable content lags edits by the listener debounce; read the live
+    // document so commit-on-save cannot persist the previous state.
+    if (nativeEditor?.getMarkdown) {
+      return nativeEditor.getMarkdown();
+    }
+    return content || '';
+  }
+
   export function insertImage(...args) {
     if (activeProvider) {
       console.warn('[PluginEditorHost] insertImage is not supported by plugin editors');

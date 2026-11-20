@@ -6,6 +6,7 @@
   import { gfm, toggleStrikethroughCommand } from '@milkdown/kit/preset/gfm';
   import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
   import { clipboard } from '@milkdown/kit/plugin/clipboard';
+  import { history } from '@milkdown/kit/plugin/history';
   import { upload, uploadConfig } from '@milkdown/kit/plugin/upload';
   import { insert, callCommand } from '@milkdown/kit/utils';
   import { replaceAll } from '@milkdown/utils';
@@ -639,6 +640,7 @@
         .use(gfm)
         .use(listener)
         .use(clipboard)
+        .use(history)
         .use(upload)  // Include upload in main chain per docs
         .use(imageBlockComponent)  // Enable image resizing
         .use(mentionDecorationPlugin)  // Add mention chip decorations
@@ -1438,12 +1440,12 @@
     outline-offset: 1px;
   }
 
-  :global(.milkdown-editor.readonly .ProseMirror li[data-item-type='task']::before) {
-    cursor: default;
-  }
-
   :global(.milkdown-editor:not(.readonly) .ProseMirror li[data-item-type='task']::before) {
     cursor: pointer;
+  }
+
+  :global(.milkdown-editor.readonly .ProseMirror li[data-item-type='task']::before) {
+    cursor: default;
   }
 
   /* GFM: Tables */

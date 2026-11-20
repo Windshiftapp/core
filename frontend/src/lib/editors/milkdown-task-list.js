@@ -4,9 +4,14 @@
 // `<li data-item-type="task" data-checked="true|false">` and never emits an
 // `<input>`. The editor styles draw the checkbox from `data-checked`; this
 // plugin adds the missing behavior:
-//   - toggles `checked` when the marker gutter is clicked,
-//   - exposes task items as checkboxes to assistive technology,
+//   - toggles `checked` on pointer activation and on synthesized clicks
+//     (assistive technology),
+//   - exposes task items as checkboxes and toggles on unmodified Space/Enter,
 //   - provides a toolbar command to turn a list item into a task item.
+//
+// A native <input> was tried first, but ProseMirror moves focus off form
+// controls inside the contenteditable on keydown, so the checkbox could not
+// keep keyboard focus. The marker itself stays focusable instead.
 //
 // The stored Markdown stays standard GFM (`- [ ]` / `- [x]`), so copy,
 // duplicate and template flows keep working without a storage change.
@@ -87,6 +92,19 @@ function syncAriaDisabled(view) {
 }
 
 /**
+ * Apply a checkbox toggle and keep keyboard focus on the marker. Changing the
+ * list item's markup makes ProseMirror replace the focused <li>, so focus is
+ * restored to the replacement to preserve the Tab sequence.
+ */
+function applyToggle(view, found, marker) {
+  const hadFocus = marker === document.activeElement;
+  view.dispatch(flipTaskChecked(view.state, found));
+  if (!hadFocus) return;
+  const replacement = view.nodeDOM(found.pos);
+  if (replacement instanceof HTMLElement) replacement.focus();
+}
+
+/**
  * Resolve the task list item for a DOM event inside the editor, or null when
  * the event did not land on a task item.
  */
@@ -106,19 +124,6 @@ function isMarkerClick(li, event) {
   const content = li.firstElementChild;
   const boundary = content ? content.getBoundingClientRect().left : li.getBoundingClientRect().left;
   return event.clientX < boundary;
-}
-
-/**
- * Apply a checkbox toggle and keep keyboard focus on the marker. Changing the
- * list item's markup makes ProseMirror replace the focused <li>, so focus is
- * restored to the replacement to preserve the Tab sequence.
- */
-function applyToggle(view, found, marker) {
-  const hadFocus = marker === document.activeElement;
-  view.dispatch(flipTaskChecked(view.state, found));
-  if (!hadFocus) return;
-  const replacement = view.nodeDOM(found.pos);
-  if (replacement instanceof HTMLElement) replacement.focus();
 }
 
 export const taskListPlugin = $prose(() => {
@@ -150,10 +155,26 @@ export const taskListPlugin = $prose(() => {
           applyToggle(view, found, li);
           return true;
         },
+        click(view, event) {
+          // Assistive-technology activation sends a click without a mousedown;
+          // pointer clicks are already handled above (detail > 0).
+          if (!view.editable || event.detail !== 0) return false;
+          const target = event.target;
+          if (!(target instanceof Element)) return false;
+          const li = target.closest('li[data-item-type="task"]');
+          if (!li) return false;
+          const found = taskListItemFromEvent(view, target);
+          if (!found) return false;
+          event.preventDefault();
+          applyToggle(view, found, li);
+          return true;
+        },
       },
       handleKeyDown(view, event) {
         if (!view.editable) return false;
         if (event.key !== ' ' && event.key !== 'Enter') return false;
+        // Leave modified keys (e.g. Ctrl/Cmd+Enter save) to their own handlers.
+        if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return false;
         const target = event.target;
         // Only react when the marker itself is focused, never while typing.
         if (!(target instanceof Element) || !target.matches('li[data-item-type="task"]')) {

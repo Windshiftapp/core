@@ -131,7 +131,10 @@
   });
 
   function saveDescription() {
-    onsavefield?.({ field: 'description', value: editorContent });
+    // Read the live editor value: the bound content is updated by Milkdown's
+    // debounced listener and can lag the last edit (e.g. a checkbox toggle).
+    const value = milkdownEditor?.getMarkdown?.() ?? editorContent;
+    onsavefield?.({ field: 'description', value });
   }
 
   function cancelEdit() {
