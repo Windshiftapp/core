@@ -3468,6 +3468,24 @@ CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_m
 		SQLite:        domainEventClaimableIndexMigration,
 		Postgres:      domainEventClaimableIndexMigration,
 	},
+	{
+		// Item lists and their total count always exclude merged duplicates.
+		// Without the partial predicate the count scans the whole items table
+		// (reading every description and JSON payload) and the ranked page
+		// selection fetches the table row for every skipped offset entry.
+		Version:       "20261128_items_active_list_indexes",
+		Name:          "Index the active item list and workspace count",
+		CheckSQLite:   sqliteIndexCheck("idx_items_workspace_id_active"),
+		CheckPostgres: pgIndexCheck("idx_items_workspace_id_active"),
+		SQLite: `
+			CREATE INDEX IF NOT EXISTS idx_items_workspace_id_active ON items(workspace_id) WHERE merged_into_item_id IS NULL;
+			CREATE INDEX IF NOT EXISTS idx_items_workspace_frac_index_active ON items(workspace_id, frac_index) WHERE merged_into_item_id IS NULL;
+		`,
+		Postgres: `
+			CREATE INDEX IF NOT EXISTS idx_items_workspace_id_active ON items(workspace_id) WHERE merged_into_item_id IS NULL;
+			CREATE INDEX IF NOT EXISTS idx_items_workspace_frac_index_active ON items(workspace_id, frac_index) WHERE merged_into_item_id IS NULL;
+		`,
+	},
 }
 
 // domainEventClaimableIndexMigration adds the partial index the claim query
