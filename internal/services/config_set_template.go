@@ -121,6 +121,9 @@ type ConfigSetTplScreenField struct {
 	DisplayOrder    int    `json:"display_order"`
 	IsRequired      bool   `json:"is_required,omitempty"`
 	FieldWidth      string `json:"field_width,omitempty"`
+	// Placement is omitted for the sidebar default, so templates exported
+	// before placement existed stay byte-identical and import unchanged.
+	Placement string `json:"placement,omitempty"`
 }
 
 type ConfigSetTplWorkflow struct {

@@ -120,6 +120,16 @@
             </div>
 
             <div class="flex items-center gap-3 flex-shrink-0">
+              {#if field.placement === 'main' || screenEditorStore.canFieldUseMainColumn(field)}
+                <span title={t('screensPage.mainColumnHint')} data-testid={`screen-field-main-column-${field.field_identifier}`}>
+                  <Checkbox
+                    checked={field.placement === 'main'}
+                    onchange={() => screenEditorStore.toggleFieldPlacement(index)}
+                    label={t('screensPage.mainColumn')}
+                    size="small"
+                  />
+                </span>
+              {/if}
               <Checkbox
                 checked={field.is_required}
                 disabled={!field.is_required && !screenEditorStore.canFieldBeRequired(field)}

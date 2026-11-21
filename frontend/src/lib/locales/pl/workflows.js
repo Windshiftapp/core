@@ -165,6 +165,8 @@ export default {
     dragToReorder: 'Przeciągnij, aby zmienić kolejność pól, lub upuść dostępne pola tutaj',
     dropFieldsHere: 'Upuść pola tutaj, aby skonfigurować ekran',
     required: 'Wymagane',
+    mainColumn: 'Kolumna główna',
+    mainColumnHint: 'Pokaż to pole pod opisem zamiast na pasku bocznym',
     removeField: 'Usuń pole',
     editScreen: 'Edytuj ekran',
     createScreen: 'Utwórz ekran',

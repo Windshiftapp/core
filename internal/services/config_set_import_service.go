@@ -810,9 +810,9 @@ func (s *ConfigSetImportService) findOrCreateScreen(ctx context.Context, tx data
 			ident = strconv.Itoa(cfID)
 		}
 		_, err := tx.ExecContext(ctx, `
-			INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width)
-			VALUES (?, ?, ?, ?, ?, ?)
-		`, id, f.FieldKind, ident, f.DisplayOrder, f.IsRequired, f.FieldWidth)
+			INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width, placement)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`, id, f.FieldKind, ident, f.DisplayOrder, f.IsRequired, f.FieldWidth, models.NormalizeScreenFieldPlacement(f.Placement))
 		if err != nil {
 			return 0, false, err
 		}

@@ -157,6 +157,8 @@ export default {
     dragToReorder: 'Drag to reorder fields or drop available fields here',
     dropFieldsHere: 'Drop fields here to configure the screen',
     required: 'Required',
+    mainColumn: 'Main column',
+    mainColumnHint: 'Show this field under the description instead of in the sidebar',
     removeField: 'Remove field',
     editScreen: 'Edit Screen',
     createScreen: 'Create Screen',

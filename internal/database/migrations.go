@@ -3512,6 +3512,17 @@ CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_m
 			CREATE INDEX IF NOT EXISTS idx_items_workspace_activity_active ON items(workspace_id, COALESCE(last_active_at, updated_at, created_at), id) WHERE merged_into_item_id IS NULL;
 		`,
 	},
+	{
+		// Long-form custom fields (multi-line and rich text) can render in the
+		// item detail main column under the description instead of the
+		// sidebar. Existing rows keep the sidebar, so no layout changes.
+		Version:       "20261130_screen_field_placement",
+		Name:          "Add main-column placement for screen fields",
+		CheckSQLite:   sqliteColumnCheck("screen_fields", "placement"),
+		CheckPostgres: pgColumnCheck("screen_fields", "placement"),
+		SQLite:        `ALTER TABLE screen_fields ADD COLUMN placement TEXT NOT NULL DEFAULT 'sidebar'`,
+		Postgres:      `ALTER TABLE screen_fields ADD COLUMN IF NOT EXISTS placement TEXT NOT NULL DEFAULT 'sidebar'`,
+	},
 }
 
 // domainEventClaimableIndexMigration adds the partial index the claim query

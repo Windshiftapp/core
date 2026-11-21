@@ -155,6 +155,8 @@ export default {
     dragToReorder: 'Ziehen zum Neuordnen oder verfügbare Felder hier ablegen',
     dropFieldsHere: 'Felder hier ablegen, um die Maske zu konfigurieren',
     required: 'Erforderlich',
+    mainColumn: 'Hauptspalte',
+    mainColumnHint: 'Feld unter der Beschreibung statt in der Seitenleiste anzeigen',
     removeField: 'Feld entfernen',
     editScreen: 'Maske bearbeiten',
     createScreen: 'Maske erstellen',
