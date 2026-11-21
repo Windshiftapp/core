@@ -598,6 +598,25 @@
     if (isSelfEditing) enterEdit();
   }
 
+  // The read-only display can contain real links (rendered rich text). A
+  // <button> wrapper would swallow their clicks, so the onStartEdit wrapper is
+  // a role="button" element and activation is skipped for interactive targets.
+  function isInteractiveTarget(event) {
+    return !!event.target?.closest?.('a[href], button, input, textarea, select');
+  }
+
+  function handleActivateClick(event) {
+    if (isInteractiveTarget(event)) return;
+    handleActivate();
+  }
+
+  function handleActivateKeydown(event) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    if (isInteractiveTarget(event)) return;
+    event.preventDefault();
+    handleActivate();
+  }
+
   function handleEditorChange(newValue) {
     onChange(newValue);
     // Multi-value editors stay open so several entries can be picked in a
@@ -1268,7 +1287,7 @@
     </div>
   {:else}
     <div>
-      {#if (onStartEdit || isSelfEditing) && !disabled}
+      {#if isSelfEditing && !disabled}
         <button
           type="button"
           class="flex w-full min-w-0 items-center gap-2 {displayAlignment === 'end' ? 'justify-end text-right' : 'justify-start text-left'} {truncateDisplay ? 'whitespace-nowrap overflow-hidden' : ''} {bare || noPadding ? '' : 'px-3'} {bare ? '' : 'py-2'} text-sm {bare ? '' : 'hover:bg-ds-background-neutral-hovered transition-colors rounded'}"
@@ -1277,6 +1296,20 @@
         >
           {@render readOnlyContent(true)}
         </button>
+      {:else if onStartEdit && !disabled}
+        <!-- role="button" instead of <button>: the read-only content can hold
+             real links (rich text), and a button wrapper would swallow their
+             clicks. The handler skips interactive targets so links stay usable. -->
+        <div
+          role="button"
+          tabindex="0"
+          class="flex w-full min-w-0 cursor-pointer items-center gap-2 {displayAlignment === 'end' ? 'justify-end text-right' : 'justify-start text-left'} {truncateDisplay ? 'whitespace-nowrap overflow-hidden' : ''} {bare || noPadding ? '' : 'px-3'} {bare ? '' : 'py-2'} text-sm {bare ? '' : 'hover:bg-ds-background-neutral-hovered transition-colors rounded'}"
+          onclick={handleActivateClick}
+          onkeydown={handleActivateKeydown}
+          data-testid={displayTestId}
+        >
+          {@render readOnlyContent(true)}
+        </div>
       {:else}
         <div
           class="min-w-0 {displayAlignment === 'end' ? 'text-right' : ''} {truncateDisplay ? 'whitespace-nowrap overflow-hidden' : ''} {bare || noPadding ? '' : 'px-3'} {bare ? '' : 'py-2'} text-sm {disabled ? 'opacity-50' : ''}"
