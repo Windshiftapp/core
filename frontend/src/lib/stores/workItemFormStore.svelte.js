@@ -23,6 +23,7 @@ import { isGenericSubtaskType, sortItemTypesByHierarchy } from '../utils/hierarc
 import {
   isCreateSystemFieldAutoManaged,
   isCreateSystemFieldRenderable,
+  isMainColumnScreenField,
   isSystemFieldConfigured,
   systemFieldIdentifiers,
 } from '../utils/screenFields.js';
@@ -226,11 +227,25 @@ class WorkItemFormStore {
    */
   get nonRequiredCustomFields() {
     return this.customFields.filter((cf) => {
-      const screenField = this.screenFields.find(
-        (f) => f.field_type === 'custom' && parseInt(f.field_identifier, 10) === cf.id
-      );
-      return !screenField?.is_required;
+      const screenField = this.#screenFieldFor(cf);
+      return !screenField?.is_required && !isMainColumnScreenField(screenField);
     });
+  }
+
+  /**
+   * Long-form custom fields the create screen places in the main column. They
+   * render under the description, always visible, required or not.
+   */
+  get mainColumnCustomFields() {
+    return this.customFields
+      .map((cf) => ({ field: cf, screenField: this.#screenFieldFor(cf) }))
+      .filter(({ screenField }) => isMainColumnScreenField(screenField));
+  }
+
+  #screenFieldFor(customField) {
+    return this.screenFields.find(
+      (f) => f.field_type === 'custom' && parseInt(f.field_identifier, 10) === customField.id
+    );
   }
 
   /**
@@ -265,7 +280,7 @@ class WorkItemFormStore {
       const screenField = this.screenFields.find(
         (f) => f.field_type === 'custom' && parseInt(f.field_identifier, 10) === cf.id
       );
-      return screenField?.is_required === true;
+      return screenField?.is_required === true && !isMainColumnScreenField(screenField);
     });
   }
 

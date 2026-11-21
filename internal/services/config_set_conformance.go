@@ -290,9 +290,10 @@ func diffScreenSections(canonical, live []ConfigSetTplScreen) []ConfigSetConform
 					fmt.Sprintf("screen %q is missing the %s field %q", want.Name, key.kind, key.key), true))
 				continue
 			}
-			if liveF.DisplayOrder != wf.DisplayOrder || liveF.IsRequired != wf.IsRequired || liveF.FieldWidth != wf.FieldWidth {
+			if liveF.DisplayOrder != wf.DisplayOrder || liveF.IsRequired != wf.IsRequired || liveF.FieldWidth != wf.FieldWidth ||
+				templatePlacement(liveF.Placement) != templatePlacement(wf.Placement) {
 				drifts = append(drifts, drift("screens", ConformanceKindDiffering, want.Name+"/field/"+key.kind+":"+key.key,
-					fmt.Sprintf("screen %q field %q differs (order/required/width changed)", want.Name, key.key), true))
+					fmt.Sprintf("screen %q field %q differs (order/required/width/placement changed)", want.Name, key.key), true))
 			}
 		}
 		for key := range gotFields {

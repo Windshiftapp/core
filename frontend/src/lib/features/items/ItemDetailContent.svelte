@@ -7,6 +7,8 @@
   import ItemDetailBreadcrumbs from '../items/ItemDetailBreadcrumbs.svelte';
   import ItemDetailHeader from '../items/ItemDetailHeader.svelte';
   import ItemDetailDescription from '../items/ItemDetailDescription.svelte';
+  import ItemDetailMainFields from './ItemDetailMainFields.svelte';
+  import { isMainColumnScreenField } from '../../utils/screenFields.js';
   import ItemIncidentPanel from '../items/ItemIncidentPanel.svelte';
   import ItemDetailLinks from './ItemDetailLinks.svelte';
   import ItemDetailTabs from '../items/ItemDetailTabs.svelte';
@@ -119,6 +121,16 @@
 
   // Component references
   let descriptionComponent = $state(null);
+
+  // Long-form custom fields placed in the main column render under the
+  // description; when present, the description gets a matching section label.
+  let hasMainColumnFields = $derived(
+    (workspaceScreenFields || []).some(
+      (screenField) =>
+        isMainColumnScreenField(screenField) &&
+        customFieldDefinitions.some((field) => field.id === parseInt(screenField.field_identifier, 10))
+    )
+  );
 
   // Diagram modal state
   let showDiagramModal = $state(false);
@@ -358,6 +370,20 @@
             {canEdit}
             onsavefield={handleSaveField}
           />
+          {#snippet mainColumnFields()}
+            <ItemDetailMainFields
+              {item}
+              {canEdit}
+              {workspaceScreenFields}
+              {customFieldDefinitions}
+              {editableScreenFieldIds}
+              {editingCustomFields}
+              {saving}
+              onsaveField={handleBackgroundSaveField}
+              {oncancelEdit}
+              onstartEditingCustomField={(detail) => onstartEditingCustomField?.(detail)}
+            />
+          {/snippet}
           <ItemDetailDescription
             bind:this={descriptionComponent}
             {item}
@@ -385,6 +411,8 @@
             ondeleteDiagram={handleDeleteDiagram}
             onexecuteAction={handleExecuteAction}
             onaiaction={handleAIAction}
+            label={hasMainColumnFields ? t('common.description') : null}
+            afterContent={hasMainColumnFields ? mainColumnFields : undefined}
           />
 
           <ItemIncidentPanel itemId={item.id} {item} {canEdit} />

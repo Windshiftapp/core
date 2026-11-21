@@ -147,6 +147,8 @@ export default {
     dragToReorder: '拖动以重新排序字段或将可用字段拖放到此处',
     dropFieldsHere: '将字段拖放到此处以配置屏幕',
     required: '必填',
+    mainColumn: '主栏',
+    mainColumnHint: '在描述下方而不是侧边栏中显示此字段',
     removeField: '移除字段',
     editScreen: '编辑屏幕',
     createScreen: '创建屏幕',

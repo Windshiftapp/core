@@ -47,7 +47,7 @@
   import { t } from '../../stores/i18n.svelte.js';
   import { formatDateOnly } from '../../utils/dateFormatter.js';
   import { parseDuration, durationToString } from '../../utils/timeUtils.js';
-  import { isSystemFieldConfigured, systemFieldIdentifiers } from '../../utils/screenFields.js';
+  import { isMainColumnScreenField, isSystemFieldConfigured, systemFieldIdentifiers } from '../../utils/screenFields.js';
   import { isExternalRequest } from '../../utils/requestOrigin.js';
   import StatusBadge from '../../components/StatusBadge.svelte';
   import { objectDisplayName } from '../../utils/systemLabels.js';
@@ -570,9 +570,14 @@
   }
 
   function handleClickOutsideSidebar() {
-    // Cancel all custom field editing if any are active
+    // Cancel the sidebar's own active custom field edits. Main-column fields
+    // edit under the description with explicit Save/Cancel, so clicks there
+    // (or anywhere outside the sidebar) must not end their edits.
+    const mainColumnFieldIds = new Set(
+      (workspaceScreenFields || []).filter(isMainColumnScreenField).map((field) => String(field.field_identifier))
+    );
     Object.keys(editingCustomFields).forEach(fieldId => {
-      if (editingCustomFields[fieldId]) {
+      if (editingCustomFields[fieldId] && !mainColumnFieldIds.has(String(fieldId))) {
         oncancelEdit?.({ field: `custom_field_${fieldId}` });
       }
     });
@@ -1257,7 +1262,8 @@
 
     <!-- Custom Fields Section (non-date) -->
     {#if workspaceScreenFields && workspaceScreenFields.length > 0}
-      {@const configuredCustomFields = workspaceScreenFields.filter(field => field.field_type === 'custom')}
+      <!-- Main-column fields render under the description instead. -->
+      {@const configuredCustomFields = workspaceScreenFields.filter(field => field.field_type === 'custom' && !isMainColumnScreenField(field))}
       {@const nonDateCustomFields = configuredCustomFields.filter(f => getCustomFieldDefinition(f.field_identifier)?.field_type !== 'date')}
       {#if nonDateCustomFields.length > 0}
         <!-- Divider before Custom Fields -->

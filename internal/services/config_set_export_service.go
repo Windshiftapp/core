@@ -793,7 +793,7 @@ func (s *ConfigSetExportService) exportScreens(ctx context.Context, screenIDs []
 	for _, sr := range screens {
 		s2 := ConfigSetTplScreen{Name: sr.Name, Description: sr.Desc}
 		fieldRows, err := s.db.QueryContext(ctx, `
-			SELECT field_type, field_identifier, display_order, COALESCE(is_required, false), COALESCE(field_width, '')
+			SELECT field_type, field_identifier, display_order, COALESCE(is_required, false), COALESCE(field_width, ''), COALESCE(placement, 'sidebar')
 			FROM screen_fields
 			WHERE screen_id = ?
 			ORDER BY display_order, id
@@ -806,11 +806,12 @@ func (s *ConfigSetExportService) exportScreens(ctx context.Context, screenIDs []
 			order     int
 			required  bool
 			width     string
+			placement string
 		}
 		var rawFields []rawField
 		for fieldRows.Next() {
 			var rf rawField
-			if scanErr := fieldRows.Scan(&rf.ft, &rf.ident, &rf.order, &rf.required, &rf.width); scanErr != nil {
+			if scanErr := fieldRows.Scan(&rf.ft, &rf.ident, &rf.order, &rf.required, &rf.width, &rf.placement); scanErr != nil {
 				_ = fieldRows.Close()
 				return nil, scanErr
 			}
@@ -831,6 +832,7 @@ func (s *ConfigSetExportService) exportScreens(ctx context.Context, screenIDs []
 				DisplayOrder: rf.order,
 				IsRequired:   rf.required,
 				FieldWidth:   rf.width,
+				Placement:    templatePlacement(rf.placement),
 			}
 			if rf.ft == "custom" {
 				if id, ok := parseIntish(rf.ident); ok && id > 0 {
@@ -1100,4 +1102,13 @@ func findApprovalSetByName(sets []ConfigSetTplApprovalSet, name string) (int, bo
 		}
 	}
 	return -1, false
+}
+
+// templatePlacement is the template form of a screen field placement: empty
+// for the sidebar default (omitted from JSON) and "main" for the main column.
+func templatePlacement(placement string) string {
+	if models.NormalizeScreenFieldPlacement(placement) == models.ScreenFieldPlacementMain {
+		return models.ScreenFieldPlacementMain
+	}
+	return ""
 }

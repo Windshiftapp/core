@@ -4,7 +4,10 @@
  * Centralizes screen list, field editing, and drag-and-drop state.
  */
 import { customFields, screens } from '../api/configuration.js';
-import { isCreateRenderableCustomFieldType } from '../utils/customFieldTypes.js';
+import {
+  isCreateRenderableCustomFieldType,
+  supportsMainColumnPlacement,
+} from '../utils/customFieldTypes.js';
 import { createSearchFilteredFields } from '../utils/fieldSearchUtils.js';
 import {
   ALWAYS_VISIBLE_SYSTEM_FIELDS,
@@ -284,6 +287,7 @@ class ScreenEditorStore extends DragStateStore {
       display_order: this.screenFields.length,
       is_required: fieldData.identifier === 'title',
       field_width: 'full',
+      placement: 'sidebar',
       field_name: fieldData.name,
       field_label: fieldData.name,
     };
@@ -314,6 +318,7 @@ class ScreenEditorStore extends DragStateStore {
       display_order: insertIndex,
       is_required: fieldData.identifier === 'title',
       field_width: 'full',
+      placement: 'sidebar',
       field_name: fieldData.name,
       field_label: fieldData.name,
     };
@@ -365,6 +370,27 @@ class ScreenEditorStore extends DragStateStore {
       return !definition || isCreateRenderableCustomFieldType(definition.field_type);
     }
     return canSystemFieldBeRequiredOnCreate(field.field_identifier);
+  }
+
+  /**
+   * Whether a screen field may render in the item detail main column. Only
+   * long-form custom fields qualify; the server enforces the same rule.
+   */
+  canFieldUseMainColumn(field) {
+    if (field?.field_type !== 'custom') return false;
+    const definition = this.customFields.find(
+      (cf) => cf.id === parseInt(field.field_identifier, 10)
+    );
+    return !!definition && supportsMainColumnPlacement(definition.field_type);
+  }
+
+  toggleFieldPlacement(index) {
+    const field = this.screenFields[index];
+    const isMain = field.placement === 'main';
+    // Allow moving a stale main-column field back, never into it.
+    if (!isMain && !this.canFieldUseMainColumn(field)) return;
+    field.placement = isMain ? 'sidebar' : 'main';
+    this.screenFields = [...this.screenFields];
   }
 
   toggleFieldRequired(index) {

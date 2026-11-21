@@ -5,7 +5,7 @@ import { getDiagrams } from '../api/misc.js';
 import { customerOrganisations } from '../api/portal.js';
 import { time } from '../api/time.js';
 import { childItemTypesForParent } from '../utils/hierarchy.js';
-import { buildDetailScreenFieldConfig } from '../utils/screenFields.js';
+import { buildDetailScreenFieldConfig, isMainColumnScreenField } from '../utils/screenFields.js';
 import { authStore } from './auth.svelte.js';
 import { workspaceDataStore } from './workspaceDataStore.svelte.js';
 import { workspacesStore } from './workspaces.svelte.js';
@@ -928,6 +928,24 @@ class ItemDetailStore {
       // Trigger reactivity
       this.editing = { ...this.editing };
     }
+  }
+
+  /**
+   * End custom field edits owned by the sidebar, which closes them whenever
+   * another field starts editing. Main-column fields keep their editor (and
+   * unsaved draft) until their own Save/Cancel, like the description.
+   */
+  cancelSidebarCustomFieldEditing() {
+    const mainColumnFieldIds = new Set(
+      this.workspaceScreenFields
+        .filter(isMainColumnScreenField)
+        .map((field) => String(field.field_identifier))
+    );
+    const active = {};
+    for (const [fieldId, isActive] of Object.entries(this.editing.customFields.active || {})) {
+      if (isActive && mainColumnFieldIds.has(String(fieldId))) active[fieldId] = true;
+    }
+    this.editing.customFields.active = active;
   }
 
   cancelEditing(field) {

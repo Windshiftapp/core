@@ -245,7 +245,10 @@ func (s *ScreenProvisioningService) ReplaceScreenFields(actor AuditActor, screen
 	if err != nil {
 		return nil, err
 	}
-	fields = cleanedFields
+	fields, err = s.normalizeFieldPlacements(cleanedFields)
+	if err != nil {
+		return nil, err
+	}
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -258,9 +261,9 @@ func (s *ScreenProvisioningService) ReplaceScreenFields(actor AuditActor, screen
 	}
 	for _, field := range fields {
 		if _, err = tx.Exec(`
-			INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width)
-			VALUES (?, ?, ?, ?, ?, ?)
-		`, screenID, field.FieldType, field.FieldIdentifier, field.DisplayOrder, field.IsRequired, field.FieldWidth); err != nil {
+			INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width, placement)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`, screenID, field.FieldType, field.FieldIdentifier, field.DisplayOrder, field.IsRequired, field.FieldWidth, field.Placement); err != nil {
 			return nil, fmt.Errorf("update screen fields: %w", err)
 		}
 	}
@@ -306,6 +309,39 @@ func (s *ScreenProvisioningService) clearLinkingRequiredFlags(fields []models.Sc
 	return fields, nil
 }
 
+// normalizeFieldPlacements keeps placement to its two values and allows the
+// main column only for long-form custom fields (multi-line and rich text).
+// Anything else falls back to the sidebar, so an API client cannot move a
+// picker or system field into the description column.
+func (s *ScreenProvisioningService) normalizeFieldPlacements(fields []models.ScreenField) ([]models.ScreenField, error) {
+	for i := range fields {
+		fields[i].Placement = models.NormalizeScreenFieldPlacement(fields[i].Placement)
+		if fields[i].Placement != models.ScreenFieldPlacementMain {
+			continue
+		}
+		fields[i].Placement = models.ScreenFieldPlacementSidebar
+		if fields[i].FieldType != "custom" {
+			continue
+		}
+		fieldID, err := strconv.Atoi(strings.TrimSpace(fields[i].FieldIdentifier))
+		if err != nil {
+			continue
+		}
+		var fieldType string
+		err = s.db.QueryRow("SELECT field_type FROM custom_field_definitions WHERE id = ?", fieldID).Scan(&fieldType)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("load custom field %d: %w", fieldID, err)
+		}
+		if models.CustomFieldTypeSupportsMainPlacement(fieldType) {
+			fields[i].Placement = models.ScreenFieldPlacementMain
+		}
+	}
+	return fields, nil
+}
+
 // ReplaceScreenSystemFields atomically replaces a screen's system-field
 // visibility configuration.
 func (s *ScreenProvisioningService) ReplaceScreenSystemFields(actor AuditActor, screenID int, systemFields []string) ([]string, error) {
@@ -342,7 +378,7 @@ func (s *ScreenProvisioningService) logScreenUpdate(actor AuditActor, screenID i
 // Helper function to get screen fields with joined data
 func (s *ScreenProvisioningService) getScreenFields(screenID int) ([]models.ScreenField, error) {
 	rows, err := s.db.Query(`
-		SELECT sf.id, sf.screen_id, sf.field_type, sf.field_identifier, sf.display_order, sf.is_required, sf.field_width,
+		SELECT sf.id, sf.screen_id, sf.field_type, sf.field_identifier, sf.display_order, sf.is_required, sf.field_width, COALESCE(sf.placement, 'sidebar'),
 		       CASE
 		           WHEN sf.field_type = 'custom' THEN cfd.name
 		           ELSE ''
@@ -372,7 +408,7 @@ func (s *ScreenProvisioningService) getScreenFields(screenID int) ([]models.Scre
 // list responses, grouped by screen ID in memory.
 func (s *ScreenProvisioningService) getAllScreenFields() (map[int][]models.ScreenField, error) {
 	rows, err := s.db.Query(`
-		SELECT sf.id, sf.screen_id, sf.field_type, sf.field_identifier, sf.display_order, sf.is_required, sf.field_width,
+		SELECT sf.id, sf.screen_id, sf.field_type, sf.field_identifier, sf.display_order, sf.is_required, sf.field_width, COALESCE(sf.placement, 'sidebar'),
 		       CASE
 		           WHEN sf.field_type = 'custom' THEN cfd.name
 		           ELSE ''
@@ -414,7 +450,7 @@ func scanScreenFields(rows *sql.Rows) ([]models.ScreenField, error) {
 		var configStr sql.NullString
 
 		err := rows.Scan(&field.ID, &field.ScreenID, &field.FieldType, &field.FieldIdentifier,
-			&field.DisplayOrder, &field.IsRequired, &field.FieldWidth,
+			&field.DisplayOrder, &field.IsRequired, &field.FieldWidth, &field.Placement,
 			&field.FieldName, &field.FieldLabel, &configStr)
 		if err != nil {
 			return nil, err
@@ -458,6 +494,7 @@ func ensureAlwaysVisibleScreenFields(screenID int, fields []models.ScreenField) 
 			FieldIdentifier: requiredField.identifier,
 			IsRequired:      requiredField.required,
 			FieldWidth:      requiredField.width,
+			Placement:       models.ScreenFieldPlacementSidebar,
 		}
 	}
 	for i := range out {

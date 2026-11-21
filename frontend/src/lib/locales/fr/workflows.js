@@ -157,6 +157,8 @@ export default {
     dragToReorder: 'Faites glisser pour réordonner les champs ou déposez les champs disponibles ici',
     dropFieldsHere: 'Déposez les champs ici pour configurer l’écran',
     required: 'Obligatoire',
+    mainColumn: 'Colonne principale',
+    mainColumnHint: 'Afficher ce champ sous la description plutôt que dans la barre latérale',
     removeField: 'Retirer le champ',
     editScreen: 'Modifier l’écran',
     createScreen: 'Créer un écran',
