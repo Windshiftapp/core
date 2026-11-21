@@ -591,9 +591,9 @@ func (r *conformanceRepairer) repairScreens(entity *conformanceEntityPlan) error
 				ident = strconv.Itoa(cfID)
 			}
 			if err := r.exec(`
-				INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width)
-				VALUES (?, ?, ?, ?, ?, ?)
-			`, screenID, f.FieldKind, ident, f.DisplayOrder, f.IsRequired, f.FieldWidth); err != nil {
+				INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width, placement)
+				VALUES (?, ?, ?, ?, ?, ?, ?)
+			`, screenID, f.FieldKind, ident, f.DisplayOrder, f.IsRequired, f.FieldWidth, models.NormalizeScreenFieldPlacement(f.Placement)); err != nil {
 				return fmt.Errorf("restore screen fields: %w", err)
 			}
 		}

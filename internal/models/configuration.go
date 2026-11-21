@@ -99,10 +99,36 @@ type ScreenField struct {
 	DisplayOrder    int    `json:"display_order"`
 	IsRequired      bool   `json:"is_required"`
 	FieldWidth      string `json:"field_width"`
+	// Placement is where the item detail view renders the field: "sidebar"
+	// (default) or "main" (under the description; long-form custom fields only).
+	Placement string `json:"placement,omitempty"`
 	// Joined/computed fields for API responses
 	FieldName   string         `json:"field_name,omitempty"`
 	FieldLabel  string         `json:"field_label,omitempty"`
 	FieldConfig map[string]any `json:"field_config,omitempty"`
+}
+
+const (
+	// ScreenFieldPlacementSidebar renders the field in the item detail sidebar.
+	ScreenFieldPlacementSidebar = "sidebar"
+	// ScreenFieldPlacementMain renders the field in the item detail main
+	// column, under the description.
+	ScreenFieldPlacementMain = "main"
+)
+
+// NormalizeScreenFieldPlacement maps any value other than "main" (including
+// empty and unknown values) to the sidebar default.
+func NormalizeScreenFieldPlacement(placement string) string {
+	if placement == ScreenFieldPlacementMain {
+		return ScreenFieldPlacementMain
+	}
+	return ScreenFieldPlacementSidebar
+}
+
+// CustomFieldTypeSupportsMainPlacement reports whether a custom field type is
+// long-form content that can render in the item detail main column.
+func CustomFieldTypeSupportsMainPlacement(fieldType string) bool {
+	return fieldType == "textarea" || fieldType == "richtext"
 }
 
 // ItemType represents a type of work item

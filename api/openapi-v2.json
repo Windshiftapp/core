@@ -9648,6 +9648,10 @@
                           "is_required": {
                             "description": "The is required value.",
                             "type": "boolean"
+                          },
+                          "placement": {
+                            "description": "The placement value.",
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -20269,6 +20273,10 @@
                               "description": "The is required value.",
                               "type": "boolean"
                             },
+                            "placement": {
+                              "description": "The placement value.",
+                              "type": "string"
+                            },
                             "screen_id": {
                               "description": "The screen id value.",
                               "type": "integer"
@@ -20387,6 +20395,10 @@
                             "is_required": {
                               "description": "The is required value.",
                               "type": "boolean"
+                            },
+                            "placement": {
+                              "description": "The placement value.",
+                              "type": "string"
                             },
                             "screen_id": {
                               "description": "The screen id value.",
@@ -30151,6 +30163,10 @@
                         "description": "The is required value.",
                         "type": "boolean"
                       },
+                      "placement": {
+                        "description": "The placement value.",
+                        "type": "string"
+                      },
                       "screen_id": {
                         "description": "The screen id value.",
                         "type": "integer"
@@ -30254,6 +30270,10 @@
                   "description": "The is required value.",
                   "type": "boolean"
                 },
+                "placement": {
+                  "description": "The placement value.",
+                  "type": "string"
+                },
                 "screen_id": {
                   "description": "The screen id value.",
                   "type": "integer"
@@ -30349,6 +30369,10 @@
                     "is_required": {
                       "description": "The is required value.",
                       "type": "boolean"
+                    },
+                    "placement": {
+                      "description": "The placement value.",
+                      "type": "string"
                     },
                     "screen_id": {
                       "description": "The screen id value.",
@@ -36841,6 +36865,10 @@
                           "description": "The is required value.",
                           "type": "boolean"
                         },
+                        "placement": {
+                          "description": "The placement value.",
+                          "type": "string"
+                        },
                         "screen_id": {
                           "description": "The screen id value.",
                           "type": "integer"
@@ -37037,6 +37065,10 @@
                         "is_required": {
                           "description": "The is required value.",
                           "type": "boolean"
+                        },
+                        "placement": {
+                          "description": "The placement value.",
+                          "type": "string"
                         },
                         "screen_id": {
                           "description": "The screen id value.",
@@ -37748,6 +37780,10 @@
                               "is_required": {
                                 "description": "The is required value.",
                                 "type": "boolean"
+                              },
+                              "placement": {
+                                "description": "The placement value.",
+                                "type": "string"
                               }
                             },
                             "required": [
@@ -51526,6 +51562,10 @@
                               "description": "The is required value.",
                               "type": "boolean"
                             },
+                            "placement": {
+                              "description": "The placement value.",
+                              "type": "string"
+                            },
                             "screen_id": {
                               "description": "The screen id value.",
                               "type": "integer"
@@ -51644,6 +51684,10 @@
                             "is_required": {
                               "description": "The is required value.",
                               "type": "boolean"
+                            },
+                            "placement": {
+                              "description": "The placement value.",
+                              "type": "string"
                             },
                             "screen_id": {
                               "description": "The screen id value.",
@@ -61241,6 +61285,10 @@
                     "is_required": {
                       "description": "The is required value.",
                       "type": "boolean"
+                    },
+                    "placement": {
+                      "description": "The placement value.",
+                      "type": "string"
                     },
                     "screen_id": {
                       "description": "The screen id value.",
@@ -71948,6 +71996,10 @@
                           "is_required": {
                             "description": "The is required value.",
                             "type": "boolean"
+                          },
+                          "placement": {
+                            "description": "The placement value.",
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -72839,6 +72891,10 @@
                               "is_required": {
                                 "description": "The is required value.",
                                 "type": "boolean"
+                              },
+                              "placement": {
+                                "description": "The placement value.",
+                                "type": "string"
                               }
                             },
                             "required": [
@@ -73792,6 +73848,10 @@
                           "is_required": {
                             "description": "The is required value.",
                             "type": "boolean"
+                          },
+                          "placement": {
+                            "description": "The placement value.",
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -92093,6 +92153,10 @@
                       "description": "The is required value.",
                       "type": "boolean"
                     },
+                    "placement": {
+                      "description": "The placement value.",
+                      "type": "string"
+                    },
                     "screen_id": {
                       "description": "The screen id value.",
                       "type": "integer"
@@ -95580,6 +95644,10 @@
                               "is_required": {
                                 "description": "The is required value.",
                                 "type": "boolean"
+                              },
+                              "placement": {
+                                "description": "The placement value.",
+                                "type": "string"
                               }
                             },
                             "required": [
@@ -102876,6 +102944,10 @@
                   "description": "The is required value.",
                   "type": "boolean"
                 },
+                "placement": {
+                  "description": "The placement value.",
+                  "type": "string"
+                },
                 "screen_id": {
                   "description": "The screen id value.",
                   "type": "integer"
@@ -102945,6 +103017,10 @@
                 "is_required": {
                   "description": "The is required value.",
                   "type": "boolean"
+                },
+                "placement": {
+                  "description": "The placement value.",
+                  "type": "string"
                 },
                 "screen_id": {
                   "description": "The screen id value.",
