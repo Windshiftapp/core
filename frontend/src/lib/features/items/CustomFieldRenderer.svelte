@@ -862,6 +862,18 @@
           <LazyMilkdownEditor content={value} readonly={true} showToolbar={false} compact={true} allowImageUpload={false} {workspaceId} testId={`custom-field-input-${field.id}`} />
         </div>
       {/if}
+    {:else if field.field_type === 'textarea'}
+      <!-- Multi-line text: long-form detail views preserve the author's line
+           breaks; compact rows keep the truncated one-liner. -->
+      <span
+        class={valueTruncate
+          ? 'block min-w-0 truncate'
+          : renderRichText
+            ? 'block whitespace-pre-wrap break-words'
+            : ''}
+        dir="auto"
+        style="color: var(--ds-text);"
+      >{renderDisplayValue()}</span>
     {:else}
       <span class={valueTruncate ? 'block min-w-0 truncate' : ''} dir="auto" style="color: var(--ds-text);">{renderDisplayValue()}</span>
     {/if}
