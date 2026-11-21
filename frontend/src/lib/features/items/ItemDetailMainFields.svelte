@@ -87,11 +87,13 @@
           {emptyText}
         </button>
       {:else}
+        <!-- Read-only empty state: no edit affordance, so avoid the
+             imperative "Set X" the editable button uses. -->
         <p
           class="text-start w-full py-2 text-[0.875rem] text-ds-text-subtle"
           data-testid={`item-main-custom-field-empty-${fieldDef.id}`}
         >
-          {emptyText}
+          {t('items.notSet')}
         </p>
       {/if}
     {:else}
