@@ -114,6 +114,12 @@ function defaultScreenFieldKey(field) {
   return `${field.field_type}:${field.field_identifier}`;
 }
 
+// The server only stores "main" for long-form custom fields, so the placement
+// alone decides whether the item detail renders the field under the description.
+export function isMainColumnScreenField(field) {
+  return field?.field_type === 'custom' && field?.placement === 'main';
+}
+
 export function customFieldDefinitionIdFromScreenField(field) {
   const id = parseInt(field?.field_identifier, 10);
   return Number.isFinite(id) ? id : null;

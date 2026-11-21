@@ -549,44 +549,44 @@ import NativeSelect from '../../components/NativeSelect.svelte';
   }
 
   function handleStartEditingAssignee() {
-    // Cancel all custom field editing when starting to edit assignee
-    itemDetailStore.editing.customFields.active = {};
+    // Cancel sidebar custom field editing when starting to edit assignee
+    itemDetailStore.cancelSidebarCustomFieldEditing();
     itemDetailStore.startEditing('assignee');
   }
 
   function handleStartEditingMilestone() {
-    // Cancel all custom field editing when starting to edit milestone
-    itemDetailStore.editing.customFields.active = {};
+    // Cancel sidebar custom field editing when starting to edit milestone
+    itemDetailStore.cancelSidebarCustomFieldEditing();
     itemDetailStore.startEditing('milestone');
   }
 
   function handleStartEditingIteration() {
-    // Cancel all custom field editing when starting to edit iteration
-    itemDetailStore.editing.customFields.active = {};
+    // Cancel sidebar custom field editing when starting to edit iteration
+    itemDetailStore.cancelSidebarCustomFieldEditing();
     itemDetailStore.startEditing('iteration');
   }
 
   function handleStartEditingPriority() {
-    // Cancel all custom field editing when starting to edit priority
-    itemDetailStore.editing.customFields.active = {};
+    // Cancel sidebar custom field editing when starting to edit priority
+    itemDetailStore.cancelSidebarCustomFieldEditing();
     itemDetailStore.startEditing('priority');
   }
 
   function handleStartEditingStatus() {
-    // Cancel all custom field editing when starting to edit status
-    itemDetailStore.editing.customFields.active = {};
+    // Cancel sidebar custom field editing when starting to edit status
+    itemDetailStore.cancelSidebarCustomFieldEditing();
     itemDetailStore.startEditing('status');
   }
 
   function handleStartEditingProject() {
-    // Cancel all custom field editing when starting to edit project
-    itemDetailStore.editing.customFields.active = {};
+    // Cancel sidebar custom field editing when starting to edit project
+    itemDetailStore.cancelSidebarCustomFieldEditing();
     itemDetailStore.startEditing('project');
   }
 
   function handleStartEditingDescription() {
-    // Cancel all custom field editing when starting to edit description
-    itemDetailStore.editing.customFields.active = {};
+    // Cancel sidebar custom field editing when starting to edit description
+    itemDetailStore.cancelSidebarCustomFieldEditing();
     itemDetailStore.startEditing('description');
   }
 

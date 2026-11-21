@@ -32,6 +32,12 @@ export function isRichTextCustomFieldType(fieldType) {
   return fieldType === 'richtext';
 }
 
+// Long-form types a screen may place in the item detail main column, under the
+// description. Mirrors models.CustomFieldTypeSupportsMainPlacement.
+export function supportsMainColumnPlacement(fieldType) {
+  return fieldType === 'textarea' || fieldType === 'richtext';
+}
+
 // Money values are objects ({ amount, currency }) rather than bare numbers, so
 // the currency travels with the value on items, assets, and customer records.
 export function isMoneyCustomFieldType(fieldType) {

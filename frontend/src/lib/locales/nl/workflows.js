@@ -157,6 +157,8 @@ export default {
     dragToReorder: 'Sleep om velden te herordenen of zet beschikbare velden hier neer',
     dropFieldsHere: 'Zet velden hier neer om het scherm te configureren',
     required: 'Verplicht',
+    mainColumn: 'Hoofdkolom',
+    mainColumnHint: 'Toon dit veld onder de beschrijving in plaats van in de zijbalk',
     removeField: 'Veld verwijderen',
     editScreen: 'Scherm bewerken',
     createScreen: 'Scherm aanmaken',

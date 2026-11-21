@@ -7,6 +7,7 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { tick } from 'svelte';
   import Button from '../../components/Button.svelte';
+  import Text from '../../components/Text.svelte';
   import FileInput from '../../components/FileInput.svelte';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import PluginEditorHost from '../../editors/PluginEditorHost.svelte';
@@ -55,6 +56,12 @@
     ondeleteDiagram = undefined,
     onexecuteAction = undefined,
     onaiaction = undefined,
+    // Optional section label. The item detail sets it when long-form custom
+    // fields share the main column, so every section there is labelled alike.
+    label = null,
+    // Optional content rendered between the description and the action row
+    // (main-column custom fields), keeping the actions as the section footer.
+    afterContent = undefined,
   } = $props();
 
   let milkdownEditor = $state(null);
@@ -186,6 +193,11 @@
 </script>
 
 <div class="pt-2">
+  {#if label}
+    <div class="mb-1.5" data-testid="item-description-label">
+      <Text weight="semibold" size="sm">{label}</Text>
+    </div>
+  {/if}
   {#if editingDescription}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="space-y-3" onkeydown={handleKeydown} data-testid="item-description-editor">
@@ -254,6 +266,8 @@
     </p>
   {/if}
   
+  {@render afterContent?.()}
+
   <!-- Action buttons - icon only, label slides in on hover. The row's -mx-2
        compensates the buttons' px-2: icons sit on the text column edge and
        the leftmost button's hover chip lines up with the title/description
