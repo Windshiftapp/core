@@ -96,13 +96,16 @@
   }
 
   // Handle item updates
-  async function handleItemUpdate(field, value) {
+  async function handleItemUpdate(field, value, fields = null) {
     try {
       const updatedItem = field === 'status_id'
-        ? await items.transition(item.id, value)
+        ? await items.transition(item.id, value, fields)
         : await items.update(item.id, { [field]: value });
       onitemUpdated?.({ item: updatedItem, field, value });
     } catch (error) {
+      // A screen modal owns its errors so it can render screen_required fields
+      // inline; direct moves surface through the caller's error handler.
+      if (fields) throw error;
       onupdateError?.({ error: error.message, field, value });
     }
   }
@@ -205,7 +208,7 @@
         {statuses}
         {statusCategories}
         {canEdit}
-        onselect={(statusId) => handleItemUpdate('status_id', statusId)}
+        onselect={(statusId, fields) => handleItemUpdate('status_id', statusId, fields)}
       />
     {/if}
 

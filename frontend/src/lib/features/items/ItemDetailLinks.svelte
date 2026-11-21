@@ -101,13 +101,16 @@
   // the refreshed list arrives.
   let pendingStatusItemIds = $state(new Set());
 
-  async function changeStatus(rowItemId, statusId, kind) {
+  async function changeStatus(rowItemId, statusId, kind, fields = null) {
     if (pendingStatusItemIds.has(rowItemId)) return;
     pendingStatusItemIds = new Set(pendingStatusItemIds).add(rowItemId);
     try {
-      await items.transition(rowItemId, statusId);
+      await items.transition(rowItemId, statusId, fields);
       await onstatuschanged?.({ itemId: rowItemId, kind });
     } catch (error) {
+      // A screen modal owns its errors so it can render screen_required fields
+      // inline; direct moves surface a toast.
+      if (fields) throw error;
       errorToast(t('dialogs.alerts.failedToUpdate', { error: `status: ${error.message || error}` }));
     } finally {
       const next = new Set(pendingStatusItemIds);
@@ -290,7 +293,7 @@
         {statusBuiltinKey}
         {statusColor}
         canEdit={workspacePermissions.canEdit(rowWorkspaceId) && !pendingStatusItemIds.has(rowItemId)}
-        onselect={(nextStatusId) => changeStatus(rowItemId, nextStatusId, kind)}
+        onselect={(nextStatusId, fields) => changeStatus(rowItemId, nextStatusId, kind, fields)}
       />
     </span>
   {/if}
