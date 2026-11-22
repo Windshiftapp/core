@@ -19,13 +19,28 @@ const maxHierarchyDepth = 30
 
 // HierarchyService handles all hierarchy-related operations using only parent_id
 type HierarchyService struct {
-	db   database.Database
-	repo *repository.ItemRepository
+	db         database.Database
+	repo       *repository.ItemRepository
+	workspaces *repository.WorkspaceRepository
+	// perm gates cross-workspace parent disclosure. It is nil until a caller
+	// installs one; ResolveParentSummaries fails closed in that case.
+	perm *PermissionService
 }
 
 // NewHierarchyService creates a new hierarchy service
 func NewHierarchyService(db database.Database) *HierarchyService {
-	return &HierarchyService{db: db, repo: repository.NewItemRepository(db)}
+	return &HierarchyService{
+		db:         db,
+		repo:       repository.NewItemRepository(db),
+		workspaces: repository.NewWorkspaceRepository(db),
+	}
+}
+
+// WithPermissions installs the permission checker used to gate cross-workspace
+// parent disclosure. It returns the receiver so construction stays fluent.
+func (h *HierarchyService) WithPermissions(perm *PermissionService) *HierarchyService {
+	h.perm = perm
+	return h
 }
 
 func itemPtrsToValues(items []*models.Item) []models.Item {

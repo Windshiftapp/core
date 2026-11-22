@@ -18,14 +18,16 @@ type ReleaseNoteComment struct {
 
 // ReleaseNoteItem is the release-notes enrichment for one work item: the fields
 // the model needs beyond the key, title and status already present in the
-// milestone progress report. Comments hold the newest public comments first,
-// capped per item by the caller.
+// milestone progress report. ParentID and the raw parent fields are resolved
+// through HierarchyService.ResolveParentSummaries before they are disclosed.
+// Comments hold the newest public comments first, capped per item by the
+// caller.
 type ReleaseNoteItem struct {
 	ItemID             int
 	Description        string
 	ItemTypeName       string
 	ItemTypeBuiltinKey string
-	ParentKey          string
+	ParentID           int
 	ParentItemNumber   int
 	ParentTitle        string
 	Comments           []ReleaseNoteComment
@@ -34,7 +36,8 @@ type ReleaseNoteItem struct {
 // ReleaseNoteItemsContext returns enrichment for the supplied work-item IDs,
 // keyed by item ID. IDs with no matching row are omitted. commentsPerItem <= 0
 // skips the comment query entirely. Callers must pass only IDs they have
-// already authorized: this read performs no permission filtering of its own.
+// already authorized: this read performs no permission filtering of its own,
+// including of the raw parent fields, which callers must gate before use.
 func (r *ItemRepository) ReleaseNoteItemsContext(ctx context.Context, itemIDs []int, commentsPerItem int) (map[int]ReleaseNoteItem, error) {
 	result := make(map[int]ReleaseNoteItem, len(itemIDs))
 	if len(itemIDs) == 0 {
@@ -42,15 +45,15 @@ func (r *ItemRepository) ReleaseNoteItemsContext(ctx context.Context, itemIDs []
 	}
 
 	in, args := inPlaceholders(itemIDs)
-	// The parent join is scoped to the item's own hierarchy; a parent may live in
-	// the same workspace, so the workspace key is read from the parent row.
+	// The parent join reads the parent row's own title and number because a
+	// cross-workspace parent may live in a different workspace than the child;
+	// the workspace key is resolved later, after the permission gate.
 	query := `SELECT i.id, COALESCE(i.description, ''),
 			COALESCE(it.name, ''), COALESCE(it.builtin_key, ''),
-			COALESCE(pw.key, ''), p.workspace_item_number, COALESCE(p.title, '')
+			COALESCE(i.parent_id, 0), p.workspace_item_number, COALESCE(p.title, '')
 		FROM items i
 		LEFT JOIN item_types it ON i.item_type_id = it.id
 		LEFT JOIN items p ON i.parent_id = p.id
-		LEFT JOIN workspaces pw ON p.workspace_id = pw.id
 		WHERE i.id IN (` + in + `)`
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
@@ -63,7 +66,7 @@ func (r *ItemRepository) ReleaseNoteItemsContext(ctx context.Context, itemIDs []
 		var item ReleaseNoteItem
 		var parentNumber sql.NullInt64
 		if err := rows.Scan(&item.ItemID, &item.Description, &item.ItemTypeName, &item.ItemTypeBuiltinKey,
-			&item.ParentKey, &parentNumber, &item.ParentTitle); err != nil {
+			&item.ParentID, &parentNumber, &item.ParentTitle); err != nil {
 			return nil, fmt.Errorf("scan release note item: %w", err)
 		}
 		if parentNumber.Valid {

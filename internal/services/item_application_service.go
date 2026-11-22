@@ -102,7 +102,7 @@ func NewItemApplicationService(
 		create:    create,
 		update:    update,
 		delete:    deleteService,
-		hierarchy: NewHierarchyService(db),
+		hierarchy: NewHierarchyService(db).WithPermissions(perm),
 		resolver:  NewIDResolverService(db),
 		move:      NewItemWorkspaceMoveService(db),
 		matrix:    NewTransitionMatrixService(db),
@@ -2430,7 +2430,7 @@ func (s *ItemApplicationService) enrich(ctx context.Context, userID int, items [
 func (s *ItemApplicationService) enrichWithMilestones(ctx context.Context, userID int, items []models.Item, loadMilestones bool) error {
 	NewTimePermissionService(s.db, s.perm).MaskInaccessibleProjectNamesContext(ctx, userID, items)
 	MaskInaccessibleRelatedWorkItems(userID, items, s.perm)
-	s.decorateItemKeys(userID, items)
+	s.decorateItemKeys(ctx, userID, items)
 	if err := repository.NewLabelRepository(s.db).LoadForItemsContext(ctx, items); err != nil {
 		return err
 	}
@@ -2440,9 +2440,11 @@ func (s *ItemApplicationService) enrichWithMilestones(ctx context.Context, userI
 	return repository.NewMilestoneAttachRepository(s.db).LoadForItemsContext(ctx, items)
 }
 
-func (s *ItemApplicationService) decorateItemKeys(userID int, items []models.Item) {
-	workspaceKeys := make(map[int]string)
-	workspaces := repository.NewWorkspaceRepository(s.db)
+// decorateItemKeys builds each item's display key and resolves its parent
+// context. Parent resolution is delegated to HierarchyService so the
+// cross-workspace permission gate has one implementation shared with AI reads.
+func (s *ItemApplicationService) decorateItemKeys(ctx context.Context, userID int, items []models.Item) {
+	refs := make([]ParentRef, 0, len(items))
 	for i := range items {
 		item := &items[i]
 		if item.WorkspaceKey != "" && item.WorkspaceItemNumber > 0 {
@@ -2451,31 +2453,38 @@ func (s *ItemApplicationService) decorateItemKeys(userID int, items []models.Ite
 		if item.ParentID == nil || item.ParentWorkspaceItemNumber == nil {
 			continue
 		}
-		parentWorkspaceID, err := s.items.GetWorkspaceID(*item.ParentID)
-		if err != nil {
+		refs = append(refs, ParentRef{
+			ChildID:                   item.ID,
+			ParentID:                  *item.ParentID,
+			ChildWorkspaceID:          item.WorkspaceID,
+			ChildWorkspaceKey:         item.WorkspaceKey,
+			ParentWorkspaceItemNumber: *item.ParentWorkspaceItemNumber,
+			ParentTitle:               item.ParentTitle,
+		})
+	}
+	if len(refs) == 0 {
+		return
+	}
+
+	summaries, err := s.hierarchy.ResolveParentSummaries(ctx, userID, refs)
+	if err != nil {
+		// Fail closed: withhold every parent rather than leak one on error.
+		summaries = map[int]ParentSummary{}
+	}
+	for i := range items {
+		item := &items[i]
+		if item.ParentID == nil {
+			continue
+		}
+		summary, ok := summaries[item.ID]
+		if !ok {
 			item.ParentTitle = ""
 			item.ParentWorkspaceItemNumber = nil
 			continue
 		}
-		parentWorkspaceKey := item.WorkspaceKey
-		if parentWorkspaceID != item.WorkspaceID {
-			allowed, permissionErr := s.perm.HasWorkspacePermission(userID, parentWorkspaceID, models.PermissionItemView)
-			if permissionErr != nil || !allowed {
-				item.ParentTitle = ""
-				item.ParentWorkspaceItemNumber = nil
-				continue
-			}
-			parentWorkspaceKey = workspaceKeys[parentWorkspaceID]
-			if parentWorkspaceKey == "" {
-				parentWorkspaceKey, err = workspaces.GetKey(parentWorkspaceID)
-				if err != nil {
-					item.ParentTitle = ""
-					item.ParentWorkspaceItemNumber = nil
-					continue
-				}
-				workspaceKeys[parentWorkspaceID] = parentWorkspaceKey
-			}
-		}
-		item.ParentKey = fmt.Sprintf("%s-%d", parentWorkspaceKey, *item.ParentWorkspaceItemNumber)
+		item.ParentKey = summary.Key
+		item.ParentTitle = summary.Title
+		number := summary.ItemNumber
+		item.ParentWorkspaceItemNumber = &number
 	}
 }

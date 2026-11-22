@@ -45,6 +45,9 @@ type AIHandler struct {
 	// releaseNotesTokenBudget caps the release-notes input size in estimated
 	// tokens. Zero keeps defaultReleaseNotesTokenBudget.
 	releaseNotesTokenBudget int
+	// hierarchy resolves viewable parent context for AI features. It shares the
+	// permission-aware parent gate used by item reads.
+	hierarchy *services.HierarchyService
 }
 
 // NewAIHandler creates a new AI handler.
@@ -73,6 +76,7 @@ func NewAIHandler(
 		agentBindings:          repository.NewWorkspaceAgentBindingRepository(db),
 		chatLLMs:               llmManager,
 		llmUsage:               repository.NewLLMUsageRepository(db),
+		hierarchy:              services.NewHierarchyService(db).WithPermissions(permService),
 	}
 }
 

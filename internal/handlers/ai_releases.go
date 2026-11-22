@@ -60,10 +60,12 @@ const (
 // needs to describe, group, and summarize it.
 type releaseNotesItem struct {
 	ID               int
+	WorkspaceID      int
 	Key              string
 	ItemNumber       int
 	Title            string
 	ItemType         string
+	ParentID         int
 	ParentKey        string
 	ParentItemNumber int
 	ParentTitle      string
@@ -147,7 +149,7 @@ func (h *AIHandler) GenerateReleaseNotes(w http.ResponseWriter, r *http.Request)
 	if limit := h.releaseNotesLimit(); len(items) > limit {
 		items = items[:limit]
 	}
-	if err := enrichReleaseNoteItems(r.Context(), repository.NewItemRepository(h.db), items); err != nil {
+	if err := h.enrichReleaseNoteItems(r.Context(), user.ID, items); err != nil {
 		respondInternalError(w, r, fmt.Errorf("failed to load release note item context: %w", err))
 		return
 	}
@@ -236,10 +238,11 @@ func collectReleaseNotesItems(progress *services.MilestoneProgressReport) []rele
 		}
 		for _, pi := range progress.ItemsByCategory[bd.CategoryName] {
 			items = append(items, releaseNotesItem{
-				ID:         pi.ID,
-				Key:        pi.WorkspaceKey,
-				ItemNumber: pi.ItemNumber,
-				Title:      pi.Title,
+				ID:          pi.ID,
+				WorkspaceID: pi.WorkspaceID,
+				Key:         pi.WorkspaceKey,
+				ItemNumber:  pi.ItemNumber,
+				Title:       pi.Title,
 			})
 		}
 	}
@@ -247,9 +250,11 @@ func collectReleaseNotesItems(progress *services.MilestoneProgressReport) []rele
 }
 
 // enrichReleaseNoteItems fills each item in place with its description, type,
-// parent and comments. Enrichment is keyed by item ID and bounded by the
-// already-capped slice, so the reads stay proportional to the prompt size.
-func enrichReleaseNoteItems(ctx context.Context, repo *repository.ItemRepository, items []releaseNotesItem) error {
+// comments and viewable parent context. Enrichment is keyed by item ID and
+// bounded by the already-capped slice, so the reads stay proportional to the
+// prompt size. Parent disclosure goes through HierarchyService so a parent in a
+// workspace the caller cannot view is withheld exactly as on item reads.
+func (h *AIHandler) enrichReleaseNoteItems(ctx context.Context, userID int, items []releaseNotesItem) error {
 	if len(items) == 0 {
 		return nil
 	}
@@ -257,10 +262,11 @@ func enrichReleaseNoteItems(ctx context.Context, repo *repository.ItemRepository
 	for _, item := range items {
 		itemIDs = append(itemIDs, item.ID)
 	}
-	enrichment, err := repo.ReleaseNoteItemsContext(ctx, itemIDs, releaseNotesCommentsPerItem)
+	enrichment, err := repository.NewItemRepository(h.db).ReleaseNoteItemsContext(ctx, itemIDs, releaseNotesCommentsPerItem)
 	if err != nil {
 		return err
 	}
+	refs := make([]services.ParentRef, 0, len(items))
 	for i := range items {
 		extra, ok := enrichment[items[i].ID]
 		if !ok {
@@ -268,10 +274,39 @@ func enrichReleaseNoteItems(ctx context.Context, repo *repository.ItemRepository
 		}
 		items[i].Description = extra.Description
 		items[i].ItemType = extra.ItemTypeName
-		items[i].ParentKey = extra.ParentKey
+		items[i].ParentID = extra.ParentID
 		items[i].ParentItemNumber = extra.ParentItemNumber
 		items[i].ParentTitle = extra.ParentTitle
 		items[i].Comments = extra.Comments
+		if extra.ParentID != 0 {
+			refs = append(refs, services.ParentRef{
+				ChildID:                   items[i].ID,
+				ParentID:                  extra.ParentID,
+				ChildWorkspaceID:          items[i].WorkspaceID,
+				ChildWorkspaceKey:         items[i].Key,
+				ParentWorkspaceItemNumber: extra.ParentItemNumber,
+				ParentTitle:               extra.ParentTitle,
+			})
+		}
+	}
+
+	summaries, err := h.hierarchy.ResolveParentSummaries(ctx, userID, refs)
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		if items[i].ParentID == 0 {
+			continue
+		}
+		summary, ok := summaries[items[i].ID]
+		if !ok {
+			items[i].ParentItemNumber = 0
+			items[i].ParentTitle = ""
+			continue
+		}
+		items[i].ParentKey = summary.Key
+		items[i].ParentItemNumber = summary.ItemNumber
+		items[i].ParentTitle = summary.Title
 	}
 	return nil
 }

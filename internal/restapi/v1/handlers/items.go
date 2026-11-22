@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,6 +35,9 @@ type ItemHandler struct {
 	approvalSvc  *services.ApprovalService
 	permSvc      *services.PermissionService
 	auditor      *logger.Auditor
+	// hierarchy owns permission-aware parent disclosure so this surface and the
+	// cookie-auth item reads agree on which parents are revealed.
+	hierarchy *services.HierarchyService
 }
 
 // NewItemHandler creates a new item handler. commentService is shared with the
@@ -63,6 +67,7 @@ func NewItemHandler(db database.Database, permissionService *services.Permission
 		approvalSvc:  services.NewApprovalService(db, leaveRepo, workflowSvc),
 		permSvc:      permissionService,
 		auditor:      logger.NewAuditor(db),
+		hierarchy:    services.NewHierarchyService(db).WithPermissions(permissionService),
 	}
 }
 
@@ -166,43 +171,30 @@ func (h *ItemHandler) allowUnlessPersonalExcluded(w http.ResponseWriter, r *http
 // setParentSummary fills the parent's display key and title on the response,
 // but only when the caller is allowed to see the parent. A parent may live in
 // a different workspace than its child; revealing its key or title across a
-// workspace boundary the caller can't view would leak information, so a
-// cross-workspace parent is gated on item-view permission — mirroring
-// validateParentHierarchy. Same-workspace parents are already covered by the
-// item's own workspace view check. The raw parent_id is left as-is
-// (pre-existing behavior); only the renderable fields are withheld, so an
-// unauthorized caller sees a parent_id it cannot resolve but no key/title.
-//
-// The key is built from the parent's own workspace key (not the child's), so
-// it is correct even when the parent lives in another workspace.
+// workspace boundary the caller can't view would leak information, so the gate
+// lives in HierarchyService.ResolveParentSummaries, shared with the item
+// application service and AI reads. The raw parent_id is left as-is
+// (pre-existing behavior); only the renderable fields are withheld.
 func (h *ItemHandler) setParentSummary(userID int, item *models.Item, resp *dto.ItemResponse) {
 	if item == nil || resp == nil || item.ParentID == nil || item.ParentWorkspaceItemNumber == nil {
 		return
 	}
 
-	parentWorkspaceID, err := h.itemRepo.GetWorkspaceID(*item.ParentID)
-	if err != nil {
-		// Fail closed: withhold the renderable fields on lookup failure.
+	summary, ok, err := h.hierarchy.ResolveParentSummary(context.Background(), userID, services.ParentRef{
+		ChildID:                   item.ID,
+		ParentID:                  *item.ParentID,
+		ChildWorkspaceID:          item.WorkspaceID,
+		ChildWorkspaceKey:         item.WorkspaceKey,
+		ParentWorkspaceItemNumber: *item.ParentWorkspaceItemNumber,
+		ParentTitle:               item.ParentTitle,
+	})
+	if err != nil || !ok {
+		// Fail closed: withhold the renderable fields on lookup or permission failure.
 		return
 	}
 
-	// The parent's workspace key — same as the child's for the common
-	// in-workspace hierarchy, looked up only when the parent is elsewhere.
-	parentWorkspaceKey := item.WorkspaceKey
-	if parentWorkspaceID != item.WorkspaceID {
-		// Cross-workspace parent: gate on view permission before revealing anything.
-		if allowed, perr := h.Perms.CanViewWorkspace(userID, parentWorkspaceID); perr != nil || !allowed {
-			return
-		}
-		key, kerr := repository.NewWorkspaceRepository(h.DB).GetKey(parentWorkspaceID)
-		if kerr != nil {
-			return
-		}
-		parentWorkspaceKey = key
-	}
-
-	resp.ParentKey = fmt.Sprintf("%s-%d", parentWorkspaceKey, *item.ParentWorkspaceItemNumber)
-	resp.ParentTitle = item.ParentTitle
+	resp.ParentKey = summary.Key
+	resp.ParentTitle = summary.Title
 }
 
 // buildExpandedItemResponse maps an item and applies the optional related
