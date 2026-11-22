@@ -16,6 +16,7 @@
   import Avatar from '../../components/Avatar.svelte';
   import Input from '../../components/Input.svelte';
   import Text from '../../components/Text.svelte';
+  import ClampedBlock from '../../components/ClampedBlock.svelte';
   import EditableField from '../../editors/EditableField.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
   import ItemPicker from '../../pickers/ItemPicker.svelte';
@@ -615,23 +616,25 @@
           >
             {@render customFieldLabel(fieldDef.name)}
           </button>
-          <CustomFieldRenderer
-            field={fieldDef}
-            value={currentValue}
-            readonly={!isEditing}
-            disabled={!canEdit || !fieldEditable}
-            renderRichText
-            {milestones}
-            {iterations}
-            itemId={item?.id}
-            workspaceId={item?.workspace_id}
-            required={screenField.is_required}
-            onChange={(val) => {
-              editCustomFieldValues[screenField.field_identifier] = val;
-            }}
-            onCommit={(val) => onsaveField?.({ field: `custom_field_${screenField.field_identifier}`, value: val })}
-            onCancel={() => oncancelEdit?.({ field: `custom_field_${screenField.field_identifier}` })}
-          />
+          <ClampedBlock maxHeight={160} enabled={!isEditing} testId={`item-custom-field-expand-${fieldDef.id}`}>
+            <CustomFieldRenderer
+              field={fieldDef}
+              value={currentValue}
+              readonly={!isEditing}
+              disabled={!canEdit || !fieldEditable}
+              renderRichText
+              {milestones}
+              {iterations}
+              itemId={item?.id}
+              workspaceId={item?.workspace_id}
+              required={screenField.is_required}
+              onChange={(val) => {
+                editCustomFieldValues[screenField.field_identifier] = val;
+              }}
+              onCommit={(val) => onsaveField?.({ field: `custom_field_${screenField.field_identifier}`, value: val })}
+              onCancel={() => oncancelEdit?.({ field: `custom_field_${screenField.field_identifier}` })}
+            />
+          </ClampedBlock>
         </div>
       {:else}
         <CustomFieldRenderer
