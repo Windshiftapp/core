@@ -1,4 +1,4 @@
-export function clickOutside(node) {
+export function clickOutside(node, { capture = true } = {}) {
   function containsControlledPopup(target) {
     const controls = [node, ...node.querySelectorAll('[aria-controls], [aria-owns]')];
     return controls.some((control) =>
@@ -15,10 +15,15 @@ export function clickOutside(node) {
     }
   }
 
-  document.addEventListener('click', handleClick, true);
+  // Capture is the default so a container sees the click before handlers on
+  // descendants can stop it. A container that wraps editors which own their
+  // own outside-click handling should pass `{ capture: false }`: the editor's
+  // capture listener then commits before the container's bubble listener tears
+  // the editor down, instead of removing that listener mid-dispatch.
+  document.addEventListener('click', handleClick, capture);
   return {
     destroy() {
-      document.removeEventListener('click', handleClick, true);
+      document.removeEventListener('click', handleClick, capture);
     },
   };
 }

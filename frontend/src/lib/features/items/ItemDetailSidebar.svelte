@@ -588,7 +588,7 @@
 <div
   class="h-full border-l flex flex-col"
   style="background-color: var(--ds-surface); border-color: var(--ds-border);"
-  use:clickOutside
+  use:clickOutside={{ capture: false }}
   onclickOutside={handleClickOutsideSidebar}
 >
   <!-- Panel Content -->
