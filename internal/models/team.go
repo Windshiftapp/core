@@ -15,7 +15,10 @@ type Team struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	// Joined fields for API responses
-	CreatedByName       string             `json:"created_by_name,omitempty"`
+	CreatedByName string `json:"created_by_name,omitempty"`
+	// Role is the requesting user's direct membership role when the team was
+	// resolved for a specific user ("admin" or "member"); empty otherwise.
+	Role                string             `json:"role,omitempty"`
 	DirectMemberCount   int                `json:"direct_member_count"`
 	GroupCount          int                `json:"group_count"`
 	ResolvedMemberCount int                `json:"resolved_member_count,omitempty"`

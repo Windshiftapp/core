@@ -478,6 +478,10 @@ type globalPermissionReader interface {
 	HasGlobalPermission(int, string) (bool, error)
 }
 
+type teamAccess interface {
+	IsTeamAdmin(teamID, userID int) (bool, error)
+}
+
 type groupApplication interface {
 	ListPage(int, int) ([]models.TeamGroup, int, error)
 	Get(int, bool) (*models.TeamGroup, error)
@@ -673,39 +677,42 @@ type Deps struct {
 	Timers                       timerApplication
 	SystemAdmins                 systemAdministrator
 	GlobalPermission             globalPermissionReader
-	Groups                       groupApplication
-	AdminUsers                   adminUserApplication
-	AuditLogs                    auditLogReader
-	AdminTokens                  adminTokenManager
-	AdminAuditor                 *logger.Auditor
-	AdminTranslations            *objecttranslation.Service
-	Comments                     commentApplication
-	CommentAccess                commentAccess
-	Attachments                  attachmentApplication
-	PageAttachments              pageAttachmentApplication
-	Collections                  collectionApplication
-	Planning                     planningApplication
-	MilestoneComments            milestoneCommentApplication
-	MilestonePageLinks           milestonePageLinkApplication
-	MilestoneActivity            milestoneActivityApplication
-	Links                        linkApplication
-	AgentRuns                    agentRunApplication
-	AgentSkills                  agentSkillReader
-	ConditionSets                conditionSetApplication
-	Governance                   governanceApplication
-	Actions                      actionApplication
-	TestManagement               *services.TestManagementApplicationService
-	Assets                       *services.AssetApplicationService
-	ItemApplication              *services.ItemApplicationService
-	ItemDetail                   *services.ItemDetailApplicationService
-	ItemLifecycle                *services.ItemLifecycleService
-	TicketImport                 *services.TicketImportService
-	SessionMiddleware            func(http.Handler) http.Handler
-	SearchAllowed                func(*http.Request) bool
-	DBRequestTimeout             time.Duration
-	CORS                         Middleware
-	CSRF                         csrfValidator
-	Concurrency                  concurrencyLimiter
+	// TeamAccess checks team-level membership roles. Optional: nil keeps the
+	// team-scoped routes answering not-found.
+	TeamAccess         teamAccess
+	Groups             groupApplication
+	AdminUsers         adminUserApplication
+	AuditLogs          auditLogReader
+	AdminTokens        adminTokenManager
+	AdminAuditor       *logger.Auditor
+	AdminTranslations  *objecttranslation.Service
+	Comments           commentApplication
+	CommentAccess      commentAccess
+	Attachments        attachmentApplication
+	PageAttachments    pageAttachmentApplication
+	Collections        collectionApplication
+	Planning           planningApplication
+	MilestoneComments  milestoneCommentApplication
+	MilestonePageLinks milestonePageLinkApplication
+	MilestoneActivity  milestoneActivityApplication
+	Links              linkApplication
+	AgentRuns          agentRunApplication
+	AgentSkills        agentSkillReader
+	ConditionSets      conditionSetApplication
+	Governance         governanceApplication
+	Actions            actionApplication
+	TestManagement     *services.TestManagementApplicationService
+	Assets             *services.AssetApplicationService
+	ItemApplication    *services.ItemApplicationService
+	ItemDetail         *services.ItemDetailApplicationService
+	ItemLifecycle      *services.ItemLifecycleService
+	TicketImport       *services.TicketImportService
+	SessionMiddleware  func(http.Handler) http.Handler
+	SearchAllowed      func(*http.Request) bool
+	DBRequestTimeout   time.Duration
+	CORS               Middleware
+	CSRF               csrfValidator
+	Concurrency        concurrencyLimiter
 	// RateLimiter is the per-user request-rate backstop for authenticated v2
 	// routes. Optional: nil leaves v2 unthrottled.
 	RateLimiter requestLimiter
@@ -985,6 +992,7 @@ func buildRoutes(deps Deps) []route {
 	registerOverviewChartRoutes(&builder, deps)
 	registerSLARoutes(&builder, deps)
 	registerSLACalendarRoutes(&builder, deps)
+	registerSLATeamCalendarRoutes(&builder, deps)
 	registerSLAWarningThresholdRoutes(&builder, deps)
 	registerSLATeamBindingRoutes(&builder, deps)
 	registerSLAMetricRoutes(&builder, deps)

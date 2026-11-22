@@ -2107,6 +2107,7 @@ func (s *Server) initialize() error {
 		Timers:                       timerService,
 		SystemAdmins:                 permService,
 		GlobalPermission:             permService,
+		TeamAccess:                   teamRepo,
 		Groups:                       groupHandler.Application(),
 		AdminUsers:                   services.NewAdminUserService(s.db, userDeactivationService),
 		AuditLogs:                    repository.NewAuditLogRepository(s.db),
