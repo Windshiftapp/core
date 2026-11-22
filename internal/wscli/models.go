@@ -469,13 +469,20 @@ type ItemTemplateListResponse struct {
 // Comments
 // ============================================
 
+// Comment is one item comment, as returned by
+// /rest/api/v2/items/{item_id}/comments. The server sends the author as flat
+// joined fields (models.Comment); AuthorID is null for portal-customer
+// comments. The author fields are always written so JSON consumers can tell
+// agent comments from human ones without a missing-key default.
 type Comment struct {
-	ID        int          `json:"id"`
-	ItemID    int          `json:"item_id"`
-	Content   string       `json:"content"`
-	Author    *UserSummary `json:"author,omitempty"`
-	CreatedAt time.Time    `json:"created_at"`
-	UpdatedAt time.Time    `json:"updated_at"`
+	ID         int       `json:"id"`
+	ItemID     int       `json:"item_id"`
+	Content    string    `json:"content"`
+	AuthorID   *int      `json:"author_id"`
+	AuthorName string    `json:"author_name"`
+	IsAgent    bool      `json:"is_agent"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // MilestoneComment is one Markdown comment on a milestone, as returned by
