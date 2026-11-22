@@ -16,6 +16,7 @@
   import Avatar from '../../components/Avatar.svelte';
   import Input from '../../components/Input.svelte';
   import Text from '../../components/Text.svelte';
+  import TruncatedFieldValue from '../../components/TruncatedFieldValue.svelte';
   import ClampedBlock from '../../components/ClampedBlock.svelte';
   import EditableField from '../../editors/EditableField.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
@@ -813,14 +814,14 @@
           {#snippet children()}
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
-              class="hover-bg w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
+              class="hover-bg w-full min-w-0 flex items-center justify-between gap-2 px-2 py-1.5 text-sm transition-colors rounded group"
             >
-              <Text variant="subtle" size="sm">{t('common.priority')}</Text>
-              <div class="flex items-center gap-2">
+              <Text variant="subtle" size="sm" class="max-w-[45%] shrink-0 truncate">{t('common.priority')}</Text>
+              <div class="flex min-w-0 flex-1 items-center justify-end gap-2">
                 {#if selectedPriority}
                   {@const PriorityIcon = priorityIconMap[selectedPriority.icon] || AlertCircle}
                   <PriorityIcon size={14} class="flex-shrink-0" style="color: {selectedPriority.color};" />
-                  <span style="color: var(--ds-text);">{objectDisplayName(selectedPriority, 'priority')}</span>
+                  <TruncatedFieldValue value={objectDisplayName(selectedPriority, 'priority')} />
                 {:else}
                   <Text variant="subtle" size="sm">{t('common.none')}</Text>
                 {/if}
@@ -866,13 +867,13 @@
             {#snippet children()}
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div
-                class="hover-bg w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
+                class="hover-bg w-full min-w-0 flex items-center justify-between gap-2 px-2 py-1.5 text-sm transition-colors rounded group"
               >
-                <Text variant="subtle" size="sm">{t('items.project')}</Text>
-                <div class="flex items-center gap-2">
+                <Text variant="subtle" size="sm" class="max-w-[45%] shrink-0 truncate">{t('items.project')}</Text>
+                <div class="flex min-w-0 flex-1 items-center justify-end gap-2">
                   {#if item.effective_project_name || item.project_name}
                     <Briefcase size={14} class="flex-shrink-0" style="color: var(--ds-text-subtle);" />
-                    <span style="color: var(--ds-text);">{getProjectDisplayText(item)}</span>
+                    <TruncatedFieldValue value={getProjectDisplayText(item)} />
                   {:else}
                     <Text variant="subtle" size="sm">{t('common.none')}</Text>
                   {/if}
@@ -908,13 +909,13 @@
           {#snippet children()}
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
-              class="hover-bg w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
+              class="hover-bg w-full min-w-0 flex items-center justify-between gap-2 px-2 py-1.5 text-sm transition-colors rounded group"
             >
-              <Text variant="subtle" size="sm">{t('common.assignee')}</Text>
-              <div class="flex items-center gap-2">
+              <Text variant="subtle" size="sm" class="max-w-[45%] shrink-0 truncate">{t('common.assignee')}</Text>
+              <div class="flex min-w-0 flex-1 items-center justify-end gap-2">
                 {#if item.assignee_id && item.assignee_name}
                   <Avatar src={item.assignee_avatar} name={item.assignee_name} size="2xs" variant="teal" />
-                  <span style="color: var(--ds-text);">{item.assignee_name}</span>
+                  <TruncatedFieldValue value={item.assignee_name} />
                 {:else}
                   <Text variant="subtle" size="sm">{t('items.unassigned')}</Text>
                 {/if}
@@ -946,16 +947,16 @@
           {#snippet children()}
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
-              class="hover-bg w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
+              class="hover-bg w-full min-w-0 flex items-center justify-between gap-2 px-2 py-1.5 text-sm transition-colors rounded group"
             >
-              <Text variant="subtle" size="sm">{t('common.team')}</Text>
-              <div class="flex items-center gap-2">
+              <Text variant="subtle" size="sm" class="max-w-[45%] shrink-0 truncate">{t('common.team')}</Text>
+              <div class="flex min-w-0 flex-1 items-center justify-end gap-2">
                 {#if item.team_id && item.team_name}
                   <span
                     class="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
                     style="background-color: {item.team_color || '#9ca3af'};"
                   ></span>
-                  <span style="color: var(--ds-text);">{item.team_name}</span>
+                  <TruncatedFieldValue value={item.team_name} />
                 {:else}
                   <Text variant="subtle" size="sm">{t('items.noTeam')}</Text>
                 {/if}
@@ -989,19 +990,20 @@
           {#snippet children()}
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
-              class="hover-bg w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
+              class="hover-bg w-full min-w-0 flex items-center justify-between gap-2 px-2 py-1.5 text-sm transition-colors rounded group"
             >
-              <Text variant="subtle" size="sm">{t('items.milestone')}</Text>
-              <div class="flex items-center gap-1 flex-wrap justify-end">
+              <Text variant="subtle" size="sm" class="max-w-[45%] shrink-0 truncate">{t('items.milestone')}</Text>
+              <div class="flex min-w-0 flex-1 items-center gap-1 flex-wrap justify-end">
                 {#if selectedMilestones.length === 0}
                   <span style="color: var(--ds-text-subtle);">{t('common.none')}</span>
                 {:else}
                   {#each selectedMilestones as ms (ms.id)}
                     <span
-                      class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs"
+                      class="inline-flex max-w-full min-w-0 items-center gap-1 px-1.5 py-0.5 rounded text-xs"
+                      title={ms.name}
                       style="background-color: {ms.category_color || '#9CA3AF'}1A; box-shadow: inset 0 0 0 1px {ms.category_color || '#9CA3AF'}; color: var(--ds-text);"
                     >
-                      {ms.name}
+                      <span class="truncate" dir="auto">{ms.name}</span>
                     </span>
                   {/each}
                 {/if}
@@ -1034,17 +1036,17 @@
           {#snippet children()}
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
-              class="hover-bg w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
+              class="hover-bg w-full min-w-0 flex items-center justify-between gap-2 px-2 py-1.5 text-sm transition-colors rounded group"
             >
-              <Text variant="subtle" size="sm">{t('items.iteration')}</Text>
-              <div class="flex items-center gap-2">
+              <Text variant="subtle" size="sm" class="max-w-[45%] shrink-0 truncate">{t('items.iteration')}</Text>
+              <div class="flex min-w-0 flex-1 items-center justify-end gap-2">
                 {#if selectedIteration}
                   {#if selectedIteration.is_global}
                     <Globe size={14} class="flex-shrink-0" style="color: var(--ds-text-subtle);" />
                   {:else}
                     <Building2 size={14} class="flex-shrink-0" style="color: var(--ds-text-subtle);" />
                   {/if}
-                  <span style="color: var(--ds-text);">{selectedIteration.name}</span>
+                  <TruncatedFieldValue value={selectedIteration.name} />
                 {:else}
                   <Text variant="subtle" size="sm">{t('common.none')}</Text>
                 {/if}
@@ -1080,16 +1082,17 @@
               <div class="flex flex-wrap justify-end gap-1.5 min-w-0">
                 {#each (item?.labels || []) as label (label.id)}
                   <span
-                    class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs"
+                    class="inline-flex max-w-full min-w-0 items-center gap-1.5 px-2 py-0.5 rounded-full text-xs"
+                    title={label.name}
                     style="background-color: {label.color || '#3B82F6'}1A; color: var(--ds-text); box-shadow: inset 0 0 0 1px {label.color || '#3B82F6'};"
                     data-testid="item-label"
                   >
                     <span
-                      class="inline-block w-2 h-2 rounded-full"
+                      class="inline-block w-2 h-2 rounded-full flex-shrink-0"
                       style="background-color: {label.color || '#3B82F6'};"
                       aria-hidden="true"
                     ></span>
-                    {label.name}
+                    <span class="truncate" dir="auto">{label.name}</span>
                   </span>
                 {:else}
                   <Text variant="subtle" size="sm">
@@ -1171,19 +1174,19 @@
     <div class="mb-1">
       <div
         data-testid="item-recurrence-summary"
-        class="hover-bg w-full flex items-center justify-between px-2 py-1.5 text-sm transition-colors rounded group"
+        class="hover-bg w-full min-w-0 flex items-center justify-between gap-2 px-2 py-1.5 text-sm transition-colors rounded group"
         role="button"
         tabindex="0"
         onclick={() => oneditRecurrence?.()}
         onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); oneditRecurrence?.(); } }}
               >
-        <div class="flex items-center gap-1.5">
+        <div class="flex shrink-0 items-center gap-1.5">
           <Repeat class="w-3.5 h-3.5" style="color: var(--ds-icon-subtle);" />
-          <Text variant="subtle" size="sm">{t('recurrence.title')}</Text>
+          <Text variant="subtle" size="sm" class="whitespace-nowrap">{t('recurrence.title')}</Text>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex min-w-0 flex-1 items-center justify-end gap-2">
             <Lozenge color={recurrenceRule.is_active ? 'green' : 'neutral'} text={recurrenceRule.is_active ? t('recurrence.active') : t('recurrence.inactive')} />
-            <span class="text-sm" style="color: var(--ds-text);">{rruleToText(recurrenceRule.rrule)}</span>
+            <TruncatedFieldValue value={rruleToText(recurrenceRule.rrule)} />
         </div>
       </div>
     </div>
