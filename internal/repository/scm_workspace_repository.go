@@ -20,9 +20,12 @@ type SCMWorkspaceRepository struct {
 }
 
 // ItemSCMLinkSummary is the source-control projection used by item briefings.
+// ExternalID holds the PR number, commit SHA, or branch name depending on
+// LinkType; Title and State are empty when the link has none stored.
 type ItemSCMLinkSummary struct {
+	LinkType   models.SCMLinkType
+	ExternalID string
 	Title      string
-	BranchName string
 	State      string
 }
 
@@ -33,9 +36,10 @@ func NewSCMWorkspaceRepository(db database.Database) *SCMWorkspaceRepository {
 // ListItemSCMLinkSummaries returns source-control links attached to an item.
 func (r *SCMWorkspaceRepository) ListItemSCMLinkSummaries(itemID int) ([]ItemSCMLinkSummary, error) {
 	rows, err := r.db.Query(`
-		SELECT title, branch_name, state
+		SELECT link_type, external_id, COALESCE(title, ''), COALESCE(state, '')
 		FROM item_scm_links
 		WHERE item_id = ?
+		ORDER BY id
 	`, itemID)
 	if err != nil {
 		return nil, fmt.Errorf("list SCM links for item %d: %w", itemID, err)
@@ -45,7 +49,7 @@ func (r *SCMWorkspaceRepository) ListItemSCMLinkSummaries(itemID int) ([]ItemSCM
 	out := make([]ItemSCMLinkSummary, 0)
 	for rows.Next() {
 		var summary ItemSCMLinkSummary
-		if err := rows.Scan(&summary.Title, &summary.BranchName, &summary.State); err != nil {
+		if err := rows.Scan(&summary.LinkType, &summary.ExternalID, &summary.Title, &summary.State); err != nil {
 			return nil, fmt.Errorf("scan SCM link for item %d: %w", itemID, err)
 		}
 		out = append(out, summary)
