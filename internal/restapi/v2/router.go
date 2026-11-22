@@ -1220,6 +1220,7 @@ func applyParameterCorrections(route *Route) {
 		}
 	case "GET /time/worklogs":
 		upsertParameter(route, positiveIDQuery("project_id", "Restricts worklogs to one time project."))
+		upsertParameter(route, booleanQuery("mine", "Restricts results and totals to the authenticated user's own worklogs.", false))
 		fallthrough
 	case "GET /items/{item_id}/worklogs", "GET /time/projects/{project_id}/worklogs":
 		upsertParameter(route, dateQuery("from", "Includes worklogs on or after this civil date."))

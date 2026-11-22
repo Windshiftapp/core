@@ -133,6 +133,10 @@ func listWorklogs(deps Deps) pageOperation[worklogDTO] {
 		if err != nil {
 			return nil, Pagination{}, 0, err
 		}
+		mine, err := optionalBoolQuery(r, "mine")
+		if err != nil {
+			return nil, page, 0, err
+		}
 		accessible, err := deps.TimeAccess.GetAccessibleProjects(user.ID)
 		if err != nil {
 			return nil, Pagination{}, 0, internalError(err)
@@ -144,7 +148,9 @@ func listWorklogs(deps Deps) pageOperation[worklogDTO] {
 		if err := applyWorklogFilters(r, user, &filter); err != nil {
 			return nil, Pagination{}, 0, err
 		}
-		if err := scopeWorklogReader(deps, user.ID, &filter); err != nil {
+		if mine {
+			filter.ViewerID = &user.ID
+		} else if err := scopeWorklogReader(deps, user.ID, &filter); err != nil {
 			return nil, page, 0, err
 		}
 		worklogs, total, err := deps.Worklogs.ListPage(filter)

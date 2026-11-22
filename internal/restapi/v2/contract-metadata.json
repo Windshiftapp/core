@@ -11681,6 +11681,16 @@
             "Schema": {
               "type": "string"
             }
+          },
+          {
+            "Name": "mine",
+            "In": "query",
+            "Description": "Restricts results and totals to the authenticated user's own worklogs.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
