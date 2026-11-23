@@ -51,7 +51,19 @@ func (h *PortalHandler) resolvePortalRequest(w http.ResponseWriter, r *http.Requ
 	// portal channels (an approver on item X in channel A must not be able to
 	// read X via channel B's portal slug).
 	if h.approvalService != nil {
-		isApprover, aerr := h.callerIsActiveApproverOnItem(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
+		// Resolve the same approval actor the list and decision handlers use: an
+		// internal user can be assigned through a linked customer identity, so
+		// checking only the staff pool would hide the related item context from
+		// an approver who can see the approval itself.
+		approverUserID, approverCustomerID := internalUserID, portalCustomerID
+		if actor, aerr := h.portalApprovalActorFromRequest(r); aerr == nil {
+			approverUserID, approverCustomerID = actor.userID, actor.customerID
+		} else if !errors.Is(aerr, errPortalApprovalActorUnauthorized) {
+			cancel()
+			respondInternalError(w, r, aerr)
+			return 0, models.ChannelConfig{}, nil, nil, false, nil, nil, false
+		}
+		isApprover, aerr := h.callerIsActiveApproverOnItem(ctx, itemID, channel.ID, approverUserID, approverCustomerID)
 		if aerr != nil {
 			cancel()
 			respondInternalError(w, r, aerr)
