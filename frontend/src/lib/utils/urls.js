@@ -50,3 +50,16 @@ export function portalRequestUrl(slug, itemId) {
 export function portalRequestTypeUrl(slug, requestTypeId) {
   return `/portal/${slug}/request/${requestTypeId}`;
 }
+
+// legacyRequestTypePrefill returns the query suffix that preserves prefill.*
+// values when a legacy ?request-type= link is translated to the canonical
+// /request/{id} route. Non-prefill query params (the legacy request-type
+// itself) are dropped.
+export function legacyRequestTypePrefill(query) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (key.startsWith('prefill.')) params.set(key, value);
+  }
+  const suffix = params.toString();
+  return suffix ? `?${suffix}` : '';
+}

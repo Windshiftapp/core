@@ -78,7 +78,7 @@
     {:else if !experience.authenticated}
       {@render signInCard()}
     {:else}
-      {#key `${slug}:${active}:${target.formId || ''}:${target.articleId || ''}:${experience.identity_key}:${experience.revision}:${$currentRoute.path}:${$currentRoute.query?.id || ''}`}<LazyRootView loader={loadModule} label="Portal module" componentProps={{ slug, kind: active, formId: target.formId, articleId: target.articleId, draftsEnabled: experience.modules.includes('drafts'), ondefaultunavailable: !$currentRoute.params?.pageId && !$currentRoute.params?.requestTypeId ? () => { rejectedDefault = experience.default_module; } : null }} />{/key}
+      {#key `${slug}:${active}:${target.formId || ''}:${target.articleId || ''}:${experience.identity_key}:${experience.revision}:${$currentRoute.path}:${$currentRoute.query?.id || ''}`}<LazyRootView loader={loadModule} label="Portal module" componentProps={{ slug, kind: active, formId: target.formId, articleId: target.articleId, draftsEnabled: experience.modules.includes('drafts'), ondefaultunavailable: !$currentRoute.params?.pageId && !$currentRoute.params?.requestTypeId && !$currentRoute.query?.['request-type'] ? () => { rejectedDefault = experience.default_module; } : null }} />{/key}
     {/if}
   </main>
   <PortalLoginModal kind="portal" {slug} open={showLogin} onclose={() => (showLogin = false)} onloginsuccess={identityChanged} />

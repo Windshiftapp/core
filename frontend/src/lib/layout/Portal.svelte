@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy, tick } from 'svelte';
   import { currentRoute } from '../router.js';
+  import { legacyRequestTypePrefill } from '../utils/urls.js';
   import { authStore } from '../stores/auth.svelte.js';
   import AlertCircle from '@lucide/svelte/icons/alert-circle';
   import Check from '@lucide/svelte/icons/check';
@@ -145,11 +146,13 @@
   // Track auth check completion to prevent flash of unauthenticated content
   let authCheckComplete = $state(false);
 
-  // Track the auth state we last synced the URL view state for. A deep link
-  // followed while signed out resolves its target only after sign-in, so the
-  // sync has to run once more when auth flips. It must not re-run on every
-  // route change, which would re-fetch a request the store already selected.
+  // Track the auth state and view we last synced the URL view state for. A
+  // deep link followed while signed out resolves its target only after
+  // sign-in, so the sync has to run once more when auth flips. Tracking the
+  // view as well lets browser Back/Forward restore a view (e.g. ?view=drafts)
+  // without re-running on every route change.
   let urlStateSyncedForAuth = $state(/** @type {boolean|null} */ (null));
+  let urlStateSyncedView = $state(/** @type {string|null} */ (null));
 
   // Track previous auth state to detect login events
   let previousAuthState = $state(false);
@@ -202,13 +205,18 @@
 
   // Sync portal view state from URL once the auth check completes and again
   // when the customer signs in, so magic-link deep links land on their target.
+  // The view is part of the sync key so browser Back/Forward restores it.
   $effect(() => {
-    if (!authCheckComplete || urlStateSyncedForAuth === isUserAuthenticated) return;
+    if (!authCheckComplete) return;
+    const viewKey = viewParam ?? '';
+    if (urlStateSyncedForAuth === isUserAuthenticated && urlStateSyncedView === viewKey) return;
     urlStateSyncedForAuth = isUserAuthenticated;
+    urlStateSyncedView = viewKey;
 
     if (viewParam === 'requests') {
-      // Set showMyRequests directly (don't toggle, which would navigate again)
-      portalRequestsStore.setVisible(true);
+      // Set showMyRequests directly (don't toggle, which would navigate again).
+      // Skip when the view is already active so a UI navigation is not refetched.
+      if (!portalRequestsStore.visible) portalRequestsStore.setVisible(true);
 
       // If a specific request ID is in URL, load and view it. Signed-out
       // visitors cannot read it yet; the post-login pass retries.
@@ -216,25 +224,27 @@
         portalRequestsStore.loadAndView(requestIdParam);
       }
     } else if (viewParam === 'approvals') {
-      portalApprovalsStore.setVisible(true);
+      if (!portalApprovalsStore.visible) portalApprovalsStore.setVisible(true);
 
       // Deep-link to a specific approval (magic-link `&next=` lands here).
       if (approvalIdParam && isUserAuthenticated) {
         portalApprovalsStore.loadAndView(approvalIdParam);
       }
     } else if (viewParam === 'drafts') {
-      portalDraftsStore.setVisible(true);
+      if (!portalDraftsStore.visible) portalDraftsStore.setVisible(true);
     } else {
-      portalRequestsStore.setVisible(false);
-      portalApprovalsStore.setVisible(false);
-      portalDraftsStore.setVisible(false);
+      if (portalRequestsStore.visible) portalRequestsStore.setVisible(false);
+      if (portalApprovalsStore.visible) portalApprovalsStore.setVisible(false);
+      if (portalDraftsStore.visible) portalDraftsStore.setVisible(false);
 
       // The legacy ?request-type= deep link is now an alias for the real
-      // request route.
+      // request route. Carry prefill.* values so an emailed form link keeps
+      // its prefilled fields.
       if (requestTypeParam) {
         const requestTypeId = parseInt(requestTypeParam, 10);
         if (!isNaN(requestTypeId)) {
-          navigate(`/portal/${$currentRoute.params?.slug}/request/${requestTypeId}`, {
+          const suffix = legacyRequestTypePrefill($currentRoute.query);
+          navigate(`/portal/${$currentRoute.params?.slug}/request/${requestTypeId}${suffix}`, {
             replace: true,
           });
         }

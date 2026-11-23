@@ -51,7 +51,15 @@
         const id = formId;
         const forms = portalCatalogStore.requestTypes;
         const target = id ? forms.find(form => form.id === id) : forms.length === 1 && !$currentRoute.query?.choose ? forms[0] : null;
-        if (id && !target) { if (ondefaultunavailable) { ondefaultunavailable(); return; } error = 'This request form is unavailable.'; }
+        if (id && !target) {
+          // An explicit form link (path param or legacy ?request-type=) must
+          // report the missing form rather than leave the spinner up. Only an
+          // unavailable *default* module falls back to another module.
+          if (ondefaultunavailable) ondefaultunavailable();
+          else error = 'This request form is unavailable.';
+          if (!disposed) ready = true;
+          return;
+        }
         if (target) selectedForm = target;
         prefill = Object.fromEntries(Object.entries($currentRoute.query || {}).filter(([key]) => key.startsWith('prefill.') && !key.endsWith('.label')).map(([key, value]) => [key.slice(8), value]));
       }
