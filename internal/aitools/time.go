@@ -104,6 +104,9 @@ type logTimeOut struct {
 	EndTimeLocal    string `json:"end_time_local"`
 	StartAt         string `json:"start_at"`
 	EndAt           string `json:"end_at"`
+	// Warnings lists policy adjustments applied to the description, matching
+	// the HTTP worklog responses so a caller learns its text was shortened.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // ----------------------------------------------------------------------------
@@ -314,13 +317,7 @@ func init() {
 				PreserveStored:  true,
 			})
 			if err != nil {
-				if errors.Is(err, services.ErrWorklogProjectNotFound) {
-					return map[string]string{"error": "project not found"}, nil
-				}
-				if errors.Is(err, services.ErrWorklogProjectInactive) {
-					return map[string]string{"error": "project is not active"}, nil
-				}
-				return map[string]string{"error": err.Error()}, nil
+				return worklogServiceError(err)
 			}
 			env.AuditWrite(resourceTimeWorklog, result.Worklog.ID, "log_time", result.Worklog.Description)
 			return logTimeOut{
@@ -335,6 +332,7 @@ func init() {
 				EndTimeLocal:    time.Unix(result.EndTimeUnix, 0).In(result.Location).Format("15:04"),
 				StartAt:         time.Unix(result.StartTimeUnix, 0).UTC().Format(time.RFC3339),
 				EndAt:           time.Unix(result.EndTimeUnix, 0).UTC().Format(time.RFC3339),
+				Warnings:        result.Warnings,
 			}, nil
 		},
 	})
@@ -399,6 +397,23 @@ func init() {
 			}, nil
 		},
 	})
+}
+
+// worklogServiceError maps a TimeWorklogService error to a tool response.
+// Known input errors are reported in the payload; anything else is an
+// unexpected storage failure and is returned as a Go error so MCP marks the
+// call failed instead of reporting success.
+func worklogServiceError(err error) (map[string]string, error) {
+	switch {
+	case errors.Is(err, services.ErrWorklogProjectNotFound):
+		return map[string]string{"error": "project not found"}, nil
+	case errors.Is(err, services.ErrWorklogProjectInactive):
+		return map[string]string{"error": "project is not active"}, nil
+	case errors.Is(err, services.ErrWorklogInvalidInput):
+		return map[string]string{"error": err.Error()}, nil
+	default:
+		return nil, err
+	}
 }
 
 // resolveOptionalItemRef resolves the optional work-item reference time tools
