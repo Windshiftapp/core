@@ -883,6 +883,38 @@ func (h *PortalCustomersHandler) ExportPortalCustomer(w http.ResponseWriter, r *
 	_, _ = w.Write(payload)
 }
 
+// portalCustomerLifecycle is the lifecycle state both deactivation and
+// activation read before deciding whether the transition is allowed.
+type portalCustomerLifecycle struct {
+	name          string
+	email         string
+	deactivatedAt sql.NullString
+	erasedAt      sql.NullString
+}
+
+func (h *PortalCustomersHandler) loadPortalCustomerLifecycle(id int) (*portalCustomerLifecycle, error) {
+	var state portalCustomerLifecycle
+	err := h.db.QueryRow(`SELECT name, email, deactivated_at, erased_at FROM portal_customers WHERE id = ?`, id).
+		Scan(&state.name, &state.email, &state.deactivatedAt, &state.erasedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &state, nil
+}
+
+// completePortalCustomerDeactivation runs the idempotent cleanup that must
+// accompany deactivation. Running it again for an already-deactivated customer
+// lets an attempt that failed mid-cleanup be retried to completion.
+func (h *PortalCustomersHandler) completePortalCustomerDeactivation(r *http.Request, id int) error {
+	// Invalidate every live session immediately; validation would refuse them
+	// anyway, but deletion removes the stored ip/user_agent access surface.
+	if _, err := h.db.ExecWrite(`DELETE FROM portal_customer_sessions WHERE portal_customer_id = ?`, id); err != nil {
+		slog.Error("failed to invalidate portal sessions on deactivation", slog.String("component", "portal"), slog.Int("customer_id", id), slog.Any("error", err))
+		return err
+	}
+	return repository.NewCustomerAccessRepository(h.db).RevokeCustomerCredentials(r.Context(), id)
+}
+
 // DeactivatePortalCustomer cuts portal access for a customer without
 // exercising the erasure right: it stamps deactivated_at, invalidates every
 // live session, and records the decision with the acting admin. All portal
@@ -899,10 +931,8 @@ func (h *PortalCustomersHandler) DeactivatePortalCustomer(w http.ResponseWriter,
 		return
 	}
 
-	var name, email string
-	var deactivatedAt, erasedAt sql.NullString
-	if err := h.db.QueryRow(`SELECT name, email, deactivated_at, erased_at FROM portal_customers WHERE id = ?`, id).
-		Scan(&name, &email, &deactivatedAt, &erasedAt); err != nil {
+	state, err := h.loadPortalCustomerLifecycle(id)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "customer")
 			return
@@ -910,11 +940,18 @@ func (h *PortalCustomersHandler) DeactivatePortalCustomer(w http.ResponseWriter,
 		respondInternalError(w, r, err)
 		return
 	}
-	if deactivatedAt.Valid && deactivatedAt.String != "" {
+	if state.deactivatedAt.Valid && state.deactivatedAt.String != "" {
+		// A previous attempt may have stamped the row and then failed before
+		// revoking sessions and credentials. Finish that idempotent cleanup so
+		// a retry is safe, then report the existing state.
+		if err := h.completePortalCustomerDeactivation(r, id); err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
 		respondConflict(w, r, "Portal customer is already deactivated")
 		return
 	}
-	if erasedAt.Valid && erasedAt.String != "" {
+	if state.erasedAt.Valid && state.erasedAt.String != "" {
 		respondConflict(w, r, "Portal customer has been erased and cannot be deactivated")
 		return
 	}
@@ -924,23 +961,14 @@ func (h *PortalCustomersHandler) DeactivatePortalCustomer(w http.ResponseWriter,
 		respondInternalError(w, r, err)
 		return
 	}
-
-	// Invalidate every live session immediately; validation would refuse
-	// them anyway, but deletion removes the stored ip/user_agent access
-	// surface right away.
-	if _, err := h.db.ExecWrite(`DELETE FROM portal_customer_sessions WHERE portal_customer_id = ?`, id); err != nil {
-		slog.Error("failed to invalidate portal sessions on deactivation", slog.String("component", "portal"), slog.Int("customer_id", id), slog.Any("error", err))
-		respondInternalError(w, r, err)
-		return
-	}
-	if err := repository.NewCustomerAccessRepository(h.db).RevokeCustomerCredentials(r.Context(), id); err != nil {
+	if err := h.completePortalCustomerDeactivation(r, id); err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
 	if currentUser != nil {
-		logAuditWithDetails(h.db, r, currentUser, logger.ActionPortalCustomerDeactivate, logger.ResourcePortalCustomer, &id, name, map[string]any{
-			"email": email,
+		logAuditWithDetails(h.db, r, currentUser, logger.ActionPortalCustomerDeactivate, logger.ResourcePortalCustomer, &id, state.name, map[string]any{
+			"email": state.email,
 		})
 	}
 
@@ -966,10 +994,8 @@ func (h *PortalCustomersHandler) ActivatePortalCustomer(w http.ResponseWriter, r
 		return
 	}
 
-	var name, email string
-	var deactivatedAt, erasedAt sql.NullString
-	if err := h.db.QueryRow(`SELECT name, email, deactivated_at, erased_at FROM portal_customers WHERE id = ?`, id).
-		Scan(&name, &email, &deactivatedAt, &erasedAt); err != nil {
+	state, err := h.loadPortalCustomerLifecycle(id)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			respondNotFound(w, r, "customer")
 			return
@@ -977,11 +1003,11 @@ func (h *PortalCustomersHandler) ActivatePortalCustomer(w http.ResponseWriter, r
 		respondInternalError(w, r, err)
 		return
 	}
-	if !deactivatedAt.Valid || deactivatedAt.String == "" {
+	if !state.deactivatedAt.Valid || state.deactivatedAt.String == "" {
 		respondValidationError(w, r, "Portal customer is not deactivated")
 		return
 	}
-	if erasedAt.Valid && erasedAt.String != "" {
+	if state.erasedAt.Valid && state.erasedAt.String != "" {
 		respondConflict(w, r, "Portal customer has been erased and cannot be reactivated")
 		return
 	}
@@ -997,8 +1023,8 @@ func (h *PortalCustomersHandler) ActivatePortalCustomer(w http.ResponseWriter, r
 	}
 
 	if currentUser != nil {
-		logAuditWithDetails(h.db, r, currentUser, logger.ActionPortalCustomerActivate, logger.ResourcePortalCustomer, &id, name, map[string]any{
-			"email": email,
+		logAuditWithDetails(h.db, r, currentUser, logger.ActionPortalCustomerActivate, logger.ResourcePortalCustomer, &id, state.name, map[string]any{
+			"email": state.email,
 		})
 	}
 
