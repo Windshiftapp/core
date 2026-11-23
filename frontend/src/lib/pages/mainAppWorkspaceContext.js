@@ -57,8 +57,14 @@ export function mainAppNavigationIdentity(route, personalWorkspaceId) {
   const context = resolveMainAppWorkspaceContext(route, personalWorkspaceId);
   const params = route.params ?? {};
   const collectionId = context.kind === 'global-collection' ? params.id : params.collectionId;
+  // Wiki page IDs key the editor, not the workspace shell or sidebar.
   const entities = Object.entries(params)
-    .filter(([key]) => key !== 'id' && key !== 'collectionId')
+    .filter(
+      ([key]) =>
+        key !== 'id' &&
+        key !== 'collectionId' &&
+        !(route.view === 'workspace-pages' && key === 'pageId')
+    )
     .sort(([a], [b]) => a.localeCompare(b));
   return JSON.stringify([
     context.kind,

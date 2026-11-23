@@ -33,6 +33,7 @@ export function createDependencyLoader(options = {}) {
   const chunkSize = options.chunkSize ?? DEPENDENCY_LINK_CHUNK;
   const maxConcurrentChunks = options.maxConcurrentChunks ?? MAX_CONCURRENT_CHUNKS;
   const retryCooldownMs = options.retryCooldownMs ?? RETRY_COOLDOWN_MS;
+  const batchWindowMs = options.batchWindowMs ?? 0;
   const now = options.now ?? (() => Date.now());
   const fetchGroups =
     options.fetchGroups ??
@@ -45,7 +46,34 @@ export function createDependencyLoader(options = {}) {
   const waiters = new Map();
   /** @type {number[][]} */
   const chunkQueue = [];
+  /** @type {number[]} */
+  let stagedIds = [];
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let batchTimer = null;
   let activeChunks = 0;
+
+  function enqueue(ids) {
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      chunkQueue.push(ids.slice(i, i + chunkSize));
+    }
+    pump();
+  }
+
+  function stage(ids) {
+    if (batchWindowMs <= 0) {
+      enqueue(ids);
+      return;
+    }
+    stagedIds.push(...ids);
+    if (batchTimer !== null) return;
+    // Start the window once so continuous viewport updates can't delay it.
+    batchTimer = setTimeout(() => {
+      batchTimer = null;
+      const batch = stagedIds;
+      stagedIds = [];
+      enqueue(batch);
+    }, batchWindowMs);
+  }
 
   function waiterFor(id) {
     return new Promise((resolve) => {
@@ -183,11 +211,8 @@ export function createDependencyLoader(options = {}) {
       }
       entries = next;
 
-      for (let i = 0; i < eligible.length; i += chunkSize) {
-        chunkQueue.push(eligible.slice(i, i + chunkSize));
-      }
-      pump();
       for (const id of eligible) pending.push(waiterFor(id));
+      stage(eligible);
     }
 
     return Promise.all(pending).then(() => undefined);
@@ -216,6 +241,11 @@ export function createDependencyLoader(options = {}) {
   /** Synchronously invalidate pending writes; in-flight results are dropped. */
   function reset() {
     scopeGeneration += 1;
+    if (batchTimer !== null) {
+      clearTimeout(batchTimer);
+      batchTimer = null;
+    }
+    stagedIds = [];
     chunkQueue.length = 0;
     inFlightIds.clear();
     entries = {};

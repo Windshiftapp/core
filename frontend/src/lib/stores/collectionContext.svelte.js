@@ -1228,11 +1228,10 @@ class CollectionStore {
   }
 
   /**
-   * Refresh current data without resetting pagination.
-   * Re-fetches page 1 with limit = current item count, preserving accumulated items.
-   * Used by pollers and background updates.
+   * Refresh rows without resetting pagination. Item-only deltas can reuse
+   * collection metadata; an explicit refresh can pick up remote edits to it.
    */
-  async refresh() {
+  async refresh({ reuseCollectionMetadata = false } = {}) {
     if (!this.#wsId && !this.#colId) return false;
     const loadId = ++this.#loadId;
     this.boardBackgroundLoading = false;
@@ -1256,7 +1255,7 @@ class CollectionStore {
       );
       if (loadId !== this.#loadId) return false;
       const collection = this.#colId
-        ? BOARD_VIEWS.has(this.#currentView)
+        ? reuseCollectionMetadata || BOARD_VIEWS.has(this.#currentView)
           ? (this.boardCollection ?? (await getCollection(this.#colId, this.#readOptions())))
           : await getCollection(this.#colId, this.#readOptions())
         : null;
@@ -1541,7 +1540,7 @@ class CollectionStore {
       const removedIds = new Set(changes?.removed_item_ids ?? []);
       if (removedIds.size > 0) {
         // Removed IDs may be off-page or outside the saved query altogether.
-        return await this.refresh();
+        return await this.refresh({ reuseCollectionMetadata: true });
       }
 
       const changedIds = [...new Set(changes?.changed_item_ids ?? [])].filter(
@@ -1573,7 +1572,7 @@ class CollectionStore {
         BOARD_VIEWS.has(this.#currentView) ||
         (LIST_VIEWS.has(this.#currentView) && (this.#sortBy || this.#sortDirection));
       if (hasNewVisibleItem || touchesBacklog || usesServerOrderedItems) {
-        return await this.refresh();
+        return await this.refresh({ reuseCollectionMetadata: true });
       }
 
       const updatedItems = await fetchItemsById(

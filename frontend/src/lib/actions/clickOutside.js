@@ -10,7 +10,8 @@ export function clickOutside(node, { capture = true } = {}) {
   }
 
   function handleClick(event) {
-    if (!node.contains(event.target) && !containsControlledPopup(event.target)) {
+    // The click handler may replace the trigger before the event bubbles here.
+    if (!event.composedPath().includes(node) && !containsControlledPopup(event.target)) {
       node.dispatchEvent(new CustomEvent('clickOutside'));
     }
   }
