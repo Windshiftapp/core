@@ -955,23 +955,36 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 	}
 
 	data := []map[string]any{}
+	configuredSources, failedSources := 0, 0
 	var docmostErr *restapi.APIError
 	if docmostConfigured {
+		configuredSources++
 		docmostErr = h.searchDocmostKnowledgeBase(ctx, config, searchRequest.Query, &data)
-		if docmostErr != nil && !pagesWired {
-			respondError(w, r, docmostErr)
-			return
-		}
 		if docmostErr != nil {
+			failedSources++
 			slog.Warn("docmost knowledge base search failed; serving workspace page results only",
 				slog.String("component", "portal"), slog.Any("error", docmostErr))
 		}
 	}
+	var pagesErr error
 	if pagesWired {
-		if err := h.appendWorkspacePageHits(config, searchRequest.Query, &data); err != nil {
+		configuredSources++
+		if pagesErr = h.appendWorkspacePageHits(config, searchRequest.Query, &data); pagesErr != nil {
+			failedSources++
 			slog.Error("failed to search published workspace pages",
-				slog.String("component", "portal"), slog.Any("error", err))
+				slog.String("component", "portal"), slog.Any("error", pagesErr))
 		}
+	}
+	// A failed source must not be reported as "no matches". If every
+	// configured source failed, surface the failure; otherwise keep the
+	// partial results from the sources that succeeded.
+	if knowledgeBaseSearchFailed(configuredSources, failedSources) {
+		if docmostErr != nil {
+			respondError(w, r, docmostErr)
+		} else {
+			respondInternalError(w, r, pagesErr)
+		}
+		return
 	}
 
 	h.recordKBSearch(r, channel.ID, searchRequest.Query, len(data))
@@ -1008,9 +1021,17 @@ func (h *PortalHandler) recordKBSearch(r *http.Request, channelID int, query str
 	}
 }
 
-// knowledgeBasePageSearchLimit caps how many published workspace pages one
+// knowledgeBaseSearchLimit caps how many published workspace pages one
 // search returns.
 const knowledgeBasePageSearchLimit = 25
+
+// knowledgeBaseSearchFailed reports whether a knowledge-base search should be
+// surfaced as an error. All configured sources failing is an error; a source
+// that succeeded with no matches is a real empty result, and one failed source
+// among several still yields partial results.
+func knowledgeBaseSearchFailed(configuredSources, failedSources int) bool {
+	return configuredSources > 0 && failedSources == configuredSources
+}
 
 // searchDocmostKnowledgeBase proxies a search to the connected Docmost
 // share and appends its result items (tagged source "docmost") to data.
