@@ -57,6 +57,17 @@ type Env struct {
 	PageApplicationService *services.PageApplicationService
 	// PageDiagramService owns immutable Page-diagram attachment mutations.
 	PageDiagramService *services.PageDiagramService
+	// ItemApplication is the shared, fully wired item mutation pipeline (create
+	// and update). Tools must route item writes through it so agent writes get
+	// the same mention processing, cache invalidation, and created/updated
+	// events as the HTTP surfaces. Nil-safe: a local pipeline without the
+	// server's emitters is constructed on demand.
+	ItemApplication *services.ItemApplicationService
+	// TimeWorklogService is the shared worklog validation and persistence
+	// boundary. log_time routes through it so the description policy and
+	// warnings match the HTTP surfaces. Nil-safe: a local service is
+	// constructed on demand.
+	TimeWorklogService *services.TimeWorklogService
 	// ActionService is the optional cache-invalidation hook for tools that
 	// create or mutate actions. Nil-safe: tools must check before calling
 	// InvalidateWorkspaceCache so they degrade to "next periodic refresh"
@@ -125,6 +136,31 @@ func (e *Env) audit(actionType, resourceType string, resourceID int, resourceNam
 			slog.Any("error", err),
 		)
 	}
+}
+
+// itemApplication returns the configured item mutation pipeline, or a local
+// one when the embedder did not supply the server's shared instance. The
+// fallback keeps tools working without the process-wide emitters, matching the
+// pre-injection behavior.
+func (e *Env) itemApplication() *services.ItemApplicationService {
+	if e.ItemApplication != nil {
+		return e.ItemApplication
+	}
+	return services.NewItemApplicationService(
+		e.DB,
+		e.PermService,
+		services.NewItemCreationService(e.DB, e.PermService),
+		services.NewItemUpdateApplicationService(e.DB, e.PermService),
+		services.NewItemDeletionApplicationService(e.DB, e.PermService),
+	)
+}
+
+// timeWorklogService returns the configured worklog service, or a local one.
+func (e *Env) timeWorklogService() *services.TimeWorklogService {
+	if e.TimeWorklogService != nil {
+		return e.TimeWorklogService
+	}
+	return services.NewTimeWorklogService(e.DB)
 }
 
 // HasWorkspaceAccess reports whether the caller can touch the given workspace.

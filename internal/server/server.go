@@ -2038,6 +2038,8 @@ func (s *Server) initialize() error {
 	// Board surfaces reuse the internal item reads to authorize staff viewers.
 	publicBoardHandler.SetItemAccess(itemApplication)
 	customerAccessHandler.SetItemAccess(itemApplication)
+	// Chat tools write through the same item and worklog pipelines as HTTP.
+	aiHandler.SetMutationServices(itemApplication, timeWorklogService)
 	itemDetailApplication := services.NewItemDetailApplicationService(s.db, itemApplication, itemLinkService, permService).
 		WithContextReaders(screenHandler, requestTypeHandler, actionApplication).
 		WithStoryPointRollups(repository.NewItemRepository(s.db))
@@ -2177,6 +2179,8 @@ func (s *Server) initialize() error {
 			TimerService:           timerService,
 			CommentService:         commentService,
 			ItemDeletionService:    itemHandler.ItemDeletionApplicationService(),
+			ItemApplicationService: itemApplication,
+			TimeWorklogService:     timeWorklogService,
 			PageApplicationService: pageApplication,
 			PageDiagramService:     pageDiagramService,
 			ActionService:          s.actionService,

@@ -904,6 +904,39 @@ func (s *ItemApplicationService) Patch(ctx context.Context, actor AuditActor, it
 	return &items[0], nil
 }
 
+// UpdateFieldsWithMetadata runs the shared update pipeline on an already-decoded
+// field map while preserving explicit event provenance (agent actor/source/run).
+// Agent adapters use it instead of the low-level update service so description
+// mentions and hierarchy cache invalidation stay on the one path.
+func (s *ItemApplicationService) UpdateFieldsWithMetadata(
+	ctx context.Context,
+	actor AuditActor,
+	itemID int,
+	fields map[string]any,
+	metadata itemevents.Metadata,
+) (*models.Item, error) {
+	allowed, err := s.update.CanUserEditItem(actor.UserID, itemID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, ErrItemForbidden
+	}
+	result, err := s.update.UpdateWithMetadata(actor.UserID, actor.Username, itemID, fields, metadata)
+	if err != nil {
+		return nil, err
+	}
+	items := []models.Item{*result.Item}
+	if err := s.enrich(ctx, actor.UserID, items); err != nil {
+		return nil, err
+	}
+	items[0].DescriptionHTML, err = markdown.Render(items[0].Description)
+	if err != nil {
+		return nil, fmt.Errorf("render item description: %w", err)
+	}
+	return &items[0], nil
+}
+
 // createItem preserves execute_script cascade provenance when the call arrived
 // through the script REST bridge, so a script-created item stays inside the
 // action cascade budget instead of looking like a fresh user action.

@@ -127,6 +127,8 @@ func (ms *MCPServer) buildEnv(user *models.User) (*aitools.Env, error) {
 		TimerService:           ms.deps.TimerService,
 		CommentService:         ms.deps.CommentService,
 		ItemDeletionService:    ms.deps.ItemDeletionService,
+		ItemApplication:        ms.deps.ItemApplicationService,
+		TimeWorklogService:     ms.deps.TimeWorklogService,
 		PageApplicationService: ms.deps.PageApplicationService,
 		PageDiagramService:     ms.deps.PageDiagramService,
 		ActionService:          ms.deps.ActionService,
