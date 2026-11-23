@@ -232,13 +232,10 @@ func (s *KnowledgePublicationService) SearchPublishedPagesForPortal(config model
 	sort.Ints(workspaceIDs)
 
 	rawLimit := limit * 3
-	out := make([]PublishedPageHit, 0, limit)
+	collected := make([]PublishedPageHit, 0, rawLimit)
 	seen := map[int]bool{}
 	appendHits := func(hits []repository.PageChunkSearchResult, workspaceID int, include func(page *models.Page) bool) error {
 		for _, hit := range hits {
-			if len(out) >= limit {
-				return nil
-			}
 			if seen[hit.PageID] {
 				continue
 			}
@@ -253,7 +250,7 @@ func (s *KnowledgePublicationService) SearchPublishedPagesForPortal(config model
 				continue
 			}
 			seen[hit.PageID] = true
-			out = append(out, PublishedPageHit{
+			collected = append(collected, PublishedPageHit{
 				PageID:      hit.PageID,
 				WorkspaceID: hit.WorkspaceID,
 				Title:       page.Title,
@@ -276,9 +273,6 @@ func (s *KnowledgePublicationService) SearchPublishedPagesForPortal(config model
 		if err := appendHits(hits, workspaceID, func(*models.Page) bool { return true }); err != nil {
 			return nil, err
 		}
-		if len(out) >= limit {
-			return out, nil
-		}
 	}
 	for _, workspaceID := range workspaceIDs {
 		rootIDs := rootsByWorkspace[workspaceID]
@@ -299,11 +293,21 @@ func (s *KnowledgePublicationService) SearchPublishedPagesForPortal(config model
 		if err := appendHits(hits, workspaceID, func(page *models.Page) bool { return pageInAnySubtree(page, roots) }); err != nil {
 			return nil, err
 		}
-		if len(out) >= limit {
-			break
-		}
 	}
-	return out, nil
+
+	// Rank across workspaces before applying the limit: a later workspace may
+	// hold a higher-scoring hit than the first. Ties break on page id so the
+	// limited set is stable.
+	sort.SliceStable(collected, func(i, j int) bool {
+		if collected[i].Score != collected[j].Score {
+			return collected[i].Score > collected[j].Score
+		}
+		return collected[i].PageID < collected[j].PageID
+	})
+	if len(collected) > limit {
+		collected = collected[:limit]
+	}
+	return collected, nil
 }
 
 // PublishedPagesForPortal lists the live pages this portal's knowledge
