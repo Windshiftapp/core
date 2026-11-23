@@ -116,6 +116,18 @@
 
   async function destroyEditor(target) {
     if (!target) return;
+    // Unsubscribe before teardown. The listener plugin debounces its
+    // markdownUpdated callback by 200ms and serializes the document through
+    // commonmark's paragraph serializer, which reads editorViewCtx. That timer
+    // can outlive destroy(), and once the slice is removed it throws
+    // "Context editorView not found" from inside Milkdown, before our own
+    // guarded callback gets a chance to run.
+    target.action((ctx) => {
+      if (!ctx.isInjected(listenerCtx)) return;
+      const { listeners } = ctx.get(listenerCtx);
+      listeners.markdownUpdated.length = 0;
+      listeners.updated.length = 0;
+    });
     try {
       await target.destroy();
     } catch (e) {
