@@ -350,16 +350,36 @@ func (h *CustomerAccessHandler) Guard(next http.Handler) http.Handler {
 					if parts[3] == "requests" && len(parts) == 5 && r.Method == http.MethodGet && config.PortalModuleEnabled("approvals") {
 						module = ""
 					}
-				case "request-types", "submit", "custom-fields":
+				case "request-types", "submit":
 					module = "forms"
+				case "custom-fields":
+					// Request forms and form-mode asset reports both resolve their
+					// custom-field definitions through this endpoint, so either
+					// enabled workflow may call it. The handler still scopes the
+					// definitions to what the viewer can see.
+					if !config.PortalModuleEnabled("forms") && !config.PortalModuleEnabled("asset-reports") {
+						respondForbidden(w, r)
+						return
+					}
 				case "drafts":
 					module = "drafts"
 				case "approvals":
 					module = "approvals"
 				case "knowledge-base":
 					module = "knowledge-base"
-				case "asset-reports", "assets":
+				case "asset-reports":
 					module = "asset-reports"
+				case "assets":
+					// The asset picker in a request form needs /assets/search. The
+					// other asset lookups stay with the asset-reports workflow.
+					if len(parts) == 5 && parts[4] == "search" {
+						if !config.PortalModuleEnabled("asset-reports") && !config.PortalModuleEnabled("forms") {
+							respondForbidden(w, r)
+							return
+						}
+					} else {
+						module = "asset-reports"
+					}
 				case "credentials", "passkey-prompt":
 					module = "profile"
 				case "auth":

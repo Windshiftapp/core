@@ -607,6 +607,7 @@
           portalSlug={portalStore.portalData.slug}
           isDarkMode={portalStore.isDarkMode}
           prefill={requestPrefill}
+          draftsEnabled={experience?.modules?.includes('drafts') ?? false}
           onsubmitted={handleRequestSubmitted}
           onclose={handleRequestFormClose}
         />
