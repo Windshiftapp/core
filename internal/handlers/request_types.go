@@ -100,7 +100,7 @@ func (h *RequestTypeHandler) ListVisibleFields(ctx context.Context, userID, requ
 	if err != nil || !allowed {
 		return []models.RequestTypeField{}, err
 	}
-	fields, err := h.repo.ListFields(requestTypeID)
+	fields, err := h.repo.ListFieldsContext(ctx, requestTypeID)
 	if fields == nil {
 		fields = []models.RequestTypeField{}
 	}
@@ -618,7 +618,7 @@ func (h *RequestTypeHandler) GetFields(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fields, err := h.repo.ListFields(rt.ID)
+	fields, err := h.repo.ListFieldsContext(r.Context(), rt.ID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

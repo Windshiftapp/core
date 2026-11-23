@@ -669,80 +669,43 @@ type RequestTypeField struct {
 	FieldLabel          string    `json:"field_label"`
 }
 
-// GetRequestTypeFields gets fields for a request type
+// GetRequestTypeFields gets fields for a request type. It reads through the
+// shared repository decoder and then applies the create-screen allowlist, so a
+// scan failure is surfaced instead of silently returning a partial schema.
 func (s *PortalService) GetRequestTypeFields(ctx context.Context, requestTypeID int) ([]RequestTypeField, error) {
 	allowedCustomFieldIDs, err := allowedRequestTypeCustomFieldIdentifiers(ctx, s.db, requestTypeID)
 	if err != nil {
 		return nil, fmt.Errorf("resolve request type create-screen fields: %w", err)
 	}
-	query := `
-		SELECT rtf.id, rtf.request_type_id, rtf.field_identifier, rtf.field_type,
-		       rtf.display_order, rtf.is_required, rtf.display_name, rtf.description,
-		       COALESCE(rtf.step_number, 1) as step_number,
-		       rtf.virtual_field_type, rtf.virtual_field_options,
-		       rtf.created_at, rtf.updated_at,
-		       CASE
-		           WHEN rtf.field_type = 'virtual' THEN rtf.field_identifier
-		           ELSE COALESCE(cfd.name, rtf.field_identifier)
-		       END as field_name,
-		       CASE
-		           WHEN rtf.display_name IS NOT NULL AND rtf.display_name != '' THEN rtf.display_name
-		           WHEN rtf.field_type = 'virtual' THEN rtf.field_identifier
-		           ELSE COALESCE(cfd.name, rtf.field_identifier)
-		       END as field_label
-		FROM request_type_fields rtf
-		LEFT JOIN custom_field_definitions cfd ON rtf.field_type = 'custom'
-		    AND rtf.field_identifier = CAST(cfd.id AS TEXT)
-		WHERE rtf.request_type_id = ?
-		ORDER BY rtf.step_number, rtf.display_order, rtf.id`
-
-	rows, err := s.db.QueryContext(ctx, query, requestTypeID)
+	rows, err := repository.NewRequestTypeRepository(s.db).ListFieldsContext(ctx, requestTypeID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch request type fields: %w", err)
+		return nil, err
 	}
-	defer rows.Close()
-
-	var fields []RequestTypeField
-	for rows.Next() {
-		var field RequestTypeField
-		var displayName, description, virtualFieldType, virtualFieldOptions sql.NullString
-		err := rows.Scan(
-			&field.ID, &field.RequestTypeID, &field.FieldIdentifier, &field.FieldType,
-			&field.DisplayOrder, &field.IsRequired, &displayName, &description,
-			&field.StepNumber, &virtualFieldType, &virtualFieldOptions,
-			&field.CreatedAt, &field.UpdatedAt,
-			&field.FieldName, &field.FieldLabel,
-		)
-		if err != nil {
-			continue
-		}
-		if field.FieldType == "custom" {
-			if _, allowed := allowedCustomFieldIDs[field.FieldIdentifier]; !allowed {
+	fields := make([]RequestTypeField, 0, len(rows))
+	for _, row := range rows {
+		if row.FieldType == "custom" {
+			if _, allowed := allowedCustomFieldIDs[row.FieldIdentifier]; !allowed {
 				continue
 			}
 		}
-		if displayName.Valid {
-			field.DisplayName = &displayName.String
-		}
-		if description.Valid {
-			field.Description = &description.String
-		}
-		if virtualFieldType.Valid {
-			field.VirtualFieldType = &virtualFieldType.String
-		}
-		if virtualFieldOptions.Valid {
-			field.VirtualFieldOptions = &virtualFieldOptions.String
-		}
-		fields = append(fields, field)
+		fields = append(fields, RequestTypeField{
+			ID:                  row.ID,
+			RequestTypeID:       row.RequestTypeID,
+			FieldIdentifier:     row.FieldIdentifier,
+			FieldType:           row.FieldType,
+			DisplayOrder:        row.DisplayOrder,
+			IsRequired:          row.IsRequired,
+			DisplayName:         row.DisplayName,
+			Description:         row.Description,
+			StepNumber:          row.StepNumber,
+			VirtualFieldType:    row.VirtualFieldType,
+			VirtualFieldOptions: row.VirtualFieldOptions,
+			CreatedAt:           row.CreatedAt,
+			UpdatedAt:           row.UpdatedAt,
+			FieldName:           row.FieldName,
+			FieldLabel:          row.FieldLabel,
+		})
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to iterate request type fields: %w", err)
-	}
-
-	if fields == nil {
-		fields = []RequestTypeField{}
-	}
-
 	return fields, nil
 }
 
