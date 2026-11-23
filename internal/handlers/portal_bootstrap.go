@@ -23,6 +23,26 @@ type PortalBootstrapResponse struct {
 	AssetReports []models.PublicAssetReport `json:"asset_reports"`
 }
 
+// portalCustomerProfile is the customer projection shared by the bootstrap
+// snapshot and /me. It carries the identity, passkey state and preference
+// fields so the profile page hydrates from either response.
+func portalCustomerProfile(customer *auth.PortalCustomer, info *repository.PortalCustomerSessionInfo) map[string]any {
+	profile := map[string]any{
+		"id":            customer.ID,
+		"email":         customer.Email,
+		"name":          customer.Name,
+		"passkey_count": info.PasskeyCount,
+		"language":      info.Language,
+		"timezone":      info.Timezone,
+	}
+	if info.DismissedPasskeyPromptAt != nil {
+		profile["dismissed_passkey_prompt_at"] = info.DismissedPasskeyPromptAt.Format(time.RFC3339)
+	} else {
+		profile["dismissed_passkey_prompt_at"] = nil
+	}
+	return profile
+}
+
 type PortalUserBootstrapResponse struct {
 	Authenticated bool                            `json:"authenticated"`
 	IsInternal    bool                            `json:"is_internal"`
@@ -211,13 +231,7 @@ func (h *PortalHandler) portalAuthSnapshot(ctx context.Context, r *http.Request)
 		slog.Warn("portal user bootstrap: passkey state unavailable", "portal_customer_id", portalSession.Customer.ID, "error", err)
 		info = &repository.PortalCustomerSessionInfo{}
 	}
-	response.Customer = map[string]any{
-		"id":                          portalSession.Customer.ID,
-		"email":                       portalSession.Customer.Email,
-		"name":                        portalSession.Customer.Name,
-		"passkey_count":               info.PasskeyCount,
-		"dismissed_passkey_prompt_at": info.DismissedPasskeyPromptAt,
-	}
+	response.Customer = portalCustomerProfile(portalSession.Customer, info)
 	sharing, err := h.portalService.PortalCustomerOrgRequestSharing(ctx, portalSession.Customer.ID)
 	if err != nil {
 		slog.Warn("portal user bootstrap: request sharing unavailable", "portal_customer_id", portalSession.Customer.ID, "error", err)

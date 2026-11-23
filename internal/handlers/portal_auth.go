@@ -397,19 +397,7 @@ func (h *PortalAuthHandler) GetCurrentCustomer(w http.ResponseWriter, r *http.Re
 				info = &repository.PortalCustomerSessionInfo{}
 			}
 
-			customerPayload := map[string]any{
-				"id":            session.Customer.ID,
-				"email":         session.Customer.Email,
-				"name":          session.Customer.Name,
-				"passkey_count": info.PasskeyCount,
-				"language":      info.Language,
-				"timezone":      info.Timezone,
-			}
-			if info.DismissedPasskeyPromptAt != nil {
-				customerPayload["dismissed_passkey_prompt_at"] = info.DismissedPasskeyPromptAt.Format(time.RFC3339)
-			} else {
-				customerPayload["dismissed_passkey_prompt_at"] = nil
-			}
+			customerPayload := portalCustomerProfile(session.Customer, info)
 
 			respondJSONOK(w, map[string]any{
 				"authenticated": true,
