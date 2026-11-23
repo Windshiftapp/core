@@ -57,8 +57,13 @@ type Options struct {
 	ActionService          *services.ActionService
 	PageApplicationService *services.PageApplicationService
 	PageDiagramService     *services.PageDiagramService
-	Registry               *aitools.Registry
-	RunTimeout             time.Duration
+	// ItemApplication and TimeWorklogService are the shared mutation
+	// pipelines the tools call. They must be installed before Resume starts a
+	// queued run, so agent writes match the HTTP surfaces.
+	ItemApplication    *services.ItemApplicationService
+	TimeWorklogService *services.TimeWorklogService
+	Registry           *aitools.Registry
+	RunTimeout         time.Duration
 }
 
 // ProfileSnapshot is deliberately limited to non-secret execution inputs.
@@ -283,6 +288,8 @@ func (d *Dispatcher) RunPrivateTest(ctx context.Context, binding *models.Workspa
 		CommentService:         d.opts.Comments,
 		ApprovalService:        d.opts.Approvals,
 		ActionService:          d.opts.ActionService,
+		ItemApplication:        d.opts.ItemApplication,
+		TimeWorklogService:     d.opts.TimeWorklogService,
 		PageApplicationService: d.opts.PageApplicationService,
 		PageDiagramService:     d.opts.PageDiagramService,
 	}, entries)
@@ -479,6 +486,8 @@ func (d *Dispatcher) execute(run *models.AgentRun) {
 		CommentService:         d.opts.Comments,
 		ApprovalService:        d.opts.Approvals,
 		ActionService:          d.opts.ActionService,
+		ItemApplication:        d.opts.ItemApplication,
+		TimeWorklogService:     d.opts.TimeWorklogService,
 		PageApplicationService: d.opts.PageApplicationService,
 		PageDiagramService:     d.opts.PageDiagramService,
 	}, entries)
