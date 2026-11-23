@@ -719,6 +719,7 @@ func (h *PortalHandler) validatePortalAssetCustomFields(ctx context.Context, por
 // customer identity used by CQL context functions.
 type portalAssetAccess struct {
 	ctx              context.Context
+	config           models.ChannelConfig
 	reportsBySet     map[int][]models.AssetReport
 	portalCustomerID *int
 	customerOrgID    *int
@@ -746,6 +747,7 @@ func (h *PortalHandler) portalAssetRequestContext(w http.ResponseWriter, r *http
 	}
 	return portalAssetAccess{
 		ctx:              ctx,
+		config:           config,
 		reportsBySet:     reportsBySet,
 		portalCustomerID: portalCustomerID,
 		customerOrgID:    customerOrgID,
@@ -862,6 +864,14 @@ func (h *PortalHandler) SearchPortalAssets(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	defer cancel()
+
+	// The report-scoped fallback search belongs to the asset-reports workflow.
+	// A portal that only enables request forms may use the field-scoped picker
+	// (field_id above) but must not enumerate assets from configured reports.
+	if !access.config.PortalModuleEnabled("asset-reports") {
+		respondJSONOK(w, map[string]any{"assets": []any{}})
+		return
+	}
 
 	setIDs := make([]int, 0, len(access.reportsBySet))
 	for setID := range access.reportsBySet {

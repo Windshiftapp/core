@@ -839,89 +839,100 @@ func (s *PortalService) collectVisibleChannelCustomFieldIDs(ctx context.Context,
 		servedWorkspaceIDs = channelConfig.FormWorkspaceIDs
 	}
 
-	// Visible request types → their custom-typed configured fields.
-	rtRows, err := s.db.QueryContext(ctx, `
-		SELECT rt.id, rt.item_type_id, rt.workspace_id, rt.visibility_group_ids, rt.visibility_org_ids
-		FROM request_types rt
-		WHERE rt.channel_id = ? AND rt.is_active = true AND rt.kind != 'email'
-	`, channelID)
-	if err != nil {
-		return nil, fmt.Errorf("list channel request types: %w", err)
-	}
+	// A portal only publishes field definitions for the workflows it enables.
+	// Request forms and form-mode asset reports share this endpoint, so each
+	// block is gated by its module; a form channel always serves forms.
+	formsEnabled := channelType == "form" || channelConfig.PortalModuleEnabled("forms")
+	assetsEnabled := channelType == "portal" && channelConfig.PortalModuleEnabled("asset-reports")
+
 	type visibleRoute struct {
 		id          int
 		itemTypeID  int
 		workspaceID int
 	}
-	var visibleRTRoutes []visibleRoute
-	func() {
-		defer rtRows.Close()
-		for rtRows.Next() {
-			var id, itemTypeID int
-			var workspaceID *int
-			var groups, orgs sql.NullString
-			if err := rtRows.Scan(&id, &itemTypeID, &workspaceID, &groups, &orgs); err != nil {
-				continue
-			}
-			if !isAdmin && !portalRowVisible(groups, orgs, userGroupIDs, customerOrgID) {
-				continue
-			}
-			// Request types pin their workspace at creation; an unpinned row is
-			// not routable and contributes no fields.
-			if workspaceID == nil || !containsInt(servedWorkspaceIDs, *workspaceID) {
-				continue
-			}
-			visibleRTRoutes = append(visibleRTRoutes, visibleRoute{id: id, itemTypeID: itemTypeID, workspaceID: *workspaceID})
+
+	if formsEnabled {
+		// Visible request types → their custom-typed configured fields.
+		rtRows, err := s.db.QueryContext(ctx, `
+			SELECT rt.id, rt.item_type_id, rt.workspace_id, rt.visibility_group_ids, rt.visibility_org_ids
+			FROM request_types rt
+			WHERE rt.channel_id = ? AND rt.is_active = true AND rt.kind != 'email'
+		`, channelID)
+		if err != nil {
+			return nil, fmt.Errorf("list channel request types: %w", err)
 		}
-	}()
-	if err := rtRows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate channel request types: %w", err)
-	}
-	// Portal channels can resolve asset custom fields through their own asset
-	// endpoints; public form channels cannot.
-	allowAssets := channelType == "portal"
-	for _, route := range visibleRTRoutes {
-		if err := s.collectBoundCustomFieldIDs(ctx, cfIDs, "request_type", route.id, route.workspaceID, route.itemTypeID, allowAssets); err != nil {
-			return nil, err
+		var visibleRTRoutes []visibleRoute
+		func() {
+			defer rtRows.Close()
+			for rtRows.Next() {
+				var id, itemTypeID int
+				var workspaceID *int
+				var groups, orgs sql.NullString
+				if err := rtRows.Scan(&id, &itemTypeID, &workspaceID, &groups, &orgs); err != nil {
+					continue
+				}
+				if !isAdmin && !portalRowVisible(groups, orgs, userGroupIDs, customerOrgID) {
+					continue
+				}
+				// Request types pin their workspace at creation; an unpinned row is
+				// not routable and contributes no fields.
+				if workspaceID == nil || !containsInt(servedWorkspaceIDs, *workspaceID) {
+					continue
+				}
+				visibleRTRoutes = append(visibleRTRoutes, visibleRoute{id: id, itemTypeID: itemTypeID, workspaceID: *workspaceID})
+			}
+		}()
+		if err := rtRows.Err(); err != nil {
+			return nil, fmt.Errorf("iterate channel request types: %w", err)
+		}
+		// Portal channels can resolve asset custom fields through their own asset
+		// endpoints; public form channels cannot.
+		allowAssets := channelType == "portal"
+		for _, route := range visibleRTRoutes {
+			if err := s.collectBoundCustomFieldIDs(ctx, cfIDs, "request_type", route.id, route.workspaceID, route.itemTypeID, allowAssets); err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	// Visible form-mode asset reports → their custom-typed configured fields.
-	// The portal grant is checked inside the query so it needs no second read
-	// connection while this cursor is open.
-	arRows, err := s.db.QueryContext(ctx, `
-		SELECT ar.id, ar.item_type_id, ar.workspace_id, ar.visibility_group_ids, ar.visibility_org_ids
-		FROM asset_reports ar
-		WHERE ar.channel_id = ? AND ar.is_active = true AND ar.run_mode = 'form'
-		  AND EXISTS (SELECT 1 FROM asset_set_portal_access aspa WHERE aspa.set_id = ar.asset_set_id)
-	`, channelID)
-	if err != nil {
-		return nil, fmt.Errorf("list channel asset reports: %w", err)
-	}
-	var visibleARRoutes []visibleRoute
-	func() {
-		defer arRows.Close()
-		for arRows.Next() {
-			var id int
-			var itemTypeID, workspaceID *int
-			var groups, orgs sql.NullString
-			if err := arRows.Scan(&id, &itemTypeID, &workspaceID, &groups, &orgs); err != nil {
-				continue
-			}
-			if !isAdmin && !portalRowVisible(groups, orgs, userGroupIDs, customerOrgID) {
-				continue
-			}
-			if itemTypeID != nil && workspaceID != nil && containsInt(channelConfig.PortalWorkspaceIDs, *workspaceID) {
-				visibleARRoutes = append(visibleARRoutes, visibleRoute{id: id, itemTypeID: *itemTypeID, workspaceID: *workspaceID})
-			}
+	if assetsEnabled {
+		// Visible form-mode asset reports → their custom-typed configured fields.
+		// The portal grant is checked inside the query so it needs no second read
+		// connection while this cursor is open.
+		arRows, err := s.db.QueryContext(ctx, `
+			SELECT ar.id, ar.item_type_id, ar.workspace_id, ar.visibility_group_ids, ar.visibility_org_ids
+			FROM asset_reports ar
+			WHERE ar.channel_id = ? AND ar.is_active = true AND ar.run_mode = 'form'
+			  AND EXISTS (SELECT 1 FROM asset_set_portal_access aspa WHERE aspa.set_id = ar.asset_set_id)
+		`, channelID)
+		if err != nil {
+			return nil, fmt.Errorf("list channel asset reports: %w", err)
 		}
-	}()
-	if err := arRows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate channel asset reports: %w", err)
-	}
-	for _, route := range visibleARRoutes {
-		if err := s.collectBoundCustomFieldIDs(ctx, cfIDs, "asset_report", route.id, route.workspaceID, route.itemTypeID, true); err != nil {
-			return nil, err
+		var visibleARRoutes []visibleRoute
+		func() {
+			defer arRows.Close()
+			for arRows.Next() {
+				var id int
+				var itemTypeID, workspaceID *int
+				var groups, orgs sql.NullString
+				if err := arRows.Scan(&id, &itemTypeID, &workspaceID, &groups, &orgs); err != nil {
+					continue
+				}
+				if !isAdmin && !portalRowVisible(groups, orgs, userGroupIDs, customerOrgID) {
+					continue
+				}
+				if itemTypeID != nil && workspaceID != nil && containsInt(channelConfig.PortalWorkspaceIDs, *workspaceID) {
+					visibleARRoutes = append(visibleARRoutes, visibleRoute{id: id, itemTypeID: *itemTypeID, workspaceID: *workspaceID})
+				}
+			}
+		}()
+		if err := arRows.Err(); err != nil {
+			return nil, fmt.Errorf("iterate channel asset reports: %w", err)
+		}
+		for _, route := range visibleARRoutes {
+			if err := s.collectBoundCustomFieldIDs(ctx, cfIDs, "asset_report", route.id, route.workspaceID, route.itemTypeID, true); err != nil {
+				return nil, err
+			}
 		}
 	}
 
