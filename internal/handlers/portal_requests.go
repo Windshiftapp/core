@@ -176,18 +176,34 @@ func (h *PortalHandler) GetRequestComments(w http.ResponseWriter, r *http.Reques
 	// anything else degrades to plain text. Mention tokens lose their embedded
 	// internal user id. Both the raw markdown (rendered client-side through the
 	// shared read-only editor) and the sanitized HTML form are rewritten.
-	resolver := h.portalKBPageLinkResolver(config)
 	for i := range comments {
-		comments[i].Content = h.portalRawMarkdown(comments[i].Content, config)
-		comments[i].ContentHTML = markdown.RewritePageLinks(comments[i].ContentHTML, resolver)
+		raw, html, err := h.portalCommentProjection(config, comments[i].Content)
+		if err != nil {
+			respondInternalError(w, r, fmt.Errorf("render portal comment %d: %w", comments[i].ID, err))
+			return
+		}
+		comments[i].Content = raw
+		comments[i].ContentHTML = html
 	}
 
 	respondJSONOK(w, comments)
 }
 
+// portalCommentProjection prepares a comment for portal readers. Published
+// page links become in-portal article links, everything else degrades to plain
+// text, and mention tokens lose their embedded internal user id. New and
+// loaded comments share this projection so POST and GET agree.
+func (h *PortalHandler) portalCommentProjection(config models.ChannelConfig, content string) (raw, html string, err error) {
+	html, err = markdown.Render(content)
+	if err != nil {
+		return "", "", err
+	}
+	return h.portalRawMarkdown(content, config), markdown.RewritePageLinks(html, h.portalKBPageLinkResolver(config)), nil
+}
+
 // AddRequestComment adds a comment to a request from a portal customer or internal user
 func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request) {
-	itemID, _, internalUserID, portalCustomerID, _, ctx, cancel, ok := h.resolvePortalRequest(w, r)
+	itemID, config, internalUserID, portalCustomerID, _, ctx, cancel, ok := h.resolvePortalRequest(w, r)
 	if !ok {
 		return
 	}
@@ -216,17 +232,17 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 		respondInternalError(w, r, err)
 		return
 	}
-	contentHTML, err := markdown.Render(comment.Content)
+	content, contentHTML, err := h.portalCommentProjection(config, comment.Content)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("render portal comment: %w", err))
 		return
 	}
 
-	// Return the created comment
+	// Return the created comment projected the same way as a later GET.
 	response := map[string]any{
 		"id":            comment.ID,
 		"item_id":       comment.ItemID,
-		"content":       comment.Content,
+		"content":       content,
 		"content_html":  contentHTML,
 		"created_at":    comment.CreatedAt,
 		"updated_at":    comment.UpdatedAt,
