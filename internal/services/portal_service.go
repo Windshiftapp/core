@@ -463,7 +463,7 @@ func (s *PortalService) GetRequestDetail(_ context.Context, itemID int) (*Portal
 }
 
 // PortalServesRequestWorkspace reports whether the portal channel currently
-// serves the item's workspace. VerifyRequestOwnership applies the same check
+// serves the item's workspace. VerifyRequestEngagement applies the same check
 // for owners; approver-derived access must apply it too, otherwise removing a
 // workspace from a portal leaves active approvers able to read its requests.
 func (s *PortalService) PortalServesRequestWorkspace(ctx context.Context, itemID, portalChannelID int) (bool, error) {
@@ -504,16 +504,15 @@ func (s *PortalService) PortalServesWorkspace(ctx context.Context, portalChannel
 	return portalServesWorkspace(vis, workspaceID), nil
 }
 
-// VerifyRequestOwnership verifies that a user owns a request
-// Returns true if the user owns the request within the specified channel.
-// Since WI-1547 the check also admits items created through enabled intakes
-// linked to this portal, so a customer who opened a ticket by email can read
-// and continue it in the connected portal. Since WI-1136 it also admits
-// external request participants. Since WI-1139 it also admits organisation-shared requests
-// (automatic mode, or requester_choice with the item flag set) when the
-// viewer qualifies for the configured audience. Items outside the portal's
-// served workspaces never pass, regardless of channel linkage or participation.
-func (s *PortalService) VerifyRequestOwnership(ctx context.Context, itemID, channelID int, internalUserID, portalCustomerID *int) (bool, error) {
+// VerifyRequestEngagement reports whether the viewer may actively engage with
+// the request: read it, comment, and upload attachments. True for the creator,
+// external participants (WI-1136) and qualifying organisation peers (WI-1139,
+// automatic mode or requester_choice with the item flag set), as well as items
+// created through enabled intakes linked to this portal (WI-1547). Active
+// approvers read and comment through a separate check and are not admitted
+// here. Items outside the portal's served workspaces never pass, regardless of
+// channel linkage or participation.
+func (s *PortalService) VerifyRequestEngagement(ctx context.Context, itemID, channelID int, internalUserID, portalCustomerID *int) (bool, error) {
 	detail, err := s.GetRequestDetail(ctx, itemID)
 	if err != nil {
 		return false, err
