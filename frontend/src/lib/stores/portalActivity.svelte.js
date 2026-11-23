@@ -54,8 +54,14 @@ function selectView(view) {
   showRequests = view === 'requests';
   showDrafts = view === 'drafts';
   showApprovals = view === 'approvals';
-  if (view !== 'requests') selectedRequest = null;
+  if (view !== 'requests') {
+    // Invalidate any in-flight detail read so leaving the view cannot
+    // restore the old selection later.
+    requestDetailLoadId += 1;
+    selectedRequest = null;
+  }
   if (view !== 'approvals') {
+    approvalDetailLoadId += 1;
     selectedApproval = null;
     selectedApprovalRequest = null;
   }
@@ -203,6 +209,7 @@ function setShowRequests(value) {
     if (isAuthenticated()) void loadRequests();
   } else {
     showRequests = false;
+    requestDetailLoadId += 1;
     selectedRequest = null;
   }
 }
@@ -211,6 +218,7 @@ async function toggleRequests() {
   context.closeProfileMenu();
   if (showRequests) {
     showRequests = false;
+    requestDetailLoadId += 1;
     selectedRequest = null;
     comments = [];
     navigate(`/portal/${context.getSlug()}`);
@@ -365,6 +373,7 @@ function setShowApprovals(value) {
     if (isAuthenticated()) void loadApprovals();
   } else {
     showApprovals = false;
+    approvalDetailLoadId += 1;
     selectedApproval = null;
   }
 }
@@ -373,6 +382,7 @@ async function toggleApprovals() {
   context.closeProfileMenu();
   if (showApprovals) {
     showApprovals = false;
+    approvalDetailLoadId += 1;
     selectedApproval = null;
     navigate(`/portal/${context.getSlug()}`);
     return;
