@@ -77,8 +77,6 @@ CREATE TABLE IF NOT EXISTS items (
 
 -- Workspace and item type indexes
 CREATE INDEX IF NOT EXISTS idx_items_workspace_id ON items(workspace_id);
-CREATE INDEX IF NOT EXISTS idx_items_workspace_item_number ON items(workspace_id, workspace_item_number);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_items_workspace_item_number_unique ON items(workspace_id, workspace_item_number);
 CREATE INDEX IF NOT EXISTS idx_items_item_type_id ON items(item_type_id);
 
 -- Status and priority indexes

@@ -3523,6 +3523,28 @@ CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_m
 		SQLite:        `ALTER TABLE screen_fields ADD COLUMN placement TEXT NOT NULL DEFAULT 'sidebar'`,
 		Postgres:      `ALTER TABLE screen_fields ADD COLUMN IF NOT EXISTS placement TEXT NOT NULL DEFAULT 'sidebar'`,
 	},
+	{
+		// The (workspace_id, workspace_item_number) UNIQUE constraint already
+		// backs a unique index on both engines, so the explicit indexes only
+		// added a second B-tree (and, on SQLite, a third) for the same key.
+		// The constraint predates the 0.8.5 checkpoint, so every supported
+		// upgrade path keeps uniqueness through it and the two-column lookup
+		// still resolves to the constraint-backed index.
+		Version: "20261201_drop_redundant_item_key_indexes",
+		Name:    "Drop item key indexes backed by the unique constraint",
+		// Effect present when the explicit indexes are gone; the checks return
+		// 1 on a fresh install so the runner stamps without dropping again.
+		CheckSQLite: `SELECT CASE WHEN
+			NOT EXISTS (SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_items_workspace_item_number')
+			AND NOT EXISTS (SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_items_workspace_item_number_unique')
+		THEN 1 ELSE 0 END`,
+		CheckPostgres: "SELECT CASE WHEN (SELECT COUNT(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind='i' AND c.relname='idx_items_workspace_item_number' AND n.nspname=current_schema()) = 0 THEN 1 ELSE 0 END",
+		SQLite: `
+			DROP INDEX IF EXISTS idx_items_workspace_item_number;
+			DROP INDEX IF EXISTS idx_items_workspace_item_number_unique;
+		`,
+		Postgres: `DROP INDEX IF EXISTS idx_items_workspace_item_number`,
+	},
 }
 
 // domainEventClaimableIndexMigration adds the partial index the claim query
