@@ -17,7 +17,6 @@ import (
 	"windshift/internal/blobstore"
 	"windshift/internal/database"
 	"windshift/internal/fileserve"
-	"windshift/internal/itemevents"
 	"windshift/internal/markdown"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
@@ -30,8 +29,6 @@ import (
 
 // Portal constants
 const (
-	defaultItemStatus = "open" // Default status for new portal submissions
-
 	// Request body caps for the public (unauthenticated) portal decode paths.
 	// Knowledge-base search carries only a short query string; submissions can
 	// include a description plus custom fields, so they get more headroom.
@@ -867,33 +864,6 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 		targetWorkspaceID = config.PortalWorkspaceIDs[0]
 	}
 
-	initialStatus := defaultItemStatus // Default fallback status
-	if validationResult.ItemTypeID != nil {
-		var status string
-		status, err = services.GetInitialStatusForItemType(h.db, *validationResult.ItemTypeID)
-		if err != nil {
-			slog.Warn("could not determine initial status for item type", slog.String("component", "portal"), slog.Int("item_type_id", *validationResult.ItemTypeID), slog.Any("error", err))
-		} else {
-			initialStatus = status
-		}
-	}
-	customFieldsJSON, err := json.Marshal(validationResult.CustomFieldValues)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	virtualFieldsJSON, err := json.Marshal(validationResult.VirtualFieldValues)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	eventMetadata := itemevents.System("portal")
-	if portalCustomerID != nil {
-		eventMetadata = itemevents.PortalCustomer(*portalCustomerID, "portal")
-	} else if authenticatedUserID != nil {
-		eventMetadata = itemevents.User(*authenticatedUserID, "portal")
-	}
 	// Org sharing (WI-1139): the creator's opt-in is applied only in
 	// requester_choice mode. The item flag is written once and never updated.
 	portalOrgShared := false
@@ -906,43 +876,25 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 		portalOrgShared = sharing.RequestSharing == models.OrgRequestSharingRequesterChoice
 	}
 
-	itemID, err := services.CreateItem(h.db, services.ItemCreationParams{
-		WorkspaceID:             targetWorkspaceID,
-		Title:                   submission.Title,
-		Description:             submission.Description,
-		Status:                  initialStatus,
-		ItemTypeID:              validationResult.ItemTypeID,
-		Priority:                "medium",
-		CreatorID:               authenticatedUserID,
-		CreatorPortalCustomerID: portalCustomerID, // nil for internal users, set for portal customers
-		ChannelID:               &channel.ID,
-		RequestTypeID:           submission.RequestTypeID,
-		PortalOrgShared:         portalOrgShared,
-		CustomFieldValuesJSON:   string(customFieldsJSON),
-		VirtualFieldDataJSON:    string(virtualFieldsJSON),
-		EventMetadata:           eventMetadata,
+	itemID, err := services.CreateSubmittedItem(h.db, services.SubmittedItemInput{
+		WorkspaceID:       targetWorkspaceID,
+		Title:             submission.Title,
+		Description:       submission.Description,
+		ValidationResult:  validationResult,
+		CreatorID:         authenticatedUserID,
+		CreatorCustomerID: portalCustomerID,
+		ChannelID:         channel.ID,
+		RequestTypeID:     submission.RequestTypeID,
+		PortalOrgShared:   portalOrgShared,
+		Source:            "portal",
+		LogComponent:      "portal",
 	})
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	if h.eventCoordinator != nil {
-		fullItem, fetchErr := repository.NewItemRepository(h.db).FindByIDWithDetailsContext(ctx, int(itemID))
-		if fetchErr != nil {
-			slog.Error("failed to hydrate portal-created item for side effects", slog.Int64("item_id", itemID), slog.Any("error", fetchErr))
-		} else {
-			actorID := 0
-			if authenticatedUserID != nil {
-				actorID = *authenticatedUserID
-			}
-			h.eventCoordinator.EmitItemCreated(fullItem, actorID)
-		}
-	}
-
-	if _, err := h.db.ExecWriteContext(ctx, `UPDATE channels SET last_activity = ? WHERE id = ?`, time.Now(), channel.ID); err != nil {
-		slog.Warn("failed to update channel last_activity", slog.String("component", "portal"), slog.Int("channel_id", channel.ID), slog.Any("error", err))
-	}
+	services.DispatchSubmittedItemSideEffects(ctx, h.db, h.eventCoordinator, itemID, authenticatedUserID, channel.ID, "portal", "portal")
 
 	// Drop any in-progress draft for this request type — the user just
 	// submitted, so the saved state is no longer interesting. Best-effort:
