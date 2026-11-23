@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -476,20 +477,21 @@ func (h *HubHandler) getRequestTypesForPortals(ctx context.Context, portalIDs []
 	for rows.Next() {
 		var rt models.HubPortalRequestType
 		var channelID int
-		var visGroupIDs, visOrgIDs *string
+		var visGroupIDs, visOrgIDs sql.NullString
 		err = rows.Scan(&rt.ID, &channelID, &rt.Name, &rt.Description, &rt.Icon, &rt.Color, &visGroupIDs, &visOrgIDs)
 		if err != nil {
 			return nil, err
 		}
 
-		// Create full RequestType to use IsVisibleTo method
-		fullRT := models.RequestType{
-			VisibilityGroupIDs: deserializeIntArray(visGroupIDs),
-			VisibilityOrgIDs:   deserializeIntArray(visOrgIDs),
+		visible, err := requestTypeVisibleTo(visGroupIDs, visOrgIDs, userGroupIDs, nil)
+		if err != nil {
+			slog.Error("hiding hub request type with invalid visibility configuration",
+				slog.String("component", "hub"), slog.Int("request_type_id", rt.ID), slog.Any("error", err))
+			continue
 		}
 
-		// Admin sees all, others filtered by visibility
-		if isAdmin || fullRT.IsVisibleTo(userGroupIDs, nil) {
+		// Admin sees all, others filtered by visibility.
+		if isAdmin || visible {
 			result[channelID] = append(result[channelID], rt)
 		}
 	}

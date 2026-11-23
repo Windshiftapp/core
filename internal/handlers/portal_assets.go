@@ -1033,16 +1033,15 @@ func (h *PortalHandler) visibleRequestTypeIDs(ctx context.Context, channelID int
 		if err := rows.Scan(&id, &groupIDs, &orgIDs); err != nil {
 			return nil, err
 		}
-		groups, err := unmarshalIntIDs(groupIDs)
+		allowed, err := requestTypeVisibleTo(groupIDs, orgIDs, vc.userGroupIDs, vc.customerOrgID)
 		if err != nil {
-			return nil, fmt.Errorf("parse request type %d visibility groups: %w", id, err)
+			// One malformed unrelated type must not fail the whole listing; hide
+			// it so row actions cannot target it.
+			slog.Error("hiding request type with invalid visibility configuration",
+				slog.String("component", "portal_assets"), slog.Int("request_type_id", id), slog.Any("error", err))
+			continue
 		}
-		orgs, err := unmarshalIntIDs(orgIDs)
-		if err != nil {
-			return nil, fmt.Errorf("parse request type %d visibility organizations: %w", id, err)
-		}
-		rt := models.RequestType{VisibilityGroupIDs: groups, VisibilityOrgIDs: orgs}
-		if vc.isAdmin || rt.IsVisibleTo(vc.userGroupIDs, vc.customerOrgID) {
+		if vc.isAdmin || allowed {
 			visible[id] = true
 		}
 	}

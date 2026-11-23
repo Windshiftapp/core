@@ -359,6 +359,23 @@ func applyRequestTypeVisibility(rt *models.RequestType, groups, orgs sql.NullStr
 	return nil
 }
 
+// requestTypeVisibleTo decodes a stored request-type audience and reports
+// whether the viewer may see it. A malformed audience list is an error, so the
+// caller hides the row rather than treating it as unrestricted. This is the
+// single audience predicate for catalog, hub and report projections.
+func requestTypeVisibleTo(groups, orgs sql.NullString, userGroupIDs []int, customerOrgID *int) (bool, error) {
+	groupIDs, err := unmarshalIntIDs(groups)
+	if err != nil {
+		return false, err
+	}
+	orgIDs, err := unmarshalIntIDs(orgs)
+	if err != nil {
+		return false, err
+	}
+	rt := models.RequestType{VisibilityGroupIDs: groupIDs, VisibilityOrgIDs: orgIDs}
+	return rt.IsVisibleTo(userGroupIDs, customerOrgID), nil
+}
+
 // NewPortalHandler creates a new portal handler
 func NewPortalHandler(db database.Database, sessionManager *auth.SessionManager, portalSessionManager *auth.PortalSessionManager, ipExtractor *utils.IPExtractor, storage *blobstore.Store) *PortalHandler {
 	var attachments *services.ItemAttachmentService
@@ -510,15 +527,12 @@ func (h *PortalHandler) resolvePortalBySlugTimeout(w http.ResponseWriter, r *htt
 }
 
 // callerVisibility resolves the group and organisation IDs that gate request
-// type and asset report visibility for the current caller (internal user
-// groups, plus the org when the caller is a portal customer).
-func (h *PortalHandler) callerVisibility(ctx context.Context, r *http.Request) (userGroupIDs []int, customerOrgID *int) {
-	_, portalCustomerID := h.getAuthFromContext(r)
-	userGroupIDs = h.getInternalUserGroupIDs(ctx, r)
-	if portalCustomerID != nil {
-		customerOrgID = h.getPortalCustomerOrgID(ctx, *portalCustomerID)
-	}
-	return userGroupIDs, customerOrgID
+// type and asset report visibility for the current caller. It uses the same
+// cookie-aware context as the catalog so a form offered by the catalog opens
+// for the same viewer (internal groups plus the bound portal session's org).
+func (h *PortalHandler) callerVisibility(ctx context.Context, r *http.Request, channelID int) (userGroupIDs []int, customerOrgID *int) {
+	vc := h.getPortalVisibilityContext(ctx, r, channelID)
+	return vc.userGroupIDs, vc.customerOrgID
 }
 
 // resolveVisibleRequestType loads a request type and enforces the channel and
@@ -531,7 +545,7 @@ func (h *PortalHandler) resolveVisibleRequestType(ctx context.Context, w http.Re
 		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Request type not found"))
 		return nil, false
 	}
-	userGroupIDs, customerOrgID := h.callerVisibility(ctx, r)
+	userGroupIDs, customerOrgID := h.callerVisibility(ctx, r, channelID)
 	if !rt.IsVisibleTo(userGroupIDs, customerOrgID) {
 		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Request type not found"))
 		return nil, false
@@ -715,13 +729,13 @@ func (h *PortalHandler) loadPortalRequestTypes(ctx context.Context, channelID in
 		rt.WorkspaceName = workspaceName.String
 		rt.WorkspaceKey = workspaceKey.String
 
-		if err := applyRequestTypeVisibility(&rt, visibilityGroupIDs, visibilityOrgIDs); err != nil {
+		allowed, err := requestTypeVisibleTo(visibilityGroupIDs, visibilityOrgIDs, vc.userGroupIDs, vc.customerOrgID)
+		if err != nil {
 			slog.Error("hiding request type with invalid visibility configuration",
 				slog.String("component", "portal"), slog.Int("request_type_id", rt.ID), slog.Any("error", err))
 			continue
 		}
-
-		if rt.IsVisibleTo(vc.userGroupIDs, vc.customerOrgID) {
+		if allowed {
 			// Visibility principals are internal routing data; the public portal
 			// contract exposes only what the form needs (mirrors
 			// PublicAssetReport, which drops the same IDs).

@@ -138,7 +138,7 @@ func (h *PortalHandler) GetMyDrafts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userGroupIDs, customerOrgID := h.callerVisibility(ctx, r)
+	userGroupIDs, customerOrgID := h.callerVisibility(ctx, r, channel.ID)
 	visible := make([]repository.PortalRequestDraftSummary, 0, len(summaries))
 	for _, summary := range summaries {
 		requestType, loadErr := h.getRequestTypeWithVisibility(ctx, summary.RequestTypeID)
