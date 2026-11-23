@@ -823,6 +823,10 @@ type ApprovalRequest struct {
 	CompletedAt         *time.Time             `json:"completed_at,omitempty"`
 	StepInstances       []ApprovalStepInstance `json:"step_instances,omitempty"`
 	Decisions           []ApprovalDecision     `json:"decisions,omitempty"`
+	// CanDecide is a portal-only projection: the viewer is in the active pool
+	// of a currently pending step. Historical approvers keep read access but
+	// not this, and internal callers leave it unset.
+	CanDecide bool `json:"can_decide,omitempty"`
 }
 
 // ApprovalStepInstance is a per-step runtime row.
