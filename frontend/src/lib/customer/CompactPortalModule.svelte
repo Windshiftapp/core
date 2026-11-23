@@ -38,12 +38,13 @@
       portalStore.hydrateUserBootstrap(bootstrap);
       if (!bootstrap?.authenticated) { ready = true; return; }
       if (kind === 'requests') {
+        // setVisible starts the list load; only a deep link needs an explicit
+        // detail read. Calling load() here as well issued a second list GET.
         portalRequestsStore.setVisible(true);
         if ($currentRoute.query?.id) await portalRequestsStore.loadAndView($currentRoute.query.id);
-        else await portalRequestsStore.load();
       }
-      if (kind === 'approvals') { portalApprovalsStore.setVisible(true); if ($currentRoute.query?.id) await portalApprovalsStore.loadAndView($currentRoute.query.id); else await portalApprovalsStore.load(); }
-      if (kind === 'drafts') { portalDraftsStore.setVisible(true); await portalDraftsStore.load(); }
+      if (kind === 'approvals') { portalApprovalsStore.setVisible(true); if ($currentRoute.query?.id) await portalApprovalsStore.loadAndView($currentRoute.query.id); }
+      if (kind === 'drafts') { portalDraftsStore.setVisible(true); }
       if (kind === 'forms') {
         await portalCatalogStore.loadRequestTypes();
         if (disposed) return;
