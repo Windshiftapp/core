@@ -525,6 +525,29 @@ class WorkspaceDataStore {
     this.#screenConfigPromises.clear();
   }
 
+  /**
+   * Drop the cached effective configurations for one workspace (after its
+   * assigned configuration set changed). Bumping the epoch discards any
+   * in-flight pre-change response for that workspace so a slow read cannot
+   * repopulate the cache with the old screens or priorities.
+   */
+  invalidateScreenConfigsFor(workspaceId) {
+    if (workspaceId == null || workspaceId === 'global') return;
+    const prefix = `${workspaceId}:`;
+    this.#screenConfigEpoch += 1;
+    const remaining = {};
+    for (const [key, config] of Object.entries(this.screenConfigs)) {
+      if (!key.startsWith(prefix)) remaining[key] = config;
+    }
+    this.screenConfigs = remaining;
+    for (const key of [...this.#screenConfigAccess.keys()]) {
+      if (key.startsWith(prefix)) this.#screenConfigAccess.delete(key);
+    }
+    for (const key of [...this.#screenConfigPromises.keys()]) {
+      if (key.startsWith(prefix)) this.#screenConfigPromises.delete(key);
+    }
+  }
+
   #storeScreenConfig(key, config) {
     this.screenConfigs = { ...this.screenConfigs, [key]: config };
     this.#touchScreenConfig(key);

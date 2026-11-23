@@ -11,6 +11,7 @@ import { workspaceDataStore } from './workspaceDataStore.svelte.js';
  * - `store`: a `workspaceDataStore` field,
  * - `editor`: a `collectionEditorOptions` family,
  * - `screenConfigs`: cached effective configurations,
+ * - `screenConfigsForWorkspace`: cached effective configurations for one workspace,
  * - `fullRefresh`: everything (used for cross-cutting changes).
  *
  * Matching is deliberately coarse: re-fetching an unchanged family is cheap and
@@ -39,6 +40,10 @@ const REFERENCE_ENDPOINTS = [
   { match: /\/(?:time\/projects)(?:\/|$)/, store: 'projects', editor: 'projects' },
   { match: /\/(?:labels)(?:\/|$)/, store: 'labels' },
   { match: /\/(?:configuration-sets|screens|workflows)(?:\/|$)/, screenConfigs: true },
+  // Workspace-scoped assignment (WI-1359): PUT /workspaces/:id/configuration-set.
+  // The singular endpoint changes only that workspace's effective configuration,
+  // so drop just its cached screens/priorities instead of every workspace's.
+  { match: /\/configuration-set(?:\/|$)/, screenConfigsForWorkspace: true },
   // Object translations change display names across several directories.
   { match: /\/(?:object-translations)(?:\/|$)/, fullRefresh: true },
   { match: /^\/workspaces\/\d+$/, store: 'workspace' },
@@ -85,6 +90,9 @@ export function applyReferenceInvalidation(
       else editorOptions.invalidate(workspaceId, rule.editor);
     }
     if (rule.screenConfigs) store.invalidateScreenConfigs?.();
+    if (rule.screenConfigsForWorkspace && workspaceId != null) {
+      store.invalidateScreenConfigsFor?.(workspaceId);
+    }
   }
 
   return true;
