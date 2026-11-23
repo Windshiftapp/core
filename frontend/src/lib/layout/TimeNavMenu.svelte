@@ -23,6 +23,11 @@
 
   const isActive = $derived($currentRoute.view === 'time');
 
+  // A timer needs a workspace: the open item's, the item modal's, or the
+  // workspace route. Without one the action can only fail, so the menu hides
+  // it and the global shortcut stays inert.
+  const timerWorkspaceId = $derived.by(() => resolveTimerWorkspaceId($currentRoute));
+
   const projectOptions = $derived(
     timeLogStore.projects
       .filter((project) => project.status === 'Active')
@@ -85,7 +90,7 @@
         onClick: stopTimer,
         testid: 'time-menu-stop-timer',
       });
-    } else {
+    } else if (timerWorkspaceId) {
       out.push({
         id: 'start-timer',
         type: 'regular',
@@ -178,7 +183,7 @@
 <Button
   class="sr-only"
   onclick={() => startTimer()}
-  hotkeyConfig={{ key: toHotkeyString('global', 'startTimer'), guard: () => timerStore.canStart }}
+  hotkeyConfig={{ key: toHotkeyString('global', 'startTimer'), guard: () => timerStore.canStart && timerWorkspaceId != null }}
 >{t('items.startTimer')}</Button>
 <Button
   class="sr-only"
