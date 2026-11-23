@@ -43,6 +43,10 @@ export function portalRequestUrl(slug, itemId) {
   return `/portal/${slug}${qs({ view: 'requests', id: itemId })}`;
 }
 
+// portalRequestTypeUrl builds the canonical deep link for a portal request
+// form. Classic and Compact both route /request/{id}, so a hub click lands on
+// the same form in either presentation. Legacy ?request-type= links stay
+// supported by the route parsers.
 export function portalRequestTypeUrl(slug, requestTypeId) {
-  return `/portal/${slug}${qs({ 'request-type': requestTypeId })}`;
+  return `/portal/${slug}/request/${requestTypeId}`;
 }

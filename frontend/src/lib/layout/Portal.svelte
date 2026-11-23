@@ -222,9 +222,12 @@
       if (approvalIdParam && isUserAuthenticated) {
         portalApprovalsStore.loadAndView(approvalIdParam);
       }
+    } else if (viewParam === 'drafts') {
+      portalDraftsStore.setVisible(true);
     } else {
       portalRequestsStore.setVisible(false);
       portalApprovalsStore.setVisible(false);
+      portalDraftsStore.setVisible(false);
 
       // The legacy ?request-type= deep link is now an alias for the real
       // request route.
