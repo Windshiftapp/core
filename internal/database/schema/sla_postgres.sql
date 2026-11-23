@@ -74,8 +74,6 @@ CREATE TABLE IF NOT EXISTS sla_metric_conditions (
 	UNIQUE(metric_id, phase, position)
 );
 
-CREATE INDEX IF NOT EXISTS idx_sla_metric_conditions_metric ON sla_metric_conditions(metric_id, phase, position);
-
 CREATE TABLE IF NOT EXISTS sla_goals (
 	id SERIAL PRIMARY KEY,
 	metric_id INTEGER NOT NULL,
@@ -91,8 +89,6 @@ CREATE TABLE IF NOT EXISTS sla_goals (
 	UNIQUE(metric_id, position)
 );
 
-CREATE INDEX IF NOT EXISTS idx_sla_goals_metric ON sla_goals(metric_id, position);
-
 CREATE TABLE IF NOT EXISTS sla_goal_targets (
 	id SERIAL PRIMARY KEY,
 	goal_id INTEGER NOT NULL,
@@ -106,7 +102,6 @@ CREATE TABLE IF NOT EXISTS sla_goal_targets (
 	UNIQUE(goal_id, position)
 );
 
-CREATE INDEX IF NOT EXISTS idx_sla_goal_targets_goal ON sla_goal_targets(goal_id, position);
 CREATE INDEX IF NOT EXISTS idx_sla_goal_targets_calendar ON sla_goal_targets(calendar_id);
 
 CREATE TABLE IF NOT EXISTS item_sla_cycles (

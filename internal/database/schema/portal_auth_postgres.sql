@@ -34,10 +34,8 @@ CREATE TABLE IF NOT EXISTS portal_customer_sessions (
 );
 
 -- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_portal_magic_links_token ON portal_customer_magic_links(token);
 CREATE INDEX IF NOT EXISTS idx_portal_magic_links_customer_id ON portal_customer_magic_links(portal_customer_id);
 CREATE INDEX IF NOT EXISTS idx_portal_magic_links_expires_at ON portal_customer_magic_links(expires_at);
-CREATE INDEX IF NOT EXISTS idx_portal_sessions_token ON portal_customer_sessions(session_token);
 CREATE INDEX IF NOT EXISTS idx_portal_sessions_customer_id ON portal_customer_sessions(portal_customer_id);
 CREATE INDEX IF NOT EXISTS idx_portal_sessions_expires_at ON portal_customer_sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_portal_sessions_channel_id ON portal_customer_sessions(channel_id);

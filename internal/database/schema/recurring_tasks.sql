@@ -49,7 +49,6 @@ CREATE TABLE IF NOT EXISTS recurrence_rules (
 -- Index for efficient scheduler queries (only check active rules)
 CREATE INDEX IF NOT EXISTS idx_recurrence_rules_next_check ON recurrence_rules(next_generation_check) WHERE is_active = TRUE;
 CREATE INDEX IF NOT EXISTS idx_recurrence_rules_workspace ON recurrence_rules(workspace_id);
-CREATE INDEX IF NOT EXISTS idx_recurrence_rules_template ON recurrence_rules(template_item_id);
 CREATE INDEX IF NOT EXISTS idx_recurrence_rules_active ON recurrence_rules(is_active);
 
 -- Recurrence Instances (junction table linking templates to generated instances)
@@ -72,8 +71,6 @@ CREATE TABLE IF NOT EXISTS recurrence_instances (
 
 -- Indexes for efficient queries
 CREATE INDEX IF NOT EXISTS idx_recurrence_instances_rule ON recurrence_instances(recurrence_rule_id);
-CREATE INDEX IF NOT EXISTS idx_recurrence_instances_item ON recurrence_instances(instance_item_id);
 CREATE INDEX IF NOT EXISTS idx_recurrence_instances_date ON recurrence_instances(scheduled_date);
-CREATE INDEX IF NOT EXISTS idx_recurrence_instances_rule_date ON recurrence_instances(recurrence_rule_id, scheduled_date);
 
 -- migration: 0000_baseline

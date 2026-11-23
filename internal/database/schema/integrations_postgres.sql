@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS integration_providers (
 	updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_integration_providers_slug ON integration_providers(slug);
 CREATE INDEX IF NOT EXISTS idx_integration_providers_type ON integration_providers(provider_type);
 CREATE INDEX IF NOT EXISTS idx_integration_providers_enabled ON integration_providers(enabled);
 
@@ -30,7 +29,6 @@ CREATE TABLE IF NOT EXISTS integration_oauth_state (
 	created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_integration_oauth_state_state ON integration_oauth_state(state);
 CREATE INDEX IF NOT EXISTS idx_integration_oauth_state_expires ON integration_oauth_state(expires_at);
 
 -- User Integration Tokens (per-user OAuth tokens for integration providers).
@@ -128,7 +126,6 @@ CREATE TABLE IF NOT EXISTS todoist_task_links (
 );
 
 CREATE INDEX IF NOT EXISTS idx_todoist_task_links_user ON todoist_task_links(user_id);
-CREATE INDEX IF NOT EXISTS idx_todoist_task_links_item ON todoist_task_links(item_id);
 CREATE INDEX IF NOT EXISTS idx_todoist_task_links_todoist ON todoist_task_links(todoist_task_id);
 
 CREATE TABLE IF NOT EXISTS zammad_connections (

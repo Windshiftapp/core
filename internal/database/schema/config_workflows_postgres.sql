@@ -181,5 +181,4 @@ CREATE INDEX IF NOT EXISTS idx_configuration_set_screens_config_id ON configurat
 CREATE INDEX IF NOT EXISTS idx_configuration_set_screens_screen_id ON configuration_set_screens(screen_id);
 
 -- Workspace configuration set indexes
-CREATE INDEX IF NOT EXISTS idx_workspace_configuration_sets_workspace_id ON workspace_configuration_sets(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_workspace_configuration_sets_config_id ON workspace_configuration_sets(configuration_set_id);

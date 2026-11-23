@@ -32,7 +32,6 @@ CREATE TABLE IF NOT EXISTS portal_customer_channels (
 	UNIQUE(portal_customer_id, channel_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_portal_customers_email ON portal_customers(email);
 CREATE INDEX IF NOT EXISTS idx_portal_customers_email_lower ON portal_customers(LOWER(email));
 CREATE INDEX IF NOT EXISTS idx_portal_customers_user_id ON portal_customers(user_id);
 CREATE INDEX IF NOT EXISTS idx_portal_customers_org_id ON portal_customers(customer_organisation_id);
@@ -60,7 +59,6 @@ CREATE TABLE IF NOT EXISTS portal_customer_roles (
 	UNIQUE(portal_customer_id, contact_role_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_contact_roles_name ON contact_roles(name);
 CREATE INDEX IF NOT EXISTS idx_portal_customer_roles_customer_id ON portal_customer_roles(portal_customer_id);
 CREATE INDEX IF NOT EXISTS idx_portal_customer_roles_role_id ON portal_customer_roles(contact_role_id);
 
@@ -90,7 +88,6 @@ CREATE TABLE IF NOT EXISTS customer_erasure_records (
 );
 
 CREATE INDEX IF NOT EXISTS idx_customer_erasure_records_customer_id ON customer_erasure_records(portal_customer_id);
-
 
 -- migration: 20261005_portal_customers_erased_at
 -- migration: 20261005_customer_erasure_records

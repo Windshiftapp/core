@@ -46,8 +46,6 @@ CREATE TABLE IF NOT EXISTS users (
 	CONSTRAINT users_oauth_client_requires_oauth_agent CHECK (oauth_client_id IS NULL OR (is_agent = true AND agent_provenance = 'oauth'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_scim_external_id ON users(scim_external_id) WHERE scim_external_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_scim_managed ON users(scim_managed);
 CREATE INDEX IF NOT EXISTS idx_users_is_agent ON users(is_agent);
@@ -306,7 +304,6 @@ CREATE TABLE IF NOT EXISTS system_settings (
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_system_settings_key ON system_settings(key);
 CREATE INDEX IF NOT EXISTS idx_system_settings_category ON system_settings(category);
 
 CREATE TABLE IF NOT EXISTS themes (
@@ -468,4 +465,3 @@ CREATE TABLE IF NOT EXISTS contact_roles (
 
 CREATE INDEX IF NOT EXISTS idx_item_types_hierarchy_level ON item_types(hierarchy_level);
 CREATE INDEX IF NOT EXISTS idx_item_types_sort_order ON item_types(sort_order);
-CREATE INDEX IF NOT EXISTS idx_hierarchy_levels_level ON hierarchy_levels(level);
