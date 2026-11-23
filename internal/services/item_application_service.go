@@ -872,11 +872,13 @@ func (s *ItemApplicationService) Create(ctx context.Context, actor AuditActor, i
 	}
 	items := []models.Item{*result.Item}
 	if err := s.enrich(ctx, actor.UserID, items); err != nil {
-		return nil, err
+		// The item is committed. Return it alongside the error so an adapter can
+		// audit and report the stored row instead of retrying and duplicating it.
+		return result.Item, err
 	}
 	items[0].DescriptionHTML, err = markdown.Render(items[0].Description)
 	if err != nil {
-		return nil, fmt.Errorf("render item description: %w", err)
+		return result.Item, fmt.Errorf("render item description: %w", err)
 	}
 	return &items[0], nil
 }

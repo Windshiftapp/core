@@ -364,13 +364,21 @@ func init() {
 				CustomFieldValues: args.CustomFieldValues,
 				EventMetadata:     env.eventMetadata(),
 			})
+			if created != nil {
+				// Audit as soon as the row exists: enrichment can fail after commit.
+				env.AuditWrite(logger.ResourceItem, created.ID, "create_item", created.Title)
+			}
 			if err != nil {
+				if created != nil {
+					// The item committed; only response decoration failed. Report the
+					// stored row so a caller does not retry and duplicate it.
+					return itemToSummary(created), nil
+				}
 				if errors.Is(err, services.ErrItemForbidden) {
 					return map[string]string{"error": "permission denied"}, nil
 				}
 				return map[string]string{"error": fmt.Sprintf("create failed: %s", err.Error())}, nil //nolint:nilerr // surface as a tool error in JSON, not as a protocol error
 			}
-			env.AuditWrite(logger.ResourceItem, created.ID, "create_item", created.Title)
 			return itemToSummary(created), nil
 		},
 	})
