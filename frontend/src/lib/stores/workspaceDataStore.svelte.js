@@ -35,6 +35,9 @@ class WorkspaceDataStore {
   /** @type {Map<string, Promise<object>>} */
   #screenConfigPromises = new Map();
   #screenConfigEpoch = 0;
+  // Per-workspace epochs so invalidating one workspace leaves another
+  // workspace's in-flight reads eligible for caching.
+  #screenConfigWorkspaceEpoch = new Map();
   /** @type {Map<string, true>} Insertion order is least-recently-used first. */
   #screenConfigAccess = new Map();
   /** @type {Map<number, {promise: Promise<object|null>, resolve: (user: object|null) => void}>} */
@@ -317,6 +320,7 @@ class WorkspaceDataStore {
     this.#screenConfigAccess.clear();
     this.planningCompleteness = null;
     this.#screenConfigPromises.clear();
+    this.#screenConfigWorkspaceEpoch.clear();
     this.resetUserDisplayCache();
     this.#bootstrapPromises.clear();
     this.lastRefreshedAt = null;
@@ -497,13 +501,17 @@ class WorkspaceDataStore {
     if (pending) return pending;
 
     const epoch = this.#screenConfigEpoch;
+    const workspaceEpoch = this.#screenConfigWorkspaceEpochFor(workspaceId);
     const promise = workspaces
       .getEffectiveConfig(workspaceId, itemTypeId, {
         ...FOREGROUND_READ,
         signal: this.#controller.signal,
       })
       .then((config) => {
-        if (this.#screenConfigEpoch === epoch) {
+        if (
+          this.#screenConfigEpoch === epoch &&
+          this.#screenConfigWorkspaceEpochFor(workspaceId) === workspaceEpoch
+        ) {
           this.#storeScreenConfig(key, config);
         }
         return config;
@@ -527,14 +535,16 @@ class WorkspaceDataStore {
 
   /**
    * Drop the cached effective configurations for one workspace (after its
-   * assigned configuration set changed). Bumping the epoch discards any
-   * in-flight pre-change response for that workspace so a slow read cannot
-   * repopulate the cache with the old screens or priorities.
+   * assigned configuration set changed). Only that workspace's epoch moves, so
+   * an in-flight pre-change read for this workspace is discarded while a
+   * pending read for another workspace is still cached when it resolves.
    */
   invalidateScreenConfigsFor(workspaceId) {
     if (workspaceId == null || workspaceId === 'global') return;
+    const id = Number(workspaceId);
+    if (!Number.isInteger(id) || id <= 0) return;
     const prefix = `${workspaceId}:`;
-    this.#screenConfigEpoch += 1;
+    this.#screenConfigWorkspaceEpoch.set(id, (this.#screenConfigWorkspaceEpoch.get(id) ?? 0) + 1);
     const remaining = {};
     for (const [key, config] of Object.entries(this.screenConfigs)) {
       if (!key.startsWith(prefix)) remaining[key] = config;
@@ -546,6 +556,11 @@ class WorkspaceDataStore {
     for (const key of [...this.#screenConfigPromises.keys()]) {
       if (key.startsWith(prefix)) this.#screenConfigPromises.delete(key);
     }
+  }
+
+  #screenConfigWorkspaceEpochFor(workspaceId) {
+    const id = Number(workspaceId);
+    return Number.isInteger(id) && id > 0 ? (this.#screenConfigWorkspaceEpoch.get(id) ?? 0) : 0;
   }
 
   #storeScreenConfig(key, config) {
@@ -576,11 +591,15 @@ class WorkspaceDataStore {
         const itemTypeId = itemTypePart === 'default' ? null : Number(itemTypePart);
         if (!Number.isInteger(workspaceId) || workspaceId <= 0) return;
         const epoch = this.#screenConfigEpoch;
+        const workspaceEpoch = this.#screenConfigWorkspaceEpochFor(workspaceId);
         try {
           const config = await workspaces.getEffectiveConfig(workspaceId, itemTypeId, {
             signal: this.#controller.signal,
           });
-          if (this.#screenConfigEpoch === epoch) {
+          if (
+            this.#screenConfigEpoch === epoch &&
+            this.#screenConfigWorkspaceEpochFor(workspaceId) === workspaceEpoch
+          ) {
             this.#storeScreenConfig(key, config);
           }
         } catch (err) {

@@ -42,8 +42,9 @@ const REFERENCE_ENDPOINTS = [
   { match: /\/(?:configuration-sets|screens|workflows)(?:\/|$)/, screenConfigs: true },
   // Workspace-scoped assignment (WI-1359): PUT /workspaces/:id/configuration-set.
   // The singular endpoint changes only that workspace's effective configuration,
-  // so drop just its cached screens/priorities instead of every workspace's.
-  { match: /\/configuration-set(?:\/|$)/, screenConfigsForWorkspace: true },
+  // so drop its cached screens and priority options instead of every
+  // workspace's.
+  { match: /\/configuration-set(?:\/|$)/, editor: 'priorities', screenConfigsForWorkspace: true },
   // Object translations change display names across several directories.
   { match: /\/(?:object-translations)(?:\/|$)/, fullRefresh: true },
   { match: /^\/workspaces\/\d+$/, store: 'workspace' },
