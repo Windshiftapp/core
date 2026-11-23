@@ -12,7 +12,6 @@ import EmptyState from '../components/EmptyState.svelte';
   import { portalCustomizationStore as portalStore } from '../stores/portal.svelte.js';
   import { iconMap } from '../stores/portalPresentation.js';
   import { t } from '../stores/i18n.svelte.js';
-  import Input from '../components/Input.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import { buildRowActionHref } from './rowActions.js';
   import { toExternal } from '../runtime/contextPath.js';
@@ -35,15 +34,6 @@ import EmptyState from '../components/EmptyState.svelte';
   let totalPages = $state(0);
   let customFieldDefinitions = $state([]);
   let definitionLoadToken = 0;
-
-  // Form-mode state. For run_mode='form' reports the user submits values that
-  // get substituted into the report's CQL before the query runs. Until they
-  // submit, we render the form instead of running the query.
-  let isFormMode = $derived(report?.run_mode === 'form');
-  let formFields = $state([]);
-  let formValues = $state({});
-  let formSubmitted = $state(false);
-  let formLoading = $state(false);
 
   // Stale-response guard: rapid prev/next clicks fire concurrent loads, and
   // whichever resolves last would otherwise win regardless of which page the
@@ -72,20 +62,7 @@ import EmptyState from '../components/EmptyState.svelte';
       loading = true;
       error = null;
 
-      let result;
-      if (isFormMode && formSubmitted) {
-        result = await assetReports.submit(slug, report.id, {
-          params: formValues,
-          page,
-          perPage: pageSize
-        });
-      } else if (!isFormMode) {
-        result = await assetReports.execute(slug, report.id, { page, pageSize });
-      } else {
-        // Form mode, not yet submitted — don't run the query.
-        loading = false;
-        return;
-      }
+      const result = await assetReports.execute(slug, report.id, { page, pageSize });
 
       if (myToken !== loadToken) return;
 
@@ -99,26 +76,6 @@ import EmptyState from '../components/EmptyState.svelte';
       assets = [];
     } finally {
       if (myToken === loadToken) loading = false;
-    }
-  }
-
-  // Fetch the form schema when this is a form-mode report. Mirrors the same
-  // visibility check on the backend, so a 404 here means the customer isn't
-  // allowed to see (or run) this report.
-  async function loadFormFields() {
-    if (!isFormMode || !slug || !report?.id) return;
-    try {
-      formLoading = true;
-      error = null;
-      formFields = await assetReports.getPortalFields(slug, report.id);
-      const initial = {};
-      for (const f of formFields) initial[f.field_identifier] = '';
-      formValues = initial;
-    } catch (err) {
-      console.error('Failed to load asset report fields:', err);
-      error = err.message || 'Failed to load form fields';
-    } finally {
-      formLoading = false;
     }
   }
 
@@ -141,31 +98,9 @@ import EmptyState from '../components/EmptyState.svelte';
     }
   }
 
-  function submitForm(event) {
-    event?.preventDefault?.();
-    formSubmitted = true;
-    page = 1;
-    loadAssets();
-  }
-
-  function resetForm() {
-    formSubmitted = false;
-    assets = [];
-    totalCount = 0;
-    totalPages = 0;
-    page = 1;
-  }
-
   // Reload when page changes. Fires once on mount too — no separate onMount.
-  // For form-mode reports the effect drives both the schema fetch (once) and
-  // the query (after submit).
   $effect(() => {
     page;
-    if (isFormMode && !formSubmitted && formFields.length === 0) {
-      loadFormFields();
-      loading = false;
-      return;
-    }
     loadAssets();
   });
 
@@ -285,74 +220,6 @@ import EmptyState from '../components/EmptyState.svelte';
     {/if}
   </div>
 
-  {#if isFormMode && !formSubmitted}
-    <!-- Form-mode: render the field schema as a simple form. On submit, the
-         values get substituted into the report's CQL (server-side) and the
-         results render via the table branch below. -->
-    <div class="p-4">
-      {#if formLoading}
-        <StateDisplay type="loading" />
-      {:else if error}
-        <div class="flex items-center gap-2 py-4">
-          <AlertCircle class="w-5 h-5 text-ds-icon-danger" />
-          <span class="text-sm text-ds-text-danger">{error}</span>
-        </div>
-      {:else if formFields.length === 0}
-        <p class="text-sm text-center py-6" style="color: var(--ds-text-subtle);">
-          {t('portal.noFormFieldsConfigured')}
-        </p>
-      {:else}
-        <form onsubmit={submitForm} class="space-y-3">
-          {#each formFields as field (field.id)}
-            <div>
-              <label
-                for={`ar-field-${field.id}`}
-                class="block text-sm font-medium mb-1"
-                style="color: var(--ds-text);"
-              >
-                {field.field_label || field.field_name || field.field_identifier}
-                {#if field.is_required}<span class="text-ds-text-danger">*</span>{/if}
-              </label>
-              <Input
-                id={`ar-field-${field.id}`}
-                type="text"
-                bind:value={formValues[field.field_identifier]}
-                required={field.is_required}
-                size="small"
-              />
-              {#if field.description}
-                <p class="text-xs mt-1" style="color: var(--ds-text-subtle);">{field.description}</p>
-              {/if}
-            </div>
-          {/each}
-          <div class="pt-2">
-            <button
-              type="submit"
-              class="px-4 py-2 rounded text-sm font-medium"
-              style="background-color: {report.color || '#6b7280'}; color: white;"
-            >
-              {t('common.search')}
-            </button>
-          </div>
-        </form>
-      {/if}
-    </div>
-  {:else}
-
-  {#if isFormMode && formSubmitted}
-    <!-- Form-mode results have a back-to-form button so the user can change
-         their inputs without reloading the page. -->
-    <div class="px-4 py-2 border-b flex items-center justify-end" style="border-color: var(--ds-border);">
-      <button
-        onclick={resetForm}
-        class="text-xs px-2 py-1 rounded"
-        style="color: var(--ds-text-subtle);"
-      >
-        ← {t('common.back')}
-      </button>
-    </div>
-  {/if}
-
   <!-- Table Content -->
   <div class="overflow-x-auto">
     {#if loading}
@@ -436,10 +303,9 @@ import EmptyState from '../components/EmptyState.svelte';
       </table>
     {/if}
   </div>
-  {/if}
 
   <!-- Pagination -->
-  {#if !loading && !error && totalPages > 1 && (!isFormMode || formSubmitted)}
+  {#if !loading && !error && totalPages > 1}
     <div class="flex items-center justify-between p-4 border-t" style="border-color: var(--ds-border);">
       <span class="text-sm" style="color: var(--ds-text-subtle);">
         {t('common.showingXofY', { from: (page - 1) * pageSize + 1, to: Math.min(page * pageSize, totalCount), total: totalCount })}
