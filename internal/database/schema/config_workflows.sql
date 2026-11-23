@@ -130,7 +130,6 @@ CREATE INDEX IF NOT EXISTS idx_configuration_sets_workflow_id ON configuration_s
 CREATE INDEX IF NOT EXISTS idx_item_types_configuration_set_id ON item_types(configuration_set_id);
 CREATE INDEX IF NOT EXISTS idx_item_types_hierarchy_level ON item_types(hierarchy_level);
 CREATE INDEX IF NOT EXISTS idx_item_types_sort_order ON item_types(sort_order);
-CREATE INDEX IF NOT EXISTS idx_hierarchy_levels_level ON hierarchy_levels(level);
 CREATE INDEX IF NOT EXISTS idx_screen_fields_screen_id ON screen_fields(screen_id);
 CREATE INDEX IF NOT EXISTS idx_screen_system_fields_screen_id ON screen_system_fields(screen_id);
 
@@ -226,5 +225,4 @@ CREATE TABLE IF NOT EXISTS workspace_configuration_sets (
 	FOREIGN KEY (configuration_set_id) REFERENCES configuration_sets(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_workspace_configuration_sets_workspace_id ON workspace_configuration_sets(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_workspace_configuration_sets_config_id ON workspace_configuration_sets(configuration_set_id);

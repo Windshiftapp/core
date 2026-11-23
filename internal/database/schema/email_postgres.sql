@@ -18,7 +18,6 @@ CREATE TABLE IF NOT EXISTS email_providers (
 	updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_email_providers_slug ON email_providers(slug);
 CREATE INDEX IF NOT EXISTS idx_email_providers_type ON email_providers(type);
 CREATE INDEX IF NOT EXISTS idx_email_providers_is_enabled ON email_providers(is_enabled);
 
@@ -38,8 +37,6 @@ CREATE TABLE IF NOT EXISTS email_channel_state (
 	updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE
 );
-
-CREATE INDEX IF NOT EXISTS idx_email_channel_state_channel_id ON email_channel_state(channel_id);
 
 -- Intakes (WI-1644); see email.sql for the contract.
 CREATE TABLE IF NOT EXISTS intakes (
@@ -205,6 +202,5 @@ CREATE TABLE IF NOT EXISTS email_oauth_state (
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_email_oauth_state_state ON email_oauth_state(state);
 CREATE INDEX IF NOT EXISTS idx_email_oauth_state_provider_id ON email_oauth_state(provider_id);
 CREATE INDEX IF NOT EXISTS idx_email_oauth_state_expires_at ON email_oauth_state(expires_at);

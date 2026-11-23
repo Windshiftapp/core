@@ -34,7 +34,6 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(session_token);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_expires ON user_sessions(expires_at);
 
 CREATE TABLE IF NOT EXISTS user_invitations (
@@ -47,7 +46,6 @@ CREATE TABLE IF NOT EXISTS user_invitations (
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_user_invitations_token ON user_invitations(token);
 CREATE INDEX IF NOT EXISTS idx_user_invitations_user_id ON user_invitations(user_id);
 
 -- DSAR completion evidence: one row per Article 17 erasure execution. The

@@ -34,7 +34,6 @@ CREATE TABLE IF NOT EXISTS scm_providers (
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_scm_providers_slug ON scm_providers(slug);
 CREATE INDEX IF NOT EXISTS idx_scm_providers_type ON scm_providers(provider_type);
 CREATE INDEX IF NOT EXISTS idx_scm_providers_enabled ON scm_providers(enabled);
 CREATE INDEX IF NOT EXISTS idx_scm_providers_default ON scm_providers(is_default);
@@ -55,7 +54,6 @@ CREATE TABLE IF NOT EXISTS scm_oauth_state (
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_scm_oauth_state_state ON scm_oauth_state(state);
 CREATE INDEX IF NOT EXISTS idx_scm_oauth_state_expires ON scm_oauth_state(expires_at);
 CREATE INDEX IF NOT EXISTS idx_scm_oauth_state_provider ON scm_oauth_state(provider_id);
 CREATE INDEX IF NOT EXISTS idx_scm_oauth_state_workspace ON scm_oauth_state(workspace_id);
@@ -364,7 +362,6 @@ CREATE TABLE IF NOT EXISTS issue_sync_configs (
 	FOREIGN KEY (workspace_repository_id) REFERENCES workspace_repositories(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_issue_sync_configs_repo ON issue_sync_configs(workspace_repository_id);
 CREATE INDEX IF NOT EXISTS idx_issue_sync_configs_enabled ON issue_sync_configs(sync_enabled);
 
 -- Issue Sync Items (GitHub Issue ↔ Windshift Item mapping)

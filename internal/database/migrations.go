@@ -3545,6 +3545,161 @@ CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_m
 		`,
 		Postgres: `DROP INDEX IF EXISTS idx_items_workspace_item_number`,
 	},
+	{
+		// Every index below is an explicit lookup index whose exact key,
+		// ordering, collation and predicate are already covered by a UNIQUE
+		// constraint (or, for collections.public_slug, a table-level UNIQUE)
+		// that backs its own index. The explicit copy only adds a second B-tree
+		// that every insert, update and delete has to maintain, so drop it and
+		// let the constraint-backed index serve the same reads.
+		//
+		// The strict left-prefix overlaps from the findings are intentionally
+		// left alone: the shorter index can be smaller or provide a useful
+		// tie-break order, and the report marks them for workload review rather
+		// than confirmed waste.
+		//
+		// Two explicit unique indexes are cleaned up only on fresh installs, not
+		// on upgrade. Databases upgraded from the pre-0.8.5 layouts have a
+		// two-column UNIQUE(configuration_set_id, notification_setting_id) on
+		// configuration_set_notification_settings and a plain public_slug column
+		// on collections; there the named single-column index and
+		// idx_collections_public_slug are the only uniqueness guarantees, so the
+		// migration must leave them in place.
+		Version: "20261202_drop_unique_covered_indexes",
+		Name:    "Drop lookup indexes already covered by a unique constraint",
+		CheckSQLite: `SELECT CASE WHEN (
+			SELECT COUNT(*) FROM sqlite_master
+			WHERE type='index' AND name IN (
+				'idx_api_tokens_token_hash', 'idx_asset_management_sets_name', 'idx_asset_permissions_key',
+				'idx_asset_roles_name', 'idx_calendar_feed_tokens_token',
+				'idx_calendar_feed_tokens_user_id', 'idx_cli_auth_codes_code',
+				'idx_collection_categories_name', 'idx_config_set_notification_settings_config_set',
+				'idx_contact_roles_name', 'idx_email_channel_state_channel_id',
+				'idx_email_oauth_state_state', 'idx_email_providers_slug', 'idx_hierarchy_levels_level',
+				'idx_integration_oauth_state_state', 'idx_integration_providers_slug',
+				'idx_issue_sync_configs_repo', 'idx_jira_mappings_lookup', 'idx_native_auth_codes_code',
+				'idx_oauth_authorization_codes_code', 'idx_oauth_clients_client_id',
+				'idx_oauth_refresh_tokens_token_hash', 'idx_permissions_key', 'idx_plugin_registry_name',
+				'idx_portal_magic_links_token', 'idx_portal_sessions_token', 'idx_portal_customers_email',
+				'idx_recurrence_instances_item', 'idx_recurrence_instances_rule_date',
+				'idx_recurrence_rules_template', 'idx_scm_oauth_state_state', 'idx_scm_providers_slug',
+				'idx_sla_goal_targets_goal', 'idx_sla_goals_metric', 'idx_sla_metric_conditions_metric',
+				'idx_sso_providers_slug', 'idx_sso_state_tokens_state', 'idx_system_settings_key',
+				'idx_todoist_task_links_item', 'idx_user_external_accounts_provider',
+				'idx_user_invitations_token', 'idx_user_preferences_user_id', 'idx_user_sessions_token',
+				'idx_users_email', 'idx_users_username', 'idx_workspace_configuration_sets_workspace_id',
+				'idx_workspace_roles_name'
+			)
+		) = 0 THEN 1 ELSE 0 END`,
+		CheckPostgres: `SELECT CASE WHEN (
+			SELECT COUNT(*) FROM pg_class c
+			JOIN pg_namespace n ON n.oid = c.relnamespace
+			WHERE c.relkind = 'i' AND n.nspname = current_schema()
+			  AND c.relname IN (
+				'idx_api_tokens_token_hash', 'idx_asset_management_sets_name', 'idx_asset_permissions_key',
+				'idx_asset_roles_name', 'idx_calendar_feed_tokens_token',
+				'idx_calendar_feed_tokens_user_id', 'idx_cli_auth_codes_code',
+				'idx_collection_categories_name', 'idx_config_set_notification_settings_config_set',
+				'idx_contact_roles_name', 'idx_email_channel_state_channel_id',
+				'idx_email_oauth_state_state', 'idx_email_providers_slug', 'idx_hierarchy_levels_level',
+				'idx_integration_oauth_state_state', 'idx_integration_providers_slug',
+				'idx_issue_sync_configs_repo', 'idx_jira_mappings_lookup', 'idx_native_auth_codes_code',
+				'idx_oauth_authorization_codes_code', 'idx_oauth_clients_client_id',
+				'idx_oauth_refresh_tokens_token_hash', 'idx_permissions_key', 'idx_plugin_registry_name',
+				'idx_portal_magic_links_token', 'idx_portal_sessions_token', 'idx_portal_customers_email',
+				'idx_recurrence_instances_item', 'idx_recurrence_instances_rule_date',
+				'idx_recurrence_rules_template', 'idx_scm_oauth_state_state', 'idx_scm_providers_slug',
+				'idx_sla_goal_targets_goal', 'idx_sla_goals_metric', 'idx_sla_metric_conditions_metric',
+				'idx_sso_providers_slug', 'idx_sso_state_tokens_state', 'idx_system_settings_key',
+				'idx_teams_name', 'idx_todoist_task_links_item', 'idx_user_external_accounts_provider',
+				'idx_user_invitations_token', 'idx_user_preferences_user_id', 'idx_user_sessions_token',
+				'idx_users_email', 'idx_users_username', 'idx_workspace_configuration_sets_workspace_id',
+				'idx_workspace_roles_name'
+			)
+		) = 0 THEN 1 ELSE 0 END`,
+		SQLite: `
+			DROP INDEX IF EXISTS idx_api_tokens_token_hash;
+			DROP INDEX IF EXISTS idx_asset_management_sets_name;
+			DROP INDEX IF EXISTS idx_asset_permissions_key;
+			DROP INDEX IF EXISTS idx_asset_roles_name;
+			DROP INDEX IF EXISTS idx_calendar_feed_tokens_token;
+			DROP INDEX IF EXISTS idx_calendar_feed_tokens_user_id;
+			DROP INDEX IF EXISTS idx_cli_auth_codes_code;
+			DROP INDEX IF EXISTS idx_collection_categories_name;
+			DROP INDEX IF EXISTS idx_config_set_notification_settings_config_set;
+			DROP INDEX IF EXISTS idx_contact_roles_name;
+			DROP INDEX IF EXISTS idx_email_channel_state_channel_id;
+			DROP INDEX IF EXISTS idx_email_oauth_state_state;
+			DROP INDEX IF EXISTS idx_email_providers_slug;
+			DROP INDEX IF EXISTS idx_hierarchy_levels_level;
+			DROP INDEX IF EXISTS idx_integration_oauth_state_state;
+			DROP INDEX IF EXISTS idx_integration_providers_slug;
+			DROP INDEX IF EXISTS idx_issue_sync_configs_repo;
+			DROP INDEX IF EXISTS idx_jira_mappings_lookup;
+			DROP INDEX IF EXISTS idx_native_auth_codes_code;
+			DROP INDEX IF EXISTS idx_oauth_authorization_codes_code;
+			DROP INDEX IF EXISTS idx_oauth_clients_client_id;
+			DROP INDEX IF EXISTS idx_oauth_refresh_tokens_token_hash;
+			DROP INDEX IF EXISTS idx_permissions_key;
+			DROP INDEX IF EXISTS idx_plugin_registry_name;
+			DROP INDEX IF EXISTS idx_portal_magic_links_token;
+			DROP INDEX IF EXISTS idx_portal_sessions_token;
+			DROP INDEX IF EXISTS idx_portal_customers_email;
+			DROP INDEX IF EXISTS idx_recurrence_instances_item;
+			DROP INDEX IF EXISTS idx_recurrence_instances_rule_date;
+			DROP INDEX IF EXISTS idx_recurrence_rules_template;
+			DROP INDEX IF EXISTS idx_scm_oauth_state_state;
+			DROP INDEX IF EXISTS idx_scm_providers_slug;
+			DROP INDEX IF EXISTS idx_sla_goal_targets_goal;
+			DROP INDEX IF EXISTS idx_sla_goals_metric;
+			DROP INDEX IF EXISTS idx_sla_metric_conditions_metric;
+			DROP INDEX IF EXISTS idx_sso_providers_slug;
+			DROP INDEX IF EXISTS idx_sso_state_tokens_state;
+			DROP INDEX IF EXISTS idx_system_settings_key;
+			DROP INDEX IF EXISTS idx_todoist_task_links_item;
+			DROP INDEX IF EXISTS idx_user_external_accounts_provider;
+			DROP INDEX IF EXISTS idx_user_invitations_token;
+			DROP INDEX IF EXISTS idx_user_preferences_user_id;
+			DROP INDEX IF EXISTS idx_user_sessions_token;
+			DROP INDEX IF EXISTS idx_users_email;
+			DROP INDEX IF EXISTS idx_users_username;
+			DROP INDEX IF EXISTS idx_workspace_configuration_sets_workspace_id;
+			DROP INDEX IF EXISTS idx_workspace_roles_name;
+		`,
+		Postgres: `
+DO $$
+DECLARE
+	idx text;
+BEGIN
+	FOREACH idx IN ARRAY ARRAY[
+				'idx_api_tokens_token_hash', 'idx_asset_management_sets_name', 'idx_asset_permissions_key',
+				'idx_asset_roles_name', 'idx_calendar_feed_tokens_token',
+				'idx_calendar_feed_tokens_user_id', 'idx_cli_auth_codes_code',
+				'idx_collection_categories_name', 'idx_config_set_notification_settings_config_set',
+				'idx_contact_roles_name', 'idx_email_channel_state_channel_id',
+				'idx_email_oauth_state_state', 'idx_email_providers_slug', 'idx_hierarchy_levels_level',
+				'idx_integration_oauth_state_state', 'idx_integration_providers_slug',
+				'idx_issue_sync_configs_repo', 'idx_jira_mappings_lookup', 'idx_native_auth_codes_code',
+				'idx_oauth_authorization_codes_code', 'idx_oauth_clients_client_id',
+				'idx_oauth_refresh_tokens_token_hash', 'idx_permissions_key', 'idx_plugin_registry_name',
+				'idx_portal_magic_links_token', 'idx_portal_sessions_token', 'idx_portal_customers_email',
+				'idx_recurrence_instances_item', 'idx_recurrence_instances_rule_date',
+				'idx_recurrence_rules_template', 'idx_scm_oauth_state_state', 'idx_scm_providers_slug',
+				'idx_sla_goal_targets_goal', 'idx_sla_goals_metric', 'idx_sla_metric_conditions_metric',
+				'idx_sso_providers_slug', 'idx_sso_state_tokens_state', 'idx_system_settings_key',
+				'idx_teams_name', 'idx_todoist_task_links_item', 'idx_user_external_accounts_provider',
+				'idx_user_invitations_token', 'idx_user_preferences_user_id', 'idx_user_sessions_token',
+				'idx_users_email', 'idx_users_username', 'idx_workspace_configuration_sets_workspace_id',
+				'idx_workspace_roles_name'
+	] LOOP
+		-- Scope the drop to the schema the check inspected so a
+		-- same-named index on an earlier search_path entry cannot be
+		-- removed.
+		EXECUTE format('DROP INDEX IF EXISTS %I.%I', current_schema(), idx);
+	END LOOP;
+END $$;
+		`,
+	},
 }
 
 // domainEventClaimableIndexMigration adds the partial index the claim query

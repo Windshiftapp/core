@@ -35,7 +35,6 @@ CREATE TABLE IF NOT EXISTS sso_providers (
 );
 
 -- Indexes for SSO providers
-CREATE INDEX IF NOT EXISTS idx_sso_providers_slug ON sso_providers(slug);
 CREATE INDEX IF NOT EXISTS idx_sso_providers_enabled ON sso_providers(enabled);
 CREATE INDEX IF NOT EXISTS idx_sso_providers_default ON sso_providers(is_default);
 
@@ -57,7 +56,6 @@ CREATE TABLE IF NOT EXISTS sso_state_tokens (
 );
 
 -- Indexes for SSO state tokens
-CREATE INDEX IF NOT EXISTS idx_sso_state_tokens_state ON sso_state_tokens(state);
 CREATE INDEX IF NOT EXISTS idx_sso_state_tokens_expires ON sso_state_tokens(expires_at);
 CREATE INDEX IF NOT EXISTS idx_sso_state_tokens_provider ON sso_state_tokens(provider_id);
 
@@ -88,5 +86,4 @@ CREATE TABLE IF NOT EXISTS user_external_accounts (
 
 -- Indexes for user external accounts
 CREATE INDEX IF NOT EXISTS idx_user_external_accounts_user_id ON user_external_accounts(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_external_accounts_provider ON user_external_accounts(provider_id, external_id);
 CREATE INDEX IF NOT EXISTS idx_user_external_accounts_email ON user_external_accounts(email);

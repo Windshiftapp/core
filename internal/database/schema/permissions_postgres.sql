@@ -25,7 +25,6 @@ CREATE TABLE IF NOT EXISTS user_global_permissions (
 
 -- Note: user_workspace_permissions table removed - use role-based permissions via user_workspace_roles
 
-CREATE INDEX IF NOT EXISTS idx_permissions_key ON permissions(permission_key);
 CREATE INDEX IF NOT EXISTS idx_permissions_scope ON permissions(scope);
 CREATE INDEX IF NOT EXISTS idx_user_global_permissions_user_id ON user_global_permissions(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_global_permissions_permission_id ON user_global_permissions(permission_id);
@@ -127,7 +126,6 @@ CREATE TABLE IF NOT EXISTS group_workspace_roles (
 	UNIQUE(group_id, workspace_id, role_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_workspace_roles_name ON workspace_roles(name);
 CREATE INDEX IF NOT EXISTS idx_workspace_roles_display_order ON workspace_roles(display_order);
 CREATE INDEX IF NOT EXISTS idx_user_workspace_roles_user_id ON user_workspace_roles(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_workspace_roles_workspace_id ON user_workspace_roles(workspace_id);
