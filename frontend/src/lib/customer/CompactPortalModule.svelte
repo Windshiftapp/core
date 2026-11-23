@@ -9,10 +9,9 @@
   import Button from '../components/Button.svelte';
   import Spinner from '../components/Spinner.svelte';
   import AlertBox from '../components/AlertBox.svelte';
-  import PortalLoginModal from '../portal/PortalLoginModal.svelte';
   import GlobalConfirmDialog from '../dialogs/GlobalConfirmDialog.svelte';
 
-  let { slug, kind, formId = null, articleId = null, draftsEnabled = true, onidentitychange = null, ondefaultunavailable = null } = $props();
+  let { slug, kind, formId = null, articleId = null, draftsEnabled = true, ondefaultunavailable = null } = $props();
   let ready = $state(false);
   let error = $state('');
   let selectedForm = $state(null);
@@ -37,7 +36,7 @@
       const [, bootstrap] = await Promise.all([portalStore.loadPortal(slug), portalAuthStore.checkAuth(slug)]);
       if (disposed) return;
       portalStore.hydrateUserBootstrap(bootstrap);
-      if (!bootstrap?.authenticated) { portalStore.showLoginDialog = true; ready = true; return; }
+      if (!bootstrap?.authenticated) { ready = true; return; }
       if (kind === 'requests') {
         portalRequestsStore.setVisible(true);
         if ($currentRoute.query?.id) await portalRequestsStore.loadAndView($currentRoute.query.id);
@@ -74,10 +73,9 @@
       <LazyRootView loader={kind === 'knowledge-base' && articleId ? loaders.article : loaders[kind]} label="Portal module" componentProps={kind === 'knowledge-base' && articleId ? { pageId: articleId, onunavailable: ondefaultunavailable } : kind === 'drafts' ? { onresume: ({ requestType }) => navigate(`/portal/${slug}/request/${requestType.id}`) } : kind === 'asset-reports' ? { onOpenAssetReportForm: report => selectedReport = report, onOpenRequestForm: form => navigate(`/portal/${slug}/request/${form.id}`) } : {}} />
     {/if}
   {/if}
-  <PortalLoginModal onloginsuccess={async () => { await onidentitychange?.(); if (!disposed) await load(); }} />
-  <GlobalConfirmDialog />
   {#if selectedForm}
     <LazyRootDialog loader={loadForm} isOpen={true} componentProps={{ requestType: selectedForm, portalSlug: slug, prefill, draftsEnabled, onsubmitted: id => navigate(`/portal/${slug}?view=requests&id=${id}`), onclose: () => { selectedForm = null; navigate(`/portal/${slug}?module=forms&choose=1`); } }} />
   {/if}
   {#if selectedReport}<LazyRootDialog loader={loadReport} isOpen={true} componentProps={{ report: selectedReport, portalSlug: slug, onclose: () => selectedReport = null }} />{/if}
+  <GlobalConfirmDialog />
 </div>

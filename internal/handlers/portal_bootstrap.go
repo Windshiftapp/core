@@ -50,10 +50,17 @@ func (h *PortalHandler) GetBootstrap(w http.ResponseWriter, r *http.Request) {
 		RequestTypes: []models.RequestType{},
 		AssetReports: []models.PublicAssetReport{},
 	}
-	allowed, err := h.portalChannelAccessAllowed(ctx, r, channel.ID, config)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
+	access, hasAccess := r.Context().Value(portalAccessContextKey{}).(portalAccess)
+	allowed := false
+	if hasAccess {
+		allowed = access.ContentAllowed
+	} else {
+		var err error
+		allowed, err = h.portalChannelAccessAllowed(ctx, r, channel.ID, config)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
 	}
 	if !allowed {
 		respondJSONOK(w, response)

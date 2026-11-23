@@ -1,11 +1,6 @@
 import { derived, writable } from 'svelte/store';
 import { portal, portalAuth, portalPasskey } from '../api/portal.js';
-import {
-  isWebAuthnSupported,
-  prepareCredentialRequestOptions,
-  processCredentialRequestResponse,
-} from '../utils/webauthn-utils.js';
-import { i18n } from './i18n.svelte.js';
+import { isWebAuthnSupported } from '../utils/webauthn-utils.js';
 import { clearStores, getStoreValue } from './storeUtils.js';
 
 /**
@@ -25,9 +20,6 @@ function createPortalAuthStore() {
   let authCheckId = 0;
   const isAuthenticated = writable(false);
   const isInternal = writable(false); // true if authenticated via internal session
-  const loading = writable(false);
-  const error = writable(null);
-  const emailSent = writable(false);
   // Whether the post-login passkey banner should be visible. Driven by the
   // /auth/me response (passkey_count + dismissed_passkey_prompt_at) and the
   // browser's WebAuthn capability check. Recomputed on each checkAuth.
@@ -35,35 +27,12 @@ function createPortalAuthStore() {
 
   // Create a combined derived store for easy subscription
   const combined = derived(
-    [
-      customer,
-      user,
-      isAuthenticated,
-      isInternal,
-      loading,
-      error,
-      emailSent,
-      showPasskeyBanner,
-      userBootstrap,
-    ],
-    ([
-      $customer,
-      $user,
-      $isAuthenticated,
-      $isInternal,
-      $loading,
-      $error,
-      $emailSent,
-      $showPasskeyBanner,
-      $userBootstrap,
-    ]) => ({
+    [customer, user, isAuthenticated, isInternal, showPasskeyBanner, userBootstrap],
+    ([$customer, $user, $isAuthenticated, $isInternal, $showPasskeyBanner, $userBootstrap]) => ({
       customer: $customer,
       user: $user,
       isAuthenticated: $isAuthenticated,
       isInternal: $isInternal,
-      loading: $loading,
-      error: $error,
-      emailSent: $emailSent,
       showPasskeyBanner: $showPasskeyBanner,
       userBootstrap: $userBootstrap,
     })
@@ -98,18 +67,6 @@ function createPortalAuthStore() {
       return getStoreValue(isInternal);
     },
 
-    get loading() {
-      return getStoreValue(loading);
-    },
-
-    get error() {
-      return getStoreValue(error);
-    },
-
-    get emailSent() {
-      return getStoreValue(emailSent);
-    },
-
     get showPasskeyBanner() {
       return getStoreValue(showPasskeyBanner);
     },
@@ -124,8 +81,6 @@ function createPortalAuthStore() {
      */
     async checkAuth(slug) {
       const checkId = ++authCheckId;
-      loading.set(true);
-      error.set(null);
 
       try {
         const response = await portal.getUserBootstrap(slug);
@@ -164,53 +119,6 @@ function createPortalAuthStore() {
         showPasskeyBanner.set(false);
         userBootstrap.set({ authenticated: false, my_requests: [], my_approvals: [] });
         return getStoreValue(userBootstrap);
-      } finally {
-        if (checkId === authCheckId) loading.set(false);
-      }
-    },
-
-    /**
-     * Sign in via a discoverable passkey (no email required). Resolves to
-     * { success, message? } and updates the store on success.
-     */
-    async loginWithPasskey(slug) {
-      if (!isWebAuthnSupported()) {
-        const msg = 'Passkeys are not supported in this browser.';
-        error.set(msg);
-        return { success: false, message: msg };
-      }
-      loading.set(true);
-      error.set(null);
-      try {
-        const startResponse = await portalPasskey.startLogin(slug);
-        const requestOptions = prepareCredentialRequestOptions(startResponse);
-        const credential = await navigator.credentials.get(requestOptions);
-        if (!credential) {
-          throw new Error('No credential returned from authenticator');
-        }
-        const processed = processCredentialRequestResponse(/** @type {any} */ (credential));
-        const completeResponse = await portalPasskey.completeLogin(slug, {
-          sessionId: startResponse.sessionId,
-          response: processed,
-        });
-        if (completeResponse.success) {
-          // Server set the session cookie; refresh state so UI reflects it.
-          const bootstrap = await this.checkAuth(slug);
-          return { success: true, userBootstrap: bootstrap };
-        }
-        const msg = completeResponse.message || 'Passkey sign-in failed';
-        error.set(msg);
-        return { success: false, message: msg };
-      } catch (err) {
-        // NotAllowedError = user cancelled the prompt; surface a friendlier copy.
-        const msg =
-          err?.name === 'NotAllowedError'
-            ? 'Passkey sign-in was cancelled.'
-            : err?.message || 'Passkey sign-in failed';
-        error.set(msg);
-        return { success: false, message: msg };
-      } finally {
-        loading.set(false);
       }
     },
 
@@ -254,38 +162,11 @@ function createPortalAuthStore() {
     },
 
     /**
-     * Request a magic link email
-     * @param {string} slug - Portal slug
-     * @param {string} email - Customer email
-     * @param {string} [next] - Same-portal path to resume after sign-in
-     */
-    async requestMagicLink(slug, email, next) {
-      loading.set(true);
-      error.set(null);
-      emailSent.set(false);
-
-      try {
-        await portalAuth.requestMagicLink(slug, email, next, i18n.locale);
-        // Always show success (prevents email enumeration)
-        emailSent.set(true);
-        return { success: true };
-      } catch (err) {
-        error.set(err.message || 'Failed to send magic link');
-        return { success: false, message: err.message };
-      } finally {
-        loading.set(false);
-      }
-    },
-
-    /**
      * Verify a magic link token
      * @param {string} slug - Portal slug
      * @param {string} token - Magic link token
      */
     async verifyMagicLink(slug, token) {
-      loading.set(true);
-      error.set(null);
-
       try {
         const response = await portalAuth.verifyMagicLink(slug, token);
         if (response.success) {
@@ -293,20 +174,17 @@ function createPortalAuthStore() {
           // reactive auth state. Updating it here can remount the verifier and
           // redeem the same token a second time.
           return { success: true, customer: response.customer };
-        } else {
-          error.set(response.message || 'Invalid or expired link');
-          return {
-            success: false,
-            message: response.message,
-            code: response.code,
-            email: response.email,
-          };
         }
+        return {
+          success: false,
+          message: response.message,
+          code: response.code,
+          email: response.email,
+        };
       } catch (err) {
         // fetchAPI throws on 4xx/5xx but attaches the parsed body when it can;
         // pull through code/email if available so the recovery flow still
         // fires for expired/used tokens.
-        error.set(err.message || 'Invalid or expired link');
         const body = err?.body || {};
         return {
           success: false,
@@ -314,8 +192,6 @@ function createPortalAuthStore() {
           code: body.code,
           email: body.email,
         };
-      } finally {
-        loading.set(false);
       }
     },
 
@@ -324,8 +200,6 @@ function createPortalAuthStore() {
      * @param {string} slug - Portal slug
      */
     async logout(slug) {
-      loading.set(true);
-
       try {
         await portalAuth.logout(slug);
       } catch (err) {
@@ -333,26 +207,10 @@ function createPortalAuthStore() {
       }
 
       // Clear auth state regardless of API call result
-      clearStores(customer, user, error);
+      clearStores(customer, user);
       isAuthenticated.set(false);
       isInternal.set(false);
-      loading.set(false);
-      emailSent.set(false);
       userBootstrap.set(null);
-    },
-
-    /**
-     * Clear the error state
-     */
-    clearError() {
-      error.set(null);
-    },
-
-    /**
-     * Reset the email sent state
-     */
-    resetEmailSent() {
-      emailSent.set(false);
     },
 
     /**
@@ -360,11 +218,9 @@ function createPortalAuthStore() {
      */
     reset() {
       authCheckId++;
-      clearStores(customer, user, error);
+      clearStores(customer, user);
       isAuthenticated.set(false);
       isInternal.set(false);
-      loading.set(false);
-      emailSent.set(false);
       userBootstrap.set(null);
     },
   };

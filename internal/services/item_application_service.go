@@ -2295,6 +2295,24 @@ func (s *ItemApplicationService) requireView(ctx context.Context, userID, itemID
 	return nil
 }
 
+// CanReadCollection reports whether the user may read the collection, applying
+// the same private-collection and home-workspace rule as the internal item
+// reads. Board surfaces reuse it so staff see what they see internally.
+func (s *ItemApplicationService) CanReadCollection(userID, collectionID int) (bool, error) {
+	workspaceIDs, err := s.perm.AccessibleWorkspaceIDs(userID)
+	if err != nil {
+		return false, err
+	}
+	return s.requireCollectionRead(userID, collectionID, workspaceIDs) == nil, nil
+}
+
+// RequireViewItem returns nil when the user may view the item, using the same
+// workspace and active-approver rules as the internal single-item read. It
+// returns repository.ErrNotFound when the item is not visible.
+func (s *ItemApplicationService) RequireViewItem(ctx context.Context, userID, itemID int) error {
+	return s.requireView(ctx, userID, itemID)
+}
+
 func (s *ItemApplicationService) allowedProjectIDs(userID int) map[int]struct{} {
 	projects, err := NewTimePermissionService(s.db, s.perm).GetAccessibleProjects(userID)
 	if err != nil {

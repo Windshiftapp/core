@@ -35,7 +35,7 @@
     desktop: () => import('./lib/pages/MainApp.svelte'),
     enrollment: () => import('./lib/pages/Security.svelte'),
     mobile: () => import('./lib/mobile/MobileShell.svelte'),
-    publicBoard: () => import('./lib/customer/CustomerBoard.svelte'),
+    publicBoard: () => import('./lib/pages/PublicBoard.svelte'),
     pagePrint: () => import('./lib/features/pages/PagePrintView.svelte'),
     timeReportPrint: () => import('./lib/features/time/TimeReportPrintView.svelte'),
     testRunSummaryPrint: () => import('./lib/features/testing/TestRunSummaryPrintView.svelte'),

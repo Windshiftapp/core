@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
+	"windshift/internal/utils"
 )
 
 const publicBoardItemLimit = 500
@@ -62,6 +64,16 @@ type PublicBoardHandler struct {
 	publicBoardScope  *services.PublicBoardScopeService
 	storage           *blobstore.Store
 	availability      services.PublicBoardAvailability
+	itemAccess        *services.ItemApplicationService
+}
+
+// staffBoardFilterKey marks a restricted board read by an internal user, so the
+// projection is filtered to what that user could see in the internal board.
+type staffBoardFilterKey struct{}
+
+func staffBoardFilter(r *http.Request) bool {
+	filtered, _ := r.Context().Value(staffBoardFilterKey{}).(bool)
+	return filtered
 }
 
 type portalBoardContextKey struct{}
@@ -119,6 +131,26 @@ func (h *PublicBoardHandler) available(w http.ResponseWriter, r *http.Request) b
 
 func (h *PublicBoardHandler) SetAvailability(availability services.PublicBoardAvailability) {
 	h.availability = availability
+}
+
+// SetItemAccess wires the internal item reads used to filter restricted boards
+// for staff viewers.
+func (h *PublicBoardHandler) SetItemAccess(service *services.ItemApplicationService) {
+	h.itemAccess = service
+}
+
+// staffCanViewItem reports whether the current staff viewer may open the item.
+// Non-staff viewers and unrestricted boards always pass; the gate already
+// authorized them. Failures are treated as denial.
+func (h *PublicBoardHandler) staffCanViewItem(r *http.Request, itemID int) bool {
+	if !staffBoardFilter(r) {
+		return true
+	}
+	user := utils.GetCurrentUser(r)
+	if user == nil || h.itemAccess == nil {
+		return false
+	}
+	return h.itemAccess.RequireViewItem(r.Context(), user.ID, itemID) == nil
 }
 
 func isPublicBoardScopeError(err error) bool {
@@ -275,6 +307,11 @@ func (h *PublicBoardHandler) GetPublicBoardItem(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	if !h.staffCanViewItem(r, itemID) {
+		respondNotFound(w, r, "item")
+		return
+	}
+
 	// Load labels for this item
 	labels := h.loadSingleItemLabels(itemID)
 
@@ -419,6 +456,19 @@ func (h *PublicBoardHandler) GetPublicBoard(w http.ResponseWriter, r *http.Reque
 		}
 		respondInternalError(w, r, err)
 		return
+	}
+	if staffBoardFilter(r) {
+		user := utils.GetCurrentUser(r)
+		if user == nil {
+			respondNotFound(w, r, "board")
+			return
+		}
+		accessible, err := h.permissionService.AccessibleWorkspaceIDs(user.ID)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		scopedWorkspaceIDs = slices.DeleteFunc(scopedWorkspaceIDs, func(id int) bool { return !slices.Contains(accessible, id) })
 	}
 	if len(scopedWorkspaceIDs) == 0 {
 		// No workspaces, return empty board
@@ -880,6 +930,11 @@ func (h *PublicBoardHandler) DownloadAttachment(w http.ResponseWriter, r *http.R
 		return
 	}
 	if !belongs {
+		respondNotFound(w, r, "attachment")
+		return
+	}
+
+	if !h.staffCanViewItem(r, int(itemID.Int64)) {
 		respondNotFound(w, r, "attachment")
 		return
 	}

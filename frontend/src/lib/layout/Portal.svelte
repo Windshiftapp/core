@@ -31,6 +31,7 @@
 
   // Modals
   import PortalLoginModal from '../portal/PortalLoginModal.svelte';
+  import CustomerSignInCard from '../customer/CustomerSignInCard.svelte';
   import PortalVerifyLink from '../portal/PortalVerifyLink.svelte';
   import PortalProfile from '../portal/PortalProfile.svelte';
   import PortalPasskeyBanner from '../portal/PortalPasskeyBanner.svelte';
@@ -395,6 +396,12 @@
   function handleLoginSuccess() {
     portalStore.showLoginDialog = false;
 
+    // Refresh identity so the portal swaps the shell for the protected view.
+    const slug = $currentRoute.params?.slug;
+    if (slug) {
+      void portalAuthStore.checkAuth(slug).then((userBootstrap) => portalStore.hydrateUserBootstrap(userBootstrap));
+    }
+
     // Check if there's a pending request type to open
     if (portalStore.pendingRequestType) {
       selectedRequestTypeForForm = portalStore.pendingRequestType;
@@ -552,7 +559,7 @@
             {#if linkedPlacementId}
               {#key linkedPlacementId}<LazyRootView loader={loadLinkedBoard} label="Board" componentProps={{ slug: $currentRoute.params.slug, client: linkedBoardClient, embedded: true, initialItemKey: $currentRoute.params?.itemKey || null,
                 onitemchange: key => navigate(`/portal/${experience.slug}/boards/${linkedPlacementId}${key ? `/items/${encodeURIComponent(key)}` : ''}`),
-                onaccessdenied: status => { if (status === 401) portalStore.showLoginDialog = true; },
+                onrequireauth: () => (portalStore.showLoginDialog = true),
               }} />{/key}
             {:else if isProfileRoute}
               <PortalProfile />
@@ -701,29 +708,13 @@
                 {/if}
               </div>
 
-              <div
-                class="border rounded-lg p-6 sm:p-8"
-                style="background-color: var(--ds-surface-card); border-color: var(--ds-border);"
-              >
-                <h2 class="text-lg font-semibold mb-2" style="color: var(--ds-text);">
-                  Access your requests
-                </h2>
-                <p class="text-sm leading-relaxed mb-6" style="color: var(--ds-text-subtle);">
-                  {t('portal.signInToAccess')}
-                </p>
-                <button
-                  id="portal-sign-in"
-                  type="button"
-                  onclick={() => (portalStore.showLoginDialog = true)}
-                  class="w-full h-10 rounded-md px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                  style="background-color: var(--ds-interactive, #2563eb);"
-                >
-                  {t('auth.signIn')}
-                </button>
-                <p class="text-xs mt-4" style="color: var(--ds-text-subtle);">
-                  No password required for customer access.
-                </p>
-              </div>
+              <CustomerSignInCard
+                title="Access your requests"
+                description={t('portal.signInToAccess')}
+                actionLabel={t('auth.signIn')}
+                hint="No password required for customer access."
+                onaction={() => (portalStore.showLoginDialog = true)}
+              />
             </div>
           </div>
         </main>
@@ -732,7 +723,14 @@
     {/if}
 
     <!-- Portal Login Modal (Magic Link) - always accessible -->
-    <PortalLoginModal onloginsuccess={handleLoginSuccess} />
+    <PortalLoginModal
+      kind="portal"
+      slug={$currentRoute.params?.slug}
+      open={portalStore.showLoginDialog}
+      visual={{ hasVisual: portalStore.hasBackgroundImage || portalStore.hasGradient, headerBackgroundStyle: portalStore.headerBackgroundStyle }}
+      onclose={() => (portalStore.showLoginDialog = false)}
+      onloginsuccess={handleLoginSuccess}
+    />
 
     <!-- Wait for the initial auth check before redeeming the link so its
          response cannot overwrite the verified session. Verification

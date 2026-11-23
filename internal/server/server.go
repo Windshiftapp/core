@@ -2035,6 +2035,9 @@ func (s *Server) initialize() error {
 		WithComments(commentService).
 		WithAssetPermissions(services.NewAssetPermissionService(repository.NewAssetRepository(s.db), permService)).
 		WithClock(slaClock)
+	// Board surfaces reuse the internal item reads to authorize staff viewers.
+	publicBoardHandler.SetItemAccess(itemApplication)
+	customerAccessHandler.SetItemAccess(itemApplication)
 	itemDetailApplication := services.NewItemDetailApplicationService(s.db, itemApplication, itemLinkService, permService).
 		WithContextReaders(screenHandler, requestTypeHandler, actionApplication).
 		WithStoryPointRollups(repository.NewItemRepository(s.db))
