@@ -19,6 +19,7 @@
   import Activity from '@lucide/svelte/icons/activity';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import { invalidateWorkspaceConfiguration } from '../stores/referenceDataInvalidation.js';
 
   let {
     configurationSet = null,
@@ -320,6 +321,13 @@
       }
 
       migrationSuccess = true;
+
+      // The migration reassigned the affected workspaces inside its own
+      // transaction. Its plural endpoint only clears screen configs, so drop
+      // each workspace's catalogs, status options, and priorities explicitly.
+      for (const affectedWorkspaceId of migrationAnalysis?.affected_workspaces ?? []) {
+        invalidateWorkspaceConfiguration(affectedWorkspaceId);
+      }
 
       // Close the assistant after a brief delay
       setTimeout(() => {

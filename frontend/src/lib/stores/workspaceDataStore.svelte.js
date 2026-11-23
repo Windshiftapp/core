@@ -10,6 +10,7 @@ import {
   isExpectedBackgroundSyncError,
   onBackgroundSyncAvailable,
 } from '../utils/backgroundSync.js';
+import { surfaceError } from './toasts.svelte.js';
 
 const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const USER_DISPLAY_BATCH_SIZE = 200;
@@ -561,6 +562,25 @@ class WorkspaceDataStore {
   #screenConfigWorkspaceEpochFor(workspaceId) {
     const id = Number(workspaceId);
     return Number.isInteger(id) && id > 0 ? (this.#screenConfigWorkspaceEpoch.get(id) ?? 0) : 0;
+  }
+
+  /**
+   * Re-fetch the active workspace's bootstrap catalogs (statuses, item types,
+   * priorities, projects, ...) after its assigned configuration set changed.
+   * The bootstrap is the only workspace-scoped source for item types;
+   * `invalidate('itemTypes')` reads the global catalog instead. A no-op for a
+   * workspace that is not active, which bootstraps fresh on next activation.
+   */
+  async invalidateWorkspaceCatalogs(workspaceId) {
+    const id = Number(workspaceId);
+    if (!Number.isInteger(id) || id <= 0 || this.workspaceId !== id) return;
+    const generation = this.#generation;
+    try {
+      await this._fetchAll(id, generation);
+    } catch (err) {
+      if (generation !== this.#generation) return;
+      surfaceError(err, { context: 'refreshAssignedWorkspaceCatalogs', silent: true });
+    }
   }
 
   #storeScreenConfig(key, config) {

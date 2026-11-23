@@ -9,9 +9,10 @@ import { workspaceDataStore } from './workspaceDataStore.svelte.js';
  * Each rule names what to clear after a successful mutation of a matching
  * endpoint:
  * - `store`: a `workspaceDataStore` field,
- * - `editor`: a `collectionEditorOptions` family,
+ * - `editor`: a `collectionEditorOptions` family (or list of families),
  * - `screenConfigs`: cached effective configurations,
  * - `screenConfigsForWorkspace`: cached effective configurations for one workspace,
+ * - `workspaceCatalogs`: re-fetch the active workspace's bootstrap catalogs,
  * - `fullRefresh`: everything (used for cross-cutting changes).
  *
  * Matching is deliberately coarse: re-fetching an unchanged family is cheap and
@@ -41,10 +42,16 @@ const REFERENCE_ENDPOINTS = [
   { match: /\/(?:labels)(?:\/|$)/, store: 'labels' },
   { match: /\/(?:configuration-sets|screens|workflows)(?:\/|$)/, screenConfigs: true },
   // Workspace-scoped assignment (WI-1359): PUT /workspaces/:id/configuration-set.
-  // The singular endpoint changes only that workspace's effective configuration,
-  // so drop its cached screens and priority options instead of every
-  // workspace's.
-  { match: /\/configuration-set(?:\/|$)/, editor: 'priorities', screenConfigsForWorkspace: true },
+  // The singular endpoint changes only that workspace's effective
+  // configuration: its screens, its editor priorities and statuses, and the
+  // workspace-scoped catalogs (statuses and item types) read from the
+  // bootstrap. Keep it scoped so other workspaces stay warm.
+  {
+    match: /\/configuration-set(?:\/|$)/,
+    editor: ['priorities', 'statuses'],
+    screenConfigsForWorkspace: true,
+    workspaceCatalogs: true,
+  },
   // Object translations change display names across several directories.
   { match: /\/(?:object-translations)(?:\/|$)/, fullRefresh: true },
   { match: /^\/workspaces\/\d+$/, store: 'workspace' },
@@ -87,16 +94,32 @@ export function applyReferenceInvalidation(
       void store.invalidate(rule.store);
     }
     if (rule.editor) {
-      if (workspaceId == null) editorOptions.invalidateFamily(rule.editor);
-      else editorOptions.invalidate(workspaceId, rule.editor);
+      const families = Array.isArray(rule.editor) ? rule.editor : [rule.editor];
+      for (const family of families) {
+        if (workspaceId == null) editorOptions.invalidateFamily(family);
+        else editorOptions.invalidate(workspaceId, family);
+      }
     }
     if (rule.screenConfigs) store.invalidateScreenConfigs?.();
     if (rule.screenConfigsForWorkspace && workspaceId != null) {
       store.invalidateScreenConfigsFor?.(workspaceId);
     }
+    if (rule.workspaceCatalogs && workspaceId != null) {
+      void store.invalidateWorkspaceCatalogs?.(workspaceId);
+    }
   }
 
   return true;
+}
+
+/**
+ * Apply the per-workspace configuration-change invalidation without a matching
+ * API mutation event. The migration path reassigns the workspace inside its own
+ * POST, whose plural endpoint only clears screen configs, so the caller names
+ * the affected workspaces explicitly.
+ */
+export function invalidateWorkspaceConfiguration(workspaceId, caches) {
+  return applyReferenceInvalidation(`/workspaces/${workspaceId}/configuration-set`, caches);
 }
 
 /** Subscribe the app shell to successful mutations. Returns an unsubscribe. */
