@@ -39,6 +39,7 @@
   import Label from '../../components/Label.svelte';
   import DescriptionText from '../../components/DescriptionText.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
+  import Toggle from '../../components/Toggle.svelte';
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { errorToast } from '../../stores/toasts.svelte.js';
@@ -84,10 +85,14 @@
   let everyoneRoleId = $state(null);
   let availableUsers = $state([]);
 
+  // Portal exposure state (set administrators only)
+  let portalAccess = $state(false);
+  let portalAccessSaving = $state(false);
+
   // Set form state
   let showSetForm = $state(false);
   let editingSet = $state(null);
-  let setFormData = $state({ name: '', description: '', is_default: false, portal_access: false });
+  let setFormData = $state({ name: '', description: '', is_default: false });
 
   // Field assignment state
   let showFieldsModal = $state(false);
@@ -131,6 +136,7 @@
   let categoryRequest = 0;
   let roleRequest = 0;
   let fieldsRequest = 0;
+  let portalRequest = 0;
 
   // Clear set-owned data and invalidate pending requests when selection changes.
   $effect(() => {
@@ -139,6 +145,7 @@
     assetCategories = [];
     roleAssignments = { user_roles: [], group_roles: [], everyone_role: null };
     everyoneRoleId = null;
+    portalAccess = false;
     expandedCategories = new Set();
     showTypeForm = false;
     editingType = null;
@@ -152,12 +159,14 @@
       loadAssetTypes();
       loadAssetCategories();
       loadSetRoles();
+      loadPortalAccess();
     }
     return () => {
       typeRequest++;
       categoryRequest++;
       roleRequest++;
       fieldsRequest++;
+      portalRequest++;
     };
   });
 
@@ -165,19 +174,13 @@
   function showAddSetForm() {
     showSetForm = true;
     editingSet = null;
-    setFormData = { name: '', description: '', is_default: false, portal_access: false };
+    setFormData = { name: '', description: '', is_default: false };
   }
 
-  async function showEditSetForm(set) {
+  function showEditSetForm(set) {
     showSetForm = true;
     editingSet = set;
-    setFormData = { name: set.name, description: set.description || '', is_default: !!set.is_default, portal_access: !!set.portal_access };
-    try {
-      const access = await assetSetsApi.getPortalAccess(set.id);
-      if (editingSet?.id === set.id) setFormData.portal_access = !!access;
-    } catch (error) {
-      console.error('Failed to load portal access:', error);
-    }
+    setFormData = { name: set.name, description: set.description || '', is_default: !!set.is_default };
   }
 
   async function saveConfiguration(save, refresh, complete, failureAction, failureMessage) {
@@ -220,9 +223,6 @@
             description: setFormData.description,
             is_default: setFormData.is_default,
           });
-          if (isSetAdmin) {
-            await assetSetsApi.setPortalAccess(editingSet.id, setFormData.portal_access);
-          }
         } else {
           await assetSetsApi.create({
             name: setFormData.name,
@@ -510,6 +510,34 @@
       availableGroups = groups || [];
     } catch (error) {
       console.error('Failed to load groups:', error);
+    }
+  }
+
+  async function loadPortalAccess() {
+    const setId = selectedSetId;
+    const request = ++portalRequest;
+    if (!setId) return;
+    try {
+      const access = await assetSetsApi.getPortalAccess(setId);
+      if (request !== portalRequest || setId !== selectedSetId) return;
+      portalAccess = !!access;
+    } catch (error) {
+      if (request === portalRequest && setId === selectedSetId) console.error('Failed to load portal access:', error);
+    }
+  }
+
+  async function handlePortalAccessChange(enabled) {
+    const setId = selectedSetId;
+    if (!setId) return;
+    portalAccessSaving = true;
+    try {
+      await assetSetsApi.setPortalAccess(setId, !!enabled);
+    } catch (error) {
+      console.error('Failed to update portal access:', error);
+      errorToast(t('dialogs.alerts.failedToSave', { error: error.message }));
+      if (setId === selectedSetId) portalAccess = !enabled;
+    } finally {
+      portalAccessSaving = false;
     }
   }
 
@@ -872,6 +900,25 @@
         </div>
       </div>
 
+      <!-- Portal Access Section -->
+      <div class="mb-6 p-4 rounded-lg bg-ds-surface border border-ds-border">
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <h3 class="text-sm font-semibold text-ds-text">{t('assets.availableOnPortals')}</h3>
+            <DescriptionText>
+              {t('assets.availableOnPortalsDesc')}
+            </DescriptionText>
+          </div>
+          <Toggle
+            bind:checked={portalAccess}
+            onchange={handlePortalAccessChange}
+            disabled={portalAccessSaving}
+            ariaLabel={t('assets.availableOnPortals')}
+            dataTestid="asset-set-portal-access"
+          />
+        </div>
+      </div>
+
       <!-- Role Assignments -->
       <div class="mb-4 flex justify-between items-center">
         <h3 class="text-sm font-semibold" style="color: var(--ds-text);">{t('assets.permissions')}</h3>
@@ -960,14 +1007,6 @@
         />
       </div>
       <Checkbox bind:checked={setFormData.is_default} label={t('assets.default')} />
-      {#if editingSet && isSetAdmin}
-        <Checkbox
-          bind:checked={setFormData.portal_access}
-          label={t('assets.availableOnPortals')}
-          hint={t('assets.availableOnPortalsDesc')}
-          dataTestid="asset-set-portal-access"
-        />
-      {/if}
     </div>
     <DialogFooter
       onCancel={closeSetForm}
