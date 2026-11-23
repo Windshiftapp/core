@@ -632,10 +632,9 @@ func (s *PortalService) GetRequestComments(ctx context.Context, itemID int) ([]P
 			id := int(portalCustomerID.Int64)
 			comment.PortalCustomerID = &id
 		}
-		comment.ContentHTML, err = markdown.Render(comment.Content)
-		if err != nil {
-			return nil, fmt.Errorf("render portal comment %d: %w", comment.ID, err)
-		}
+		// ContentHTML is projected by the portal handler, which renders once and
+		// applies the portal link rewrite. Rendering here too would double the
+		// Markdown work for every comment on the thread.
 		comments = append(comments, comment)
 	}
 	if err := rows.Err(); err != nil {
