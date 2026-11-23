@@ -902,6 +902,27 @@ func (h *PortalCustomersHandler) loadPortalCustomerLifecycle(id int) (*portalCus
 	return &state, nil
 }
 
+// recordPortalCustomerDeactivationAudit records the deactivation exactly once.
+// A deactivation that stamped the row and then failed mid-cleanup may be
+// retried; the retry must not duplicate the audit, and the first attempt must
+// still record it even if cleanup failed.
+func (h *PortalCustomersHandler) recordPortalCustomerDeactivationAudit(r *http.Request, currentUser *models.User, id int, name, email string) {
+	if currentUser == nil {
+		return
+	}
+	var exists bool
+	if err := h.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM audit_logs WHERE action_type = ? AND resource_id = ?)`, logger.ActionPortalCustomerDeactivate, id).Scan(&exists); err != nil {
+		slog.Warn("failed to check portal customer deactivation audit", slog.String("component", "portal"), slog.Int("customer_id", id), slog.Any("error", err))
+		return
+	}
+	if exists {
+		return
+	}
+	logAuditWithDetails(h.db, r, currentUser, logger.ActionPortalCustomerDeactivate, logger.ResourcePortalCustomer, &id, name, map[string]any{
+		"email": email,
+	})
+}
+
 // completePortalCustomerDeactivation runs the idempotent cleanup that must
 // accompany deactivation. Running it again for an already-deactivated customer
 // lets an attempt that failed mid-cleanup be retried to completion.
@@ -940,19 +961,20 @@ func (h *PortalCustomersHandler) DeactivatePortalCustomer(w http.ResponseWriter,
 		respondInternalError(w, r, err)
 		return
 	}
+	if state.erasedAt.Valid && state.erasedAt.String != "" {
+		respondConflict(w, r, "Portal customer has been erased and cannot be deactivated")
+		return
+	}
 	if state.deactivatedAt.Valid && state.deactivatedAt.String != "" {
 		// A previous attempt may have stamped the row and then failed before
-		// revoking sessions and credentials. Finish that idempotent cleanup so
-		// a retry is safe, then report the existing state.
+		// recording the audit or revoking sessions and credentials. Record the
+		// transition once and finish the idempotent cleanup so a retry is safe.
+		h.recordPortalCustomerDeactivationAudit(r, currentUser, id, state.name, state.email)
 		if err := h.completePortalCustomerDeactivation(r, id); err != nil {
 			respondInternalError(w, r, err)
 			return
 		}
 		respondConflict(w, r, "Portal customer is already deactivated")
-		return
-	}
-	if state.erasedAt.Valid && state.erasedAt.String != "" {
-		respondConflict(w, r, "Portal customer has been erased and cannot be deactivated")
 		return
 	}
 
@@ -961,15 +983,12 @@ func (h *PortalCustomersHandler) DeactivatePortalCustomer(w http.ResponseWriter,
 		respondInternalError(w, r, err)
 		return
 	}
+	// Record the transition before cleanup so a failed revoke does not lose the
+	// audit; the retry path records it only if it is still missing.
+	h.recordPortalCustomerDeactivationAudit(r, currentUser, id, state.name, state.email)
 	if err := h.completePortalCustomerDeactivation(r, id); err != nil {
 		respondInternalError(w, r, err)
 		return
-	}
-
-	if currentUser != nil {
-		logAuditWithDetails(h.db, r, currentUser, logger.ActionPortalCustomerDeactivate, logger.ResourcePortalCustomer, &id, state.name, map[string]any{
-			"email": state.email,
-		})
 	}
 
 	c, err := h.loadPortalCustomerWithRoles(int64(id))
