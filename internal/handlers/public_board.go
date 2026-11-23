@@ -50,11 +50,7 @@ func filterPublicBoardCardFields(fields []models.ListColumn) []models.ListColumn
 }
 
 func rewritePublicAttachmentURLs(content, slug string) string {
-	return strings.ReplaceAll(
-		content,
-		"/api/attachments/",
-		fmt.Sprintf("/api/public/board/%s/attachments/", slug),
-	)
+	return rewriteAttachmentURLs(content, "", fmt.Sprintf("/api/public/board/%s/attachments/", slug))
 }
 
 // PublicBoardHandler serves read-only public board views.
@@ -101,8 +97,7 @@ func (h *PublicBoardHandler) boardSource(r *http.Request) (*publicBoardSource, e
 
 func rewriteBoardAttachmentURLs(r *http.Request, content, slug string) string {
 	if placement, ok := r.Context().Value(portalBoardContextKey{}).(portalBoardContext); ok {
-		content = strings.ReplaceAll(content, requestContextPrefix(r)+"/api/attachments/", placement.AttachmentPrefix)
-		return strings.ReplaceAll(content, "/api/attachments/", placement.AttachmentPrefix)
+		return rewriteAttachmentURLs(content, requestContextPrefix(r), placement.AttachmentPrefix)
 	}
 	return rewritePublicAttachmentURLs(content, slug)
 }
