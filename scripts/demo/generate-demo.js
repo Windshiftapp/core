@@ -63,7 +63,8 @@ import {
   assetCategories,
   assetTypeFields,
   assets,
-  personalTasks
+  personalTasks,
+  sampleStory
 } from './demo-data.js';
 
 // Date utility functions for relative date generation
@@ -130,7 +131,8 @@ function parseArgs() {
     challenge: false,
     scale: false,
     adminUser: 'admin',
-    adminPassword: 'admin'
+    adminPassword: 'admin',
+    sampleRepo: null
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -175,6 +177,11 @@ function parseArgs() {
       case '--admin-password':
         options.adminPassword = args[++i];
         break;
+      case '--sample-repo':
+        // Seed the sandbox bug-fix story's SCM evidence against this public
+        // sample repository. Omitted for partner demos.
+        options.sampleRepo = args[++i];
+        break;
       case '--help':
         console.log(`
 ${colors.bright}${APP_NAME} Demo Content Generator${colors.reset}
@@ -196,6 +203,8 @@ ${colors.cyan}Options:${colors.reset}
   --scale                Generate large-scale dataset (22 workspaces, 10,000+ items)
   --admin-user <user>    Admin username for login (default: admin)
   --admin-password <pw>  Admin password for login (default: admin)
+  --sample-repo <url>    Seed the sample bug-fix story's SCM evidence for this
+                         public repository (sandbox only)
   --help                 Show this help message
 
 ${colors.cyan}Examples:${colors.reset}
@@ -1285,8 +1294,14 @@ async function createWorkItem(baseURL, token, item, workspaceId, workspaceKey, i
       iterationId = iterationMap[localKey] || iterationMap[item.iterationName] || null;
     }
 
-    // Determine item type based on depth and characteristics
-    const itemTypeId = determineItemType(item, depth, itemTypes);
+    // Prefer an explicit item_type (by name) so a dataset can place a Bug,
+    // Story, or Epic precisely; otherwise fall back to the depth heuristic.
+    let itemTypeId;
+    if (item.item_type && itemTypes[item.item_type]) {
+      itemTypeId = itemTypes[item.item_type];
+    } else {
+      itemTypeId = determineItemType(item, depth, itemTypes);
+    }
 
     const itemData = {
       workspace_id: workspaceId,
@@ -1705,6 +1720,228 @@ async function createTestCaseLinks(baseURL, token, itemMap, testCaseMap, linkTyp
   }
 
   return createdCount;
+}
+
+// --- Sample bug-fix story (WW-133) -----------------------------------------
+//
+// The STOR workspace and its work items are seeded by the generic pass above.
+// This adds the evidence an evaluator follows: a regression test linked to the
+// bug, a recorded run, a customer-visible update, and (sandbox only) an item
+// link to the public fix. No GitHub credentials are used; the link is written
+// through the normal item SCM-link API as trusted provisioning.
+
+// executeSampleTestRun executes a template, records one outcome per result,
+// and ends the run.
+async function executeSampleTestRun(baseURL, token, workspaceId, templateId, run) {
+  const testRun = await v2(baseURL, token, 'POST', `/api/v2/workspaces/${workspaceId}/test-run-templates/${templateId}/execute`, {});
+  const results = await v2(baseURL, token, 'GET', `/api/v2/workspaces/${workspaceId}/test-runs/${testRun.id}/results`);
+  for (const result of Array.isArray(results) ? results : []) {
+    await v2Patch(baseURL, token, `/api/v2/workspaces/${workspaceId}/test-runs/${testRun.id}/results/${result.id}`, {
+      status: run.status,
+      actual_result: run.actualResult
+    });
+  }
+  await v2(baseURL, token, 'POST', `/api/v2/workspaces/${workspaceId}/test-runs/${testRun.id}/end`, {});
+  logSuccess(`Recorded ${run.status} run (${Array.isArray(results) ? results.length : 0} result(s))`);
+}
+
+// createItemComment adds one comment. Private comments are internal notes;
+// public comments are the customer-visible updates.
+async function createItemComment(baseURL, token, itemId, content, isPrivate) {
+  try {
+    await v2(baseURL, token, 'POST', `/api/v2/items/${itemId}/comments`, { content, is_private: isPrivate });
+  } catch (error) {
+    logError(`Failed to comment on item ${itemId}: ${error.message}`);
+  }
+}
+
+// seedSampleScmLink writes the SCM provider, workspace connection, repository,
+// and item links that the GitHub integration would normally create. It never
+// calls GitHub and stores no credential.
+async function seedSampleScmLink(baseURL, token, repoURL, workspaceId, bugId) {
+  const { provider, repository, links } = sampleStory.scm;
+
+  const providersResp = await makeAuthRequest(baseURL, 'GET', '/api/admin/scm-providers', null, token);
+  const providers = Array.isArray(providersResp.data) ? providersResp.data : [];
+  let providerId = (providers.find(p => p.slug === provider.slug) || {}).id;
+
+  if (!providerId) {
+    const created = await makeAuthRequest(baseURL, 'POST', '/api/admin/scm-providers', {
+      slug: provider.slug,
+      name: provider.name,
+      provider_type: provider.provider_type,
+      auth_method: provider.auth_method,
+      enabled: true,
+      is_default: false,
+      workspace_restriction_mode: 'unrestricted'
+    }, token);
+    if (created.status < 200 || created.status >= 300) {
+      throw new Error(`provider create failed: ${created.status} - ${JSON.stringify(created.data)?.slice(0, 200)}`);
+    }
+    providerId = created.data.id;
+    logSuccess(`Created SCM provider: ${provider.name}`);
+  }
+
+  const connectionsResp = await makeAuthRequest(baseURL, 'GET', `/api/workspaces/${workspaceId}/scm-connections`, null, token);
+  const connections = Array.isArray(connectionsResp.data) ? connectionsResp.data : [];
+  let connectionId = (connections.find(c => c.scm_provider_id === providerId) || {}).id;
+
+  if (!connectionId) {
+    const created = await makeAuthRequest(baseURL, 'POST', `/api/workspaces/${workspaceId}/scm-connections`, {
+      scm_provider_id: providerId
+    }, token);
+    if (created.status < 200 || created.status >= 300) {
+      throw new Error(`connection create failed: ${created.status}`);
+    }
+    connectionId = created.data.id;
+    logSuccess('Created workspace SCM connection');
+  }
+
+  const reposResp = await makeAuthRequest(baseURL, 'GET', `/api/workspaces/${workspaceId}/scm-connections/${connectionId}/repositories`, null, token);
+  const repos = Array.isArray(reposResp.data) ? reposResp.data : [];
+  let repoId = (repos.find(r => r.repository_external_id === repository.externalId) || {}).id;
+
+  if (!repoId) {
+    const created = await makeAuthRequest(baseURL, 'POST', `/api/workspaces/${workspaceId}/scm-connections/${connectionId}/repositories`, {
+      repository_external_id: repository.externalId,
+      repository_name: repository.name,
+      repository_url: repoURL,
+      default_branch: repository.defaultBranch
+    }, token);
+    if (created.status < 200 || created.status >= 300) {
+      throw new Error(`repository link failed: ${created.status}`);
+    }
+    repoId = created.data.id;
+    logSuccess(`Linked repository: ${repository.name}`);
+  }
+
+  for (const link of links) {
+    const created = await makeAuthRequest(baseURL, 'POST', `/api/items/${bugId}/scm-links`, {
+      workspace_repository_id: repoId,
+      link_type: link.linkType,
+      external_id: link.externalId,
+      external_url: link.url,
+      title: link.title,
+      state: link.state,
+      author_name: link.authorName
+    }, token);
+    if (created.status < 200 || created.status >= 300) {
+      throw new Error(`SCM link create failed for ${link.linkType} ${link.externalId}: ${created.status}`);
+    }
+  }
+  logSuccess(`Linked the bug to ${repoURL}`);
+}
+
+// verifySampleStory re-reads the seeded evidence over the API. It runs on the
+// sandbox seed so a nightly reset fails loudly if any link is missing.
+async function verifySampleStory(baseURL, token, { requestId, bugId, testCaseId }) {
+  const unwrap = (response) => {
+    const body = response.data;
+    return body && typeof body === 'object' && 'data' in body ? body.data : body;
+  };
+  const problems = [];
+
+  const scmLinks = unwrap(await makeAuthRequest(baseURL, 'GET', `/api/items/${bugId}/scm-links`, null, token)) || [];
+  if (!scmLinks.some(link => link.link_type === 'pull_request' && link.external_url)) {
+    problems.push('no pull_request SCM link on the bug');
+  }
+
+  const linkBody = unwrap(await makeAuthRequest(baseURL, 'GET', `/api/v2/items/${bugId}/links`, null, token)) || {};
+  const links = [...(linkBody.outgoing || []), ...(linkBody.incoming || [])];
+  if (!links.some(link => link.source_type === 'test_case' && link.source_id === testCaseId)) {
+    problems.push('the regression test is not linked to the bug');
+  }
+
+  const commentBody = unwrap(await makeAuthRequest(baseURL, 'GET', `/api/v2/items/${requestId}/comments`, null, token)) || {};
+  const comments = commentBody.comments || [];
+  if (!comments.some(comment => comment.is_private === false)) {
+    problems.push('no customer-visible comment on the request');
+  }
+
+  if (problems.length > 0) {
+    throw new Error(`sample story verification failed: ${problems.join('; ')}`);
+  }
+  logSuccess('Verified the sample story links');
+}
+
+async function seedSampleStory(baseURL, token, options, { workspaceMap, itemMap, linkTypeMap }) {
+  const workspaceId = workspaceMap[sampleStory.workspaceKey];
+  if (!workspaceId) {
+    logError(`Sample story workspace ${sampleStory.workspaceKey} not found - skipping sample story`);
+    return;
+  }
+
+  const requestId = itemMap[`${sampleStory.workspaceKey}:${sampleStory.requestTitle}`];
+  const bugId = itemMap[`${sampleStory.workspaceKey}:${sampleStory.bugTitle}`];
+  if (!requestId || !bugId) {
+    logError('Sample story work items not found - skipping sample story');
+    return;
+  }
+
+  logSection('Seeding Sample Bug-Fix Story (WW-133)');
+
+  // Regression test case, in its own folder in the storefront workspace.
+  const folderMap = await createTestFolders(baseURL, token, workspaceId, [sampleStory.testFolder]);
+  const testCaseMap = await createTestCases(baseURL, token, workspaceId, folderMap, {}, sampleStory.testCases);
+  const testCaseId = testCaseMap[`${sampleStory.testCases[0].folderPath}:${sampleStory.testCases[0].title}`];
+  if (!testCaseId) {
+    logError('Sample story test case was not created');
+    return;
+  }
+
+  // Test plan, template, and the before/after executions.
+  let planId = null;
+  try {
+    const plan = await v2(baseURL, token, 'POST', `/api/v2/workspaces/${workspaceId}/test-plans`, {
+      name: sampleStory.testPlan.name,
+      description: sampleStory.testPlan.description
+    });
+    planId = plan.id;
+    await v2(baseURL, token, 'POST', `/api/v2/workspaces/${workspaceId}/test-plans/${planId}/test-cases`, { test_case_id: testCaseId });
+    logSuccess(`Created test plan: ${sampleStory.testPlan.name}`);
+
+    const template = await v2(baseURL, token, 'POST', `/api/v2/workspaces/${workspaceId}/test-run-templates`, {
+      plan_id: planId,
+      name: sampleStory.testRunTemplate.name,
+      description: sampleStory.testRunTemplate.description
+    });
+    logSuccess(`Created test run template: ${sampleStory.testRunTemplate.name}`);
+
+    for (const run of sampleStory.testRuns) {
+      await executeSampleTestRun(baseURL, token, workspaceId, template.id, run);
+    }
+  } catch (error) {
+    logError(`Failed to seed sample story test runs: ${error.message}`);
+  }
+
+  // Traceability: the regression test covers the bug.
+  const testsLinkTypeId = linkTypeMap['Tests'];
+  if (testsLinkTypeId) {
+    try {
+      await v2(baseURL, token, 'POST', '/api/v2/links', {
+        link_type_id: testsLinkTypeId,
+        source_type: 'test_case',
+        source_id: testCaseId,
+        target_type: 'item',
+        target_id: bugId
+      });
+      logSuccess('Linked the regression test to the bug');
+    } catch (error) {
+      logError(`Failed to link the regression test: ${error.message}`);
+    }
+  }
+
+  // Customer-visible update on the request, internal note on the bug.
+  await createItemComment(baseURL, token, requestId, sampleStory.requestComment, false);
+  await createItemComment(baseURL, token, bugId, sampleStory.bugComment, true);
+
+  // Sandbox only: link the bug to the public fix. Partner demos omit the flag.
+  // A sandbox seed that cannot write the evidence must fail the nightly reset,
+  // so this path verifies and rethrows instead of logging and continuing.
+  if (options.sampleRepo) {
+    await seedSampleScmLink(baseURL, token, options.sampleRepo, workspaceId, bugId);
+    await verifySampleStory(baseURL, token, { requestId, bugId, testCaseId });
+  }
 }
 
 // Create asset management sets
@@ -2190,6 +2427,10 @@ ${colors.reset}`);
       linkCount = await createTestCaseLinks(options.baseURL, token, itemMap, testCaseMap, linkTypeMap);
     }
 
+    // Sample bug-fix story (WW-133): regression test, recorded run, and
+    // customer-visible update; the SCM link is seeded only with --sample-repo.
+    await seedSampleStory(options.baseURL, token, options, { workspaceMap, itemMap, linkTypeMap });
+
     // Asset Management
     const assetSetMap = await createAssetSets(options.baseURL, token);
     const assetTypeMap = await createAssetTypes(options.baseURL, token, assetSetMap);
@@ -2302,6 +2543,7 @@ export {
   createWorkItems,
   createComments,
   createPersonalTasks,
+  seedSampleStory,
   createAssetSets,
   createAssetTypes,
   createAssetCategories,

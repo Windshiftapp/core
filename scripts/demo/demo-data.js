@@ -208,6 +208,11 @@ export const workspaces = [
     name: 'Marketing',
     key: 'MKTG',
     description: 'Marketing campaigns and content management'
+  },
+  {
+    name: 'Storefront',
+    key: 'STOR',
+    description: 'Online storefront, checkout, and payments'
   }
 ];
 
@@ -246,6 +251,13 @@ export const projects = [
     customerName: 'TechStart Inc',
     name: 'Q1 2025 Campaign',
     description: 'First quarter marketing campaign and content',
+    active: true
+  },
+  {
+    workspaceKey: 'STOR',
+    customerName: 'Acme Corporation',
+    name: 'Acme Storefront',
+    description: 'Checkout, payments, and order management for the Acme online store',
     active: true
   }
 ];
@@ -1110,6 +1122,49 @@ export const workItems = {
       priority: 'Low',
       iterationName: 'v2.0 Release',  // Global release iteration
       due_date: '2025-02-01'
+    }
+  ],
+  // A single inspectable bug-fix story for the public sandbox (WW-133).
+  // A customer report (the Story) contains the engineering Bug, which carries
+  // the linked test result and the sample-repository evidence.
+  'STOR': [
+    {
+      title: 'Checkout reliability',
+      description: 'Keep the Acme Storefront checkout correct under retries, timeouts, and duplicate submissions.',
+      item_type: 'Epic',
+      status_name: 'In Progress',
+      priority: 'High',
+      project: 'Acme Storefront',
+      custom_fields: { 'Story Points': 21 },
+      children: [
+        {
+          title: 'Charged full price after a payment retry',
+          description: 'A customer reported that an order is charged the full price when the payment is retried after a transient gateway failure. The SAVE20 coupon is applied to the first attempt but lost on the retry.',
+          item_type: 'Story',
+          status_name: 'Open',
+          priority: 'Critical',
+          project: 'Acme Storefront',
+          custom_fields: {
+            'Request Type': 'Bug Report',
+            'Customer Tier': 'Enterprise',
+            'Severity': 'Critical'
+          },
+          children: [
+            {
+              title: 'Payment retry drops the applied discount',
+              description: 'chargeWithRetry recomputes the amount from the cart on every attempt, so the coupon is lost after the first failure. Keep the quoted amount across attempts. The fix and its regression test are in the linked pull request.',
+              item_type: 'Bug',
+              status_name: 'Done',
+              priority: 'Critical',
+              project: 'Acme Storefront',
+              custom_fields: {
+                'Story Points': 3,
+                'Severity': 'Critical'
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 };
@@ -2662,3 +2717,93 @@ export const personalTasks = [
     // No due date
   }
 ];
+
+// Sample bug-fix story for the public sandbox (WW-133).
+//
+// The STOR workspace and its work items above are seeded for every demo. This
+// block drives the extra evidence that only the sandbox needs: a Windshift test
+// case and recorded run linked to the bug, a customer-visible update on the
+// request, and (when a sample repository is supplied) an item link to the
+// public fix. The repository is fictional and unrelated to Windshift core.
+export const sampleStory = {
+  workspaceKey: 'STOR',
+  requestTitle: 'Charged full price after a payment retry',
+  bugTitle: 'Payment retry drops the applied discount',
+  testFolder: {
+    name: 'Checkout',
+    description: 'Checkout and payment regression tests'
+  },
+  testCases: [
+    {
+      folderPath: 'Checkout',
+      title: 'Retry after a transient payment failure keeps the discount',
+      preconditions: 'A cart with a 20% coupon (SAVE20) and a payment gateway that fails the first charge with a transient error.',
+      steps: [
+        {
+          action: 'Start checkout with coupon SAVE20 and a gateway that fails the first charge',
+          data: '',
+          expected: 'The first attempt is rejected and the charge is retried'
+        },
+        {
+          action: 'Inspect the amount charged on the successful retry',
+          data: '',
+          expected: 'The retry charges the discounted total (1600 cents), not the original subtotal (2000 cents)'
+        }
+      ]
+    }
+  ],
+  testPlan: {
+    name: 'Checkout Regression',
+    description: 'Regression coverage for the Acme Storefront checkout'
+  },
+  testRunTemplate: {
+    name: 'Checkout regression',
+    description: 'Run the checkout regression suite'
+  },
+  // Two executions tell the before/after story: the bug reproduced, then the
+  // fix was verified. Results are recorded against the single test case.
+  testRuns: [
+    {
+      status: 'failed',
+      actualResult: 'Retry charged 2000 cents instead of the discounted 1600 cents'
+    },
+    {
+      status: 'passed',
+      actualResult: 'Retry charged the discounted 1600 cents; matches the merged fix'
+    }
+  ],
+  requestComment: 'Thanks for the report. We reproduced this on a retried charge and shipped a fix. The regression test "Retry after a transient payment failure keeps the discount" now covers the retry path.',
+  bugComment: 'Root cause: chargeWithRetry recomputed the amount from the cart on every attempt, dropping the coupon. Fixed by keeping the quoted amount across attempts.',
+  scm: {
+    provider: {
+      slug: 'sample-checkout',
+      name: 'GitHub (sample-checkout)',
+      provider_type: 'github',
+      auth_method: 'pat'
+    },
+    repository: {
+      externalId: 'Windshiftapp/sample-checkout',
+      name: 'sample-checkout',
+      url: 'https://github.com/Windshiftapp/sample-checkout',
+      defaultBranch: 'main'
+    },
+    links: [
+      {
+        linkType: 'pull_request',
+        externalId: '1',
+        url: 'https://github.com/Windshiftapp/sample-checkout/pull/1',
+        title: 'fix: keep the coupon applied when a payment is retried',
+        state: 'merged',
+        authorName: 'Stefan Ernst'
+      },
+      {
+        linkType: 'commit',
+        externalId: '95cd7dc61a38489026bfa63a8396f79ea05b811d',
+        url: 'https://github.com/Windshiftapp/sample-checkout/commit/95cd7dc61a38489026bfa63a8396f79ea05b811d',
+        title: 'fix: keep the coupon applied when a payment is retried (#1)',
+        state: 'merged',
+        authorName: 'Stefan Ernst'
+      }
+    ]
+  }
+};
