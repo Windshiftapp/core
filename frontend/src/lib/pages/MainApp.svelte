@@ -4,7 +4,7 @@
   import { useEventListener } from 'runed';
   import { auth } from '../api/auth.js';
   import Button from '../components/Button.svelte';
-  import Spinner from '../components/Spinner.svelte';
+  import LazyRootView from '../components/LazyRootView.svelte';
   import EmailVerificationBanner from '../features/notifications/EmailVerificationBanner.svelte';
   import CollectionNavigation from '../features/collections/CollectionNavigation.svelte';
   import MainSidebar from '../layout/MainSidebar.svelte';
@@ -24,6 +24,7 @@
   import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
   import { aiStore } from '../stores/aiStore.svelte.js';
   import { terminalStore } from '../stores/terminalStore.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
   import { useGradientStyles } from '../stores/workspaceGradient.svelte.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { LazyComponentLoader } from '../utils/lazyComponentLoader.svelte.js';
@@ -74,8 +75,6 @@
   });
 
   let terminalState = $derived($terminalStore);
-  let TerminalPanelComponent = $state(null);
-  let terminalLoading = $state(false);
   let isResizingTerminal = $state(false);
   let resizeStartX = $state(0);
   let resizeStartPercent = $state(50);
@@ -106,23 +105,9 @@
     }
   }
 
-  async function loadTerminalPanel() {
-    if (TerminalPanelComponent || terminalLoading) return;
-    terminalLoading = true;
-    try {
-      const module = await import('../features/terminal/TerminalPanel.svelte');
-      TerminalPanelComponent = module.default;
-    } catch (error) {
-      console.error('Failed to load terminal panel:', error);
-    } finally {
-      terminalLoading = false;
-    }
-  }
-
   function toggleTerminal() {
     closeAllSidebarSurfaces();
     terminalStore.toggle();
-    if (!TerminalPanelComponent) void loadTerminalPanel();
   }
 
   function handleTerminalResizeStart(event) {
@@ -329,9 +314,6 @@
     if (redirect) navigate(redirect, { replace: true });
   });
 
-  $effect(() => {
-    if (terminalState.visible && !TerminalPanelComponent) void loadTerminalPanel();
-  });
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -455,13 +437,7 @@
             class="flex flex-col min-w-0"
             style="width: {100 - terminalState.splitPercent}%; flex-shrink: 0;"
           >
-            {#if TerminalPanelComponent}
-              <TerminalPanelComponent />
-            {:else if terminalLoading}
-              <div class="flex items-center justify-center h-full" style="background-color: #1a1b26;">
-                <Spinner />
-              </div>
-            {/if}
+            <LazyRootView loader={MAIN_APP_COMPONENT_LOADERS['terminal-panel']} label={t('nav.terminal')} />
           </div>
         {/if}
       </div>
