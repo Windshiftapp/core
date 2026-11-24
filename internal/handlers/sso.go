@@ -10,7 +10,6 @@ import (
 	"io"
 	"log"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -70,8 +69,7 @@ type SSOHandler struct {
 	allowedHosts             []string           // Allowed hosts for redirect URI validation (from --allowed-hosts)
 	devMode                  bool               // Development mode (from --no-csrf flag)
 	ipExtractor              *utils.IPExtractor // IP extractor with proxy validation
-	useProxy                 bool               // Whether proxy mode is enabled
-	additionalProxies        []net.IP           // Additional trusted proxy IPs beyond private ranges
+	trust                    utils.TrustPolicy  // Shared proxy trust policy
 }
 
 // SSOStatusProviderInfo represents a single provider in the public status response
@@ -103,7 +101,7 @@ type SSOProviderResponse struct {
 	HasClientSecret        bool   `json:"has_client_secret"`
 	Scopes                 string `json:"scopes"`
 	AutoProvisionUsers     bool   `json:"auto_provision_users"`
-	RequireVerifiedEmail   bool   `json:"require_verified_email"` // Provider is authoritative for email; skips Windshift email verification.
+	RequireVerifiedEmail   bool   `json:"require_verified_email"` // Provider is authoritative for email: auto-links to existing accounts by email even when the provider reports the address unverified.
 	AttributeMapping       string `json:"attribute_mapping"`
 	GitHubOrganization     string `json:"github_organization,omitempty"`
 	AccountType            string `json:"account_type"`
@@ -185,6 +183,13 @@ func sanitizeSSOProviderRequest(w http.ResponseWriter, r *http.Request, req *SSO
 // useProxy: whether to trust proxy headers from trusted sources
 // additionalProxiesStr: comma-separated list of additional trusted proxy IPs
 func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, permissionService *services.PermissionService, emailVerificationService *services.EmailVerificationService, pluginManager *plugins.Manager, sessionSecret, baseURL, allowedHostsStr string, devMode bool, ipExtractor *utils.IPExtractor, useProxy bool, additionalProxiesStr []string) *SSOHandler {
+	return NewSSOHandlerWithTrust(db, sessionManager, permissionService, emailVerificationService, pluginManager, sessionSecret, baseURL, allowedHostsStr, devMode, ipExtractor, utils.NewTrustPolicy(useProxy, false, additionalProxiesStr, nil))
+}
+
+// NewSSOHandlerWithTrust creates an SSO handler bound to an explicit proxy trust
+// policy. trust decides whether forwarded headers from the immediate peer may be
+// believed.
+func NewSSOHandlerWithTrust(db database.Database, sessionManager *auth.SessionManager, permissionService *services.PermissionService, emailVerificationService *services.EmailVerificationService, pluginManager *plugins.Manager, sessionSecret, baseURL, allowedHostsStr string, devMode bool, ipExtractor *utils.IPExtractor, trust utils.TrustPolicy) *SSOHandler {
 	// Defensive: config.Load guarantees non-empty, but a wiring bug upstream
 	// would silently break session encryption — fail fast instead.
 	if sessionSecret == "" {
@@ -199,14 +204,6 @@ func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, pe
 			if trimmed := strings.TrimSpace(h); trimmed != "" {
 				allowedHosts = append(allowedHosts, trimmed)
 			}
-		}
-	}
-
-	// Parse additional proxy IPs (beyond auto-trusted private ranges)
-	var additionalProxies []net.IP
-	for _, proxyStr := range additionalProxiesStr {
-		if ip := net.ParseIP(strings.TrimSpace(proxyStr)); ip != nil {
-			additionalProxies = append(additionalProxies, ip)
 		}
 	}
 
@@ -242,8 +239,7 @@ func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, pe
 		allowedHosts:             allowedHosts,
 		devMode:                  devMode,
 		ipExtractor:              ipExtractor,
-		useProxy:                 useProxy,
-		additionalProxies:        additionalProxies,
+		trust:                    trust,
 	}
 }
 
@@ -1226,22 +1222,7 @@ func (h *SSOHandler) getRedirectURI(r *http.Request, slug string) string {
 
 // isTrustedRequest checks if the request comes from a trusted proxy
 func (h *SSOHandler) isTrustedRequest(r *http.Request) bool {
-	if !h.useProxy {
-		return false // Proxy mode disabled - trust nothing
-	}
-
-	// Get the immediate client IP (could be proxy)
-	remoteAddr := r.RemoteAddr
-	if colonIndex := strings.LastIndex(remoteAddr, ":"); colonIndex != -1 {
-		remoteAddr = remoteAddr[:colonIndex]
-	}
-
-	clientIP := net.ParseIP(remoteAddr)
-	if clientIP == nil {
-		return false
-	}
-
-	return utils.IsTrustedProxy(clientIP, h.useProxy, h.additionalProxies)
+	return h.trust.IsTrusted(utils.PeerIP(r))
 }
 
 // isAllowedHost checks if a host is in the allowed hosts list

@@ -24,9 +24,15 @@ type Config struct {
 	UseProxy          bool
 	UseProxyExplicit  bool
 	AdditionalProxies string
-	TLSCertPath       string
-	TLSKeyPath        string
-	DisableCSRF       bool
+	// ProxyTrustMode selects how forwarded headers (X-Forwarded-For,
+	// X-Forwarded-Proto, X-Real-IP) are trusted. ProxyTrustModeLegacy is the
+	// default through 0.9.7: every private, loopback, or link-local peer counts
+	// as a trusted proxy. ProxyTrustModeStrict trusts only loopback and the
+	// explicitly configured AdditionalProxies. 0.9.8 switches the default.
+	ProxyTrustMode string
+	TLSCertPath    string
+	TLSKeyPath     string
+	DisableCSRF    bool
 
 	// H2CEnabled accepts unencrypted HTTP/2 (h2c) on the plain HTTP listener, so
 	// a fronting proxy can multiplex streams onto one upstream connection. A TLS
@@ -94,6 +100,17 @@ type Config struct {
 type MemoryConfig struct {
 	LimitMB int
 }
+
+// Proxy trust modes accepted by PROXY_TRUST_MODE.
+const (
+	// ProxyTrustModeLegacy trusts any private/loopback/link-local peer as a
+	// proxy. Retained as the default for existing installations through 0.9.7.
+	ProxyTrustModeLegacy = "legacy"
+	// ProxyTrustModeStrict trusts only loopback and ADDITIONAL_PROXIES. An
+	// unlisted peer is treated as the client and its forwarding headers are
+	// ignored.
+	ProxyTrustModeStrict = "strict"
+)
 
 // Storage backend names accepted by STORAGE_BACKEND.
 const (

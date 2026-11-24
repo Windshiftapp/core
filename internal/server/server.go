@@ -393,14 +393,19 @@ func (s *Server) initialize() error {
 		additionalProxyList = strings.Split(cfg.AdditionalProxies, ",")
 	}
 
-	ipExtractor := utils.NewIPExtractor(cfg.UseProxy, additionalProxyList)
+	// One trust policy is shared by client-IP extraction, session-cookie
+	// Secure/HSTS detection, audit attribution, and the admin diagnostic that
+	// reports whether the deployment is affected by the private-range finding.
+	proxyTrustObserver := utils.NewTrustObserver()
+	trustPolicy := utils.NewTrustPolicy(cfg.UseProxy, cfg.ProxyTrustMode == config.ProxyTrustModeStrict, additionalProxyList, proxyTrustObserver)
+
+	ipExtractor := utils.NewIPExtractorWithPolicy(trustPolicy)
 
 	primarySessionCacheMB, _ := config.SplitSSHCacheBudget(s.memoryBudget.SessionCacheMB, cfg.SSH.Enabled)
-	sessionManager := auth.NewSessionManagerWithValidationCacheTTL(
+	sessionManager := auth.NewSessionManagerWithTrustPolicy(
 		s.db,
 		enableHTTPS,
-		cfg.UseProxy,
-		additionalProxyList,
+		trustPolicy,
 		cfg.Auth.SessionSecret,
 		cfg.Auth.SessionIPBinding,
 		cfg.Auth.SessionValidationCacheTTL,
@@ -493,14 +498,7 @@ func (s *Server) initialize() error {
 		},
 	)
 
-	authMiddleware := middleware.NewAuthMiddleware(sessionManager, tokenManager, s.db, cfg.UseProxy, additionalProxyList, setupCompleted)
-
-	var additionalProxyIPs []net.IP
-	for _, proxyStr := range additionalProxyList {
-		if ip := net.ParseIP(strings.TrimSpace(proxyStr)); ip != nil {
-			additionalProxyIPs = append(additionalProxyIPs, ip)
-		}
-	}
+	authMiddleware := middleware.NewAuthMiddleware(sessionManager, tokenManager, s.db, trustPolicy, setupCompleted)
 
 	mux := http.NewServeMux()
 	healthHandler := health.NewHandler(s.db.GetDB())
@@ -624,7 +622,7 @@ func (s *Server) initialize() error {
 
 	emailVerificationService := services.NewEmailVerificationService(s.db, smtpSender, baseURL)
 
-	portalSessionManager := auth.NewPortalSessionManager(s.db, enableHTTPS, cfg.UseProxy, additionalProxyList, cfg.Auth.SessionSecret, cfg.Auth.SessionIPBinding)
+	portalSessionManager := auth.NewPortalSessionManagerWithTrustPolicy(s.db, enableHTTPS, trustPolicy, cfg.Auth.SessionSecret, cfg.Auth.SessionIPBinding)
 
 	magicLinkService := services.NewMagicLinkService(s.db, smtpSender, baseURL)
 
@@ -943,7 +941,7 @@ func (s *Server) initialize() error {
 
 	setupHandler := handlers.NewSetupHandler(s.db, sessionManager, authMiddleware, ipExtractor)
 
-	ssoHandler := handlers.NewSSOHandler(s.db, sessionManager, permService, emailVerificationService, s.pluginManager, cfg.Auth.SessionSecret, baseURL, cfg.AllowedHosts, cfg.DisableCSRF, ipExtractor, cfg.UseProxy, additionalProxyList)
+	ssoHandler := handlers.NewSSOHandlerWithTrust(s.db, sessionManager, permService, emailVerificationService, s.pluginManager, cfg.Auth.SessionSecret, baseURL, cfg.AllowedHosts, cfg.DisableCSRF, ipExtractor, trustPolicy)
 
 	s.scmHTTPClients = scm.NewHTTPClientPool()
 	scmProviderHandler := handlers.NewSCMProviderHandler(s.db, cfg.Auth.SessionSecret, baseURL, s.scmHTTPClients)
@@ -1656,7 +1654,7 @@ func (s *Server) initialize() error {
 	scimGroup := router.NewRouteGroup(mux, "/scim/v2", scimMiddleware...)
 
 	// Create portal auth middleware (accepts both internal and portal sessions)
-	portalAuthMiddleware := middleware.NewPortalAuthMiddleware(sessionManager, portalSessionManager, cfg.UseProxy, additionalProxyList)
+	portalAuthMiddleware := middleware.NewPortalAuthMiddleware(sessionManager, portalSessionManager, trustPolicy)
 	oauthHandler := handlers.NewOAuthHandler(
 		s.db,
 		agentHandler,
@@ -1668,6 +1666,44 @@ func (s *Server) initialize() error {
 
 	// Build route dependencies
 	slaHandler := handlers.NewSLAHandler(s.db, s.slaEngine, permService)
+
+	// One diagnostics handler serves both the unversioned admin routes and the
+	// canonical v2 session route.
+	diagnosticsHandler := handlers.NewDiagnosticsHandler(
+		sessionManager,
+		s.databaseDiagRepo,
+		repository.NewActionRepository(s.db),
+		repository.NewWebhookDeliveryRepository(s.db),
+		repository.NewSchedulerRunRepository(s.db),
+		repository.NewFracIndexRepository(s.db),
+		repository.NewAIRepository(s.db),
+		llmManager,
+		llmModelCache,
+		logger.NewAuditor(s.db),
+		repository.NewRunnerRepository(s.db),
+		repository.NewAgentRunRepository(s.db),
+		s.webhookSender,
+		transitionMatrixService,
+		bulkOperationMetrics,
+		repository.NewRecurrenceRepository(s.db),
+		repository.NewSystemSettingRepository(s.db),
+		s.globalRankMigrationScheduler,
+		s.memoryBudget,
+		s.eventEngine.Store(),
+		repository.NewSCMHealthRepository(s.db),
+		repository.NewChannelRepository(s.db),
+		s.sideEffectDispatcher,
+		handlers.ProxyTrustConfig{
+			UseProxy:          cfg.UseProxy,
+			ProxyAutoDetected: cfg.UseProxy && !cfg.UseProxyExplicit,
+			Strict:            cfg.ProxyTrustMode == config.ProxyTrustModeStrict,
+			AdditionalProxies: trustPolicy.ConfiguredProxies(),
+			InvalidProxies:    trustPolicy.InvalidAdditional,
+			Observer:          proxyTrustObserver,
+			Policy:            trustPolicy,
+		},
+	)
+
 	routeDeps := &routes.Deps{
 		SLA:       slaHandler,
 		API:       api,
@@ -1764,31 +1800,7 @@ func (s *Server) initialize() error {
 			Features:         featuresHandler,
 			ShellBootstrap:   shellBootstrapHandler,
 			OAuthClients:     handlers.NewAdminOAuthClientHandler(s.db, tokenManager, permService),
-			Diagnostics: handlers.NewDiagnosticsHandler(
-				sessionManager,
-				s.databaseDiagRepo,
-				repository.NewActionRepository(s.db),
-				repository.NewWebhookDeliveryRepository(s.db),
-				repository.NewSchedulerRunRepository(s.db),
-				repository.NewFracIndexRepository(s.db),
-				repository.NewAIRepository(s.db),
-				llmManager,
-				llmModelCache,
-				logger.NewAuditor(s.db),
-				repository.NewRunnerRepository(s.db),
-				repository.NewAgentRunRepository(s.db),
-				s.webhookSender,
-				transitionMatrixService,
-				bulkOperationMetrics,
-				repository.NewRecurrenceRepository(s.db),
-				repository.NewSystemSettingRepository(s.db),
-				s.globalRankMigrationScheduler,
-				s.memoryBudget,
-				s.eventEngine.Store(),
-				repository.NewSCMHealthRepository(s.db),
-				repository.NewChannelRepository(s.db),
-				s.sideEffectDispatcher,
-			),
+			Diagnostics:      diagnosticsHandler,
 			AgentSecurity: handlers.NewAgentSecurityHandler(
 				agentSecurityRepo,
 				services.NewUserReadService(s.db),
@@ -2144,6 +2156,7 @@ func (s *Server) initialize() error {
 		ItemLifecycle:                services.NewItemLifecycleService(s.db, permService),
 		TicketImport:                 services.NewTicketImportService(s.db, permService, importScratch),
 		OperatorControls:             services.NewOperatorControlsService(s.db, attachmentStorage),
+		Diagnostics:                  diagnosticsHandler,
 		SessionMiddleware:            authMiddleware.OptionalAuth,
 		SearchAllowed:                s.searchLimiter.AllowRequest,
 		DBRequestTimeout:             s.config.DB.RequestTimeout,
@@ -2292,7 +2305,7 @@ func (s *Server) initialize() error {
 	go jiraHosts.Start(s.jiraHostStopChan)
 
 	// Recovery converts panics before the metrics layer records the final status.
-	securityMiddleware := createSecurityHeaders(enableHTTPS, cfg.UseProxy, additionalProxyIPs, jiraHosts.Allowed, securitySettingsHandler.ExternalImagesAllowed)
+	securityMiddleware := createSecurityHeadersWithTrust(enableHTTPS, trustPolicy, jiraHosts.Allowed, securitySettingsHandler.ExternalImagesAllowed)
 	compressionMiddleware := middleware.CreateCompressionMiddleware(cfg.UseProxy)
 	applicationHandler := middleware.Recovery(compressionMiddleware(securityMiddleware(middleware.OperatorAdmission(controls)(s.metrics.CaptureRoutePattern(mux)))))
 	handler := s.metrics.Instrument(applicationHandler)

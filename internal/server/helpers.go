@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -293,7 +292,7 @@ func isDefaultPort(scheme, port string) bool {
 
 const excalidrawFontCDNOrigin = "https://esm.sh"
 
-func createSecurityHeaders(enableHTTPS, useProxy bool, additionalProxies []net.IP, jiraOrigins func() []string, externalImagesAllowed func() bool) func(http.Handler) http.Handler {
+func createSecurityHeadersWithTrust(enableHTTPS bool, trust utils.TrustPolicy, jiraOrigins func() []string, externalImagesAllowed func() bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -350,13 +349,11 @@ func createSecurityHeaders(enableHTTPS, useProxy bool, additionalProxies []net.I
 			w.Header().Set("Permissions-Policy", permissionsPolicy)
 
 			isSecure := r.TLS != nil || enableHTTPS
-			if !isSecure && useProxy {
-				remoteAddr := r.RemoteAddr
-				if colonIndex := strings.LastIndex(remoteAddr, ":"); colonIndex != -1 {
-					remoteAddr = remoteAddr[:colonIndex]
-				}
-				clientIP := net.ParseIP(remoteAddr)
-				if clientIP != nil && utils.IsTrustedProxy(clientIP, useProxy, additionalProxies) {
+			if !isSecure && trust.UseProxy {
+				// PeerIP handles IPv6 brackets; a LastIndex(":") split would leave
+				// "[::1]" unparseable and make HSTS disagree with cookie Secure and
+				// client attribution.
+				if clientIP := utils.PeerIP(r); clientIP != nil && trust.IsTrusted(clientIP) {
 					if r.Header.Get("X-Forwarded-Proto") == "https" {
 						isSecure = true
 					}

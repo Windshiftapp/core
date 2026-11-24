@@ -63,6 +63,7 @@ func RegisterAdminRoutes(deps *Deps) {
 	api.HandleH("PUT /admin/diagnostics/recurrence-volume", admin(http.HandlerFunc(deps.Admin.Diagnostics.UpdateRecurrenceVolumeSettings)))
 	api.HandleH("GET /admin/diagnostics/domain-events", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetDomainEvents)))
 	api.HandleH("GET /admin/diagnostics/scm-connections", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetSCMConnections)))
+	api.HandleH("GET /admin/diagnostics/proxy-trust", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetProxyTrust)))
 	api.HandleH("GET /admin/diagnostics/email-intake", admin(http.HandlerFunc(deps.Admin.Diagnostics.GetEmailIntakeDiagnostics)))
 	api.HandleH("POST /admin/diagnostics/domain-events/{eventID}/{consumerKey}/replay", admin(http.HandlerFunc(deps.Admin.Diagnostics.ReplayDomainEvent)))
 	api.HandleH("POST /admin/diagnostics/domain-events/{eventID}/{consumerKey}/skip", admin(http.HandlerFunc(deps.Admin.Diagnostics.SkipDomainEvent)))

@@ -37,7 +37,7 @@ type SSOProvider struct {
 	ClientSecret           string `json:"client_secret,omitempty"` // Only used for input, never stored
 	Scopes                 string `json:"scopes"`
 	AutoProvisionUsers     bool   `json:"auto_provision_users"`
-	RequireVerifiedEmail   bool   `json:"require_verified_email"` // Provider is authoritative for email; skips Windshift email verification.
+	RequireVerifiedEmail   bool   `json:"require_verified_email"` // Provider is authoritative for email: auto-links to existing accounts by email even when the provider reports the address unverified.
 	AttributeMapping       string `json:"attribute_mapping"`
 	GitHubOrganization     string `json:"github_organization,omitempty"`
 	AccountType            string `json:"account_type"`

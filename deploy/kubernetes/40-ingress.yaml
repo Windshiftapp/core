@@ -13,6 +13,11 @@ metadata:
     # stream. Adjust the annotation names for your ingress controller.
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # Let Windshift enforce the configurable attachment limit. nginx's default
+    # 1 MiB body cap would reject uploads first, and buffering would spool them
+    # before the app sees them. See deploy/proxy-trust.md.
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
 spec:
   ingressClassName: nginx
   tls:

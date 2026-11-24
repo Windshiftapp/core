@@ -374,6 +374,22 @@
         ]
       }
     },
+    "/admin/diagnostics/proxy-trust": {
+      "get": {
+        "description": ". Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [],
+        "responses": {
+          "401": {},
+          "403": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "",
+        "tags": [
+          ""
+        ]
+      }
+    },
     "/admin/groups": {
       "get": {
         "description": ". Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",

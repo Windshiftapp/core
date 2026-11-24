@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
-	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -18,31 +17,21 @@ import (
 
 // AuthMiddleware handles authentication for protected routes
 type AuthMiddleware struct {
-	sessionManager    *auth.SessionManager
-	tokenManager      *auth.TokenManager
-	db                database.Database
-	setupCompleted    atomic.Bool  // Thread-safe cached value
-	mu                sync.RWMutex // Protects one-way state transitions
-	useProxy          bool         // Whether proxy mode is enabled
-	additionalProxies []net.IP     // Additional proxy IPs beyond private ranges
+	sessionManager *auth.SessionManager
+	tokenManager   *auth.TokenManager
+	db             database.Database
+	setupCompleted atomic.Bool       // Thread-safe cached value
+	mu             sync.RWMutex      // Protects one-way state transitions
+	trust          utils.TrustPolicy // Shared proxy trust policy
 }
 
 // NewAuthMiddleware creates a new authentication middleware
-func NewAuthMiddleware(sessionManager *auth.SessionManager, tokenManager *auth.TokenManager, db database.Database, useProxy bool, additionalProxies []string, setupCompleted bool) *AuthMiddleware {
-	// Parse additional proxy IPs (beyond auto-trusted private ranges)
-	var additionalIPs []net.IP
-	for _, proxyStr := range additionalProxies {
-		if ip := net.ParseIP(strings.TrimSpace(proxyStr)); ip != nil {
-			additionalIPs = append(additionalIPs, ip)
-		}
-	}
-
+func NewAuthMiddleware(sessionManager *auth.SessionManager, tokenManager *auth.TokenManager, db database.Database, trust utils.TrustPolicy, setupCompleted bool) *AuthMiddleware {
 	am := &AuthMiddleware{
-		sessionManager:    sessionManager,
-		tokenManager:      tokenManager,
-		db:                db,
-		useProxy:          useProxy,
-		additionalProxies: additionalIPs,
+		sessionManager: sessionManager,
+		tokenManager:   tokenManager,
+		db:             db,
+		trust:          trust,
 	}
 
 	// Initialize setup status atomically
@@ -70,7 +59,7 @@ type authResult struct {
 // tryAuthenticate attempts to authenticate the request using all available methods.
 // Returns an authResult indicating the outcome. This method does not write any HTTP response.
 func (am *AuthMiddleware) tryAuthenticate(r *http.Request) authResult {
-	clientIP := am.getClientIP(r)
+	clientIP := am.clientIP(r)
 
 	// Try X-Session-Token header (used by TUI/internal services)
 	if sessionToken := r.Header.Get("X-Session-Token"); sessionToken != "" {
@@ -132,7 +121,7 @@ func (am *AuthMiddleware) tryAuthenticate(r *http.Request) authResult {
 // RequireAuth middleware that requires authentication for all routes except setup
 func (am *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		clientIP := am.getClientIP(r)
+		clientIP := am.clientIP(r)
 		r = r.WithContext(context.WithValue(r.Context(), ContextKeyClientIP, clientIP))
 
 		// Skip authentication for setup endpoints when setup is not completed
@@ -174,7 +163,7 @@ func (am *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 // OptionalAuth middleware that adds user context if authenticated but doesn't require it
 func (am *AuthMiddleware) OptionalAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		clientIP := am.getClientIP(r)
+		clientIP := am.clientIP(r)
 		r = r.WithContext(context.WithValue(r.Context(), ContextKeyClientIP, clientIP))
 
 		result := am.tryAuthenticate(r)
@@ -330,7 +319,18 @@ func (am *AuthMiddleware) handleAuthError(w http.ResponseWriter, r *http.Request
 // See utils.ExtractClientIP for the forwarded-header rules; this must stay the
 // same computation used for session validation and audit logging.
 func (am *AuthMiddleware) getClientIP(r *http.Request) string {
-	return utils.ExtractClientIP(r, am.useProxy, am.additionalProxies)
+	return am.trust.ExtractClientIP(r)
+}
+
+// clientIP returns the client IP already resolved for this request, if any, and
+// otherwise resolves it once. Middleware earlier in the chain stores the value;
+// reusing it keeps the trust observer to one observation per request instead of
+// one per resolution (OptionalAuth used to resolve, then tryAuthenticate again).
+func (am *AuthMiddleware) clientIP(r *http.Request) string {
+	if ip, ok := r.Context().Value(ContextKeyClientIP).(string); ok && ip != "" {
+		return ip
+	}
+	return am.getClientIP(r)
 }
 
 // CleanupMiddleware periodically cleans up expired sessions
@@ -417,32 +417,30 @@ func (am *AuthMiddleware) handleVerificationError(w http.ResponseWriter, r *http
 type PortalAuthMiddleware struct {
 	sessionManager       *auth.SessionManager
 	portalSessionManager *auth.PortalSessionManager
-	useProxy             bool
-	additionalProxies    []net.IP
+	trust                utils.TrustPolicy
 }
 
 // NewPortalAuthMiddleware creates a new portal authentication middleware
-func NewPortalAuthMiddleware(sessionManager *auth.SessionManager, portalSessionManager *auth.PortalSessionManager, useProxy bool, additionalProxies []string) *PortalAuthMiddleware {
-	// Parse additional proxy IPs (beyond auto-trusted private ranges)
-	var additionalIPs []net.IP
-	for _, proxyStr := range additionalProxies {
-		if ip := net.ParseIP(strings.TrimSpace(proxyStr)); ip != nil {
-			additionalIPs = append(additionalIPs, ip)
-		}
-	}
-
+func NewPortalAuthMiddleware(sessionManager *auth.SessionManager, portalSessionManager *auth.PortalSessionManager, trust utils.TrustPolicy) *PortalAuthMiddleware {
 	return &PortalAuthMiddleware{
 		sessionManager:       sessionManager,
 		portalSessionManager: portalSessionManager,
-		useProxy:             useProxy,
-		additionalProxies:    additionalIPs,
+		trust:                trust,
 	}
 }
 
 // getClientIP extracts the client IP address from request with proxy validation.
 // See utils.ExtractClientIP for the forwarded-header rules.
 func (pam *PortalAuthMiddleware) getClientIP(r *http.Request) string {
-	return utils.ExtractClientIP(r, pam.useProxy, pam.additionalProxies)
+	return pam.trust.ExtractClientIP(r)
+}
+
+// clientIP mirrors AuthMiddleware.clientIP for portal routes.
+func (pam *PortalAuthMiddleware) clientIP(r *http.Request) string {
+	if ip, ok := r.Context().Value(ContextKeyClientIP).(string); ok && ip != "" {
+		return ip
+	}
+	return pam.getClientIP(r)
 }
 
 // tryPortalAuthenticate resolves any valid session (internal header, internal cookie,
@@ -452,7 +450,7 @@ func (pam *PortalAuthMiddleware) tryPortalAuthenticate(r *http.Request) (context
 	if session, ok := r.Context().Value(ContextKeyPortalSession).(*auth.PortalSession); ok && session != nil && session.PortalCustomerID > 0 {
 		return r.Context(), true
 	}
-	clientIP := pam.getClientIP(r)
+	clientIP := pam.clientIP(r)
 
 	if sessionToken := r.Header.Get("X-Session-Token"); sessionToken != "" {
 		if session, err := pam.sessionManager.ValidateSessionContext(r.Context(), sessionToken, clientIP); err == nil {
@@ -489,7 +487,7 @@ func (pam *PortalAuthMiddleware) tryPortalAuthenticate(r *http.Request) (context
 // RequirePortalAuth middleware accepts either internal session OR portal customer session
 func (pam *PortalAuthMiddleware) RequirePortalAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		clientIP := pam.getClientIP(r)
+		clientIP := pam.clientIP(r)
 		r = r.WithContext(context.WithValue(r.Context(), ContextKeyClientIP, clientIP))
 
 		if ctx, ok := pam.tryPortalAuthenticate(r); ok {
@@ -515,7 +513,7 @@ func (pam *PortalAuthMiddleware) RequirePortalAuth(next http.Handler) http.Handl
 // but must still serve anonymous callers.
 func (pam *PortalAuthMiddleware) OptionalPortalAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		clientIP := pam.getClientIP(r)
+		clientIP := pam.clientIP(r)
 		r = r.WithContext(context.WithValue(r.Context(), ContextKeyClientIP, clientIP))
 
 		if ctx, ok := pam.tryPortalAuthenticate(r); ok {

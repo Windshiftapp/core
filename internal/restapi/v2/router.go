@@ -17,6 +17,7 @@ import (
 	apispec "windshift/api"
 	tokenauth "windshift/internal/auth"
 	"windshift/internal/contextkeys"
+	"windshift/internal/handlers"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/objecttranslation"
@@ -628,6 +629,12 @@ type actionApplication interface {
 	Execute(int, int, int, int) (models.ActionExecutionStatus, error)
 }
 
+// proxyTrustDiagnostics is the admin proxy-trust read the v2 session route
+// exposes. *handlers.DiagnosticsHandler satisfies it.
+type proxyTrustDiagnostics interface {
+	ProxyTrust(r *http.Request) (handlers.ProxyTrustStatus, error)
+}
+
 // Deps lists every required v2 dependency. Construction has no fallbacks.
 type Deps struct {
 	OperatorControls             *services.OperatorControlsService
@@ -707,12 +714,14 @@ type Deps struct {
 	ItemDetail         *services.ItemDetailApplicationService
 	ItemLifecycle      *services.ItemLifecycleService
 	TicketImport       *services.TicketImportService
-	SessionMiddleware  func(http.Handler) http.Handler
-	SearchAllowed      func(*http.Request) bool
-	DBRequestTimeout   time.Duration
-	CORS               Middleware
-	CSRF               csrfValidator
-	Concurrency        concurrencyLimiter
+	// Diagnostics serves the admin proxy-trust read on the session contract.
+	Diagnostics       proxyTrustDiagnostics
+	SessionMiddleware func(http.Handler) http.Handler
+	SearchAllowed     func(*http.Request) bool
+	DBRequestTimeout  time.Duration
+	CORS              Middleware
+	CSRF              csrfValidator
+	Concurrency       concurrencyLimiter
 	// RateLimiter is the per-user request-rate backstop for authenticated v2
 	// routes. Optional: nil leaves v2 unthrottled.
 	RateLimiter requestLimiter

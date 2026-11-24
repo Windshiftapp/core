@@ -24,6 +24,14 @@ services:
       - BASE_URL=https://${DOMAIN}
       - PORT=8080
       - USE_PROXY=true
+      # Trust only loopback and ADDITIONAL_PROXIES. The shipped .env.example
+      # sets strict for fresh installs and requires ADDITIONAL_PROXIES to be set
+      # to the verified proxy address. The "legacy" fallback keeps an existing
+      # installation on its current behavior when only this manifest is
+      # refreshed; see deploy/proxy-trust.md. Diagnostics -> Proxy trust reports
+      # an unlisted proxy.
+      - PROXY_TRUST_MODE=${PROXY_TRUST_MODE:-legacy}
+      - ADDITIONAL_PROXIES=${ADDITIONAL_PROXIES:-}
       - SSO_SECRET=${SSO_SECRET}
       - SESSION_IP_BINDING=${SESSION_IP_BINDING:-log}
       - ATTACHMENT_PATH=/data/attachments

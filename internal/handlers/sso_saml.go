@@ -352,9 +352,10 @@ func (h *SSOHandler) samlAssertionToClaims(info *sso.SAMLAssertionInfo, provider
 		claims.Username = strings.Split(claims.Email, "@")[0]
 	}
 
-	// SAML lacks a standard verified-email claim. If the IdP asserts the mapped
-	// attribute, honor it; otherwise provider trust decides whether the
-	// asserted email can auto-link an existing account.
+	// SAML lacks a standard verified-email claim. Record the mapped attribute
+	// when the IdP asserts it. Provider trust still governs auto-linking: a true
+	// claim links regardless of trust, while a false or absent claim links only
+	// when the provider is trusted. When absent, trust supplies the value.
 	claims.EmailVerifiedProvided = true
 	if attrMap.EmailVerified != "" {
 		if v := info.GetAttribute(attrMap.EmailVerified); v != "" {

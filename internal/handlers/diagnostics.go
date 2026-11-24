@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"runtime"
@@ -57,6 +58,22 @@ type DiagnosticsHandler struct {
 	scmHealthRepo       *repository.SCMHealthRepository
 	channelRepo         *repository.ChannelRepository
 	sideEffectStats     sideEffectDiagnostics
+	proxyTrust          ProxyTrustConfig
+}
+
+// ProxyTrustConfig is the resolved proxy-trust state reported to administrators.
+// Observer is the shared process-local recorder of private peers that are not
+// configured proxies.
+type ProxyTrustConfig struct {
+	UseProxy          bool
+	ProxyAutoDetected bool
+	Strict            bool
+	AdditionalProxies []string
+	InvalidProxies    []string
+	Observer          *utils.TrustObserver
+	// Policy is the running trust policy. The diagnostic uses it to report each
+	// observed peer's effective trust under the active mode.
+	Policy utils.TrustPolicy
 }
 
 // NewDiagnosticsHandler creates a new diagnostics handler.
@@ -84,6 +101,7 @@ func NewDiagnosticsHandler(
 	scmHealthRepo *repository.SCMHealthRepository,
 	channelRepo *repository.ChannelRepository,
 	sideEffectStats sideEffectDiagnostics,
+	proxyTrust ProxyTrustConfig,
 ) *DiagnosticsHandler {
 	return &DiagnosticsHandler{
 		controls:            operatorcontrols.From(settingsRepo),
@@ -110,6 +128,7 @@ func NewDiagnosticsHandler(
 		scmHealthRepo:       scmHealthRepo,
 		channelRepo:         channelRepo,
 		sideEffectStats:     sideEffectStats,
+		proxyTrust:          proxyTrust,
 	}
 }
 
@@ -126,6 +145,127 @@ func (h *DiagnosticsHandler) GetSCMConnections(w http.ResponseWriter, r *http.Re
 		connections = []repository.SCMConnectionDiagnostic{}
 	}
 	respondJSONOK(w, connections)
+}
+
+// ProxyTrustStatus is the admin-facing verdict on the deployment's proxy trust
+// policy. It answers whether the installation is affected by the private-range
+// spoofing and shared-lockout-bucket class, and whether strict trust is ignoring
+// headers from a proxy that has not been listed.
+type ProxyTrustStatus struct {
+	UseProxy          bool                   `json:"use_proxy"`
+	ProxyAutoDetected bool                   `json:"proxy_auto_detected"`
+	TrustMode         string                 `json:"trust_mode"`
+	AdditionalProxies []string               `json:"additional_proxies"`
+	InvalidProxies    []string               `json:"invalid_proxies"`
+	Affected          bool                   `json:"affected"`
+	Status            string                 `json:"status"`
+	Summary           string                 `json:"summary"`
+	Hint              string                 `json:"hint,omitempty"`
+	PrivateClients    []ProxyPeerObservation `json:"private_clients"`
+	UnlistedProxies   []ProxyPeerObservation `json:"unlisted_proxies"`
+}
+
+// ProxyPeerObservation is a peer observation plus the effective trust decision
+// under the running policy. A peer observation alone never authorizes trust; the
+// UI uses Trusted to label each row, not to accept a proxy.
+type ProxyPeerObservation struct {
+	utils.PeerObservation
+	Trusted bool `json:"trusted"`
+}
+
+// ProxyTrust reports whether this installation is affected by the private-range
+// client-IP finding and whether any unlisted proxy is having its headers
+// ignored. It is read-only and process-local; in a multi-replica deployment each
+// replica reports the peers it has seen. The runtime-diagnostics operator
+// control is enforced here so both the unversioned and v2 routes share it.
+func (h *DiagnosticsHandler) ProxyTrust(r *http.Request) (ProxyTrustStatus, error) {
+	if err := h.controls.Check(operatorcontrols.RuntimeDiagnostics); err != nil {
+		return ProxyTrustStatus{}, err
+	}
+	trustMode := config.ProxyTrustModeLegacy
+	if h.proxyTrust.Strict {
+		trustMode = config.ProxyTrustModeStrict
+	}
+	observations := h.proxyTrust.Observer.Snapshot()
+	privateClients := make([]ProxyPeerObservation, 0, len(observations))
+	unlistedProxies := make([]ProxyPeerObservation, 0, len(observations))
+	for _, obs := range observations {
+		entry := ProxyPeerObservation{
+			PeerObservation: obs,
+			Trusted:         h.proxyTrust.Policy.IsTrusted(net.ParseIP(obs.IP)),
+		}
+		if obs.Kind == utils.PeerKindUnlistedProxy {
+			unlistedProxies = append(unlistedProxies, entry)
+		} else {
+			privateClients = append(privateClients, entry)
+		}
+	}
+
+	status := ProxyTrustStatus{
+		UseProxy:          h.proxyTrust.UseProxy,
+		ProxyAutoDetected: h.proxyTrust.ProxyAutoDetected,
+		TrustMode:         trustMode,
+		AdditionalProxies: h.proxyTrust.AdditionalProxies,
+		InvalidProxies:    h.proxyTrust.InvalidProxies,
+		PrivateClients:    privateClients,
+		UnlistedProxies:   unlistedProxies,
+	}
+
+	switch {
+	case !h.proxyTrust.UseProxy:
+		status.Status = "disabled"
+		status.Summary = "Proxy mode is disabled: forwarding headers are never trusted, so private-address clients cannot spoof their IP."
+	case h.proxyTrust.Strict && len(unlistedProxies) > 0:
+		status.Status = "action_required"
+		status.Summary = "Strict trust is enabled, but peers not listed in ADDITIONAL_PROXIES are sending forwarding headers. Their headers are ignored, so their clients are attributed to the proxy address."
+		status.Hint = "Confirm each address under unlisted_proxies is really your reverse proxy before adding it to ADDITIONAL_PROXIES — a client can send forwarding headers too. A stable proxy address or a loopback sidecar is safer than trusting an observed address."
+	case h.proxyTrust.Strict:
+		status.Status = "protected"
+		status.Summary = "Strict trust is enabled: only loopback and ADDITIONAL_PROXIES may supply forwarding headers. This verdict covers the peers this replica has observed since it started."
+	default:
+		status.Affected = true
+		status.Status = "vulnerable"
+		status.Summary = "Legacy proxy trust is active: every private, loopback, and link-local peer is trusted to supply X-Forwarded-For, so a private-network client can choose its own resolved IP and LAN users behind a proxy share one lockout bucket."
+		status.Hint = "Set PROXY_TRUST_MODE=strict and list the confirmed proxy addresses in ADDITIONAL_PROXIES. Only add addresses you have independently confirmed are proxies; a client can send forwarding headers too. The peers below preview what strict would stop trusting. Strict becomes the default in 0.9.8."
+	}
+
+	// Surface allowlist entries that did not parse. They are not trusted, so an
+	// operator who expects them to be must correct them. The status verdict is
+	// unchanged: a strict deployment with only invalid entries is still strict,
+	// and the unlisted-proxy observations carry the actionable signal. The
+	// explanation depends on the active mode, because legacy still trusts private
+	// peers and disabled trusts nothing.
+	if len(h.proxyTrust.InvalidProxies) > 0 {
+		ignored := strings.Join(h.proxyTrust.InvalidProxies, ", ")
+		note := "These ADDITIONAL_PROXIES entries are not literal IPv4/IPv6 addresses and are ignored: " + ignored + ". "
+		switch {
+		case !h.proxyTrust.UseProxy:
+			note += "Proxy mode is disabled, so no forwarded headers are trusted."
+		case h.proxyTrust.Strict:
+			note += "Strict trust trusts only loopback and the parsed addresses above."
+		default:
+			note += "Legacy trust still trusts every private, loopback, and link-local peer in addition to the parsed addresses above."
+		}
+		if status.Hint == "" {
+			status.Hint = note
+		} else {
+			status.Hint = status.Hint + " " + note
+		}
+	}
+
+	return status, nil
+}
+
+// GetProxyTrust writes the proxy-trust status.
+//
+// GET /api/admin/diagnostics/proxy-trust
+func (h *DiagnosticsHandler) GetProxyTrust(w http.ResponseWriter, r *http.Request) {
+	status, err := h.ProxyTrust(r)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	respondJSONOK(w, status)
 }
 
 // GetEmailIntakeDiagnostics returns machine-generated inbound mail that intake

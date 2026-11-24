@@ -16,6 +16,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/utils"
 )
 
 const (
@@ -94,12 +95,15 @@ type Session struct {
 // NewSessionManagerWithValidationCacheTTL creates a session manager with a
 // bounded local validation cache. A non-positive TTL disables retained cache
 // entries while preserving in-flight request coalescing.
+// NewSessionManagerWithValidationCacheTTL creates a session manager with a
+// bounded local validation cache. A non-positive TTL disables retained cache
+// entries while preserving in-flight request coalescing. It uses the legacy
+// proxy trust policy; NewSessionManagerWithTrustPolicy takes an explicit one.
 func NewSessionManagerWithValidationCacheTTL(db database.Database, useSecureCookies, useProxy bool, additionalProxies []string, cookieSecret, ipBinding string, validationCacheTTL time.Duration, cacheSizeMB ...int) *SessionManager {
 	return newSessionManagerWithValidationCache(
 		db,
 		useSecureCookies,
-		useProxy,
-		additionalProxies,
+		utils.NewTrustPolicy(useProxy, false, additionalProxies, nil),
 		cookieSecret,
 		ipBinding,
 		validationCacheTTL,
@@ -108,7 +112,23 @@ func NewSessionManagerWithValidationCacheTTL(db database.Database, useSecureCook
 	)
 }
 
-func newSessionManagerWithValidationCache(db database.Database, useSecureCookies, useProxy bool, additionalProxies []string, cookieSecret, ipBinding string, validationCacheTTL time.Duration, cacheName string, cacheSizeMB ...int) *SessionManager {
+// NewSessionManagerWithTrustPolicy creates a session manager bound to an
+// explicit proxy trust policy so cookie Secure/HSTS detection and client-IP
+// resolution agree.
+func NewSessionManagerWithTrustPolicy(db database.Database, useSecureCookies bool, trust utils.TrustPolicy, cookieSecret, ipBinding string, validationCacheTTL time.Duration, cacheSizeMB ...int) *SessionManager {
+	return newSessionManagerWithValidationCache(
+		db,
+		useSecureCookies,
+		trust,
+		cookieSecret,
+		ipBinding,
+		validationCacheTTL,
+		"session_validation",
+		cacheSizeMB...,
+	)
+}
+
+func newSessionManagerWithValidationCache(db database.Database, useSecureCookies bool, trust utils.TrustPolicy, cookieSecret, ipBinding string, validationCacheTTL time.Duration, cacheName string, cacheSizeMB ...int) *SessionManager {
 	var opaqueKey []byte
 	if cookieSecret != "" {
 		opaqueKey = deriveKey(cookieSecret, "windshift-auth-opaque-values", 32)
@@ -116,7 +136,7 @@ func newSessionManagerWithValidationCache(db database.Database, useSecureCookies
 		opaqueKey = generateSecureKey(32)
 	}
 	return &SessionManager{
-		cookieManager: newCookieManager(useSecureCookies, useProxy, additionalProxies, cookieSecret,
+		cookieManager: newCookieManagerWithPolicy(useSecureCookies, trust, cookieSecret,
 			"windshift-cookie-hash", "windshift-cookie-block"),
 		db:                db,
 		opaqueKey:         opaqueKey,

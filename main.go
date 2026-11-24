@@ -136,6 +136,7 @@ func main() {
 
 	// Apply resolved values back to config
 	cfg.UseProxy = resolved.UseProxy
+	cfg.ProxyTrustMode = resolved.ProxyTrustMode
 	cfg.AllowedHosts = resolved.AllowedHosts
 	cfg.AllowedPort = resolved.AllowedPort
 

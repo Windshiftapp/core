@@ -42,6 +42,7 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 		baseURL               = flag.String("base-url", "", "Public URL for the server")
 		contextPath           = flag.String("context-path", "", "Public context path to serve Windshift under, e.g. /windshift")
 		additionalProxies     = flag.String("additional-proxies", "", "Additional proxy IPs to trust")
+		proxyTrustMode        = flag.String("proxy-trust-mode", "", "How to trust forwarded headers: 'legacy' (default through 0.9.7) or 'strict' (trust only loopback and ADDITIONAL_PROXIES)")
 		enableSSH             = flag.Bool("ssh", false, "Enable SSH TUI server")
 		enableMCP             = flag.Bool("mcp", false, "Enable MCP server at /mcp")
 		sshPort               = flag.String("ssh-port", "23234", "SSH server port")
@@ -154,6 +155,10 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 		useProxyExplicit = true
 	}
 	resolvedAdditionalProxies := firstNonEmpty(os.Getenv("ADDITIONAL_PROXIES"), *additionalProxies)
+	resolvedProxyTrustMode := firstNonEmpty(os.Getenv("PROXY_TRUST_MODE"), *proxyTrustMode)
+	if resolvedProxyTrustMode == "" {
+		resolvedProxyTrustMode = ProxyTrustModeLegacy
+	}
 
 	resolvedPluginDir := firstNonEmpty(os.Getenv("PLUGIN_DIR"), "")
 	licensePubKey := os.Getenv("PLUGIN_LICENSE_PUBKEY")
@@ -234,6 +239,7 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 		UseProxy:          proxyVal,
 		UseProxyExplicit:  useProxyExplicit,
 		AdditionalProxies: resolvedAdditionalProxies,
+		ProxyTrustMode:    resolvedProxyTrustMode,
 		TLSCertPath:       firstNonEmpty(os.Getenv("TLS_CERT"), *tlsCertPath),
 		TLSKeyPath:        firstNonEmpty(os.Getenv("TLS_KEY"), *tlsKeyPath),
 		DisableCSRF:       *disableCSRF,

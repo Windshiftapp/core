@@ -229,9 +229,11 @@ func (s *UserStore) CreateUser(claims *OIDCClaims, emailVerified bool) (*models.
 //   - SSO authentication is itself evidence that the identity controls the
 //     account: every user returned from a successful login is treated as
 //     email-verified. Nothing in the app gates on the verification column.
-//   - require_verified_email only governs auto-linking to pre-existing
-//     accounts: when disabled, linking requires a verified email claim from
-//     the provider.
+//   - require_verified_email (provider trust) only governs auto-linking to
+//     pre-existing accounts. When enabled (the default), the provider is
+//     authoritative for the email: linking needs no verified claim, and an
+//     explicit email_verified=false is deliberately overridden. When disabled,
+//     linking requires a verified email claim from the provider.
 func (s *UserStore) FindOrCreateUser(provider *SSOProvider, claims *OIDCClaims) (*FindOrCreateResult, error) {
 	result := &FindOrCreateResult{}
 

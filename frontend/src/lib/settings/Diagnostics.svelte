@@ -4,6 +4,7 @@
   import SectionHeader from '../layout/SectionHeader.svelte';
   import TabNav from '../components/TabNav.svelte';
   import ServerClockSection from './diagnostics/ServerClockSection.svelte';
+  import ProxyTrustSection from './diagnostics/ProxyTrustSection.svelte';
   import ActionLogsSection from './diagnostics/ActionLogsSection.svelte';
   import WebhookDeliveriesSection from './diagnostics/WebhookDeliveriesSection.svelte';
   import SchedulerRunsSection from './diagnostics/SchedulerRunsSection.svelte';
@@ -20,10 +21,10 @@
   import { capabilitiesStore } from '../stores/capabilities.svelte.js';
   import AlertBox from '../components/AlertBox.svelte';
 
-  const runtimeTabs = new Set(['schedulers', 'domain-events', 'frac-index', 'runner-pools', 'database-pools', 'cache-memory']);
+  const runtimeTabs = new Set(['schedulers', 'domain-events', 'frac-index', 'runner-pools', 'database-pools', 'cache-memory', 'proxy-trust']);
 
   let diagnosticGroups = $derived([
-    { label: t('diagnostics.groups.overview'), tabs: [{ id: 'clock', label: t('diagnostics.tabs.clock') }] },
+    { label: t('diagnostics.groups.overview'), tabs: [{ id: 'clock', label: t('diagnostics.tabs.clock') }, { id: 'proxy-trust', label: 'Proxy trust' }] },
     {
       label: t('diagnostics.groups.automation'),
       tabs: [
@@ -79,6 +80,8 @@
         <div data-testid="operator-controls-diagnostics-restricted"><AlertBox variant="info" message={t('operatorControls.restricted')} /></div>
       {:else if subtab === 'clock'}
         <ServerClockSection />
+      {:else if subtab === 'proxy-trust'}
+        <ProxyTrustSection />
       {:else if subtab === 'actions'}
         <ActionLogsSection />
       {:else if subtab === 'webhooks'}

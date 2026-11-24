@@ -34,7 +34,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: windshift
-          image: ghcr.io/windshiftapp/windshift:0.9.3 # pin the release you deploy
+          image: ghcr.io/windshiftapp/windshift:0.9.6 # pin the release you deploy; strict proxy trust requires 0.9.6+
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -53,6 +53,16 @@ spec:
             # Required behind an Ingress or reverse proxy.
             - name: USE_PROXY
               value: "true"
+            # Trust only loopback and ADDITIONAL_PROXIES. The example Ingress
+            # reaches Windshift from a dynamic controller pod address, so list a
+            # stable address here, or run a loopback sidecar as described in
+            # deploy/proxy-trust.md. An unlisted proxy is treated as the client;
+            # Diagnostics -> Proxy trust reports it.
+            - name: PROXY_TRUST_MODE
+              value: "strict"
+            # Comma-separated literal IPv4/IPv6 proxy addresses (no CIDR).
+            # - name: ADDITIONAL_PROXIES
+            #   value: "10.0.0.11,10.0.0.12"
             - name: SSO_SECRET
               valueFrom:
                 secretKeyRef:
