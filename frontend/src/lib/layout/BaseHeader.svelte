@@ -21,7 +21,11 @@
 </script>
 
 <div class="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between {marginClass}">
-  <div class="min-w-0">
+  <!-- On `sm+` the action cluster keeps its natural width and this column takes
+       the remainder (down to a readable floor). Sizing the text column from the
+       actions instead of from its own content means late-arriving subtitle/count
+       text cannot reflow the actions into an extra row after paint. -->
+  <div class="min-w-0 sm:flex-1 sm:min-w-32">
     <div class="flex items-baseline gap-2 mb-2">
       <h1 class="text-xl font-medium" style="{textStyle || 'color: var(--ds-text);'}">
         {title}
