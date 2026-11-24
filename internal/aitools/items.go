@@ -311,7 +311,7 @@ func init() {
 		Risk:        RiskMedium,
 		Description: "Create a new work item in a workspace. Optionally set custom fields with custom_field_values, keyed by numeric field ID from list_custom_fields.",
 		Scopes:      []string{auth.ScopeItemsWrite},
-		Run: func(_ context.Context, env *Env, args createItemArgs) (any, error) {
+		Run: func(ctx context.Context, env *Env, args createItemArgs) (any, error) {
 			if strings.TrimSpace(args.Title) == "" {
 				return map[string]string{"error": "title is required"}, nil
 			}
@@ -344,33 +344,33 @@ func init() {
 			if !validationResult.Valid {
 				return map[string]string{"error": validationResult.Error}, nil
 			}
-			customFieldValuesJSON, err := services.EncodeCustomFieldValuesJSON(env.DB, args.CustomFieldValues)
-			if err != nil {
+			if _, err := services.EncodeCustomFieldValuesJSON(env.DB, args.CustomFieldValues); err != nil {
 				return map[string]string{"error": err.Error()}, nil //nolint:nilerr // surface as a tool error in JSON, not as a protocol error
 			}
-			itemID, err := services.CreateItem(env.DB, services.ItemCreationParams{
-				WorkspaceID:           args.WorkspaceID,
-				Title:                 title,
-				Description:           desc,
-				StatusID:              args.StatusID,
-				PriorityID:            args.PriorityID,
-				AssigneeID:            args.AssigneeID,
-				ParentID:              args.ParentID,
-				ItemTypeID:            args.ItemTypeID,
-				CreatorID:             &env.UserID,
-				ValidatingUserID:      env.UserID,
-				CustomFieldValuesJSON: customFieldValuesJSON,
-				PermService:           env.PermService,
-				EventMetadata:         env.eventMetadata(),
+			// Route through the shared application service so the canonical created
+			// event and downstream effects fire exactly once, as they do for the
+			// HTTP surfaces.
+			created, err := env.itemApplication().Create(ctx, services.AuditActor{
+				UserID: env.UserID, Username: env.Username,
+			}, services.ItemCreateInput{
+				WorkspaceID:       args.WorkspaceID,
+				Title:             title,
+				Description:       desc,
+				StatusID:          args.StatusID,
+				PriorityID:        args.PriorityID,
+				AssigneeID:        args.AssigneeID,
+				ParentID:          args.ParentID,
+				ItemTypeID:        args.ItemTypeID,
+				CustomFieldValues: args.CustomFieldValues,
+				EventMetadata:     env.eventMetadata(),
 			})
 			if err != nil {
+				if errors.Is(err, services.ErrItemForbidden) {
+					return map[string]string{"error": "permission denied"}, nil
+				}
 				return map[string]string{"error": fmt.Sprintf("create failed: %s", err.Error())}, nil //nolint:nilerr // surface as a tool error in JSON, not as a protocol error
 			}
-			env.AuditWrite(logger.ResourceItem, int(itemID), "create_item", title)
-			created, err := services.NewItemCRUDService(env.DB).GetByID(int(itemID))
-			if err != nil {
-				return map[string]any{"id": itemID}, nil //nolint:nilerr // surface as a tool error in JSON, not as a protocol error
-			}
+			env.AuditWrite(logger.ResourceItem, created.ID, "create_item", created.Title)
 			return itemToSummary(created), nil
 		},
 	})
@@ -385,7 +385,7 @@ func init() {
 		Risk:        RiskMedium,
 		Description: "Update fields on an existing work item. Identifies the item by numeric ID or key. Use transition_item to change status (workflow + condition rules apply).",
 		Scopes:      []string{auth.ScopeItemsWrite},
-		Run: func(_ context.Context, env *Env, args updateItemArgs) (any, error) {
+		Run: func(ctx context.Context, env *Env, args updateItemArgs) (any, error) {
 			itemID, err := resolveItemID(env.DB, args.ItemID, args.ItemKey)
 			if err != nil {
 				return map[string]string{"error": err.Error()}, nil //nolint:nilerr // surface as a tool error in JSON, not as a protocol error
@@ -412,20 +412,18 @@ func init() {
 			if len(updateData) == 0 {
 				return map[string]string{"error": "no fields to update"}, nil
 			}
-			result, err := services.NewItemUpdateService(env.DB).
-				WithPermissionService(env.PermService).
-				UpdateItem(services.UpdateItemRequest{
-					ItemID:        itemID,
-					UpdateData:    updateData,
-					UserID:        env.UserID,
-					EventMetadata: env.eventMetadata(),
-				})
+			result, err := env.itemApplication().UpdateFieldsWithMetadata(ctx, services.AuditActor{
+				UserID: env.UserID, Username: env.Username,
+			}, itemID, updateData, env.eventMetadata())
 			if err != nil {
+				if errors.Is(err, services.ErrItemForbidden) {
+					return map[string]string{"error": "permission denied"}, nil
+				}
 				return map[string]string{"error": fmt.Sprintf("update failed: %s", err.Error())}, nil //nolint:nilerr // surface as a tool error in JSON, not as a protocol error
 			}
-			env.AuditWrite(logger.ResourceItem, itemID, "update_item", result.Item.Title)
+			env.AuditWrite(logger.ResourceItem, itemID, "update_item", result.Title)
 			out := map[string]any{
-				"item":           itemToSummary(result.Item),
+				"item":           itemToSummary(result),
 				"changed_fields": changed,
 			}
 			return out, nil

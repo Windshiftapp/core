@@ -16,7 +16,6 @@ import (
 
 	"windshift/internal/auth"
 	"windshift/internal/database"
-	"windshift/internal/itemevents"
 	"windshift/internal/logger"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
@@ -29,6 +28,16 @@ import (
 // formSubmissionMaxBytes caps the public form submission body. A submission
 // can carry a description plus custom-field values, so it gets 1 MiB of
 // headroom while still bounding per-request memory on this public endpoint.
+//
+// Public forms are the one multi-file upload surface, so their limits are an
+// aggregate policy rather than the per-file attachment setting used by every
+// authenticated single-file upload:
+//   - publicFormMultipartMaxBytes caps the entire anonymous submission;
+//   - publicFormMaxAttachmentBytes clamps each part below that aggregate; and
+//   - publicFormMaxAttachmentCount caps how many parts may be sent.
+//
+// The effective attachment setting still applies per file on top of
+// publicFormMaxAttachmentBytes; see publicFormAttachmentConfig.
 const (
 	formSubmissionMaxBytes       = 1 << 20
 	publicFormMultipartMaxBytes  = 32 << 20
@@ -637,48 +646,17 @@ func (h *FormHandler) SubmitForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Determine initial status
-	initialStatus := defaultItemStatus
-	if validationResult.ItemTypeID != nil {
-		status, err := services.GetInitialStatusForItemType(h.db, *validationResult.ItemTypeID)
-		if err != nil {
-			slog.Warn("could not determine initial status for item type", slog.String("component", "forms"), slog.Int("item_type_id", *validationResult.ItemTypeID), slog.Any("error", err))
-		} else {
-			initialStatus = status
-		}
-	}
-	customFieldsJSON, err := json.Marshal(validationResult.CustomFieldValues)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	virtualFieldsJSON, err := json.Marshal(validationResult.VirtualFieldValues)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	eventMetadata := itemevents.System("form")
-	if portalCustomerID != nil {
-		eventMetadata = itemevents.PortalCustomer(*portalCustomerID, "form")
-	} else if authenticatedUserID != nil {
-		eventMetadata = itemevents.User(*authenticatedUserID, "form")
-	}
-	// Create item
-	itemID, err := services.CreateItem(h.db, services.ItemCreationParams{
-		WorkspaceID:             targetWorkspaceID,
-		Title:                   submission.Title,
-		Description:             submission.Description,
-		Status:                  initialStatus,
-		ItemTypeID:              validationResult.ItemTypeID,
-		Priority:                "medium",
-		CreatorID:               authenticatedUserID,
-		CreatorPortalCustomerID: portalCustomerID,
-		ChannelID:               &channel.ID,
-		RequestTypeID:           submission.RequestTypeID,
-		CustomFieldValuesJSON:   string(customFieldsJSON),
-		VirtualFieldDataJSON:    string(virtualFieldsJSON),
-		EventMetadata:           eventMetadata,
+	itemID, err := services.CreateSubmittedItem(h.db, services.SubmittedItemInput{
+		WorkspaceID:       targetWorkspaceID,
+		Title:             submission.Title,
+		Description:       submission.Description,
+		ValidationResult:  validationResult,
+		CreatorID:         authenticatedUserID,
+		CreatorCustomerID: portalCustomerID,
+		ChannelID:         channel.ID,
+		RequestTypeID:     submission.RequestTypeID,
+		Source:            "form",
+		LogComponent:      "forms",
 	})
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -703,23 +681,7 @@ func (h *FormHandler) SubmitForm(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if h.eventCoordinator != nil {
-		fullItem, fetchErr := repository.NewItemRepository(h.db).FindByIDWithDetailsContext(ctx, int(itemID))
-		if fetchErr != nil {
-			slog.Error("failed to hydrate form-created item for side effects", slog.Int64("item_id", itemID), slog.Any("error", fetchErr))
-		} else {
-			actorID := 0
-			if authenticatedUserID != nil {
-				actorID = *authenticatedUserID
-			}
-			h.eventCoordinator.EmitItemCreated(fullItem, actorID)
-		}
-	}
-
-	// Update channel last activity
-	if _, err := h.db.ExecWriteContext(ctx, `UPDATE channels SET last_activity = ? WHERE id = ?`, time.Now(), channel.ID); err != nil {
-		slog.Warn("failed to update channel last_activity", slog.String("component", "forms"), slog.Int("channel_id", channel.ID), slog.Any("error", err))
-	}
+	services.DispatchSubmittedItemSideEffects(ctx, h.db, h.eventCoordinator, itemID, authenticatedUserID, channel.ID, "form", "forms")
 
 	// Build response with per-form config overrides
 	const defaultSuccessMessage = "Submission received successfully"

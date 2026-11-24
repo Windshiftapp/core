@@ -82,6 +82,8 @@ ones that matter most on Kubernetes:
 | --- | --- |
 | `BASE_URL` | Public scheme + host. Must match how users reach Windshift, or cookies, links, and WebAuthn break. |
 | `USE_PROXY` | `true` behind an Ingress/reverse proxy. |
+| `PROXY_TRUST_MODE` | `strict` trusts only loopback and `ADDITIONAL_PROXIES`; `legacy` (the pre-0.9.8 default) also trusts every private address. The manifest sets `strict`. See [`proxy-trust.md`](proxy-trust.md). |
+| `ADDITIONAL_PROXIES` | Comma-separated literal proxy addresses trusted to supply forwarding headers. No CIDR ranges. |
 | `SSO_SECRET` | Required. From the `windshift-secrets` Secret. |
 | `WINDSHIFT_CONTEXT_PATH` | Set when serving under a subpath, e.g. `/windshift`. Probes follow it. |
 | `ATTACHMENT_PATH`, `PLUGIN_DIR`, `AI_PROMPTS_DIR` | Default under `/data`. |
@@ -125,6 +127,13 @@ Admin → Diagnostics.
    sets `proxy-read-timeout`/`proxy-send-timeout` to 3600s. Translate to your
    controller's annotations.
 2. **`BASE_URL`.** Set it to the public URL, and keep `USE_PROXY=true`.
+3. **Proxy trust.** The manifest sets `PROXY_TRUST_MODE=strict`. An nginx
+   Ingress reaches Windshift from a dynamic controller pod address, which
+   cannot be listed in `ADDITIONAL_PROXIES` (literal addresses only). Either
+   add a loopback sidecar as described in [`proxy-trust.md`](proxy-trust.md),
+   or list a stable ingress address (for example a `hostNetwork` controller's
+   node IP). Verify on Admin → Diagnostics → Proxy trust: the status must be
+   `protected` and **Unlisted proxies** empty.
 
 ## Backups
 

@@ -145,6 +145,42 @@ func (s *KnowledgePublicationService) pageInSubtree(page *models.Page, rootPageI
 	return strings.HasPrefix(page.Path, prefix), nil
 }
 
+// livePublishedRoots resolves the wired root pages that still publish content:
+// the root must exist, be unarchived, and live in the wired workspace. Shared
+// by search and browse so both evaluate the same publication scope.
+func (s *KnowledgePublicationService) livePublishedRoots(workspaceID int, rootIDs []int) ([]*models.Page, error) {
+	roots := make([]*models.Page, 0, len(rootIDs))
+	for _, rootID := range rootIDs {
+		root, err := s.pages.GetByID(rootID)
+		if err == repository.ErrNotFound {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if root.ArchivedAt != nil || root.WorkspaceID != workspaceID {
+			continue
+		}
+		roots = append(roots, root)
+	}
+	return roots, nil
+}
+
+// pageInAnySubtree reports whether the page is one of the roots or a descendant
+// of one, using the same path-prefix rule as pageInSubtree.
+func pageInAnySubtree(page *models.Page, roots []*models.Page) bool {
+	for _, root := range roots {
+		if page.ID == root.ID {
+			return true
+		}
+		prefix := root.Path + strconv.Itoa(root.ID) + "/"
+		if strings.HasPrefix(page.Path, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 // PublishedPageHit is one search hit from published workspace pages.
 type PublishedPageHit struct {
 	PageID      int
@@ -176,25 +212,30 @@ func (s *KnowledgePublicationService) SearchPublishedPagesForPortal(config model
 	}
 
 	// Group whole-workspace and subtree wirings per workspace so each
-	// workspace is searched once.
+	// workspace is searched once. Ascending workspace order makes the limited
+	// result set deterministic across sources, matching the browse listing.
 	wholeWorkspaces := map[int]bool{}
 	rootsByWorkspace := map[int][]int{}
+	workspaceIDs := make([]int, 0, len(sources))
+	seenWorkspaces := map[int]bool{}
 	for _, src := range sources {
+		if !seenWorkspaces[src.WorkspaceID] {
+			seenWorkspaces[src.WorkspaceID] = true
+			workspaceIDs = append(workspaceIDs, src.WorkspaceID)
+		}
 		if src.RootPageID == nil {
 			wholeWorkspaces[src.WorkspaceID] = true
 		} else {
 			rootsByWorkspace[src.WorkspaceID] = append(rootsByWorkspace[src.WorkspaceID], *src.RootPageID)
 		}
 	}
+	sort.Ints(workspaceIDs)
 
 	rawLimit := limit * 3
-	out := make([]PublishedPageHit, 0, limit)
+	collected := make([]PublishedPageHit, 0, rawLimit)
 	seen := map[int]bool{}
 	appendHits := func(hits []repository.PageChunkSearchResult, workspaceID int, include func(page *models.Page) bool) error {
 		for _, hit := range hits {
-			if len(out) >= limit {
-				return nil
-			}
 			if seen[hit.PageID] {
 				continue
 			}
@@ -209,7 +250,7 @@ func (s *KnowledgePublicationService) SearchPublishedPagesForPortal(config model
 				continue
 			}
 			seen[hit.PageID] = true
-			out = append(out, PublishedPageHit{
+			collected = append(collected, PublishedPageHit{
 				PageID:      hit.PageID,
 				WorkspaceID: hit.WorkspaceID,
 				Title:       page.Title,
@@ -221,7 +262,10 @@ func (s *KnowledgePublicationService) SearchPublishedPagesForPortal(config model
 		return nil
 	}
 
-	for workspaceID := range wholeWorkspaces {
+	for _, workspaceID := range workspaceIDs {
+		if !wholeWorkspaces[workspaceID] {
+			continue
+		}
 		hits, err := s.pages.SearchChunks(workspaceID, query, rawLimit)
 		if err != nil {
 			return nil, err
@@ -229,24 +273,15 @@ func (s *KnowledgePublicationService) SearchPublishedPagesForPortal(config model
 		if err := appendHits(hits, workspaceID, func(*models.Page) bool { return true }); err != nil {
 			return nil, err
 		}
-		if len(out) >= limit {
-			return out, nil
-		}
 	}
-	for workspaceID, rootIDs := range rootsByWorkspace {
-		roots := make([]*models.Page, 0, len(rootIDs))
-		for _, rootID := range rootIDs {
-			root, err := s.pages.GetByID(rootID)
-			if err == repository.ErrNotFound {
-				continue
-			}
-			if err != nil {
-				return nil, err
-			}
-			if root.ArchivedAt != nil || root.WorkspaceID != workspaceID {
-				continue
-			}
-			roots = append(roots, root)
+	for _, workspaceID := range workspaceIDs {
+		rootIDs := rootsByWorkspace[workspaceID]
+		if len(rootIDs) == 0 {
+			continue
+		}
+		roots, err := s.livePublishedRoots(workspaceID, rootIDs)
+		if err != nil {
+			return nil, err
 		}
 		if len(roots) == 0 {
 			continue
@@ -255,23 +290,24 @@ func (s *KnowledgePublicationService) SearchPublishedPagesForPortal(config model
 		if err != nil {
 			return nil, err
 		}
-		include := func(page *models.Page) bool {
-			for _, root := range roots {
-				prefix := root.Path + strconv.Itoa(root.ID) + "/"
-				if page.ID == root.ID || strings.HasPrefix(page.Path, prefix) {
-					return true
-				}
-			}
-			return false
-		}
-		if err := appendHits(hits, workspaceID, include); err != nil {
+		if err := appendHits(hits, workspaceID, func(page *models.Page) bool { return pageInAnySubtree(page, roots) }); err != nil {
 			return nil, err
 		}
-		if len(out) >= limit {
-			break
-		}
 	}
-	return out, nil
+
+	// Rank across workspaces before applying the limit: a later workspace may
+	// hold a higher-scoring hit than the first. Ties break on page id so the
+	// limited set is stable.
+	sort.SliceStable(collected, func(i, j int) bool {
+		if collected[i].Score != collected[j].Score {
+			return collected[i].Score > collected[j].Score
+		}
+		return collected[i].PageID < collected[j].PageID
+	})
+	if len(collected) > limit {
+		collected = collected[:limit]
+	}
+	return collected, nil
 }
 
 // PublishedPagesForPortal lists the live pages this portal's knowledge
@@ -311,35 +347,16 @@ func (s *KnowledgePublicationService) PublishedPagesForPortal(config models.Chan
 		if err != nil {
 			return nil, err
 		}
-		roots := make([]*models.Page, 0, len(rootsByWorkspace[workspaceID]))
-		for _, rootID := range rootsByWorkspace[workspaceID] {
-			root, err := s.pages.GetByID(rootID)
-			if err == repository.ErrNotFound {
-				continue
-			}
-			if err != nil {
-				return nil, err
-			}
-			if root.ArchivedAt != nil || root.WorkspaceID != workspaceID {
-				continue
-			}
-			roots = append(roots, root)
+		roots, err := s.livePublishedRoots(workspaceID, rootsByWorkspace[workspaceID])
+		if err != nil {
+			return nil, err
 		}
 
 		for _, page := range pages {
 			if seenPages[page.ID] {
 				continue
 			}
-			included := wholeWorkspaces[workspaceID]
-			if !included {
-				for _, root := range roots {
-					prefix := root.Path + strconv.Itoa(root.ID) + "/"
-					if page.ID == root.ID || strings.HasPrefix(page.Path, prefix) {
-						included = true
-						break
-					}
-				}
-			}
+			included := wholeWorkspaces[workspaceID] || pageInAnySubtree(&page, roots)
 			if included {
 				seenPages[page.ID] = true
 				out = append(out, page)

@@ -248,6 +248,7 @@ export default {
     inlineCode: 'Kod w linii',
     bulletList: 'Lista punktowana',
     numberedList: 'Lista numerowana',
+    taskList: 'Lista zadań',
     insertImage: 'Wstaw obraz',
     userNotFound: 'Nie znaleziono użytkownika',
     multipleUsersMatch: 'Wielu użytkowników pasuje',

@@ -31,6 +31,10 @@ type ScreenFieldRow struct {
 	FieldIdentifier string
 	FieldName       string // populated when FieldType == "custom" (joined custom_field_definitions.name)
 	CustomFieldType string // populated when FieldType == "custom"
+	// CustomFieldOptions is the joined custom_field_definitions.options JSON.
+	// Callers that need arity (for example to keep multi-asset fields out of
+	// report forms) read it without a second lookup.
+	CustomFieldOptions string
 }
 
 // GetCreateScreenID resolves a (workspace, item_type) pair to a configured
@@ -84,7 +88,8 @@ func (r *ScreenRepository) ListFields(screenID int) ([]ScreenFieldRow, error) {
 	rows, err := r.db.Query(`
 		SELECT sf.field_type, sf.field_identifier,
 		       CASE WHEN sf.field_type = 'custom' THEN cfd.name ELSE '' END as field_name,
-		       CASE WHEN sf.field_type = 'custom' THEN cfd.field_type ELSE '' END as custom_field_type
+		       CASE WHEN sf.field_type = 'custom' THEN cfd.field_type ELSE '' END as custom_field_type,
+		       CASE WHEN sf.field_type = 'custom' THEN COALESCE(cfd.options, '') ELSE '' END as custom_field_options
 		FROM screen_fields sf
 		LEFT JOIN custom_field_definitions cfd ON sf.field_type = 'custom' AND (CASE WHEN sf.field_type = 'custom' THEN CAST(sf.field_identifier AS INTEGER) END) = cfd.id
 		WHERE sf.screen_id = ?
@@ -99,7 +104,7 @@ func (r *ScreenRepository) ListFields(screenID int) ([]ScreenFieldRow, error) {
 	var out []ScreenFieldRow
 	for rows.Next() {
 		var sfr ScreenFieldRow
-		if err := rows.Scan(&sfr.FieldType, &sfr.FieldIdentifier, &sfr.FieldName, &sfr.CustomFieldType); err != nil {
+		if err := rows.Scan(&sfr.FieldType, &sfr.FieldIdentifier, &sfr.FieldName, &sfr.CustomFieldType, &sfr.CustomFieldOptions); err != nil {
 			return nil, fmt.Errorf("scan screen_field: %w", err)
 		}
 		out = append(out, sfr)
@@ -265,8 +270,8 @@ func (r *ScreenRepository) ensureImportedFieldScreen(
 		if sourceScreenID > 0 {
 			if _, err := r.db.ExecWrite(`
 				INSERT INTO screen_fields
-					(screen_id, field_type, field_identifier, display_order, is_required, field_width)
-				SELECT ?, field_type, field_identifier, display_order, is_required, field_width
+					(screen_id, field_type, field_identifier, display_order, is_required, field_width, placement)
+				SELECT ?, field_type, field_identifier, display_order, is_required, field_width, placement
 				FROM screen_fields WHERE screen_id = ?
 			`, screenID, sourceScreenID); err != nil {
 				return 0, fmt.Errorf("copy Jira import screen fields: %w", err)

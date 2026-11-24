@@ -100,7 +100,7 @@ func (h *RequestTypeHandler) ListVisibleFields(ctx context.Context, userID, requ
 	if err != nil || !allowed {
 		return []models.RequestTypeField{}, err
 	}
-	fields, err := h.repo.ListFields(requestTypeID)
+	fields, err := h.repo.ListFieldsContext(ctx, requestTypeID)
 	if fields == nil {
 		fields = []models.RequestTypeField{}
 	}
@@ -209,8 +209,15 @@ func (h *RequestTypeHandler) channelServedWorkspaceIDs(ctx context.Context, chan
 	}
 }
 
-func (h *RequestTypeHandler) availableFieldsForRequestType(rt *models.RequestType) ([]AvailableField, error) {
-	return availableCreateFields(h.screenRepo, rt.WorkspaceID, rt.ItemTypeID)
+// availableFieldsForRequestType resolves the create-screen fields offered to
+// the form builder. Portal channels may bind asset custom fields because the
+// portal resolves them through its own asset endpoints; public forms may not.
+func (h *RequestTypeHandler) availableFieldsForRequestType(ctx context.Context, rt *models.RequestType) ([]AvailableField, error) {
+	channel, err := h.channelService.GetByID(ctx, rt.ChannelID)
+	if err != nil {
+		return nil, err
+	}
+	return availableCreateFields(h.screenRepo, rt.WorkspaceID, rt.ItemTypeID, channel.Type == "portal", false)
 }
 
 // validateRequestTypeRouting requires an inbound portal/form channel, a pinned
@@ -571,39 +578,47 @@ func (h *RequestTypeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// GetFields returns a request type's fields.
-func (h *RequestTypeHandler) GetFields(w http.ResponseWriter, r *http.Request) {
+// resolveManagedRequestType loads a request type the authenticated caller may
+// manage. Every failure is concealed as 404 so hidden request types cannot be
+// enumerated by guessing IDs.
+func (h *RequestTypeHandler) resolveManagedRequestType(w http.ResponseWriter, r *http.Request) (*models.RequestType, bool) {
 	requestTypeID, ok := requireIDParam(w, r, "id")
 	if !ok {
-		return
+		return nil, false
 	}
-
 	user, ok := RequireAuth(w, r)
 	if !ok {
-		return
+		return nil, false
 	}
-
 	rt, err := h.repo.GetByID(requestTypeID)
 	if errors.Is(err, repository.ErrNotFound) {
 		respondNotFound(w, r, "request_type")
-		return
+		return nil, false
 	}
 	if err != nil {
 		respondInternalError(w, r, err)
-		return
+		return nil, false
 	}
-
 	canManage, err := h.channelService.UserCanManage(r.Context(), user.ID, rt.ChannelID)
 	if err != nil {
 		respondInternalError(w, r, err)
-		return
+		return nil, false
 	}
 	if !canManage {
 		respondNotFound(w, r, "request_type")
+		return nil, false
+	}
+	return rt, true
+}
+
+// GetFields returns a request type's fields.
+func (h *RequestTypeHandler) GetFields(w http.ResponseWriter, r *http.Request) {
+	rt, ok := h.resolveManagedRequestType(w, r)
+	if !ok {
 		return
 	}
 
-	fields, err := h.repo.ListFields(requestTypeID)
+	fields, err := h.repo.ListFieldsContext(r.Context(), rt.ID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -638,7 +653,7 @@ func (h *RequestTypeHandler) UpdateFields(w http.ResponseWriter, r *http.Request
 	}
 	// The legacy GetFields response cannot surface sanitization warnings.
 	_ = sanitizeRequestTypeFields(fields)
-	available, err := h.availableFieldsForRequestType(rt)
+	available, err := h.availableFieldsForRequestType(r.Context(), rt)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
@@ -670,34 +685,12 @@ func (h *RequestTypeHandler) UpdateFields(w http.ResponseWriter, r *http.Request
 // GetAvailableFields resolves the request type's create-screen fields,
 // falling back to title and description when no screen applies.
 func (h *RequestTypeHandler) GetAvailableFields(w http.ResponseWriter, r *http.Request) {
-	requestTypeID, ok := requireIDParam(w, r, "id")
+	rt, ok := h.resolveManagedRequestType(w, r)
 	if !ok {
-		return
-	}
-	user, ok := RequireAuth(w, r)
-	if !ok {
-		return
-	}
-	rt, err := h.repo.GetByID(requestTypeID)
-	if errors.Is(err, repository.ErrNotFound) {
-		respondNotFound(w, r, "request_type")
-		return
-	}
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	canManage, err := h.channelService.UserCanManage(r.Context(), user.ID, rt.ChannelID)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	if !canManage {
-		respondNotFound(w, r, "request_type")
 		return
 	}
 
-	fields, err := h.availableFieldsForRequestType(rt)
+	fields, err := h.availableFieldsForRequestType(r.Context(), rt)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return

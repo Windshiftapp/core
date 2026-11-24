@@ -434,6 +434,13 @@ var Catalog = []Migration{
 		`,
 		SQLite:   eventsSchema,
 		Postgres: eventsSchemaPostgres,
+		// The canonical schema gained the claimable-delivery index in place, so
+		// this already-applied migration's checksum changed. ReconcileChecksum
+		// advances the stored checksum instead of failing every existing
+		// database; the index itself is created by
+		// 20261127_domain_event_claimable_index on existing databases and is part
+		// of the base schema on fresh installs.
+		ReconcileChecksum: true,
 	},
 	{
 		Version: "20260827_durable_action_consumer",
@@ -3460,7 +3467,279 @@ CREATE INDEX IF NOT EXISTS idx_plane_import_mappings_windshift ON plane_import_m
 		SQLite:   `ALTER TABLE time_projects ADD COLUMN currency TEXT NOT NULL DEFAULT ''`,
 		Postgres: `ALTER TABLE time_projects ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT ''`,
 	},
+	{
+		Version:       "20261127_domain_event_claimable_index",
+		Name:          "Add a partial claimable-delivery index and align leased eligibility",
+		CheckSQLite:   sqliteIndexCheck("idx_domain_event_deliveries_claimable"),
+		CheckPostgres: pgIndexCheck("idx_domain_event_deliveries_claimable"),
+		SQLite:        domainEventClaimableIndexMigration,
+		Postgres:      domainEventClaimableIndexMigration,
+	},
+	{
+		// Item lists and their total count always exclude merged duplicates.
+		// Without the partial predicate the count scans the whole items table
+		// (reading every description and JSON payload) and the ranked page
+		// selection fetches the table row for every skipped offset entry.
+		Version:       "20261128_items_active_list_indexes",
+		Name:          "Index the active item list and workspace count",
+		CheckSQLite:   sqliteIndexCheck("idx_items_workspace_id_active"),
+		CheckPostgres: pgIndexCheck("idx_items_workspace_id_active"),
+		SQLite: `
+			CREATE INDEX IF NOT EXISTS idx_items_workspace_id_active ON items(workspace_id) WHERE merged_into_item_id IS NULL;
+			CREATE INDEX IF NOT EXISTS idx_items_workspace_frac_index_active ON items(workspace_id, frac_index) WHERE merged_into_item_id IS NULL;
+		`,
+		Postgres: `
+			CREATE INDEX IF NOT EXISTS idx_items_workspace_id_active ON items(workspace_id) WHERE merged_into_item_id IS NULL;
+			CREATE INDEX IF NOT EXISTS idx_items_workspace_frac_index_active ON items(workspace_id, frac_index) WHERE merged_into_item_id IS NULL;
+		`,
+	},
+	{
+		// The board's Bubble Mode sorts by the null-safe recency expression,
+		// which the narrower (workspace_id, last_active_at) index cannot supply:
+		// both engines fall back to a workspace scan plus a temporary sort. The
+		// partial expression index matches the exact ORDER BY, so page selection
+		// becomes an ordered index search, and it replaces the index it supersedes.
+		Version:       "20261129_items_workspace_activity_index",
+		Name:          "Index the active item list by workspace recency",
+		CheckSQLite:   sqliteIndexCheck("idx_items_workspace_activity_active"),
+		CheckPostgres: pgIndexCheck("idx_items_workspace_activity_active"),
+		SQLite: `
+			DROP INDEX IF EXISTS idx_items_workspace_last_active;
+			CREATE INDEX IF NOT EXISTS idx_items_workspace_activity_active ON items(workspace_id, COALESCE(last_active_at, updated_at, created_at), id) WHERE merged_into_item_id IS NULL;
+		`,
+		Postgres: `
+			DROP INDEX IF EXISTS idx_items_workspace_last_active;
+			CREATE INDEX IF NOT EXISTS idx_items_workspace_activity_active ON items(workspace_id, COALESCE(last_active_at, updated_at, created_at), id) WHERE merged_into_item_id IS NULL;
+		`,
+	},
+	{
+		// Long-form custom fields (multi-line and rich text) can render in the
+		// item detail main column under the description instead of the
+		// sidebar. Existing rows keep the sidebar, so no layout changes.
+		Version:       "20261130_screen_field_placement",
+		Name:          "Add main-column placement for screen fields",
+		CheckSQLite:   sqliteColumnCheck("screen_fields", "placement"),
+		CheckPostgres: pgColumnCheck("screen_fields", "placement"),
+		SQLite:        `ALTER TABLE screen_fields ADD COLUMN placement TEXT NOT NULL DEFAULT 'sidebar'`,
+		Postgres:      `ALTER TABLE screen_fields ADD COLUMN IF NOT EXISTS placement TEXT NOT NULL DEFAULT 'sidebar'`,
+	},
+	{
+		// The (workspace_id, workspace_item_number) UNIQUE constraint already
+		// backs a unique index on both engines, so the explicit indexes only
+		// added a second B-tree (and, on SQLite, a third) for the same key.
+		// The constraint predates the 0.8.5 checkpoint, so every supported
+		// upgrade path keeps uniqueness through it and the two-column lookup
+		// still resolves to the constraint-backed index.
+		Version: "20261201_drop_redundant_item_key_indexes",
+		Name:    "Drop item key indexes backed by the unique constraint",
+		// Effect present when the explicit indexes are gone; the checks return
+		// 1 on a fresh install so the runner stamps without dropping again.
+		CheckSQLite: `SELECT CASE WHEN
+			NOT EXISTS (SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_items_workspace_item_number')
+			AND NOT EXISTS (SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_items_workspace_item_number_unique')
+		THEN 1 ELSE 0 END`,
+		CheckPostgres: "SELECT CASE WHEN (SELECT COUNT(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind='i' AND c.relname='idx_items_workspace_item_number' AND n.nspname=current_schema()) = 0 THEN 1 ELSE 0 END",
+		SQLite: `
+			DROP INDEX IF EXISTS idx_items_workspace_item_number;
+			DROP INDEX IF EXISTS idx_items_workspace_item_number_unique;
+		`,
+		Postgres: `DROP INDEX IF EXISTS idx_items_workspace_item_number`,
+	},
+	{
+		// Every index below is an explicit lookup index whose exact key,
+		// ordering, collation and predicate are already covered by a UNIQUE
+		// constraint (or, for collections.public_slug, a table-level UNIQUE)
+		// that backs its own index. The explicit copy only adds a second B-tree
+		// that every insert, update and delete has to maintain, so drop it and
+		// let the constraint-backed index serve the same reads.
+		//
+		// The strict left-prefix overlaps from the findings are intentionally
+		// left alone: the shorter index can be smaller or provide a useful
+		// tie-break order, and the report marks them for workload review rather
+		// than confirmed waste.
+		//
+		// Two explicit unique indexes are cleaned up only on fresh installs, not
+		// on upgrade. Databases upgraded from the pre-0.8.5 layouts have a
+		// two-column UNIQUE(configuration_set_id, notification_setting_id) on
+		// configuration_set_notification_settings and a plain public_slug column
+		// on collections; there the named single-column index and
+		// idx_collections_public_slug are the only uniqueness guarantees, so the
+		// migration must leave them in place.
+		Version: "20261202_drop_unique_covered_indexes",
+		Name:    "Drop lookup indexes already covered by a unique constraint",
+		CheckSQLite: `SELECT CASE WHEN (
+			SELECT COUNT(*) FROM sqlite_master
+			WHERE type='index' AND name IN (
+				'idx_api_tokens_token_hash', 'idx_asset_management_sets_name', 'idx_asset_permissions_key',
+				'idx_asset_roles_name', 'idx_calendar_feed_tokens_token',
+				'idx_calendar_feed_tokens_user_id', 'idx_cli_auth_codes_code',
+				'idx_collection_categories_name', 'idx_config_set_notification_settings_config_set',
+				'idx_contact_roles_name', 'idx_email_channel_state_channel_id',
+				'idx_email_oauth_state_state', 'idx_email_providers_slug', 'idx_hierarchy_levels_level',
+				'idx_integration_oauth_state_state', 'idx_integration_providers_slug',
+				'idx_issue_sync_configs_repo', 'idx_jira_mappings_lookup', 'idx_native_auth_codes_code',
+				'idx_oauth_authorization_codes_code', 'idx_oauth_clients_client_id',
+				'idx_oauth_refresh_tokens_token_hash', 'idx_permissions_key', 'idx_plugin_registry_name',
+				'idx_portal_magic_links_token', 'idx_portal_sessions_token', 'idx_portal_customers_email',
+				'idx_recurrence_instances_item', 'idx_recurrence_instances_rule_date',
+				'idx_recurrence_rules_template', 'idx_scm_oauth_state_state', 'idx_scm_providers_slug',
+				'idx_sla_goal_targets_goal', 'idx_sla_goals_metric', 'idx_sla_metric_conditions_metric',
+				'idx_sso_providers_slug', 'idx_sso_state_tokens_state', 'idx_system_settings_key',
+				'idx_todoist_task_links_item', 'idx_user_external_accounts_provider',
+				'idx_user_invitations_token', 'idx_user_preferences_user_id', 'idx_user_sessions_token',
+				'idx_users_email', 'idx_users_username', 'idx_workspace_configuration_sets_workspace_id',
+				'idx_workspace_roles_name'
+			)
+		) = 0 THEN 1 ELSE 0 END`,
+		CheckPostgres: `SELECT CASE WHEN (
+			SELECT COUNT(*) FROM pg_class c
+			JOIN pg_namespace n ON n.oid = c.relnamespace
+			WHERE c.relkind = 'i' AND n.nspname = current_schema()
+			  AND c.relname IN (
+				'idx_api_tokens_token_hash', 'idx_asset_management_sets_name', 'idx_asset_permissions_key',
+				'idx_asset_roles_name', 'idx_calendar_feed_tokens_token',
+				'idx_calendar_feed_tokens_user_id', 'idx_cli_auth_codes_code',
+				'idx_collection_categories_name', 'idx_config_set_notification_settings_config_set',
+				'idx_contact_roles_name', 'idx_email_channel_state_channel_id',
+				'idx_email_oauth_state_state', 'idx_email_providers_slug', 'idx_hierarchy_levels_level',
+				'idx_integration_oauth_state_state', 'idx_integration_providers_slug',
+				'idx_issue_sync_configs_repo', 'idx_jira_mappings_lookup', 'idx_native_auth_codes_code',
+				'idx_oauth_authorization_codes_code', 'idx_oauth_clients_client_id',
+				'idx_oauth_refresh_tokens_token_hash', 'idx_permissions_key', 'idx_plugin_registry_name',
+				'idx_portal_magic_links_token', 'idx_portal_sessions_token', 'idx_portal_customers_email',
+				'idx_recurrence_instances_item', 'idx_recurrence_instances_rule_date',
+				'idx_recurrence_rules_template', 'idx_scm_oauth_state_state', 'idx_scm_providers_slug',
+				'idx_sla_goal_targets_goal', 'idx_sla_goals_metric', 'idx_sla_metric_conditions_metric',
+				'idx_sso_providers_slug', 'idx_sso_state_tokens_state', 'idx_system_settings_key',
+				'idx_teams_name', 'idx_todoist_task_links_item', 'idx_user_external_accounts_provider',
+				'idx_user_invitations_token', 'idx_user_preferences_user_id', 'idx_user_sessions_token',
+				'idx_users_email', 'idx_users_username', 'idx_workspace_configuration_sets_workspace_id',
+				'idx_workspace_roles_name'
+			)
+		) = 0 THEN 1 ELSE 0 END`,
+		SQLite: `
+			DROP INDEX IF EXISTS idx_api_tokens_token_hash;
+			DROP INDEX IF EXISTS idx_asset_management_sets_name;
+			DROP INDEX IF EXISTS idx_asset_permissions_key;
+			DROP INDEX IF EXISTS idx_asset_roles_name;
+			DROP INDEX IF EXISTS idx_calendar_feed_tokens_token;
+			DROP INDEX IF EXISTS idx_calendar_feed_tokens_user_id;
+			DROP INDEX IF EXISTS idx_cli_auth_codes_code;
+			DROP INDEX IF EXISTS idx_collection_categories_name;
+			DROP INDEX IF EXISTS idx_config_set_notification_settings_config_set;
+			DROP INDEX IF EXISTS idx_contact_roles_name;
+			DROP INDEX IF EXISTS idx_email_channel_state_channel_id;
+			DROP INDEX IF EXISTS idx_email_oauth_state_state;
+			DROP INDEX IF EXISTS idx_email_providers_slug;
+			DROP INDEX IF EXISTS idx_hierarchy_levels_level;
+			DROP INDEX IF EXISTS idx_integration_oauth_state_state;
+			DROP INDEX IF EXISTS idx_integration_providers_slug;
+			DROP INDEX IF EXISTS idx_issue_sync_configs_repo;
+			DROP INDEX IF EXISTS idx_jira_mappings_lookup;
+			DROP INDEX IF EXISTS idx_native_auth_codes_code;
+			DROP INDEX IF EXISTS idx_oauth_authorization_codes_code;
+			DROP INDEX IF EXISTS idx_oauth_clients_client_id;
+			DROP INDEX IF EXISTS idx_oauth_refresh_tokens_token_hash;
+			DROP INDEX IF EXISTS idx_permissions_key;
+			DROP INDEX IF EXISTS idx_plugin_registry_name;
+			DROP INDEX IF EXISTS idx_portal_magic_links_token;
+			DROP INDEX IF EXISTS idx_portal_sessions_token;
+			DROP INDEX IF EXISTS idx_portal_customers_email;
+			DROP INDEX IF EXISTS idx_recurrence_instances_item;
+			DROP INDEX IF EXISTS idx_recurrence_instances_rule_date;
+			DROP INDEX IF EXISTS idx_recurrence_rules_template;
+			DROP INDEX IF EXISTS idx_scm_oauth_state_state;
+			DROP INDEX IF EXISTS idx_scm_providers_slug;
+			DROP INDEX IF EXISTS idx_sla_goal_targets_goal;
+			DROP INDEX IF EXISTS idx_sla_goals_metric;
+			DROP INDEX IF EXISTS idx_sla_metric_conditions_metric;
+			DROP INDEX IF EXISTS idx_sso_providers_slug;
+			DROP INDEX IF EXISTS idx_sso_state_tokens_state;
+			DROP INDEX IF EXISTS idx_system_settings_key;
+			DROP INDEX IF EXISTS idx_todoist_task_links_item;
+			DROP INDEX IF EXISTS idx_user_external_accounts_provider;
+			DROP INDEX IF EXISTS idx_user_invitations_token;
+			DROP INDEX IF EXISTS idx_user_preferences_user_id;
+			DROP INDEX IF EXISTS idx_user_sessions_token;
+			DROP INDEX IF EXISTS idx_users_email;
+			DROP INDEX IF EXISTS idx_users_username;
+			DROP INDEX IF EXISTS idx_workspace_configuration_sets_workspace_id;
+			DROP INDEX IF EXISTS idx_workspace_roles_name;
+		`,
+		Postgres: `
+DO $$
+DECLARE
+	idx text;
+BEGIN
+	FOREACH idx IN ARRAY ARRAY[
+				'idx_api_tokens_token_hash', 'idx_asset_management_sets_name', 'idx_asset_permissions_key',
+				'idx_asset_roles_name', 'idx_calendar_feed_tokens_token',
+				'idx_calendar_feed_tokens_user_id', 'idx_cli_auth_codes_code',
+				'idx_collection_categories_name', 'idx_config_set_notification_settings_config_set',
+				'idx_contact_roles_name', 'idx_email_channel_state_channel_id',
+				'idx_email_oauth_state_state', 'idx_email_providers_slug', 'idx_hierarchy_levels_level',
+				'idx_integration_oauth_state_state', 'idx_integration_providers_slug',
+				'idx_issue_sync_configs_repo', 'idx_jira_mappings_lookup', 'idx_native_auth_codes_code',
+				'idx_oauth_authorization_codes_code', 'idx_oauth_clients_client_id',
+				'idx_oauth_refresh_tokens_token_hash', 'idx_permissions_key', 'idx_plugin_registry_name',
+				'idx_portal_magic_links_token', 'idx_portal_sessions_token', 'idx_portal_customers_email',
+				'idx_recurrence_instances_item', 'idx_recurrence_instances_rule_date',
+				'idx_recurrence_rules_template', 'idx_scm_oauth_state_state', 'idx_scm_providers_slug',
+				'idx_sla_goal_targets_goal', 'idx_sla_goals_metric', 'idx_sla_metric_conditions_metric',
+				'idx_sso_providers_slug', 'idx_sso_state_tokens_state', 'idx_system_settings_key',
+				'idx_teams_name', 'idx_todoist_task_links_item', 'idx_user_external_accounts_provider',
+				'idx_user_invitations_token', 'idx_user_preferences_user_id', 'idx_user_sessions_token',
+				'idx_users_email', 'idx_users_username', 'idx_workspace_configuration_sets_workspace_id',
+				'idx_workspace_roles_name'
+	] LOOP
+		-- Scope the drop to the schema the check inspected so a
+		-- same-named index on an earlier search_path entry cannot be
+		-- removed.
+		EXECUTE format('DROP INDEX IF EXISTS %I.%I', current_schema(), idx);
+	END LOOP;
+END $$;
+		`,
+	},
+	{
+		// A priority catalog must have at most one default. The partial unique
+		// index makes that a database invariant instead of a per-transaction
+		// convention, so two concurrent saves cannot both win. Existing
+		// duplicates from before the index are collapsed to the lowest id.
+		Version: "20261203_priorities_single_default",
+		Name:    "Enforce a single default priority",
+		CheckSQLite: `SELECT CASE WHEN EXISTS (
+			SELECT 1 FROM sqlite_master WHERE type='index' AND name='uq_priorities_single_default'
+		) THEN 1 ELSE 0 END`,
+		CheckPostgres: `SELECT CASE WHEN (SELECT COUNT(*) FROM pg_class c
+			JOIN pg_namespace n ON n.oid = c.relnamespace
+			WHERE c.relkind = 'i' AND c.relname = 'uq_priorities_single_default' AND n.nspname = current_schema()) > 0
+			THEN 1 ELSE 0 END`,
+		SQLite: `
+			UPDATE priorities SET is_default = false
+			WHERE is_default = true
+			  AND id <> (SELECT id FROM priorities WHERE is_default = true ORDER BY id LIMIT 1);
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_priorities_single_default ON priorities(is_default) WHERE is_default = true;
+		`,
+		Postgres: `
+			UPDATE priorities SET is_default = false
+			WHERE is_default = true
+			  AND id <> (SELECT id FROM priorities WHERE is_default = true ORDER BY id LIMIT 1);
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_priorities_single_default ON priorities(is_default) WHERE is_default = true;
+		`,
+	},
 }
+
+// domainEventClaimableIndexMigration adds the partial index the claim query
+// orders by, and makes next_attempt_at the single eligibility time for leased
+// rows so the claim can use that index across pending, retry, and leased.
+const domainEventClaimableIndexMigration = `
+CREATE INDEX IF NOT EXISTS idx_domain_event_deliveries_claimable
+	ON domain_event_deliveries(consumer_key, next_attempt_at, event_id)
+	WHERE state IN ('pending', 'retry', 'leased');
+UPDATE domain_event_deliveries
+	SET next_attempt_at = lease_expires_at
+	WHERE state = 'leased' AND lease_expires_at IS NOT NULL AND next_attempt_at < lease_expires_at;
+`
 
 const timeWorklogDraftsMigrationSQLite = `
 CREATE TABLE IF NOT EXISTS time_worklog_drafts (

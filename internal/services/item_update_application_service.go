@@ -1,12 +1,14 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/itemevents"
 	"windshift/internal/models"
 	"windshift/internal/validation"
 )
@@ -32,7 +34,6 @@ type ItemUpdateApplicationService struct {
 	hierarchy       *HierarchyService
 	mentionService  *MentionService
 	emitter         ItemUpdatedEmitter
-	fallback        ItemUpdatedEmitter
 }
 
 func NewItemUpdateApplicationService(db database.Database, perm *PermissionService) *ItemUpdateApplicationService {
@@ -70,25 +71,19 @@ func (s *ItemUpdateApplicationService) SetEmitter(emitter ItemUpdatedEmitter) {
 	s.emitter = emitter
 }
 
-// SetFallbackEmitter installs the event pipeline used when no EventCoordinator
-// is wired. Legacy transports configure it with the original per-service
-// notifier so lightweight embeddings keep identical side effects.
-func (s *ItemUpdateApplicationService) SetFallbackEmitter(emitter ItemUpdatedEmitter) {
-	s.fallback = emitter
-}
-
-// SetFallbackWebhook forwards the webhook sender into the legacy fallback
-// emitter when one is installed.
-func (s *ItemUpdateApplicationService) SetFallbackWebhook(dispatcher WebhookDispatcher) {
-	if legacy, ok := s.fallback.(*LegacyItemUpdatedEmitter); ok {
+// SetEmitterWebhook configures the installed emitter's webhook sink. The
+// coordinator owns its own sinks, so this only affects the legacy emitter used
+// by lightweight embeddings.
+func (s *ItemUpdateApplicationService) SetEmitterWebhook(dispatcher WebhookDispatcher) {
+	if legacy, ok := s.emitter.(*LegacyItemUpdatedEmitter); ok {
 		legacy.SetWebhook(dispatcher)
 	}
 }
 
-// SetFallbackAction forwards the automation action service into the legacy
-// fallback emitter when one is installed.
-func (s *ItemUpdateApplicationService) SetFallbackAction(action ActionEventEmitter) {
-	if legacy, ok := s.fallback.(*LegacyItemUpdatedEmitter); ok {
+// SetEmitterAction configures the installed emitter's automation sink. As with
+// SetEmitterWebhook, the coordinator is unaffected.
+func (s *ItemUpdateApplicationService) SetEmitterAction(action ActionEventEmitter) {
+	if legacy, ok := s.emitter.(*LegacyItemUpdatedEmitter); ok {
 		legacy.SetAction(action)
 	}
 }
@@ -302,6 +297,31 @@ func (s *ItemUpdateApplicationService) updateItem(
 	updateData map[string]any,
 	actionContext *ActionContext,
 ) (*UpdateItemResult, error) {
+	return s.updateItemWithMetadata(actorUserID, actorUsername, itemID, updateData, actionContext,
+		itemEventMetadata(actorUserID, "application", actionContext))
+}
+
+// UpdateWithMetadata runs the user-facing update pipeline with explicit event
+// provenance. Agent adapters use it so the agent actor, source, and run survive
+// instead of being replaced by the human-only "application" default.
+func (s *ItemUpdateApplicationService) UpdateWithMetadata(
+	actorUserID int,
+	actorUsername string,
+	itemID int,
+	updateData map[string]any,
+	metadata itemevents.Metadata,
+) (*UpdateItemResult, error) {
+	return s.updateItemWithMetadata(actorUserID, actorUsername, itemID, updateData, nil, metadata)
+}
+
+func (s *ItemUpdateApplicationService) updateItemWithMetadata(
+	actorUserID int,
+	actorUsername string,
+	itemID int,
+	updateData map[string]any,
+	actionContext *ActionContext,
+	metadata itemevents.Metadata,
+) (*UpdateItemResult, error) {
 	if s.activityTracker != nil {
 		if err := s.activityTracker.TrackItemActivity(actorUserID, itemID, ActivityEdit); err != nil {
 			slog.Warn("failed to track item edit activity", slog.Int("user_id", actorUserID), slog.Int("item_id", itemID), slog.Any("error", err))
@@ -312,7 +332,7 @@ func (s *ItemUpdateApplicationService) updateItem(
 		ItemID:        itemID,
 		UpdateData:    updateData,
 		UserID:        actorUserID,
-		EventMetadata: itemEventMetadata(actorUserID, "application", actionContext),
+		EventMetadata: metadata,
 	})
 	if err != nil {
 		return nil, err
@@ -323,38 +343,16 @@ func (s *ItemUpdateApplicationService) updateItem(
 	}
 
 	assigneeChanged := !itemIntPtrEqual(result.OriginalItem.AssigneeID, result.Item.AssigneeID)
-	if contextual, ok := s.emitter.(contextualItemUpdatedEmitter); ok && actionContext != nil {
-		contextual.EmitItemUpdatedWithContext(
-			result.OriginalItem,
-			result.Item,
-			result.StatusChanged,
-			assigneeChanged,
-			actorUserID,
-			result.FieldChanges,
-			*actionContext,
-			actorUsername,
-		)
-	} else if s.emitter != nil {
-		s.emitter.EmitItemUpdated(
-			result.OriginalItem,
-			result.Item,
-			result.StatusChanged,
-			assigneeChanged,
-			actorUserID,
-			result.FieldChanges,
-			actorUsername,
-		)
-	} else if s.fallback != nil {
-		s.fallback.EmitItemUpdated(
-			result.OriginalItem,
-			result.Item,
-			result.StatusChanged,
-			assigneeChanged,
-			actorUserID,
-			result.FieldChanges,
-			actorUsername,
-		)
-	}
+	s.emitItemUpdated(
+		result.OriginalItem,
+		result.Item,
+		result.StatusChanged,
+		assigneeChanged,
+		actorUserID,
+		result.FieldChanges,
+		actionContext,
+		actorUsername,
+	)
 
 	if s.mentionService != nil && result.OriginalItem.Description != result.Item.Description {
 		if err := s.mentionService.ProcessMentions(ProcessMentionsParams{
@@ -383,35 +381,38 @@ func (s *ItemUpdateApplicationService) AddMilestoneWithContext(
 	actionContext ActionContext,
 ) (*UpdateItemResult, bool, error) {
 	result, changed, err := s.update.AddMilestone(UpdateItemRequest{
-		ItemID: itemID,
-		UserID: actorUserID,
+		ItemID:        itemID,
+		UserID:        actorUserID,
+		EventMetadata: itemEventMetadata(actorUserID, "application", &actionContext),
 	}, milestoneID)
 	if err != nil || !changed {
 		return result, changed, err
 	}
-	if contextual, ok := s.emitter.(contextualItemUpdatedEmitter); ok {
-		contextual.EmitItemUpdatedWithContext(
-			result.OriginalItem,
-			result.Item,
-			false,
-			false,
-			actorUserID,
-			result.FieldChanges,
-			actionContext,
-			actorUsername,
-		)
-	} else if s.emitter != nil {
-		s.emitter.EmitItemUpdated(
-			result.OriginalItem,
-			result.Item,
-			false,
-			false,
-			actorUserID,
-			result.FieldChanges,
-			actorUsername,
-		)
-	}
+	s.emitItemUpdated(
+		result.OriginalItem,
+		result.Item,
+		false,
+		false,
+		actorUserID,
+		result.FieldChanges,
+		&actionContext,
+		actorUsername,
+	)
 	return result, true, nil
+}
+
+// emitItemUpdated is the single dispatch point for item-update side effects. A
+// contextual emitter receives the automation provenance; every other emitter
+// gets the plain update. Callers select the emitter once at construction.
+func (s *ItemUpdateApplicationService) emitItemUpdated(original, updated *models.Item, statusChanged, assigneeChanged bool, actorUserID int, fieldChanges []HistoryEntry, actionContext *ActionContext, actorUsername string) {
+	if s.emitter == nil {
+		return
+	}
+	if contextual, ok := s.emitter.(contextualItemUpdatedEmitter); ok && actionContext != nil {
+		contextual.EmitItemUpdatedWithContext(original, updated, statusChanged, assigneeChanged, actorUserID, fieldChanges, *actionContext, actorUsername)
+		return
+	}
+	s.emitter.EmitItemUpdated(original, updated, statusChanged, assigneeChanged, actorUserID, fieldChanges, actorUsername)
 }
 
 func itemProjectResolutionChanged(original, updated *models.Item) bool {
@@ -432,12 +433,12 @@ func (s *ItemUpdateApplicationService) invalidateEffectiveProjectSubtree(itemID 
 	if s.hierarchy == nil {
 		return
 	}
-	descendants, err := s.hierarchy.GetDescendants(itemID, 0)
+	descendantIDs, err := s.hierarchy.GetDescendantIDsContext(context.Background(), itemID, 0)
 	if err != nil {
 		slog.Warn("failed to load descendants for cache invalidation", slog.Int("item_id", itemID), slog.Any("error", err))
 		return
 	}
-	for i := range descendants {
-		_ = s.itemCache.InvalidateItemHierarchy(descendants[i].ID, nil)
+	for _, descendantID := range descendantIDs {
+		_ = s.itemCache.InvalidateItemHierarchy(descendantID, nil)
 	}
 }

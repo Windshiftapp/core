@@ -19,13 +19,28 @@ const maxHierarchyDepth = 30
 
 // HierarchyService handles all hierarchy-related operations using only parent_id
 type HierarchyService struct {
-	db   database.Database
-	repo *repository.ItemRepository
+	db         database.Database
+	repo       *repository.ItemRepository
+	workspaces *repository.WorkspaceRepository
+	// perm gates cross-workspace parent disclosure. It is nil until a caller
+	// installs one; ResolveParentSummaries fails closed in that case.
+	perm *PermissionService
 }
 
 // NewHierarchyService creates a new hierarchy service
 func NewHierarchyService(db database.Database) *HierarchyService {
-	return &HierarchyService{db: db, repo: repository.NewItemRepository(db)}
+	return &HierarchyService{
+		db:         db,
+		repo:       repository.NewItemRepository(db),
+		workspaces: repository.NewWorkspaceRepository(db),
+	}
+}
+
+// WithPermissions installs the permission checker used to gate cross-workspace
+// parent disclosure. It returns the receiver so construction stays fluent.
+func (h *HierarchyService) WithPermissions(perm *PermissionService) *HierarchyService {
+	h.perm = perm
+	return h
 }
 
 func itemPtrsToValues(items []*models.Item) []models.Item {
@@ -135,6 +150,16 @@ func (h *HierarchyService) GetDescendantsContext(ctx context.Context, itemID, ma
 // loop the DB.
 func (h *HierarchyService) CountDescendants(itemID int) (int, error) {
 	return h.repo.CountDescendants(itemID)
+}
+
+// GetDescendantIDsContext returns only the IDs of an item's descendants,
+// capped at maxDepth. Cache invalidation uses it to avoid hydrating full rows
+// just to evict by ID.
+func (h *HierarchyService) GetDescendantIDsContext(ctx context.Context, itemID, maxDepth int) ([]int, error) {
+	if maxDepth <= 0 || maxDepth > maxHierarchyDepth {
+		maxDepth = maxHierarchyDepth
+	}
+	return h.repo.GetDescendantIDsWithMaxDepthContext(ctx, itemID, maxDepth)
 }
 
 // CountDescendantsContext is the request-aware form of CountDescendants.

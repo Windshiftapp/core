@@ -35,7 +35,7 @@
     desktop: () => import('./lib/pages/MainApp.svelte'),
     enrollment: () => import('./lib/pages/Security.svelte'),
     mobile: () => import('./lib/mobile/MobileShell.svelte'),
-    publicBoard: () => import('./lib/customer/CustomerBoard.svelte'),
+    publicBoard: () => import('./lib/pages/PublicBoard.svelte'),
     pagePrint: () => import('./lib/features/pages/PagePrintView.svelte'),
     timeReportPrint: () => import('./lib/features/time/TimeReportPrintView.svelte'),
     testRunSummaryPrint: () => import('./lib/features/testing/TestRunSummaryPrintView.svelte'),
@@ -140,7 +140,7 @@
       // MobileShell own their subsequent data loading.
       appInitialized = true;
       if (!setupCompleted) {
-        moduleSettings.load();
+        moduleSettings.ensureLoaded();
       } else if ($authStore.isAuthenticated) {
         // An OAuth callback just landed here: send the user back to the
         // page that started the flow (replaces the callback redirect entry).

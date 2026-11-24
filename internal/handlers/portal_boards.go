@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"slices"
 
-	"windshift/internal/middleware"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 )
@@ -50,7 +49,11 @@ func (h *CustomerAccessHandler) portalBoard(w http.ResponseWriter, r *http.Reque
 		respondNotFound(w, r, "board")
 		return nil, false
 	}
-	id := h.customer(r, *portal)
+	access, err := h.resolvePortalAccess(r, *portal, config)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return nil, false
+	}
 	portalPolicy, err := h.repo.Policy(r.Context(), "portal", portal.ID)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -61,39 +64,70 @@ func (h *CustomerAccessHandler) portalBoard(w http.ResponseWriter, r *http.Reque
 		respondInternalError(w, r, err)
 		return nil, false
 	}
-	restricted := portalAdmissionRequired(config) || portalPolicy.Mode != "public" || boardPolicy.Mode != "public" || placement.Policy.Mode != "public"
-	if restricted && id == 0 {
+	status, restricted, err := h.boardAccess(r, config, portalPolicy, access, *placement, collection.ID, boardPolicy)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return nil, false
+	}
+	switch status {
+	case http.StatusOK:
+	case http.StatusNotFound:
+		respondNotFound(w, r, "board")
+		return nil, false
+	case http.StatusForbidden:
+		respondForbidden(w, r)
+		return nil, false
+	default:
 		respondJSON(w, http.StatusUnauthorized, map[string]any{"error": "Customer sign-in is required", "code": "CUSTOMER_LOGIN_REQUIRED"})
 		return nil, false
 	}
-	if id > 0 {
-		_, email, identityErr := h.customers.GetIdentity(r.Context(), id)
-		if identityErr != nil || h.portalAdmission(r.Context(), *portal, email) != nil {
-			respondForbidden(w, r)
-			return nil, false
-		}
-		for _, surface := range []models.CustomerSurface{*portal, {Kind: "board", ID: collection.ID}} {
-			allowed, err := h.repo.Allowed(r.Context(), surface, id)
-			if err != nil {
-				respondInternalError(w, r, err)
-				return nil, false
-			}
-			if !allowed {
-				respondForbidden(w, r)
-				return nil, false
-			}
-		}
-		if placement.Policy.Mode == "organisations" {
-			organisationID, err := h.customers.OrganisationID(id)
-			if err != nil || organisationID == nil || !slices.Contains(placement.Policy.OrganisationIDs, *organisationID) {
-				respondForbidden(w, r)
-				return nil, false
-			}
-		}
-	}
 	prefix := requestContextPrefix(r) + "/api/v2/portal/" + url.PathEscape(portal.Slug) + "/boards/" + url.PathEscape(placement.ID) + "/attachments/"
 	ctx := context.WithValue(r.Context(), portalBoardContextKey{}, portalBoardContext{CollectionID: collection.ID, AttachmentPrefix: prefix})
+	if restricted && access.InternalID > 0 {
+		ctx = context.WithValue(ctx, staffBoardFilterKey{}, true)
+	}
 	return r.WithContext(ctx), true
+}
+
+// boardAccess returns the effective status for reading a board placement: 200
+// allowed, 401 customer sign-in required, 403 signed-in customer without
+// access, 404 staff without internal collection access. It applies the portal
+// admission/audience rules for customers and the internal collection rule for
+// staff, so discovery and embedded reads share one decision. The bool reports
+// whether the board is restricted rather than fully public.
+func (h *CustomerAccessHandler) boardAccess(r *http.Request, config models.ChannelConfig, portalPolicy models.CustomerAccessPolicy, access portalAccess, placement models.BoardPlacement, collectionID int, baseline models.CustomerAccessPolicy) (status int, restricted bool, err error) {
+	if !portalAdmissionRequired(config) && portalPolicy.Mode == "public" && baseline.Mode == "public" && placement.Policy.Mode == "public" {
+		return http.StatusOK, false, nil
+	}
+	if access.InternalID > 0 {
+		if h.staffBoardAllowed(access.InternalID, collectionID) {
+			return http.StatusOK, true, nil
+		}
+		return http.StatusNotFound, true, nil
+	}
+	if access.CustomerID == 0 {
+		return http.StatusUnauthorized, true, nil
+	}
+	if !access.ContentAllowed {
+		return http.StatusForbidden, true, nil
+	}
+	allowed, err := h.repo.Allowed(r.Context(), models.CustomerSurface{Kind: "board", ID: collectionID}, access.CustomerID)
+	if err != nil {
+		return 0, true, err
+	}
+	if !allowed {
+		return http.StatusForbidden, true, nil
+	}
+	if placement.Policy.Mode == "organisations" {
+		organisation, err := h.customers.OrganisationID(access.CustomerID)
+		if err != nil {
+			return 0, true, err
+		}
+		if organisation == nil || !slices.Contains(placement.Policy.OrganisationIDs, *organisation) {
+			return http.StatusForbidden, true, nil
+		}
+	}
+	return http.StatusOK, true, nil
 }
 
 func (h *CustomerAccessHandler) GetPortalBoard(w http.ResponseWriter, r *http.Request) {
@@ -132,46 +166,21 @@ func (h *CustomerAccessHandler) GetPortalExperience(w http.ResponseWriter, r *ht
 		respondInternalError(w, r, err)
 		return
 	}
-	id := h.customer(r, *surface)
-	if id == 0 && portalAdmissionRequired(config) {
-		respondJSON(w, http.StatusUnauthorized, map[string]any{"error": "Customer sign-in is required", "code": "CUSTOMER_LOGIN_REQUIRED"})
+	access, err := h.resolvePortalAccess(r, *surface, config)
+	if err != nil {
+		respondInternalError(w, r, err)
 		return
-	}
-	if id > 0 {
-		_, email, err := h.customers.GetIdentity(r.Context(), id)
-		if err != nil || h.portalAdmission(r.Context(), *surface, email) != nil {
-			respondForbidden(w, r)
-			return
-		}
 	}
 	policy, err := h.repo.Policy(r.Context(), "portal", surface.ID)
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
-	if policy.Mode != "public" {
-		if id == 0 {
-			respondJSON(w, http.StatusUnauthorized, map[string]any{"error": "Customer sign-in is required", "code": "CUSTOMER_LOGIN_REQUIRED"})
-			return
-		}
-		allowed, err := h.repo.Allowed(r.Context(), *surface, id)
-		if err != nil {
-			respondInternalError(w, r, err)
-			return
-		}
-		if !allowed {
-			respondForbidden(w, r)
-			return
-		}
-	}
 	result := models.CustomerExperience{Presentation: config.PortalPresentation, Title: config.PortalTitle, LogoURL: config.PortalLogoURL,
 		Slug: surface.Slug, Modules: config.PortalModules, Navigation: config.PortalNavigation, DefaultModule: config.PortalDefaultModule,
-		Boards: []models.CustomerExperienceBoard{}, Authenticated: id > 0, IdentityKey: id}
-	// Internal authentication is useful to existing request modules, never board audience evidence.
-	if id == 0 && policy.Mode == "public" {
-		if user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User); ok && user != nil {
-			result.Authenticated, result.IsInternal, result.IdentityKey = true, true, -user.ID
-		}
+		Boards: []models.CustomerExperienceBoard{}, Authenticated: access.CustomerID > 0 || access.InternalID > 0, IdentityKey: access.CustomerID}
+	if access.InternalID > 0 {
+		result.IsInternal, result.IdentityKey = true, -access.InternalID
 	}
 	if result.Presentation == "" {
 		result.Presentation = "classic"
@@ -212,30 +221,21 @@ func (h *CustomerAccessHandler) GetPortalExperience(w http.ResponseWriter, r *ht
 				respondInternalError(w, r, err)
 				return
 			}
-			if id == 0 && (baseline.Mode != "public" || placement.Policy.Mode != "public") {
+			status, _, err := h.boardAccess(r, config, policy, access, placement, collection.ID, baseline)
+			if err != nil {
+				respondInternalError(w, r, err)
+				return
+			}
+			if status != http.StatusOK {
 				continue
 			}
-			if id > 0 {
-				allowed, err := h.repo.Allowed(r.Context(), models.CustomerSurface{Kind: "board", ID: collection.ID}, id)
-				if err != nil {
-					respondInternalError(w, r, err)
-					return
-				}
-				if !allowed {
-					continue
-				}
-				if placement.Policy.Mode == "organisations" {
-					organisation, err := h.customers.OrganisationID(id)
-					if err != nil {
-						respondInternalError(w, r, err)
-						return
-					}
-					if organisation == nil || !slices.Contains(placement.Policy.OrganisationIDs, *organisation) {
-						continue
-					}
-				}
-			}
 			result.Boards = append(result.Boards, models.CustomerExperienceBoard{ID: placement.ID, Label: placement.Label, DisplayOrder: placement.DisplayOrder, PublicationRevision: collection.SharingRevision, PlacementRevision: placement.Revision})
+		}
+	}
+	if len(result.Boards) == 0 {
+		result.Navigation = slices.DeleteFunc(slices.Clone(result.Navigation), func(module string) bool { return module == "boards" })
+		if result.DefaultModule == "boards" {
+			result.DefaultModule = ""
 		}
 	}
 	revision, err := json.Marshal(struct {

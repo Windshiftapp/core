@@ -548,35 +548,34 @@ type RequestType struct {
 	FieldCount int `json:"field_count"`
 }
 
-// IsVisibleTo checks if this request type is visible to the given user groups and/or customer organization
-// Returns true if no restrictions are set, or if the user matches any group OR the customer org matches any org
-func (rt *RequestType) IsVisibleTo(userGroupIDs []int, customerOrgID *int) bool {
-	// No restrictions = visible to all
-	if len(rt.VisibilityGroupIDs) == 0 && len(rt.VisibilityOrgIDs) == 0 {
+// audienceVisibleTo reports whether a group/organisation audience grants the
+// viewer access. No restrictions means visible to all; a match in either list
+// is enough. RequestType and AssetReport share this rule.
+func audienceVisibleTo(groupIDs, orgIDs, userGroupIDs []int, customerOrgID *int) bool {
+	if len(groupIDs) == 0 && len(orgIDs) == 0 {
 		return true
 	}
-
-	// Check group match (internal users)
-	if len(rt.VisibilityGroupIDs) > 0 && len(userGroupIDs) > 0 {
-		for _, gid := range rt.VisibilityGroupIDs {
-			for _, ug := range userGroupIDs {
-				if gid == ug {
-					return true
-				}
+	for _, gid := range groupIDs {
+		for _, ug := range userGroupIDs {
+			if gid == ug {
+				return true
 			}
 		}
 	}
-
-	// Check org match (portal customers)
-	if len(rt.VisibilityOrgIDs) > 0 && customerOrgID != nil {
-		for _, oid := range rt.VisibilityOrgIDs {
+	if customerOrgID != nil {
+		for _, oid := range orgIDs {
 			if oid == *customerOrgID {
 				return true
 			}
 		}
 	}
-
 	return false
+}
+
+// IsVisibleTo checks if this request type is visible to the given user groups and/or customer organization
+// Returns true if no restrictions are set, or if the user matches any group OR the customer org matches any org
+func (rt *RequestType) IsVisibleTo(userGroupIDs []int, customerOrgID *int) bool {
+	return audienceVisibleTo(rt.VisibilityGroupIDs, rt.VisibilityOrgIDs, userGroupIDs, customerOrgID)
 }
 
 // AssetReport represents a portal asset report that displays filtered assets
@@ -654,32 +653,7 @@ type AssetReportField struct {
 // IsVisibleTo checks if this asset report is visible to the given user groups and/or customer organization
 // Returns true if no restrictions are set, or if the user matches any group OR the customer org matches any org
 func (ar *AssetReport) IsVisibleTo(userGroupIDs []int, customerOrgID *int) bool {
-	// No restrictions = visible to all
-	if len(ar.VisibilityGroupIDs) == 0 && len(ar.VisibilityOrgIDs) == 0 {
-		return true
-	}
-
-	// Check group match (internal users)
-	if len(ar.VisibilityGroupIDs) > 0 && len(userGroupIDs) > 0 {
-		for _, gid := range ar.VisibilityGroupIDs {
-			for _, ug := range userGroupIDs {
-				if gid == ug {
-					return true
-				}
-			}
-		}
-	}
-
-	// Check org match (portal customers)
-	if len(ar.VisibilityOrgIDs) > 0 && customerOrgID != nil {
-		for _, oid := range ar.VisibilityOrgIDs {
-			if oid == *customerOrgID {
-				return true
-			}
-		}
-	}
-
-	return false
+	return audienceVisibleTo(ar.VisibilityGroupIDs, ar.VisibilityOrgIDs, userGroupIDs, customerOrgID)
 }
 
 // RequestTypeField represents a field configuration for a request type

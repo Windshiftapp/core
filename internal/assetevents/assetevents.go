@@ -141,5 +141,6 @@ func (r *Recorder) append(ctx context.Context, tx database.Tx, eventType string,
 	if err != nil {
 		return nil, fmt.Errorf("append %s for asset %d: %w", eventType, asset.ID, err)
 	}
+	stageFact(tx, event, metadata)
 	return event, nil
 }

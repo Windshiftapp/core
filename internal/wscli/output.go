@@ -432,22 +432,14 @@ func (o *Output) printTransitionsCSV(w *csv.Writer, transitions []Transition) {
 func (o *Output) printCommentsCSV(w *csv.Writer, comments []Comment) {
 	_ = w.Write([]string{"ID", "AUTHOR", "CREATED", "CONTENT"})
 	for _, c := range comments {
-		author := ""
-		if c.Author != nil {
-			author = c.Author.FullName
-		}
 		created := c.CreatedAt.Format("2006-01-02 15:04")
-		_ = w.Write([]string{fmt.Sprintf("%d", c.ID), author, created, c.Content})
+		_ = w.Write([]string{fmt.Sprintf("%d", c.ID), c.AuthorName, created, c.Content})
 	}
 }
 
 func (o *Output) printCommentCSV(w *csv.Writer, c *Comment) {
-	author := ""
-	if c.Author != nil {
-		author = c.Author.FullName
-	}
 	_ = w.Write([]string{"ID", "ITEM_ID", "AUTHOR", "CREATED", "UPDATED", "CONTENT"})
-	_ = w.Write([]string{fmt.Sprintf("%d", c.ID), fmt.Sprintf("%d", c.ItemID), author, c.CreatedAt.Format(time.RFC3339), c.UpdatedAt.Format(time.RFC3339), c.Content})
+	_ = w.Write([]string{fmt.Sprintf("%d", c.ID), fmt.Sprintf("%d", c.ItemID), c.AuthorName, c.CreatedAt.Format(time.RFC3339), c.UpdatedAt.Format(time.RFC3339), c.Content})
 }
 
 func (o *Output) printMilestoneCommentsCSV(w *csv.Writer, comments []MilestoneComment) {
@@ -734,17 +726,23 @@ func (o *Output) printTransitionsTable(w *tabwriter.Writer, transitions []Transi
 	}
 }
 
+// commentAuthorLabel is the comment author for table output, marking
+// agent-authored comments.
+func commentAuthorLabel(c *Comment) string {
+	if c.IsAgent && c.AuthorName != "" {
+		return c.AuthorName + " (agent)"
+	}
+	return c.AuthorName
+}
+
 func (o *Output) printCommentsTable(w *tabwriter.Writer, comments []Comment) {
 	_, _ = fmt.Fprintln(w, "ID\tAUTHOR\tCREATED\tCONTENT")
 	_, _ = fmt.Fprintln(w, "--\t------\t-------\t-------")
-	for _, c := range comments {
-		author := ""
-		if c.Author != nil {
-			author = c.Author.FullName
-		}
+	for i := range comments {
+		c := &comments[i]
 		created := c.CreatedAt.Format("2006-01-02 15:04")
 		content := truncateString(c.Content, 50)
-		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", c.ID, author, created, content)
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", c.ID, commentAuthorLabel(c), created, content)
 	}
 }
 
@@ -809,8 +807,8 @@ func humanFileSize(n int64) string {
 func (o *Output) printCommentDetailTable(w *tabwriter.Writer, c *Comment) {
 	_, _ = fmt.Fprintf(w, "ID:\t%d\n", c.ID)
 	_, _ = fmt.Fprintf(w, "Item ID:\t%d\n", c.ItemID)
-	if c.Author != nil {
-		_, _ = fmt.Fprintf(w, "Author:\t%s\n", c.Author.FullName)
+	if c.AuthorName != "" {
+		_, _ = fmt.Fprintf(w, "Author:\t%s\n", commentAuthorLabel(c))
 	}
 	_, _ = fmt.Fprintf(w, "Created:\t%s\n", c.CreatedAt.Format("2006-01-02 15:04:05"))
 	_, _ = fmt.Fprintf(w, "Updated:\t%s\n", c.UpdatedAt.Format("2006-01-02 15:04:05"))

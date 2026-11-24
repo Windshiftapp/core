@@ -4,12 +4,12 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -69,8 +69,7 @@ type SSOHandler struct {
 	allowedHosts             []string           // Allowed hosts for redirect URI validation (from --allowed-hosts)
 	devMode                  bool               // Development mode (from --no-csrf flag)
 	ipExtractor              *utils.IPExtractor // IP extractor with proxy validation
-	useProxy                 bool               // Whether proxy mode is enabled
-	additionalProxies        []net.IP           // Additional trusted proxy IPs beyond private ranges
+	trust                    utils.TrustPolicy  // Shared proxy trust policy
 }
 
 // SSOStatusProviderInfo represents a single provider in the public status response
@@ -86,6 +85,7 @@ type SSOStatusResponse struct {
 	ProviderName string                  `json:"provider_name,omitempty"`
 	ProviderSlug string                  `json:"provider_slug,omitempty"`
 	Providers    []SSOStatusProviderInfo `json:"providers,omitempty"`
+	NativeS256   bool                    `json:"native_s256,omitempty"`
 }
 
 // SSOProviderResponse represents a provider for API responses (without secrets)
@@ -101,7 +101,7 @@ type SSOProviderResponse struct {
 	HasClientSecret        bool   `json:"has_client_secret"`
 	Scopes                 string `json:"scopes"`
 	AutoProvisionUsers     bool   `json:"auto_provision_users"`
-	RequireVerifiedEmail   bool   `json:"require_verified_email"` // Provider is authoritative for email; skips Windshift email verification.
+	RequireVerifiedEmail   bool   `json:"require_verified_email"` // Provider is authoritative for email: auto-links to existing accounts by email even when the provider reports the address unverified.
 	AttributeMapping       string `json:"attribute_mapping"`
 	GitHubOrganization     string `json:"github_organization,omitempty"`
 	AccountType            string `json:"account_type"`
@@ -183,6 +183,13 @@ func sanitizeSSOProviderRequest(w http.ResponseWriter, r *http.Request, req *SSO
 // useProxy: whether to trust proxy headers from trusted sources
 // additionalProxiesStr: comma-separated list of additional trusted proxy IPs
 func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, permissionService *services.PermissionService, emailVerificationService *services.EmailVerificationService, pluginManager *plugins.Manager, sessionSecret, baseURL, allowedHostsStr string, devMode bool, ipExtractor *utils.IPExtractor, useProxy bool, additionalProxiesStr []string) *SSOHandler {
+	return NewSSOHandlerWithTrust(db, sessionManager, permissionService, emailVerificationService, pluginManager, sessionSecret, baseURL, allowedHostsStr, devMode, ipExtractor, utils.NewTrustPolicy(useProxy, false, additionalProxiesStr, nil))
+}
+
+// NewSSOHandlerWithTrust creates an SSO handler bound to an explicit proxy trust
+// policy. trust decides whether forwarded headers from the immediate peer may be
+// believed.
+func NewSSOHandlerWithTrust(db database.Database, sessionManager *auth.SessionManager, permissionService *services.PermissionService, emailVerificationService *services.EmailVerificationService, pluginManager *plugins.Manager, sessionSecret, baseURL, allowedHostsStr string, devMode bool, ipExtractor *utils.IPExtractor, trust utils.TrustPolicy) *SSOHandler {
 	// Defensive: config.Load guarantees non-empty, but a wiring bug upstream
 	// would silently break session encryption — fail fast instead.
 	if sessionSecret == "" {
@@ -197,14 +204,6 @@ func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, pe
 			if trimmed := strings.TrimSpace(h); trimmed != "" {
 				allowedHosts = append(allowedHosts, trimmed)
 			}
-		}
-	}
-
-	// Parse additional proxy IPs (beyond auto-trusted private ranges)
-	var additionalProxies []net.IP
-	for _, proxyStr := range additionalProxiesStr {
-		if ip := net.ParseIP(strings.TrimSpace(proxyStr)); ip != nil {
-			additionalProxies = append(additionalProxies, ip)
 		}
 	}
 
@@ -240,8 +239,7 @@ func NewSSOHandler(db database.Database, sessionManager *auth.SessionManager, pe
 		allowedHosts:             allowedHosts,
 		devMode:                  devMode,
 		ipExtractor:              ipExtractor,
-		useProxy:                 useProxy,
-		additionalProxies:        additionalProxies,
+		trust:                    trust,
 	}
 }
 
@@ -289,6 +287,7 @@ func (h *SSOHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		ProviderName: defaultProvider.Name,
 		ProviderSlug: defaultProvider.Slug,
 		Providers:    providerInfos,
+		NativeS256:   true,
 	})
 }
 
@@ -327,6 +326,15 @@ func (h *SSOHandler) StartLogin(w http.ResponseWriter, r *http.Request) {
 	// stored verbatim in the state row and detected again in Callback.
 	if !isValidRedirectURI(redirectAfterLogin) && !isValidNativeRedirectURI(redirectAfterLogin) {
 		redirectAfterLogin = "/"
+	}
+	query := r.URL.Query()
+	if query.Has("native_challenge") || query.Has("native_state") {
+		binding := nativeSSOBinding{challenge: query.Get("native_challenge"), state: query.Get("native_state")}
+		if redirectAfterLogin != nativeRedirectURI || !binding.valid() {
+			respondBadRequest(w, r, "invalid native sign-in request")
+			return
+		}
+		redirectAfterLogin = binding.redirectRecord()
 	}
 
 	rememberMe := ssoRememberMeFromRequest(r)
@@ -496,15 +504,6 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 			slog.String("provider", provider.Slug),
 			slog.Bool("remember_me", rememberMe),
 		)
-		// A native (desktop/iOS) flow is identified by its custom-scheme
-		// redirect target, stored in StartLogin. Web flows keep the existing
-		// relative-path coercion; the native target is left intact so the
-		// branch below can hand back a one-time code instead of a cookie.
-		nativeFlow := isValidNativeRedirectURI(storedRedirectURI)
-		if !nativeFlow && (storedRedirectURI == "" || !isValidRedirectURI(storedRedirectURI)) {
-			storedRedirectURI = "/"
-		}
-
 		// Extract claims
 		claims, err := h.oidcService.ExtractClaims(tokens, attributeMap)
 		if err != nil {
@@ -556,14 +555,19 @@ func (h *SSOHandler) completeSSOLogin(w http.ResponseWriter, r *http.Request, pr
 		h.redirectWithError(w, r, "Failed to create session")
 		return
 	}
-	if isValidNativeRedirectURI(redirectURI) {
-		code, err := h.issueNativeAuthCode(session.Token, session.ExpiresAt)
+	binding, bound := parseNativeSSOBinding(redirectURI)
+	if bound || isValidNativeRedirectURI(redirectURI) {
+		code, err := h.issueNativeAuthCode(session.Token, session.ExpiresAt, binding.challenge)
 		if err != nil {
 			loginLogger.Error("failed to issue native auth code", "error", err)
 			h.redirectWithError(w, r, "Failed to complete sign-in")
 			return
 		}
-		http.Redirect(w, r, nativeRedirectURI+"?code="+url.QueryEscape(code), http.StatusFound) // #nosec G710 -- fixed scheme and opaque code
+		query := url.Values{"code": {code}}
+		if bound {
+			query.Set("state", binding.state)
+		}
+		http.Redirect(w, r, nativeRedirectURI+"?"+query.Encode(), http.StatusFound) // #nosec G710 -- fixed callback and encoded parameters
 		return
 	}
 	if !isValidRedirectURI(redirectURI) {
@@ -582,16 +586,14 @@ func (h *SSOHandler) completeSSOLogin(w http.ResponseWriter, r *http.Request, pr
 // within seconds of receiving the custom-scheme callback.
 const nativeAuthCodeTTL = 2 * time.Minute
 
-// issueNativeAuthCode persists a single-use code bound to a freshly created
-// session and returns it. The desktop/native app redeems it at
-// /api/auth/native/exchange for the encoded session cookie value.
-func (h *SSOHandler) issueNativeAuthCode(sessionToken string, sessionExpiresAt time.Time) (string, error) {
+// issueNativeAuthCode stores the lookup key and returns the code for the callback.
+func (h *SSOHandler) issueNativeAuthCode(sessionToken string, sessionExpiresAt time.Time, challenge string) (string, error) {
 	code, err := randomOpaqueCode()
 	if err != nil {
 		return "", err
 	}
 	expires := time.Now().Add(nativeAuthCodeTTL)
-	if err := repository.NewNativeAuthRepository(h.db).Store(code, sessionToken, sessionExpiresAt, expires); err != nil {
+	if err := repository.NewNativeAuthRepository(h.db).Store(nativeAuthLookupKey(code, challenge), sessionToken, sessionExpiresAt, expires); err != nil {
 		return "", err
 	}
 	return code, nil
@@ -599,7 +601,8 @@ func (h *SSOHandler) issueNativeAuthCode(sessionToken string, sessionExpiresAt t
 
 // nativeExchangeRequest is the payload the native app POSTs to redeem its code.
 type nativeExchangeRequest struct {
-	Code string `json:"code"`
+	Code     string `json:"code"`
+	Verifier string `json:"code_verifier"`
 }
 
 // nativeExchangeResponse hands the app everything it needs to write the session
@@ -626,7 +629,19 @@ func (h *SSOHandler) NativeExchange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	row, err := repository.NewNativeAuthRepository(h.db).Consume(req.Code, time.Now())
+	// Raw codes exist only for the legacy desktop exchange; never query a
+	// caller-supplied storage key or fall back from a verifier-bound lookup.
+	rawCode, codeErr := hex.DecodeString(req.Code)
+	if codeErr != nil || len(rawCode) != 24 || (req.Verifier != "" && !validNativeSSOValue(req.Verifier)) {
+		respondBadRequest(w, r, "invalid or expired code")
+		return
+	}
+	var challenge string
+	if req.Verifier != "" {
+		digest := sha256.Sum256([]byte(req.Verifier))
+		challenge = base64.RawURLEncoding.EncodeToString(digest[:])
+	}
+	row, err := repository.NewNativeAuthRepository(h.db).Consume(nativeAuthLookupKey(req.Code, challenge), time.Now())
 	if errors.Is(err, repository.ErrNotFound) {
 		respondBadRequest(w, r, "invalid or expired code")
 		return
@@ -643,6 +658,7 @@ func (h *SSOHandler) NativeExchange(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("native auth code exchanged", slog.String("component", "sso"))
+	w.Header().Set("Cache-Control", "no-store")
 	respondJSONOK(w, nativeExchangeResponse{
 		CookieName:  auth.SessionCookieName,
 		CookieValue: value,
@@ -1206,22 +1222,7 @@ func (h *SSOHandler) getRedirectURI(r *http.Request, slug string) string {
 
 // isTrustedRequest checks if the request comes from a trusted proxy
 func (h *SSOHandler) isTrustedRequest(r *http.Request) bool {
-	if !h.useProxy {
-		return false // Proxy mode disabled - trust nothing
-	}
-
-	// Get the immediate client IP (could be proxy)
-	remoteAddr := r.RemoteAddr
-	if colonIndex := strings.LastIndex(remoteAddr, ":"); colonIndex != -1 {
-		remoteAddr = remoteAddr[:colonIndex]
-	}
-
-	clientIP := net.ParseIP(remoteAddr)
-	if clientIP == nil {
-		return false
-	}
-
-	return utils.IsTrustedProxy(clientIP, h.useProxy, h.additionalProxies)
+	return h.trust.IsTrusted(utils.PeerIP(r))
 }
 
 // isAllowedHost checks if a host is in the allowed hosts list

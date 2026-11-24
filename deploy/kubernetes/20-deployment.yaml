@@ -34,7 +34,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: windshift
-          image: ghcr.io/windshiftapp/windshift:0.9.3 # pin the release you deploy
+          image: ghcr.io/windshiftapp/windshift:0.9.6 # pin the release you deploy; strict proxy trust requires 0.9.6+
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -53,6 +53,16 @@ spec:
             # Required behind an Ingress or reverse proxy.
             - name: USE_PROXY
               value: "true"
+            # Trust only loopback and ADDITIONAL_PROXIES. The example Ingress
+            # reaches Windshift from a dynamic controller pod address, so list a
+            # stable address here, or run a loopback sidecar as described in
+            # deploy/proxy-trust.md. An unlisted proxy is treated as the client;
+            # Diagnostics -> Proxy trust reports it.
+            - name: PROXY_TRUST_MODE
+              value: "strict"
+            # Comma-separated literal IPv4/IPv6 proxy addresses (no CIDR).
+            # - name: ADDITIONAL_PROXIES
+            #   value: "10.0.0.11,10.0.0.12"
             - name: SSO_SECRET
               valueFrom:
                 secretKeyRef:
@@ -69,6 +79,13 @@ spec:
               value: /data/plugins
             - name: AI_PROMPTS_DIR
               value: /data/prompts
+            # Optional: cap the completed work items included in AI-generated
+            # release notes (default 200) and the estimated input token budget
+            # (default 128000).
+            # - name: AI_RELEASE_NOTES_ITEM_LIMIT
+            #   value: "200"
+            # - name: AI_RELEASE_NOTES_TOKEN_BUDGET
+            #   value: "128000"
             # SQLite and some parsers need a writable /tmp; the root filesystem
             # is read-only, so it is an emptyDir.
             - name: TMPDIR

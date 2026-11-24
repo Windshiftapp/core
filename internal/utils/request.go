@@ -11,28 +11,24 @@ import (
 
 // IPExtractor extracts client IP addresses with proxy validation
 type IPExtractor struct {
-	useProxy          bool
-	additionalProxies []net.IP
+	policy TrustPolicy
 }
 
-// NewIPExtractor creates a new IP extractor with proxy configuration
+// NewIPExtractor creates a legacy-mode extractor with proxy configuration.
 func NewIPExtractor(useProxy bool, additionalProxies []string) *IPExtractor {
-	var additionalIPs []net.IP
-	for _, proxyStr := range additionalProxies {
-		if ip := net.ParseIP(strings.TrimSpace(proxyStr)); ip != nil {
-			additionalIPs = append(additionalIPs, ip)
-		}
-	}
-	return &IPExtractor{
-		useProxy:          useProxy,
-		additionalProxies: additionalIPs,
-	}
+	return &IPExtractor{policy: NewTrustPolicy(useProxy, false, additionalProxies, nil)}
+}
+
+// NewIPExtractorWithPolicy creates an extractor bound to an explicit trust
+// policy, including the shared observer used by admin diagnostics.
+func NewIPExtractorWithPolicy(policy TrustPolicy) *IPExtractor {
+	return &IPExtractor{policy: policy}
 }
 
 // GetClientIP extracts the client IP with proxy validation. Only trusts
 // X-Forwarded-For/X-Real-IP headers if the request comes from a trusted proxy.
 func (e *IPExtractor) GetClientIP(r *http.Request) string {
-	return ExtractClientIP(r, e.useProxy, e.additionalProxies)
+	return e.policy.ExtractClientIP(r)
 }
 
 // ExtractClientIP returns the client IP for r, trusting X-Forwarded-For and
@@ -50,33 +46,95 @@ func (e *IPExtractor) GetClientIP(r *http.Request) string {
 // client-supplied value. A client therefore cannot rotate its own identity by
 // injecting trusted-range addresses into the forwarded headers.
 func ExtractClientIP(r *http.Request, useProxy bool, additionalProxies []net.IP) string {
+	return TrustPolicy{UseProxy: useProxy, Additional: additionalProxies}.ExtractClientIP(r)
+}
+
+// ExtractClientIP resolves the client IP under p and, when p carries an
+// observer, records private peers that are not configured proxies. It applies
+// the same walk described on the package-level ExtractClientIP.
+func (p TrustPolicy) ExtractClientIP(r *http.Request) string {
 	remoteAddr := remoteHost(r.RemoteAddr)
 	peer := net.ParseIP(remoteAddr)
 	if peer == nil {
 		return remoteAddr // Return as-is if parsing fails
 	}
 
-	if !IsTrustedProxy(peer, useProxy, additionalProxies) {
+	trusted := p.IsTrusted(peer)
+	// Observe every non-loopback peer that is not a configured proxy. Under
+	// strict this shows which peers are having their headers ignored; under
+	// legacy it previews which peers strict would stop trusting, so an operator
+	// can build ADDITIONAL_PROXIES before switching.
+	p.observePeer(r, peer)
+	if !trusted {
 		return remoteAddr
 	}
 
-	isTrusted := func(ip net.IP) bool {
-		return IsTrustedProxy(ip, useProxy, additionalProxies)
-	}
-	if clientIP := ForwardedClientIP(r.Header.Get("X-Forwarded-For"), isTrusted); clientIP != "" {
+	if clientIP := ForwardedClientIP(forwardedHeader(r, "X-Forwarded-For"), p.IsTrusted); clientIP != "" {
 		return clientIP
 	}
 
 	// X-Real-IP is a single hop. Trust it only when it is not itself a trusted
 	// proxy, mirroring the X-Forwarded-For rule; otherwise fall back to the peer.
 	if realIP := strings.TrimSpace(r.Header.Get("X-Real-IP")); realIP != "" {
-		if ip := net.ParseIP(realIP); isValidForwardedIP(ip) && !isTrusted(ip) {
+		if ip := net.ParseIP(realIP); isValidForwardedIP(ip) && !p.IsTrusted(ip) {
 			return realIP
 		}
 	}
 
 	// Fall back to direct connection IP
 	return remoteAddr
+}
+
+// forwardedHeader joins every field of a possibly repeated forwarding header
+// into one comma-separated value. Header.Get returns only the first field, so a
+// proxy that emits several X-Forwarded-For lines would otherwise hide the
+// rightmost (most trustworthy) entries.
+func forwardedHeader(r *http.Request, name string) string {
+	values := r.Header.Values(name)
+	switch len(values) {
+	case 0:
+		return ""
+	case 1:
+		return values[0]
+	default:
+		return strings.Join(values, ", ")
+	}
+}
+
+// hasForwardingHeaders reports whether the request carries any header a proxy
+// would set. X-Forwarded-Proto alone is enough to identify a peer that behaves
+// like a proxy, even when it sends no address header.
+func hasForwardingHeaders(r *http.Request) bool {
+	return strings.TrimSpace(forwardedHeader(r, "X-Forwarded-For")) != "" ||
+		strings.TrimSpace(r.Header.Get("X-Real-IP")) != "" ||
+		strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")) != ""
+}
+
+// observePeer records a non-loopback peer that is not a configured proxy so
+// admin diagnostics can distinguish a correctly identified private client from
+// an unlisted proxy whose forwarding headers are being ignored (strict) or
+// would be ignored (legacy preview).
+//
+// A peer that sends forwarding headers is recorded regardless of address class:
+// a public-address upstream is the case that a private-only observer misses, and
+// under strict its headers are ignored so its clients collapse to its address
+// and lose Secure/HSTS detection.
+func (p TrustPolicy) observePeer(r *http.Request, peer net.IP) {
+	// Configured proxies are known and must not be reported as unlisted; loopback
+	// is the local-process exception.
+	if p.Observer == nil || peer.IsLoopback() || p.isConfiguredProxy(peer) {
+		return
+	}
+	if hasForwardingHeaders(r) {
+		p.Observer.Record(peer.String(), PeerKindUnlistedProxy)
+		return
+	}
+	// A private peer with no forwarding headers is a correctly identified client;
+	// record it so legacy can preview what strict would stop trusting. A public
+	// peer with no forwarding headers is an ordinary client and is not recorded.
+	if IsPrivateIP(peer) {
+		p.Observer.Record(peer.String(), PeerKindPrivateClient)
+	}
 }
 
 // ForwardedClientIP returns the client IP encoded in an X-Forwarded-For header.
@@ -186,25 +244,17 @@ func allZero(b []byte) bool {
 	return true
 }
 
-// IsTrustedProxy checks if an IP is a trusted proxy (private IP or in additional list)
-// This is the canonical implementation used throughout the codebase.
+// IsTrustedProxy checks if an IP is a trusted proxy (private IP in legacy mode,
+// loopback, or in the additional list).
+// It is a legacy-mode wrapper around TrustPolicy.IsTrusted.
 // Parameters:
 //   - ip: the IP address to check
 //   - useProxy: whether proxy mode is enabled (if false, always returns false)
 //   - additionalProxies: list of additional trusted proxy IPs beyond private ranges
+//
+// Deprecated: prefer TrustPolicy.IsTrusted so strict trust mode is honored.
 func IsTrustedProxy(ip net.IP, useProxy bool, additionalProxies []net.IP) bool {
-	if !useProxy {
-		return false // Proxy mode disabled - trust nothing
-	}
-	if IsPrivateIP(ip) {
-		return true
-	}
-	for _, trustedIP := range additionalProxies {
-		if ip.Equal(trustedIP) {
-			return true
-		}
-	}
-	return false
+	return TrustPolicy{UseProxy: useProxy, Additional: additionalProxies}.IsTrusted(ip)
 }
 
 // GetClientIP extracts the client IP address from request context.

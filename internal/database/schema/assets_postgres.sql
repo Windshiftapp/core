@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS asset_management_sets (
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_asset_management_sets_name ON asset_management_sets(name);
 CREATE INDEX IF NOT EXISTS idx_asset_management_sets_is_default ON asset_management_sets(is_default);
 
 -- Asset Roles (similar to workspace_roles)
@@ -26,7 +25,6 @@ CREATE TABLE IF NOT EXISTS asset_roles (
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_asset_roles_name ON asset_roles(name);
 CREATE INDEX IF NOT EXISTS idx_asset_roles_display_order ON asset_roles(display_order);
 
 -- Asset Permissions
@@ -37,8 +35,6 @@ CREATE TABLE IF NOT EXISTS asset_permissions (
 	description TEXT,
 	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX IF NOT EXISTS idx_asset_permissions_key ON asset_permissions(permission_key);
 
 -- Asset Role to Permission mapping
 CREATE TABLE IF NOT EXISTS asset_role_permissions (

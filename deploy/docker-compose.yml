@@ -24,6 +24,14 @@ services:
       - BASE_URL=https://${DOMAIN}
       - PORT=8080
       - USE_PROXY=true
+      # Trust only loopback and ADDITIONAL_PROXIES. The shipped .env.example
+      # sets strict for fresh installs and requires ADDITIONAL_PROXIES to be set
+      # to the verified proxy address. The "legacy" fallback keeps an existing
+      # installation on its current behavior when only this manifest is
+      # refreshed; see deploy/proxy-trust.md. Diagnostics -> Proxy trust reports
+      # an unlisted proxy.
+      - PROXY_TRUST_MODE=${PROXY_TRUST_MODE:-legacy}
+      - ADDITIONAL_PROXIES=${ADDITIONAL_PROXIES:-}
       - SSO_SECRET=${SSO_SECRET}
       - SESSION_IP_BINDING=${SESSION_IP_BINDING:-log}
       - ATTACHMENT_PATH=/data/attachments
@@ -83,6 +91,10 @@ services:
       # - POSTGRES_CONNECTION_HEADROOM=10
       # --- LLM (uncomment when using llm service) ---
       # - LLM_ENDPOINT=http://llm:8081
+      # Optional: cap the completed work items included in AI-generated release
+      # notes (default 200) and the estimated input token budget (default 128000).
+      # - AI_RELEASE_NOTES_ITEM_LIMIT=200
+      # - AI_RELEASE_NOTES_TOKEN_BUDGET=128000
       # --- Coding agents (uncomment the windshift-runner service + coding-agent
       #     network below). Windshift orchestrates only — it queues runs and
       #     serves the runner pool; agents execute on the windshift-runner host,

@@ -1331,11 +1331,14 @@ func (r *AssetRepository) GetDefaultStatus(setID int) (*int, error) {
 		SELECT id FROM asset_statuses WHERE set_id = ? AND is_default = true LIMIT 1
 	`, setID).Scan(&statusID)
 
-	if errors.Is(err, sql.ErrNoRows) || !statusID.Valid {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get default status: %w", err)
+	}
+	if !statusID.Valid {
+		return nil, nil
 	}
 
 	id := int(statusID.Int64)

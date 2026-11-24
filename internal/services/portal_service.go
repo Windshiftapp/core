@@ -463,7 +463,7 @@ func (s *PortalService) GetRequestDetail(_ context.Context, itemID int) (*Portal
 }
 
 // PortalServesRequestWorkspace reports whether the portal channel currently
-// serves the item's workspace. VerifyRequestOwnership applies the same check
+// serves the item's workspace. VerifyRequestEngagement applies the same check
 // for owners; approver-derived access must apply it too, otherwise removing a
 // workspace from a portal leaves active approvers able to read its requests.
 func (s *PortalService) PortalServesRequestWorkspace(ctx context.Context, itemID, portalChannelID int) (bool, error) {
@@ -504,16 +504,15 @@ func (s *PortalService) PortalServesWorkspace(ctx context.Context, portalChannel
 	return portalServesWorkspace(vis, workspaceID), nil
 }
 
-// VerifyRequestOwnership verifies that a user owns a request
-// Returns true if the user owns the request within the specified channel.
-// Since WI-1547 the check also admits items created through enabled intakes
-// linked to this portal, so a customer who opened a ticket by email can read
-// and continue it in the connected portal. Since WI-1136 it also admits
-// external request participants. Since WI-1139 it also admits organisation-shared requests
-// (automatic mode, or requester_choice with the item flag set) when the
-// viewer qualifies for the configured audience. Items outside the portal's
-// served workspaces never pass, regardless of channel linkage or participation.
-func (s *PortalService) VerifyRequestOwnership(ctx context.Context, itemID, channelID int, internalUserID, portalCustomerID *int) (bool, error) {
+// VerifyRequestEngagement reports whether the viewer may actively engage with
+// the request: read it, comment, and upload attachments. True for the creator,
+// external participants (WI-1136) and qualifying organisation peers (WI-1139,
+// automatic mode or requester_choice with the item flag set), as well as items
+// created through enabled intakes linked to this portal (WI-1547). Active
+// approvers read and comment through a separate check and are not admitted
+// here. Items outside the portal's served workspaces never pass, regardless of
+// channel linkage or participation.
+func (s *PortalService) VerifyRequestEngagement(ctx context.Context, itemID, channelID int, internalUserID, portalCustomerID *int) (bool, error) {
 	detail, err := s.GetRequestDetail(ctx, itemID)
 	if err != nil {
 		return false, err
@@ -633,10 +632,9 @@ func (s *PortalService) GetRequestComments(ctx context.Context, itemID int) ([]P
 			id := int(portalCustomerID.Int64)
 			comment.PortalCustomerID = &id
 		}
-		comment.ContentHTML, err = markdown.Render(comment.Content)
-		if err != nil {
-			return nil, fmt.Errorf("render portal comment %d: %w", comment.ID, err)
-		}
+		// ContentHTML is projected by the portal handler, which renders once and
+		// applies the portal link rewrite. Rendering here too would double the
+		// Markdown work for every comment on the thread.
 		comments = append(comments, comment)
 	}
 	if err := rows.Err(); err != nil {
@@ -669,80 +667,43 @@ type RequestTypeField struct {
 	FieldLabel          string    `json:"field_label"`
 }
 
-// GetRequestTypeFields gets fields for a request type
+// GetRequestTypeFields gets fields for a request type. It reads through the
+// shared repository decoder and then applies the create-screen allowlist, so a
+// scan failure is surfaced instead of silently returning a partial schema.
 func (s *PortalService) GetRequestTypeFields(ctx context.Context, requestTypeID int) ([]RequestTypeField, error) {
 	allowedCustomFieldIDs, err := allowedRequestTypeCustomFieldIdentifiers(ctx, s.db, requestTypeID)
 	if err != nil {
 		return nil, fmt.Errorf("resolve request type create-screen fields: %w", err)
 	}
-	query := `
-		SELECT rtf.id, rtf.request_type_id, rtf.field_identifier, rtf.field_type,
-		       rtf.display_order, rtf.is_required, rtf.display_name, rtf.description,
-		       COALESCE(rtf.step_number, 1) as step_number,
-		       rtf.virtual_field_type, rtf.virtual_field_options,
-		       rtf.created_at, rtf.updated_at,
-		       CASE
-		           WHEN rtf.field_type = 'virtual' THEN rtf.field_identifier
-		           ELSE COALESCE(cfd.name, rtf.field_identifier)
-		       END as field_name,
-		       CASE
-		           WHEN rtf.display_name IS NOT NULL AND rtf.display_name != '' THEN rtf.display_name
-		           WHEN rtf.field_type = 'virtual' THEN rtf.field_identifier
-		           ELSE COALESCE(cfd.name, rtf.field_identifier)
-		       END as field_label
-		FROM request_type_fields rtf
-		LEFT JOIN custom_field_definitions cfd ON rtf.field_type = 'custom'
-		    AND rtf.field_identifier = CAST(cfd.id AS TEXT)
-		WHERE rtf.request_type_id = ?
-		ORDER BY rtf.step_number, rtf.display_order, rtf.id`
-
-	rows, err := s.db.QueryContext(ctx, query, requestTypeID)
+	rows, err := repository.NewRequestTypeRepository(s.db).ListFieldsContext(ctx, requestTypeID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch request type fields: %w", err)
+		return nil, err
 	}
-	defer rows.Close()
-
-	var fields []RequestTypeField
-	for rows.Next() {
-		var field RequestTypeField
-		var displayName, description, virtualFieldType, virtualFieldOptions sql.NullString
-		err := rows.Scan(
-			&field.ID, &field.RequestTypeID, &field.FieldIdentifier, &field.FieldType,
-			&field.DisplayOrder, &field.IsRequired, &displayName, &description,
-			&field.StepNumber, &virtualFieldType, &virtualFieldOptions,
-			&field.CreatedAt, &field.UpdatedAt,
-			&field.FieldName, &field.FieldLabel,
-		)
-		if err != nil {
-			continue
-		}
-		if field.FieldType == "custom" {
-			if _, allowed := allowedCustomFieldIDs[field.FieldIdentifier]; !allowed {
+	fields := make([]RequestTypeField, 0, len(rows))
+	for _, row := range rows {
+		if row.FieldType == "custom" {
+			if _, allowed := allowedCustomFieldIDs[row.FieldIdentifier]; !allowed {
 				continue
 			}
 		}
-		if displayName.Valid {
-			field.DisplayName = &displayName.String
-		}
-		if description.Valid {
-			field.Description = &description.String
-		}
-		if virtualFieldType.Valid {
-			field.VirtualFieldType = &virtualFieldType.String
-		}
-		if virtualFieldOptions.Valid {
-			field.VirtualFieldOptions = &virtualFieldOptions.String
-		}
-		fields = append(fields, field)
+		fields = append(fields, RequestTypeField{
+			ID:                  row.ID,
+			RequestTypeID:       row.RequestTypeID,
+			FieldIdentifier:     row.FieldIdentifier,
+			FieldType:           row.FieldType,
+			DisplayOrder:        row.DisplayOrder,
+			IsRequired:          row.IsRequired,
+			DisplayName:         row.DisplayName,
+			Description:         row.Description,
+			StepNumber:          row.StepNumber,
+			VirtualFieldType:    row.VirtualFieldType,
+			VirtualFieldOptions: row.VirtualFieldOptions,
+			CreatedAt:           row.CreatedAt,
+			UpdatedAt:           row.UpdatedAt,
+			FieldName:           row.FieldName,
+			FieldLabel:          row.FieldLabel,
+		})
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to iterate request type fields: %w", err)
-	}
-
-	if fields == nil {
-		fields = []RequestTypeField{}
-	}
-
 	return fields, nil
 }
 
@@ -877,83 +838,100 @@ func (s *PortalService) collectVisibleChannelCustomFieldIDs(ctx context.Context,
 		servedWorkspaceIDs = channelConfig.FormWorkspaceIDs
 	}
 
-	// Visible request types → their custom-typed configured fields.
-	rtRows, err := s.db.QueryContext(ctx, `
-		SELECT rt.id, rt.item_type_id, rt.workspace_id, rt.visibility_group_ids, rt.visibility_org_ids
-		FROM request_types rt
-		WHERE rt.channel_id = ? AND rt.is_active = true AND rt.kind != 'email'
-	`, channelID)
-	if err != nil {
-		return nil, fmt.Errorf("list channel request types: %w", err)
-	}
+	// A portal only publishes field definitions for the workflows it enables.
+	// Request forms and form-mode asset reports share this endpoint, so each
+	// block is gated by its module; a form channel always serves forms.
+	formsEnabled := channelType == "form" || channelConfig.PortalModuleEnabled("forms")
+	assetsEnabled := channelType == "portal" && channelConfig.PortalModuleEnabled("asset-reports")
+
 	type visibleRoute struct {
 		id          int
 		itemTypeID  int
 		workspaceID int
 	}
-	var visibleRTRoutes []visibleRoute
-	func() {
-		defer rtRows.Close()
-		for rtRows.Next() {
-			var id, itemTypeID int
-			var workspaceID *int
-			var groups, orgs sql.NullString
-			if err := rtRows.Scan(&id, &itemTypeID, &workspaceID, &groups, &orgs); err != nil {
-				continue
-			}
-			if !isAdmin && !portalRowVisible(groups, orgs, userGroupIDs, customerOrgID) {
-				continue
-			}
-			// Request types pin their workspace at creation; an unpinned row is
-			// not routable and contributes no fields.
-			if workspaceID == nil || !containsInt(servedWorkspaceIDs, *workspaceID) {
-				continue
-			}
-			visibleRTRoutes = append(visibleRTRoutes, visibleRoute{id: id, itemTypeID: itemTypeID, workspaceID: *workspaceID})
+
+	if formsEnabled {
+		// Visible request types → their custom-typed configured fields.
+		rtRows, err := s.db.QueryContext(ctx, `
+			SELECT rt.id, rt.item_type_id, rt.workspace_id, rt.visibility_group_ids, rt.visibility_org_ids
+			FROM request_types rt
+			WHERE rt.channel_id = ? AND rt.is_active = true AND rt.kind != 'email'
+		`, channelID)
+		if err != nil {
+			return nil, fmt.Errorf("list channel request types: %w", err)
 		}
-	}()
-	if err := rtRows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate channel request types: %w", err)
-	}
-	for _, route := range visibleRTRoutes {
-		if err := s.collectBoundCustomFieldIDs(ctx, cfIDs, "request_type", route.id, route.workspaceID, route.itemTypeID); err != nil {
-			return nil, err
+		var visibleRTRoutes []visibleRoute
+		func() {
+			defer rtRows.Close()
+			for rtRows.Next() {
+				var id, itemTypeID int
+				var workspaceID *int
+				var groups, orgs sql.NullString
+				if err := rtRows.Scan(&id, &itemTypeID, &workspaceID, &groups, &orgs); err != nil {
+					continue
+				}
+				if !isAdmin && !portalRowVisible(groups, orgs, userGroupIDs, customerOrgID) {
+					continue
+				}
+				// Request types pin their workspace at creation; an unpinned row is
+				// not routable and contributes no fields.
+				if workspaceID == nil || !containsInt(servedWorkspaceIDs, *workspaceID) {
+					continue
+				}
+				visibleRTRoutes = append(visibleRTRoutes, visibleRoute{id: id, itemTypeID: itemTypeID, workspaceID: *workspaceID})
+			}
+		}()
+		if err := rtRows.Err(); err != nil {
+			return nil, fmt.Errorf("iterate channel request types: %w", err)
+		}
+		// Portal channels can resolve asset custom fields through their own asset
+		// endpoints; public form channels cannot.
+		allowAssets := channelType == "portal"
+		for _, route := range visibleRTRoutes {
+			if err := s.collectBoundCustomFieldIDs(ctx, cfIDs, "request_type", route.id, route.workspaceID, route.itemTypeID, allowAssets); err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	// Visible form-mode asset reports → their custom-typed configured fields.
-	arRows, err := s.db.QueryContext(ctx, `
-		SELECT ar.id, ar.item_type_id, ar.workspace_id, ar.visibility_group_ids, ar.visibility_org_ids
-		FROM asset_reports ar
-		WHERE ar.channel_id = ? AND ar.is_active = true AND ar.run_mode = 'form'
-	`, channelID)
-	if err != nil {
-		return nil, fmt.Errorf("list channel asset reports: %w", err)
-	}
-	var visibleARRoutes []visibleRoute
-	func() {
-		defer arRows.Close()
-		for arRows.Next() {
-			var id int
-			var itemTypeID, workspaceID *int
-			var groups, orgs sql.NullString
-			if err := arRows.Scan(&id, &itemTypeID, &workspaceID, &groups, &orgs); err != nil {
-				continue
-			}
-			if !isAdmin && !portalRowVisible(groups, orgs, userGroupIDs, customerOrgID) {
-				continue
-			}
-			if itemTypeID != nil && workspaceID != nil && containsInt(channelConfig.PortalWorkspaceIDs, *workspaceID) {
-				visibleARRoutes = append(visibleARRoutes, visibleRoute{id: id, itemTypeID: *itemTypeID, workspaceID: *workspaceID})
-			}
+	if assetsEnabled {
+		// Visible form-mode asset reports → their custom-typed configured fields.
+		// The portal grant is checked inside the query so it needs no second read
+		// connection while this cursor is open.
+		arRows, err := s.db.QueryContext(ctx, `
+			SELECT ar.id, ar.item_type_id, ar.workspace_id, ar.visibility_group_ids, ar.visibility_org_ids
+			FROM asset_reports ar
+			WHERE ar.channel_id = ? AND ar.is_active = true AND ar.run_mode = 'form'
+			  AND EXISTS (SELECT 1 FROM asset_set_portal_access aspa WHERE aspa.set_id = ar.asset_set_id)
+		`, channelID)
+		if err != nil {
+			return nil, fmt.Errorf("list channel asset reports: %w", err)
 		}
-	}()
-	if err := arRows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate channel asset reports: %w", err)
-	}
-	for _, route := range visibleARRoutes {
-		if err := s.collectBoundCustomFieldIDs(ctx, cfIDs, "asset_report", route.id, route.workspaceID, route.itemTypeID); err != nil {
-			return nil, err
+		var visibleARRoutes []visibleRoute
+		func() {
+			defer arRows.Close()
+			for arRows.Next() {
+				var id int
+				var itemTypeID, workspaceID *int
+				var groups, orgs sql.NullString
+				if err := arRows.Scan(&id, &itemTypeID, &workspaceID, &groups, &orgs); err != nil {
+					continue
+				}
+				if !isAdmin && !portalRowVisible(groups, orgs, userGroupIDs, customerOrgID) {
+					continue
+				}
+				if itemTypeID != nil && workspaceID != nil && containsInt(channelConfig.PortalWorkspaceIDs, *workspaceID) {
+					visibleARRoutes = append(visibleARRoutes, visibleRoute{id: id, itemTypeID: *itemTypeID, workspaceID: *workspaceID})
+				}
+			}
+		}()
+		if err := arRows.Err(); err != nil {
+			return nil, fmt.Errorf("iterate channel asset reports: %w", err)
+		}
+		for _, route := range visibleARRoutes {
+			if err := s.collectBoundCustomFieldIDs(ctx, cfIDs, "asset_report", route.id, route.workspaceID, route.itemTypeID, true); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -963,8 +941,8 @@ func (s *PortalService) collectVisibleChannelCustomFieldIDs(ctx context.Context,
 // collectBoundCustomFieldIDs admits only custom fields present on the route's
 // effective create screen. This keeps legacy or forged field rows from
 // exposing definitions outside the portal/form workspace configuration.
-func (s *PortalService) collectBoundCustomFieldIDs(ctx context.Context, out map[int]struct{}, ownerType string, ownerID, workspaceID, itemTypeID int) error {
-	createScreenID, err := repository.NewScreenRepository(s.db).GetCreateScreenID(workspaceID, itemTypeID)
+func (s *PortalService) collectBoundCustomFieldIDs(ctx context.Context, out map[int]struct{}, ownerType string, ownerID, workspaceID, itemTypeID int, allowAssets bool) error {
+	createScreenID, err := repository.NewScreenRepository(s.db).GetEffectiveCreateScreenID(workspaceID, itemTypeID)
 	if err != nil || createScreenID == nil {
 		return err
 	}
@@ -972,10 +950,11 @@ func (s *PortalService) collectBoundCustomFieldIDs(ctx context.Context, out map[
 	if err != nil {
 		return err
 	}
+	fillable := PublicFormFillableCustomFieldType(allowAssets)
 	allowed := make(map[string]struct{}, len(screenFields))
 	for _, field := range screenFields {
 		if field.FieldType == "custom" && field.FieldName != "" &&
-			IsPublicFormFillableCustomFieldType(field.CustomFieldType) {
+			fillable(field.CustomFieldType) {
 			allowed[field.FieldIdentifier] = struct{}{}
 		}
 	}

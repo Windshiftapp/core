@@ -191,8 +191,11 @@ func (rs *RecurrenceScheduler) generateInstancesForRule(rule *models.RecurrenceR
 	}
 
 	// Expand incrementally so high-frequency rules never materialize an
-	// unbounded occurrence slice in memory.
-	nextOccurrence := r.After(startFrom, true)
+	// unbounded occurrence slice in memory. A single iterator walks from DTSTART
+	// to the checkpoint once, then yields each later occurrence; calling
+	// After per occurrence would restart that walk every time.
+	next := r.Iterator()
+	nextOccurrence := nextAfter(next, startFrom, true)
 	if nextOccurrence.IsZero() || nextOccurrence.After(generateUntil) {
 		// No occurrences in window, update next check time
 		nextCheck := now.Add(24 * time.Hour)
@@ -225,7 +228,7 @@ func (rs *RecurrenceScheduler) generateInstancesForRule(rule *models.RecurrenceR
 	examinedCount := 0
 	for !nextOccurrence.IsZero() && !nextOccurrence.After(generateUntil) && examinedCount < MaxRecurrenceInstancesPerRulePass {
 		occurrence := nextOccurrence
-		nextOccurrence = r.After(occurrence, false)
+		nextOccurrence = nextAfter(next, occurrence, false)
 		examinedCount++
 		dateKey := occurrence.Format("2006-01-02")
 		if existingDates[dateKey] {
@@ -266,6 +269,21 @@ func (rs *RecurrenceScheduler) generateInstancesForRule(rule *models.RecurrenceR
 		return generatedCount, fmt.Errorf("instance creation failed mid-batch: %w", firstFailure)
 	}
 	return generatedCount, nil
+}
+
+// nextAfter advances an iterator to the first occurrence with RRule.After
+// semantics: inclusive when inc is set. Reusing one iterator is what avoids
+// restarting the walk from DTSTART for every occurrence.
+func nextAfter(next rrule.Next, dt time.Time, inc bool) time.Time {
+	for {
+		occurrence, ok := next()
+		if !ok {
+			return time.Time{}
+		}
+		if inc && !occurrence.Before(dt) || !inc && occurrence.After(dt) {
+			return occurrence
+		}
+	}
 }
 
 // createInstance creates a single recurring task instance

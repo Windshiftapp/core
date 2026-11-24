@@ -45,24 +45,33 @@ class TimeLogStore {
   async #loadPickerData() {
     if (this.#pickerPromise) return this.#pickerPromise;
     const generation = this.#generation;
-    const fallback = (promise, label) =>
+    // A failed directory resolves to null: last-good data stays on screen and
+    // the next open retries it instead of caching an empty directory.
+    const load = (promise, label) =>
       promise.catch((err) => {
         surfaceError(err, { context: `loadTimeLogPicker:${label}`, silent: true });
-        return [];
+        return null;
       });
-    this.#pickerPromise = Promise.all([
-      fallback(time.projects.getAll(), 'time projects'),
-      fallback(customerOrganisations.getAll(), 'customers'),
-      fallback(items.getAll({ limit: 100 }), 'work items'),
-      fallback(workspacesStore.load(), 'workspaces'),
-    ]).then(([projects, customers, workItems, workspaces]) => {
-      if (generation !== this.#generation) return;
-      this.projects = projects || [];
-      this.customers = customers || [];
-      this.workItems = workItems?.data ?? [];
-      this.workspaces = workspaces || [];
-    });
-    return this.#pickerPromise;
+    let promise;
+    promise = Promise.all([
+      load(time.projects.getAll(), 'time projects'),
+      load(customerOrganisations.getAll(), 'customers'),
+      load(items.getAll({ limit: 100 }), 'work items'),
+      load(workspacesStore.load(), 'workspaces'),
+    ])
+      .then(([projects, customers, workItems, workspaces]) => {
+        if (generation !== this.#generation) return;
+        if (projects !== null) this.projects = projects;
+        if (customers !== null) this.customers = customers;
+        if (workItems !== null) this.workItems = workItems?.data ?? [];
+        if (workspaces !== null) this.workspaces = workspaces;
+      })
+      .finally(() => {
+        // The promise represents only an in-flight load, never a cached result.
+        if (this.#pickerPromise === promise) this.#pickerPromise = null;
+      });
+    this.#pickerPromise = promise;
+    return promise;
   }
 
   /** Load projects/customers/items/workspaces for the pickers and menu. */
@@ -151,13 +160,13 @@ class TimeLogStore {
 /**
  * Resolve the item/workspace context for a context-free open. Mirrors the
  * surface order in the design: open item modal, then the item-detail page,
- * then the active timer.
+ * then the active timer. Pass `route` to evaluate a specific route instead of
+ * the live one, which lets runes components read it inside `$derived`.
  */
-export function resolveTimeLogContext() {
+export function resolveTimeLogContext(route = get(currentRoute)) {
   if (itemModalStore.isOpen) {
     return { itemId: itemModalStore.itemId, workspaceId: itemModalStore.workspaceId };
   }
-  const route = get(currentRoute);
   if (route?.view === 'item-detail' || route?.view === 'mobile-item-detail') {
     const itemId = Number.parseInt(route.params?.itemId ?? route.params?.id, 10);
     if (Number.isFinite(itemId)) {
@@ -178,11 +187,10 @@ export const timeLogStore = new TimeLogStore();
  * workspace first, then the current workspace route. Returns null when neither
  * is available so callers require an explicit choice instead of inventing one.
  */
-export function resolveTimerWorkspaceId() {
-  const context = resolveTimeLogContext();
+export function resolveTimerWorkspaceId(route = get(currentRoute)) {
+  const context = resolveTimeLogContext(route);
   if (context.workspaceId) return context.workspaceId;
   if (context.itemId) return null;
-  const route = get(currentRoute);
   // `id` names collections and other resources too. Only a matched workspace
   // URL establishes that this parameter identifies a workspace.
   if (!route?.view || route.view === '404' || !/^\/workspaces\/[1-9]\d*(?:\/|$)/.test(route.path)) {

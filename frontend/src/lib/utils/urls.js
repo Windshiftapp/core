@@ -43,6 +43,23 @@ export function portalRequestUrl(slug, itemId) {
   return `/portal/${slug}${qs({ view: 'requests', id: itemId })}`;
 }
 
+// portalRequestTypeUrl builds the canonical deep link for a portal request
+// form. Classic and Compact both route /request/{id}, so a hub click lands on
+// the same form in either presentation. Legacy ?request-type= links stay
+// supported by the route parsers.
 export function portalRequestTypeUrl(slug, requestTypeId) {
-  return `/portal/${slug}${qs({ 'request-type': requestTypeId })}`;
+  return `/portal/${slug}/request/${requestTypeId}`;
+}
+
+// legacyRequestTypePrefill returns the query suffix that preserves prefill.*
+// values when a legacy ?request-type= link is translated to the canonical
+// /request/{id} route. Non-prefill query params (the legacy request-type
+// itself) are dropped.
+export function legacyRequestTypePrefill(query) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (key.startsWith('prefill.')) params.set(key, value);
+  }
+  const suffix = params.toString();
+  return suffix ? `?${suffix}` : '';
 }

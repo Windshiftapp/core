@@ -1,5 +1,5 @@
 <script>
-  import { onMount, untrack } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import { useEventListener } from 'runed';
   import { t } from '../../stores/i18n.svelte.js';
   import { onWorkItemRefresh } from '../../stores/workItemRefresh.js';
@@ -180,7 +180,8 @@
   let selectedItemId = $state(null);
 
   // Scope-owned dependency-link loader for hover summaries and blocker counts.
-  const dependencyLoader = createDependencyLoader();
+  const dependencyLoader = createDependencyLoader({ batchWindowMs: 32 });
+  onDestroy(dependencyLoader.reset);
 
   // Quick-add state per column
   let quickAddState = $state({});
@@ -666,8 +667,7 @@
     }
   });
 
-  // Load dependency links only for cards near the viewport. Overlapping waves
-  // join pending ids; each successful chunk commits independently.
+  // Batch visibility updates before loading dependency links for nearby cards.
   $effect(() => {
     if (collectionStore.loading) return;
     const ids = loadedVisibleItemIDs(visibleBoardItemIds, itemsById);

@@ -751,7 +751,7 @@ func (c *Client) UploadPageAttachment(workspaceID, pageID int, originalFilename 
 }
 
 // UploadItemAttachment shares the page upload envelope. Its 404 hides item
-// existence; callers pre-check the route's 32 MB limit.
+// existence; callers pre-check that each file exists and is readable.
 func (c *Client) UploadItemAttachment(itemID int, originalFilename string, body io.Reader) (*Attachment, error) {
 	path := fmt.Sprintf("/rest/api/v2/items/%d/attachments", itemID)
 	return c.uploadAttachment(path, originalFilename, body)

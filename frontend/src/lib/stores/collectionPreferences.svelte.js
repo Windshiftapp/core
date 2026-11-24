@@ -27,9 +27,15 @@ class CollectionPreferencesStore {
   #userId = null;
   #loadPromise = null;
   #generation = 0;
-  #dirtyViewScopes = new Set();
-  #dirtyFilterScopes = new Set();
-  #dirtyCommentSort = false;
+  // Unsaved writes belong to the authenticated session that produced them.
+  // They are stored as the actual patch to send, not as dirty scope names, so
+  // a later flush cannot reconstruct a delete from whichever snapshot happens
+  // to be current. #session increments on reset so a stale rejection cannot
+  // re-arm an old account's write.
+  #session = 0;
+  #pendingViewState = {};
+  #pendingSavedFilters = {};
+  #pendingCommentSort = null;
   #saveTimer = null;
   #saving = null;
 
@@ -74,6 +80,7 @@ class CollectionPreferencesStore {
   /** Clear the cache on logout or user change. */
   reset() {
     this.#generation += 1;
+    this.#session += 1;
     setCalendarPreference('auto');
     setWeekStartPreference('auto');
     this.viewState = {};
@@ -83,9 +90,9 @@ class CollectionPreferencesStore {
     this.loadError = false;
     this.#userId = null;
     this.#loadPromise = null;
-    this.#dirtyViewScopes.clear();
-    this.#dirtyFilterScopes.clear();
-    this.#dirtyCommentSort = false;
+    this.#pendingViewState = {};
+    this.#pendingSavedFilters = {};
+    this.#pendingCommentSort = null;
     if (this.#saveTimer) {
       clearTimeout(this.#saveTimer);
       this.#saveTimer = null;
@@ -112,11 +119,12 @@ class CollectionPreferencesStore {
     const scope = collectionScopeId(workspaceId, collectionId);
     const currentScope = this.viewState[scope] ?? {};
     const currentView = currentScope[view] ?? {};
+    const nextScope = { ...currentScope, [view]: { ...currentView, ...patch } };
     this.viewState = {
       ...this.viewState,
-      [scope]: { ...currentScope, [view]: { ...currentView, ...patch } },
+      [scope]: nextScope,
     };
-    this.#dirtyViewScopes.add(scope);
+    this.#pendingViewState[scope] = nextScope;
     this.#scheduleSave();
   }
 
@@ -129,7 +137,7 @@ class CollectionPreferencesStore {
   setSavedFilters(workspaceId, collectionId, filters) {
     const scope = collectionScopeId(workspaceId, collectionId);
     this.savedFilters = { ...this.savedFilters, [scope]: filters };
-    this.#dirtyFilterScopes.add(scope);
+    this.#pendingSavedFilters[scope] = filters;
     this.#scheduleSave();
   }
 
@@ -138,7 +146,7 @@ class CollectionPreferencesStore {
     const next = order === 'newest' ? 'newest' : 'oldest';
     if (this.commentSortOrder === next) return;
     this.commentSortOrder = next;
-    this.#dirtyCommentSort = true;
+    this.#pendingCommentSort = next;
     this.#scheduleSave();
   }
 
@@ -157,42 +165,44 @@ class CollectionPreferencesStore {
       this.#saveTimer = null;
     }
     if (this.#saving) {
-      // A save is already in flight; the new dirty scopes ride the next flush.
+      // A save is already in flight; the new pending writes ride the next flush.
       await this.#saving;
     }
-    const viewScopes = [...this.#dirtyViewScopes];
-    const filterScopes = [...this.#dirtyFilterScopes];
-    const commentSortDirty = this.#dirtyCommentSort;
-    if (viewScopes.length === 0 && filterScopes.length === 0 && !commentSortDirty) return;
+    const session = this.#session;
+    const viewState = this.#pendingViewState;
+    const savedFilters = this.#pendingSavedFilters;
+    const commentSort = this.#pendingCommentSort;
+    this.#pendingViewState = {};
+    this.#pendingSavedFilters = {};
+    this.#pendingCommentSort = null;
 
-    this.#dirtyViewScopes.clear();
-    this.#dirtyFilterScopes.clear();
-    this.#dirtyCommentSort = false;
+    const viewScopes = Object.keys(viewState);
+    const filterScopes = Object.keys(savedFilters);
+    if (viewScopes.length === 0 && filterScopes.length === 0 && commentSort === null) return;
 
     const body = {};
-    if (viewScopes.length > 0) {
-      body.view_state = Object.fromEntries(
-        viewScopes.map((scope) => [scope, this.viewState[scope] ?? null])
-      );
-    }
-    if (filterScopes.length > 0) {
-      body.saved_filters = Object.fromEntries(
-        filterScopes.map((scope) => [scope, this.savedFilters[scope] ?? null])
-      );
-    }
-    if (commentSortDirty) {
-      body.comment_sort_order = this.commentSortOrder;
-    }
+    if (viewScopes.length > 0) body.view_state = viewState;
+    if (filterScopes.length > 0) body.saved_filters = savedFilters;
+    if (commentSort !== null) body.comment_sort_order = commentSort;
 
     const save = keepalive
       ? userPreferences.update(body, { keepalive: true })
       : userPreferences.update(body);
     this.#saving = save
       .catch((error) => {
-        // Re-mark for retry; the local state stays authoritative.
-        for (const scope of viewScopes) this.#dirtyViewScopes.add(scope);
-        for (const scope of filterScopes) this.#dirtyFilterScopes.add(scope);
-        if (commentSortDirty) this.#dirtyCommentSort = true;
+        // Retry the exact failed patch, but only inside the session that made
+        // it. A newer pending value for the same scope wins over the retry.
+        if (session !== this.#session) return;
+        for (const scope of viewScopes) {
+          if (!(scope in this.#pendingViewState)) this.#pendingViewState[scope] = viewState[scope];
+        }
+        for (const scope of filterScopes) {
+          if (!(scope in this.#pendingSavedFilters))
+            this.#pendingSavedFilters[scope] = savedFilters[scope];
+        }
+        if (commentSort !== null && this.#pendingCommentSort === null) {
+          this.#pendingCommentSort = commentSort;
+        }
         console.warn('[collectionPreferences] failed to save preferences', error);
       })
       .finally(() => {

@@ -276,6 +276,14 @@
     applyPrefill(prefill);
   }
 
+  // Asset custom fields resolve their options through the portal's asset
+  // search, which evaluates the field's ql_query against the set the
+  // administrator exposed to portals.
+  function loadAssetOptions(assetSetId, _cqlQuery, search, fieldId) {
+    if (!portalSlug) return Promise.resolve({ assets: [], total: 0 });
+    return portal.searchAssets(portalSlug, { fieldId, assetSetId, query: search });
+  }
+
   function validateCurrentStep() {
     const message = validateFormStep({
       fields,
@@ -362,17 +370,12 @@
 
       success = true;
 
-      // Server-side SubmitToPortal already drops the draft on success, but
-      // call delete here too so callers polling drafts.list right after
-      // submission see a consistent view without depending on backend
-      // ordering. Best-effort.
-      if (portalSlug && draftsEnabled) {
-        portal.drafts.delete(portalSlug, requestType.id).catch((err) => {
-          if (err?.status !== 404) {
-            surfaceError(err, { silent: true, context: 'deleteDraftAfterSubmit' });
-          }
-        });
-      }
+      // Submission owns draft cleanup: SubmitToPortal deletes the submitted
+      // draft before it responds, so the client must not send a second delete.
+      // A blind retry could remove a newer draft started in another tab. If
+      // the server cleanup fails, the old draft remains and is resumed the
+      // next time the form opens; the explicit "discard draft" action still
+      // removes it.
 
       // Close modal after short delay. Upload failures keep it open so the
       // customer can read the retry hint before the timeline takes over.
@@ -501,6 +504,7 @@
             bind:customFieldValues
             {isDarkMode}
             idPrefix="request"
+            {loadAssetOptions}
           />
 
           <!-- Staged attachments (last step only). Uploads happen after the

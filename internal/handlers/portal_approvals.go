@@ -97,6 +97,11 @@ func (h *PortalHandler) GetApproval(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// Tell the UI whether to render the decision controls. The same linked
+	// customer resolution that admits the actor must drive this, otherwise a
+	// staff user assigned through a linked customer sees the approval but no
+	// buttons.
+	req.CanDecide = portalActorCanDecide(actor, req)
 	respondJSONOK(w, req)
 }
 
@@ -259,21 +264,31 @@ func portalServedWorkspace(served []int, workspaceID int) bool {
 // it resolves, prior approvers retain read access to the history.
 func portalActorCanViewRequest(actor portalApprovalActor, req *models.ApprovalRequest) bool {
 	if req.Status == models.ApprovalRequestStatusPending {
-		for _, si := range req.StepInstances {
-			if si.Status != models.ApprovalStepStatusPending || si.StartedAt == nil {
-				continue
-			}
-			for _, app := range si.Approvers {
-				if app.IsActive && portalActorMatchesApprover(actor, app) {
-					return true
-				}
-			}
-		}
-		return false
+		return portalActorCanDecide(actor, req)
 	}
 	for _, si := range req.StepInstances {
 		for _, app := range si.Approvers {
 			if portalActorMatchesApprover(actor, app) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// portalActorCanDecide reports whether the actor is in the active pool of a
+// currently pending step, i.e. whether the portal decision controls apply.
+// Historical approvers keep read access but must not be able to decide.
+func portalActorCanDecide(actor portalApprovalActor, req *models.ApprovalRequest) bool {
+	if req == nil || req.Status != models.ApprovalRequestStatusPending {
+		return false
+	}
+	for _, si := range req.StepInstances {
+		if si.Status != models.ApprovalStepStatusPending || si.StartedAt == nil {
+			continue
+		}
+		for _, app := range si.Approvers {
+			if app.IsActive && portalActorMatchesApprover(actor, app) {
 				return true
 			}
 		}

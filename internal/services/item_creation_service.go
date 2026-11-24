@@ -1,9 +1,10 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"log/slog"
 	"time"
 
 	"windshift/internal/database"
@@ -63,6 +64,10 @@ type ItemCreateInput struct {
 type ItemCreateResult struct {
 	Item              *models.Item
 	MandatoryTemplate MandatoryTemplateInfo
+	// ID is the row created by the transaction. It is always set, even when the
+	// post-commit detail read fails, so a caller can report and audit the stored
+	// item instead of retrying and duplicating it.
+	ID int64
 }
 
 // ItemCreationValidationError identifies validation performed before the
@@ -207,8 +212,9 @@ func (s *ItemCreationService) create(
 
 	var mandatoryTemplate MandatoryTemplateInfo
 	metadata := mergeItemEventMetadata(input.EventMetadata, itemEventMetadata(actorUserID, "application", actionContext))
-	itemID, err := CreateItem(s.db, ItemCreationParams{
+	itemID, snapshot, err := createItemWithSnapshot(context.Background(), s.db, ItemCreationParams{
 		WorkspaceID:           input.WorkspaceID,
+		WorkspaceKey:          validationResult.WorkspaceKey,
 		Title:                 input.Title,
 		Description:           input.Description,
 		StatusID:              input.StatusID,
@@ -242,18 +248,24 @@ func (s *ItemCreationService) create(
 		return nil, err
 	}
 
+	// The transaction's ID and snapshot are the create result. The joined read
+	// only decorates the response, so a failure must not turn a committed create
+	// into an error a caller would retry or leave callers without a row.
+	result := &ItemCreateResult{ID: itemID, Item: snapshot, MandatoryTemplate: mandatoryTemplate}
 	item, err := repository.NewItemRepository(s.db).FindByIDWithDetails(int(itemID))
 	if err != nil {
-		return nil, fmt.Errorf("load created item: %w", err)
+		slog.Error("load created item after commit", slog.Int64("item_id", itemID), slog.Any("error", err))
+	} else {
+		result.Item = item
 	}
 	// Imported facts are historical: skip the live notification/webhook/automation
 	// pipeline even though validation and persistence used the canonical path.
 	if !itemevents.IsImportOrigin(metadata.ActorKind, metadata.SourceKind) {
 		if contextual, ok := s.emitter.(contextualItemCreatedEmitter); ok && actionContext != nil {
-			contextual.EmitItemCreatedWithContext(item, actorUserID, *actionContext, actorUsername)
+			contextual.EmitItemCreatedWithContext(result.Item, actorUserID, *actionContext, actorUsername)
 		} else if s.emitter != nil {
-			s.emitter.EmitItemCreated(item, actorUserID, actorUsername)
+			s.emitter.EmitItemCreated(result.Item, actorUserID, actorUsername)
 		}
 	}
-	return &ItemCreateResult{Item: item, MandatoryTemplate: mandatoryTemplate}, nil
+	return result, nil
 }

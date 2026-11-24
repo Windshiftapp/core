@@ -934,8 +934,15 @@ func validateEnabledChannel(channel *models.Channel, config *models.ChannelConfi
 		if channel.Type == "form" {
 			slug, workspaces = config.FormSlug, config.FormWorkspaceIDs
 		}
-		if !channelSlugPattern.MatchString(slug) || len(workspaces) == 0 {
-			return channelConfigInvalid("Enabled public channels require a valid slug and at least one target workspace")
+		if !channelSlugPattern.MatchString(slug) {
+			return channelConfigInvalid("Enabled public channels require a valid slug")
+		}
+		// A board-only portal needs no target workspace; a form channel, or a
+		// portal with request forms enabled, still does. This mirrors
+		// preparePublicChannelEnable so an enabled channel passes the same rule
+		// on later edits that it passed when it was enabled.
+		if len(workspaces) == 0 && (channel.Type != "portal" || config.PortalModuleEnabled("forms")) {
+			return channelConfigInvalid("Enabled public channels require at least one target workspace")
 		}
 	case "webhook":
 		if strings.TrimSpace(config.WebhookURL) == "" {

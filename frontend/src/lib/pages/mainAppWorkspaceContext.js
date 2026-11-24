@@ -53,14 +53,12 @@ export function getMainAppWorkspaceRedirect(currentRoute, activeWorkspace) {
   return `${base}/${activeWorkspace.default_view || 'board'}`;
 }
 
-// Route params that only pick a section inside a shell that stays mounted
-// (sidebar + content pane). The shell swaps its own content for these, so
-// they must not change the navigation identity: remounting the shell resets
-// its sidebar scroll and state on every section click (#542).
+// These params change the shell's content without remounting its sidebar.
 const SHELL_SECTION_PARAMS = {
   admin: ['tab', 'categoryId', 'type'],
   'delegated-admin': ['tab'],
   'team-detail': ['section'],
+  'workspace-pages': ['pageId'],
 };
 
 export function mainAppNavigationIdentity(route, personalWorkspaceId) {

@@ -43,6 +43,11 @@ export function compactTarget(experience, route, modules) {
   if (suffix === '/kb') return { kind: 'knowledge-base' };
   if (suffix === '/profile') return { kind: 'profile' };
   if (params.requestTypeId) return { kind: 'forms', formId: Number(params.requestTypeId) };
+  // Legacy ?request-type= deep links (hub cards, bookmarks) still open the
+  // form instead of falling through to the default module.
+  const legacyFormId = Number(query['request-type']);
+  if (Number.isInteger(legacyFormId) && legacyFormId > 0)
+    return { kind: 'forms', formId: legacyFormId };
   if (query.module || ['requests', 'approvals', 'drafts'].includes(query.view))
     return { kind: query.module || query.view };
   const fallback = { kind: modules[0]?.id };

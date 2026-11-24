@@ -1,4 +1,4 @@
-import { fetchAPI } from './core.js';
+import { fetchAPI, fetchV2Data } from './core.js';
 
 function diagnosticsQuery(endpoint, opts, overrides = {}) {
   const params = new URLSearchParams();
@@ -187,6 +187,20 @@ export function getCacheMemory() {
 /** Durable health for scheduled repository sync and pull-request refresh operations. */
 export function getSCMConnectionHealth() {
   return fetchAPI('/admin/diagnostics/scm-connections');
+}
+
+/**
+ * Proxy trust policy and the private peers this replica has seen. Answers
+ * whether the installation is affected by the private-range client-IP finding
+ * and whether an unlisted proxy is having its forwarding headers ignored.
+ *
+ * @returns {Promise<{use_proxy: boolean, proxy_auto_detected: boolean,
+ *   trust_mode: string, additional_proxies: string[], invalid_proxies: string[],
+ *   affected: boolean, status: string, summary: string, hint?: string,
+ *   private_clients: Array<object>, unlisted_proxies: Array<object>}>}
+ */
+export function getProxyTrust() {
+  return fetchV2Data('/admin/diagnostics/proxy-trust');
 }
 
 /**

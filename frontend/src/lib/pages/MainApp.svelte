@@ -435,7 +435,10 @@
           >
             {#if navigationLifetime.ready}
               {#key navigationLifetime.generation}
-                <MainRouteContent view={effectiveView} route={$currentRoute} {lazyComponents} />
+                <!-- Remount the wiki editor so it flushes its draft without resetting the shell. -->
+                {#key effectiveView === 'workspace-pages' ? $currentRoute.params.pageId : null}
+                  <MainRouteContent view={effectiveView} route={$currentRoute} {lazyComponents} />
+                {/key}
               {/key}
             {/if}
           </main>

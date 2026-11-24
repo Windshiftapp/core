@@ -2,13 +2,11 @@ import { actions } from '../api/actions.js';
 import { hierarchyLevels as hierarchyLevelsApi, links as linksApi } from '../api/configuration.js';
 import { items } from '../api/items.js';
 import { getDiagrams } from '../api/misc.js';
-import { customerOrganisations } from '../api/portal.js';
 import { time } from '../api/time.js';
 import { childItemTypesForParent } from '../utils/hierarchy.js';
-import { buildDetailScreenFieldConfig } from '../utils/screenFields.js';
+import { buildDetailScreenFieldConfig, isMainColumnScreenField } from '../utils/screenFields.js';
 import { authStore } from './auth.svelte.js';
 import { workspaceDataStore } from './workspaceDataStore.svelte.js';
-import { workspacesStore } from './workspaces.svelte.js';
 
 const FIELD_MAP = {
   description: 'description',
@@ -107,9 +105,6 @@ class ItemDetailStore {
   #diagramsPromise = null;
   #diagramsPromiseItemId = null;
   #diagramsLoadedItemId = null;
-  #timeModalDataController = null;
-  #timeModalDataPromise = null;
-  #timeModalDataLoaded = false;
 
   // === Current Item ===
   item = $state(null);
@@ -181,10 +176,6 @@ class ItemDetailStore {
   timeProjects = $state([]);
   timeWorklogs = $state([]);
   timeWorklogsLoading = $state(false);
-  timeModalDataLoading = $state(false);
-  customers = $state([]);
-  workItems = $state([]);
-  workspaces = $state([]);
   // Cache the optional child-item rollup for the current item.
   includeChildItems = $state(false);
   timeRollup = $state(null);
@@ -538,7 +529,6 @@ class ItemDetailStore {
     this.#linksController?.abort();
     this.#worklogsController?.abort();
     this.#diagramsController?.abort();
-    this.#timeModalDataController?.abort();
     this.item = null;
     this.#refreshController = null;
     this.#refreshInFlight = false;
@@ -588,48 +578,6 @@ class ItemDetailStore {
         }
       });
     this.#worklogsPromise = promise;
-    return promise;
-  }
-
-  // Load TimeLogModal-only picker data lazily and once.
-  async loadTimeModalData() {
-    if (this.#timeModalDataLoaded) return;
-    if (this.#timeModalDataPromise) return this.#timeModalDataPromise;
-
-    const controller = new AbortController();
-    this.#timeModalDataController = controller;
-    this.timeModalDataLoading = true;
-    const requestOptions = { signal: controller.signal };
-    const fallback = (promise, label) =>
-      promise.catch((err) => {
-        if (isAbortError(err)) throw err;
-        console.warn(`Failed to load ${label} for time logging:`, err);
-        return [];
-      });
-
-    const promise = Promise.all([
-      fallback(customerOrganisations.getAll({}, requestOptions), 'customers'),
-      fallback(items.getAll({ limit: 100 }, requestOptions), 'work items'),
-      fallback(workspacesStore.load(), 'workspaces'),
-    ])
-      .then(([customers, workItems, workspaces]) => {
-        if (this.#timeModalDataController !== controller || controller.signal.aborted) return;
-        this.customers = customers || [];
-        this.workItems = workItems?.data ?? [];
-        this.workspaces = workspaces || [];
-        this.#timeModalDataLoaded = true;
-      })
-      .catch((err) => {
-        if (!isAbortError(err)) console.error('Failed to load time-log modal data:', err);
-      })
-      .finally(() => {
-        if (this.#timeModalDataController === controller) {
-          this.#timeModalDataController = null;
-          this.#timeModalDataPromise = null;
-          this.timeModalDataLoading = false;
-        }
-      });
-    this.#timeModalDataPromise = promise;
     return promise;
   }
 
@@ -930,6 +878,24 @@ class ItemDetailStore {
     }
   }
 
+  /**
+   * End custom field edits owned by the sidebar, which closes them whenever
+   * another field starts editing. Main-column fields keep their editor (and
+   * unsaved draft) until their own Save/Cancel, like the description.
+   */
+  cancelSidebarCustomFieldEditing() {
+    const mainColumnFieldIds = new Set(
+      this.workspaceScreenFields
+        .filter(isMainColumnScreenField)
+        .map((field) => String(field.field_identifier))
+    );
+    const active = {};
+    for (const [fieldId, isActive] of Object.entries(this.editing.customFields.active || {})) {
+      if (isActive && mainColumnFieldIds.has(String(fieldId))) active[fieldId] = true;
+    }
+    this.editing.customFields.active = active;
+  }
+
   cancelEditing(field) {
     if (field.startsWith('custom_field_')) {
       const fieldId = field.replace('custom_field_', '');
@@ -954,6 +920,7 @@ class ItemDetailStore {
   ) {
     if (!this.item) return;
     const token = this.#loadToken;
+    const itemId = this.item.id;
     if (
       !this.#saveOwner ||
       this.#saveOwner.token !== token ||
@@ -989,7 +956,12 @@ class ItemDetailStore {
       );
       sync();
       await pending;
-      if (this.#saveOwner === owner && this.#loadToken === token) this.cancelEditing(field);
+      // A live reconcile can reload the same item while the save is in flight
+      // and bump #loadToken. The committed field must still close its editor;
+      // only navigating to a different item should leave editing untouched.
+      if (this.#saveOwner === owner && String(this.item?.id) === String(itemId)) {
+        this.cancelEditing(field);
+      }
     } finally {
       sync();
       if (this.#saveOwner === owner && this.#loadToken === token) this.#runPendingRefresh();
@@ -1509,7 +1481,6 @@ class ItemDetailStore {
     this.#linksController?.abort();
     this.#worklogsController?.abort();
     this.#diagramsController?.abort();
-    this.#timeModalDataController?.abort();
     this.#loadController = null;
     this.#refreshController = null;
     this.#refreshInFlight = false;
@@ -1522,9 +1493,6 @@ class ItemDetailStore {
     this.#diagramsPromise = null;
     this.#diagramsPromiseItemId = null;
     this.#diagramsLoadedItemId = null;
-    this.#timeModalDataController = null;
-    this.#timeModalDataPromise = null;
-    this.#timeModalDataLoaded = false;
     this.item = null;
     this.itemId = null;
     this.workspaceId = null;
@@ -1567,13 +1535,9 @@ class ItemDetailStore {
     this.timeProjects = [];
     this.timeWorklogs = [];
     this.timeWorklogsLoading = false;
-    this.timeModalDataLoading = false;
     this.includeChildItems = false;
     this.timeRollup = null;
     this.timeRollupLoading = false;
-    this.customers = [];
-    this.workItems = [];
-    this.workspaces = [];
     this.diagrams = [];
     this.loadingDiagrams = false;
     this.diagramsLoaded = false;

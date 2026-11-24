@@ -158,6 +158,34 @@ func appendHierarchyContext(lines []string, parent *models.Item, parentComments 
 	return lines
 }
 
+// formatSCMLinkSummary renders one source-control link as a briefing line,
+// e.g. "- PR #12: Fix importer (open)", "- Branch: feature/x", or
+// "- Commit abc1234: Fix importer". Missing titles and states are omitted.
+func formatSCMLinkSummary(link repository.ItemSCMLinkSummary) string {
+	var line string
+	switch link.LinkType {
+	case models.SCMLinkTypePullRequest:
+		line = "- PR #" + link.ExternalID
+	case models.SCMLinkTypeBranch:
+		return "- Branch: " + link.ExternalID
+	case models.SCMLinkTypeCommit:
+		sha := link.ExternalID
+		if len(sha) > 7 {
+			sha = sha[:7]
+		}
+		line = "- Commit " + sha
+	default:
+		line = fmt.Sprintf("- %s %s", link.LinkType, link.ExternalID)
+	}
+	if link.Title != "" {
+		line += ": " + link.Title
+	}
+	if link.State != "" {
+		line += " (" + link.State + ")"
+	}
+	return line
+}
+
 // CatchMeUp generates a summary briefing for an item.
 func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
 	item, llmClient, ok := h.loadItemWithPermission(w, r, "catch_me_up")
@@ -299,7 +327,7 @@ func (h *AIHandler) CatchMeUp(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		scmLinks := make([]string, 0, len(scmRows))
 		for _, link := range scmRows {
-			scmLinks = append(scmLinks, fmt.Sprintf("- PR: %s (branch: %s, state: %s)", link.Title, link.BranchName, link.State))
+			scmLinks = append(scmLinks, formatSCMLinkSummary(link))
 		}
 		if len(scmLinks) > 0 {
 			contextLines = append(contextLines, "\nSource control:")

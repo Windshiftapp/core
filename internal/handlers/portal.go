@@ -17,7 +17,6 @@ import (
 	"windshift/internal/blobstore"
 	"windshift/internal/database"
 	"windshift/internal/fileserve"
-	"windshift/internal/itemevents"
 	"windshift/internal/markdown"
 	"windshift/internal/middleware"
 	"windshift/internal/models"
@@ -30,8 +29,6 @@ import (
 
 // Portal constants
 const (
-	defaultItemStatus = "open" // Default status for new portal submissions
-
 	// Request body caps for the public (unauthenticated) portal decode paths.
 	// Knowledge-base search carries only a short query string; submissions can
 	// include a description plus custom fields, so they get more headroom.
@@ -150,7 +147,11 @@ func (h *PortalHandler) getPortalCustomerID(ctx context.Context, r *http.Request
 		}
 	}
 
-	// Fall back to internal user session (backward compatible)
+	// Fall back to internal user session (backward compatible). A handler
+	// without a session manager has no internal identity to resolve.
+	if h.sessionManager == nil {
+		return nil, fmt.Errorf("authentication required")
+	}
 	sessionToken, err := h.sessionManager.GetSessionFromRequest(r)
 	if err != nil {
 		return nil, fmt.Errorf("authentication required")
@@ -355,6 +356,23 @@ func applyRequestTypeVisibility(rt *models.RequestType, groups, orgs sql.NullStr
 	return nil
 }
 
+// requestTypeVisibleTo decodes a stored request-type audience and reports
+// whether the viewer may see it. A malformed audience list is an error, so the
+// caller hides the row rather than treating it as unrestricted. This is the
+// single audience predicate for catalog, hub and report projections.
+func requestTypeVisibleTo(groups, orgs sql.NullString, userGroupIDs []int, customerOrgID *int) (bool, error) {
+	groupIDs, err := unmarshalIntIDs(groups)
+	if err != nil {
+		return false, err
+	}
+	orgIDs, err := unmarshalIntIDs(orgs)
+	if err != nil {
+		return false, err
+	}
+	rt := models.RequestType{VisibilityGroupIDs: groupIDs, VisibilityOrgIDs: orgIDs}
+	return rt.IsVisibleTo(userGroupIDs, customerOrgID), nil
+}
+
 // NewPortalHandler creates a new portal handler
 func NewPortalHandler(db database.Database, sessionManager *auth.SessionManager, portalSessionManager *auth.PortalSessionManager, ipExtractor *utils.IPExtractor, storage *blobstore.Store) *PortalHandler {
 	var attachments *services.ItemAttachmentService
@@ -506,15 +524,12 @@ func (h *PortalHandler) resolvePortalBySlugTimeout(w http.ResponseWriter, r *htt
 }
 
 // callerVisibility resolves the group and organisation IDs that gate request
-// type and asset report visibility for the current caller (internal user
-// groups, plus the org when the caller is a portal customer).
-func (h *PortalHandler) callerVisibility(ctx context.Context, r *http.Request) (userGroupIDs []int, customerOrgID *int) {
-	_, portalCustomerID := h.getAuthFromContext(r)
-	userGroupIDs = h.getInternalUserGroupIDs(ctx, r)
-	if portalCustomerID != nil {
-		customerOrgID = h.getPortalCustomerOrgID(ctx, *portalCustomerID)
-	}
-	return userGroupIDs, customerOrgID
+// type and asset report visibility for the current caller. It uses the same
+// cookie-aware context as the catalog so a form offered by the catalog opens
+// for the same viewer (internal groups plus the bound portal session's org).
+func (h *PortalHandler) callerVisibility(ctx context.Context, r *http.Request, channelID int) (userGroupIDs []int, customerOrgID *int) {
+	vc := h.getPortalVisibilityContext(ctx, r, channelID)
+	return vc.userGroupIDs, vc.customerOrgID
 }
 
 // resolveVisibleRequestType loads a request type and enforces the channel and
@@ -527,7 +542,7 @@ func (h *PortalHandler) resolveVisibleRequestType(ctx context.Context, w http.Re
 		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Request type not found"))
 		return nil, false
 	}
-	userGroupIDs, customerOrgID := h.callerVisibility(ctx, r)
+	userGroupIDs, customerOrgID := h.callerVisibility(ctx, r, channelID)
 	if !rt.IsVisibleTo(userGroupIDs, customerOrgID) {
 		respondError(w, r, restapi.NewAPIError(http.StatusNotFound, restapi.ErrCodeNotFound, "Request type not found"))
 		return nil, false
@@ -711,13 +726,13 @@ func (h *PortalHandler) loadPortalRequestTypes(ctx context.Context, channelID in
 		rt.WorkspaceName = workspaceName.String
 		rt.WorkspaceKey = workspaceKey.String
 
-		if err := applyRequestTypeVisibility(&rt, visibilityGroupIDs, visibilityOrgIDs); err != nil {
+		allowed, err := requestTypeVisibleTo(visibilityGroupIDs, visibilityOrgIDs, vc.userGroupIDs, vc.customerOrgID)
+		if err != nil {
 			slog.Error("hiding request type with invalid visibility configuration",
 				slog.String("component", "portal"), slog.Int("request_type_id", rt.ID), slog.Any("error", err))
 			continue
 		}
-
-		if rt.IsVisibleTo(vc.userGroupIDs, vc.customerOrgID) {
+		if allowed {
 			// Visibility principals are internal routing data; the public portal
 			// contract exposes only what the form needs (mirrors
 			// PublicAssetReport, which drops the same IDs).
@@ -794,6 +809,18 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Asset custom fields reference assets in an administrator-exposed set,
+	// which the generic custom-field validator cannot authorize. Reject ids
+	// outside the field's configured set, a set without a portal grant, or an
+	// asset the field's own query excludes before creating the item. The filter
+	// identity matches the picker (including a linked customer on an internal
+	// session); item attribution still uses getAuthFromContext.
+	filterCustomerID, filterOrgID := h.portalAssetFilterIdentity(ctx, r, channel.ID)
+	if err := h.validatePortalAssetCustomFields(ctx, filterCustomerID, filterOrgID, validationResult.CustomFieldValues); err != nil {
+		respondValidationError(w, r, err.Error())
+		return
+	}
+
 	// Title fallback: when the request type hides the title field from the
 	// form, render its title_template. Items have a NOT NULL title, so we
 	// reject when the template is missing or renders to empty.
@@ -837,33 +864,6 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 		targetWorkspaceID = config.PortalWorkspaceIDs[0]
 	}
 
-	initialStatus := defaultItemStatus // Default fallback status
-	if validationResult.ItemTypeID != nil {
-		var status string
-		status, err = services.GetInitialStatusForItemType(h.db, *validationResult.ItemTypeID)
-		if err != nil {
-			slog.Warn("could not determine initial status for item type", slog.String("component", "portal"), slog.Int("item_type_id", *validationResult.ItemTypeID), slog.Any("error", err))
-		} else {
-			initialStatus = status
-		}
-	}
-	customFieldsJSON, err := json.Marshal(validationResult.CustomFieldValues)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-	virtualFieldsJSON, err := json.Marshal(validationResult.VirtualFieldValues)
-	if err != nil {
-		respondInternalError(w, r, err)
-		return
-	}
-
-	eventMetadata := itemevents.System("portal")
-	if portalCustomerID != nil {
-		eventMetadata = itemevents.PortalCustomer(*portalCustomerID, "portal")
-	} else if authenticatedUserID != nil {
-		eventMetadata = itemevents.User(*authenticatedUserID, "portal")
-	}
 	// Org sharing (WI-1139): the creator's opt-in is applied only in
 	// requester_choice mode. The item flag is written once and never updated.
 	portalOrgShared := false
@@ -876,43 +876,25 @@ func (h *PortalHandler) SubmitToPortal(w http.ResponseWriter, r *http.Request) {
 		portalOrgShared = sharing.RequestSharing == models.OrgRequestSharingRequesterChoice
 	}
 
-	itemID, err := services.CreateItem(h.db, services.ItemCreationParams{
-		WorkspaceID:             targetWorkspaceID,
-		Title:                   submission.Title,
-		Description:             submission.Description,
-		Status:                  initialStatus,
-		ItemTypeID:              validationResult.ItemTypeID,
-		Priority:                "medium",
-		CreatorID:               authenticatedUserID,
-		CreatorPortalCustomerID: portalCustomerID, // nil for internal users, set for portal customers
-		ChannelID:               &channel.ID,
-		RequestTypeID:           submission.RequestTypeID,
-		PortalOrgShared:         portalOrgShared,
-		CustomFieldValuesJSON:   string(customFieldsJSON),
-		VirtualFieldDataJSON:    string(virtualFieldsJSON),
-		EventMetadata:           eventMetadata,
+	itemID, err := services.CreateSubmittedItem(h.db, services.SubmittedItemInput{
+		WorkspaceID:       targetWorkspaceID,
+		Title:             submission.Title,
+		Description:       submission.Description,
+		ValidationResult:  validationResult,
+		CreatorID:         authenticatedUserID,
+		CreatorCustomerID: portalCustomerID,
+		ChannelID:         channel.ID,
+		RequestTypeID:     submission.RequestTypeID,
+		PortalOrgShared:   portalOrgShared,
+		Source:            "portal",
+		LogComponent:      "portal",
 	})
 	if err != nil {
 		respondInternalError(w, r, err)
 		return
 	}
 
-	if h.eventCoordinator != nil {
-		fullItem, fetchErr := repository.NewItemRepository(h.db).FindByIDWithDetailsContext(ctx, int(itemID))
-		if fetchErr != nil {
-			slog.Error("failed to hydrate portal-created item for side effects", slog.Int64("item_id", itemID), slog.Any("error", fetchErr))
-		} else {
-			actorID := 0
-			if authenticatedUserID != nil {
-				actorID = *authenticatedUserID
-			}
-			h.eventCoordinator.EmitItemCreated(fullItem, actorID)
-		}
-	}
-
-	if _, err := h.db.ExecWriteContext(ctx, `UPDATE channels SET last_activity = ? WHERE id = ?`, time.Now(), channel.ID); err != nil {
-		slog.Warn("failed to update channel last_activity", slog.String("component", "portal"), slog.Int("channel_id", channel.ID), slog.Any("error", err))
-	}
+	services.DispatchSubmittedItemSideEffects(ctx, h.db, h.eventCoordinator, itemID, authenticatedUserID, channel.ID, "portal", "portal")
 
 	// Drop any in-progress draft for this request type — the user just
 	// submitted, so the saved state is no longer interesting. Best-effort:
@@ -973,23 +955,36 @@ func (h *PortalHandler) SearchKnowledgeBase(w http.ResponseWriter, r *http.Reque
 	}
 
 	data := []map[string]any{}
+	configuredSources, failedSources := 0, 0
 	var docmostErr *restapi.APIError
 	if docmostConfigured {
+		configuredSources++
 		docmostErr = h.searchDocmostKnowledgeBase(ctx, config, searchRequest.Query, &data)
-		if docmostErr != nil && !pagesWired {
-			respondError(w, r, docmostErr)
-			return
-		}
 		if docmostErr != nil {
+			failedSources++
 			slog.Warn("docmost knowledge base search failed; serving workspace page results only",
 				slog.String("component", "portal"), slog.Any("error", docmostErr))
 		}
 	}
+	var pagesErr error
 	if pagesWired {
-		if err := h.appendWorkspacePageHits(config, searchRequest.Query, &data); err != nil {
+		configuredSources++
+		if pagesErr = h.appendWorkspacePageHits(config, searchRequest.Query, &data); pagesErr != nil {
+			failedSources++
 			slog.Error("failed to search published workspace pages",
-				slog.String("component", "portal"), slog.Any("error", err))
+				slog.String("component", "portal"), slog.Any("error", pagesErr))
 		}
+	}
+	// A failed source must not be reported as "no matches". If every
+	// configured source failed, surface the failure; otherwise keep the
+	// partial results from the sources that succeeded.
+	if knowledgeBaseSearchFailed(configuredSources, failedSources) {
+		if docmostErr != nil {
+			respondError(w, r, docmostErr)
+		} else {
+			respondInternalError(w, r, pagesErr)
+		}
+		return
 	}
 
 	h.recordKBSearch(r, channel.ID, searchRequest.Query, len(data))
@@ -1026,9 +1021,17 @@ func (h *PortalHandler) recordKBSearch(r *http.Request, channelID int, query str
 	}
 }
 
-// knowledgeBasePageSearchLimit caps how many published workspace pages one
+// knowledgeBaseSearchLimit caps how many published workspace pages one
 // search returns.
 const knowledgeBasePageSearchLimit = 25
+
+// knowledgeBaseSearchFailed reports whether a knowledge-base search should be
+// surfaced as an error. All configured sources failing is an error; a source
+// that succeeded with no matches is a real empty result, and one failed source
+// among several still yields partial results.
+func knowledgeBaseSearchFailed(configuredSources, failedSources int) bool {
+	return configuredSources > 0 && failedSources == configuredSources
+}
 
 // searchDocmostKnowledgeBase proxies a search to the connected Docmost
 // share and appends its result items (tagged source "docmost") to data.

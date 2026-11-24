@@ -206,6 +206,7 @@ export default {
     inlineCode: 'Встроенный код',
     bulletList: 'Маркированный список',
     numberedList: 'Нумерованный список',
+    taskList: 'Список задач',
     insertImage: 'Вставить изображение',
     userNotFound: 'Пользователь не найден',
     multipleUsersMatch: 'Совпадает несколько пользователей',

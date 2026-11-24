@@ -21,6 +21,39 @@ export function parseChannelConfig(config) {
   return config;
 }
 
+// tryParseChannelConfig is the non-throwing form used by editors: a corrupt
+// config returns null so the caller can refuse to render rather than overwrite
+// it with whatever an empty form produces on save.
+export function tryParseChannelConfig(config) {
+  try {
+    return parseChannelConfig(config);
+  } catch {
+    return null;
+  }
+}
+
+// portalChannelFormData maps a stored portal channel config to the editable
+// portal fields. Shared by the channel modal and the portal settings page so
+// both editors read the same stored shape (including null modules and joined
+// domain strings).
+export function portalChannelFormData(config, channel) {
+  return {
+    slug: config.portal_slug || '',
+    workspace_ids: config.portal_workspace_ids || [],
+    enabled: channel?.status === 'enabled',
+    title: config.portal_title || '',
+    description: config.portal_description || '',
+    registration_mode: config.portal_registration_mode === 'manual' ? 'manual' : 'open',
+    presentation: config.portal_presentation || 'classic',
+    modules: config.portal_modules ?? null,
+    navigation: config.portal_navigation || [],
+    default_module: config.portal_default_module || '',
+    allowed_domains: Array.isArray(config.portal_allowed_domains)
+      ? config.portal_allowed_domains.join(', ')
+      : '',
+  };
+}
+
 /**
  * Email channels whose tickets surface in a portal. An intake linked to the
  * portal (portal_channel_id) is the only link since WI-1644. The channel list

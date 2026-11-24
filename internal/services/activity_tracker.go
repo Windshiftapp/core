@@ -66,6 +66,7 @@ type ActivityTracker struct {
 	pendingWorkspaceVisits map[string]*WorkspaceVisit // key: userID:workspaceID
 	pendingItemActivities  map[string]*ItemActivity   // key: userID:itemID:activityType
 	pendingMu              sync.RWMutex
+	flushRevision          uint64 // guarded by pendingMu
 
 	// Cache statistics
 	hits    int64
@@ -272,32 +273,38 @@ func (at *ActivityTracker) TrackItemActivity(userID, itemID int, activityType Ac
 
 // GetUserActivity retrieves comprehensive activity data for a user
 func (at *ActivityTracker) GetUserActivity(userID int) (*UserActivityCache, error) {
-	// Try cache first
-	cached, err := at.getUserActivityCache(userID)
-	if err == nil {
-		atomic.AddInt64(&at.hits, 1)
-		// Merge pending activities before returning
-		at.mergePendingActivities(userID, cached)
-		return cached, nil
-	}
+	for {
+		at.pendingMu.RLock()
+		revision := at.flushRevision
+		cached, err := at.getUserActivityCache(userID)
+		if err == nil {
+			atomic.AddInt64(&at.hits, 1)
+			at.mergePendingActivities(userID, cached)
+			at.pendingMu.RUnlock()
+			return cached, nil
+		}
+		at.pendingMu.RUnlock()
 
-	// Cache miss - load from database
-	atomic.AddInt64(&at.misses, 1)
-	result, err := at.loadUserActivityFromDB(userID)
-	if err != nil {
-		return nil, err
+		atomic.AddInt64(&at.misses, 1)
+		result, err := at.loadUserActivityFromDB(userID)
+		if err != nil {
+			return nil, err
+		}
+		at.pendingMu.RLock()
+		// A concurrent flush may have retired pending data this snapshot missed.
+		if revision != at.flushRevision {
+			at.pendingMu.RUnlock()
+			continue
+		}
+		_ = at.storeUserActivityCache(userID, result)
+		at.mergePendingActivities(userID, result)
+		at.pendingMu.RUnlock()
+		return result, nil
 	}
-
-	// Merge pending activities
-	at.mergePendingActivities(userID, result)
-	return result, nil
 }
 
-// mergePendingActivities adds pending visits and item activity to a cached result.
+// mergePendingActivities adds pending activity. The caller holds pendingMu.
 func (at *ActivityTracker) mergePendingActivities(userID int, cached *UserActivityCache) {
-	at.pendingMu.RLock()
-	defer at.pendingMu.RUnlock()
-
 	for _, visit := range at.pendingWorkspaceVisits {
 		if visit.UserID != userID {
 			continue
@@ -476,9 +483,6 @@ func (at *ActivityTracker) loadUserActivityFromDB(userID int) (*UserActivityCach
 		cached.ItemWatches = itemIDs
 	}
 
-	// Store in cache
-	_ = at.storeUserActivityCache(userID, cached)
-
 	return cached, nil
 }
 
@@ -547,9 +551,10 @@ func (at *ActivityTracker) flushWorkspaceVisitBatch(ctx context.Context, visits 
 		return fmt.Errorf("commit workspace visits: %w", err)
 	}
 
-	// Clear flushed entries from shadow map
+	users := make(map[int]struct{})
 	at.pendingMu.Lock()
 	for _, visit := range visits {
+		users[visit.UserID] = struct{}{}
 		key := fmt.Sprintf("%d:%d", visit.UserID, visit.WorkspaceID)
 		if existing, ok := at.pendingWorkspaceVisits[key]; ok {
 			if !existing.VisitedAt.After(visit.VisitedAt) {
@@ -557,6 +562,7 @@ func (at *ActivityTracker) flushWorkspaceVisitBatch(ctx context.Context, visits 
 			}
 		}
 	}
+	at.invalidateFlushedUsers(users)
 	at.pendingMu.Unlock()
 
 	atomic.AddInt64(&at.flushes, 1)
@@ -599,9 +605,10 @@ func (at *ActivityTracker) flushItemActivityBatch(ctx context.Context, activitie
 		return fmt.Errorf("commit item activities: %w", err)
 	}
 
-	// Clear flushed entries from shadow map
+	users := make(map[int]struct{})
 	at.pendingMu.Lock()
 	for _, activity := range activities {
+		users[activity.UserID] = struct{}{}
 		key := fmt.Sprintf("%d:%d:%s", activity.UserID, activity.ItemID, activity.ActivityType)
 		if existing, ok := at.pendingItemActivities[key]; ok {
 			if !existing.ActivityAt.After(activity.ActivityAt) {
@@ -609,10 +616,20 @@ func (at *ActivityTracker) flushItemActivityBatch(ctx context.Context, activitie
 			}
 		}
 	}
+	at.invalidateFlushedUsers(users)
 	at.pendingMu.Unlock()
 
 	atomic.AddInt64(&at.flushes, 1)
 	return nil
+}
+
+// Retire stale cache snapshots together with flushed shadow entries.
+// The caller holds pendingMu.
+func (at *ActivityTracker) invalidateFlushedUsers(users map[int]struct{}) {
+	at.flushRevision++
+	for userID := range users {
+		_ = at.InvalidateUserCache(userID)
+	}
 }
 
 // CleanupExpiredActivities removes expired activity records

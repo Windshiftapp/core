@@ -261,6 +261,24 @@ func (h *PortalHandler) ExecuteAssetReport(w http.ResponseWriter, r *http.Reques
 				}
 			}
 		}
+		// Asset fields carry a reference the picker scoped to a granted set and
+		// the field's own query. Validate the submitted reference with the same
+		// policy before substituting it into the report query. Only custom fields
+		// bound to this report are candidates: a virtual field with a numeric
+		// identifier must not be looked up as a global custom-field id.
+		submitted := make(map[string]any, len(fields))
+		for _, f := range fields {
+			if f.FieldType != "custom" {
+				continue
+			}
+			if value, ok := formValues[f.FieldIdentifier]; ok {
+				submitted[f.FieldIdentifier] = value
+			}
+		}
+		if err := h.validatePortalAssetCustomFields(ctx, portalCustomerID, customerOrgID, submitted); err != nil {
+			respondValidationError(w, r, err.Error())
+			return
+		}
 		cqlQuery = substituteFormFields(cqlQuery, formValues)
 	}
 
@@ -425,15 +443,16 @@ func (h *PortalHandler) portalExposedSetReports(
 	return bySet, nil
 }
 
-// portalReportCQLSQL evaluates a report's CQL with the current portal context
-// functions substituted and returns the SQL fragment plus args. An empty CQL
+// portalAssetCQLSQL evaluates an admin-authored asset CQL query (a report's
+// query or an asset custom field's ql_query) with the current portal context
+// functions substituted and returns the SQL fragment plus args. An empty query
 // yields an empty fragment that matches every asset in the set.
-func (h *PortalHandler) portalReportCQLSQL(
+func (h *PortalHandler) portalAssetCQLSQL(
 	ctx context.Context,
-	report *models.AssetReport,
+	setID int,
+	query string,
 	portalCustomerID, customerOrgID *int,
 ) (cqlSQL string, arguments []any, err error) {
-	query := report.CQLQuery
 	if strings.TrimSpace(query) == "" {
 		return "", nil, nil
 	}
@@ -461,7 +480,7 @@ func (h *PortalHandler) portalReportCQLSQL(
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to load workspace mapping: %w", err)
 	}
-	customFieldMap, err := assetRepo.GetCQLCustomFieldMap(report.AssetSetID)
+	customFieldMap, err := assetRepo.GetCQLCustomFieldMap(setID)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to load custom field mapping: %w", err)
 	}
@@ -471,6 +490,15 @@ func (h *PortalHandler) portalReportCQLSQL(
 	}
 	evaluator := cql.NewAssetEvaluator(setMap, workspaceMap, customFieldMap, itemCustomFieldMap, h.db.GetDriverName())
 	return evaluator.EvaluateToSQL(query)
+}
+
+// portalReportCQLSQL evaluates a report's CQL against its own set.
+func (h *PortalHandler) portalReportCQLSQL(
+	ctx context.Context,
+	report *models.AssetReport,
+	portalCustomerID, customerOrgID *int,
+) (cqlSQL string, arguments []any, err error) {
+	return h.portalAssetCQLSQL(ctx, report.AssetSetID, report.CQLQuery, portalCustomerID, customerOrgID)
 }
 
 // resolvePortalAsset authorizes and projects a single asset. It returns nil
@@ -515,11 +543,183 @@ func (h *PortalHandler) resolvePortalAsset(
 	return nil, nil
 }
 
+// assetFieldOptions is the stored configuration for an asset custom field.
+type assetFieldOptions struct {
+	AssetSetID int    `json:"asset_set_id"`
+	QLQuery    string `json:"ql_query"`
+	// CQLQuery is a legacy alias older fields still carry; the picker honors
+	// it, so the server must too.
+	CQLQuery string `json:"cql_query"`
+}
+
+// query resolves the configured filter. cql_query is the legacy alias the
+// shared picker still prefers; ql_query is the canonical key for newly written
+// fields. Both are honored so an unedited legacy field keeps its restriction.
+func (o assetFieldOptions) query() string {
+	if strings.TrimSpace(o.CQLQuery) != "" {
+		return o.CQLQuery
+	}
+	return o.QLQuery
+}
+
+// portalAssetFieldValueIDs extracts every asset id from a submitted asset
+// custom-field value: an id, an object carrying one, or an array of either. It
+// fails on any malformed entry so a nonblank value with no valid id cannot pass
+// required-field validation and be stored unchanged.
+func portalAssetFieldValueIDs(value any) ([]int, error) {
+	entries := []any{value}
+	if arr, ok := value.([]any); ok {
+		entries = arr
+	}
+	ids := make([]int, 0, len(entries))
+	for _, entry := range entries {
+		raw := entry
+		if object, ok := entry.(map[string]any); ok {
+			raw = object["id"]
+		}
+		id, ok := portalAssetID(raw)
+		if !ok {
+			return nil, fmt.Errorf("asset reference %v is invalid", entry)
+		}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("asset reference is empty")
+	}
+	return ids, nil
+}
+
+// portalAssetID coerces one asset reference to a positive integer id.
+func portalAssetID(raw any) (int, bool) {
+	switch v := raw.(type) {
+	case float64:
+		if v > 0 && v == float64(int(v)) {
+			return int(v), true
+		}
+	case int:
+		if v > 0 {
+			return v, true
+		}
+	case int64:
+		if v > 0 {
+			return int(v), true
+		}
+	case json.Number:
+		if parsed, err := v.Int64(); err == nil && parsed > 0 {
+			return int(parsed), true
+		}
+	case string:
+		if parsed, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && parsed > 0 {
+			return parsed, true
+		}
+	}
+	return 0, false
+}
+
+// validatePortalAssetCustomFields rejects asset custom-field values that
+// reference an id outside the field's configured asset set, a set the
+// administrator has not exposed to portals, or an asset the field's own query
+// excludes. It is an authorization gate, not a normalizer: the stored value
+// keeps the shape the form submitted.
+func (h *PortalHandler) validatePortalAssetCustomFields(ctx context.Context, portalCustomerID, customerOrgID *int, values map[string]any) error {
+	if len(values) == 0 {
+		return nil
+	}
+	ids := make([]any, 0, len(values))
+	for key := range values {
+		if _, err := strconv.Atoi(key); err == nil {
+			ids = append(ids, key)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
+	rows, err := h.db.QueryContext(ctx, "SELECT id, field_type, COALESCE(options, '') FROM custom_field_definitions WHERE id IN ("+placeholders+")", ids...)
+	if err != nil {
+		return fmt.Errorf("load asset field definitions: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	assetFields := make(map[string]assetFieldOptions)
+	for rows.Next() {
+		var id int
+		var fieldType, options string
+		if err := rows.Scan(&id, &fieldType, &options); err != nil {
+			return fmt.Errorf("scan asset field definition: %w", err)
+		}
+		if models.CanonicalCustomFieldType(fieldType) != "asset" {
+			continue
+		}
+		var opts assetFieldOptions
+		if err := json.Unmarshal([]byte(options), &opts); err != nil {
+			return fmt.Errorf("field %d has invalid asset options", id)
+		}
+		if opts.AssetSetID <= 0 {
+			return fmt.Errorf("field %d has no asset set configured", id)
+		}
+		assetFields[strconv.Itoa(id)] = opts
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate asset field definitions: %w", err)
+	}
+
+	assetRepo := repository.NewAssetRepository(h.db)
+	for key, value := range values {
+		opts, ok := assetFields[key]
+		if !ok {
+			continue
+		}
+		enabled, err := assetRepo.IsSetPortalEnabled(opts.AssetSetID)
+		if err != nil {
+			return fmt.Errorf("check asset field %s portal access: %w", key, err)
+		}
+		if !enabled {
+			return fmt.Errorf("field %s references an unavailable asset", key)
+		}
+		submitted, err := portalAssetFieldValueIDs(value)
+		if err != nil {
+			return fmt.Errorf("field %s: %w", key, err)
+		}
+		cqlSQL, cqlArgs, err := h.portalAssetCQLSQL(ctx, opts.AssetSetID, opts.query(), portalCustomerID, customerOrgID)
+		if err != nil {
+			return fmt.Errorf("resolve asset field %s filter: %w", key, err)
+		}
+		for _, assetID := range submitted {
+			setID, err := assetRepo.GetAssetSetID(assetID)
+			if errors.Is(err, repository.ErrNotFound) {
+				return fmt.Errorf("field %s references an unavailable asset", key)
+			}
+			if err != nil {
+				return fmt.Errorf("resolve asset field %s: %w", key, err)
+			}
+			if setID != opts.AssetSetID {
+				return fmt.Errorf("field %s references an unavailable asset", key)
+			}
+			if cqlSQL == "" {
+				continue
+			}
+			filterSQL := cqlSQL + " AND a.id = ?"
+			filterArgs := append(append([]any{}, cqlArgs...), assetID)
+			matches, err := assetRepo.ListPortalReportAssets(ctx, opts.AssetSetID, filterSQL, filterArgs, 1, 0, nil)
+			if err != nil {
+				return fmt.Errorf("resolve asset field %s: %w", key, err)
+			}
+			if len(matches) == 0 {
+				return fmt.Errorf("field %s references an unavailable asset", key)
+			}
+		}
+	}
+	return nil
+}
+
 // portalAssetAccess carries the resolved portal context shared by the asset
 // read endpoints: the visible reports grouped by set, and the current
 // customer identity used by CQL context functions.
 type portalAssetAccess struct {
 	ctx              context.Context
+	config           models.ChannelConfig
 	reportsBySet     map[int][]models.AssetReport
 	portalCustomerID *int
 	customerOrgID    *int
@@ -547,6 +747,7 @@ func (h *PortalHandler) portalAssetRequestContext(w http.ResponseWriter, r *http
 	}
 	return portalAssetAccess{
 		ctx:              ctx,
+		config:           config,
 		reportsBySet:     reportsBySet,
 		portalCustomerID: portalCustomerID,
 		customerOrgID:    customerOrgID,
@@ -621,19 +822,40 @@ func (h *PortalHandler) PortalAssetSummaries(w http.ResponseWriter, r *http.Requ
 	respondJSONOK(w, map[string]any{"assets": assets})
 }
 
-// SearchPortalAssets searches assets limited to portal-enabled sets this
-// visitor can reach through a visible report, then re-checks each hit against
-// those reports' CQL so the search cannot reveal assets a report hides.
+// SearchPortalAssets searches assets for the portal. An asset custom field
+// passes field_id: the server then loads that field's admin-configured asset
+// set and ql_query, so the caller never supplies CQL. The field's set must
+// carry a portal grant and the field must be exposed on this portal. Without
+// field_id it falls back to the report-scoped text search.
 func (h *PortalHandler) SearchPortalAssets(w http.ResponseWriter, r *http.Request) {
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
-	if query == "" {
-		respondJSONOK(w, map[string]any{"assets": []any{}})
-		return
-	}
 	limit := 20
 	if raw := r.URL.Query().Get("limit"); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 && parsed <= 50 {
 			limit = parsed
+		}
+	}
+
+	fieldID := 0
+	if raw := r.URL.Query().Get("field_id"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			fieldID = parsed
+		}
+	}
+	if fieldID > 0 {
+		h.searchPortalAssetField(w, r, fieldID, query, limit)
+		return
+	}
+
+	if query == "" {
+		respondJSONOK(w, map[string]any{"assets": []any{}})
+		return
+	}
+	// Optional set scope narrows the report-scoped search to one exposed set.
+	requestedSetID := 0
+	if raw := r.URL.Query().Get("asset_set_id"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			requestedSetID = parsed
 		}
 	}
 
@@ -643,9 +865,24 @@ func (h *PortalHandler) SearchPortalAssets(w http.ResponseWriter, r *http.Reques
 	}
 	defer cancel()
 
+	// The report-scoped fallback search belongs to the asset-reports workflow.
+	// A portal that only enables request forms may use the field-scoped picker
+	// (field_id above) but must not enumerate assets from configured reports.
+	if !access.config.PortalModuleEnabled("asset-reports") {
+		respondJSONOK(w, map[string]any{"assets": []any{}})
+		return
+	}
+
 	setIDs := make([]int, 0, len(access.reportsBySet))
 	for setID := range access.reportsBySet {
+		if requestedSetID > 0 && setID != requestedSetID {
+			continue
+		}
 		setIDs = append(setIDs, setID)
+	}
+	if len(setIDs) == 0 {
+		respondJSONOK(w, map[string]any{"assets": []any{}})
+		return
 	}
 	matches, err := repository.NewAssetRepository(h.db).Search(query, setIDs, limit)
 	if err != nil {
@@ -665,6 +902,99 @@ func (h *PortalHandler) SearchPortalAssets(w http.ResponseWriter, r *http.Reques
 		}
 	}
 	respondJSONOK(w, map[string]any{"assets": assets})
+}
+
+// portalAssetFilterIdentity resolves the portal customer and organisation used
+// by asset CQL context functions. It accepts a linked customer from an internal
+// session, matching the picker, so read and write paths evaluate the same
+// currentUser()/currentCustomer()/currentOrganisation(). Request attribution
+// keeps using getAuthFromContext.
+func (h *PortalHandler) portalAssetFilterIdentity(ctx context.Context, r *http.Request, channelID int) (portalCustomerID, customerOrgID *int) {
+	portalCustomerID, _ = h.getPortalCustomerID(ctx, r, channelID)
+	if portalCustomerID != nil {
+		customerOrgID = h.getPortalCustomerOrgID(ctx, *portalCustomerID)
+	}
+	return portalCustomerID, customerOrgID
+}
+
+// searchPortalAssetField resolves picker options for an asset custom field. The
+// field must be exposed on this portal and its set must carry a portal grant;
+// the field's ql_query is evaluated server-side with the portal context so a
+// caller cannot inject CQL.
+func (h *PortalHandler) searchPortalAssetField(w http.ResponseWriter, r *http.Request, fieldID int, query string, limit int) {
+	ctx, cancel, channel, _, ok := h.resolvePortalBySlug(w, r)
+	if !ok {
+		return
+	}
+	defer cancel()
+
+	vc := h.getPortalVisibilityContext(ctx, r, channel.ID)
+	definitions, err := h.portalService.GetCustomFieldsForChannel(ctx, channel.ID, vc.userGroupIDs, vc.customerOrgID, vc.isAdmin)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	var field *models.CustomFieldDefinition
+	for i := range definitions {
+		if definitions[i].ID == fieldID {
+			field = &definitions[i]
+			break
+		}
+	}
+	if field == nil || models.CanonicalCustomFieldType(field.FieldType) != "asset" {
+		respondJSONOK(w, map[string]any{"assets": []any{}})
+		return
+	}
+	var options assetFieldOptions
+	if err := json.Unmarshal([]byte(field.Options), &options); err != nil || options.AssetSetID <= 0 {
+		respondJSONOK(w, map[string]any{"assets": []any{}})
+		return
+	}
+
+	assetRepo := repository.NewAssetRepository(h.db)
+	enabled, err := assetRepo.IsSetPortalEnabled(options.AssetSetID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !enabled {
+		respondJSONOK(w, map[string]any{"assets": []any{}})
+		return
+	}
+
+	portalCustomerID, customerOrgID := h.portalAssetFilterIdentity(ctx, r, channel.ID)
+	cqlSQL, cqlArgs, err := h.portalAssetCQLSQL(ctx, options.AssetSetID, options.query(), portalCustomerID, customerOrgID)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	filterSQL, filterArgs := portalAssetTextFilter(cqlSQL, cqlArgs, query)
+	assets, err := assetRepo.ListPortalReportAssets(ctx, options.AssetSetID, filterSQL, filterArgs, limit, 0, nil)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	respondJSONOK(w, map[string]any{"assets": assets})
+}
+
+// portalAssetTextFilter combines an evaluated CQL fragment with an optional
+// substring search over asset title and description.
+func portalAssetTextFilter(cqlSQL string, cqlArgs []any, query string) (filterSQL string, args []any) {
+	filterSQL = ""
+	args = make([]any, 0, len(cqlArgs)+2)
+	if cqlSQL != "" {
+		filterSQL = "(" + cqlSQL + ")"
+		args = append(args, cqlArgs...)
+	}
+	if query != "" {
+		if filterSQL != "" {
+			filterSQL += " AND "
+		}
+		filterSQL += "(a.title LIKE ? OR a.description LIKE ?)"
+		like := "%" + query + "%"
+		args = append(args, like, like)
+	}
+	return filterSQL, args
 }
 
 // GetAssetReports returns asset reports for a portal, filtered by visibility
@@ -713,16 +1043,15 @@ func (h *PortalHandler) visibleRequestTypeIDs(ctx context.Context, channelID int
 		if err := rows.Scan(&id, &groupIDs, &orgIDs); err != nil {
 			return nil, err
 		}
-		groups, err := unmarshalIntIDs(groupIDs)
+		allowed, err := requestTypeVisibleTo(groupIDs, orgIDs, vc.userGroupIDs, vc.customerOrgID)
 		if err != nil {
-			return nil, fmt.Errorf("parse request type %d visibility groups: %w", id, err)
+			// One malformed unrelated type must not fail the whole listing; hide
+			// it so row actions cannot target it.
+			slog.Error("hiding request type with invalid visibility configuration",
+				slog.String("component", "portal_assets"), slog.Int("request_type_id", id), slog.Any("error", err))
+			continue
 		}
-		orgs, err := unmarshalIntIDs(orgIDs)
-		if err != nil {
-			return nil, fmt.Errorf("parse request type %d visibility organizations: %w", id, err)
-		}
-		rt := models.RequestType{VisibilityGroupIDs: groups, VisibilityOrgIDs: orgs}
-		if vc.isAdmin || rt.IsVisibleTo(vc.userGroupIDs, vc.customerOrgID) {
+		if vc.isAdmin || allowed {
 			visible[id] = true
 		}
 	}
@@ -901,7 +1230,7 @@ func (h *PortalHandler) loadAssetReportFields(assetReportID int) ([]models.Asset
 	}
 	allowedCustomFieldIDs := make(map[string]struct{})
 	if report.ItemTypeID != nil && report.WorkspaceID != nil {
-		allowedCustomFieldIDs, err = services.AllowedCreateScreenCustomFieldIdentifiers(h.db, *report.WorkspaceID, *report.ItemTypeID)
+		allowedCustomFieldIDs, err = services.AllowedCreateScreenCustomFieldIdentifiers(h.db, *report.WorkspaceID, *report.ItemTypeID, true, true)
 		if err != nil {
 			return nil, err
 		}

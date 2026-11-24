@@ -374,6 +374,22 @@
         ]
       }
     },
+    "/admin/diagnostics/proxy-trust": {
+      "get": {
+        "description": ". Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [],
+        "responses": {
+          "401": {},
+          "403": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "",
+        "tags": [
+          ""
+        ]
+      }
+    },
     "/admin/groups": {
       "get": {
         "description": ". Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -10871,6 +10887,178 @@
         ]
       }
     },
+    "/teams/{team_id}/working-calendars": {
+      "get": {
+        "description": "List team service-hours calendars. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "team_id",
+            "In": "path",
+            "Description": "The team identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List team service-hours calendars",
+        "tags": [
+          "Teams"
+        ]
+      },
+      "post": {
+        "description": "Create team service-hours calendar. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [
+          {
+            "Name": "team_id",
+            "In": "path",
+            "Description": "The team identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Create team service-hours calendar",
+        "tags": [
+          "Teams"
+        ]
+      }
+    },
+    "/teams/{team_id}/working-calendars/{calendar_id}": {
+      "delete": {
+        "description": "Delete team service-hours calendar. The server verifies resource ownership and deletion preconditions before removing the resource.",
+        "parameters": [
+          {
+            "Name": "team_id",
+            "In": "path",
+            "Description": "The team identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "calendar_id",
+            "In": "path",
+            "Description": "The working calendar identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Delete team service-hours calendar",
+        "tags": [
+          "Teams"
+        ]
+      },
+      "put": {
+        "description": "Update team service-hours calendar. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [
+          {
+            "Name": "team_id",
+            "In": "path",
+            "Description": "The team identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "calendar_id",
+            "In": "path",
+            "Description": "The working calendar identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "404": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Update team service-hours calendar",
+        "tags": [
+          "Teams"
+        ]
+      }
+    },
+    "/teams/{team_id}/working-calendars/{calendar_id}/impact": {
+      "get": {
+        "description": "Preview team service-hours calendar edit impact. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "team_id",
+            "In": "path",
+            "Description": "The team identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "calendar_id",
+            "In": "path",
+            "Description": "The working calendar identifier.",
+            "Required": true,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Preview team service-hours calendar edit impact",
+        "tags": [
+          "Teams"
+        ]
+      }
+    },
     "/test-cases/{test_case_id}/links": {
       "get": {
         "description": "List test case links. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
@@ -11680,6 +11868,16 @@
             "Required": false,
             "Schema": {
               "type": "string"
+            }
+          },
+          {
+            "Name": "mine",
+            "In": "query",
+            "Description": "Restricts results and totals to the authenticated user's own worklogs.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],

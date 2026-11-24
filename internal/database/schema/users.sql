@@ -34,8 +34,6 @@
 		CHECK (oauth_client_id IS NULL OR (is_agent = true AND agent_provenance = 'oauth'))
 	);
 
-	CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-	CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_users_scim_external_id ON users(scim_external_id) WHERE scim_external_id IS NOT NULL;
 	CREATE INDEX IF NOT EXISTS idx_users_scim_managed ON users(scim_managed);
 	CREATE INDEX IF NOT EXISTS idx_users_is_agent ON users(is_agent);
@@ -151,7 +149,6 @@
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
-	CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(session_token);
 	CREATE INDEX IF NOT EXISTS idx_user_sessions_expires ON user_sessions(expires_at);
 
 CREATE TABLE IF NOT EXISTS user_invitations (
@@ -164,7 +161,6 @@ CREATE TABLE IF NOT EXISTS user_invitations (
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_user_invitations_token ON user_invitations(token);
 CREATE INDEX IF NOT EXISTS idx_user_invitations_user_id ON user_invitations(user_id);
 
 -- DSAR completion evidence: one row per Article 17 erasure execution. The
@@ -182,7 +178,6 @@ CREATE TABLE IF NOT EXISTS user_erasure_records (
 );
 
 CREATE INDEX IF NOT EXISTS idx_user_erasure_records_user_id ON user_erasure_records(user_id);
-
 
 -- migration: 20260914_users_erased_at
 -- migration: 20260914_user_erasure_records

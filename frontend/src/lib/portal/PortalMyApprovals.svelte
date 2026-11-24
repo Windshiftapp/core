@@ -11,28 +11,7 @@
   import Button from '../components/Button.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import { portalApprovalsStore } from '../stores/portalActivity.svelte.js';
-  import { portalAuthStore } from '../stores/portalAuth.svelte.js';
-  import { authStore } from '../stores/auth.svelte.js';
   import { formatDateTimeLocale } from '../utils/dateFormatter.js';
-
-  // Resolve "is this customer in the active pool" so we know whether to show
-  // the decide controls. Mirrors the internal-side ApprovalsTimeline check.
-  function activeStep(req) {
-    return req?.step_instances?.find((si) => si.status === 'pending' && si.started_at);
-  }
-
-  function isInActivePool(req) {
-    const step = activeStep(req);
-    if (!step) return false;
-    const customerId = $portalAuthStore.customer?.id;
-    const userId = $authStore.currentUser?.id || $portalAuthStore.user?.id;
-    return !!step.approvers?.some(
-      (a) =>
-        a.is_active &&
-        ((customerId && a.portal_customer_id === customerId) ||
-          (userId && a.user_id === userId))
-    );
-  }
 
   function statusVariant(status) {
     switch (status) {
@@ -84,8 +63,7 @@
 <div class="space-y-6" data-testid="portal-my-approvals">
   {#if portalApprovalsStore.selected}
     {@const req = portalApprovalsStore.selected}
-    {@const inPool = isInActivePool(req)}
-    {@const myStep = activeStep(req)}
+    {@const canDecide = req.can_decide === true}
     {@const itemCtx = portalApprovalsStore.selectedRequest}
 
     <!-- Approval Detail View -->
@@ -171,8 +149,9 @@
         </div>
       </div>
 
-      <!-- Decision controls (only for active pool members on a pending step) -->
-      {#if req.status === 'pending' && inPool && myStep}
+      <!-- Decision controls (only when the server says the viewer may decide;
+           a linked-customer approver has no local customer identity to match) -->
+      {#if req.status === 'pending' && canDecide}
         <div
           class="p-6 rounded space-y-3"
           style="background-color: var(--ds-surface-card); border: 1px solid var(--ds-border);"

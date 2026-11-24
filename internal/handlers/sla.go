@@ -931,6 +931,8 @@ func (h *SLAHandler) authorizeWorkspaceAdmin(w http.ResponseWriter, r *http.Requ
 	return workspaceID, true
 }
 
+// authorizeTeamAdmin parses the team ID and permits a global team manager or a
+// direct team admin, mirroring TeamHandler.canManageTeam.
 func (h *SLAHandler) authorizeTeamAdmin(w http.ResponseWriter, r *http.Request) (int, bool) {
 	user, ok := RequireAuth(w, r)
 	if !ok {
@@ -940,9 +942,21 @@ func (h *SLAHandler) authorizeTeamAdmin(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return 0, false
 	}
+	hasGlobal, err := h.permissionService.HasGlobalPermission(user.ID, models.PermissionTeamsManage)
+	if err != nil {
+		respondInternalError(w, r, err)
+		return 0, false
+	}
+	if hasGlobal {
+		return teamID, true
+	}
 	isAdmin, err := h.teamRepo.IsTeamAdmin(teamID, user.ID)
-	if err != nil || !isAdmin {
-		respondNotFound(w, r, "team")
+	if err != nil {
+		respondInternalError(w, r, err)
+		return 0, false
+	}
+	if !isAdmin {
+		respondForbidden(w, r)
 		return 0, false
 	}
 	return teamID, true

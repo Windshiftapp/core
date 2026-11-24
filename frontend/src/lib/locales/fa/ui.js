@@ -261,6 +261,7 @@ export default {
     "inlineCode": "کد درون خطی",
     "bulletList": "فهرست نقطه‌ای",
     "numberedList": "فهرست شماره‌گذاری‌شده",
+    "taskList": "فهرست وظایف",
     "insertImage": "درج تصویر",
     "userNotFound": "کاربر پیدا نشد",
     "multipleUsersMatch": "چند کاربر مطابقت دارند",

@@ -55,8 +55,25 @@ func (h *PageAttachmentUploadHandler) Upload(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
+	policy, err := h.uploads.UploadPolicy()
+	if err != nil {
+		h.RespondInternalError(w, r)
+		return
+	}
+	if !policy.Enabled || policy.MaxFileSize <= 0 {
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusServiceUnavailable, restapi.ErrCodeServiceUnavailable, "Attachments are not enabled on this server"))
+		return
+	}
+
+	// Bound the body by the effective file limit plus multipart framing; the
+	// per-file limit is enforced after reading.
+	maxBody := policy.MaxFileSize + services.AttachmentMultipartOverheadBytes
+	r.Body = http.MaxBytesReader(w, r.Body, maxBody)
 	if err := r.ParseMultipartForm(32 << 20); err != nil { // #nosec G120 -- MaxBytesReader caps the body; this is the memory threshold.
+		if restapi.IsRequestBodyTooLarge(err) {
+			h.RespondError(w, r, restapi.NewAPIError(http.StatusRequestEntityTooLarge, restapi.ErrCodeRequestTooLarge, "Request body too large"))
+			return
+		}
 		h.RespondError(w, r, restapi.NewAPIError(http.StatusBadRequest, restapi.ErrCodeInvalidInput, "Failed to parse form data: "+err.Error()))
 		return
 	}
@@ -68,9 +85,13 @@ func (h *PageAttachmentUploadHandler) Upload(w http.ResponseWriter, r *http.Requ
 	}
 	defer func() { _ = file.Close() }()
 
-	fileData, err := io.ReadAll(file)
+	fileData, err := io.ReadAll(io.LimitReader(file, policy.MaxFileSize+1))
 	if err != nil {
 		h.RespondInternalError(w, r)
+		return
+	}
+	if int64(len(fileData)) > policy.MaxFileSize {
+		h.RespondError(w, r, restapi.NewAPIError(http.StatusRequestEntityTooLarge, restapi.ErrCodeRequestTooLarge, "Attachment exceeds the configured size limit"))
 		return
 	}
 

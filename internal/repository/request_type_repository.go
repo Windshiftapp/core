@@ -403,10 +403,11 @@ func (r *RequestTypeRepository) Delete(id, channelID int) error {
 	})
 }
 
-// ListFields returns a request_type's fields with the joined custom-field
-// definition name when applicable.
-func (r *RequestTypeRepository) ListFields(requestTypeID int) ([]models.RequestTypeField, error) {
-	rows, err := r.db.Query(`
+// ListFieldsContext is the context-aware field reader shared by the manager and
+// portal surfaces. Scan failures are returned rather than skipped so a caller
+// can never present a partial required-field schema as complete.
+func (r *RequestTypeRepository) ListFieldsContext(ctx context.Context, requestTypeID int) ([]models.RequestTypeField, error) {
+	rows, err := r.db.QueryContext(ctx, `
 		SELECT rtf.id, rtf.request_type_id, rtf.field_identifier, rtf.field_type,
 		       rtf.display_order, rtf.is_required, rtf.display_name, rtf.description,
 		       COALESCE(rtf.step_number, 1) as step_number,

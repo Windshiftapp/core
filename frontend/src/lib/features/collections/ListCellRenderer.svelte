@@ -198,6 +198,7 @@
       />
     {:else}
       <ItemStatusPicker
+        itemId={item.id}
         workspaceId={item.workspace_id}
         statusId={item.status_id}
         statusName={item.status_name}

@@ -1117,7 +1117,7 @@ func (r *PageRepository) searchChunksPostgres(workspaceID int, query string, lim
 		WHERE c.workspace_id = ? AND p.archived_at IS NULL
 		AND to_tsvector('english', coalesce(c.heading_path, '') || ' ' || coalesce(c.content, ''))
 		    @@ websearch_to_tsquery('english', ?)
-		ORDER BY score DESC
+		ORDER BY score DESC, c.id ASC
 		LIMIT ?
 	`, query, query, workspaceID, query, limit)
 	if err != nil {

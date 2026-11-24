@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS teams (
 	FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_teams_name ON teams(name);
 CREATE INDEX IF NOT EXISTS idx_teams_is_active ON teams(is_active);
 CREATE INDEX IF NOT EXISTS idx_teams_created_by ON teams(created_by);
 

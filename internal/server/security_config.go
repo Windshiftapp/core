@@ -6,6 +6,8 @@ import (
 	"net"
 	"net/url"
 	"strings"
+
+	"windshift/internal/config"
 )
 
 // DiagnosticLevel indicates the severity of a security diagnostic.
@@ -30,6 +32,10 @@ type ResolvedSecurityConfig struct {
 	EnableHTTPS       bool
 	UseProxy          bool
 	ProxyAutoDetected bool
+	// ProxyTrustMode is the normalized trust mode (legacy or strict).
+	ProxyTrustMode string
+	// StrictProxyTrust is true when ProxyTrustMode is strict.
+	StrictProxyTrust  bool
 	AllowedHosts      string
 	AllowedPort       string
 	Scheme            string
@@ -120,35 +126,51 @@ func ResolveSecurityConfig(cfg Config) (*ResolvedSecurityConfig, error) {
 		r.Scheme = browserOriginScheme(cfg)
 	}
 
-	// 6. No BASE_URL and no AllowedHosts
+	// 6. Resolve the proxy trust mode. Empty means legacy, the behavior every
+	// existing installation has had through 0.9.7. Strict is the opt-in that
+	// 0.9.8 will make the default.
+	switch strings.ToLower(strings.TrimSpace(cfg.ProxyTrustMode)) {
+	case "", config.ProxyTrustModeLegacy:
+		r.ProxyTrustMode = config.ProxyTrustModeLegacy
+	case config.ProxyTrustModeStrict:
+		r.ProxyTrustMode = config.ProxyTrustModeStrict
+		r.StrictProxyTrust = true
+	default:
+		r.addDiag(DiagError, "INVALID_PROXY_TRUST_MODE",
+			fmt.Sprintf("PROXY_TRUST_MODE %q is not recognized.", cfg.ProxyTrustMode),
+			"Use 'legacy' (current default) or 'strict' (trust only loopback and ADDITIONAL_PROXIES).")
+		return r, fmt.Errorf("invalid PROXY_TRUST_MODE %q: use 'legacy' or 'strict'", cfg.ProxyTrustMode)
+	}
+
+	// 7. No BASE_URL and no AllowedHosts
 	if cfg.BaseURL == "" && cfg.AllowedHosts == "" {
 		r.addDiag(DiagWarn, "NO_BASE_URL",
 			"No BASE_URL or ALLOWED_HOSTS configured. CORS will reject all cross-origin requests.",
 			"Set BASE_URL to your server's public URL (e.g. BASE_URL=https://myapp.example.com).")
 	}
 
-	// 7. Scheme mismatch warnings
+	// 8. Scheme mismatch warnings
 	if parsedURL != nil && parsedURL.Scheme == "http" && r.EnableHTTPS {
 		r.addDiag(DiagWarn, "SCHEME_MISMATCH",
 			"BASE_URL uses http:// but TLS certificates are configured. CORS origins will use http:// which may not match actual requests.",
 			"Update BASE_URL to https:// to match your TLS configuration.")
 	}
 
-	// 8. No HTTPS at all
+	// 9. No HTTPS at all
 	if !r.EnableHTTPS && !r.UseProxy {
 		r.addDiag(DiagWarn, "NO_HTTPS",
 			"Running without HTTPS — credentials will be transmitted in plaintext.",
 			"For production, either configure TLS (--tls-cert, --tls-key) or run behind a reverse proxy (USE_PROXY=true) with TLS termination.")
 	}
 
-	// 9. Additional proxies without proxy mode
+	// 10. Additional proxies without proxy mode
 	if cfg.AdditionalProxies != "" && !r.UseProxy {
 		r.addDiag(DiagWarn, "PROXIES_IGNORED",
 			"ADDITIONAL_PROXIES is set but proxy mode is not enabled. These IPs will be ignored.",
 			"Enable proxy mode with USE_PROXY=true or set BASE_URL to an https:// URL.")
 	}
 
-	// 10. Parse additional proxies
+	// 11. Parse additional proxies
 	if cfg.AdditionalProxies != "" && r.UseProxy {
 		parts := strings.Split(cfg.AdditionalProxies, ",")
 		for _, part := range parts {
@@ -164,6 +186,26 @@ func ResolveSecurityConfig(cfg Config) (*ResolvedSecurityConfig, error) {
 				continue
 			}
 			r.AdditionalProxies = append(r.AdditionalProxies, ip)
+		}
+	}
+
+	// 12. Proxy trust policy diagnostics. Legacy trust keeps existing
+	// installations on their current behavior, so it is a warning rather than an
+	// error; strict trust is the migration target.
+	if r.UseProxy {
+		if r.StrictProxyTrust {
+			r.addDiag(DiagInfo, "PROXY_TRUST_STRICT",
+				"Strict proxy trust is enabled: only loopback and ADDITIONAL_PROXIES may supply forwarding headers.",
+				"List every reverse proxy address in ADDITIONAL_PROXIES. An unlisted proxy is treated as the client, so its clients share one address and lose Secure-cookie/HSTS detection.")
+			if len(r.AdditionalProxies) == 0 {
+				r.addDiag(DiagWarn, "PROXY_TRUST_STRICT_NO_PROXIES",
+					"Strict proxy trust is enabled but ADDITIONAL_PROXIES is empty, so only loopback is trusted.",
+					"If a reverse proxy reaches Windshift over a private network address, add that address to ADDITIONAL_PROXIES or its clients will be attributed to the proxy.")
+			}
+		} else {
+			r.addDiag(DiagWarn, "PROXY_TRUST_LEGACY",
+				"Legacy proxy trust is active: every private, loopback, and link-local peer is trusted to supply X-Forwarded-For, so a private-network client can choose its own resolved IP and LAN users behind a proxy share one lockout bucket.",
+				"Set PROXY_TRUST_MODE=strict and list the proxy addresses in ADDITIONAL_PROXIES. Strict becomes the default in 0.9.8; staying on legacy keeps the spoofing and shared-bucket behavior.")
 		}
 	}
 

@@ -9,6 +9,7 @@ import (
 // last review: ser, 210426
 type SQLiteTx struct {
 	tx *sql.Tx
+	txEffectState
 }
 
 // NewSQLiteTx creates a new SQLite transaction wrapper
@@ -57,16 +58,24 @@ func (t *SQLiteTx) PrepareContext(ctx context.Context, query string) (*sql.Stmt,
 }
 
 func (t *SQLiteTx) Commit() error {
-	return t.tx.Commit()
+	if err := t.tx.Commit(); err != nil {
+		t.discard()
+		return err
+	}
+	t.publish()
+	return nil
 }
 
 func (t *SQLiteTx) Rollback() error {
-	return t.tx.Rollback()
+	err := t.tx.Rollback()
+	t.discard()
+	return err
 }
 
 // PostgresTx wraps a *sql.Tx for PostgreSQL with placeholder conversion
 type PostgresTx struct {
 	tx *sql.Tx
+	txEffectState
 }
 
 // NewPostgresTx creates a new PostgreSQL transaction wrapper
@@ -125,9 +134,16 @@ func (t *PostgresTx) PrepareContext(ctx context.Context, query string) (*sql.Stm
 }
 
 func (t *PostgresTx) Commit() error {
-	return t.tx.Commit()
+	if err := t.tx.Commit(); err != nil {
+		t.discard()
+		return err
+	}
+	t.publish()
+	return nil
 }
 
 func (t *PostgresTx) Rollback() error {
-	return t.tx.Rollback()
+	err := t.tx.Rollback()
+	t.discard()
+	return err
 }

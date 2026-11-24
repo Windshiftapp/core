@@ -24,7 +24,6 @@ CREATE TABLE IF NOT EXISTS system_settings (
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_system_settings_key ON system_settings(key);
 CREATE INDEX IF NOT EXISTS idx_system_settings_category ON system_settings(category);
 
 -- Reviews table
@@ -57,7 +56,6 @@ CREATE TABLE IF NOT EXISTS plugin_registry (
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_plugin_registry_name ON plugin_registry(name);
 CREATE INDEX IF NOT EXISTS idx_plugin_registry_enabled ON plugin_registry(enabled);
 
 -- API tokens table
@@ -79,7 +77,6 @@ CREATE TABLE IF NOT EXISTS api_tokens (
 );
 
 CREATE INDEX IF NOT EXISTS idx_api_tokens_user_id ON api_tokens(user_id);
-CREATE INDEX IF NOT EXISTS idx_api_tokens_token_hash ON api_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_expires_at ON api_tokens(expires_at);
 
 -- OAuth 2.0 server tables. Pair with internal/handlers/oauth.go and
@@ -104,7 +101,6 @@ CREATE TABLE IF NOT EXISTS oauth_clients (
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_oauth_clients_client_id ON oauth_clients(client_id);
 CREATE INDEX IF NOT EXISTS idx_oauth_clients_enabled ON oauth_clients(enabled);
 
 -- Wire up the FK from users.oauth_client_id → oauth_clients(id) now that
@@ -142,7 +138,6 @@ CREATE TABLE IF NOT EXISTS oauth_authorization_codes (
 	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_oauth_authorization_codes_code ON oauth_authorization_codes(code);
 CREATE INDEX IF NOT EXISTS idx_oauth_authorization_codes_expires_at ON oauth_authorization_codes(expires_at);
 
 -- oauth_refresh_tokens: 30-day refresh tokens with rotation. token_hash is
@@ -165,7 +160,6 @@ CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (
 	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_token_hash ON oauth_refresh_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_api_token_id ON oauth_refresh_tokens(api_token_id);
 CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_expires_at ON oauth_refresh_tokens(expires_at);
 
@@ -178,8 +172,6 @@ CREATE TABLE IF NOT EXISTS collection_categories (
 	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX IF NOT EXISTS idx_collection_categories_name ON collection_categories(name);
 
 -- Collections table
 CREATE TABLE IF NOT EXISTS collections (
@@ -216,7 +208,6 @@ CREATE INDEX IF NOT EXISTS idx_collections_workspace_id ON collections(workspace
 CREATE INDEX IF NOT EXISTS idx_collections_created_by ON collections(created_by);
 CREATE INDEX IF NOT EXISTS idx_collections_is_public ON collections(is_public);
 CREATE INDEX IF NOT EXISTS idx_collections_category_id ON collections(category_id);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_public_slug ON collections(public_slug);
 
 -- migration: 20261126_board_portal_placements
 CREATE TABLE IF NOT EXISTS board_placements (
@@ -232,7 +223,6 @@ CREATE TABLE IF NOT EXISTS board_placements (
 	UNIQUE(collection_id, channel_id)
 );
 CREATE INDEX IF NOT EXISTS idx_board_placements_channel ON board_placements(channel_id, display_order);
-
 
 CREATE OR REPLACE FUNCTION log_collection_change() RETURNS trigger AS $$
 BEGIN
@@ -484,9 +474,6 @@ CREATE TABLE IF NOT EXISTS calendar_feed_tokens (
 	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_calendar_feed_tokens_token ON calendar_feed_tokens(token);
-CREATE INDEX IF NOT EXISTS idx_calendar_feed_tokens_user_id ON calendar_feed_tokens(user_id);
-
 -- SCIM tokens table for dedicated SCIM authentication
 CREATE TABLE IF NOT EXISTS scim_tokens (
 	id SERIAL PRIMARY KEY,
@@ -525,7 +512,6 @@ CREATE TABLE IF NOT EXISTS cli_auth_codes (
 	consumed_at TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_cli_auth_codes_code ON cli_auth_codes(code);
 CREATE INDEX IF NOT EXISTS idx_cli_auth_codes_expires_at ON cli_auth_codes(expires_at);
 
 -- Native auth codes (short-lived, single-use). Bridge a system-browser SSO
@@ -543,7 +529,6 @@ CREATE TABLE IF NOT EXISTS native_auth_codes (
 	consumed_at TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_native_auth_codes_code ON native_auth_codes(code);
 CREATE INDEX IF NOT EXISTS idx_native_auth_codes_expires_at ON native_auth_codes(expires_at);
 
 -- Background scheduler runs: one row per tick of each in-process scheduler

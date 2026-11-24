@@ -72,7 +72,11 @@
     { id: 'members', label: t('teams.tabs.members'), icon: IconUsers, badge: team?.direct_member_count, testid: 'team-tab-members' },
     { id: 'groups', label: t('teams.tabs.groups'), icon: IconStack2, badge: team?.group_count, testid: 'team-tab-groups' },
     { id: 'on-call', label: t('teams.tabs.onCall'), icon: IconBellRinging, testid: 'team-tab-on-call' },
-    { id: 'service-hours', label: t('teams.tabs.serviceHours'), icon: IconClock, testid: 'team-tab-service-hours' },
+    // Service hours are a management surface: the API only serves team admins
+    // and global team managers, so the tab stays hidden for everyone else.
+    ...(canEdit
+      ? [{ id: 'service-hours', label: t('teams.tabs.serviceHours'), icon: IconClock, testid: 'team-tab-service-hours' }]
+      : []),
   ]);
 
   // svelte-ignore state_referenced_locally
@@ -113,16 +117,16 @@
     />
 
     <Tabs {tabs} bind:activeTab onTabChange={changeSection}>
-      {#if activeTab === 'overview'}
-        <OverviewTab {team} {canEdit} onUpdated={reload} />
-      {:else if activeTab === 'members'}
+      {#if activeTab === 'members'}
         <MembersTab {team} {canEdit} onUpdated={reload} />
       {:else if activeTab === 'groups'}
         <GroupsTab {team} canEdit={hasGlobalManage || myRole === 'admin'} onUpdated={reload} />
       {:else if activeTab === 'on-call'}
         <OnCallTab {team} {canEdit} />
-      {:else if activeTab === 'service-hours'}
+      {:else if activeTab === 'service-hours' && canEdit}
         <ServiceHoursTab {team} {canEdit} />
+      {:else}
+        <OverviewTab {team} {canEdit} onUpdated={reload} />
       {/if}
     </Tabs>
   {/if}

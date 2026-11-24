@@ -72,7 +72,7 @@ func (s *TimeWorklogService) Create(userID int, input WorklogMutationInput) (*Wo
 	if err != nil {
 		return nil, err
 	}
-	id, err := s.worklogs.Create(repository.NewWorklog{
+	worklog, err := s.worklogs.CreateDetail(repository.NewWorklog{
 		ProjectID: input.ProjectID, UserID: userID,
 		ItemID: input.ItemID, Description: prepared.description, DateUnix: WorklogDateUnix(prepared.date),
 		StartTimeUnix: prepared.startUnix, EndTimeUnix: prepared.endUnix, DurationMinutes: prepared.durationMinutes,
@@ -80,7 +80,7 @@ func (s *TimeWorklogService) Create(userID int, input WorklogMutationInput) (*Wo
 	if err != nil {
 		return nil, err
 	}
-	return s.result(int(id), prepared)
+	return worklogMutationResult(worklog, prepared), nil
 }
 
 // Update validates, fully updates, and reloads a worklog.
@@ -428,9 +428,13 @@ func (s *TimeWorklogService) result(worklogID int, prepared preparedWorklog) (*W
 	if err != nil {
 		return nil, err
 	}
+	return worklogMutationResult(worklog, prepared), nil
+}
+
+func worklogMutationResult(worklog *models.Worklog, prepared preparedWorklog) *WorklogMutationResult {
 	return &WorklogMutationResult{
 		Worklog: worklog, Warnings: prepared.warnings, Timezone: prepared.timezone,
 		Location: prepared.location, StartTimeUnix: prepared.startUnix,
 		EndTimeUnix: prepared.endUnix, DurationMinutes: prepared.durationMinutes,
-	}, nil
+	}
 }

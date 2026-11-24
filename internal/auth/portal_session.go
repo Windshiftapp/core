@@ -12,6 +12,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/repository"
+	"windshift/internal/utils"
 )
 
 const (
@@ -75,10 +76,18 @@ type PortalSessionManager struct {
 // so that sessions survive process restarts with the same secret.
 // ipBinding is the resolved SESSION_IP_BINDING mode; portal sessions share the
 // setting with internal user sessions because they enforce the same binding.
+// It uses the legacy proxy trust policy; NewPortalSessionManagerWithTrustPolicy
+// takes an explicit one.
 // last review: ser, 210426, NOTE: Found hardcoded env var in caller
 func NewPortalSessionManager(db database.Database, useSecureCookies, useProxy bool, additionalProxies []string, cookieSecret, ipBinding string) *PortalSessionManager {
+	return NewPortalSessionManagerWithTrustPolicy(db, useSecureCookies, utils.NewTrustPolicy(useProxy, false, additionalProxies, nil), cookieSecret, ipBinding)
+}
+
+// NewPortalSessionManagerWithTrustPolicy creates a portal session manager bound
+// to an explicit proxy trust policy.
+func NewPortalSessionManagerWithTrustPolicy(db database.Database, useSecureCookies bool, trust utils.TrustPolicy, cookieSecret, ipBinding string) *PortalSessionManager {
 	return &PortalSessionManager{
-		cookieManager: newCookieManager(useSecureCookies, useProxy, additionalProxies, cookieSecret,
+		cookieManager: newCookieManagerWithPolicy(useSecureCookies, trust, cookieSecret,
 			"windshift-portal-cookie-hash", "windshift-portal-cookie-block"),
 		db:        db,
 		ipBinding: ipBinding,

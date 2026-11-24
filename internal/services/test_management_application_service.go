@@ -179,11 +179,14 @@ func (s *TestManagementApplicationService) CoverageSummary(userID int, scope Tes
 		return models.TestCoverageSummary{}, err
 	}
 	typeIDs, workspaceID, err := s.coverageTypeIDs(scope)
-	if errors.Is(err, repository.ErrNotFound) || len(typeIDs) == 0 {
-		return models.TestCoverageSummary{}, nil
-	}
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return models.TestCoverageSummary{}, nil
+		}
 		return models.TestCoverageSummary{}, err
+	}
+	if len(typeIDs) == 0 {
+		return models.TestCoverageSummary{}, nil
 	}
 	total, covered, err := s.coverage.GetCoverageSummary(workspaceID, typeIDs)
 	return coverageSummary(total, covered), err
@@ -194,11 +197,14 @@ func (s *TestManagementApplicationService) CoverageRequirements(userID int, scop
 		return nil, 0, models.TestCoverageSummary{}, err
 	}
 	typeIDs, workspaceID, err := s.coverageTypeIDs(scope)
-	if errors.Is(err, repository.ErrNotFound) || len(typeIDs) == 0 {
-		return []models.RequirementCoverageItem{}, 0, models.TestCoverageSummary{}, nil
-	}
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return []models.RequirementCoverageItem{}, 0, models.TestCoverageSummary{}, nil
+		}
 		return nil, 0, models.TestCoverageSummary{}, err
+	}
+	if len(typeIDs) == 0 {
+		return []models.RequirementCoverageItem{}, 0, models.TestCoverageSummary{}, nil
 	}
 	if filter.ItemTypeID != nil {
 		matched := false

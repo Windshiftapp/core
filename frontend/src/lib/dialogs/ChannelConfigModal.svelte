@@ -30,7 +30,7 @@
   import ChannelSMTPConfig from '../features/channels/ChannelSMTPConfig.svelte';
   import ChannelFormConfig from '../features/channels/ChannelFormConfig.svelte';
   import FormBuilder from '../features/channels/FormBuilder.svelte';
-  import { loadPortalConnectedMailboxes } from '../features/channels/channelAdmin.js';
+  import { channelBasicFormData, loadPortalConnectedMailboxes, portalChannelFormData, tryParseChannelConfig } from '../features/channels/channelAdmin.js';
   import { formatAuthenticatedDateTime } from '../utils/authenticatedDateFormatter.js';
 	import TextareaField from '../components/TextareaField.svelte';
 	import SelectField from '../components/SelectField.svelte';
@@ -162,33 +162,11 @@
     category_id: null
   });
 
-  // Parse config JSON string. Returns null on parse failure so the caller
-  // can refuse to render an editable form (and avoid silently overwriting
-  // corrupted config with whatever the empty form produces on Save).
-  function parseChannelConfig(config) {
-    if (config == null) return {};
-    if (typeof config === 'string') {
-      if (config.trim() === '') return {};
-      try {
-        const parsed = JSON.parse(config);
-        if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
-          throw new Error('Channel configuration must be a JSON object');
-        }
-        return parsed;
-      } catch (e) {
-        console.error('Failed to parse channel config:', e);
-        return null;
-      }
-    }
-    if (Array.isArray(config) || typeof config !== 'object') return null;
-    return config;
-  }
-
   // Workspaces this channel routes submissions to — used to scope the form
   // builder's routing-metadata pickers. Falls back to [] (all workspaces) when
   // unparseable; the backend still validates the chosen workspace.
   let formBuilderWorkspaceIds = $derived.by(() => {
-    const c = parseChannelConfig(channel?.config) || {};
+    const c = tryParseChannelConfig(channel?.config) || {};
     return c.form_workspace_ids || c.portal_workspace_ids || [];
   });
 
@@ -198,13 +176,9 @@
       persistedStatus = channel.status || 'disabled';
       portalOptions = [];
       connectedMailboxes = [];
-      channelFormData = {
-        name: channel.name || '',
-        description: channel.description || '',
-        category_id: channel.category_id || null
-      };
+      channelFormData = channelBasicFormData(channel);
 
-      const config = parseChannelConfig(channel.config);
+      const config = tryParseChannelConfig(channel.config);
       if (config === null) {
         configParseFailed = true;
         errorToast(t('channel.channelConfigCorrupted'));
@@ -214,21 +188,7 @@
       configParseFailed = false;
 
       if (channel.type === 'portal') {
-        portalFormData = {
-          slug: config.portal_slug || '',
-          workspace_ids: config.portal_workspace_ids || [],
-          enabled: channel.status === 'enabled',
-          title: config.portal_title || '',
-          description: config.portal_description || '',
-          registration_mode: config.portal_registration_mode === 'manual' ? 'manual' : 'open',
-          presentation: config.portal_presentation || 'classic',
-          modules: config.portal_modules ?? null,
-          navigation: config.portal_navigation || [],
-          default_module: config.portal_default_module || '',
-          allowed_domains: Array.isArray(config.portal_allowed_domains)
-            ? config.portal_allowed_domains.join(', ')
-            : ''
-        };
+        portalFormData = portalChannelFormData(config, channel);
         loadConnectedMailboxes();
       } else if (channel.type === 'webhook') {
         const headersArray = config.webhook_headers

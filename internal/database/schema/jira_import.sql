@@ -63,7 +63,6 @@ CREATE TABLE IF NOT EXISTS jira_import_id_mappings (
     UNIQUE(job_id, entity_type, jira_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_jira_mappings_lookup ON jira_import_id_mappings(job_id, entity_type, jira_id);
 CREATE INDEX IF NOT EXISTS idx_jira_mappings_key ON jira_import_id_mappings(job_id, jira_key);
 CREATE INDEX IF NOT EXISTS idx_jira_mappings_windshift ON jira_import_id_mappings(entity_type, windshift_id);
 

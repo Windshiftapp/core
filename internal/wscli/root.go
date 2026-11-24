@@ -179,8 +179,11 @@ func Run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	rootCmd.SetErr(stderr)
 	rootCmd.SetIn(stdin)
 
+	// cobra already prints the error as "Error: <msg>" on stderr (plus a
+	// "Run 'ws --help' for usage." hint for unknown commands), so Run only
+	// maps the failure to the exit code. Printing it here as well would show
+	// every error twice.
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
-		_, _ = fmt.Fprintln(stderr, err)
 		return 1
 	}
 	return 0

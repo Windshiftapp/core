@@ -17,6 +17,7 @@ import (
 	apispec "windshift/api"
 	tokenauth "windshift/internal/auth"
 	"windshift/internal/contextkeys"
+	"windshift/internal/handlers"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/objecttranslation"
@@ -478,6 +479,10 @@ type globalPermissionReader interface {
 	HasGlobalPermission(int, string) (bool, error)
 }
 
+type teamAccess interface {
+	IsTeamAdmin(teamID, userID int) (bool, error)
+}
+
 type groupApplication interface {
 	ListPage(int, int) ([]models.TeamGroup, int, error)
 	Get(int, bool) (*models.TeamGroup, error)
@@ -524,6 +529,7 @@ type attachmentApplication interface {
 }
 
 type pageAttachmentApplication interface {
+	UploadPolicy() (services.ItemAttachmentUploadPolicy, error)
 	UploadPageAttachment(context.Context, services.PageAttachmentUploadInput) (models.AttachmentUploadResponse, error)
 	OpenPageAttachment(context.Context, int, int, bool) (*services.ItemAttachmentBinary, error)
 }
@@ -624,6 +630,12 @@ type actionApplication interface {
 	Execute(int, int, int, int) (models.ActionExecutionStatus, error)
 }
 
+// proxyTrustDiagnostics is the admin proxy-trust read the v2 session route
+// exposes. *handlers.DiagnosticsHandler satisfies it.
+type proxyTrustDiagnostics interface {
+	ProxyTrust(r *http.Request) (handlers.ProxyTrustStatus, error)
+}
+
 // Deps lists every required v2 dependency. Construction has no fallbacks.
 type Deps struct {
 	OperatorControls             *services.OperatorControlsService
@@ -673,39 +685,44 @@ type Deps struct {
 	Timers                       timerApplication
 	SystemAdmins                 systemAdministrator
 	GlobalPermission             globalPermissionReader
-	Groups                       groupApplication
-	AdminUsers                   adminUserApplication
-	AuditLogs                    auditLogReader
-	AdminTokens                  adminTokenManager
-	AdminAuditor                 *logger.Auditor
-	AdminTranslations            *objecttranslation.Service
-	Comments                     commentApplication
-	CommentAccess                commentAccess
-	Attachments                  attachmentApplication
-	PageAttachments              pageAttachmentApplication
-	Collections                  collectionApplication
-	Planning                     planningApplication
-	MilestoneComments            milestoneCommentApplication
-	MilestonePageLinks           milestonePageLinkApplication
-	MilestoneActivity            milestoneActivityApplication
-	Links                        linkApplication
-	AgentRuns                    agentRunApplication
-	AgentSkills                  agentSkillReader
-	ConditionSets                conditionSetApplication
-	Governance                   governanceApplication
-	Actions                      actionApplication
-	TestManagement               *services.TestManagementApplicationService
-	Assets                       *services.AssetApplicationService
-	ItemApplication              *services.ItemApplicationService
-	ItemDetail                   *services.ItemDetailApplicationService
-	ItemLifecycle                *services.ItemLifecycleService
-	TicketImport                 *services.TicketImportService
-	SessionMiddleware            func(http.Handler) http.Handler
-	SearchAllowed                func(*http.Request) bool
-	DBRequestTimeout             time.Duration
-	CORS                         Middleware
-	CSRF                         csrfValidator
-	Concurrency                  concurrencyLimiter
+	// TeamAccess checks team-level membership roles. Optional: nil keeps the
+	// team-scoped routes answering not-found.
+	TeamAccess         teamAccess
+	Groups             groupApplication
+	AdminUsers         adminUserApplication
+	AuditLogs          auditLogReader
+	AdminTokens        adminTokenManager
+	AdminAuditor       *logger.Auditor
+	AdminTranslations  *objecttranslation.Service
+	Comments           commentApplication
+	CommentAccess      commentAccess
+	Attachments        attachmentApplication
+	PageAttachments    pageAttachmentApplication
+	Collections        collectionApplication
+	Planning           planningApplication
+	MilestoneComments  milestoneCommentApplication
+	MilestonePageLinks milestonePageLinkApplication
+	MilestoneActivity  milestoneActivityApplication
+	Links              linkApplication
+	AgentRuns          agentRunApplication
+	AgentSkills        agentSkillReader
+	ConditionSets      conditionSetApplication
+	Governance         governanceApplication
+	Actions            actionApplication
+	TestManagement     *services.TestManagementApplicationService
+	Assets             *services.AssetApplicationService
+	ItemApplication    *services.ItemApplicationService
+	ItemDetail         *services.ItemDetailApplicationService
+	ItemLifecycle      *services.ItemLifecycleService
+	TicketImport       *services.TicketImportService
+	// Diagnostics serves the admin proxy-trust read on the session contract.
+	Diagnostics       proxyTrustDiagnostics
+	SessionMiddleware func(http.Handler) http.Handler
+	SearchAllowed     func(*http.Request) bool
+	DBRequestTimeout  time.Duration
+	CORS              Middleware
+	CSRF              csrfValidator
+	Concurrency       concurrencyLimiter
 	// RateLimiter is the per-user request-rate backstop for authenticated v2
 	// routes. Optional: nil leaves v2 unthrottled.
 	RateLimiter requestLimiter
@@ -985,6 +1002,7 @@ func buildRoutes(deps Deps) []route {
 	registerOverviewChartRoutes(&builder, deps)
 	registerSLARoutes(&builder, deps)
 	registerSLACalendarRoutes(&builder, deps)
+	registerSLATeamCalendarRoutes(&builder, deps)
 	registerSLAWarningThresholdRoutes(&builder, deps)
 	registerSLATeamBindingRoutes(&builder, deps)
 	registerSLAMetricRoutes(&builder, deps)
@@ -1220,6 +1238,7 @@ func applyParameterCorrections(route *Route) {
 		}
 	case "GET /time/worklogs":
 		upsertParameter(route, positiveIDQuery("project_id", "Restricts worklogs to one time project."))
+		upsertParameter(route, booleanQuery("mine", "Restricts results and totals to the authenticated user's own worklogs.", false))
 		fallthrough
 	case "GET /items/{item_id}/worklogs", "GET /time/projects/{project_id}/worklogs":
 		upsertParameter(route, dateQuery("from", "Includes worklogs on or after this civil date."))

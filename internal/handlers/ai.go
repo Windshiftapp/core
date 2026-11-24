@@ -31,14 +31,29 @@ type AIHandler struct {
 	actionService          *services.ActionService
 	pageApplicationService *services.PageApplicationService
 	pageDiagramService     *services.PageDiagramService
-	conversations          *repository.AgentConversationRepository
-	agentBindings          *repository.WorkspaceAgentBindingRepository
-	commentService         *services.CommentService
-	approvalService        *services.ApprovalService
-	chatLLMs               chatLLMResolver
+	// itemApplication is the shared item mutation pipeline used by mutating
+	// chat tools so agent writes match the HTTP surfaces. Installed after
+	// construction because server wiring builds it late.
+	itemApplication *services.ItemApplicationService
+	// timeWorklogService is the shared worklog boundary used by log_time.
+	timeWorklogService *services.TimeWorklogService
+	conversations      *repository.AgentConversationRepository
+	agentBindings      *repository.WorkspaceAgentBindingRepository
+	commentService     *services.CommentService
+	approvalService    *services.ApprovalService
+	chatLLMs           chatLLMResolver
 	// llmUsage meters each chat turn's token/cost against its own agent_runs
 	// row, so the model's identity and the turn's spend outlive the response.
 	llmUsage *repository.LLMUsageRepository
+	// releaseNotesItemLimit caps how many completed work items the release-notes
+	// generator sends to the model. Zero keeps defaultReleaseNotesItemLimit.
+	releaseNotesItemLimit int
+	// releaseNotesTokenBudget caps the release-notes input size in estimated
+	// tokens. Zero keeps defaultReleaseNotesTokenBudget.
+	releaseNotesTokenBudget int
+	// hierarchy resolves viewable parent context for AI features. It shares the
+	// permission-aware parent gate used by item reads.
+	hierarchy *services.HierarchyService
 }
 
 // NewAIHandler creates a new AI handler.
@@ -67,12 +82,21 @@ func NewAIHandler(
 		agentBindings:          repository.NewWorkspaceAgentBindingRepository(db),
 		chatLLMs:               llmManager,
 		llmUsage:               repository.NewLLMUsageRepository(db),
+		hierarchy:              services.NewHierarchyService(db).WithPermissions(permService),
 	}
 }
 
 func (h *AIHandler) SetConversationDependencies(comments *services.CommentService, approvals *services.ApprovalService) {
 	h.commentService = comments
 	h.approvalService = approvals
+}
+
+// SetMutationServices installs the shared item and worklog pipelines used by
+// mutating chat tools. Server wiring builds them after the handler, so this is
+// called once those services exist.
+func (h *AIHandler) SetMutationServices(itemApplication *services.ItemApplicationService, worklogs *services.TimeWorklogService) {
+	h.itemApplication = itemApplication
+	h.timeWorklogService = worklogs
 }
 
 // PlanMyDayResponse is the response for the Plan My Day endpoint.

@@ -8,9 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
-	"strings"
 
 	"github.com/gorilla/securecookie"
 	"golang.org/x/crypto/hkdf"
@@ -21,17 +19,15 @@ import (
 // cookieManager provides shared cookie handling and secure-request detection
 // infrastructure. Both SessionManager and PortalSessionManager embed it.
 type cookieManager struct {
-	secureCookie      *securecookie.SecureCookie
-	useSecure         bool     // Whether to set Secure flag on cookies (true for HTTPS, false for HTTP)
-	useProxy          bool     // Whether proxy mode is enabled
-	additionalProxies []net.IP // Additional proxy IPs beyond private ranges
+	secureCookie *securecookie.SecureCookie
+	useSecure    bool              // Whether to set Secure flag on cookies (true for HTTPS, false for HTTP)
+	trust        utils.TrustPolicy // Shared proxy trust policy for X-Forwarded-Proto
 }
 
-// newCookieManager creates a cookieManager with HKDF-derived (or random) keys.
-// hashInfo and blockInfo are the HKDF info strings used to derive cookie keys,
-// allowing different managers to use distinct key material from the same secret.
-// last review: ser, 210426
-func newCookieManager(useSecureCookies, useProxy bool, additionalProxies []string, cookieSecret, hashInfo, blockInfo string) cookieManager {
+// newCookieManagerWithPolicy creates a cookieManager bound to an explicit trust
+// policy so the Secure-cookie and HSTS decision agrees with client-IP
+// resolution.
+func newCookieManagerWithPolicy(useSecureCookies bool, trust utils.TrustPolicy, cookieSecret, hashInfo, blockInfo string) cookieManager {
 	var hashKey, blockKey []byte
 	if cookieSecret != "" {
 		hashKey = deriveKey(cookieSecret, hashInfo, 64)
@@ -41,19 +37,10 @@ func newCookieManager(useSecureCookies, useProxy bool, additionalProxies []strin
 		blockKey = generateSecureKey(32) // 256-bit key for encryption
 	}
 
-	// Parse additional proxy IPs (beyond auto-trusted private ranges)
-	var additionalIPs []net.IP
-	for _, proxyStr := range additionalProxies {
-		if ip := net.ParseIP(strings.TrimSpace(proxyStr)); ip != nil {
-			additionalIPs = append(additionalIPs, ip)
-		}
-	}
-
 	return cookieManager{
-		secureCookie:      securecookie.New(hashKey, blockKey),
-		useSecure:         useSecureCookies,
-		useProxy:          useProxy,
-		additionalProxies: additionalIPs,
+		secureCookie: securecookie.New(hashKey, blockKey),
+		useSecure:    useSecureCookies,
+		trust:        trust,
 	}
 }
 
@@ -105,20 +92,16 @@ func (cm *cookieManager) isSecureRequest(r *http.Request) bool {
 		return true
 	}
 
-	// Extract direct client IP (not from headers)
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		host = r.RemoteAddr
-	}
-
-	clientIP := net.ParseIP(host)
+	// Extract the socket peer (not from headers). utils.PeerIP handles IPv6
+	// brackets so this agrees with client-IP extraction and HSTS.
+	clientIP := utils.PeerIP(r)
 	if clientIP == nil {
-		slog.Debug("secure request check: failed to parse IP", slog.String("component", "sso"), slog.String("remote_addr", host), slog.Bool("result", false)) //nolint:gosec // G706: logging parsed host from r.RemoteAddr
+		slog.Debug("secure request check: failed to parse IP", slog.String("component", "sso"), slog.String("remote_addr", r.RemoteAddr), slog.Bool("result", false)) //nolint:gosec // G706: logging parsed host from r.RemoteAddr
 		return false
 	}
 
 	// Only trust X-Forwarded-Proto if request comes from a trusted proxy
-	isTrusted := utils.IsTrustedProxy(clientIP, cm.useProxy, cm.additionalProxies)
+	isTrusted := cm.trust.IsTrusted(clientIP)
 	proto := r.Header.Get("X-Forwarded-Proto")
 	if isTrusted {
 		result := proto == "https"

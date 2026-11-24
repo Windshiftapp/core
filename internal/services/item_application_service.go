@@ -102,7 +102,7 @@ func NewItemApplicationService(
 		create:    create,
 		update:    update,
 		delete:    deleteService,
-		hierarchy: NewHierarchyService(db),
+		hierarchy: NewHierarchyService(db).WithPermissions(perm),
 		resolver:  NewIDResolverService(db),
 		move:      NewItemWorkspaceMoveService(db),
 		matrix:    NewTransitionMatrixService(db),
@@ -733,7 +733,7 @@ func (s *ItemApplicationService) Get(ctx context.Context, userID, itemID int, tr
 }
 
 func (s *ItemApplicationService) GetWithOptions(ctx context.Context, userID, itemID int, options ItemReadOptions) (*models.Item, error) {
-	result, err := s.crud.GetByIDWithWorkspaceStatus(itemID)
+	result, err := s.crud.GetByIDWithWorkspaceStatus(ctx, itemID)
 	if err != nil {
 		return nil, err
 	}
@@ -764,12 +764,14 @@ func (s *ItemApplicationService) GetWithOptions(ctx context.Context, userID, ite
 		}
 	}
 
-	item, err := s.crud.GetWithEffectiveProject(itemID)
-	if err != nil {
+	item := result.Item
+	if err := s.crud.ApplyEffectiveProject(item); err != nil {
 		return nil, err
 	}
 	items := []models.Item{*item}
-	if err := s.enrich(ctx, userID, items); err != nil {
+	// FindByIDWithWorkspaceStatus already attached milestones to the authorized
+	// item, so enrich must not repeat that lookup.
+	if err := s.enrichWithMilestones(ctx, userID, items, false); err != nil {
 		return nil, err
 	}
 	item = &items[0]
@@ -870,11 +872,15 @@ func (s *ItemApplicationService) Create(ctx context.Context, actor AuditActor, i
 	}
 	items := []models.Item{*result.Item}
 	if err := s.enrich(ctx, actor.UserID, items); err != nil {
-		return nil, err
+		// Enrichment masks project names and related-item metadata before the
+		// label and milestone reads. Return the caller-facing copy either way so
+		// a later read failure cannot discard those redactions.
+		slog.Warn("enrich created item", slog.Int64("item_id", result.ID), slog.Any("error", err))
 	}
-	items[0].DescriptionHTML, err = markdown.Render(items[0].Description)
-	if err != nil {
-		return nil, fmt.Errorf("render item description: %w", err)
+	if rendered, err := markdown.Render(items[0].Description); err != nil {
+		slog.Warn("render created item description", slog.Int64("item_id", result.ID), slog.Any("error", err))
+	} else {
+		items[0].DescriptionHTML = rendered
 	}
 	return &items[0], nil
 }
@@ -888,6 +894,39 @@ func (s *ItemApplicationService) Patch(ctx context.Context, actor AuditActor, it
 		return nil, ErrItemForbidden
 	}
 	result, err := s.patchItem(ctx, actor, itemID, fields)
+	if err != nil {
+		return nil, err
+	}
+	items := []models.Item{*result.Item}
+	if err := s.enrich(ctx, actor.UserID, items); err != nil {
+		return nil, err
+	}
+	items[0].DescriptionHTML, err = markdown.Render(items[0].Description)
+	if err != nil {
+		return nil, fmt.Errorf("render item description: %w", err)
+	}
+	return &items[0], nil
+}
+
+// UpdateFieldsWithMetadata runs the shared update pipeline on an already-decoded
+// field map while preserving explicit event provenance (agent actor/source/run).
+// Agent adapters use it instead of the low-level update service so description
+// mentions and hierarchy cache invalidation stay on the one path.
+func (s *ItemApplicationService) UpdateFieldsWithMetadata(
+	ctx context.Context,
+	actor AuditActor,
+	itemID int,
+	fields map[string]any,
+	metadata itemevents.Metadata,
+) (*models.Item, error) {
+	allowed, err := s.update.CanUserEditItem(actor.UserID, itemID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, ErrItemForbidden
+	}
+	result, err := s.update.UpdateWithMetadata(actor.UserID, actor.Username, itemID, fields, metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -2148,12 +2187,12 @@ func (s *ItemApplicationService) invalidateHierarchy(itemID int) {
 		return
 	}
 	_ = s.cache.InvalidateItemHierarchy(itemID, nil)
-	descendants, err := s.hierarchy.GetDescendants(itemID, 0)
+	descendantIDs, err := s.hierarchy.GetDescendantIDsContext(context.Background(), itemID, 0)
 	if err != nil {
 		return
 	}
-	for i := range descendants {
-		_ = s.cache.InvalidateItemHierarchy(descendants[i].ID, nil)
+	for _, descendantID := range descendantIDs {
+		_ = s.cache.InvalidateItemHierarchy(descendantID, nil)
 	}
 }
 
@@ -2293,6 +2332,24 @@ func (s *ItemApplicationService) requireView(ctx context.Context, userID, itemID
 	return nil
 }
 
+// CanReadCollection reports whether the user may read the collection, applying
+// the same private-collection and home-workspace rule as the internal item
+// reads. Board surfaces reuse it so staff see what they see internally.
+func (s *ItemApplicationService) CanReadCollection(userID, collectionID int) (bool, error) {
+	workspaceIDs, err := s.perm.AccessibleWorkspaceIDs(userID)
+	if err != nil {
+		return false, err
+	}
+	return s.requireCollectionRead(userID, collectionID, workspaceIDs) == nil, nil
+}
+
+// RequireViewItem returns nil when the user may view the item, using the same
+// workspace and active-approver rules as the internal single-item read. It
+// returns repository.ErrNotFound when the item is not visible.
+func (s *ItemApplicationService) RequireViewItem(ctx context.Context, userID, itemID int) error {
+	return s.requireView(ctx, userID, itemID)
+}
+
 func (s *ItemApplicationService) allowedProjectIDs(userID int) map[int]struct{} {
 	projects, err := NewTimePermissionService(s.db, s.perm).GetAccessibleProjects(userID)
 	if err != nil {
@@ -2419,18 +2476,30 @@ func (s *ItemApplicationService) relatedItemVisible(userID, itemID int) bool {
 }
 
 func (s *ItemApplicationService) enrich(ctx context.Context, userID int, items []models.Item) error {
+	return s.enrichWithMilestones(ctx, userID, items, true)
+}
+
+// enrichWithMilestones decorates items and, when loadMilestones is set, owns
+// the milestone lookup. A caller whose items already carry milestones passes
+// false so a single detail read loads them exactly once.
+func (s *ItemApplicationService) enrichWithMilestones(ctx context.Context, userID int, items []models.Item, loadMilestones bool) error {
 	NewTimePermissionService(s.db, s.perm).MaskInaccessibleProjectNamesContext(ctx, userID, items)
 	MaskInaccessibleRelatedWorkItems(userID, items, s.perm)
-	s.decorateItemKeys(userID, items)
+	s.decorateItemKeys(ctx, userID, items)
 	if err := repository.NewLabelRepository(s.db).LoadForItemsContext(ctx, items); err != nil {
 		return err
+	}
+	if !loadMilestones {
+		return nil
 	}
 	return repository.NewMilestoneAttachRepository(s.db).LoadForItemsContext(ctx, items)
 }
 
-func (s *ItemApplicationService) decorateItemKeys(userID int, items []models.Item) {
-	workspaceKeys := make(map[int]string)
-	workspaces := repository.NewWorkspaceRepository(s.db)
+// decorateItemKeys builds each item's display key and resolves its parent
+// context. Parent resolution is delegated to HierarchyService so the
+// cross-workspace permission gate has one implementation shared with AI reads.
+func (s *ItemApplicationService) decorateItemKeys(ctx context.Context, userID int, items []models.Item) {
+	refs := make([]ParentRef, 0, len(items))
 	for i := range items {
 		item := &items[i]
 		if item.WorkspaceKey != "" && item.WorkspaceItemNumber > 0 {
@@ -2439,31 +2508,38 @@ func (s *ItemApplicationService) decorateItemKeys(userID int, items []models.Ite
 		if item.ParentID == nil || item.ParentWorkspaceItemNumber == nil {
 			continue
 		}
-		parentWorkspaceID, err := s.items.GetWorkspaceID(*item.ParentID)
-		if err != nil {
+		refs = append(refs, ParentRef{
+			ChildID:                   item.ID,
+			ParentID:                  *item.ParentID,
+			ChildWorkspaceID:          item.WorkspaceID,
+			ChildWorkspaceKey:         item.WorkspaceKey,
+			ParentWorkspaceItemNumber: *item.ParentWorkspaceItemNumber,
+			ParentTitle:               item.ParentTitle,
+		})
+	}
+	if len(refs) == 0 {
+		return
+	}
+
+	summaries, err := s.hierarchy.ResolveParentSummaries(ctx, userID, refs)
+	if err != nil {
+		// Fail closed: withhold every parent rather than leak one on error.
+		summaries = map[int]ParentSummary{}
+	}
+	for i := range items {
+		item := &items[i]
+		if item.ParentID == nil {
+			continue
+		}
+		summary, ok := summaries[item.ID]
+		if !ok {
 			item.ParentTitle = ""
 			item.ParentWorkspaceItemNumber = nil
 			continue
 		}
-		parentWorkspaceKey := item.WorkspaceKey
-		if parentWorkspaceID != item.WorkspaceID {
-			allowed, permissionErr := s.perm.HasWorkspacePermission(userID, parentWorkspaceID, models.PermissionItemView)
-			if permissionErr != nil || !allowed {
-				item.ParentTitle = ""
-				item.ParentWorkspaceItemNumber = nil
-				continue
-			}
-			parentWorkspaceKey = workspaceKeys[parentWorkspaceID]
-			if parentWorkspaceKey == "" {
-				parentWorkspaceKey, err = workspaces.GetKey(parentWorkspaceID)
-				if err != nil {
-					item.ParentTitle = ""
-					item.ParentWorkspaceItemNumber = nil
-					continue
-				}
-				workspaceKeys[parentWorkspaceID] = parentWorkspaceKey
-			}
-		}
-		item.ParentKey = fmt.Sprintf("%s-%d", parentWorkspaceKey, *item.ParentWorkspaceItemNumber)
+		item.ParentKey = summary.Key
+		item.ParentTitle = summary.Title
+		number := summary.ItemNumber
+		item.ParentWorkspaceItemNumber = &number
 	}
 }

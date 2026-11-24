@@ -231,6 +231,25 @@
     {/key}
   </div>
 
+  <!-- Main-column custom fields sit with the description, always visible, in
+       the same place they render on the item detail page. -->
+  {#each store.mainColumnCustomFields as { field, screenField } (field.id)}
+    <div class="space-y-1" data-testid={`create-main-custom-field-${field.id}`}>
+      <Label color="default">
+        {field.name}
+        {#if screenField?.is_required}<span class="text-ds-text-danger">*</span>{/if}
+      </Label>
+      <CustomFieldRenderer
+        {field}
+        bind:value={store.customFieldValues[field.id]}
+        readonly={false}
+        onChange={(val) => store.customFieldValues[field.id] = val}
+        isDarkMode={false}
+        workspaceId={store.formData.workspace_id}
+      />
+    </div>
+  {/each}
+
   <!-- Field Chips Row -->
   <div class="flex flex-wrap items-center gap-2 pt-2 border-t" style="border-color: var(--ds-border);">
     <!-- Item Type Chip -->

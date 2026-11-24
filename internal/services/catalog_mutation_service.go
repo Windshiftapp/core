@@ -624,9 +624,9 @@ func (s *CatalogMutationService) preparePriority(item *models.Priority, excludeI
 	if exists {
 		return NewServiceError(http.StatusConflict, "priority name already exists")
 	}
-	if item.IsDefault {
-		return s.priorities.ClearOtherDefaults(excludeID)
-	}
+	// Default-status transfer and membership replacement happen with the save in
+	// one transaction; preparation must stay read-only so a failed save cannot
+	// leave the catalog without a default.
 	return nil
 }
 
@@ -684,6 +684,9 @@ func validateLinkType(item models.LinkType) error {
 	return nil
 }
 func catalogRepositoryError(err error) error {
+	if errors.Is(err, repository.ErrDefaultConflict) {
+		return NewServiceError(http.StatusConflict, "another priority is already the default")
+	}
 	if errors.Is(err, repository.ErrDuplicateEntry) || database.IsUniqueConstraintError(err) {
 		return NewServiceError(http.StatusConflict, "catalog name already exists")
 	}

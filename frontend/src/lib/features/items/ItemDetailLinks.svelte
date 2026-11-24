@@ -283,6 +283,7 @@
   {#if statusId && rowWorkspaceId}
     <span data-testid="{kind}-status">
       <ItemStatusPicker
+        itemId={rowItemId}
         workspaceId={rowWorkspaceId}
         {statusId}
         {statusName}

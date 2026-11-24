@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"windshift/internal/handlers"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -22,6 +23,22 @@ func registerAdminRoutes(builder *routeBuilder, deps Deps) {
 	builder.SessionPage("/admin/users", listAdminUsers(deps))
 	builder.SessionRead("/admin/users/{user_id}", getAdminUser(deps))
 	builder.SessionJSON(http.MethodPatch, "/admin/users/{user_id}", http.StatusOK, true, updateAdminUser(deps))
+	builder.SessionRead("/admin/diagnostics/proxy-trust", getProxyTrustDiagnostics(deps))
+}
+
+// getProxyTrustDiagnostics exposes the proxy-trust verdict on the canonical
+// session contract. It keeps the system-admin and runtime-diagnostics denials:
+// requireSystemAdmin here and the operator-controls check inside ProxyTrust.
+func getProxyTrustDiagnostics(deps Deps) readOperation[handlers.ProxyTrustStatus] {
+	return func(r *http.Request) (handlers.ProxyTrustStatus, error) {
+		if _, err := requireSystemAdmin(r, deps); err != nil {
+			return handlers.ProxyTrustStatus{}, err
+		}
+		if deps.Diagnostics == nil {
+			return handlers.ProxyTrustStatus{}, newError(http.StatusServiceUnavailable, "diagnostics_unavailable", "Diagnostics are unavailable")
+		}
+		return deps.Diagnostics.ProxyTrust(r)
+	}
 }
 
 type adminGroupCreateRequest struct {

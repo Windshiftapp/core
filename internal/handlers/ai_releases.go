@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"windshift/internal/llm"
 	"windshift/internal/models"
@@ -20,7 +21,57 @@ type GenerateReleaseNotesResponse struct {
 	Notes   string `json:"notes"`
 }
 
-var errNoCompletedReleaseItems = errors.New("milestone has no completed work items to use as release-note sources")
+const (
+	// defaultReleaseNotesItemLimit bounds how many completed work items are sent
+	// to the model when the operator has not set AI_RELEASE_NOTES_ITEM_LIMIT.
+	defaultReleaseNotesItemLimit = 200
+	// maxReleaseNotesItemLimit clamps an operator override so the enrichment
+	// queries cannot build an unbounded IN (...) list or an oversized prompt.
+	maxReleaseNotesItemLimit = 1000
+	// defaultReleaseNotesTokenBudget bounds the whole release-notes input
+	// (system + user message) so a milestone with many verbose items cannot
+	// exceed the context window. Operators override it with
+	// AI_RELEASE_NOTES_TOKEN_BUDGET.
+	defaultReleaseNotesTokenBudget = 128_000
+	// releaseNotesSystemPromptReserveTokens covers the release_notes.txt system
+	// prompt plus a margin for token-estimation error.
+	releaseNotesSystemPromptReserveTokens = 1_000
+	// releaseNotesTruncationNoteReserveTokens covers the "Only X of Y items are
+	// shown" footer.
+	releaseNotesTruncationNoteReserveTokens = 64
+	// releaseNotesMinTokenBudget is a floor for a misconfigured budget so the
+	// builder still emits a usable prompt.
+	releaseNotesMinTokenBudget = 1_000
+	// releaseNotesDescriptionLimit and releaseNotesCommentLimit bound each
+	// free-text field so one verbose item cannot crowd the rest of the
+	// milestone context out of the model's window.
+	releaseNotesDescriptionLimit = 4000
+	releaseNotesCommentLimit     = 2000
+	// releaseNotesMilestoneDescriptionLimit bounds the milestone's own
+	// description, which would otherwise be an uncapped term in the budget.
+	releaseNotesMilestoneDescriptionLimit = 4000
+	// releaseNotesCommentsPerItem caps how many public comments per item are
+	// included, newest first.
+	releaseNotesCommentsPerItem = 5
+)
+
+// releaseNotesItem is one completed work item selected for the release-notes
+// prompt, carrying the milestone progress row plus the enrichment the model
+// needs to describe, group, and summarize it.
+type releaseNotesItem struct {
+	ID               int
+	WorkspaceID      int
+	Key              string
+	ItemNumber       int
+	Title            string
+	ItemType         string
+	ParentID         int
+	ParentKey        string
+	ParentItemNumber int
+	ParentTitle      string
+	Description      string
+	Comments         []repository.ReleaseNoteComment
+}
 
 // GenerateReleaseNotes generates release notes for a milestone using the LLM.
 func (h *AIHandler) GenerateReleaseNotes(w http.ResponseWriter, r *http.Request) {
@@ -87,15 +138,23 @@ func (h *AIHandler) GenerateReleaseNotes(w http.ResponseWriter, r *http.Request)
 		testStats = loadedTestStats
 	}
 
-	userPrompt, err := buildReleaseNotesUserPrompt(milestone, progress, testStats)
-	if errors.Is(err, errNoCompletedReleaseItems) {
+	// Select completed items, cap the list, then enrich only the selected items
+	// so a large milestone does not pay for context the model never sees.
+	items := collectReleaseNotesItems(progress)
+	if len(items) == 0 {
 		respondConflict(w, r, "This milestone has no completed work items to generate release notes from.")
 		return
 	}
-	if err != nil {
-		respondInternalError(w, r, fmt.Errorf("failed to build release notes prompt: %w", err))
+	totalCompleted := len(items)
+	if limit := h.releaseNotesLimit(); len(items) > limit {
+		items = items[:limit]
+	}
+	if err := h.enrichReleaseNoteItems(r.Context(), user.ID, items); err != nil {
+		respondInternalError(w, r, fmt.Errorf("failed to load release note item context: %w", err))
 		return
 	}
+
+	userPrompt := buildReleaseNotesUserPrompt(milestone, progress, testStats, items, totalCompleted, h.releaseNotesBudget())
 
 	systemPrompt := h.promptStore.Get(llm.PromptReleaseNotes)
 
@@ -123,70 +182,262 @@ func (h *AIHandler) GenerateReleaseNotes(w http.ResponseWriter, r *http.Request)
 	respondJSONOK(w, GenerateReleaseNotesResponse{Notes: notes})
 }
 
+// SetReleaseNotesItemLimit overrides the maximum number of completed work
+// items included in generated release notes. Zero or negative keeps the
+// built-in default. Wired from AI_RELEASE_NOTES_ITEM_LIMIT at startup.
+func (h *AIHandler) SetReleaseNotesItemLimit(limit int) {
+	h.releaseNotesItemLimit = limit
+}
+
+// SetReleaseNotesTokenBudget overrides the estimated-token budget for the
+// whole release-notes input. Zero or negative keeps the built-in default.
+// Wired from AI_RELEASE_NOTES_TOKEN_BUDGET at startup.
+func (h *AIHandler) SetReleaseNotesTokenBudget(budget int) {
+	h.releaseNotesTokenBudget = budget
+}
+
+// releaseNotesBudget returns the configured input-token budget, falling back
+// to the built-in default and enforcing a floor so a misconfigured value still
+// produces a usable prompt.
+func (h *AIHandler) releaseNotesBudget() int {
+	budget := h.releaseNotesTokenBudget
+	if budget <= 0 {
+		budget = defaultReleaseNotesTokenBudget
+	}
+	if budget < releaseNotesMinTokenBudget {
+		budget = releaseNotesMinTokenBudget
+	}
+	return budget
+}
+
+// releaseNotesLimit returns the configured item cap, falling back to the
+// built-in default when unset and clamping an oversized override.
+func (h *AIHandler) releaseNotesLimit() int {
+	limit := h.releaseNotesItemLimit
+	if limit <= 0 {
+		limit = defaultReleaseNotesItemLimit
+	}
+	if limit > maxReleaseNotesItemLimit {
+		limit = maxReleaseNotesItemLimit
+	}
+	return limit
+}
+
+// collectReleaseNotesItems returns the milestone's completed items in
+// status-breakdown order, which keeps the prompt stable across requests even
+// though the progress report groups items in a map. Incomplete categories are
+// skipped, matching the progress report's completion definition.
+func collectReleaseNotesItems(progress *services.MilestoneProgressReport) []releaseNotesItem {
+	if progress == nil {
+		return nil
+	}
+	var items []releaseNotesItem
+	for _, bd := range progress.StatusBreakdown {
+		if !bd.IsCompleted {
+			continue
+		}
+		for _, pi := range progress.ItemsByCategory[bd.CategoryName] {
+			items = append(items, releaseNotesItem{
+				ID:          pi.ID,
+				WorkspaceID: pi.WorkspaceID,
+				Key:         pi.WorkspaceKey,
+				ItemNumber:  pi.ItemNumber,
+				Title:       pi.Title,
+			})
+		}
+	}
+	return items
+}
+
+// enrichReleaseNoteItems fills each item in place with its description, type,
+// comments and viewable parent context. Enrichment is keyed by item ID and
+// bounded by the already-capped slice, so the reads stay proportional to the
+// prompt size. Parent disclosure goes through HierarchyService so a parent in a
+// workspace the caller cannot view is withheld exactly as on item reads.
+func (h *AIHandler) enrichReleaseNoteItems(ctx context.Context, userID int, items []releaseNotesItem) error {
+	if len(items) == 0 {
+		return nil
+	}
+	itemIDs := make([]int, 0, len(items))
+	for _, item := range items {
+		itemIDs = append(itemIDs, item.ID)
+	}
+	enrichment, err := repository.NewItemRepository(h.db).ReleaseNoteItemsContext(ctx, itemIDs, releaseNotesCommentsPerItem)
+	if err != nil {
+		return err
+	}
+	refs := make([]services.ParentRef, 0, len(items))
+	for i := range items {
+		extra, ok := enrichment[items[i].ID]
+		if !ok {
+			continue
+		}
+		items[i].Description = extra.Description
+		items[i].ItemType = extra.ItemTypeName
+		items[i].ParentID = extra.ParentID
+		items[i].ParentItemNumber = extra.ParentItemNumber
+		items[i].ParentTitle = extra.ParentTitle
+		items[i].Comments = extra.Comments
+		if extra.ParentID != 0 {
+			refs = append(refs, services.ParentRef{
+				ChildID:                   items[i].ID,
+				ParentID:                  extra.ParentID,
+				ChildWorkspaceID:          items[i].WorkspaceID,
+				ChildWorkspaceKey:         items[i].Key,
+				ParentWorkspaceItemNumber: extra.ParentItemNumber,
+				ParentTitle:               extra.ParentTitle,
+			})
+		}
+	}
+
+	summaries, err := h.hierarchy.ResolveParentSummaries(ctx, userID, refs)
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		if items[i].ParentID == 0 {
+			continue
+		}
+		summary, ok := summaries[items[i].ID]
+		if !ok {
+			items[i].ParentItemNumber = 0
+			items[i].ParentTitle = ""
+			continue
+		}
+		items[i].ParentKey = summary.Key
+		items[i].ParentItemNumber = summary.ItemNumber
+		items[i].ParentTitle = summary.Title
+	}
+	return nil
+}
+
+// buildReleaseNotesUserPrompt renders the milestone facts and the enriched work
+// items as plain data. All generation instructions live in the overridable
+// system prompt (release_notes.txt) so an operator override fully controls the
+// output format.
+//
+// tokenBudget caps the whole input (system prompt included) using a
+// script-aware estimate. Items are added whole until the next one would exceed
+// the budget; the omitted count is disclosed so the model does not invent
+// details for work it never saw.
 func buildReleaseNotesUserPrompt(
 	milestone *services.MilestoneResult,
 	progress *services.MilestoneProgressReport,
 	testStats *services.MilestoneTestStats,
-) (string, error) {
-	var contextLines []string
-	contextLines = append(contextLines, fmt.Sprintf("Milestone: %s", milestone.Name))
+	items []releaseNotesItem,
+	totalCompleted int,
+	tokenBudget int,
+) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Milestone: %s\n", milestone.Name)
 	if milestone.Description != "" {
-		contextLines = append(contextLines, fmt.Sprintf("Description: %s", milestone.Description))
+		fmt.Fprintf(&b, "Description: %s\n", truncateReleaseNoteText(milestone.Description, releaseNotesMilestoneDescriptionLimit))
 	}
 	if milestone.TargetDate != "" {
-		contextLines = append(contextLines, fmt.Sprintf("Target Date: %s", milestone.TargetDate))
+		fmt.Fprintf(&b, "Target Date: %s\n", milestone.TargetDate)
 	}
-	contextLines = append(contextLines, fmt.Sprintf("Progress: %d/%d items completed (%.0f%%)",
-		progress.CompletedItems, progress.TotalItems, progress.PercentComplete))
+	fmt.Fprintf(&b, "Progress: %d/%d items completed (%.0f%%)\n",
+		progress.CompletedItems, progress.TotalItems, progress.PercentComplete)
 
-	// Include status breakdown
 	if len(progress.StatusBreakdown) > 0 {
-		contextLines = append(contextLines, "\nStatus breakdown:")
+		b.WriteString("\nStatus breakdown:\n")
 		for _, bd := range progress.StatusBreakdown {
-			contextLines = append(contextLines, fmt.Sprintf("  - %s: %d items", bd.CategoryName, bd.ItemCount))
+			fmt.Fprintf(&b, "  - %s: %d items\n", bd.CategoryName, bd.ItemCount)
 		}
 	}
 
-	// Include completed item titles (cap at 50 total)
-	totalItemsListed := 0
-	if len(progress.ItemsByCategory) > 0 {
-		contextLines = append(contextLines, "\nCompleted work items:")
-		for categoryName, items := range progress.ItemsByCategory {
-			// Only include completed-category items
-			isCompleted := false
-			for _, bd := range progress.StatusBreakdown {
-				if bd.CategoryName == categoryName && bd.IsCompleted {
-					isCompleted = true
-					break
-				}
-			}
-			if !isCompleted {
-				continue
-			}
-			for _, item := range items {
-				if totalItemsListed >= 50 {
-					break
-				}
-				contextLines = append(contextLines, fmt.Sprintf("  - %s-%d: %s", item.WorkspaceKey, item.ItemNumber, item.Title))
-				totalItemsListed++
-			}
-			if totalItemsListed >= 50 {
-				break
-			}
-		}
-	}
-	if totalItemsListed == 0 {
-		return "", errNoCompletedReleaseItems
-	}
+	b.WriteString("\nCompleted work items:\n")
 
+	testLine := ""
 	if testStats != nil {
-		contextLines = append(contextLines, fmt.Sprintf("\nTest coverage: %d test plans, %d runs (%d successful, %d failed)",
-			testStats.TotalTestPlans, testStats.TotalTestRuns, testStats.SuccessfulTestRuns, testStats.FailedTestRuns))
+		testLine = fmt.Sprintf("\nTest coverage: %d test plans, %d runs (%d successful, %d failed)\n",
+			testStats.TotalTestPlans, testStats.TotalTestRuns, testStats.SuccessfulTestRuns, testStats.FailedTestRuns)
 	}
 
-	return fmt.Sprintf(`Generate release notes for this milestone using only the facts below.
-Every release-note bullet must cite one or more supplied work-item keys. Do not infer features,
-implementation details, user impact, or test results that are not explicitly supported by the input.
+	// The footer is always emitted, so reserve its estimated cost before adding
+	// items. The system prompt shares the same context window.
+	budget := tokenBudget - releaseNotesSystemPromptReserveTokens
+	if budget < releaseNotesMinTokenBudget {
+		budget = releaseNotesMinTokenBudget
+	}
+	reserve := estimateReleaseNotesTokens(testLine) + releaseNotesTruncationNoteReserveTokens
+	used := estimateReleaseNotesTokens(b.String())
 
-%s`, strings.Join(contextLines, "\n")), nil
+	included := 0
+	for _, item := range items {
+		block := releaseNotesItemBlock(item)
+		blockTokens := estimateReleaseNotesTokens(block)
+		if used+blockTokens+reserve > budget {
+			break
+		}
+		b.WriteString(block)
+		used += blockTokens
+		included++
+	}
+
+	if totalCompleted > included {
+		fmt.Fprintf(&b, "\nOnly %d of %d completed items are shown; do not invent details for the omitted items.\n",
+			included, totalCompleted)
+	}
+	b.WriteString(testLine)
+
+	return b.String()
+}
+
+// releaseNotesItemBlock renders one work item and its optional parent,
+// description, and comments, applying the per-field truncation limits.
+func releaseNotesItemBlock(item releaseNotesItem) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "- %s-%d", item.Key, item.ItemNumber)
+	if item.ItemType != "" {
+		fmt.Fprintf(&b, " [%s]", item.ItemType)
+	}
+	fmt.Fprintf(&b, ": %s\n", item.Title)
+	if item.ParentKey != "" {
+		fmt.Fprintf(&b, "  Parent: %s-%d %s\n", item.ParentKey, item.ParentItemNumber, item.ParentTitle)
+	}
+	if item.Description != "" {
+		fmt.Fprintf(&b, "  Description: %s\n", truncateReleaseNoteText(item.Description, releaseNotesDescriptionLimit))
+	}
+	if len(item.Comments) > 0 {
+		b.WriteString("  Comments (newest first):\n")
+		for _, comment := range item.Comments {
+			fmt.Fprintf(&b, "    - %s %s: %s\n", comment.CreatedAt.Format("2006-01-02"), comment.Author, truncateReleaseNoteText(comment.Content, releaseNotesCommentLimit))
+		}
+	}
+	return b.String()
+}
+
+// estimateReleaseNotesTokens approximates the tokenizer cost of the prompt.
+// ASCII text averages roughly four characters per token, while non-ASCII
+// scripts (CJK, emoji, etc.) tokenize at close to one token per rune. Counting
+// non-ASCII runes one-for-one keeps the estimate conservative for exactly the
+// scripts where a character-based estimate would overflow the context window.
+func estimateReleaseNotesTokens(s string) int {
+	ascii := 0
+	nonASCII := 0
+	for _, r := range s {
+		if r < utf8.RuneSelf {
+			ascii++
+		} else {
+			nonASCII++
+		}
+	}
+	return (ascii+3)/4 + nonASCII
+}
+
+// truncateReleaseNoteText flattens a description or comment to a single line
+// and bounds it to limit runes, appending an ellipsis when content is dropped.
+// Flattening keeps the line-oriented prompt structure intact, and runes are
+// counted rather than bytes so multi-byte text is never cut mid-character.
+func truncateReleaseNoteText(value string, limit int) string {
+	value = strings.Join(strings.Fields(value), " ")
+	if limit <= 0 {
+		return value
+	}
+	runes := []rune(value)
+	if len(runes) <= limit {
+		return value
+	}
+	return strings.TrimSpace(string(runes[:limit])) + "…"
 }

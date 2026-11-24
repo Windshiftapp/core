@@ -50,6 +50,23 @@ type CustomerAccessHandler struct {
 	publicBoards   services.PublicBoardAvailability
 	sharing        *services.CollectionApplicationService
 	boardViewer    *PublicBoardHandler
+	itemAccess     *services.ItemApplicationService
+}
+
+// SetItemAccess wires the internal item reads used to authorize restricted
+// boards for staff viewers.
+func (h *CustomerAccessHandler) SetItemAccess(service *services.ItemApplicationService) {
+	h.itemAccess = service
+}
+
+// staffBoardAllowed reports whether a staff viewer may read the board
+// collection, reusing the internal item reads' collection rule.
+func (h *CustomerAccessHandler) staffBoardAllowed(userID, collectionID int) bool {
+	if h.itemAccess == nil {
+		return false
+	}
+	allowed, err := h.itemAccess.CanReadCollection(userID, collectionID)
+	return err == nil && allowed
 }
 
 func (h *CustomerAccessHandler) SetLimiter(limiter interface{ AllowRequest(*http.Request) bool }) {
@@ -333,16 +350,36 @@ func (h *CustomerAccessHandler) Guard(next http.Handler) http.Handler {
 					if parts[3] == "requests" && len(parts) == 5 && r.Method == http.MethodGet && config.PortalModuleEnabled("approvals") {
 						module = ""
 					}
-				case "request-types", "submit", "custom-fields":
+				case "request-types", "submit":
 					module = "forms"
+				case "custom-fields":
+					// Request forms and form-mode asset reports both resolve their
+					// custom-field definitions through this endpoint, so either
+					// enabled workflow may call it. The handler still scopes the
+					// definitions to what the viewer can see.
+					if !config.PortalModuleEnabled("forms") && !config.PortalModuleEnabled("asset-reports") {
+						respondForbidden(w, r)
+						return
+					}
 				case "drafts":
 					module = "drafts"
 				case "approvals":
 					module = "approvals"
 				case "knowledge-base":
 					module = "knowledge-base"
-				case "asset-reports", "assets":
+				case "asset-reports":
 					module = "asset-reports"
+				case "assets":
+					// The asset picker in a request form needs /assets/search. The
+					// other asset lookups stay with the asset-reports workflow.
+					if len(parts) == 5 && parts[4] == "search" {
+						if !config.PortalModuleEnabled("asset-reports") && !config.PortalModuleEnabled("forms") {
+							respondForbidden(w, r)
+							return
+						}
+					} else {
+						module = "asset-reports"
+					}
 				case "credentials", "passkey-prompt":
 					module = "profile"
 				case "auth":
@@ -355,6 +392,22 @@ func (h *CustomerAccessHandler) Guard(next http.Handler) http.Handler {
 				respondForbidden(w, r)
 				return
 			}
+			// The branded shell must render for denied visitors, so let the
+			// bootstrap read through with the effective access decision instead
+			// of rejecting it here. Content routes still gate below.
+			if len(parts) > 3 && parts[3] == "bootstrap" && r.Method == http.MethodGet {
+				access, err := h.resolvePortalAccess(r, *surface, config)
+				if err != nil {
+					respondInternalError(w, r, err)
+					return
+				}
+				next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), portalAccessContextKey{}, access)))
+				return
+			}
+		}
+		if kind == "portal" && internalUserID(r) > 0 {
+			next.ServeHTTP(w, r)
+			return
 		}
 		policy, err := h.repo.Policy(r.Context(), kind, surface.ID)
 		if err != nil {
@@ -364,6 +417,16 @@ func (h *CustomerAccessHandler) Guard(next http.Handler) http.Handler {
 		if policy.Mode == "public" {
 			next.ServeHTTP(w, r)
 			return
+		}
+		if kind == "board" {
+			if user := internalUserID(r); user > 0 {
+				if !h.staffBoardAllowed(user, surface.ID) {
+					respondNotFound(w, r, "board")
+					return
+				}
+				next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), staffBoardFilterKey{}, true)))
+				return
+			}
 		}
 		id := h.customer(r, *surface)
 		if id == 0 {
@@ -438,6 +501,67 @@ func (h *CustomerAccessHandler) issueSession(w http.ResponseWriter, r *http.Requ
 
 func portalAdmissionRequired(config models.ChannelConfig) bool {
 	return config.PortalRegistrationMode != "" && config.PortalRegistrationMode != "open" || len(config.PortalAllowedDomains) > 0
+}
+
+// portalAccess is the effective viewer for a portal request. Staff sessions take
+// precedence over a co-present customer session, matching the portal auth
+// middleware, so staff rules decide what a staff viewer may read.
+type portalAccess struct {
+	CustomerID     int
+	InternalID     int
+	ContentAllowed bool
+}
+
+// portalAccessContextKey carries the access decision from Guard to the portal
+// shell handler so a denied visitor still receives the branded entry response.
+type portalAccessContextKey struct{}
+
+// resolvePortalAccess decides whether the request may read portal content.
+// Identity is resolved independently from access: a signed-in customer who fails
+// admission or audience still gets an identity and a branded shell.
+func (h *CustomerAccessHandler) resolvePortalAccess(r *http.Request, surface models.CustomerSurface, config models.ChannelConfig) (portalAccess, error) {
+	access := portalAccess{}
+	if internal := internalUserID(r); internal > 0 {
+		access.InternalID, access.ContentAllowed = internal, true
+		return access, nil
+	}
+	access.CustomerID = h.customer(r, surface)
+	if access.CustomerID == 0 {
+		return access, nil
+	}
+	if portalAdmissionRequired(config) {
+		_, email, err := h.customers.GetIdentity(r.Context(), access.CustomerID)
+		if err != nil {
+			return access, err
+		}
+		if admitted := h.portalAdmission(r.Context(), surface, email) == nil; !admitted {
+			return access, nil
+		}
+	}
+	policy, err := h.repo.Policy(r.Context(), surface.Kind, surface.ID)
+	if err != nil {
+		return access, err
+	}
+	if policy.Mode == "public" {
+		access.ContentAllowed = true
+		return access, nil
+	}
+	allowed, err := h.repo.Allowed(r.Context(), surface, access.CustomerID)
+	if err != nil {
+		return access, err
+	}
+	access.ContentAllowed = allowed
+	return access, nil
+}
+
+// internalUserID returns the authenticated internal user's ID, or 0. Staff
+// sessions are recognized independently of customer admission so staff can
+// enter the portal; board audience rules still treat them as non-customers.
+func internalUserID(r *http.Request) int {
+	if user, ok := r.Context().Value(middleware.ContextKeyUser).(*models.User); ok && user != nil {
+		return user.ID
+	}
+	return 0
 }
 
 // Check current registration rules for customer sign-in and portal board reads.

@@ -27,6 +27,7 @@ import (
 	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 	"windshift/internal/repository/actionutil"
+	"windshift/internal/sideeffects"
 	"windshift/internal/utils"
 	"windshift/internal/validation"
 
@@ -80,6 +81,7 @@ type ActionService struct {
 
 	// Event admission and cache lifecycle.
 	durableIngress *DurableActionIngress
+	automationLane *sideeffects.Lane
 	stopChan       chan struct{}
 	wg             sync.WaitGroup
 
@@ -136,16 +138,15 @@ func NewActionService(db database.Database, config ActionServiceConfig, chainSto
 		chainStore = NewExecutionChainStore()
 	}
 	service := &ActionService{
-		db:             db,
-		repo:           repository.NewActionRepository(db),
-		revisions:      repository.NewActionRevisionRepository(db),
-		itemRepo:       repository.NewItemRepository(db),
-		config:         config,
-		actionCache:    make(map[int][]*models.Action),
-		durableIngress: NewDurableActionIngress(db),
-		stopChan:       make(chan struct{}),
-		chainStore:     chainStore,
-		itemUpdate:     NewItemUpdateApplicationService(db, nil),
+		db:          db,
+		repo:        repository.NewActionRepository(db),
+		revisions:   repository.NewActionRevisionRepository(db),
+		itemRepo:    repository.NewItemRepository(db),
+		config:      config,
+		actionCache: make(map[int][]*models.Action),
+		stopChan:    make(chan struct{}),
+		chainStore:  chainStore,
+		itemUpdate:  NewItemUpdateApplicationService(db, nil),
 	}
 
 	if err := service.refreshActionCache(); err != nil {
@@ -236,26 +237,73 @@ func (as *ActionService) SetPermissionService(ps *PermissionService) {
 	}
 }
 
-// EmitActionEvent durably admits an action trigger. Item compatibility events
-// stop at the recorded canonical cutover; SCM observations remain durable.
+// SetAutomationLane installs the shared automation lane. The dispatcher owns
+// the lane; the action service only admits non-canonical triggers into it.
+func (as *ActionService) SetAutomationLane(lane *sideeffects.Lane) { as.automationLane = lane }
+
+// EmitActionEvent admits an action trigger to the bounded in-memory automation
+// lane. Item compatibility events are derived from staged canonical facts and
+// stop here; the durable ingress is only used by the legacy test harness.
 func (as *ActionService) EmitActionEvent(event *models.ActionEvent) {
 	if event == nil {
 		return
 	}
-	if err := as.durableIngress.Emit(context.Background(), event); err != nil {
-		slog.Error("failed to persist action event",
+	if as.durableIngress != nil {
+		if err := as.durableIngress.Emit(context.Background(), event); err != nil {
+			slog.Error("failed to persist action event",
+				slog.String("component", "actions"),
+				slog.String("event_type", string(event.EventType)),
+				slog.Int("workspace_id", event.WorkspaceID),
+				slog.Any("error", err),
+			)
+			atomic.AddInt64(&as.errors, 1)
+		}
+		return
+	}
+	if isItemActionTrigger(event.EventType) {
+		return
+	}
+	if !as.admitAutomationEvent(event) {
+		slog.Warn("automation lane dropped action event",
 			slog.String("component", "actions"),
 			slog.String("event_type", string(event.EventType)),
 			slog.Int("workspace_id", event.WorkspaceID),
-			slog.Any("error", err),
 		)
 		atomic.AddInt64(&as.errors, 1)
 	}
 }
 
-// EmitActionEventInTx admits an SCM observation with its source ledger row.
+// admitAutomationEvent offers one action trigger to the automation lane.
+func (as *ActionService) admitAutomationEvent(event *models.ActionEvent) bool {
+	if as.automationLane == nil {
+		return false
+	}
+	payload, err := json.Marshal(automationEnvelope{Kind: envelopeKindAction, Action: event})
+	if err != nil {
+		return false
+	}
+	admitted, _ := as.automationLane.TryAdmit(sideeffects.Candidate{
+		EventType:  string(event.EventType),
+		Key:        uuid.New().String(),
+		Payload:    payload,
+		OccurredAt: time.Now().UTC(),
+	})
+	return admitted
+}
+
+// EmitActionEventInTx stages an SCM observation in the ledger transaction that
+// admits its provider identity. A rolled-back ledger publishes nothing.
 func (as *ActionService) EmitActionEventInTx(ctx context.Context, tx database.Tx, event *models.ActionEvent) error {
-	return as.durableIngress.EmitInTx(ctx, tx, event)
+	if as.durableIngress != nil {
+		return as.durableIngress.EmitInTx(ctx, tx, event)
+	}
+	if event == nil || !isSCMActionTrigger(event.EventType) {
+		return errors.New("SCM action event is required")
+	}
+	if stager, ok := database.TxEffectsOf(tx).(actionEventStager); ok {
+		stager.StageActionEvent(event)
+	}
+	return nil
 }
 
 // MarkScriptWritePending implements ActionScriptWriteMarker. It persists the

@@ -113,22 +113,22 @@ export const sla = {
     }
   },
 
-  // --- Team service-hours calendars ---
-  getTeamCalendars: (teamId) => fetchAPI(`${teamBase(teamId)}/working-calendars`),
+  // --- Team service-hours calendars (v2 session surface) ---
+  getTeamCalendars: (teamId) => fetchV2Data(`${teamBase(teamId)}/working-calendars`),
   createTeamCalendar: (teamId, data) =>
-    fetchAPI(`${teamBase(teamId)}/working-calendars`, {
+    fetchV2Data(`${teamBase(teamId)}/working-calendars`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
   updateTeamCalendar: (teamId, calendarId, data) =>
-    fetchAPI(`${teamBase(teamId)}/working-calendars/${calendarId}`, {
+    fetchV2Data(`${teamBase(teamId)}/working-calendars/${calendarId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
   deleteTeamCalendar: (teamId, calendarId) =>
-    fetchAPI(`${teamBase(teamId)}/working-calendars/${calendarId}`, { method: 'DELETE' }),
+    fetchV2Data(`${teamBase(teamId)}/working-calendars/${calendarId}`, { method: 'DELETE' }),
   getTeamCalendarImpact: (teamId, calendarId) =>
-    fetchAPI(`${teamBase(teamId)}/working-calendars/${calendarId}/impact`),
+    fetchV2Data(`${teamBase(teamId)}/working-calendars/${calendarId}/impact`),
 
   // --- Team-workspace bindings ---
   getWorkspaceTeamBindings: (workspaceId) => fetchAPI(`/workspaces/${workspaceId}/team-bindings`),

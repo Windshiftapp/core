@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS screen_fields (
 	display_order INTEGER DEFAULT 0,
 	is_required BOOLEAN DEFAULT false,
 	field_width TEXT DEFAULT 'full',
+	placement TEXT NOT NULL DEFAULT 'sidebar',
 	FOREIGN KEY (screen_id) REFERENCES screens(id) ON DELETE CASCADE
 );
 
@@ -141,6 +142,7 @@ CREATE INDEX IF NOT EXISTS idx_configuration_sets_workflow_id ON configuration_s
 CREATE UNIQUE INDEX IF NOT EXISTS uq_configuration_sets_builtin_key ON configuration_sets(builtin_key) WHERE builtin_key IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_item_types_builtin_key ON item_types(builtin_key) WHERE builtin_key IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_priorities_builtin_key ON priorities(builtin_key) WHERE builtin_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_priorities_single_default ON priorities(is_default) WHERE is_default = true;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_hierarchy_levels_builtin_key ON hierarchy_levels(builtin_key) WHERE builtin_key IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_screens_builtin_key ON screens(builtin_key) WHERE builtin_key IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_status_categories_builtin_key ON status_categories(builtin_key) WHERE builtin_key IS NOT NULL;
@@ -180,5 +182,4 @@ CREATE INDEX IF NOT EXISTS idx_configuration_set_screens_config_id ON configurat
 CREATE INDEX IF NOT EXISTS idx_configuration_set_screens_screen_id ON configuration_set_screens(screen_id);
 
 -- Workspace configuration set indexes
-CREATE INDEX IF NOT EXISTS idx_workspace_configuration_sets_workspace_id ON workspace_configuration_sets(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_workspace_configuration_sets_config_id ON workspace_configuration_sets(configuration_set_id);

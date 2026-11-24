@@ -1,8 +1,13 @@
 <script>
   import { untrack } from 'svelte';
   import { publicBoard } from '../api/publicBoard.js';
+  import { customerAccess } from '../api/customerAccess.js';
   import { themeStore } from '../stores/theme.svelte.js';
   import CustomerHeader from '../customer/CustomerHeader.svelte';
+  import CustomerSignInCard from '../customer/CustomerSignInCard.svelte';
+  import PortalLoginModal from '../portal/PortalLoginModal.svelte';
+  import AlertBox from '../components/AlertBox.svelte';
+  import Button from '../components/Button.svelte';
   import IconClipboardList from '@tabler/icons-svelte-runes/icons/clipboard-list';
   import IconAlertTriangle from '@tabler/icons-svelte-runes/icons/alert-triangle';
   import PublicBoardItemDetail from './PublicBoardItemDetail.svelte';
@@ -15,7 +20,7 @@
   import Lozenge from '../components/Lozenge.svelte';
   import StatusPill from '../components/StatusPill.svelte';
 
-  let { slug, client = publicBoard, embedded = false, initialItemKey = null, onitemchange = null, onaccessdenied = null } = $props();
+  let { slug, client = publicBoard, embedded = false, initialItemKey = null, onitemchange = null, onaccessdenied = null, onrequireauth = null } = $props();
 
   let selectedItemKey = $state(null);
 
@@ -23,6 +28,56 @@
   let loading = $state(true);
   let error = $state(null);
   let loadId = 0;
+  let showLogin = $state(false);
+  let authenticated = $state(false);
+  let authRevision = $state(0);
+  // A denied board OAuth redirect lands back here with the reason in the query.
+  let authError = $state(typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('customer_login_error') || '' : '');
+
+  async function refreshAuth() {
+    if (embedded) return;
+    try {
+      const status = await customerAccess.status('board', slug);
+      authenticated = status.authenticated === true;
+    } catch {
+      authenticated = false;
+    }
+  }
+
+  // Embedded boards open the host portal's single modal; standalone boards own
+  // their own. A user click opens it, never a background refresh.
+  function requireAuth() {
+    if (onrequireauth) onrequireauth();
+    else showLogin = true;
+  }
+
+  async function signOut() {
+    try { await customerAccess.login('board', slug, 'logout'); } catch { /* already signed out */ }
+    authenticated = false;
+    authRevision += 1;
+  }
+
+  async function handleLoginSuccess() {
+    await refreshAuth();
+    authRevision += 1;
+  }
+
+  // Board magic link: consume the one-time token once, clear it from the URL,
+  // then reload the board with the new session.
+  $effect(() => {
+    if (embedded || typeof window === 'undefined') return;
+    const token = new URLSearchParams(window.location.hash.slice(1)).get('customer_token');
+    if (!token) return;
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    customerAccess.login('board', slug, 'verify', { token })
+      .then(() => { void refreshAuth(); authRevision += 1; })
+      .catch(() => {});
+  });
+
+  $effect(() => {
+    if (embedded) return;
+    void refreshAuth();
+  });
 
   function selectItem(key) { selectedItemKey = key; onitemchange?.(key); }
 
@@ -105,6 +160,7 @@
   $effect(() => {
     const activeSlug = slug;
     const activeClient = client;
+    authRevision;
     const id = ++loadId;
     const controller = new AbortController();
     let inFlight = false;
@@ -133,7 +189,7 @@
         error = null;
       } catch (err) {
         if (disposed || id !== loadId || err?.name === 'AbortError') return;
-        error = err?.status === 404 ? 'not_found' : 'error';
+        error = err?.status === 404 ? 'not_found' : err?.status === 403 ? 'denied' : err?.status === 401 ? 'login_required' : 'error';
         board = null;
         selectedItemKey = null;
         if (err?.status === 401 || err?.status === 403) onaccessdenied?.(err.status);
@@ -168,7 +224,11 @@
 >
   <!-- Header -->
   {#if !embedded}
-    <CustomerHeader title={board?.collection.name || ''} description={board?.collection.description || ''} logo="windshift-3.svg" />
+    <CustomerHeader title={board?.collection.name || ''} description={board?.collection.description || ''} logo="windshift-3.svg">
+      {#snippet actions()}
+        {#if authenticated}<Button variant="ghost" dataTestid="customer-board-logout" onclick={signOut}>Sign out</Button>{/if}
+      {/snippet}
+    </CustomerHeader>
   {/if}
 
   <!-- Content -->
@@ -186,6 +246,28 @@
           <IconClipboardList class="w-10 h-10 mx-auto mb-4" style="color: var(--ds-icon-disabled);" />
           <h2 style="font-size: 20px; font-weight: 600; margin: 0 0 8px;">Board not found</h2>
           <p style="color: var(--ds-text-subtle); font-size: 14px;">This board doesn't exist or is no longer public.</p>
+        </div>
+      </div>
+    {:else if error === 'denied'}
+      <div data-testid="public-board-denied" style="display: flex; align-items: center; justify-content: center; height: 60vh;">
+        <div style="text-align: center; max-width: 360px;">
+          <IconAlertTriangle class="w-10 h-10 mx-auto mb-4" style="color: var(--ds-icon-danger);" />
+          <h2 style="font-size: 20px; font-weight: 600; margin: 0 0 8px;">Access denied</h2>
+          <p style="color: var(--ds-text-subtle); font-size: 14px;">Your account does not have access to this board.</p>
+        </div>
+      </div>
+    {:else if error === 'login_required'}
+      <div data-testid="public-board-login-required" style="display: flex; align-items: center; justify-content: center; height: 60vh; padding: 20px;">
+        <div style="max-width: 420px; width: 100%;">
+          {#if authError}
+            <div data-testid="customer-login-error" style="margin-bottom: 12px;"><AlertBox variant="error" message={authError} /></div>
+          {/if}
+          <CustomerSignInCard
+            title="Sign in to view this board"
+            description="Use your customer account to continue."
+            actionLabel="Sign in"
+            onaction={requireAuth}
+          />
         </div>
       </div>
     {:else if error}
@@ -366,6 +448,10 @@
 
   {#if selectedItemKey}
     {#key selectedItemKey}<PublicBoardItemDetail {slug} {client} itemKey={selectedItemKey} onclose={() => selectItem(null)} />{/key}
+  {/if}
+
+  {#if !embedded}
+    <PortalLoginModal kind="board" {slug} open={showLogin} onclose={() => (showLogin = false)} onloginsuccess={handleLoginSuccess} />
   {/if}
 </div>
 

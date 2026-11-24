@@ -149,14 +149,7 @@ CREATE TABLE IF NOT EXISTS configuration_set_notification_settings (
 	UNIQUE(configuration_set_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_config_set_notification_settings_config_set ON configuration_set_notification_settings(configuration_set_id);
 CREATE INDEX IF NOT EXISTS idx_config_set_notification_settings_notification ON configuration_set_notification_settings(notification_setting_id);
--- Pins the "one notification setting per configuration set" rule with a named
--- index so the matching catalog migration can detect it (the column-level
--- UNIQUE above creates an unnamed auto-index that the Check predicate can't
--- key on).
-CREATE UNIQUE INDEX IF NOT EXISTS uq_config_set_notification_setting_one_per_set
-    ON configuration_set_notification_settings(configuration_set_id);
 
 -- Web Push subscriptions: one per browser/device endpoint a user registers for
 -- push notifications. Mirrored by the 20260618_push_subscriptions catalog

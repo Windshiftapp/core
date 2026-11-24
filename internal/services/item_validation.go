@@ -1,6 +1,7 @@
 package services
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -30,6 +31,10 @@ type ItemValidationParams struct {
 type ItemValidationResult struct {
 	Valid bool
 	Error string
+	// WorkspaceKey is the validated workspace's display key. Carrying it here
+	// keeps one source of identity for the creation snapshot, so a caller that
+	// cannot do a joined read still has the item key.
+	WorkspaceKey string
 }
 
 // IsItemTypeAllowedInWorkspace checks whether the given item type is allowed
@@ -60,14 +65,14 @@ func ValidateItemCreation(db database.Database, params ItemValidationParams) *It
 		return &ItemValidationResult{Valid: false, Error: "Title is required"}
 	}
 
-	// Validate workspace exists
-	var workspaceExists bool
-	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = ?)", params.WorkspaceID).Scan(&workspaceExists)
+	// Validate workspace exists and carry its key for the creation snapshot.
+	var workspaceKey string
+	err := db.QueryRow("SELECT key FROM workspaces WHERE id = ?", params.WorkspaceID).Scan(&workspaceKey)
+	if errors.Is(err, sql.ErrNoRows) {
+		return &ItemValidationResult{Valid: false, Error: "Workspace not found"}
+	}
 	if err != nil {
 		return &ItemValidationResult{Valid: false, Error: fmt.Sprintf("Failed to validate workspace: %v", err)}
-	}
-	if !workspaceExists {
-		return &ItemValidationResult{Valid: false, Error: "Workspace not found"}
 	}
 
 	// Validate parent item if specified
@@ -90,7 +95,7 @@ func ValidateItemCreation(db database.Database, params ItemValidationParams) *It
 		}
 	}
 
-	return &ItemValidationResult{Valid: true}
+	return &ItemValidationResult{Valid: true, WorkspaceKey: workspaceKey}
 }
 
 // validateParentHierarchy validates the parent-child hierarchy relationship.

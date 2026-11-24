@@ -17,11 +17,13 @@ import (
 	"windshift/internal/validation"
 )
 
-// resolvePortalRequest authorizes a request owner or active approver.
-// Approver access permits reading and commenting only and ends with the pending
-// approval step; isOwner distinguishes the two so write endpoints can refuse
-// approvers. On success callers must defer cancel.
-func (h *PortalHandler) resolvePortalRequest(w http.ResponseWriter, r *http.Request) (itemID int, config models.ChannelConfig, internalUserID *int, portalCustomerID *int, isOwner bool, ctx context.Context, cancel context.CancelFunc, ok bool) { //nolint:gocritic // multiple results needed for this complex guard
+// resolvePortalRequest authorizes a request viewer: the creator, an external
+// participant or a qualifying organisation peer may read, comment and upload;
+// an active approver may read and comment only. canEngage is true for the
+// former group so write endpoints (uploads) admit them and refuse approvers.
+// Approver access ends with the pending approval step. On success callers must
+// defer cancel.
+func (h *PortalHandler) resolvePortalRequest(w http.ResponseWriter, r *http.Request) (itemID int, config models.ChannelConfig, internalUserID *int, portalCustomerID *int, canEngage bool, ctx context.Context, cancel context.CancelFunc, ok bool) { //nolint:gocritic // multiple results needed for this complex guard
 	itemID, itemOK := requireIDParam(w, r, "itemId")
 	if !itemOK {
 		return 0, models.ChannelConfig{}, nil, nil, false, nil, nil, false
@@ -35,14 +37,17 @@ func (h *PortalHandler) resolvePortalRequest(w http.ResponseWriter, r *http.Requ
 	// Get auth info from context (middleware already validated)
 	internalUserID, portalCustomerID = h.getAuthFromContext(r)
 
-	// Ownership grants request access only while the requests module is enabled.
-	isOwner, err := h.portalService.VerifyRequestOwnership(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
+	// The creator, participants and qualifying organisation peers may engage
+	// with the request (read, comment, upload) while the requests module is
+	// enabled. This is deliberately not "ownership": the shared rule admits
+	// non-creators who are allowed to participate.
+	canEngage, err := h.portalService.VerifyRequestEngagement(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
 	if err != nil {
 		cancel()
 		respondInternalError(w, r, err)
 		return 0, models.ChannelConfig{}, nil, nil, false, nil, nil, false
 	}
-	if isOwner && config.PortalModuleEnabled("requests") {
+	if canEngage && config.PortalModuleEnabled("requests") {
 		return itemID, config, internalUserID, portalCustomerID, true, ctx, cancel, true
 	}
 
@@ -51,7 +56,19 @@ func (h *PortalHandler) resolvePortalRequest(w http.ResponseWriter, r *http.Requ
 	// portal channels (an approver on item X in channel A must not be able to
 	// read X via channel B's portal slug).
 	if h.approvalService != nil {
-		isApprover, aerr := h.callerIsActiveApproverOnItem(ctx, itemID, channel.ID, internalUserID, portalCustomerID)
+		// Resolve the same approval actor the list and decision handlers use: an
+		// internal user can be assigned through a linked customer identity, so
+		// checking only the staff pool would hide the related item context from
+		// an approver who can see the approval itself.
+		approverUserID, approverCustomerID := internalUserID, portalCustomerID
+		if actor, aerr := h.portalApprovalActorFromRequest(r); aerr == nil {
+			approverUserID, approverCustomerID = actor.userID, actor.customerID
+		} else if !errors.Is(aerr, errPortalApprovalActorUnauthorized) {
+			cancel()
+			respondInternalError(w, r, aerr)
+			return 0, models.ChannelConfig{}, nil, nil, false, nil, nil, false
+		}
+		isApprover, aerr := h.callerIsActiveApproverOnItem(ctx, itemID, channel.ID, approverUserID, approverCustomerID)
 		if aerr != nil {
 			cancel()
 			respondInternalError(w, r, aerr)
@@ -176,18 +193,34 @@ func (h *PortalHandler) GetRequestComments(w http.ResponseWriter, r *http.Reques
 	// anything else degrades to plain text. Mention tokens lose their embedded
 	// internal user id. Both the raw markdown (rendered client-side through the
 	// shared read-only editor) and the sanitized HTML form are rewritten.
-	resolver := h.portalKBPageLinkResolver(config)
 	for i := range comments {
-		comments[i].Content = h.portalRawMarkdown(comments[i].Content, config)
-		comments[i].ContentHTML = markdown.RewritePageLinks(comments[i].ContentHTML, resolver)
+		raw, html, err := h.portalCommentProjection(config, comments[i].Content)
+		if err != nil {
+			respondInternalError(w, r, fmt.Errorf("render portal comment %d: %w", comments[i].ID, err))
+			return
+		}
+		comments[i].Content = raw
+		comments[i].ContentHTML = html
 	}
 
 	respondJSONOK(w, comments)
 }
 
+// portalCommentProjection prepares a comment for portal readers. Published
+// page links become in-portal article links, everything else degrades to plain
+// text, and mention tokens lose their embedded internal user id. New and
+// loaded comments share this projection so POST and GET agree.
+func (h *PortalHandler) portalCommentProjection(config models.ChannelConfig, content string) (raw, html string, err error) {
+	html, err = markdown.Render(content)
+	if err != nil {
+		return "", "", err
+	}
+	return h.portalRawMarkdown(content, config), markdown.RewritePageLinks(html, h.portalKBPageLinkResolver(config)), nil
+}
+
 // AddRequestComment adds a comment to a request from a portal customer or internal user
 func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request) {
-	itemID, _, internalUserID, portalCustomerID, _, ctx, cancel, ok := h.resolvePortalRequest(w, r)
+	itemID, config, internalUserID, portalCustomerID, _, ctx, cancel, ok := h.resolvePortalRequest(w, r)
 	if !ok {
 		return
 	}
@@ -216,17 +249,17 @@ func (h *PortalHandler) AddRequestComment(w http.ResponseWriter, r *http.Request
 		respondInternalError(w, r, err)
 		return
 	}
-	contentHTML, err := markdown.Render(comment.Content)
+	content, contentHTML, err := h.portalCommentProjection(config, comment.Content)
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("render portal comment: %w", err))
 		return
 	}
 
-	// Return the created comment
+	// Return the created comment projected the same way as a later GET.
 	response := map[string]any{
 		"id":            comment.ID,
 		"item_id":       comment.ItemID,
-		"content":       comment.Content,
+		"content":       content,
 		"content_html":  contentHTML,
 		"created_at":    comment.CreatedAt,
 		"updated_at":    comment.UpdatedAt,
@@ -266,20 +299,21 @@ func (h *PortalHandler) GetRequestAttachments(w http.ResponseWriter, r *http.Req
 	respondJSONOK(w, attachments)
 }
 
-// AddRequestAttachment stores a file uploaded by the request owner. Approvers
-// have read-only portal access, so uploads are owner-only. The upload shares
-// the submission rate limiter and the same validation, storage, and limits as
-// the authenticated item attachment surface. Portal-customer uploads are
-// attributed to the customer end to end (attachment record + item history);
-// internal-owner uploads keep user attribution.
+// AddRequestAttachment stores a file uploaded by a request participant.
+// Creators, external participants and qualifying organisation peers may
+// upload; active approvers have read/comment-only access, so uploads are
+// refused for them. The upload shares the submission rate limiter and the same
+// validation, storage, and limits as the authenticated item attachment surface.
+// Portal-customer uploads are attributed to the customer end to end (attachment
+// record + item history); internal-owner uploads keep user attribution.
 func (h *PortalHandler) AddRequestAttachment(w http.ResponseWriter, r *http.Request) {
-	itemID, _, internalUserID, portalCustomerID, isOwner, _, cancel, ok := h.resolvePortalRequest(w, r)
+	itemID, _, internalUserID, portalCustomerID, canEngage, _, cancel, ok := h.resolvePortalRequest(w, r)
 	if !ok {
 		return
 	}
 	defer cancel()
 
-	if !isOwner {
+	if !canEngage {
 		respondNotFound(w, r, "item")
 		return
 	}
@@ -289,9 +323,21 @@ func (h *PortalHandler) AddRequestAttachment(w http.ResponseWriter, r *http.Requ
 		respondServiceUnavailable(w, r, "Attachments are not enabled on this server")
 		return
 	}
+	policy, err := svc.UploadPolicy()
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !policy.Enabled || policy.MaxFileSize <= 0 {
+		respondServiceUnavailable(w, r, "Attachments are not enabled on this server")
+		return
+	}
 
-	// Cap the request before parsing, mirroring the internal upload endpoint.
-	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
+	// Cap the request at the effective per-file limit plus multipart framing,
+	// mirroring the internal upload endpoint; the per-file limit is enforced
+	// after reading.
+	maxBody := policy.MaxFileSize + services.AttachmentMultipartOverheadBytes
+	r.Body = http.MaxBytesReader(w, r.Body, maxBody)
 	// #nosec G120 -- the body is already capped by MaxBytesReader above; the int arg is the in-memory threshold, not the upper bound
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		if isRequestBodyTooLarge(err) {
@@ -307,9 +353,13 @@ func (h *PortalHandler) AddRequestAttachment(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	defer func() { _ = file.Close() }()
-	data, err := io.ReadAll(file)
+	data, err := io.ReadAll(io.LimitReader(file, policy.MaxFileSize+1))
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("read portal attachment: %w", err))
+		return
+	}
+	if int64(len(data)) > policy.MaxFileSize {
+		respondRequestTooLarge(w, r)
 		return
 	}
 

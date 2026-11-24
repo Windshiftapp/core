@@ -136,6 +136,18 @@ func (r *ItemRepository) GetDescendantsWithMaxDepthContext(ctx context.Context, 
 	if maxDepth <= 0 || maxDepth > maxItemHierarchyDepth {
 		maxDepth = maxItemHierarchyDepth
 	}
+	// Drive hydration from the descendant set so the planner does one
+	// primary-key lookup per descendant instead of scanning every item and
+	// probing the descendant set. SQLite only honors the order through a
+	// CROSS JOIN; PostgreSQL rejects CROSS JOIN ... ON and may reorder a plain
+	// inner join, so it uses a lateral lookup instead.
+	fromClause := "FROM descendants d CROSS JOIN items i ON i.id = d.id"
+	if database.IsPostgresDriver(r.db.GetDriverName()) {
+		// PostgreSQL rejects CROSS JOIN ... ON and flattens a plain lateral
+		// subquery back into a hash join; OFFSET 0 keeps it a barrier so the
+		// plan does one primary-key lookup per descendant.
+		fromClause = "FROM descendants d CROSS JOIN LATERAL (SELECT * FROM items WHERE id = d.id OFFSET 0) i"
+	}
 	rows, err := r.db.QueryContext(ctx, `
 		WITH RECURSIVE descendants AS (
 			SELECT id, parent_id, 1 as level
@@ -157,8 +169,7 @@ func (r *ItemRepository) GetDescendantsWithMaxDepthContext(ctx context.Context, 
 		       s.builtin_key as status_builtin_key,
 		       it.name as item_type_name,
 		       d.level
-		FROM items i
-		INNER JOIN descendants d ON i.id = d.id
+		`+fromClause+`
 		JOIN workspaces w ON i.workspace_id = w.id
 		LEFT JOIN priorities pri ON i.priority_id = pri.id
 		LEFT JOIN statuses s ON i.status_id = s.id
@@ -661,7 +672,18 @@ func (r *ItemRepository) GetDescendantIDsInWorkspaces(parentID int, workspaceIDs
 
 // GetDescendantIDs returns just the IDs of all descendants (for bulk operations like delete)
 func (r *ItemRepository) GetDescendantIDs(parentID int) ([]int, error) {
-	rows, err := r.db.Query(`
+	return r.GetDescendantIDsWithMaxDepthContext(context.Background(), parentID, maxItemHierarchyDepth)
+}
+
+// GetDescendantIDsWithMaxDepthContext returns only the descendant IDs, capped
+// at maxDepth levels. It is the narrow counterpart to
+// GetDescendantsWithMaxDepthContext for callers that evict or mutate by ID and
+// do not need hydrated rows.
+func (r *ItemRepository) GetDescendantIDsWithMaxDepthContext(ctx context.Context, parentID, maxDepth int) ([]int, error) {
+	if maxDepth <= 0 || maxDepth > maxItemHierarchyDepth {
+		maxDepth = maxItemHierarchyDepth
+	}
+	rows, err := r.db.QueryContext(ctx, `
 		WITH RECURSIVE descendants AS (
 			SELECT id, 1 as level FROM items WHERE parent_id = ?
 			UNION ALL
@@ -670,7 +692,7 @@ func (r *ItemRepository) GetDescendantIDs(parentID int) ([]int, error) {
 			WHERE d.level < ?
 		)
 		SELECT id FROM descendants
-	`, parentID, maxItemHierarchyDepth)
+	`, parentID, maxDepth)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get descendant ids: %w", err)
 	}

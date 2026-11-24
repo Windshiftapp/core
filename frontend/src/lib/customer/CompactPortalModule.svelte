@@ -9,10 +9,9 @@
   import Button from '../components/Button.svelte';
   import Spinner from '../components/Spinner.svelte';
   import AlertBox from '../components/AlertBox.svelte';
-  import PortalLoginModal from '../portal/PortalLoginModal.svelte';
   import GlobalConfirmDialog from '../dialogs/GlobalConfirmDialog.svelte';
 
-  let { slug, kind, formId = null, articleId = null, draftsEnabled = true, onidentitychange = null, ondefaultunavailable = null } = $props();
+  let { slug, kind, formId = null, articleId = null, draftsEnabled = true, ondefaultunavailable = null } = $props();
   let ready = $state(false);
   let error = $state('');
   let selectedForm = $state(null);
@@ -37,21 +36,30 @@
       const [, bootstrap] = await Promise.all([portalStore.loadPortal(slug), portalAuthStore.checkAuth(slug)]);
       if (disposed) return;
       portalStore.hydrateUserBootstrap(bootstrap);
-      if (!bootstrap?.authenticated) { portalStore.showLoginDialog = true; ready = true; return; }
+      if (!bootstrap?.authenticated) { ready = true; return; }
       if (kind === 'requests') {
+        // setVisible starts the list load; only a deep link needs an explicit
+        // detail read. Calling load() here as well issued a second list GET.
         portalRequestsStore.setVisible(true);
         if ($currentRoute.query?.id) await portalRequestsStore.loadAndView($currentRoute.query.id);
-        else await portalRequestsStore.load();
       }
-      if (kind === 'approvals') { portalApprovalsStore.setVisible(true); if ($currentRoute.query?.id) await portalApprovalsStore.loadAndView($currentRoute.query.id); else await portalApprovalsStore.load(); }
-      if (kind === 'drafts') { portalDraftsStore.setVisible(true); await portalDraftsStore.load(); }
+      if (kind === 'approvals') { portalApprovalsStore.setVisible(true); if ($currentRoute.query?.id) await portalApprovalsStore.loadAndView($currentRoute.query.id); }
+      if (kind === 'drafts') { portalDraftsStore.setVisible(true); }
       if (kind === 'forms') {
         await portalCatalogStore.loadRequestTypes();
         if (disposed) return;
         const id = formId;
         const forms = portalCatalogStore.requestTypes;
         const target = id ? forms.find(form => form.id === id) : forms.length === 1 && !$currentRoute.query?.choose ? forms[0] : null;
-        if (id && !target) { if (ondefaultunavailable) { ondefaultunavailable(); return; } error = 'This request form is unavailable.'; }
+        if (id && !target) {
+          // An explicit form link (path param or legacy ?request-type=) must
+          // report the missing form rather than leave the spinner up. Only an
+          // unavailable *default* module falls back to another module.
+          if (ondefaultunavailable) ondefaultunavailable();
+          else error = 'This request form is unavailable.';
+          if (!disposed) ready = true;
+          return;
+        }
         if (target) selectedForm = target;
         prefill = Object.fromEntries(Object.entries($currentRoute.query || {}).filter(([key]) => key.startsWith('prefill.') && !key.endsWith('.label')).map(([key, value]) => [key.slice(8), value]));
       }
@@ -74,10 +82,9 @@
       <LazyRootView loader={kind === 'knowledge-base' && articleId ? loaders.article : loaders[kind]} label="Portal module" componentProps={kind === 'knowledge-base' && articleId ? { pageId: articleId, onunavailable: ondefaultunavailable } : kind === 'drafts' ? { onresume: ({ requestType }) => navigate(`/portal/${slug}/request/${requestType.id}`) } : kind === 'asset-reports' ? { onOpenAssetReportForm: report => selectedReport = report, onOpenRequestForm: form => navigate(`/portal/${slug}/request/${form.id}`) } : {}} />
     {/if}
   {/if}
-  <PortalLoginModal onloginsuccess={async () => { await onidentitychange?.(); if (!disposed) await load(); }} />
-  <GlobalConfirmDialog />
   {#if selectedForm}
     <LazyRootDialog loader={loadForm} isOpen={true} componentProps={{ requestType: selectedForm, portalSlug: slug, prefill, draftsEnabled, onsubmitted: id => navigate(`/portal/${slug}?view=requests&id=${id}`), onclose: () => { selectedForm = null; navigate(`/portal/${slug}?module=forms&choose=1`); } }} />
   {/if}
   {#if selectedReport}<LazyRootDialog loader={loadReport} isOpen={true} componentProps={{ report: selectedReport, portalSlug: slug, onclose: () => selectedReport = null }} />{/if}
+  <GlobalConfirmDialog />
 </div>

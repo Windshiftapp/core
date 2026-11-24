@@ -155,6 +155,7 @@ type Server struct {
 	workflowService              *services.WorkflowService
 	actionService                *services.ActionService
 	assetActionService           *services.AssetActionService
+	sideEffectDispatcher         *services.SideEffectDispatcher
 	eventEngine                  *events.Engine
 	approvalEscalationSweeper    *services.ApprovalEscalationSweeper
 	incidentEscalationSweeper    *services.IncidentEscalationSweeper
@@ -392,14 +393,19 @@ func (s *Server) initialize() error {
 		additionalProxyList = strings.Split(cfg.AdditionalProxies, ",")
 	}
 
-	ipExtractor := utils.NewIPExtractor(cfg.UseProxy, additionalProxyList)
+	// One trust policy is shared by client-IP extraction, session-cookie
+	// Secure/HSTS detection, audit attribution, and the admin diagnostic that
+	// reports whether the deployment is affected by the private-range finding.
+	proxyTrustObserver := utils.NewTrustObserver()
+	trustPolicy := utils.NewTrustPolicy(cfg.UseProxy, cfg.ProxyTrustMode == config.ProxyTrustModeStrict, additionalProxyList, proxyTrustObserver)
+
+	ipExtractor := utils.NewIPExtractorWithPolicy(trustPolicy)
 
 	primarySessionCacheMB, _ := config.SplitSSHCacheBudget(s.memoryBudget.SessionCacheMB, cfg.SSH.Enabled)
-	sessionManager := auth.NewSessionManagerWithValidationCacheTTL(
+	sessionManager := auth.NewSessionManagerWithTrustPolicy(
 		s.db,
 		enableHTTPS,
-		cfg.UseProxy,
-		additionalProxyList,
+		trustPolicy,
 		cfg.Auth.SessionSecret,
 		cfg.Auth.SessionIPBinding,
 		cfg.Auth.SessionValidationCacheTTL,
@@ -492,14 +498,7 @@ func (s *Server) initialize() error {
 		},
 	)
 
-	authMiddleware := middleware.NewAuthMiddleware(sessionManager, tokenManager, s.db, cfg.UseProxy, additionalProxyList, setupCompleted)
-
-	var additionalProxyIPs []net.IP
-	for _, proxyStr := range additionalProxyList {
-		if ip := net.ParseIP(strings.TrimSpace(proxyStr)); ip != nil {
-			additionalProxyIPs = append(additionalProxyIPs, ip)
-		}
-	}
+	authMiddleware := middleware.NewAuthMiddleware(sessionManager, tokenManager, s.db, trustPolicy, setupCompleted)
 
 	mux := http.NewServeMux()
 	healthHandler := health.NewHandler(s.db.GetDB())
@@ -533,9 +532,6 @@ func (s *Server) initialize() error {
 		services.DefaultNotificationServiceConfig(),
 		notificationAssetPermissions,
 	)
-	if err := services.PrepareDurableNotificationEngine(context.Background(), s.eventEngine, s.notificationService); err != nil {
-		return fmt.Errorf("prepare durable notification consumers: %w", err)
-	}
 
 	smtpSender := smtp.NewNotificationSMTPSender(s.db)
 	s.notificationScheduler = scheduler.NewNotificationScheduler(s.db, smtpSender, cfg.Notification.BatchInterval, s.notificationService)
@@ -593,18 +589,27 @@ func (s *Server) initialize() error {
 	s.actionService = services.NewActionService(s.db, services.DefaultActionServiceConfig(), chainStore)
 	s.actionService.SetNotificationService(s.notificationService)
 	s.actionService.SetPermissionService(permService)
-	if err := services.PrepareDurableActionEngine(context.Background(), s.eventEngine, s.actionService); err != nil {
-		return fmt.Errorf("prepare durable action consumers: %w", err)
-	}
 	slog.Info("action service initialized")
 
 	s.assetActionService = services.NewAssetActionService(s.db, services.DefaultActionServiceConfig(), chainStore)
 	s.assetActionService.SetNotificationService(s.notificationService)
 	s.assetActionService.SetPermissionService(permService)
-	if err := services.PrepareDurableAssetActionEngine(context.Background(), s.eventEngine, s.assetActionService); err != nil {
-		return fmt.Errorf("prepare durable asset action consumers: %w", err)
-	}
 	slog.Info("asset action service initialized")
+
+	// The side-effect dispatcher owns the shared automation lane and builds the
+	// per-transaction staging buffer both lanes publish through. Canonical item
+	// and asset facts are staged by their recorders and published once after the
+	// outer commit; the durable consumers are retired below.
+	dispatcher, err := services.NewSideEffectDispatcher(
+		s.db, s.notificationService, s.actionService, s.assetActionService,
+		services.DefaultSideEffectBudget(),
+	)
+	if err != nil {
+		return fmt.Errorf("create side-effect dispatcher: %w", err)
+	}
+	s.sideEffectDispatcher = dispatcher
+	database.SetTxEffectsFactory(dispatcher.NewTransactionEffects)
+	slog.Info("side-effect dispatcher initialized")
 
 	// Determine base URL — cfg.BaseURL is already resolved by config.Load
 	// from the --base-url flag or BASE_URL env; only the localhost fallback
@@ -617,7 +622,7 @@ func (s *Server) initialize() error {
 
 	emailVerificationService := services.NewEmailVerificationService(s.db, smtpSender, baseURL)
 
-	portalSessionManager := auth.NewPortalSessionManager(s.db, enableHTTPS, cfg.UseProxy, additionalProxyList, cfg.Auth.SessionSecret, cfg.Auth.SessionIPBinding)
+	portalSessionManager := auth.NewPortalSessionManagerWithTrustPolicy(s.db, enableHTTPS, trustPolicy, cfg.Auth.SessionSecret, cfg.Auth.SessionIPBinding)
 
 	magicLinkService := services.NewMagicLinkService(s.db, smtpSender, baseURL)
 
@@ -936,7 +941,7 @@ func (s *Server) initialize() error {
 
 	setupHandler := handlers.NewSetupHandler(s.db, sessionManager, authMiddleware, ipExtractor)
 
-	ssoHandler := handlers.NewSSOHandler(s.db, sessionManager, permService, emailVerificationService, s.pluginManager, cfg.Auth.SessionSecret, baseURL, cfg.AllowedHosts, cfg.DisableCSRF, ipExtractor, cfg.UseProxy, additionalProxyList)
+	ssoHandler := handlers.NewSSOHandlerWithTrust(s.db, sessionManager, permService, emailVerificationService, s.pluginManager, cfg.Auth.SessionSecret, baseURL, cfg.AllowedHosts, cfg.DisableCSRF, ipExtractor, trustPolicy)
 
 	s.scmHTTPClients = scm.NewHTTPClientPool()
 	scmProviderHandler := handlers.NewSCMProviderHandler(s.db, cfg.Auth.SessionSecret, baseURL, s.scmHTTPClients)
@@ -1287,36 +1292,6 @@ func (s *Server) initialize() error {
 	s.zammadSyncScheduler.Start()
 	zammadHandler.SetSyncAllTrigger(s.zammadSyncScheduler.TriggerSyncAll)
 
-	// Standard profiles execute in-process through the canonical aitools
-	// registry. Wiring is intentionally late because their final comments and
-	// approval tools use the fully configured application services above.
-	if bindingSvc != nil {
-		standardDispatcher, err := standardagent.New(standardagent.Options{
-			DB:                     s.db,
-			Runs:                   repository.NewAgentRunRepository(s.db),
-			Bindings:               agentBindingRepo,
-			LLMs:                   llmManager,
-			Permissions:            permService,
-			TimePermissions:        timePermissionService,
-			Timers:                 timerService,
-			Comments:               commentService,
-			Approvals:              approvalService,
-			Notifications:          s.notificationService,
-			ActionService:          s.actionService,
-			PageApplicationService: pageApplication,
-			PageDiagramService:     pageDiagramService,
-			Registry:               aitools.Default,
-		})
-		if err != nil {
-			return fmt.Errorf("construct Standard agent runtime: %w", err)
-		}
-		bindingSvc.SetStandardRunDispatcher(standardDispatcher)
-		s.standardAgentDispatcher = standardDispatcher
-		if err := standardDispatcher.Resume(context.Background()); err != nil {
-			return fmt.Errorf("resume Standard agent runtime: %w", err)
-		}
-	}
-
 	// Background sweeper drives time-based escalation for pending approval steps.
 	s.approvalEscalationSweeper = services.NewApprovalEscalationSweeper(s.db, approvalService, services.DefaultApprovalEscalationSweeperConfig())
 	s.approvalEscalationSweeper.Start()
@@ -1339,7 +1314,7 @@ func (s *Server) initialize() error {
 		slaClock = s.slaTestClock
 	}
 	s.slaEngine.SetClock(slaClock)
-	s.slaEngine.SetSideEffectEmitter(services.NewSLASideEffectEmitter(s.db))
+	s.slaEngine.SetSideEffectEmitter(services.NewSLASideEffectEmitter())
 	s.slaEngine.SetInlineObserver(s.metrics)
 	s.slaLoop = sla.NewLoop(repository.NewSLARepository(s.db), s.slaEngine, slaClock, nil, sla.LoopConfig{})
 	s.slaEngine.SetJobOwner(s.slaLoop.Owner())
@@ -1615,6 +1590,8 @@ func (s *Server) initialize() error {
 		pageDiagramService,
 	)
 	aiHandler.SetConversationDependencies(commentService, approvalService)
+	aiHandler.SetReleaseNotesItemLimit(cfg.LLM.ReleaseNotesItemLimit)
+	aiHandler.SetReleaseNotesTokenBudget(cfg.LLM.ReleaseNotesTokenBudget)
 	conversationRepo := repository.NewAgentConversationRepository(s.db)
 	if _, err := conversationRepo.FailInterruptedRuns(context.Background()); err != nil {
 		return fmt.Errorf("repair interrupted agent conversations: %w", err)
@@ -1677,7 +1654,7 @@ func (s *Server) initialize() error {
 	scimGroup := router.NewRouteGroup(mux, "/scim/v2", scimMiddleware...)
 
 	// Create portal auth middleware (accepts both internal and portal sessions)
-	portalAuthMiddleware := middleware.NewPortalAuthMiddleware(sessionManager, portalSessionManager, cfg.UseProxy, additionalProxyList)
+	portalAuthMiddleware := middleware.NewPortalAuthMiddleware(sessionManager, portalSessionManager, trustPolicy)
 	oauthHandler := handlers.NewOAuthHandler(
 		s.db,
 		agentHandler,
@@ -1689,6 +1666,44 @@ func (s *Server) initialize() error {
 
 	// Build route dependencies
 	slaHandler := handlers.NewSLAHandler(s.db, s.slaEngine, permService)
+
+	// One diagnostics handler serves both the unversioned admin routes and the
+	// canonical v2 session route.
+	diagnosticsHandler := handlers.NewDiagnosticsHandler(
+		sessionManager,
+		s.databaseDiagRepo,
+		repository.NewActionRepository(s.db),
+		repository.NewWebhookDeliveryRepository(s.db),
+		repository.NewSchedulerRunRepository(s.db),
+		repository.NewFracIndexRepository(s.db),
+		repository.NewAIRepository(s.db),
+		llmManager,
+		llmModelCache,
+		logger.NewAuditor(s.db),
+		repository.NewRunnerRepository(s.db),
+		repository.NewAgentRunRepository(s.db),
+		s.webhookSender,
+		transitionMatrixService,
+		bulkOperationMetrics,
+		repository.NewRecurrenceRepository(s.db),
+		repository.NewSystemSettingRepository(s.db),
+		s.globalRankMigrationScheduler,
+		s.memoryBudget,
+		s.eventEngine.Store(),
+		repository.NewSCMHealthRepository(s.db),
+		repository.NewChannelRepository(s.db),
+		s.sideEffectDispatcher,
+		handlers.ProxyTrustConfig{
+			UseProxy:          cfg.UseProxy,
+			ProxyAutoDetected: cfg.UseProxy && !cfg.UseProxyExplicit,
+			Strict:            cfg.ProxyTrustMode == config.ProxyTrustModeStrict,
+			AdditionalProxies: trustPolicy.ConfiguredProxies(),
+			InvalidProxies:    trustPolicy.InvalidAdditional,
+			Observer:          proxyTrustObserver,
+			Policy:            trustPolicy,
+		},
+	)
+
 	routeDeps := &routes.Deps{
 		SLA:       slaHandler,
 		API:       api,
@@ -1785,30 +1800,7 @@ func (s *Server) initialize() error {
 			Features:         featuresHandler,
 			ShellBootstrap:   shellBootstrapHandler,
 			OAuthClients:     handlers.NewAdminOAuthClientHandler(s.db, tokenManager, permService),
-			Diagnostics: handlers.NewDiagnosticsHandler(
-				sessionManager,
-				s.databaseDiagRepo,
-				repository.NewActionRepository(s.db),
-				repository.NewWebhookDeliveryRepository(s.db),
-				repository.NewSchedulerRunRepository(s.db),
-				repository.NewFracIndexRepository(s.db),
-				repository.NewAIRepository(s.db),
-				llmManager,
-				llmModelCache,
-				logger.NewAuditor(s.db),
-				repository.NewRunnerRepository(s.db),
-				repository.NewAgentRunRepository(s.db),
-				s.webhookSender,
-				transitionMatrixService,
-				bulkOperationMetrics,
-				repository.NewRecurrenceRepository(s.db),
-				repository.NewSystemSettingRepository(s.db),
-				s.globalRankMigrationScheduler,
-				s.memoryBudget,
-				s.eventEngine.Store(),
-				repository.NewSCMHealthRepository(s.db),
-				repository.NewChannelRepository(s.db),
-			),
+			Diagnostics:      diagnosticsHandler,
 			AgentSecurity: handlers.NewAgentSecurityHandler(
 				agentSecurityRepo,
 				services.NewUserReadService(s.db),
@@ -2025,6 +2017,44 @@ func (s *Server) initialize() error {
 		WithComments(commentService).
 		WithAssetPermissions(services.NewAssetPermissionService(repository.NewAssetRepository(s.db), permService)).
 		WithClock(slaClock)
+	// Board surfaces reuse the internal item reads to authorize staff viewers.
+	publicBoardHandler.SetItemAccess(itemApplication)
+	customerAccessHandler.SetItemAccess(itemApplication)
+	// Chat tools write through the same item and worklog pipelines as HTTP.
+	aiHandler.SetMutationServices(itemApplication, timeWorklogService)
+	// Standard profiles execute in-process through the canonical aitools
+	// registry. Wiring is intentionally late because their final comments,
+	// approval tools, and item/worklog mutations use the fully configured
+	// application services above; Resume must not start a queued run before
+	// those services are installed.
+	if bindingSvc != nil {
+		standardDispatcher, err := standardagent.New(standardagent.Options{
+			DB:                     s.db,
+			Runs:                   repository.NewAgentRunRepository(s.db),
+			Bindings:               agentBindingRepo,
+			LLMs:                   llmManager,
+			Permissions:            permService,
+			TimePermissions:        timePermissionService,
+			Timers:                 timerService,
+			Comments:               commentService,
+			Approvals:              approvalService,
+			Notifications:          s.notificationService,
+			ActionService:          s.actionService,
+			ItemApplication:        itemApplication,
+			TimeWorklogService:     timeWorklogService,
+			PageApplicationService: pageApplication,
+			PageDiagramService:     pageDiagramService,
+			Registry:               aitools.Default,
+		})
+		if err != nil {
+			return fmt.Errorf("construct Standard agent runtime: %w", err)
+		}
+		bindingSvc.SetStandardRunDispatcher(standardDispatcher)
+		s.standardAgentDispatcher = standardDispatcher
+		if err := standardDispatcher.Resume(context.Background()); err != nil {
+			return fmt.Errorf("resume Standard agent runtime: %w", err)
+		}
+	}
 	itemDetailApplication := services.NewItemDetailApplicationService(s.db, itemApplication, itemLinkService, permService).
 		WithContextReaders(screenHandler, requestTypeHandler, actionApplication).
 		WithStoryPointRollups(repository.NewItemRepository(s.db))
@@ -2097,6 +2127,7 @@ func (s *Server) initialize() error {
 		Timers:                       timerService,
 		SystemAdmins:                 permService,
 		GlobalPermission:             permService,
+		TeamAccess:                   teamRepo,
 		Groups:                       groupHandler.Application(),
 		AdminUsers:                   services.NewAdminUserService(s.db, userDeactivationService),
 		AuditLogs:                    repository.NewAuditLogRepository(s.db),
@@ -2125,6 +2156,7 @@ func (s *Server) initialize() error {
 		ItemLifecycle:                services.NewItemLifecycleService(s.db, permService),
 		TicketImport:                 services.NewTicketImportService(s.db, permService, importScratch),
 		OperatorControls:             services.NewOperatorControlsService(s.db, attachmentStorage),
+		Diagnostics:                  diagnosticsHandler,
 		SessionMiddleware:            authMiddleware.OptionalAuth,
 		SearchAllowed:                s.searchLimiter.AllowRequest,
 		DBRequestTimeout:             s.config.DB.RequestTimeout,
@@ -2163,6 +2195,8 @@ func (s *Server) initialize() error {
 			TimerService:           timerService,
 			CommentService:         commentService,
 			ItemDeletionService:    itemHandler.ItemDeletionApplicationService(),
+			ItemApplicationService: itemApplication,
+			TimeWorklogService:     timeWorklogService,
 			PageApplicationService: pageApplication,
 			PageDiagramService:     pageDiagramService,
 			ActionService:          s.actionService,
@@ -2271,7 +2305,7 @@ func (s *Server) initialize() error {
 	go jiraHosts.Start(s.jiraHostStopChan)
 
 	// Recovery converts panics before the metrics layer records the final status.
-	securityMiddleware := createSecurityHeaders(enableHTTPS, cfg.UseProxy, additionalProxyIPs, jiraHosts.Allowed, securitySettingsHandler.ExternalImagesAllowed)
+	securityMiddleware := createSecurityHeadersWithTrust(enableHTTPS, trustPolicy, jiraHosts.Allowed, securitySettingsHandler.ExternalImagesAllowed)
 	compressionMiddleware := middleware.CreateCompressionMiddleware(cfg.UseProxy)
 	applicationHandler := middleware.Recovery(compressionMiddleware(securityMiddleware(middleware.OperatorAdmission(controls)(s.metrics.CaptureRoutePattern(mux)))))
 	handler := s.metrics.Instrument(applicationHandler)
@@ -2285,6 +2319,21 @@ func (s *Server) initialize() error {
 		IdleTimeout:         60 * time.Second,
 		MaxHeaderBytes:      1 << 20,
 		MaxHeaderValueCount: maxRequestHeaderValueCount,
+	}
+	if err := services.DeactivateRetiredConsumers(context.Background(), s.eventEngine.Store()); err != nil {
+		return fmt.Errorf("deactivate retired domain event consumers: %w", err)
+	}
+	// Account for and remove abandoned retired work in bounded batches. The
+	// pass is resumable: a large backlog is drained over later startups and
+	// never marks unfinished work successful.
+	if _, err := services.RunRetiredCleanup(context.Background(), s.db, services.RetiredConsumerKeys(), services.RetiredCleanupOptions{
+		BatchSize:  200,
+		MaxBatches: 10,
+	}); err != nil {
+		slog.Warn("retired side-effect cleanup did not complete", slog.String("component", "sideeffects"), slog.Any("error", err))
+	}
+	if s.sideEffectDispatcher != nil {
+		s.sideEffectDispatcher.Start(context.Background())
 	}
 	if err := s.eventEngine.Start(context.Background()); err != nil {
 		return fmt.Errorf("start domain event engine: %w", err)
@@ -2602,6 +2651,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		}
 	}
 
+	if s.sideEffectDispatcher != nil {
+		slog.Info("draining side-effect automation lane")
+		s.sideEffectDispatcher.Shutdown(ctx)
+	}
+
 	if s.notificationService != nil {
 		slog.Info("stopping notification service")
 		_ = s.notificationService.Close()
@@ -2664,6 +2718,11 @@ func (s *Server) cleanup() {
 	// New also calls cleanup after a partially completed initialize. Signal any
 	// loops already started there, even when Shutdown was never reachable.
 	s.stopBackgroundLoops()
+	if s.sideEffectDispatcher != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		s.sideEffectDispatcher.Shutdown(ctx)
+		cancel()
+	}
 	if s.databasePoolMonitor != nil {
 		s.databasePoolMonitor.Stop()
 	}

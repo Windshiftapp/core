@@ -35,6 +35,7 @@ let approvalComment = $state('');
 let decidingApproval = $state(false);
 
 let requestsLoadId = 0;
+let requestDetailLoadId = 0;
 let commentsLoadId = 0;
 let attachmentsLoadId = 0;
 let draftsLoadId = 0;
@@ -53,8 +54,14 @@ function selectView(view) {
   showRequests = view === 'requests';
   showDrafts = view === 'drafts';
   showApprovals = view === 'approvals';
-  if (view !== 'requests') selectedRequest = null;
+  if (view !== 'requests') {
+    // Invalidate any in-flight detail read so leaving the view cannot
+    // restore the old selection later.
+    requestDetailLoadId += 1;
+    selectedRequest = null;
+  }
   if (view !== 'approvals') {
+    approvalDetailLoadId += 1;
     selectedApproval = null;
     selectedApprovalRequest = null;
   }
@@ -128,6 +135,8 @@ async function addAttachment(file) {
 }
 
 async function viewRequest(request) {
+  // A list selection supersedes any in-flight deep-link detail load.
+  requestDetailLoadId += 1;
   selectedRequest = request;
   navigate(`/portal/${context.getSlug()}?view=requests&id=${request.id}`);
   await Promise.all([loadComments(request.id), loadAttachments(request.id)]);
@@ -136,8 +145,10 @@ async function viewRequest(request) {
 async function loadAndViewRequest(requestId) {
   const slug = context.getSlug();
   if (!slug) return;
+  const loadId = ++requestDetailLoadId;
   try {
     let request = await portal.getRequestDetail(slug, requestId);
+    if (loadId !== requestDetailLoadId) return;
     // A merged duplicate is a redirect to its canonical (WI-1528). Follow a
     // bounded chain so a stale deep link lands on the live thread. When the
     // canonical is not readable here (a cross-requester merge keeps the
@@ -149,10 +160,13 @@ async function loadAndViewRequest(requestId) {
         request = await portal.getRequestDetail(slug, requestId);
         break;
       }
+      if (loadId !== requestDetailLoadId) return;
     }
+    if (loadId !== requestDetailLoadId) return;
     selectedRequest = request;
     await Promise.all([loadComments(request.id), loadAttachments(request.id)]);
   } catch (err) {
+    if (loadId !== requestDetailLoadId) return;
     console.error('Failed to load request:', err);
   }
 }
@@ -179,7 +193,9 @@ async function addComment() {
 }
 
 function closeRequestDetail() {
+  requestDetailLoadId += 1;
   attachmentsLoadId += 1;
+  commentsLoadId += 1;
   selectedRequest = null;
   comments = [];
   newComment = '';
@@ -193,6 +209,7 @@ function setShowRequests(value) {
     if (isAuthenticated()) void loadRequests();
   } else {
     showRequests = false;
+    requestDetailLoadId += 1;
     selectedRequest = null;
   }
 }
@@ -201,6 +218,7 @@ async function toggleRequests() {
   context.closeProfileMenu();
   if (showRequests) {
     showRequests = false;
+    requestDetailLoadId += 1;
     selectedRequest = null;
     comments = [];
     navigate(`/portal/${context.getSlug()}`);
@@ -292,8 +310,11 @@ async function loadAndViewApproval(approvalId, _replaceState = true) {
     selectedApprovalRequest = null;
     if (detail?.item_id) {
       try {
-        selectedApprovalRequest = await portal.getRequestDetail(slug, detail.item_id);
+        const requestContext = await portal.getRequestDetail(slug, detail.item_id);
+        if (loadId !== approvalDetailLoadId) return;
+        selectedApprovalRequest = requestContext;
       } catch (err) {
+        if (loadId !== approvalDetailLoadId) return;
         console.warn('Failed to load request context for approval:', err);
       }
     }
@@ -339,6 +360,7 @@ async function decideApproval(decision) {
 }
 
 function closeApprovalDetail() {
+  approvalDetailLoadId += 1;
   selectedApproval = null;
   selectedApprovalRequest = null;
   approvalComment = '';
@@ -351,6 +373,7 @@ function setShowApprovals(value) {
     if (isAuthenticated()) void loadApprovals();
   } else {
     showApprovals = false;
+    approvalDetailLoadId += 1;
     selectedApproval = null;
   }
 }
@@ -359,6 +382,7 @@ async function toggleApprovals() {
   context.closeProfileMenu();
   if (showApprovals) {
     showApprovals = false;
+    approvalDetailLoadId += 1;
     selectedApproval = null;
     navigate(`/portal/${context.getSlug()}`);
     return;
@@ -380,7 +404,9 @@ function hydrate(bootstrap) {
 
 function reset() {
   requestsLoadId++;
+  requestDetailLoadId++;
   commentsLoadId++;
+  attachmentsLoadId++;
   draftsLoadId++;
   approvalsLoadId++;
   approvalDetailLoadId++;

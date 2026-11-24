@@ -442,11 +442,14 @@ func (r *TeamRepository) GetResolvedMembers(teamID int) ([]models.ResolvedTeamMe
 	return members, rows.Err()
 }
 
-// GetTeamsForUser returns teams where the user is a direct member or in a mapped group
+// GetTeamsForUser returns teams where the user is a direct member or in a mapped
+// group, with the user's direct membership role joined for permission-aware UIs.
 func (r *TeamRepository) GetTeamsForUser(userID int) ([]models.Team, error) {
 	rows, err := r.db.Query(`
-		SELECT DISTINCT t.id, t.name, t.description, t.is_active, t.created_by, t.created_at, t.updated_at
+		SELECT t.id, t.name, t.description, t.is_active, t.created_by, t.created_at, t.updated_at,
+		       COALESCE(tm.role, 'member') AS role
 		FROM teams t
+		LEFT JOIN team_members tm ON tm.team_id = t.id AND tm.user_id = ?
 		WHERE t.id IN (
 			SELECT team_id FROM team_members WHERE user_id = ?
 			UNION
@@ -455,7 +458,7 @@ func (r *TeamRepository) GetTeamsForUser(userID int) ([]models.Team, error) {
 			WHERE gm.user_id = ?
 		)
 		ORDER BY t.name
-	`, userID, userID)
+	`, userID, userID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get teams for user: %w", err)
 	}
@@ -468,7 +471,7 @@ func (r *TeamRepository) GetTeamsForUser(userID int) ([]models.Team, error) {
 
 		if err := rows.Scan(
 			&team.ID, &team.Name, &team.Description, &team.IsActive, &createdBy,
-			&team.CreatedAt, &team.UpdatedAt,
+			&team.CreatedAt, &team.UpdatedAt, &team.Role,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan team: %w", err)
 		}

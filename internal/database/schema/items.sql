@@ -77,8 +77,6 @@ CREATE TABLE IF NOT EXISTS items (
 
 -- Workspace and item type indexes
 CREATE INDEX IF NOT EXISTS idx_items_workspace_id ON items(workspace_id);
-CREATE INDEX IF NOT EXISTS idx_items_workspace_item_number ON items(workspace_id, workspace_item_number);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_items_workspace_item_number_unique ON items(workspace_id, workspace_item_number);
 CREATE INDEX IF NOT EXISTS idx_items_item_type_id ON items(item_type_id);
 
 -- Status and priority indexes
@@ -94,8 +92,11 @@ CREATE INDEX IF NOT EXISTS idx_items_creator_id ON items(creator_id);
 CREATE INDEX IF NOT EXISTS idx_items_reporter_id ON items(reporter_id);
 CREATE INDEX IF NOT EXISTS idx_items_creator_portal_customer_id ON items(creator_portal_customer_id);
 
--- Board "Bubble Mode" recency sort
-CREATE INDEX IF NOT EXISTS idx_items_workspace_last_active ON items(workspace_id, last_active_at);
+-- Board "Bubble Mode" recency sort. The list orders by the null-safe
+-- COALESCE expression, which the narrower (workspace_id, last_active_at)
+-- index cannot supply; the expression index matches the ORDER BY and the
+-- active-row predicate so page selection is an ordered index search.
+CREATE INDEX IF NOT EXISTS idx_items_workspace_activity_active ON items(workspace_id, COALESCE(last_active_at, updated_at, created_at), id) WHERE merged_into_item_id IS NULL;
 
 -- Time tracking indexes
 CREATE INDEX IF NOT EXISTS idx_items_time_project_id ON items(time_project_id);
@@ -119,6 +120,13 @@ CREATE INDEX IF NOT EXISTS idx_items_workspace_parent_rank ON items(workspace_id
 CREATE UNIQUE INDEX IF NOT EXISTS idx_items_frac_index ON items(frac_index);
 CREATE INDEX IF NOT EXISTS idx_items_workspace_frac_index ON items(workspace_id, frac_index);
 CREATE INDEX IF NOT EXISTS idx_items_workspace_parent_frac_index ON items(workspace_id, parent_id, frac_index);
+
+-- Active (unmerged) item indexes. Every list and count filters out merged
+-- duplicates, so the partial predicate keeps those rows out of the hot-path
+-- indexes and makes the workspace count and the ranked page selection
+-- index-only instead of scanning the items table.
+CREATE INDEX IF NOT EXISTS idx_items_workspace_id_active ON items(workspace_id) WHERE merged_into_item_id IS NULL;
+CREATE INDEX IF NOT EXISTS idx_items_workspace_frac_index_active ON items(workspace_id, frac_index) WHERE merged_into_item_id IS NULL;
 
 -- Durable singleton coordination state for the 0.8.5 global rank
 -- normalization. The 'legacy' phase stays admitted here only so databases

@@ -25,6 +25,15 @@ type domainEventDiagnosticsResponse struct {
 	Filter      domainEventDiagnosticsFilter    `json:"filter"`
 	Consumers   []domainEventConsumerDiagnostic `json:"consumers"`
 	Failures    []domainEventFailureDiagnostic  `json:"failures"`
+	// SideEffects reports the process-local notification and automation lanes
+	// that replaced the retired durable consumers.
+	SideEffects map[string]any `json:"side_effects,omitempty"`
+}
+
+// sideEffectDiagnostics exposes the bounded in-memory lane counters without
+// coupling the handler to the service implementation.
+type sideEffectDiagnostics interface {
+	Diagnostics() map[string]any
 }
 
 type domainEventDiagnosticsFilter struct {
@@ -136,9 +145,19 @@ func (h *DiagnosticsHandler) GetDomainEvents(w http.ResponseWriter, r *http.Requ
 			ConsumerKey: filter.ConsumerKey,
 			WorkspaceID: filter.WorkspaceID,
 		},
-		Consumers: consumers,
-		Failures:  failureRows,
+		Consumers:   consumers,
+		Failures:    failureRows,
+		SideEffects: h.sideEffectStatsDiagnostics(),
 	})
+}
+
+// sideEffectStatsDiagnostics returns the in-memory lane diagnostics, or nil
+// when the handler was constructed without them.
+func (h *DiagnosticsHandler) sideEffectStatsDiagnostics() map[string]any {
+	if h.sideEffectStats == nil {
+		return nil
+	}
+	return h.sideEffectStats.Diagnostics()
 }
 
 func parseDomainEventDiagnosticsQuery(
@@ -246,6 +265,8 @@ func (h *DiagnosticsHandler) changeDomainEventDelivery(w http.ResponseWriter, r 
 			respondNotFound(w, r, "Domain event")
 		case errors.Is(err, events.ErrDeliveryState):
 			respondConflict(w, r, "Domain event delivery is not in terminal failure state")
+		case errors.Is(err, events.ErrConsumerRetired):
+			respondConflict(w, r, "Domain event consumer is retired and no longer accepts replay")
 		default:
 			respondInternalError(w, r, err)
 		}

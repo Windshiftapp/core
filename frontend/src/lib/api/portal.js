@@ -3,16 +3,6 @@ import { createCrudClient } from './createCrudClient.js';
 
 // Portal Auth API (magic link authentication for portal customers)
 export const portalAuth = {
-  // Request a magic link email. `next` is an optional same-portal path the
-  // emailed verify link should return to after sign-in. `locale` is the portal
-  // UI's current locale; the server stores it once on first contact so the
-  // first email is already localized.
-  requestMagicLink: (slug, email, next, locale) =>
-    fetchAPI(`/portal/${slug}/auth/request`, {
-      method: 'POST',
-      body: JSON.stringify({ email, next, locale }),
-    }),
-
   // Verify a magic link token (returns session on success)
   verifyMagicLink: (slug, token) =>
     fetchAPI(`/portal/${slug}/auth/verify?token=${encodeURIComponent(token)}`),
@@ -52,15 +42,6 @@ export const portalPasskey = {
   remove: (slug, credentialId) =>
     fetchAPI(`/portal/${slug}/credentials/webauthn/${encodeURIComponent(credentialId)}`, {
       method: 'DELETE',
-    }),
-  startLogin: (slug) =>
-    fetchAPI(`/portal/${slug}/auth/webauthn/login/start`, {
-      method: 'POST',
-    }),
-  completeLogin: (slug, body) =>
-    fetchAPI(`/portal/${slug}/auth/webauthn/login/complete`, {
-      method: 'POST',
-      body: JSON.stringify(body),
     }),
   dismissPrompt: (slug) =>
     fetchAPI(`/portal/${slug}/passkey-prompt/dismiss`, {
@@ -130,6 +111,19 @@ export const portal = {
 
   // Get custom fields used by this portal's request types (portal-authenticated)
   getCustomFields: (slug) => fetchAPI(`/portal/${slug}/custom-fields`),
+
+  // Search assets exposed to the portal. Pass `fieldId` for an asset custom
+  // field: the server loads that field's admin-configured asset set and
+  // ql_query (the caller never supplies CQL). `assetSetId` is the report-scoped
+  // fallback. `query` narrows by title/description.
+  searchAssets: (slug, { fieldId = null, query = '', assetSetId = null, limit = 20 } = {}) => {
+    const params = new URLSearchParams();
+    if (fieldId) params.set('field_id', String(fieldId));
+    if (query) params.set('q', query);
+    if (assetSetId) params.set('asset_set_id', String(assetSetId));
+    if (limit) params.set('limit', String(limit));
+    return fetchAPI(`/portal/${slug}/assets/search?${params.toString()}`);
+  },
 
   // Portal-side approvals — list pending approvals for the active customer (or
   // internal user with a customer link), open a single request, and decide.
