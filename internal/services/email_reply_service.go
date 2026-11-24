@@ -126,13 +126,8 @@ func (s *EmailReplyService) handleCommentCreated(params HandleCommentParams, del
 	// reply key proves the address, plus every external request participant
 	// (WI-1136). Each gets its own outbox row so replies attribute per
 	// recipient, and the intake participant guard accepts them as repliers.
-	var customerEmail, customerName string
-	if item.CreatorPortalCustomerID != nil {
-		err = s.db.QueryRow("SELECT email, name FROM portal_customers WHERE id = ?", *item.CreatorPortalCustomerID).Scan(&customerEmail, &customerName)
-	} else {
-		customerEmail, customerName = item.ContactEmail, item.ContactName
-	}
-	if err != nil || customerEmail == "" {
+	customerEmail, customerName, ok := s.requesterRecipient(item)
+	if !ok {
 		slog.Debug("no addressable requester for item, skipping reply",
 			"component", "email_reply_service",
 			slog.Int("item_id", params.ItemID),
@@ -255,6 +250,11 @@ func (s *EmailReplyService) handleCommentCreated(params HandleCommentParams, del
 		}
 		outboxIDs = append(outboxIDs, outboxID)
 	}
+	if len(outboxIDs) > 0 {
+		// The key is persisted, so the ticket must never fall back to legacy
+		// (generation 0) authorization again, even after this row is pruned.
+		s.markReplyKeyIssued(params.ItemID)
+	}
 
 	// Sending immediately keeps the current low-latency behavior. The durable
 	// rows remain pending on failure and are retried by NotificationScheduler.
@@ -359,6 +359,40 @@ func (s *EmailReplyService) mailboxAddress(channelID int) (address, name string)
 	}
 	_ = s.db.QueryRow(`SELECT name FROM channels WHERE id = ?`, channelID).Scan(&name)
 	return address, name
+}
+
+// markReplyKeyIssued records the durable per-item marker that this ticket has
+// issued a recipient-bound reply key (WI-2365). It is what lets the legacy
+// fallback stay closed after the outbox row carrying the key is pruned, so it
+// must be written whenever a generation-1 outbox row is persisted. Set-once; a
+// failure is logged because the outbox row still blocks the legacy path until
+// it is pruned.
+func (s *EmailReplyService) markReplyKeyIssued(itemID int) {
+	if _, err := s.db.ExecWrite(`
+		UPDATE items SET reply_key_issued_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND reply_key_issued_at IS NULL
+	`, itemID); err != nil {
+		slog.Warn("failed to record reply-key marker; legacy replies stay blocked by the outbox row only",
+			"component", "email_reply_service",
+			slog.Int("item_id", itemID),
+			slog.Any("error", err),
+		)
+	}
+}
+
+// requesterRecipient resolves the customer-facing recipient of an item: the
+// verified portal owner when there is one, otherwise the unverified email
+// contact recorded by intake. Notices, receipts and replies all use it so an
+// email-only request reaches its sender before ownership is verified
+// (WI-2365). ok is false when the item has no addressable requester.
+func (s *EmailReplyService) requesterRecipient(item *models.Item) (email, name string, ok bool) {
+	if item.CreatorPortalCustomerID != nil {
+		return s.noticeCustomer(*item.CreatorPortalCustomerID)
+	}
+	if item.ContactEmail == "" {
+		return "", "", false
+	}
+	return item.ContactEmail, item.ContactName, true
 }
 
 // emailRecipient is one outbound reply target.
@@ -503,10 +537,10 @@ func (s *EmailReplyService) SendAutomationNotice(itemID, actorID int, subject, m
 	if err != nil || item == nil {
 		return false, skipReason, err
 	}
-	if item.CreatorPortalCustomerID == nil {
-		return false, "no_customer", nil
-	}
-	customerEmail, customerName, ok := s.noticeCustomer(*item.CreatorPortalCustomerID)
+	// Same requester resolution as staff replies and receipts: an email-only
+	// request has no portal owner yet, but its contact is still the person an
+	// automation `notify_customer` rule is meant to reach (WI-2365).
+	customerEmail, customerName, ok := s.requesterRecipient(item)
 	if !ok {
 		return false, "no_customer", nil
 	}
@@ -639,20 +673,33 @@ func (s *EmailReplyService) sendItemNotice(item *models.Item, toEmail, toName, s
 	// succeeds but the process dies before recording the key, the customer
 	// holds a Message-ID Windshift never learned. A persistence failure must
 	// therefore fail the notice instead of sending an unroutable key.
-	if _, err := s.db.ExecWrite(`
+	//
+	// Delivery is recorded only after SMTP accepts the message: an undelivered
+	// row is not a delivered reply key, and must never be picked as a thread
+	// parent, or a later email would name a message the customer never received
+	// as its parent (WI-2365). Holding outboxMu keeps the scheduler from
+	// claiming this pending row between the insert and the send.
+	s.outboxMu.Lock()
+	defer s.outboxMu.Unlock()
+	var outboxID int
+	if err := s.db.QueryRow(`
 		INSERT INTO email_reply_outbox (
 			kind, channel_id, item_id, to_email, to_name, subject,
 			html_body, text_body, message_id, key_generation, in_reply_to, references_json,
 			from_email, from_name, reply_to_email, reply_to_name,
-			next_attempt_at, delivered_at, created_at, updated_at
+			next_attempt_at, created_at, updated_at
 		) VALUES ('notice', ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?,
-		          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		ON CONFLICT DO NOTHING
+		RETURNING id
 	`, *item.ChannelID, item.ID, toEmail, toName, emailSubject,
 		htmlBody, textBody, messageID, inReplyTo, string(referencesJSON),
-		s.getSMTPFromEmail(), authorName, replyToEmail, replyToName); err != nil {
+		s.getSMTPFromEmail(), authorName, replyToEmail, replyToName).Scan(&outboxID); err != nil {
 		return false, "", fmt.Errorf("persist customer notice reply key: %w", err)
 	}
+	// The key exists on the ticket from now on, so the legacy fallback is closed
+	// for it even if this notice is never delivered.
+	s.markReplyKeyIssued(item.ID)
 
 	if err := s.smtpSender.SendThreadedEmail(smtp.ThreadedEmailParams{
 		ToEmail:      toEmail,
@@ -666,7 +713,26 @@ func (s *EmailReplyService) sendItemNotice(item *models.Item, toEmail, toName, s
 		InReplyTo:    inReplyTo,
 		References:   references,
 	}); err != nil {
+		// The customer never received this key, and the action run records the
+		// failure, so the row must not be retried as a delayed notice. Drop it;
+		// the reply-key marker above stays set conservatively.
+		if _, delErr := s.db.ExecWrite(`DELETE FROM email_reply_outbox WHERE id = ? AND delivered_at IS NULL`, outboxID); delErr != nil {
+			slog.Warn("failed to drop undelivered customer notice key",
+				"component", "email_reply_service",
+				slog.Int("item_id", item.ID),
+				slog.Int("outbox_id", outboxID),
+				slog.Any("error", delErr),
+			)
+		}
 		return false, "", fmt.Errorf("send customer notice: %w", err)
+	}
+
+	if _, err := s.db.ExecWrite(`
+		UPDATE email_reply_outbox
+		SET delivered_at = CURRENT_TIMESTAMP, last_error = NULL, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND delivered_at IS NULL
+	`, outboxID); err != nil {
+		return false, "", fmt.Errorf("mark customer notice delivered: %w", err)
 	}
 
 	// Audit record after a successful send: the notice's Message-ID and thread
@@ -765,6 +831,9 @@ func (s *EmailReplyService) EnqueueIntakeConfirmation(itemID, customerID int) er
 		htmlBody, textBody, messageID, s.getSMTPFromEmail(), customerName, replyToEmail, replyToName); err != nil {
 		return fmt.Errorf("enqueue intake confirmation: %w", err)
 	}
+	// A duplicate receipt (ON CONFLICT DO NOTHING) means an earlier enqueue already
+	// carried the key, so the marker is safe to set either way.
+	s.markReplyKeyIssued(itemID)
 	return nil
 }
 

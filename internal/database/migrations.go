@@ -3786,6 +3786,25 @@ END $$;
 			CREATE INDEX IF NOT EXISTS idx_email_message_tracking_key_generation ON email_message_tracking(key_generation);
 		`,
 	},
+	{
+		// WI-2365 review: the legacy (generation 0) fallback must stay closed on a
+		// ticket that has issued a recipient-bound key, even after the outbox row
+		// is pruned. Outbox rows are deleted 90 days after delivery, so a guard
+		// that only looks there reopens the legacy path once the last key is
+		// pruned. This per-item marker is never pruned.
+		Version: "20261206_email_reply_key_marker",
+		Name:    "Record that a ticket issued a recipient-bound reply key (WI-2365)",
+		CheckSQLite: "SELECT CASE WHEN (" + sqliteColumnCheck("items", "reply_key_issued_at") +
+			") > 0 THEN 1 ELSE 0 END",
+		CheckPostgres: "SELECT CASE WHEN (" + pgColumnCheck("items", "reply_key_issued_at") +
+			") > 0 THEN 1 ELSE 0 END",
+		SQLite: `
+			ALTER TABLE items ADD COLUMN reply_key_issued_at DATETIME;
+		`,
+		Postgres: `
+			ALTER TABLE items ADD COLUMN IF NOT EXISTS reply_key_issued_at TIMESTAMPTZ;
+		`,
+	},
 }
 
 // domainEventClaimableIndexMigration adds the partial index the claim query

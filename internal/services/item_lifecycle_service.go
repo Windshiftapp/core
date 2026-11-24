@@ -702,13 +702,23 @@ func (s *ItemLifecycleService) GetMergeRedirect(ctx context.Context, userID, ite
 }
 
 func sameRequester(a, b *models.Item) bool {
-	if a.CreatorPortalCustomerID == nil && b.CreatorPortalCustomerID == nil {
-		return true
+	// A portal customer is a verified, shared identity: two tickets belong to
+	// the same requester only when both name the same customer.
+	if a.CreatorPortalCustomerID != nil || b.CreatorPortalCustomerID != nil {
+		return a.CreatorPortalCustomerID != nil && b.CreatorPortalCustomerID != nil &&
+			*a.CreatorPortalCustomerID == *b.CreatorPortalCustomerID
 	}
-	if a.CreatorPortalCustomerID == nil || b.CreatorPortalCustomerID == nil {
+	// Neither side has a verified owner. An unverified email contact is not a
+	// shared identity: the claimed From proves nothing, so a matching address
+	// may still be two different requesters. Such merges take the
+	// different-requester path (private comments, content kept on the source)
+	// until ownership is verified (WI-2365).
+	if a.ContactEmail != "" || b.ContactEmail != "" {
 		return false
 	}
-	return *a.CreatorPortalCustomerID == *b.CreatorPortalCustomerID
+	// Both tickets were created internally (no portal owner, no email contact),
+	// so they share the workspace rather than an external requester.
+	return true
 }
 
 // sourceItemLinks lists item links attached to the given item on either side.

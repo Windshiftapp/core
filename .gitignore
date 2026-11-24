@@ -38,6 +38,9 @@ cx
 !frontend/src/lib/mobile/mobile-i18n.spec.js
 !frontend/scripts/hardcoded-i18n-ast.spec.js
 !frontend/src/lib/api/integrations.spec.js
+# Email-origin request classification (WI-2365): the internal-note control must
+# stay available on helpdesk-email requests, so this helper is covered in-tree.
+!frontend/src/lib/utils/requestOrigin.spec.js
 !frontend/src/lib/features/items/zammadPanelContext.spec.js
 !frontend/src/lib/features/items/ZammadLinkResolver.spec.js
 !internal/repository/zammad_repository_test.go

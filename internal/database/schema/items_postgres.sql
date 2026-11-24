@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS items (
 	-- contact_email/contact_name: see items.sql for the unverified-contact contract.
 	contact_email TEXT,
 	contact_name TEXT,
+	-- reply_key_issued_at: see items.sql for the reply-key marker contract.
+	reply_key_issued_at TIMESTAMPTZ,
 	custom_field_values JSONB,
 	virtual_field_data TEXT,
 	calendar_data TEXT,

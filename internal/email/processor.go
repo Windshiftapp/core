@@ -626,6 +626,12 @@ func (p *Processor) lookupReplyKey(ctx context.Context, canonicalID string) (ite
 // ticket it was recorded on. Those rows are generation 0 and carry no
 // recipient, so they are tolerated only on a ticket that has never issued a
 // recipient-bound key; synthetic anchors (from_email = ”) never authorize.
+//
+// "Never issued" is decided by the durable items.reply_key_issued_at marker,
+// not by the outbox: delivered outbox rows are pruned after 90 days, so a guard
+// that only looked there would reopen the legacy path once the last key row
+// disappeared (WI-2365). The outbox check stays as a second line of defense for
+// a marker write that failed.
 func (p *Processor) lookupLegacyReplyItem(ctx context.Context, canonicalID string) (int, bool) {
 	bareID := bareMessageID(canonicalID)
 	var itemID int
@@ -633,6 +639,10 @@ func (p *Processor) lookupLegacyReplyItem(ctx context.Context, canonicalID strin
 		SELECT t.item_id FROM email_message_tracking t
 		WHERE t.message_id IN (?, ?) AND t.direction = 'outbound' AND t.item_id IS NOT NULL
 		  AND t.key_generation = 0 AND t.from_email <> ''
+		  AND NOT EXISTS (
+		      SELECT 1 FROM items i
+		      WHERE i.id = t.item_id AND i.reply_key_issued_at IS NOT NULL
+		  )
 		  AND NOT EXISTS (
 		      SELECT 1 FROM email_reply_outbox o
 		      WHERE o.item_id = t.item_id AND o.key_generation >= 1
