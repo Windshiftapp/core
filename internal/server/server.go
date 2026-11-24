@@ -1294,36 +1294,6 @@ func (s *Server) initialize() error {
 	s.zammadSyncScheduler.Start()
 	zammadHandler.SetSyncAllTrigger(s.zammadSyncScheduler.TriggerSyncAll)
 
-	// Standard profiles execute in-process through the canonical aitools
-	// registry. Wiring is intentionally late because their final comments and
-	// approval tools use the fully configured application services above.
-	if bindingSvc != nil {
-		standardDispatcher, err := standardagent.New(standardagent.Options{
-			DB:                     s.db,
-			Runs:                   repository.NewAgentRunRepository(s.db),
-			Bindings:               agentBindingRepo,
-			LLMs:                   llmManager,
-			Permissions:            permService,
-			TimePermissions:        timePermissionService,
-			Timers:                 timerService,
-			Comments:               commentService,
-			Approvals:              approvalService,
-			Notifications:          s.notificationService,
-			ActionService:          s.actionService,
-			PageApplicationService: pageApplication,
-			PageDiagramService:     pageDiagramService,
-			Registry:               aitools.Default,
-		})
-		if err != nil {
-			return fmt.Errorf("construct Standard agent runtime: %w", err)
-		}
-		bindingSvc.SetStandardRunDispatcher(standardDispatcher)
-		s.standardAgentDispatcher = standardDispatcher
-		if err := standardDispatcher.Resume(context.Background()); err != nil {
-			return fmt.Errorf("resume Standard agent runtime: %w", err)
-		}
-	}
-
 	// Background sweeper drives time-based escalation for pending approval steps.
 	s.approvalEscalationSweeper = services.NewApprovalEscalationSweeper(s.db, approvalService, services.DefaultApprovalEscalationSweeperConfig())
 	s.approvalEscalationSweeper.Start()
@@ -2038,6 +2008,41 @@ func (s *Server) initialize() error {
 	// Board surfaces reuse the internal item reads to authorize staff viewers.
 	publicBoardHandler.SetItemAccess(itemApplication)
 	customerAccessHandler.SetItemAccess(itemApplication)
+	// Chat tools write through the same item and worklog pipelines as HTTP.
+	aiHandler.SetMutationServices(itemApplication, timeWorklogService)
+	// Standard profiles execute in-process through the canonical aitools
+	// registry. Wiring is intentionally late because their final comments,
+	// approval tools, and item/worklog mutations use the fully configured
+	// application services above; Resume must not start a queued run before
+	// those services are installed.
+	if bindingSvc != nil {
+		standardDispatcher, err := standardagent.New(standardagent.Options{
+			DB:                     s.db,
+			Runs:                   repository.NewAgentRunRepository(s.db),
+			Bindings:               agentBindingRepo,
+			LLMs:                   llmManager,
+			Permissions:            permService,
+			TimePermissions:        timePermissionService,
+			Timers:                 timerService,
+			Comments:               commentService,
+			Approvals:              approvalService,
+			Notifications:          s.notificationService,
+			ActionService:          s.actionService,
+			ItemApplication:        itemApplication,
+			TimeWorklogService:     timeWorklogService,
+			PageApplicationService: pageApplication,
+			PageDiagramService:     pageDiagramService,
+			Registry:               aitools.Default,
+		})
+		if err != nil {
+			return fmt.Errorf("construct Standard agent runtime: %w", err)
+		}
+		bindingSvc.SetStandardRunDispatcher(standardDispatcher)
+		s.standardAgentDispatcher = standardDispatcher
+		if err := standardDispatcher.Resume(context.Background()); err != nil {
+			return fmt.Errorf("resume Standard agent runtime: %w", err)
+		}
+	}
 	itemDetailApplication := services.NewItemDetailApplicationService(s.db, itemApplication, itemLinkService, permService).
 		WithContextReaders(screenHandler, requestTypeHandler, actionApplication).
 		WithStoryPointRollups(repository.NewItemRepository(s.db))
@@ -2177,6 +2182,8 @@ func (s *Server) initialize() error {
 			TimerService:           timerService,
 			CommentService:         commentService,
 			ItemDeletionService:    itemHandler.ItemDeletionApplicationService(),
+			ItemApplicationService: itemApplication,
+			TimeWorklogService:     timeWorklogService,
 			PageApplicationService: pageApplication,
 			PageDiagramService:     pageDiagramService,
 			ActionService:          s.actionService,

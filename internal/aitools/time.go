@@ -104,6 +104,9 @@ type logTimeOut struct {
 	EndTimeLocal    string `json:"end_time_local"`
 	StartAt         string `json:"start_at"`
 	EndAt           string `json:"end_at"`
+	// Warnings lists policy adjustments applied to the description, matching
+	// the HTTP worklog responses so a caller learns its text was shortened.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // ----------------------------------------------------------------------------
@@ -298,32 +301,38 @@ func init() {
 			if toolErr != nil {
 				return toolErr, nil
 			}
-			id, err := repository.NewTimeWorklogRepository(env.DB).Create(repository.NewWorklog{
+			// Route through the shared worklog service so the description policy and
+			// warnings match the HTTP surfaces. PreserveStored keeps the interval
+			// already parsed above instead of re-deriving it.
+			result, err := env.timeWorklogService().Create(env.UserID, services.WorklogMutationInput{
 				ProjectID:       args.ProjectID,
-				UserID:          env.UserID,
 				ItemID:          itemID,
 				Description:     args.Description,
-				DateUnix:        services.WorklogDateUnix(date),
-				StartTimeUnix:   startUnix,
-				EndTimeUnix:     endUnix,
+				Date:            args.Date,
+				Timezone:        resolvedTimezone,
+				UserTimezone:    env.Timezone,
 				DurationMinutes: durationMins,
+				StoredStartUnix: startUnix,
+				StoredEndUnix:   endUnix,
+				PreserveStored:  true,
 			})
 			if err != nil {
-				return nil, err
+				return worklogServiceError(err)
 			}
-			env.AuditWrite(resourceTimeWorklog, int(id), "log_time", args.Description)
+			env.AuditWrite(resourceTimeWorklog, result.Worklog.ID, "log_time", result.Worklog.Description)
 			return logTimeOut{
-				ID:              id,
+				ID:              int64(result.Worklog.ID),
 				ProjectID:       args.ProjectID,
 				ProjectName:     project.Name,
 				Date:            args.Date,
-				DurationMinutes: durationMins,
-				Description:     args.Description,
-				Timezone:        resolvedTimezone,
-				StartTimeLocal:  time.Unix(startUnix, 0).In(location).Format("15:04"),
-				EndTimeLocal:    time.Unix(endUnix, 0).In(location).Format("15:04"),
-				StartAt:         time.Unix(startUnix, 0).UTC().Format(time.RFC3339),
-				EndAt:           time.Unix(endUnix, 0).UTC().Format(time.RFC3339),
+				DurationMinutes: result.DurationMinutes,
+				Description:     result.Worklog.Description,
+				Timezone:        result.Timezone,
+				StartTimeLocal:  time.Unix(result.StartTimeUnix, 0).In(result.Location).Format("15:04"),
+				EndTimeLocal:    time.Unix(result.EndTimeUnix, 0).In(result.Location).Format("15:04"),
+				StartAt:         time.Unix(result.StartTimeUnix, 0).UTC().Format(time.RFC3339),
+				EndAt:           time.Unix(result.EndTimeUnix, 0).UTC().Format(time.RFC3339),
+				Warnings:        result.Warnings,
 			}, nil
 		},
 	})
@@ -388,6 +397,23 @@ func init() {
 			}, nil
 		},
 	})
+}
+
+// worklogServiceError maps a TimeWorklogService error to a tool response.
+// Known input errors are reported in the payload; anything else is an
+// unexpected storage failure and is returned as a Go error so MCP marks the
+// call failed instead of reporting success.
+func worklogServiceError(err error) (map[string]string, error) {
+	switch {
+	case errors.Is(err, services.ErrWorklogProjectNotFound):
+		return map[string]string{"error": "project not found"}, nil
+	case errors.Is(err, services.ErrWorklogProjectInactive):
+		return map[string]string{"error": "project is not active"}, nil
+	case errors.Is(err, services.ErrWorklogInvalidInput):
+		return map[string]string{"error": err.Error()}, nil
+	default:
+		return nil, err
+	}
 }
 
 // resolveOptionalItemRef resolves the optional work-item reference time tools

@@ -525,6 +525,29 @@ class WorkspaceDataStore {
     this.#screenConfigPromises.clear();
   }
 
+  /**
+   * Apply an assigned-configuration change for one workspace. Drops cached
+   * effective configurations and, when the workspace is active, reloads it
+   * through the normal reset/initialization lifecycle. The reset advances the
+   * generation, so a bootstrap read that started before the change cannot
+   * install its stale catalogs afterwards. A configuration change is rare, so
+   * the extra reads are preferable to a second invalidation counter.
+   */
+  async reloadForConfigurationChange(workspaceId) {
+    const id = Number(workspaceId);
+    if (!Number.isInteger(id) || id <= 0) return;
+    if (this.workspaceId !== id) {
+      // Not active: drop the cached effective configurations; the next
+      // activation bootstraps fresh through initialize().
+      this.invalidateScreenConfigs();
+      return;
+    }
+    // Active: reset and reload through the normal lifecycle so the generation
+    // advances and a bootstrap read from before the change is discarded.
+    this.reset();
+    await this.initialize(id);
+  }
+
   #storeScreenConfig(key, config) {
     this.screenConfigs = { ...this.screenConfigs, [key]: config };
     this.#touchScreenConfig(key);

@@ -47,6 +47,9 @@ for rule in "${RULES[@]}"; do
 
     [[ -d "$pkg" ]] || continue
 
+    # Match the forbidden package exactly or any subpackage of it, so a leaf
+    # rule like cacheutil|windshift/internal also catches
+    # windshift/internal/<sub> imports.
     while IFS= read -r match; do
         [[ -z "$match" ]] && continue
         # match looks like: internal/handlers/foo.go:12:	"windshift/internal/database"
@@ -58,7 +61,7 @@ for rule in "${RULES[@]}"; do
         fi
         new_violations+=("$match  -- $rationale")
         found=1
-    done < <(grep -rn "\"$forbidden\"" "$pkg" --include='*.go' 2>/dev/null | grep -v '_test\.go' || true)
+    done < <(grep -rnE "\"${forbidden}(\"|/)" "$pkg" --include='*.go' 2>/dev/null | grep -v '_test\.go' || true)
 done
 
 if [[ "$found" -eq 1 ]]; then

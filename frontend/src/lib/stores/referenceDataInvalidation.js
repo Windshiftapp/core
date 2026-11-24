@@ -11,6 +11,8 @@ import { workspaceDataStore } from './workspaceDataStore.svelte.js';
  * - `store`: a `workspaceDataStore` field,
  * - `editor`: a `collectionEditorOptions` family,
  * - `screenConfigs`: cached effective configurations,
+ * - `configurationChanged`: reload the assigned workspace through the store's
+ *   reset/initialization lifecycle and reset the editor caches,
  * - `fullRefresh`: everything (used for cross-cutting changes).
  *
  * Matching is deliberately coarse: re-fetching an unchanged family is cheap and
@@ -39,6 +41,10 @@ const REFERENCE_ENDPOINTS = [
   { match: /\/(?:time\/projects)(?:\/|$)/, store: 'projects', editor: 'projects' },
   { match: /\/(?:labels)(?:\/|$)/, store: 'labels' },
   { match: /\/(?:configuration-sets|screens|workflows)(?:\/|$)/, screenConfigs: true },
+  // Workspace-scoped assignment (WI-1359): PUT /workspaces/:id/configuration-set.
+  // The singular endpoint reassigns the workspace, so reload it through the
+  // normal lifecycle and reset the editor caches.
+  { match: /\/configuration-set(?:\/|$)/, configurationChanged: true },
   // Object translations change display names across several directories.
   { match: /\/(?:object-translations)(?:\/|$)/, fullRefresh: true },
   { match: /^\/workspaces\/\d+$/, store: 'workspace' },
@@ -85,8 +91,29 @@ export function applyReferenceInvalidation(
       else editorOptions.invalidate(workspaceId, rule.editor);
     }
     if (rule.screenConfigs) store.invalidateScreenConfigs?.();
+    if (rule.configurationChanged && workspaceId != null) {
+      invalidateWorkspaceConfiguration(workspaceId, { store, editorOptions });
+    }
   }
 
+  return true;
+}
+
+/**
+ * Apply an assigned-configuration change for one workspace. The migration path
+ * reassigns the workspace inside its own POST, whose plural endpoint only clears
+ * screen configs, so the caller names the affected workspaces explicitly. This
+ * is also the rule the direct assignment endpoint matches.
+ */
+export function invalidateWorkspaceConfiguration(
+  workspaceId,
+  { store = workspaceDataStore, editorOptions = collectionEditorOptions } = {}
+) {
+  if (workspaceId == null) return false;
+  // Reset the editor caches, then reload the active workspace through the
+  // store's reset/initialization lifecycle, which rejects superseded reads.
+  editorOptions.reset?.();
+  void store.reloadForConfigurationChange?.(workspaceId);
   return true;
 }
 

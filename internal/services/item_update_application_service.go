@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/itemevents"
 	"windshift/internal/models"
 	"windshift/internal/validation"
 )
@@ -296,6 +297,31 @@ func (s *ItemUpdateApplicationService) updateItem(
 	updateData map[string]any,
 	actionContext *ActionContext,
 ) (*UpdateItemResult, error) {
+	return s.updateItemWithMetadata(actorUserID, actorUsername, itemID, updateData, actionContext,
+		itemEventMetadata(actorUserID, "application", actionContext))
+}
+
+// UpdateWithMetadata runs the user-facing update pipeline with explicit event
+// provenance. Agent adapters use it so the agent actor, source, and run survive
+// instead of being replaced by the human-only "application" default.
+func (s *ItemUpdateApplicationService) UpdateWithMetadata(
+	actorUserID int,
+	actorUsername string,
+	itemID int,
+	updateData map[string]any,
+	metadata itemevents.Metadata,
+) (*UpdateItemResult, error) {
+	return s.updateItemWithMetadata(actorUserID, actorUsername, itemID, updateData, nil, metadata)
+}
+
+func (s *ItemUpdateApplicationService) updateItemWithMetadata(
+	actorUserID int,
+	actorUsername string,
+	itemID int,
+	updateData map[string]any,
+	actionContext *ActionContext,
+	metadata itemevents.Metadata,
+) (*UpdateItemResult, error) {
 	if s.activityTracker != nil {
 		if err := s.activityTracker.TrackItemActivity(actorUserID, itemID, ActivityEdit); err != nil {
 			slog.Warn("failed to track item edit activity", slog.Int("user_id", actorUserID), slog.Int("item_id", itemID), slog.Any("error", err))
@@ -306,7 +332,7 @@ func (s *ItemUpdateApplicationService) updateItem(
 		ItemID:        itemID,
 		UpdateData:    updateData,
 		UserID:        actorUserID,
-		EventMetadata: itemEventMetadata(actorUserID, "application", actionContext),
+		EventMetadata: metadata,
 	})
 	if err != nil {
 		return nil, err
@@ -355,8 +381,9 @@ func (s *ItemUpdateApplicationService) AddMilestoneWithContext(
 	actionContext ActionContext,
 ) (*UpdateItemResult, bool, error) {
 	result, changed, err := s.update.AddMilestone(UpdateItemRequest{
-		ItemID: itemID,
-		UserID: actorUserID,
+		ItemID:        itemID,
+		UserID:        actorUserID,
+		EventMetadata: itemEventMetadata(actorUserID, "application", &actionContext),
 	}, milestoneID)
 	if err != nil || !changed {
 		return result, changed, err

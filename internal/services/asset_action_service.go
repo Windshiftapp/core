@@ -634,7 +634,7 @@ func (as *AssetActionService) executeCreateItem(node *models.AssetActionNode, ct
 	if err != nil {
 		return fmt.Errorf("failed to create item: %w", err)
 	}
-	itemID := result.Item.ID
+	itemID := result.ID
 
 	stepResult.Output = map[string]any{
 		"item_id":      itemID,

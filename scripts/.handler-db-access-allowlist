@@ -43,3 +43,6 @@ internal/handlers/setup.go
 internal/handlers/sla.go
 internal/handlers/webauthn.go
 internal/handlers/workspaces_personal.go
+internal/restapi/v2/catalog.go
+internal/restapi/v2/labels.go
+internal/restapi/v2/preferences.go

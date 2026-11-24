@@ -14,6 +14,7 @@ ALLOWLIST="scripts/.handler-db-access-allowlist"
 HANDLER_DIRS=(
     "internal/handlers"
     "internal/restapi/v1/handlers"
+    "internal/restapi/v2"
 )
 
 # Match direct DB methods while avoiding URL query parsing (`r.URL.Query()`).

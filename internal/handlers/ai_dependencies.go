@@ -900,6 +900,8 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		CommentService:         h.commentService,
 		ApprovalService:        h.approvalService,
 		ActionService:          h.actionService,
+		ItemApplication:        h.itemApplication,
+		TimeWorklogService:     h.timeWorklogService,
 		PageApplicationService: h.pageApplicationService,
 		PageDiagramService:     h.pageDiagramService,
 	}

@@ -872,11 +872,15 @@ func (s *ItemApplicationService) Create(ctx context.Context, actor AuditActor, i
 	}
 	items := []models.Item{*result.Item}
 	if err := s.enrich(ctx, actor.UserID, items); err != nil {
-		return nil, err
+		// Enrichment masks project names and related-item metadata before the
+		// label and milestone reads. Return the caller-facing copy either way so
+		// a later read failure cannot discard those redactions.
+		slog.Warn("enrich created item", slog.Int64("item_id", result.ID), slog.Any("error", err))
 	}
-	items[0].DescriptionHTML, err = markdown.Render(items[0].Description)
-	if err != nil {
-		return nil, fmt.Errorf("render item description: %w", err)
+	if rendered, err := markdown.Render(items[0].Description); err != nil {
+		slog.Warn("render created item description", slog.Int64("item_id", result.ID), slog.Any("error", err))
+	} else {
+		items[0].DescriptionHTML = rendered
 	}
 	return &items[0], nil
 }
@@ -890,6 +894,39 @@ func (s *ItemApplicationService) Patch(ctx context.Context, actor AuditActor, it
 		return nil, ErrItemForbidden
 	}
 	result, err := s.patchItem(ctx, actor, itemID, fields)
+	if err != nil {
+		return nil, err
+	}
+	items := []models.Item{*result.Item}
+	if err := s.enrich(ctx, actor.UserID, items); err != nil {
+		return nil, err
+	}
+	items[0].DescriptionHTML, err = markdown.Render(items[0].Description)
+	if err != nil {
+		return nil, fmt.Errorf("render item description: %w", err)
+	}
+	return &items[0], nil
+}
+
+// UpdateFieldsWithMetadata runs the shared update pipeline on an already-decoded
+// field map while preserving explicit event provenance (agent actor/source/run).
+// Agent adapters use it instead of the low-level update service so description
+// mentions and hierarchy cache invalidation stay on the one path.
+func (s *ItemApplicationService) UpdateFieldsWithMetadata(
+	ctx context.Context,
+	actor AuditActor,
+	itemID int,
+	fields map[string]any,
+	metadata itemevents.Metadata,
+) (*models.Item, error) {
+	allowed, err := s.update.CanUserEditItem(actor.UserID, itemID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, ErrItemForbidden
+	}
+	result, err := s.update.UpdateWithMetadata(actor.UserID, actor.Username, itemID, fields, metadata)
 	if err != nil {
 		return nil, err
 	}

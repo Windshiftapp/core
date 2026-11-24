@@ -28,6 +28,10 @@ type itemCreation struct {
 	// eventMetadata is the merged provenance recorded with the creation fact.
 	// finish() consults it so import-origin writes never start an agent run.
 	eventMetadata itemevents.Metadata
+	// snapshot is the row the creation transaction recorded. It is a guaranteed
+	// creation result for callers that need a row or an event after commit,
+	// independent of a later joined read.
+	snapshot *models.Item
 }
 
 func prepareItemCreation(ctx context.Context, db database.Database, params ItemCreationParams) (*itemCreation, error) {
@@ -351,6 +355,7 @@ func (c *itemCreation) recordCreation(tx database.Tx, itemID, itemNumber int) er
 	if err != nil {
 		return err
 	}
+	c.snapshot = item
 	metadata := itemCreateEventMetadata(c.params, c.createdAt)
 	c.eventMetadata = metadata
 	creatorUserID := 0
@@ -378,7 +383,7 @@ func (c *itemCreation) eventItem(itemID, itemNumber int) (*models.Item, error) {
 	}
 	p := c.params
 	return &models.Item{
-		ID: itemID, WorkspaceID: p.WorkspaceID, WorkspaceItemNumber: itemNumber,
+		ID: itemID, WorkspaceID: p.WorkspaceID, WorkspaceKey: p.WorkspaceKey, WorkspaceItemNumber: itemNumber,
 		ItemTypeID: p.ItemTypeID, Title: p.Title, Description: p.Description,
 		StatusID: c.statusID, PriorityID: c.priorityID, IsTask: p.IsTask,
 		AssigneeID: p.AssigneeID, TeamID: p.TeamID, ReporterID: p.ReporterID, CreatorID: p.CreatorID,
