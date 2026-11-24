@@ -3700,6 +3700,33 @@ BEGIN
 END $$;
 		`,
 	},
+	{
+		// A priority catalog must have at most one default. The partial unique
+		// index makes that a database invariant instead of a per-transaction
+		// convention, so two concurrent saves cannot both win. Existing
+		// duplicates from before the index are collapsed to the lowest id.
+		Version: "20261203_priorities_single_default",
+		Name:    "Enforce a single default priority",
+		CheckSQLite: `SELECT CASE WHEN EXISTS (
+			SELECT 1 FROM sqlite_master WHERE type='index' AND name='uq_priorities_single_default'
+		) THEN 1 ELSE 0 END`,
+		CheckPostgres: `SELECT CASE WHEN (SELECT COUNT(*) FROM pg_class c
+			JOIN pg_namespace n ON n.oid = c.relnamespace
+			WHERE c.relkind = 'i' AND c.relname = 'uq_priorities_single_default' AND n.nspname = current_schema()) > 0
+			THEN 1 ELSE 0 END`,
+		SQLite: `
+			UPDATE priorities SET is_default = false
+			WHERE is_default = true
+			  AND id <> (SELECT id FROM priorities WHERE is_default = true ORDER BY id LIMIT 1);
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_priorities_single_default ON priorities(is_default) WHERE is_default = true;
+		`,
+		Postgres: `
+			UPDATE priorities SET is_default = false
+			WHERE is_default = true
+			  AND id <> (SELECT id FROM priorities WHERE is_default = true ORDER BY id LIMIT 1);
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_priorities_single_default ON priorities(is_default) WHERE is_default = true;
+		`,
+	},
 }
 
 // domainEventClaimableIndexMigration adds the partial index the claim query

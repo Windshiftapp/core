@@ -17,6 +17,11 @@ var (
 	// ErrDuplicateEntry is returned when a unique constraint is violated
 	ErrDuplicateEntry = errors.New("duplicate entry")
 
+	// ErrDefaultConflict is returned when two concurrent priority saves try to
+	// become the single default. It is a default-selection conflict, distinct
+	// from a duplicate name.
+	ErrDefaultConflict = errors.New("another priority is already the default")
+
 	// ErrConcurrentUpdate is returned when an optimistic write loses a race.
 	ErrConcurrentUpdate = errors.New("concurrent update")
 

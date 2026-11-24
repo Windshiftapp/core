@@ -17,12 +17,19 @@ function createModuleSettingsStore() {
   const { subscribe, set, update } = store;
   // Shared in-flight request so concurrent ensureLoaded() callers fetch once.
   let inFlight = null;
+  // Bumped whenever a newer request, reload, or hydration takes ownership.
+  // Only the request that still owns the generation may publish or clear
+  // itself, so a slow GET cannot overwrite a forced reload or a shell snapshot.
+  let generation = 0;
 
   return {
     subscribe,
 
     hydrate(settings) {
       if (!settings) return;
+      // The shell snapshot supersedes any pending GET.
+      generation += 1;
+      inFlight = null;
       set({
         ...settings,
         loaded: true,
@@ -37,10 +44,12 @@ function createModuleSettingsStore() {
     async ensureLoaded() {
       if (get(store).loaded) return;
       if (inFlight) return inFlight;
+      const requestGeneration = ++generation;
       update((state) => ({ ...state, loading: true }));
-      inFlight = (async () => {
+      const request = (async () => {
         try {
           const settings = await setup.getModuleSettings();
+          if (requestGeneration !== generation) return;
           set({
             ...settings,
             loaded: true,
@@ -48,12 +57,14 @@ function createModuleSettingsStore() {
           });
         } catch (error) {
           console.error('Failed to load module settings:', error);
+          if (requestGeneration !== generation) return;
           update((state) => ({ ...state, loading: false }));
         } finally {
-          inFlight = null;
+          if (requestGeneration === generation) inFlight = null;
         }
       })();
-      return inFlight;
+      inFlight = request;
+      return request;
     },
 
     // Update module settings both in store and API
@@ -70,14 +81,16 @@ function createModuleSettingsStore() {
       }
     },
 
-    // Force reload from API
+    // Force reload from API. Supersede any in-flight GET so its late response
+    // cannot restore the previous value.
     async reload() {
+      generation += 1;
+      inFlight = null;
       set({
         ...DEFAULT_SETTINGS,
         loaded: false,
         loading: false,
       });
-      inFlight = null;
       await this.ensureLoaded();
     },
   };

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -35,17 +36,18 @@ func (r *PriorityRepository) Create(priority *models.Priority) (int, error) {
 	now := time.Now()
 	var id int
 	err := database.WithTx(r.db, func(tx database.Tx) error {
+		// Clear the old default before writing the new one so the partial
+		// unique index never observes two defaults inside one transaction.
+		if priority.IsDefault {
+			if err := clearOtherDefaults(tx, 0); err != nil {
+				return err
+			}
+		}
 		if err := tx.QueryRow(`
 			INSERT INTO priorities (name, description, is_default, icon, color, sort_order, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 		`, priority.Name, priority.Description, priority.IsDefault, priority.Icon, priority.Color, priority.SortOrder, now, now).Scan(&id); err != nil {
-			if database.IsUniqueConstraintError(err) {
-				return ErrDuplicateEntry
-			}
-			return fmt.Errorf("create priority: %w", err)
-		}
-		if err := transferDefaultStatus(tx, id, priority.IsDefault); err != nil {
-			return err
+			return priorityWriteError(err, "create priority")
 		}
 		return replaceConfigurationSets(tx, id, priority.ConfigurationSetIDs, now)
 	})
@@ -58,16 +60,15 @@ func (r *PriorityRepository) Create(priority *models.Priority) (int, error) {
 func (r *PriorityRepository) Update(id int, priority *models.Priority) error {
 	now := time.Now()
 	return database.WithTx(r.db, func(tx database.Tx) error {
+		if priority.IsDefault {
+			if err := clearOtherDefaults(tx, id); err != nil {
+				return err
+			}
+		}
 		if _, err := tx.ExecWrite(`
 			UPDATE priorities SET name = ?, description = ?, is_default = ?, icon = ?, color = ?, sort_order = ?, updated_at = ? WHERE id = ?
 		`, priority.Name, priority.Description, priority.IsDefault, priority.Icon, priority.Color, priority.SortOrder, now, id); err != nil {
-			if database.IsUniqueConstraintError(err) {
-				return ErrDuplicateEntry
-			}
-			return fmt.Errorf("update priority %d: %w", id, err)
-		}
-		if err := transferDefaultStatus(tx, id, priority.IsDefault); err != nil {
-			return err
+			return priorityWriteError(err, fmt.Sprintf("update priority %d", id))
 		}
 		return replaceConfigurationSets(tx, id, priority.ConfigurationSetIDs, now)
 	})
@@ -87,14 +88,42 @@ type priorityWriter interface {
 	ExecWrite(query string, args ...any) (sql.Result, error)
 }
 
-// transferDefaultStatus clears every other default when the saved priority is
-// the default, inside the caller's transaction so a later failure rolls it
-// back instead of leaving the catalog without a default.
-func transferDefaultStatus(tx priorityWriter, priorityID int, isDefault bool) error {
-	if !isDefault {
+// priorityWriteError maps a priority write failure to a repository sentinel.
+// The single-default partial unique index is a default-selection conflict, not
+// a duplicate name.
+func priorityWriteError(err error, context string) error {
+	if isSingleDefaultViolation(err) {
+		return ErrDefaultConflict
+	}
+	if database.IsUniqueConstraintError(err) {
+		return ErrDuplicateEntry
+	}
+	return fmt.Errorf("%s: %w", context, err)
+}
+
+// isSingleDefaultViolation reports whether err is the partial unique index that
+// keeps at most one priority default. PostgreSQL names the index; SQLite names
+// the indexed column.
+func isSingleDefaultViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := err.Error()
+	return strings.Contains(message, "uq_priorities_single_default") ||
+		strings.Contains(message, "priorities.is_default")
+}
+
+// clearOtherDefaults removes default status from every priority except
+// excludeID (0 clears all). It runs before the new default is written so the
+// partial unique index never observes two defaults inside one transaction.
+func clearOtherDefaults(tx priorityWriter, excludeID int) error {
+	if excludeID == 0 {
+		if _, err := tx.ExecWrite("UPDATE priorities SET is_default = false WHERE is_default = true"); err != nil {
+			return fmt.Errorf("clear other default priorities: %w", err)
+		}
 		return nil
 	}
-	if _, err := tx.ExecWrite("UPDATE priorities SET is_default = false WHERE is_default = true AND id != ?", priorityID); err != nil {
+	if _, err := tx.ExecWrite("UPDATE priorities SET is_default = false WHERE is_default = true AND id != ?", excludeID); err != nil {
 		return fmt.Errorf("clear other default priorities: %w", err)
 	}
 	return nil

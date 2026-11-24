@@ -684,6 +684,9 @@ func validateLinkType(item models.LinkType) error {
 	return nil
 }
 func catalogRepositoryError(err error) error {
+	if errors.Is(err, repository.ErrDefaultConflict) {
+		return NewServiceError(http.StatusConflict, "another priority is already the default")
+	}
 	if errors.Is(err, repository.ErrDuplicateEntry) || database.IsUniqueConstraintError(err) {
 		return NewServiceError(http.StatusConflict, "catalog name already exists")
 	}

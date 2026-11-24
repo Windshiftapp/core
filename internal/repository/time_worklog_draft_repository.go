@@ -275,13 +275,9 @@ func (r *TimeWorklogDraftRepository) BookDraft(draftID, userID, expectedVersion 
 				return err
 			}
 		}
-		var worklogID int
-		if err := tx.QueryRow(insertBookedWorklogQuery,
-			in.ProjectID, in.UserID, in.ItemID, in.Description,
-			in.DateUnix, in.StartTimeUnix, in.EndTimeUnix, in.DurationMinutes, in.NowUnix, in.NowUnix,
-		).Scan(&worklogID); err != nil {
-			return err
-		}
+		// Claim the draft before writing the worklog. The conditional delete is
+		// the only winner selector, so a transaction that loses the race has no
+		// worklog to roll back and cannot double-book the same draft.
 		result, err := tx.ExecWrite(
 			`DELETE FROM time_worklog_drafts WHERE id = ? AND user_id = ? AND version = ?`,
 			draftID, userID, expectedVersion,
@@ -316,6 +312,14 @@ func (r *TimeWorklogDraftRepository) BookDraft(draftID, userID, expectedVersion 
 				return ErrNotFound
 			}
 			return ErrConflict
+		}
+		var worklogID int
+		if err := tx.QueryRow(insertBookedWorklogQuery,
+			in.ProjectID, in.UserID, in.ItemID, in.Description,
+			in.DateUnix, in.StartTimeUnix, in.EndTimeUnix, in.DurationMinutes, in.NowUnix, in.NowUnix,
+		).Scan(&worklogID); err != nil {
+			// The transaction rolls back and restores the claimed draft.
+			return err
 		}
 		if bookingKey != "" {
 			if _, err := tx.ExecWrite(
