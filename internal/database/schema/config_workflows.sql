@@ -16,8 +16,7 @@ CREATE TABLE IF NOT EXISTS configuration_sets (
 CREATE TABLE IF NOT EXISTS item_types (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	builtin_key TEXT,
-	configuration_set_id INTEGER, -- Made nullable for many-to-many relationship
-	name TEXT NOT NULL UNIQUE, -- Changed to global unique (not per config set)
+	name TEXT NOT NULL UNIQUE, -- Global unique; set membership lives in configuration_set_item_types
 	description TEXT,
 	is_default BOOLEAN DEFAULT false,
 	icon TEXT DEFAULT 'FileText',
@@ -127,7 +126,6 @@ CREATE TABLE IF NOT EXISTS screen_system_fields (
 );
 
 CREATE INDEX IF NOT EXISTS idx_configuration_sets_workflow_id ON configuration_sets(workflow_id);
-CREATE INDEX IF NOT EXISTS idx_item_types_configuration_set_id ON item_types(configuration_set_id);
 CREATE INDEX IF NOT EXISTS idx_item_types_hierarchy_level ON item_types(hierarchy_level);
 CREATE INDEX IF NOT EXISTS idx_item_types_sort_order ON item_types(sort_order);
 CREATE INDEX IF NOT EXISTS idx_screen_fields_screen_id ON screen_fields(screen_id);

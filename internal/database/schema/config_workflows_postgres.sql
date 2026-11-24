@@ -150,7 +150,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_statuses_builtin_key ON statuses(builtin_ke
 CREATE UNIQUE INDEX IF NOT EXISTS uq_workflows_builtin_key ON workflows(builtin_key) WHERE builtin_key IS NOT NULL;
 
 -- Item type indexes (moved to base_tables_postgres.sql)
-CREATE INDEX IF NOT EXISTS idx_item_types_configuration_set_id ON item_types(configuration_set_id);
 
 -- Screen field indexes
 CREATE INDEX IF NOT EXISTS idx_screen_fields_screen_id ON screen_fields(screen_id);

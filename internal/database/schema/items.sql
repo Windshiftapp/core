@@ -77,11 +77,10 @@ CREATE TABLE IF NOT EXISTS items (
 	FOREIGN KEY (item_type_id) REFERENCES item_types(id) ON DELETE SET NULL,
 	FOREIGN KEY (parent_id) REFERENCES items(id) ON DELETE CASCADE,
 	FOREIGN KEY (iteration_id) REFERENCES iterations(id) ON DELETE SET NULL,
-	FOREIGN KEY (time_project_id) REFERENCES time_projects(id) ON DELETE SET NULL,
-	FOREIGN KEY (assignee_id) REFERENCES users(id) ON DELETE SET NULL,
-	FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE SET NULL,
-	FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE SET NULL,
-	FOREIGN KEY (creator_portal_customer_id) REFERENCES portal_customers(id) ON DELETE SET NULL,
+	-- time_project_id, assignee_id, creator_id, reporter_id and
+	-- creator_portal_customer_id declare their foreign key inline above.
+	-- Existing SQLite installs keep the duplicate copies until the planned items
+	-- rebuild; fresh installs declare each relationship once.
 	UNIQUE(workspace_id, workspace_item_number)
 );
 

@@ -485,7 +485,7 @@ func (s *BindingService) Create(ctx context.Context, req CreateBindingRequest) (
 		TokenTTLMinutes: req.TokenTTLMinutes,
 		MaxRunsPerDay:   req.MaxRunsPerDay,
 		Instructions:    req.Instructions,
-		CreatedByUserID: req.CreatedByUserID,
+		CreatedByUserID: &req.CreatedByUserID,
 		Repos:           repos,
 	}
 	// Persist the binding and repository rows atomically.

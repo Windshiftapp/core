@@ -107,15 +107,16 @@ CREATE TABLE IF NOT EXISTS configuration_set_notification_settings (
 	notification_setting_id INTEGER NOT NULL,
 	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (configuration_set_id) REFERENCES configuration_sets(id) ON DELETE CASCADE,
-	FOREIGN KEY (notification_setting_id) REFERENCES notification_settings(id) ON DELETE CASCADE,
-	UNIQUE(configuration_set_id, notification_setting_id)
+	FOREIGN KEY (notification_setting_id) REFERENCES notification_settings(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_config_set_notification_settings_notification ON configuration_set_notification_settings(notification_setting_id);
 -- One notification setting per configuration set. The column-level UNIQUE on
 -- SQLite already enforces this, but PostgreSQL needs a single-column unique
 -- index as the ON CONFLICT(configuration_set_id) target used by
--- ConfigurationSetRepository.AssignNotification.
+-- ConfigurationSetRepository.AssignNotification. It also subsumes the old
+-- UNIQUE(configuration_set_id, notification_setting_id), which the migration
+-- 20261209_notification_setting_unique drops.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_config_set_notification_setting_one_per_set
     ON configuration_set_notification_settings(configuration_set_id);
 

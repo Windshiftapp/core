@@ -36,17 +36,6 @@ A built-in importer handles the move off Jira.
 
 It ships as a single Go binary with the Svelte frontend built in, SQLite by default or PostgreSQL for data storage. No Java, no Elasticsearch cluster, no per-user pricing, and your data stays on your infrastructure.
 
-## Operator controls
-
-Deployment owners can apply immutable [operator controls](internal/operatorcontrols/README.md)
-without changing organization preferences or maintaining a separate application fork.
-
-## Agents and automation
-
-Windshift runs coding agents against your repositories. Agent Studio binds an agent to a workspace, launches it from a work item, and links the resulting pull request back to that item. Source control integrations cover GitHub, GitLab, Gitea, and Forgejo.
-
-The built-in MCP server exposes work items, comments, pages, knowledge, tests, time tracking, and actions over the Model Context Protocol, with OAuth so agents and assistants authenticate as a real user and inherit that user's permissions.
-
 ## Highlights
 
 - Plan Jira-style without the Jira footprint: boards, backlogs, sprints, epics and sub-tasks, hierarchy trees, roadmaps, and dashboards.
@@ -120,6 +109,12 @@ The built-in MCP server exposes work items, comments, pages, knowledge, tests, t
 - Thirteen built-in languages: English, Deutsch, Español, Français, Italiano, Nederlands, Polski, Português (Brasil), العربية, فارسی, Русский, 简体中文, and 한국어, with right-to-left support for Arabic and Persian.
 
 </details>
+
+## Agents and automation
+
+Windshift runs coding agents against your repositories. Agent Studio binds an agent to a workspace, launches it from a work item, and links the resulting pull request back to that item. Source control integrations cover GitHub, GitLab, Gitea, and Forgejo.
+
+The built-in MCP server exposes work items, comments, pages, knowledge, tests, time tracking, and actions over the Model Context Protocol, with OAuth so agents and assistants authenticate as a real user and inherit that user's permissions.
 
 ## Take a look
 

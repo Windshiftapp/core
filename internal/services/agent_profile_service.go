@@ -413,7 +413,7 @@ func (s *BindingService) CreateStudioProfile(ctx context.Context, req CreateStud
 			TokenTTLMinutes:  req.TokenTTLMinutes,
 			MaxRunsPerDay:    req.MaxRunsPerDay,
 			Instructions:     *req.Instructions,
-			CreatedByUserID:  req.CreatedByUserID,
+			CreatedByUserID:  &req.CreatedByUserID,
 			Repos:            repos,
 		}
 		txBindings := repository.NewWorkspaceAgentBindingRepositoryTx(tx)

@@ -53,18 +53,21 @@ export function getMainAppWorkspaceRedirect(currentRoute, activeWorkspace) {
   return `${base}/${activeWorkspace.default_view || 'board'}`;
 }
 
+// These params change the shell's content without remounting its sidebar.
+const SHELL_SECTION_PARAMS = {
+  admin: ['tab', 'categoryId', 'type'],
+  'delegated-admin': ['tab'],
+  'team-detail': ['section'],
+  'workspace-pages': ['pageId'],
+};
+
 export function mainAppNavigationIdentity(route, personalWorkspaceId) {
   const context = resolveMainAppWorkspaceContext(route, personalWorkspaceId);
   const params = route.params ?? {};
   const collectionId = context.kind === 'global-collection' ? params.id : params.collectionId;
-  // Wiki page IDs key the editor, not the workspace shell or sidebar.
+  const sectionParams = SHELL_SECTION_PARAMS[route.view] ?? [];
   const entities = Object.entries(params)
-    .filter(
-      ([key]) =>
-        key !== 'id' &&
-        key !== 'collectionId' &&
-        !(route.view === 'workspace-pages' && key === 'pageId')
-    )
+    .filter(([key]) => key !== 'id' && key !== 'collectionId' && !sectionParams.includes(key))
     .sort(([a], [b]) => a.localeCompare(b));
   return JSON.stringify([
     context.kind,

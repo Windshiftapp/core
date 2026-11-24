@@ -91,8 +91,9 @@ type WorkspaceAgentBinding struct {
 	// Instructions is the binding's persona/specialization, appended to the
 	// run's standard initial prompt as a "Your role" section (WI-258). It
 	// never replaces the operational prompt.
-	Instructions    string    `json:"instructions,omitempty"`
-	CreatedByUserID int       `json:"created_by_user_id"`
+	Instructions string `json:"instructions,omitempty"`
+	// CreatedByUserID is a soft audit ref; nil once the creator is deleted.
+	CreatedByUserID *int      `json:"created_by_user_id,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 

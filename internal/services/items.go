@@ -316,30 +316,37 @@ func createItemWithSnapshot(ctx context.Context, db database.Database, params It
 	return int64(itemID), creation.snapshot, nil
 }
 
-// GetInitialStatusForItemType determines the initial status for an item type
-// by querying the workflow assigned to the item type. Uses a two-tier override system:
-// 1. First checks if there's a workflow override for this specific item type
+// GetInitialStatusForItemType determines the initial status for an item type in
+// a workspace by resolving the workspace's effective configuration set and then
+// the item type's workflow inside that set. Uses a two-tier override system:
+// 1. First checks for a workflow override on the set's configuration_set_item_types row
 // 2. Falls back to the configuration set's default workflow if no override exists
-// Returns the status name of the first status in the workflow (where from_status_id IS NULL).
-// Returns an error if the item type, configuration set, workflow, or initial status cannot be found.
-func GetInitialStatusForItemType(db database.Database, itemTypeID int) (string, error) {
-	// First, get the workflow ID with fallback logic:
-	// 1. Check for item-type-specific override in configuration_set_item_types
-	// 2. If NULL, use configuration set default workflow
+// The junction is authoritative: a type the set deliberately excludes (for
+// example Initiative in the simplified default set) resolves to the set default
+// rather than to another set's workflow. Returns the status name of the first
+// status in the workflow (where from_status_id IS NULL). Returns an error if the
+// workspace, configuration set, workflow, or initial status cannot be found.
+func GetInitialStatusForItemType(db database.Database, workspaceID, itemTypeID int) (string, error) {
+	// Resolve the effective set the same way ItemTypeRepository.ListForWorkspace
+	// does (assigned set, else the global default), then the item type's override.
 	workflowQuery := `
-		SELECT COALESCE(csit.workflow_id, cs.workflow_id) as workflow_id
-		FROM item_types it
-		LEFT JOIN configuration_set_item_types csit ON it.id = csit.item_type_id
-		JOIN configuration_sets cs ON (
-			csit.configuration_set_id = cs.id OR
-			(csit.configuration_set_id IS NULL AND it.configuration_set_id = cs.id)
+		WITH effective AS (
+			SELECT COALESCE(wcs.configuration_set_id,
+			         (SELECT id FROM configuration_sets WHERE is_default = true ORDER BY id LIMIT 1)) AS configuration_set_id
+			FROM workspaces w
+			LEFT JOIN workspace_configuration_sets wcs ON wcs.workspace_id = w.id
+			WHERE w.id = ?
 		)
-		WHERE it.id = ?
+		SELECT COALESCE(csit.workflow_id, cs.workflow_id) as workflow_id
+		FROM effective e
+		LEFT JOIN configuration_sets cs ON cs.id = e.configuration_set_id
+		LEFT JOIN configuration_set_item_types csit
+			ON csit.configuration_set_id = cs.id AND csit.item_type_id = ?
 		LIMIT 1
 	`
 
 	var workflowID *int
-	err := db.QueryRow(workflowQuery, itemTypeID).Scan(&workflowID)
+	err := db.QueryRow(workflowQuery, workspaceID, itemTypeID).Scan(&workflowID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("no configuration set or workflow found for item type %d", itemTypeID)
 	}
