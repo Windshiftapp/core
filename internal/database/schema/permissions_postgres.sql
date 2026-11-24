@@ -207,6 +207,7 @@ INSERT INTO permissions (permission_key, permission_name, description, scope, is
 	('action.manage', 'Manage Actions', 'Can create, edit, delete, and execute workspace actions', 'workspace', false),
 	('action.credential.manage', 'Manage Action Credentials', 'Can create, rotate, and delete workspace-scoped action credentials (API tokens for HTTP capabilities)', 'workspace', false),
 	('action.set_actor', 'Set Action Actor', 'Can configure an action to run as a specific user (impersonation); grants cross-workspace reach', 'global', false),
+	('action.execute_script', 'Run Action Scripts', 'Can save or manually run actions that execute author-supplied JavaScript; in-process scripts have no per-script memory bound', 'global', false),
 	('teams.manage', 'Manage Teams', 'Can create, edit, and delete teams', 'global', false),
 	('public_board.manage', 'Manage Public Boards', 'Can make collections public and configure public board sharing', 'global', false)
 ON CONFLICT (permission_key) DO NOTHING;

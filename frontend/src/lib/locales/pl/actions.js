@@ -122,6 +122,7 @@ export default {
       roundRobinAssign: 'Przypisanie rotacyjne',
       createMilestone: 'Utwórz kamień milowy',
       executeScript: 'Uruchom skrypt',
+      scriptTrustRequired: 'Wymaga globalnego uprawnienia action.execute_script. Bez niego zapisanie tej akcji lub ręczne uruchomienie jest odrzucane; środowisko działające w procesie nie ma limitu pamięci na skrypt.',
       notifyCustomer: 'Powiadom klienta',
       insertCannedResponse: 'Wstaw gotową odpowiedź',
       adjustLabels: 'Dostosuj etykiety',

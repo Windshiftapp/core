@@ -1,6 +1,8 @@
 <script>
   import Input from '../../components/Input.svelte';
   import Textarea from '../../components/Textarea.svelte';
+  import { t } from '../../stores/i18n.svelte.js';
+  import { permissionStore } from '../../stores/permissions.svelte.js';
 
   let {
     selectedNode,
@@ -8,6 +10,7 @@
   } = $props();
 
   const cfg = $derived(selectedNode?.data?.config || {});
+  const canExecuteScript = $derived(permissionStore.hasPermissionKey('action.execute_script'));
 
   const sourceExample = `// The effective executor's identity and permissions apply.
 // Call the v2 REST API synchronously:
@@ -21,6 +24,14 @@ return { comment_id: res.body?.id ?? null };`;
 </script>
 
 <div class="script-panel">
+  {#if !canExecuteScript}
+    <p
+      class="permission-warning border border-ds-border-warning bg-ds-warning-subtle text-ds-text-warning"
+      data-testid="execute-script-permission-warning"
+    >
+      {t('actions.nodes.scriptTrustRequired')}
+    </p>
+  {/if}
   <div>
     <label for="execute-script-source" class="block text-xs font-medium mb-1">JavaScript (function body)</label>
     <Textarea
@@ -117,6 +128,12 @@ return { comment_id: res.body?.id ?? null };`;
   .hint {
     margin-top: 4px;
     color: var(--ds-text-subtle);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .permission-warning {
+    border-radius: 6px;
+    padding: 8px;
     font-size: 11px;
     line-height: 1.4;
   }

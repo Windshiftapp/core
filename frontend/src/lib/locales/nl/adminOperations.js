@@ -534,6 +534,7 @@ export default {
       action_manage: { name: 'Acties beheren', description: 'Kan werkruimteacties aanmaken, bewerken, verwijderen en uitvoeren' },
       action_credential_manage: { name: 'Actiereferenties beheren', description: 'Kan referenties met werkruimtebereik aanmaken, roteren en verwijderen' },
       action_set_actor: { name: 'Actie-actor instellen', description: 'Kan een actie namens een andere gebruiker uitvoeren, ook tussen werkruimten' },
+      action_execute_script: { name: 'Actiescripts uitvoeren', description: 'Kan acties opslaan of handmatig uitvoeren die door de auteur aangeleverde JavaScript uitvoeren; in-process scripts hebben geen geheugenlimiet per script' },
       teams_manage: { name: 'Teams beheren', description: 'Kan teams aanmaken, bewerken en verwijderen' },
       public_board_manage: { name: 'Openbare borden beheren', description: 'Kan collecties openbaar maken en openbare borddeling configureren' },
     },

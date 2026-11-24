@@ -61,6 +61,10 @@ const (
 	PermissionProjectManage   = "project.manage"
 	PermissionCustomersManage = "customers.manage"
 	PermissionActionSetActor  = "action.set_actor" // Configure an action's actor_user_id to impersonate any user at execution time
+	// PermissionActionExecuteScript gates authoring and running action nodes that
+	// execute author-supplied JavaScript. Sobek runs in-process without a hard
+	// per-script heap bound, so this is a global trust level, not a workspace one.
+	PermissionActionExecuteScript = "action.execute_script" // Save or manually run actions containing execute_script nodes
 
 	// Workspace permissions
 	PermissionWorkspaceAdmin = "workspace.admin" // Manage workspace (administer workspace)

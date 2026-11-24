@@ -120,6 +120,7 @@ export default {
       roundRobinAssign: 'Attribution à tour de rôle',
       createMilestone: 'Créer un jalon',
       executeScript: 'Exécuter le script',
+      scriptTrustRequired: 'Nécessite la permission globale action.execute_script. Sans elle, l’enregistrement de cette action ou son exécution manuelle est refusé ; le moteur en processus n’a pas de limite de mémoire par script.',
     },
 
     // Toast shown when the AI chat updates the open action via update_action.

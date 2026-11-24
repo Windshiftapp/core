@@ -117,6 +117,7 @@ export default {
       roundRobinAssign: 'Round-Robin zuweisen',
       createMilestone: 'Meilenstein erstellen',
       executeScript: 'Skript ausführen',
+      scriptTrustRequired: 'Erfordert die globale Berechtigung action.execute_script. Ohne sie werden Speichern oder manuelles Ausführen dieser Aktion abgelehnt; die In-Process-Laufzeit hat keine Speichergrenze pro Skript.',
     },
 
     aiUpdated: 'Aktion durch KI aktualisiert',

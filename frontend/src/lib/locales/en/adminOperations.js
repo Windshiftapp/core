@@ -534,6 +534,7 @@ export default {
       action_manage: { name: 'Manage Actions', description: 'Can create, edit, delete, and execute workspace actions' },
       action_credential_manage: { name: 'Manage Action Credentials', description: 'Can create, rotate, and delete workspace-scoped action credentials' },
       action_set_actor: { name: 'Set Action Actor', description: 'Can run an action as another user, including across workspaces' },
+      action_execute_script: { name: 'Run Action Scripts', description: 'Can save or manually run actions that execute author-supplied JavaScript; in-process scripts have no per-script memory bound' },
       teams_manage: { name: 'Manage Teams', description: 'Can create, edit, and delete teams' },
       public_board_manage: { name: 'Manage Public Boards', description: 'Can make collections public and configure public board sharing' },
     },

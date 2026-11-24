@@ -84,6 +84,7 @@ export default {
       roundRobinAssign: 'Назначить по очереди',
       createMilestone: 'Создать этап',
       executeScript: 'Запустить скрипт',
+      scriptTrustRequired: 'Требуется глобальное разрешение action.execute_script. Без него сохранение этого действия или его ручной запуск отклоняются; у внутрипроцессного рантайма нет ограничения памяти на скрипт.',
       notifyCustomer: 'Уведомить клиента',
       insertCannedResponse: 'Вставить шаблон ответа',
       adjustLabels: 'Изменить метки',

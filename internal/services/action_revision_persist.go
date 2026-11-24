@@ -36,16 +36,20 @@ type ActionWriteMeta struct {
 	AuthorizeActor func(currentActor, effectiveActor *int, actorChanging bool) error
 }
 
-// PrivilegedActionEditDenied reports a rejected attempt to change the
-// executable configuration of an action with a configured actor without
-// action.set_actor. It carries only safe metadata.
+// PrivilegedActionEditDenied reports a rejected attempt to author or run
+// executable configuration without the required global permission. It carries
+// only safe metadata.
 type PrivilegedActionEditDenied struct {
 	AttemptedFields    []string
 	RequiredPermission string
 }
 
 func (e *PrivilegedActionEditDenied) Error() string {
-	return "action.set_actor required to edit executable configuration of a privileged action"
+	required := e.RequiredPermission
+	if required == "" {
+		required = models.PermissionActionSetActor
+	}
+	return required + " required to edit or run executable configuration of a privileged action"
 }
 
 // editorSource resolves the stored editor source label for a revision.

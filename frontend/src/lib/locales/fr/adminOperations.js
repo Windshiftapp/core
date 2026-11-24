@@ -494,6 +494,7 @@ export default {
       action_manage: { name: 'Gérer les actions', description: 'Peut créer, modifier, supprimer et exécuter des actions d’espace de travail' },
       action_credential_manage: { name: 'Gérer les identifiants d’action', description: 'Peut créer, renouveler et supprimer des identifiants d’action restreints à l’espace de travail' },
       action_set_actor: { name: 'Définir l’acteur de l’action', description: 'Peut exécuter une action en tant qu’autre utilisateur, y compris entre espaces de travail' },
+      action_execute_script: { name: 'Exécuter les scripts d’action', description: 'Peut enregistrer ou exécuter manuellement des actions qui exécutent du JavaScript fourni par l’auteur ; les scripts en processus n’ont pas de limite de mémoire par script' },
       teams_manage: { name: 'Gérer les équipes', description: 'Peut créer, modifier et supprimer des équipes' },
       public_board_manage: { name: 'Gérer les tableaux publics', description: 'Peut rendre des collections publiques et configurer le partage de tableaux publics' },
     },

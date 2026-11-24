@@ -151,7 +151,7 @@ func executeAction(actions actionApplication) jsonOperation[actionExecuteRequest
 		if input.ItemID <= 0 {
 			return actionExecuteResponse{}, newError(http.StatusBadRequest, "invalid_request", "item_id is required")
 		}
-		status, err := actions.Execute(user.ID, workspaceID, actionID, input.ItemID)
+		status, err := actions.Execute(user.ID, workspaceID, actionID, input.ItemID, auditActor(r, user))
 		return actionExecuteResponse{Status: status}, actionError(err)
 	}
 }

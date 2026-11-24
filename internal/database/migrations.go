@@ -3727,6 +3727,24 @@ END $$;
 			CREATE UNIQUE INDEX IF NOT EXISTS uq_priorities_single_default ON priorities(is_default) WHERE is_default = true;
 		`,
 	},
+	{
+		// Existing databases need the permission row inserted; fresh installs get
+		// it from permissions.sql, and the check then stamps this migration so it
+		// is not re-run.
+		Version: "20261204_action_execute_script_permission",
+		Name:    "Add the global action.execute_script trust permission",
+		CheckSQLite: `SELECT CASE WHEN EXISTS (
+			SELECT 1 FROM permissions WHERE permission_key = 'action.execute_script'
+		) THEN 1 ELSE 0 END`,
+		CheckPostgres: `SELECT CASE WHEN EXISTS (
+			SELECT 1 FROM permissions WHERE permission_key = 'action.execute_script'
+		) THEN 1 ELSE 0 END`,
+		SQLite: `INSERT OR IGNORE INTO permissions (permission_key, permission_name, description, scope, is_system)
+			VALUES ('action.execute_script', 'Run Action Scripts', 'Can save or manually run actions that execute author-supplied JavaScript; in-process scripts have no per-script memory bound', 'global', 0)`,
+		Postgres: `INSERT INTO permissions (permission_key, permission_name, description, scope, is_system)
+			VALUES ('action.execute_script', 'Run Action Scripts', 'Can save or manually run actions that execute author-supplied JavaScript; in-process scripts have no per-script memory bound', 'global', false)
+			ON CONFLICT (permission_key) DO NOTHING`,
+	},
 }
 
 // domainEventClaimableIndexMigration adds the partial index the claim query

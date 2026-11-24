@@ -421,7 +421,7 @@ func init() {
 				TriggerConfig: def.TriggerConfig,
 				CreatedBy:     &env.UserID,
 			}
-			definitions := services.NewActionDefinitionService(env.DB, repo, env.ActionService)
+			definitions := services.NewActionDefinitionService(env.DB, repo, env.ActionService, env.PermService)
 			created, validation, err := definitions.Create(action, def.Nodes, def.Edges, env.actionWriteMeta(logger.ActionAutomationCreate, map[string]any{"workspace_id": args.WorkspaceID}))
 			if len(validation) > 0 {
 				return map[string]any{"error": validation[0].Message, "validation_errors": validation}, nil
@@ -540,7 +540,7 @@ func init() {
 			existing.TriggerType = def.TriggerType
 			existing.TriggerConfig = def.TriggerConfig
 
-			definitions := services.NewActionDefinitionService(env.DB, repo, env.ActionService)
+			definitions := services.NewActionDefinitionService(env.DB, repo, env.ActionService, env.PermService)
 			meta := env.actionWriteMeta(logger.ActionAutomationUpdate, map[string]any{"workspace_id": args.WorkspaceID})
 			meta.AuthorizeActor = func(_ *int, effectiveActor *int, actorChanging bool) error {
 				if !actorChanging && effectiveActor == nil {

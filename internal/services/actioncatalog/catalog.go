@@ -357,7 +357,7 @@ func Build() (*Catalog, error) {
 	if err := registerNode[models.ExecuteScriptNodeConfig](c, nodeSpec{
 		Type:        models.ActionNodeExecuteScript,
 		Label:       "Run script",
-		Description: "Run a JavaScript function body with the effective executor's identity. The script can call the v2 REST API through a server-minted, short-lived token; the return value is stored in the configured output variable.",
+		Description: "Run a JavaScript function body with the effective executor's identity. The script can call the v2 REST API through a server-minted, short-lived token; the return value is stored in the configured output variable. Requires the global action.execute_script permission to save or run: the runtime is in-process and has no per-script memory bound.",
 		Category:    CategoryIntegration,
 	}); err != nil {
 		return nil, err

@@ -48,6 +48,7 @@ customer instance retains its own application, database and storage boundary.
 | Plugin CLI execution | Operator gate intersects persisted organization preference |
 | LDAP writes, test and sync | Operator gate; existing records retained for migration |
 | Script authoring/import/execution | Operator gate; read/remove definitions remains possible |
+| Saving or manually running `execute_script` nodes | Global `action.execute_script` permission; `action.manage` alone is not sufficient |
 | Attachment preference | Organization may tighten operator per-object ceiling |
 | Bulk imports | Operator gate and optional host admission |
 | Mail transports and AI connections | Operator gate; normal permissions still required |
@@ -147,4 +148,8 @@ Enabled condition and action scripts share the instance-wide `concurrent_scripts
 admission pool. `script_timeout_ms` caps both runtimes and action-script REST
 deadlines; node settings can only narrow the ceiling. Permits are released on
 success, error and cancellation. These ceilings are not heap/process isolation.
+Saving or manually running an action that contains an `execute_script` node also
+requires the global `action.execute_script` permission: a workspace
+`action.manage` holder cannot author a script node. Existing definitions still
+run on triggers, so remove or rewrite them before revoking the permission.
 Keep untrusted scripts disabled until a separately bounded worker design is available.

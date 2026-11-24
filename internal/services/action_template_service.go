@@ -40,6 +40,19 @@ type ApplyToWorkspaceResult struct {
 	Name        string `json:"name"`
 }
 
+// rejectTemplateScriptNodes refuses a blueprint that ships executable script
+// nodes. Templates come with the binary, so an applier cannot hold the per-user
+// action.execute_script trust level the authoring gate requires; shipping a
+// script in a template would bypass that gate.
+func rejectTemplateScriptNodes(templateKey string, tmpl actiontemplates.Template) error {
+	for _, node := range tmpl.Nodes {
+		if models.ActionNodeType(node.NodeType) == models.ActionNodeExecuteScript {
+			return fmt.Errorf("template %q contains an execute_script node; templates must not ship executable scripts", templateKey)
+		}
+	}
+	return nil
+}
+
 // ApplyToWorkspace snapshot-copies the template into the workspace as a new
 // Action. The blueprint's node and edge graph is materialized: each
 // template node becomes a fresh action_nodes row, each template edge a
@@ -60,6 +73,9 @@ func (s *ActionTemplateService) ApplyToWorkspace(
 	tmpl, ok := actiontemplates.Get(templateKey)
 	if !ok {
 		return nil, fmt.Errorf("template not found: %q", templateKey)
+	}
+	if err := rejectTemplateScriptNodes(templateKey, tmpl); err != nil {
+		return nil, err
 	}
 
 	triggerConfigJSON, err := json.Marshal(tmpl.TriggerConfig)

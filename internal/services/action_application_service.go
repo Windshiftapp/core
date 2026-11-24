@@ -69,7 +69,7 @@ type ActionApplicationService struct {
 }
 
 func NewActionApplicationService(db database.Database, repo *repository.ActionRepository, items *repository.ItemRepository, permissions *PermissionService, runtime *ActionService, assets *AssetService) *ActionApplicationService {
-	definitions := NewActionDefinitionService(db, repo, runtime)
+	definitions := NewActionDefinitionService(db, repo, runtime, permissions)
 	definitions.SetAssetService(assets)
 	return &ActionApplicationService{db: db, repo: repo, revisions: repository.NewActionRevisionRepository(db), items: items, permissions: permissions, definitions: definitions, runtime: runtime, templates: NewActionTemplateService(db, repo)}
 }
@@ -412,13 +412,20 @@ func (s *ActionApplicationService) GetRevision(userID, workspaceID, actionID, re
 	return s.revisions.GetByIDForAction(revisionID, actionID, workspaceID)
 }
 
-func (s *ActionApplicationService) Execute(userID, workspaceID, actionID, itemID int) (models.ActionExecutionStatus, error) {
+func (s *ActionApplicationService) Execute(userID, workspaceID, actionID, itemID int, actor AuditActor) (models.ActionExecutionStatus, error) {
 	action, err := s.actionInWorkspace(actionID, workspaceID)
 	if err != nil {
 		return "", err
 	}
 	allowed, err := s.canExecute(userID, workspaceID, action)
 	if err != nil || !allowed {
+		return "", ErrActionNotVisible
+	}
+	if nodesContainExecuteScript(action.Nodes) && !s.canRunScripts(userID) {
+		s.definitions.auditDeniedPrivilegedEdit(actor, action, &PrivilegedActionEditDenied{
+			AttemptedFields:    []string{"execute"},
+			RequiredPermission: models.PermissionActionExecuteScript,
+		})
 		return "", ErrActionNotVisible
 	}
 	if !action.IsEnabled {
@@ -477,6 +484,16 @@ func (s *ActionApplicationService) requireSetActor(userID int) error {
 		return ErrActionNotVisible
 	}
 	return nil
+}
+
+// canRunScripts reports whether the caller holds the global action.execute_script
+// trust level. A missing permission service fails closed.
+func (s *ActionApplicationService) canRunScripts(userID int) bool {
+	if s.permissions == nil {
+		return false
+	}
+	allowed, err := s.permissions.HasGlobalPermission(userID, models.PermissionActionExecuteScript)
+	return err == nil && allowed
 }
 
 func (s *ActionApplicationService) validateRoles(trigger models.ActionTriggerType, roleIDs []int) ([]int, error) {

@@ -72,6 +72,7 @@ export default {
       "roundRobinAssign": "تخصیص نوبتی",
       "createMilestone": "نقطه عطف ایجاد کنید",
       "executeScript": "اجرای اسکریپت",
+      "scriptTrustRequired": "به مجوز سراسری action.execute_script نیاز دارد. بدون آن، ذخیره این کنش یا اجرای دستی آن رد می‌شود؛ زمان اجرای درون‌فرایندی محدودیت حافظه برای هر اسکریپت ندارد.",
       "notifyCustomer": "به مشتری اطلاع دهید",
       "insertCannedResponse": "درج پاسخ آماده",
       "adjustLabels": "برچسب ها را تنظیم کنید",

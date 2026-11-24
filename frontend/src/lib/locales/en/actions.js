@@ -90,6 +90,7 @@ export default {
       insertCannedResponse: 'Insert canned response',
       adjustLabels: 'Adjust labels',
       executeScript: 'Run script',
+      scriptTrustRequired: 'Requires the global action.execute_script permission. Saving this action or running it manually is refused without it; the in-process runtime has no per-script memory bound.',
       createItem: 'Create work item',
     },
 

@@ -19,19 +19,21 @@ var ErrActionDefinitionInvalid = errors.New("action definition is invalid")
 // immutable revision and its audit rows in the same transaction as the action
 // row and graph, so an audit or revision failure rolls the mutation back.
 type ActionDefinitionService struct {
-	db        database.Database
-	repo      *repository.ActionRepository
-	revisions *repository.ActionRevisionRepository
-	runtime   *ActionService
-	asset     *AssetService
+	db          database.Database
+	repo        *repository.ActionRepository
+	revisions   *repository.ActionRevisionRepository
+	runtime     *ActionService
+	asset       *AssetService
+	permissions *PermissionService
 }
 
-func NewActionDefinitionService(db database.Database, repo *repository.ActionRepository, runtime *ActionService) *ActionDefinitionService {
+func NewActionDefinitionService(db database.Database, repo *repository.ActionRepository, runtime *ActionService, permissions *PermissionService) *ActionDefinitionService {
 	return &ActionDefinitionService{
-		db:        db,
-		repo:      repo,
-		revisions: repository.NewActionRevisionRepository(db),
-		runtime:   runtime,
+		db:          db,
+		repo:        repo,
+		revisions:   repository.NewActionRevisionRepository(db),
+		runtime:     runtime,
+		permissions: permissions,
 	}
 }
 
@@ -78,6 +80,13 @@ func (s *ActionDefinitionService) Create(action *models.Action, nodes []models.A
 	}
 	if validationErrors, err := s.Validate(action.WorkspaceID, definition); err != nil || len(validationErrors) > 0 {
 		return nil, validationErrors, err
+	}
+	if err := s.authorizeExecuteScript(meta.Actor, nodes, true); err != nil {
+		var denied *PrivilegedActionEditDenied
+		if errors.As(err, &denied) {
+			s.auditDeniedPrivilegedEdit(meta.Actor, action, denied)
+		}
+		return nil, nil, err
 	}
 	if meta.Source == "" {
 		meta.Source = models.ActionRevisionSourceCreate
@@ -128,6 +137,13 @@ func (s *ActionDefinitionService) Save(action *models.Action, nodes []models.Act
 		if validationErrors, err := s.Validate(action.WorkspaceID, definition); err != nil || len(validationErrors) > 0 {
 			return nil, validationErrors, err
 		}
+	}
+	if err := s.authorizeExecuteScript(meta.Actor, nodes, replaceGraph); err != nil {
+		var denied *PrivilegedActionEditDenied
+		if errors.As(err, &denied) {
+			s.auditDeniedPrivilegedEdit(meta.Actor, action, denied)
+		}
+		return nil, nil, err
 	}
 	if meta.Source == "" {
 		meta.Source = models.ActionRevisionSourceUpdate
@@ -205,10 +221,10 @@ func (s *ActionDefinitionService) Save(action *models.Action, nodes []models.Act
 	return updated, nil, nil
 }
 
-// auditDeniedPrivilegedEdit records a rejected attempt to change the executable
-// configuration of a privileged action without action.set_actor. It stores only
-// safe metadata: which fields were attempted, never the definition itself. The
-// write is independent of the rolled-back mutation transaction.
+// auditDeniedPrivilegedEdit records a rejected attempt to author or run
+// executable configuration without the required global permission. It stores
+// only safe metadata: which fields were attempted, never the definition itself.
+// The write is independent of any rolled-back mutation transaction.
 func (s *ActionDefinitionService) auditDeniedPrivilegedEdit(actor AuditActor, action *models.Action, denied *PrivilegedActionEditDenied) {
 	required := denied.RequiredPermission
 	if required == "" {
@@ -263,4 +279,41 @@ func (s *ActionDefinitionService) invalidate(workspaceID int) {
 	if s.runtime != nil {
 		s.runtime.InvalidateWorkspaceCache(workspaceID)
 	}
+}
+
+// nodesContainExecuteScript reports whether a definition graph includes a node
+// that runs author-supplied JavaScript.
+func nodesContainExecuteScript(nodes []models.ActionNode) bool {
+	for i := range nodes {
+		if nodes[i].NodeType == models.ActionNodeExecuteScript {
+			return true
+		}
+	}
+	return false
+}
+
+// authorizeExecuteScript enforces the global action.execute_script trust level
+// before a graph replacement containing execute_script nodes is persisted.
+// In-process scripts have no per-script heap bound, so action.manage alone is
+// not sufficient to author them. Metadata-only edits that leave the graph
+// untouched stay available to action managers.
+func (s *ActionDefinitionService) authorizeExecuteScript(actor AuditActor, nodes []models.ActionNode, replaceGraph bool) error {
+	if !replaceGraph || !nodesContainExecuteScript(nodes) {
+		return nil
+	}
+	denied := &PrivilegedActionEditDenied{
+		AttemptedFields:    []string{"nodes"},
+		RequiredPermission: models.PermissionActionExecuteScript,
+	}
+	if s.permissions == nil {
+		return denied
+	}
+	allowed, err := s.permissions.HasGlobalPermission(actor.UserID, models.PermissionActionExecuteScript)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return denied
+	}
+	return nil
 }

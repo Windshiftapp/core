@@ -33,7 +33,7 @@ type ActionHandler struct {
 // low-volume admin tooling, slower than the cookie path).
 func NewActionHandler(db database.Database, permissionService *services.PermissionService, actionService *services.ActionService) *ActionHandler {
 	repo := repository.NewActionRepository(db)
-	definitions := services.NewActionDefinitionService(db, repo, actionService)
+	definitions := services.NewActionDefinitionService(db, repo, actionService, permissionService)
 	return &ActionHandler{
 		BaseHandler: NewBaseHandler(db, permissionService),
 		repo:        repo,

@@ -50,10 +50,10 @@ type ActionScriptWriteMarker interface {
 // cleanup.
 //
 // Trusted authors only: Sobek runs in-process and has no hard per-script heap
-// limit, so time and output budgets do not make a hostile allocation safe.
-// Restricting authorship to action managers and requiring action.set_actor for
-// executable edits of privileged actions is the current mitigation; process
-// isolation would be a prerequisite before accepting untrusted authors.
+// limit, so time and output budgets do not make a hostile allocation safe. The
+// global action.execute_script permission gates saving and manually running a
+// definition that contains this node; process isolation would be a prerequisite
+// before accepting untrusted authors.
 //
 // Side effects are not transactional. A script that mutates state and then
 // fails has already committed those writes, matching every other action node.

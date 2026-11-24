@@ -94,6 +94,7 @@ export default {
       roundRobinAssign: '轮询分配',
       createMilestone: '创建里程碑',
       executeScript: '运行脚本',
+      scriptTrustRequired: '需要全局 action.execute_script 权限。没有该权限将拒绝保存此操作或手动运行；进程内运行时对每个脚本没有内存上限。',
     },
     aiUpdated: 'AI 已更新动作',
     addNodes: '添加节点',

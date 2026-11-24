@@ -90,6 +90,7 @@ export default {
       insertCannedResponse: 'Standaardantwoord invoegen',
       adjustLabels: 'Labels aanpassen',
       executeScript: 'Script uitvoeren',
+      scriptTrustRequired: 'Vereist de globale machtiging action.execute_script. Zonder deze wordt het opslaan of handmatig uitvoeren van deze actie geweigerd; de in-process runtime heeft geen geheugenlimiet per script.',
       createItem: 'Werkitem aanmaken',
     },
 
