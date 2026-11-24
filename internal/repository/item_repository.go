@@ -42,7 +42,7 @@ func (r *ItemRepository) GetDetailPanelAvailability(workspaceID, itemID int) (sc
 
 const itemBaseColumns = `id, workspace_id, workspace_item_number, item_type_id, title, description, status_id,
        priority_id, due_date, start_date, end_date, is_task, iteration_id, project_id, inherit_project,
-       time_project_id, assignee_id, creator_id, creator_portal_customer_id, custom_field_values, parent_id, related_work_item_id,
+       time_project_id, assignee_id, creator_id, creator_portal_customer_id, contact_email, contact_name, custom_field_values, parent_id, related_work_item_id,
        story_points, estimate_minutes, frac_index, created_at, updated_at, channel_id`
 
 func scanItemBase(scanner interface {
@@ -52,6 +52,7 @@ func scanItemBase(scanner interface {
 	var customFieldValuesJSON sql.NullString
 	var itemTypeID, parentID, statusID, iterationID, projectID, priorityID sql.NullInt64
 	var timeProjectID, assigneeID, creatorID, creatorPortalCustomerID, relatedWorkItemID sql.NullInt64
+	var contactEmail, contactName sql.NullString
 	var dueDate, startDate, endDate sql.NullTime
 	var storyPoints sql.NullFloat64
 	var estimateMinutes sql.NullInt64
@@ -61,7 +62,7 @@ func scanItemBase(scanner interface {
 	err := scanner.Scan(
 		&item.ID, &item.WorkspaceID, &item.WorkspaceItemNumber, &itemTypeID, &item.Title, &item.Description,
 		&statusID, &priorityID, &dueDate, &startDate, &endDate, &item.IsTask, &iterationID,
-		&projectID, &item.InheritProject, &timeProjectID, &assigneeID, &creatorID, &creatorPortalCustomerID, &customFieldValuesJSON, &parentID,
+		&projectID, &item.InheritProject, &timeProjectID, &assigneeID, &creatorID, &creatorPortalCustomerID, &contactEmail, &contactName, &customFieldValuesJSON, &parentID,
 		&relatedWorkItemID, &storyPoints, &estimateMinutes, &fracIndex, &item.CreatedAt, &item.UpdatedAt, &channelID,
 	)
 	if err != nil {
@@ -78,6 +79,8 @@ func scanItemBase(scanner interface {
 	assignNullableInt(&item.AssigneeID, assigneeID)
 	assignNullableInt(&item.CreatorID, creatorID)
 	assignNullableInt(&item.CreatorPortalCustomerID, creatorPortalCustomerID)
+	assignNullableString(&item.ContactEmail, contactEmail)
+	assignNullableString(&item.ContactName, contactName)
 	assignNullableInt(&item.RelatedWorkItemID, relatedWorkItemID)
 	assignNullableInt(&item.ChannelID, channelID)
 	assignNullableTime(&item.DueDate, dueDate)
@@ -325,7 +328,7 @@ const itemDetailsSelectBody = `
 	       i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values,
 	       i.virtual_field_data,
 	       i.parent_id, i.story_points, i.estimate_minutes, i.frac_index, i.created_at, i.updated_at,
-	       i.creator_portal_customer_id, i.channel_id, i.request_type_id,
+	       i.creator_portal_customer_id, i.contact_email, i.contact_name, i.channel_id, i.request_type_id,
 	       w.name as workspace_name, w.key as workspace_key, w.active as workspace_active,
 	       iter.name as iteration_name,
 	       proj.name as project_name,
@@ -385,6 +388,7 @@ func scanItemDetailsRow(scanner rowScanner) (models.Item, bool, error) {
 	var relatedWorkItemTitle, relatedWorkItemWorkspaceKey sql.NullString
 	var relatedWorkItemWorkspaceID, relatedWorkItemNumber sql.NullInt64
 	var creatorPortalCustomerID, channelID, requestTypeID sql.NullInt64
+	var contactEmail, contactName sql.NullString
 	var teamID, incidentID sql.NullInt64
 	var teamName, teamColor, teamAvatar sql.NullString
 	var creatorPortalCustomerName, creatorPortalCustomerEmail sql.NullString
@@ -400,7 +404,7 @@ func scanItemDetailsRow(scanner rowScanner) (models.Item, bool, error) {
 		&projectID, &item.InheritProject, &timeProjectID, &assigneeID, &creatorID, &customFieldValuesJSON,
 		&virtualFieldDataJSON,
 		&parentID, &storyPoints, &estimateMinutes, &item.FracIndex, &item.CreatedAt, &item.UpdatedAt,
-		&creatorPortalCustomerID, &channelID, &requestTypeID,
+		&creatorPortalCustomerID, &contactEmail, &contactName, &channelID, &requestTypeID,
 		&item.WorkspaceName, &item.WorkspaceKey, &workspaceActive,
 		&iterationName, &projectName, &timeProjectName, &parentTitle, &parentWorkspaceItemNumber,
 		&assigneeName, &assigneeEmail, &assigneeAvatar, &creatorName, &creatorEmail,
@@ -437,6 +441,8 @@ func scanItemDetailsRow(scanner rowScanner) (models.Item, bool, error) {
 	assignNullableInt(&item.CreatorID, creatorID)
 
 	assignNullableInt(&item.CreatorPortalCustomerID, creatorPortalCustomerID)
+	assignNullableString(&item.ContactEmail, contactEmail)
+	assignNullableString(&item.ContactName, contactName)
 	assignNullableInt(&item.ChannelID, channelID)
 	assignNullableInt(&item.RequestTypeID, requestTypeID)
 	assignNullableInt(&item.TeamID, teamID)
@@ -1114,14 +1120,16 @@ func (r *ItemRepository) Create(tx database.Tx, item *models.Item) (int, error) 
 		INSERT INTO items (
 			workspace_id, workspace_item_number, item_type_id, title, description, status_id, priority_id, is_task,
 			iteration_id, project_id, inherit_project, time_project_id, assignee_id, team_id, reporter_id, creator_id, creator_portal_customer_id,
+			contact_email, contact_name,
 			channel_id, request_type_id, intake_id, portal_org_shared, due_date, start_date, end_date, related_work_item_id,
 			story_points, estimate_minutes, custom_field_values, virtual_field_data, parent_id,
 			frac_index, created_at, updated_at, last_active_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
 		item.WorkspaceID, item.WorkspaceItemNumber, item.ItemTypeID, item.Title, item.Description,
 		item.StatusID, item.PriorityID, item.IsTask, item.IterationID, item.ProjectID, item.InheritProject,
 		item.TimeProjectID, item.AssigneeID, item.TeamID, item.ReporterID, item.CreatorID, item.CreatorPortalCustomerID,
+		item.ContactEmail, item.ContactName,
 		item.ChannelID, item.RequestTypeID, item.IntakeID, item.PortalOrgShared,
 		item.DueDate, item.StartDate, item.EndDate, item.RelatedWorkItemID,
 		item.StoryPoints, item.EstimateMinutes, customFieldValuesJSON, virtualFieldDataJSON, item.ParentID,

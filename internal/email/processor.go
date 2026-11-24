@@ -170,22 +170,6 @@ func (p *Processor) ProcessEmailWithIntake(
 		parentItemID = p.findParentItem(ctx, email)
 	}
 
-	// 2. Resolve the sender to a portal customer. An authorized reply proves
-	// the sender controls the address Windshift wrote to, so it also restores
-	// channel access; a brand new request records a contact address only and
-	// grants no portal or thread access from the claimed From.
-	customerID, err := p.findOrCreatePortalCustomer(ctx, email.From.Address, email.From.Name, channelID, config)
-	if err != nil {
-		p.releaseTrackingClaim(ctx, channelID, dedupKey)
-		return nil, fmt.Errorf("failed to find/create portal customer: %w", err)
-	}
-	if parentItemID != nil {
-		if err := p.grantChannelAccess(ctx, customerID, channelID, email.From.Address, config); err != nil {
-			p.releaseTrackingClaim(ctx, channelID, dedupKey)
-			return nil, fmt.Errorf("grant customer access for authorized reply: %w", err)
-		}
-	}
-
 	// Flood protection gates NEW conversations only; replies keep flowing.
 	if parentItemID == nil && p.senderIsRateLimited(ctx, channelID, intakeID, config, email.From.Address) {
 		p.markRateLimited(ctx, channelID, dedupKey)
@@ -198,6 +182,23 @@ func (p *Processor) ProcessEmailWithIntake(
 		return &ProcessingResult{Action: ActionRateLimited}, nil
 	}
 
+	// 2. Only an authorized reply has proven the sender controls the address
+	// Windshift wrote to. Resolve them to a portal customer and restore access;
+	// a new request records an unverified contact on the item instead and never
+	// acquires a portal owner from the claimed From.
+	var customerID int
+	if parentItemID != nil {
+		customerID, err = p.findOrCreatePortalCustomer(ctx, email.From.Address, email.From.Name, channelID, config)
+		if err != nil {
+			p.releaseTrackingClaim(ctx, channelID, dedupKey)
+			return nil, fmt.Errorf("failed to find/create portal customer: %w", err)
+		}
+		if err := p.grantChannelAccess(ctx, customerID, channelID, email.From.Address, config); err != nil {
+			p.releaseTrackingClaim(ctx, channelID, dedupKey)
+			return nil, fmt.Errorf("grant customer access for authorized reply: %w", err)
+		}
+	}
+
 	// 4. Create item or add comment
 	var result *ProcessingResult
 	if parentItemID != nil {
@@ -205,7 +206,7 @@ func (p *Processor) ProcessEmailWithIntake(
 		result, err = p.addCommentFromReply(ctx, email, *parentItemID, customerID)
 	} else {
 		// This is a new conversation - create item
-		result, err = p.createItemFromEmail(ctx, email, channelID, config, customerID, intakeID)
+		result, err = p.createItemFromEmail(ctx, email, channelID, config, intakeID)
 	}
 
 	if err != nil {
@@ -213,7 +214,10 @@ func (p *Processor) ProcessEmailWithIntake(
 		return nil, err
 	}
 
-	result.CustomerID = &customerID
+	if parentItemID != nil {
+		result.CustomerID = &customerID
+		p.linkVerifiedContact(ctx, *parentItemID, customerID, email.From.Address)
+	}
 
 	// 5. Finalize tracking with the created item/comment ID. If this UPDATE
 	// fails the item still exists and the preclaim row continues to block
@@ -604,6 +608,7 @@ func (p *Processor) lookupReplyKey(ctx context.Context, canonicalID string) (ite
 	err := p.db.QueryRowContext(ctx, `
 		SELECT item_id, to_email FROM email_reply_outbox
 		WHERE message_id IN (?, ?) AND item_id IS NOT NULL AND to_email <> ''
+		  AND key_generation >= 1
 		  AND COALESCE(delivered_at, created_at) >= ?
 		ORDER BY id DESC
 		LIMIT 1
@@ -618,18 +623,20 @@ func (p *Processor) lookupReplyKey(ctx context.Context, canonicalID string) (ite
 }
 
 // lookupLegacyReplyItem resolves a pre-WI-2365 outbound Message-ID to the
-// ticket it was recorded on. Those rows carry no recipient and have no
-// recipient-bound outbox row, so they are tolerated only on the existing
-// ticket that recorded them; synthetic anchors (from_email = ”) never
-// authorize.
+// ticket it was recorded on. Those rows are generation 0 and carry no
+// recipient, so they are tolerated only on a ticket that has never issued a
+// recipient-bound key; synthetic anchors (from_email = ”) never authorize.
 func (p *Processor) lookupLegacyReplyItem(ctx context.Context, canonicalID string) (int, bool) {
 	bareID := bareMessageID(canonicalID)
 	var itemID int
 	err := p.db.QueryRowContext(ctx, `
 		SELECT t.item_id FROM email_message_tracking t
 		WHERE t.message_id IN (?, ?) AND t.direction = 'outbound' AND t.item_id IS NOT NULL
-		  AND t.from_email <> ''
-		  AND NOT EXISTS (SELECT 1 FROM email_reply_outbox o WHERE o.message_id = t.message_id)
+		  AND t.key_generation = 0 AND t.from_email <> ''
+		  AND NOT EXISTS (
+		      SELECT 1 FROM email_reply_outbox o
+		      WHERE o.item_id = t.item_id AND o.key_generation >= 1
+		  )
 		ORDER BY t.id DESC
 		LIMIT 1
 	`, canonicalID, bareID).Scan(&itemID)
@@ -650,6 +657,14 @@ func (p *Processor) senderStillAuthorized(_ context.Context, itemID int, senderE
 	if senderEmail == "" {
 		return false
 	}
+	// Unverified contact recorded on the item: the reply key's recipient match
+	// already proved control of the address, so the contact may append.
+	var contactEmail sql.NullString
+	if err := p.db.QueryRow(`SELECT contact_email FROM items WHERE id = ?`, itemID).Scan(&contactEmail); err == nil {
+		if contactEmail.Valid && normalizedEmail(contactEmail.String) == senderEmail {
+			return true
+		}
+	}
 	// Original creator via portal customer.
 	if creatorEmail, err := repository.NewItemRepository(p.db).GetPortalCustomerEmailForItem(itemID); err == nil {
 		if normalizedEmail(creatorEmail) == senderEmail {
@@ -662,6 +677,24 @@ func (p *Processor) senderStillAuthorized(_ context.Context, itemID int, senderE
 		return true
 	}
 	return false
+}
+
+// linkVerifiedContact promotes an unverified item contact to the portal owner
+// once a reply key proves the sender controls the address. It only acts when
+// the item has no owner and the contact matches the verified sender, so a
+// reply key can never reassign someone else's request.
+func (p *Processor) linkVerifiedContact(ctx context.Context, itemID, customerID int, senderEmail string) {
+	if customerID <= 0 || senderEmail == "" {
+		return
+	}
+	if _, err := p.db.ExecWriteContext(ctx, `
+		UPDATE items
+		SET creator_portal_customer_id = ?, contact_email = NULL, contact_name = NULL, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND creator_portal_customer_id IS NULL AND LOWER(contact_email) = ?
+	`, customerID, itemID, normalizedEmail(senderEmail)); err != nil {
+		slog.Warn("failed to link verified email contact to portal customer",
+			"item_id", itemID, "customer_id", customerID, "error", err)
+	}
 }
 
 // findParentItem resolves the item an email reply is authorized to append to,
@@ -693,7 +726,6 @@ func (p *Processor) createItemFromEmail(
 	email *ParsedEmail,
 	channelID int,
 	config *models.ChannelConfig,
-	customerID int,
 	intakeID *int,
 ) (*ProcessingResult, error) {
 	workspaceID, itemTypeID, requestTypeID, err := p.resolveEmailIntakeTarget(config)
@@ -724,18 +756,21 @@ func (p *Processor) createItemFromEmail(
 	// Build item parameters. Leave StatusID nil so services.CreateItem resolves
 	// it from the workspace workflow. PriorityID is supplied only when the
 	// channel explicitly configured a workspace-valid override; otherwise the
-	// shared service resolves the workspace default.
+	// shared service resolves the workspace default. The sender is recorded as
+	// an unverified contact, not a portal owner: the claimed From must not make
+	// the request appear in a customer's portal or organisation sharing (WI-2365).
 	params := services.ItemCreationParams{
-		WorkspaceID:             workspaceID,
-		Title:                   sanitize.PlainTextField.Sanitize(email.GetSubjectForItem()),
-		Description:             sanitize.Comment.Sanitize(email.bodyMarkdown(false)),
-		ItemTypeID:              itemTypeID,
-		PriorityID:              config.EmailDefaultPriorityID,
-		RequestTypeID:           requestTypeID,
-		IntakeID:                intakeID,
-		CreatorPortalCustomerID: &customerID,
-		ChannelID:               &channelID,
-		EventMetadata:           itemevents.PortalCustomer(customerID, "email"),
+		WorkspaceID:   workspaceID,
+		Title:         sanitize.PlainTextField.Sanitize(email.GetSubjectForItem()),
+		Description:   sanitize.Comment.Sanitize(email.bodyMarkdown(false)),
+		ItemTypeID:    itemTypeID,
+		PriorityID:    config.EmailDefaultPriorityID,
+		RequestTypeID: requestTypeID,
+		IntakeID:      intakeID,
+		ContactEmail:  email.From.Address,
+		ContactName:   email.From.Name,
+		ChannelID:     &channelID,
+		EventMetadata: itemevents.System("email"),
 	}
 
 	// Create the item via the shared service entry point.

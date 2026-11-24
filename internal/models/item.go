@@ -41,6 +41,11 @@ type Item struct {
 	CreatorID               *int `json:"creator_id,omitempty"`                 // Internal user who created this item
 	ReporterID              *int `json:"reporter_id,omitempty"`                // User who reported this item (from Jira import)
 	CreatorPortalCustomerID *int `json:"creator_portal_customer_id,omitempty"` // Portal customer who created this item (for portal submissions)
+	// ContactEmail/ContactName record an unverified inbound email sender until a
+	// reply key proves they control the address (WI-2365). They are not a portal
+	// identity: the item is not listed in any customer's portal.
+	ContactEmail string `json:"contact_email,omitempty"`
+	ContactName  string `json:"contact_name,omitempty"`
 	// Portal submission tracking fields (immutable once set)
 	ChannelID         *int                    `json:"channel_id,omitempty"`      // Portal/channel this request was submitted through
 	RequestTypeID     *int                    `json:"request_type_id,omitempty"` // Request type used for submission

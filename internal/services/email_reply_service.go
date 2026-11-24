@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -99,8 +100,8 @@ func (s *EmailReplyService) handleCommentCreated(params HandleCommentParams, del
 		return fmt.Errorf("failed to query item for email reply: %w", err)
 	}
 
-	// Skip if item has no channel or no portal customer creator
-	if item.ChannelID == nil || item.CreatorPortalCustomerID == nil {
+	// Skip if item has no channel or no addressable requester.
+	if item.ChannelID == nil {
 		return nil
 	}
 
@@ -117,18 +118,24 @@ func (s *EmailReplyService) handleCommentCreated(params HandleCommentParams, del
 	// Portal/form-originated tickets thread from the anchor minted at
 	// submission; the ensure covers pre-upgrade tickets (created before the
 	// anchor existed) and repairs a failed best-effort mint. It is a no-op for
-	// email channels and for items that already have their anchor.
+	// email channels and for items that already have their anchor. An
+	// unverified email contact has no anchor: the inbound message is the root.
 	maybeRecordPortalThreadAnchor(s.db, int64(params.ItemID), item.ChannelID, item.CreatorPortalCustomerID, item.Title)
 
-	// Recipients: the creator plus every external request participant
+	// Recipients: the verified creator, or the item's unverified contact until a
+	// reply key proves the address, plus every external request participant
 	// (WI-1136). Each gets its own outbox row so replies attribute per
 	// recipient, and the intake participant guard accepts them as repliers.
 	var customerEmail, customerName string
-	err = s.db.QueryRow("SELECT email, name FROM portal_customers WHERE id = ?", *item.CreatorPortalCustomerID).Scan(&customerEmail, &customerName)
+	if item.CreatorPortalCustomerID != nil {
+		err = s.db.QueryRow("SELECT email, name FROM portal_customers WHERE id = ?", *item.CreatorPortalCustomerID).Scan(&customerEmail, &customerName)
+	} else {
+		customerEmail, customerName = item.ContactEmail, item.ContactName
+	}
 	if err != nil || customerEmail == "" {
-		slog.Debug("no email for portal customer, skipping reply",
-			slog.String("component", "email_reply_service"),
-			slog.Int("customer_id", *item.CreatorPortalCustomerID),
+		slog.Debug("no addressable requester for item, skipping reply",
+			"component", "email_reply_service",
+			slog.Int("item_id", params.ItemID),
 		)
 		return nil
 	}
@@ -231,10 +238,10 @@ func (s *EmailReplyService) handleCommentCreated(params HandleCommentParams, del
 		err = s.db.QueryRow(`
 			INSERT INTO email_reply_outbox (
 				comment_id, channel_id, item_id, to_email, to_name, subject,
-				html_body, text_body, message_id, in_reply_to, references_json,
+				html_body, text_body, message_id, key_generation, in_reply_to, references_json,
 				from_email, from_name, reply_to_email, reply_to_name,
 				next_attempt_at, created_at, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 			ON CONFLICT(comment_id, to_email) WHERE comment_id IS NOT NULL DO NOTHING
 			RETURNING id
 		`, params.CommentID, *item.ChannelID, params.ItemID, recipient.Email, recipient.Name,
@@ -381,16 +388,19 @@ type emailThreadRecord struct {
 	Subject   sql.NullString
 	Direction string
 	ToEmail   string
+	At        time.Time
 }
 
 // loadItemThread loads the item's conversation for building recipient-specific
 // threading headers. Inbound messages and synthetic anchors come from
-// email_message_tracking; outbound reply keys come from email_reply_outbox,
-// which alone records the intended recipient (WI-2365).
+// email_message_tracking; delivered reply keys come from email_reply_outbox,
+// which alone records the intended recipient (WI-2365). The two sources are
+// merged chronologically so the parent chosen below is the most recent message,
+// not whichever source was appended last.
 func (s *EmailReplyService) loadItemThread(itemID int) ([]emailThreadRecord, error) {
 	var records []emailThreadRecord
 	rows, err := s.db.Query(`
-		SELECT message_id, subject, direction, '' FROM email_message_tracking
+		SELECT message_id, subject, direction, '', processed_at FROM email_message_tracking
 		WHERE item_id = ?
 		  AND (direction = 'inbound' OR (direction = 'outbound' AND comment_id IS NULL AND from_email = ''))
 		ORDER BY processed_at ASC, id ASC
@@ -400,7 +410,7 @@ func (s *EmailReplyService) loadItemThread(itemID int) ([]emailThreadRecord, err
 	}
 	for rows.Next() {
 		var rec emailThreadRecord
-		if err := rows.Scan(&rec.MessageID, &rec.Subject, &rec.Direction, &rec.ToEmail); err != nil {
+		if err := rows.Scan(&rec.MessageID, &rec.Subject, &rec.Direction, &rec.ToEmail, &rec.At); err != nil {
 			continue
 		}
 		records = append(records, rec)
@@ -413,12 +423,14 @@ func (s *EmailReplyService) loadItemThread(itemID int) ([]emailThreadRecord, err
 		return nil, fmt.Errorf("close email tracking rows: %w", err)
 	}
 
-	// Outbound deliveries persist item, recipient and Message-ID together; the
-	// row is the recipient-bound reply key.
+	// Only delivered, non-discarded, recipient-bound keys belong in the thread:
+	// a pending or discarded row was never sent, and a generation-0 row is a
+	// pre-upgrade ID that must not be exposed.
 	keyRows, err := s.db.Query(`
-		SELECT message_id, subject, to_email FROM email_reply_outbox
+		SELECT message_id, subject, to_email, delivered_at FROM email_reply_outbox
 		WHERE item_id = ? AND message_id <> '' AND to_email <> ''
-		ORDER BY created_at ASC, id ASC
+		  AND delivered_at IS NOT NULL AND discarded_at IS NULL AND key_generation >= 1
+		ORDER BY delivered_at ASC, id ASC
 	`, itemID)
 	if err != nil {
 		return nil, fmt.Errorf("query email reply keys: %w", err)
@@ -426,7 +438,7 @@ func (s *EmailReplyService) loadItemThread(itemID int) ([]emailThreadRecord, err
 	defer keyRows.Close()
 	for keyRows.Next() {
 		var rec emailThreadRecord
-		if err := keyRows.Scan(&rec.MessageID, &rec.Subject, &rec.ToEmail); err != nil {
+		if err := keyRows.Scan(&rec.MessageID, &rec.Subject, &rec.ToEmail, &rec.At); err != nil {
 			continue
 		}
 		rec.Direction = "outbound"
@@ -435,6 +447,7 @@ func (s *EmailReplyService) loadItemThread(itemID int) ([]emailThreadRecord, err
 	if err := keyRows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate email reply keys: %w", err)
 	}
+	sort.SliceStable(records, func(i, j int) bool { return records[i].At.Before(records[j].At) })
 	return records, nil
 }
 
@@ -624,27 +637,21 @@ func (s *EmailReplyService) sendItemNotice(item *models.Item, toEmail, toName, s
 
 	// Persist the reply key before crossing the SMTP boundary. If the send
 	// succeeds but the process dies before recording the key, the customer
-	// holds a Message-ID Windshift never learned. The notice is sent directly,
-	// so the row is stored as already delivered; a send failure leaves an
-	// unused key, which authorizes nothing.
+	// holds a Message-ID Windshift never learned. A persistence failure must
+	// therefore fail the notice instead of sending an unroutable key.
 	if _, err := s.db.ExecWrite(`
 		INSERT INTO email_reply_outbox (
 			kind, channel_id, item_id, to_email, to_name, subject,
-			html_body, text_body, message_id, in_reply_to, references_json,
+			html_body, text_body, message_id, key_generation, in_reply_to, references_json,
 			from_email, from_name, reply_to_email, reply_to_name,
 			next_attempt_at, delivered_at, created_at, updated_at
-		) VALUES ('notice', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+		) VALUES ('notice', ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?,
 		          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		ON CONFLICT DO NOTHING
 	`, *item.ChannelID, item.ID, toEmail, toName, emailSubject,
 		htmlBody, textBody, messageID, inReplyTo, string(referencesJSON),
 		s.getSMTPFromEmail(), authorName, replyToEmail, replyToName); err != nil {
-		slog.Warn("failed to persist customer notice reply key",
-			slog.String("component", "email_reply_service"),
-			slog.Int("item_id", item.ID),
-			slog.String("message_id", messageID),
-			slog.Any("error", err),
-		)
+		return false, "", fmt.Errorf("persist customer notice reply key: %w", err)
 	}
 
 	if err := s.smtpSender.SendThreadedEmail(smtp.ThreadedEmailParams{
@@ -667,8 +674,8 @@ func (s *EmailReplyService) sendItemNotice(item *models.Item, toEmail, toName, s
 	if _, err := s.db.ExecWrite(`
 		INSERT INTO email_message_tracking (
 			channel_id, message_id, dedup_key, in_reply_to, from_email, from_name, subject,
-			item_id, comment_id, direction, processed_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 'outbound', CURRENT_TIMESTAMP)
+			item_id, comment_id, key_generation, direction, processed_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 1, 'outbound', CURRENT_TIMESTAMP)
 		ON CONFLICT(channel_id, dedup_key) DO NOTHING
 	`, *item.ChannelID, messageID, messageID, inReplyTo, s.getSMTPFromEmail(), authorName, emailSubject, item.ID); err != nil {
 		slog.Warn("failed to record customer notice in email tracking; replies may not thread",
@@ -692,16 +699,6 @@ func (s *EmailReplyService) EnqueueIntakeConfirmation(itemID, customerID int) er
 	if !s.smtpSender.IsSMTPConfigured() {
 		return nil
 	}
-	var customerEmail, customerName string
-	if err := s.db.QueryRow(`SELECT email, COALESCE(name, '') FROM portal_customers WHERE id = ?`, customerID).Scan(&customerEmail, &customerName); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil
-		}
-		return fmt.Errorf("load portal customer for intake confirmation: %w", err)
-	}
-	if customerEmail == "" {
-		return nil
-	}
 	item, err := repository.NewItemRepository(s.db).FindByIDWithDetails(itemID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
@@ -710,6 +707,22 @@ func (s *EmailReplyService) EnqueueIntakeConfirmation(itemID, customerID int) er
 		return fmt.Errorf("load item for intake confirmation: %w", err)
 	}
 	if item.ChannelID == nil {
+		return nil
+	}
+	// A receipt goes to the verified portal customer when there is one, or to
+	// the item's unverified contact address until a reply key verifies it.
+	var customerEmail, customerName string
+	if customerID > 0 {
+		if err := s.db.QueryRow(`SELECT email, COALESCE(name, '') FROM portal_customers WHERE id = ?`, customerID).Scan(&customerEmail, &customerName); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil
+			}
+			return fmt.Errorf("load portal customer for intake confirmation: %w", err)
+		}
+	} else {
+		customerEmail, customerName = item.ContactEmail, item.ContactName
+	}
+	if customerEmail == "" {
 		return nil
 	}
 	if customerName == "" {
@@ -742,10 +755,10 @@ func (s *EmailReplyService) EnqueueIntakeConfirmation(itemID, customerID int) er
 	if _, err := s.db.ExecWrite(`
 		INSERT INTO email_reply_outbox (
 			kind, channel_id, item_id, to_email, to_name, subject,
-			html_body, text_body, message_id, in_reply_to, references_json,
+			html_body, text_body, message_id, key_generation, in_reply_to, references_json,
 			from_email, from_name, reply_to_email, reply_to_name,
 			next_attempt_at, created_at, updated_at
-		) VALUES ('intake_confirmation', ?, ?, ?, ?, ?, ?, ?, ?, '', '[]', ?, ?, ?, ?,
+		) VALUES ('intake_confirmation', ?, ?, ?, ?, ?, ?, ?, ?, 1, '', '[]', ?, ?, ?, ?,
 		          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		ON CONFLICT DO NOTHING
 	`, *item.ChannelID, itemID, customerEmail, customerName, subject,
@@ -938,11 +951,13 @@ func (s *EmailReplyService) deliverPendingReply(ctx context.Context, outboxID in
 
 	// Tracking is best-effort after delivery. Do not retry SMTP merely because
 	// this audit/threading insert failed; that would duplicate customer mail.
+	// key_generation marks the row as a recipient-bound reply key so it survives
+	// outbox pruning without ever being mistaken for a pre-upgrade ID.
 	if _, err := s.db.ExecWrite(`
 		INSERT INTO email_message_tracking (
 			channel_id, message_id, dedup_key, in_reply_to, from_email, from_name, subject,
-			item_id, comment_id, direction, processed_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'outbound', CURRENT_TIMESTAMP)
+			item_id, comment_id, key_generation, direction, processed_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'outbound', CURRENT_TIMESTAMP)
 		ON CONFLICT(channel_id, dedup_key) DO NOTHING
 	`, row.ChannelID, row.MessageID, row.MessageID, row.InReplyTo, row.FromEmail,
 		row.FromName, row.Subject, row.ItemID, row.CommentID); err != nil {

@@ -16,6 +16,12 @@ CREATE TABLE IF NOT EXISTS items (
 	creator_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
 	reporter_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
 	creator_portal_customer_id INTEGER REFERENCES portal_customers(id) ON DELETE SET NULL,
+	-- Unverified contact recorded for an inbound email before its sender proved
+	-- control of the address. Kept separate from creator_portal_customer_id so
+	-- a claimed From cannot make the item appear in a customer's portal or
+	-- organisation sharing (WI-2365). Cleared when the contact is verified.
+	contact_email TEXT,
+	contact_name TEXT,
 	custom_field_values TEXT,
 	virtual_field_data TEXT,
 	calendar_data TEXT,

@@ -3750,6 +3750,42 @@ END $$;
 			ALTER TABLE intakes ADD COLUMN IF NOT EXISTS sender_authentication TEXT NOT NULL DEFAULT '';
 		`,
 	},
+	{
+		// WI-2365: only a recipient-bound outbound Message-ID may authorize an
+		// email reply. key_generation marks rows issued under that scheme (>= 1);
+		// pre-upgrade rows default to 0 and never authorize. The marker lives on
+		// the tracking row too so it survives outbox pruning. contact_email/
+		// contact_name keep an unverified inbound sender off the customer's
+		// portal identity until a reply key proves control of the address.
+		Version: "20261205_email_reply_keys",
+		Name:    "Recipient-bound reply keys and unverified email contacts (WI-2365)",
+		CheckSQLite: "SELECT CASE WHEN (" + sqliteColumnCheck("email_reply_outbox", "key_generation") +
+			") > 0 AND (" + sqliteColumnCheck("email_message_tracking", "key_generation") +
+			") > 0 AND (" + sqliteColumnCheck("items", "contact_email") +
+			") > 0 AND (" + sqliteIndexCheck("idx_email_reply_outbox_message_id") + ") > 0 THEN 1 ELSE 0 END",
+		CheckPostgres: "SELECT CASE WHEN (" + pgColumnCheck("email_reply_outbox", "key_generation") +
+			") > 0 AND (" + pgColumnCheck("email_message_tracking", "key_generation") +
+			") > 0 AND (" + pgColumnCheck("items", "contact_email") +
+			") > 0 AND (" + pgIndexCheck("idx_email_reply_outbox_message_id") + ") > 0 THEN 1 ELSE 0 END",
+		SQLite: `
+			ALTER TABLE email_reply_outbox ADD COLUMN key_generation INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE email_message_tracking ADD COLUMN key_generation INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE items ADD COLUMN contact_email TEXT;
+			ALTER TABLE items ADD COLUMN contact_name TEXT;
+			CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_message_id ON email_reply_outbox(message_id);
+			CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_item_created ON email_reply_outbox(item_id, created_at);
+			CREATE INDEX IF NOT EXISTS idx_email_message_tracking_key_generation ON email_message_tracking(key_generation);
+		`,
+		Postgres: `
+			ALTER TABLE email_reply_outbox ADD COLUMN IF NOT EXISTS key_generation INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE email_message_tracking ADD COLUMN IF NOT EXISTS key_generation INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE items ADD COLUMN IF NOT EXISTS contact_email TEXT;
+			ALTER TABLE items ADD COLUMN IF NOT EXISTS contact_name TEXT;
+			CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_message_id ON email_reply_outbox(message_id);
+			CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_item_created ON email_reply_outbox(item_id, created_at);
+			CREATE INDEX IF NOT EXISTS idx_email_message_tracking_key_generation ON email_message_tracking(key_generation);
+		`,
+	},
 }
 
 // domainEventClaimableIndexMigration adds the partial index the claim query

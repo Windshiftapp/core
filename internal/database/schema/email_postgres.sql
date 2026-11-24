@@ -112,6 +112,8 @@ CREATE TABLE IF NOT EXISTS email_message_tracking (
 	subject TEXT,
 	item_id INTEGER,
 	comment_id INTEGER,
+	-- key_generation: see email.sql for the reply-key contract.
+	key_generation INTEGER NOT NULL DEFAULT 0,
 	-- attachments_status: see email.sql for the column contract.
 	attachments_status TEXT CHECK(attachments_status IN ('ok','partial','failed') OR attachments_status IS NULL),
 	direction TEXT DEFAULT 'inbound' CHECK(direction IN ('inbound', 'outbound')),
@@ -131,6 +133,7 @@ CREATE TABLE IF NOT EXISTS email_message_tracking (
 
 CREATE INDEX IF NOT EXISTS idx_email_message_tracking_channel_id ON email_message_tracking(channel_id);
 CREATE INDEX IF NOT EXISTS idx_email_message_tracking_message_id ON email_message_tracking(message_id);
+CREATE INDEX IF NOT EXISTS idx_email_message_tracking_key_generation ON email_message_tracking(key_generation);
 CREATE INDEX IF NOT EXISTS idx_email_message_tracking_in_reply_to ON email_message_tracking(in_reply_to);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_email_message_tracking_dedup ON email_message_tracking(channel_id, dedup_key);
 CREATE INDEX IF NOT EXISTS idx_email_message_tracking_sender ON email_message_tracking(from_email);
@@ -153,6 +156,8 @@ CREATE TABLE IF NOT EXISTS email_reply_outbox (
 	html_body TEXT NOT NULL,
 	text_body TEXT NOT NULL,
 	message_id TEXT NOT NULL,
+	-- key_generation: see email.sql for the reply-key contract.
+	key_generation INTEGER NOT NULL DEFAULT 0,
 	in_reply_to TEXT NOT NULL DEFAULT '',
 	references_json TEXT NOT NULL DEFAULT '[]',
 	from_email TEXT NOT NULL,
@@ -178,6 +183,12 @@ CREATE TABLE IF NOT EXISTS email_reply_outbox (
 
 CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_pending
 	ON email_reply_outbox(delivered_at, next_attempt_at);
+
+-- Reply-key lookup by Message-ID and thread assembly by item.
+CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_message_id
+	ON email_reply_outbox(message_id);
+CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_item_created
+	ON email_reply_outbox(item_id, created_at);
 
 -- One outbound reply per comment recipient (WI-1136).
 CREATE UNIQUE INDEX IF NOT EXISTS uq_email_reply_outbox_comment_recipient
