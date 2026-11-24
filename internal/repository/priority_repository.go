@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"windshift/internal/database"
@@ -34,17 +35,23 @@ func (r *PriorityRepository) NameExists(name string, excludeID int) (bool, error
 func (r *PriorityRepository) Create(priority *models.Priority) (int, error) {
 	now := time.Now()
 	var id int
-	err := r.db.QueryRow(`
-		INSERT INTO priorities (name, description, is_default, icon, color, sort_order, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-	`, priority.Name, priority.Description, priority.IsDefault, priority.Icon, priority.Color, priority.SortOrder, now, now).Scan(&id)
-	if err != nil {
-		if database.IsUniqueConstraintError(err) {
-			return 0, ErrDuplicateEntry
+	err := database.WithTx(r.db, func(tx database.Tx) error {
+		// Clear the old default before writing the new one so the partial
+		// unique index never observes two defaults inside one transaction.
+		if priority.IsDefault {
+			if err := clearOtherDefaults(tx, 0); err != nil {
+				return err
+			}
 		}
-		return 0, fmt.Errorf("create priority: %w", err)
-	}
-	if err := r.replaceConfigurationSets(id, priority.ConfigurationSetIDs, now); err != nil {
+		if err := tx.QueryRow(`
+			INSERT INTO priorities (name, description, is_default, icon, color, sort_order, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+		`, priority.Name, priority.Description, priority.IsDefault, priority.Icon, priority.Color, priority.SortOrder, now, now).Scan(&id); err != nil {
+			return priorityWriteError(err, "create priority")
+		}
+		return replaceConfigurationSets(tx, id, priority.ConfigurationSetIDs, now)
+	})
+	if err != nil {
 		return 0, err
 	}
 	return id, nil
@@ -52,15 +59,19 @@ func (r *PriorityRepository) Create(priority *models.Priority) (int, error) {
 
 func (r *PriorityRepository) Update(id int, priority *models.Priority) error {
 	now := time.Now()
-	if _, err := r.db.ExecWrite(`
-		UPDATE priorities SET name = ?, description = ?, is_default = ?, icon = ?, color = ?, sort_order = ?, updated_at = ? WHERE id = ?
-	`, priority.Name, priority.Description, priority.IsDefault, priority.Icon, priority.Color, priority.SortOrder, now, id); err != nil {
-		if database.IsUniqueConstraintError(err) {
-			return ErrDuplicateEntry
+	return database.WithTx(r.db, func(tx database.Tx) error {
+		if priority.IsDefault {
+			if err := clearOtherDefaults(tx, id); err != nil {
+				return err
+			}
 		}
-		return fmt.Errorf("update priority %d: %w", id, err)
-	}
-	return r.replaceConfigurationSets(id, priority.ConfigurationSetIDs, now)
+		if _, err := tx.ExecWrite(`
+			UPDATE priorities SET name = ?, description = ?, is_default = ?, icon = ?, color = ?, sort_order = ?, updated_at = ? WHERE id = ?
+		`, priority.Name, priority.Description, priority.IsDefault, priority.Icon, priority.Color, priority.SortOrder, now, id); err != nil {
+			return priorityWriteError(err, fmt.Sprintf("update priority %d", id))
+		}
+		return replaceConfigurationSets(tx, id, priority.ConfigurationSetIDs, now)
+	})
 }
 
 func (r *PriorityRepository) Delete(id int) error {
@@ -70,21 +81,68 @@ func (r *PriorityRepository) Delete(id int) error {
 	return nil
 }
 
-func (r *PriorityRepository) ClearOtherDefaults(excludeID int) error {
-	if excludeID == 0 {
-		_, err := r.db.ExecWrite("UPDATE priorities SET is_default = false WHERE is_default = true")
-		return err
-	}
-	_, err := r.db.ExecWrite("UPDATE priorities SET is_default = false WHERE is_default = true AND id != ?", excludeID)
-	return err
+// priorityWriter is satisfied by database.Database and database.Tx so the
+// default-status transfer and membership replacement can share one transaction
+// with the priority insert/update.
+type priorityWriter interface {
+	ExecWrite(query string, args ...any) (sql.Result, error)
 }
 
-func (r *PriorityRepository) replaceConfigurationSets(priorityID int, ids []int, now time.Time) error {
-	if _, err := r.db.ExecWrite("DELETE FROM configuration_set_priorities WHERE priority_id = ?", priorityID); err != nil {
+// priorityWriteError maps a priority write failure to a repository sentinel.
+// The single-default partial unique index is a default-selection conflict, not
+// a duplicate name.
+func priorityWriteError(err error, context string) error {
+	if isSingleDefaultViolation(err) {
+		return ErrDefaultConflict
+	}
+	if database.IsUniqueConstraintError(err) {
+		return ErrDuplicateEntry
+	}
+	return fmt.Errorf("%s: %w", context, err)
+}
+
+// isSingleDefaultViolation reports whether err is the partial unique index that
+// keeps at most one priority default. PostgreSQL names the index; SQLite names
+// the indexed column.
+func isSingleDefaultViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := err.Error()
+	return strings.Contains(message, "uq_priorities_single_default") ||
+		strings.Contains(message, "priorities.is_default")
+}
+
+// clearOtherDefaults removes default status from every priority except
+// excludeID (0 clears all). It runs before the new default is written so the
+// partial unique index never observes two defaults inside one transaction.
+func clearOtherDefaults(tx priorityWriter, excludeID int) error {
+	if excludeID == 0 {
+		if _, err := tx.ExecWrite("UPDATE priorities SET is_default = false WHERE is_default = true"); err != nil {
+			return fmt.Errorf("clear other default priorities: %w", err)
+		}
+		return nil
+	}
+	if _, err := tx.ExecWrite("UPDATE priorities SET is_default = false WHERE is_default = true AND id != ?", excludeID); err != nil {
+		return fmt.Errorf("clear other default priorities: %w", err)
+	}
+	return nil
+}
+
+// replaceConfigurationSets rewrites a priority's memberships. Duplicate ids are
+// treated as a set so a repeated id cannot trip the membership unique index and
+// surface as a misleading name conflict.
+func replaceConfigurationSets(tx priorityWriter, priorityID int, ids []int, now time.Time) error {
+	if _, err := tx.ExecWrite("DELETE FROM configuration_set_priorities WHERE priority_id = ?", priorityID); err != nil {
 		return fmt.Errorf("clear configuration sets for priority %d: %w", priorityID, err)
 	}
+	seen := make(map[int]struct{}, len(ids))
 	for _, id := range ids {
-		if _, err := r.db.ExecWrite(`INSERT INTO configuration_set_priorities (configuration_set_id, priority_id, created_at) VALUES (?, ?, ?)`, id, priorityID, now); err != nil {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		if _, err := tx.ExecWrite(`INSERT INTO configuration_set_priorities (configuration_set_id, priority_id, created_at) VALUES (?, ?, ?)`, id, priorityID, now); err != nil {
 			return fmt.Errorf("associate priority %d with configuration set %d: %w", priorityID, id, err)
 		}
 	}

@@ -411,7 +411,9 @@ func (r *TimeWorklogRepository) Update(in UpdateWorklog) error {
 }
 
 // Create inserts a worklog row, stamping created_at/updated_at, and returns
-// the new row's id.
+// the new row's id. Callers that only need the committed id use this; callers
+// that must return the joined display row use CreateDetail so the insert and
+// the read share one success boundary.
 func (r *TimeWorklogRepository) Create(in NewWorklog) (int64, error) {
 	now := time.Now().Unix()
 	var id int64
@@ -425,6 +427,35 @@ func (r *TimeWorklogRepository) Create(in NewWorklog) (int64, error) {
 		return 0, fmt.Errorf("create worklog: %w", err)
 	}
 	return id, nil
+}
+
+// CreateDetail inserts a worklog and returns its joined display row in the
+// same transaction. A failed detail read rolls the insert back, so an error
+// never means "actually booked" and a caller retry cannot double-book time.
+func (r *TimeWorklogRepository) CreateDetail(in NewWorklog) (*models.Worklog, error) {
+	now := time.Now().Unix()
+	var worklog models.Worklog
+	err := database.WithTx(r.db, func(tx database.Tx) error {
+		var id int64
+		if err := tx.QueryRow(`
+			INSERT INTO time_worklogs (project_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+			in.ProjectID, in.UserID, in.ItemID, in.Description,
+			in.DateUnix, in.StartTimeUnix, in.EndTimeUnix, in.DurationMinutes, now, now,
+		).Scan(&id); err != nil {
+			return fmt.Errorf("create worklog: %w", err)
+		}
+		row, err := scanWorklogDetail(tx.QueryRow(worklogDetailSelect+"\nWHERE w.id = ?", id))
+		if err != nil {
+			return fmt.Errorf("read created worklog: %w", err)
+		}
+		worklog = row
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &worklog, nil
 }
 
 // WorklogListFilter narrows ListForUser results. Nil pointer fields disable

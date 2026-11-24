@@ -149,13 +149,13 @@ function createWorkspacesStore() {
           return nextWorkspaces;
         })
         .catch((error) => {
-          if (lifecycle !== lifecycleGeneration || generation !== listLoadGeneration) return [];
-          if (isExpectedBackgroundSyncError(error)) return [];
+          if (lifecycle !== lifecycleGeneration || generation !== listLoadGeneration)
+            return get(workspaces);
+          if (isExpectedBackgroundSyncError(error)) return get(workspaces);
           console.error('Failed to load workspaces:', error);
-          workspaces.set([]);
-          total.set(0);
-          loaded.set(true);
-          return [];
+          // Preserve the last good directory and leave the load retryable:
+          // never cache an empty list or mark a failed load as loaded.
+          return get(workspaces);
         })
         .finally(() => {
           if (lifecycle === lifecycleGeneration && generation === listLoadGeneration) {

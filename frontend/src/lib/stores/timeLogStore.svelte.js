@@ -45,24 +45,33 @@ class TimeLogStore {
   async #loadPickerData() {
     if (this.#pickerPromise) return this.#pickerPromise;
     const generation = this.#generation;
-    const fallback = (promise, label) =>
+    // A failed directory resolves to null: last-good data stays on screen and
+    // the next open retries it instead of caching an empty directory.
+    const load = (promise, label) =>
       promise.catch((err) => {
         surfaceError(err, { context: `loadTimeLogPicker:${label}`, silent: true });
-        return [];
+        return null;
       });
-    this.#pickerPromise = Promise.all([
-      fallback(time.projects.getAll(), 'time projects'),
-      fallback(customerOrganisations.getAll(), 'customers'),
-      fallback(items.getAll({ limit: 100 }), 'work items'),
-      fallback(workspacesStore.load(), 'workspaces'),
-    ]).then(([projects, customers, workItems, workspaces]) => {
-      if (generation !== this.#generation) return;
-      this.projects = projects || [];
-      this.customers = customers || [];
-      this.workItems = workItems?.data ?? [];
-      this.workspaces = workspaces || [];
-    });
-    return this.#pickerPromise;
+    let promise;
+    promise = Promise.all([
+      load(time.projects.getAll(), 'time projects'),
+      load(customerOrganisations.getAll(), 'customers'),
+      load(items.getAll({ limit: 100 }), 'work items'),
+      load(workspacesStore.load(), 'workspaces'),
+    ])
+      .then(([projects, customers, workItems, workspaces]) => {
+        if (generation !== this.#generation) return;
+        if (projects !== null) this.projects = projects;
+        if (customers !== null) this.customers = customers;
+        if (workItems !== null) this.workItems = workItems?.data ?? [];
+        if (workspaces !== null) this.workspaces = workspaces;
+      })
+      .finally(() => {
+        // The promise represents only an in-flight load, never a cached result.
+        if (this.#pickerPromise === promise) this.#pickerPromise = null;
+      });
+    this.#pickerPromise = promise;
+    return promise;
   }
 
   /** Load projects/customers/items/workspaces for the pickers and menu. */

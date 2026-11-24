@@ -140,7 +140,7 @@
       // MobileShell own their subsequent data loading.
       appInitialized = true;
       if (!setupCompleted) {
-        moduleSettings.load();
+        moduleSettings.ensureLoaded();
       } else if ($authStore.isAuthenticated) {
         // An OAuth callback just landed here: send the user back to the
         // page that started the flow (replaces the callback redirect entry).

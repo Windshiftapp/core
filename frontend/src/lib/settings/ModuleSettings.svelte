@@ -61,7 +61,7 @@
   });
 
   onMount(() => {
-    moduleSettings.load().then(() => {
+    moduleSettings.ensureLoaded().then(() => {
       initialLoad = false; // Enable auto-save after initial load
     });
     loadPlugins();

@@ -221,8 +221,20 @@ type Booking struct {
 // GetBooking returns the booking recorded for a caller-scoped idempotency key,
 // or ErrNotFound.
 func (r *TimeWorklogDraftRepository) GetBooking(userID int, key string) (*Booking, error) {
+	return bookingByKey(r.db, userID, key)
+}
+
+// bookingQueryer is satisfied by both database.Database and database.Tx, so the
+// booking lookup runs inside the same transaction that records it.
+type bookingQueryer interface {
+	QueryRow(query string, args ...any) *sql.Row
+}
+
+// bookingByKey reads one idempotency-key booking, returning ErrNotFound when
+// the key is unrecorded.
+func bookingByKey(q bookingQueryer, userID int, key string) (*Booking, error) {
 	booking := &Booking{}
-	err := r.db.QueryRow(
+	err := q.QueryRow(
 		`SELECT user_id, idempotency_key, worklog_id, draft_id FROM time_worklog_bookings WHERE user_id = ? AND idempotency_key = ?`,
 		userID, key,
 	).Scan(&booking.UserID, &booking.IdempotencyKey, &booking.WorklogID, &booking.DraftID)
@@ -235,19 +247,37 @@ func (r *TimeWorklogDraftRepository) GetBooking(userID int, key string) (*Bookin
 	return booking, nil
 }
 
+// errDuplicateBooking reports that a concurrent transaction recorded the
+// idempotency key first. BookDraft re-reads the winning booking outside the
+// rolled-back transaction.
+var errDuplicateBooking = errors.New("booking key already recorded")
+
 // BookDraft atomically materializes an owned draft as a worklog and deletes the
 // draft. The delete is conditional on the expected version, so exactly one
 // concurrent booking wins and a concurrent update cannot be silently lost. The
 // booking is recorded in the same transaction for idempotent replay.
-func (r *TimeWorklogDraftRepository) BookDraft(draftID, userID, expectedVersion int, in CreateWorklogInput, bookingKey string) (int, error) {
-	var worklogID int
+//
+// The returned Booking identifies the worklog this call produced or replayed.
+// Callers compare its DraftID to the requested draft to tell a replay of this
+// draft apart from a conflicting use of the same key.
+func (r *TimeWorklogDraftRepository) BookDraft(draftID, userID, expectedVersion int, in CreateWorklogInput, bookingKey string) (*Booking, error) {
+	var booked *Booking
 	err := database.WithTx(r.db, func(tx database.Tx) error {
-		if err := tx.QueryRow(insertBookedWorklogQuery,
-			in.ProjectID, in.UserID, in.ItemID, in.Description,
-			in.DateUnix, in.StartTimeUnix, in.EndTimeUnix, in.DurationMinutes, in.NowUnix, in.NowUnix,
-		).Scan(&worklogID); err != nil {
-			return err
+		// A replay must resolve before the draft-existence check: the draft is
+		// gone once booked, but the recorded key still maps to its worklog.
+		if bookingKey != "" {
+			existing, err := bookingByKey(tx, userID, bookingKey)
+			if err == nil {
+				booked = existing
+				return nil
+			}
+			if !errors.Is(err, ErrNotFound) {
+				return err
+			}
 		}
+		// Claim the draft before writing the worklog. The conditional delete is
+		// the only winner selector, so a transaction that loses the race has no
+		// worklog to roll back and cannot double-book the same draft.
 		result, err := tx.ExecWrite(
 			`DELETE FROM time_worklog_drafts WHERE id = ? AND user_id = ? AND version = ?`,
 			draftID, userID, expectedVersion,
@@ -260,7 +290,36 @@ func (r *TimeWorklogDraftRepository) BookDraft(draftID, userID, expectedVersion 
 			return err
 		}
 		if affected != 1 {
+			// The draft is missing or at a newer version. A concurrent booking
+			// with this key may have consumed it, so replay the recorded booking
+			// when one exists before reporting the draft's own outcome.
+			if bookingKey != "" {
+				if existing, berr := bookingByKey(tx, userID, bookingKey); berr == nil {
+					booked = existing
+					return nil
+				} else if !errors.Is(berr, ErrNotFound) {
+					return berr
+				}
+			}
+			var exists int
+			if err := tx.QueryRow(
+				`SELECT COUNT(*) FROM time_worklog_drafts WHERE id = ? AND user_id = ?`,
+				draftID, userID,
+			).Scan(&exists); err != nil {
+				return err
+			}
+			if exists == 0 {
+				return ErrNotFound
+			}
 			return ErrConflict
+		}
+		var worklogID int
+		if err := tx.QueryRow(insertBookedWorklogQuery,
+			in.ProjectID, in.UserID, in.ItemID, in.Description,
+			in.DateUnix, in.StartTimeUnix, in.EndTimeUnix, in.DurationMinutes, in.NowUnix, in.NowUnix,
+		).Scan(&worklogID); err != nil {
+			// The transaction rolls back and restores the claimed draft.
+			return err
 		}
 		if bookingKey != "" {
 			if _, err := tx.ExecWrite(
@@ -269,17 +328,24 @@ func (r *TimeWorklogDraftRepository) BookDraft(draftID, userID, expectedVersion 
 				userID, bookingKey, worklogID, draftID, in.NowUnix,
 			); err != nil {
 				if database.IsUniqueConstraintError(err) {
-					return ErrDuplicateEntry
+					return errDuplicateBooking
 				}
 				return err
 			}
 		}
+		booked = &Booking{UserID: userID, IdempotencyKey: bookingKey, WorklogID: worklogID, DraftID: &draftID}
 		return nil
 	})
-	if err != nil {
-		return 0, err
+	if errors.Is(err, errDuplicateBooking) {
+		// A concurrent transaction recorded the key first; its worklog and
+		// draft deletion are committed. Re-read the winning booking so the
+		// caller can compare it to the requested draft.
+		return r.GetBooking(userID, bookingKey)
 	}
-	return worklogID, nil
+	if err != nil {
+		return nil, err
+	}
+	return booked, nil
 }
 
 // insertBookedWorklogQuery inserts a worklog and returns its id. It is shared by

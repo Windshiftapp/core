@@ -194,6 +194,7 @@ CREATE INDEX IF NOT EXISTS idx_workflow_transitions_screen_id ON workflow_transi
 CREATE UNIQUE INDEX IF NOT EXISTS uq_configuration_sets_builtin_key ON configuration_sets(builtin_key) WHERE builtin_key IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_item_types_builtin_key ON item_types(builtin_key) WHERE builtin_key IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_priorities_builtin_key ON priorities(builtin_key) WHERE builtin_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_priorities_single_default ON priorities(is_default) WHERE is_default = true;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_hierarchy_levels_builtin_key ON hierarchy_levels(builtin_key) WHERE builtin_key IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_screens_builtin_key ON screens(builtin_key) WHERE builtin_key IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_status_categories_builtin_key ON status_categories(builtin_key) WHERE builtin_key IS NOT NULL;
