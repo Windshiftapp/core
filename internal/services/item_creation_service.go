@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -211,7 +212,7 @@ func (s *ItemCreationService) create(
 
 	var mandatoryTemplate MandatoryTemplateInfo
 	metadata := mergeItemEventMetadata(input.EventMetadata, itemEventMetadata(actorUserID, "application", actionContext))
-	itemID, err := CreateItem(s.db, ItemCreationParams{
+	itemID, snapshot, err := createItemWithSnapshot(context.Background(), s.db, ItemCreationParams{
 		WorkspaceID:           input.WorkspaceID,
 		Title:                 input.Title,
 		Description:           input.Description,
@@ -246,23 +247,23 @@ func (s *ItemCreationService) create(
 		return nil, err
 	}
 
-	// The transaction's ID is the create result. The detail read only feeds the
-	// response and the live side-effect pipeline, so a failure must not turn a
-	// committed create into an error a caller would retry.
-	result := &ItemCreateResult{ID: itemID, MandatoryTemplate: mandatoryTemplate}
+	// The transaction's ID and snapshot are the create result. The joined read
+	// only decorates the response, so a failure must not turn a committed create
+	// into an error a caller would retry or leave callers without a row.
+	result := &ItemCreateResult{ID: itemID, Item: snapshot, MandatoryTemplate: mandatoryTemplate}
 	item, err := repository.NewItemRepository(s.db).FindByIDWithDetails(int(itemID))
 	if err != nil {
 		slog.Error("load created item after commit", slog.Int64("item_id", itemID), slog.Any("error", err))
-		return result, nil
+	} else {
+		result.Item = item
 	}
-	result.Item = item
 	// Imported facts are historical: skip the live notification/webhook/automation
 	// pipeline even though validation and persistence used the canonical path.
 	if !itemevents.IsImportOrigin(metadata.ActorKind, metadata.SourceKind) {
 		if contextual, ok := s.emitter.(contextualItemCreatedEmitter); ok && actionContext != nil {
-			contextual.EmitItemCreatedWithContext(item, actorUserID, *actionContext, actorUsername)
+			contextual.EmitItemCreatedWithContext(result.Item, actorUserID, *actionContext, actorUsername)
 		} else if s.emitter != nil {
-			s.emitter.EmitItemCreated(item, actorUserID, actorUsername)
+			s.emitter.EmitItemCreated(result.Item, actorUserID, actorUsername)
 		}
 	}
 	return result, nil

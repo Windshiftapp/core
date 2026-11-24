@@ -941,7 +941,7 @@ func (s *WorkspaceBundleImportService) importItems(ctx context.Context, imp *wor
 			imp.outcome("item", item.Ref, item.Title, "failed", err.Error())
 			continue
 		}
-		imp.itemIDs[item.Ref] = created.Item.ID
+		imp.itemIDs[item.Ref] = int(created.ID)
 		detail := ""
 		if len(droppedLabels) > 0 {
 			detail = "labels not available: " + strings.Join(droppedLabels, ", ")

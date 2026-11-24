@@ -10,6 +10,7 @@ import (
 
 	"windshift/internal/database"
 	"windshift/internal/itemevents"
+	"windshift/internal/models"
 )
 
 // ErrMissingItemType is returned by CreateItem when the caller did not
@@ -286,17 +287,25 @@ func CreateItemContext(ctx context.Context, db database.Database, params ItemCre
 }
 
 func createItem(ctx context.Context, db database.Database, params ItemCreationParams) (int64, error) {
+	itemID, _, err := createItemWithSnapshot(ctx, db, params)
+	return itemID, err
+}
+
+// createItemWithSnapshot creates an item and returns the snapshot the creation
+// transaction recorded. Callers that need a row or an event after commit use
+// the snapshot instead of a second, fallible joined read.
+func createItemWithSnapshot(ctx context.Context, db database.Database, params ItemCreationParams) (int64, *models.Item, error) {
 	creation, err := prepareItemCreation(ctx, db, params)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 
 	itemID, err := creation.insert()
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	creation.finish(itemID)
-	return int64(itemID), nil
+	return int64(itemID), creation.snapshot, nil
 }
 
 // GetInitialStatusForItemType determines the initial status for an item type
