@@ -132,7 +132,8 @@ function parseArgs() {
     scale: false,
     adminUser: 'admin',
     adminPassword: 'admin',
-    sampleRepo: null
+    sampleRepo: null,
+    throttleMs: 0
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -182,6 +183,11 @@ function parseArgs() {
         // sample repository. Omitted for partner demos.
         options.sampleRepo = args[++i];
         break;
+      case '--throttle-ms':
+        // Delay between API requests. Keep a host-local seed inside the v2
+        // rate limiter and the operator request budget.
+        options.throttleMs = parseInt(args[++i], 10) || 0;
+        break;
       case '--help':
         console.log(`
 ${colors.bright}${APP_NAME} Demo Content Generator${colors.reset}
@@ -205,6 +211,7 @@ ${colors.cyan}Options:${colors.reset}
   --admin-password <pw>  Admin password for login (default: admin)
   --sample-repo <url>    Seed the sample bug-fix story's SCM evidence for this
                          public repository (sandbox only)
+  --throttle-ms <ms>     Delay between API requests (default: 0)
   --help                 Show this help message
 
 ${colors.cyan}Examples:${colors.reset}
@@ -265,8 +272,21 @@ function logInfo(message) {
   log(`${colors.blue}ℹ${colors.reset} ${message}`, colors.dim);
 }
 
+// Delay between API requests. A seed that runs from the demo host is fast
+// enough to trip the v2 rate limiter (100 req/s, burst 200) and, on the
+// sandbox, the operator request budget (600/min). A small delay keeps the
+// whole seed inside both without weakening either limit. 0 disables it.
+let requestThrottleMs = 0;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 // HTTP request helper
-function makeRequest(method, url, data = null, headers = {}) {
+async function makeRequest(method, url, data = null, headers = {}) {
+  if (requestThrottleMs > 0) {
+    await sleep(requestThrottleMs);
+  }
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
     const isHttps = urlObj.protocol === 'https:';
@@ -2281,6 +2301,7 @@ async function createComments(baseURL, token, itemMap, userMap, scaleModule) {
 // Main execution
 async function main() {
   const options = parseArgs();
+  requestThrottleMs = options.throttleMs || 0;
 
   log(`${colors.bright}${colors.magenta}
 ╔═══════════════════════════════════════════════════════╗
