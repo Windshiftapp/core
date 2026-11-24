@@ -177,22 +177,7 @@ func (ec *EventCoordinator) emitItemUpdatedInternal(original, updated *models.It
 			applyActionContext(event, actionContext)
 			ec.actionService.EmitActionEvent(event)
 		} else {
-			oldVals := make(map[string]any)
-			newVals := make(map[string]any)
-			for _, fc := range fieldChanges {
-				fieldName := actionEventFieldName(fc.FieldName)
-				oldVals[fieldName] = fc.OldValue
-				newVals[fieldName] = fc.NewValue
-			}
-			event := &models.ActionEvent{
-				EventType:   models.ActionTriggerItemUpdated,
-				WorkspaceID: updated.WorkspaceID,
-				ItemID:      updated.ID,
-				ActorUserID: actorUserID,
-				ItemTypeID:  updated.ItemTypeID,
-				OldValues:   oldVals,
-				NewValues:   newVals,
-			}
+			event := buildItemUpdatedActionEvent(updated, actorUserID, fieldChanges)
 			applyActionContext(event, actionContext)
 			ec.actionService.EmitActionEvent(event)
 		}
@@ -206,6 +191,28 @@ func actionEventFieldName(historyFieldName string) string {
 		return "custom_field_" + strings.TrimPrefix(historyFieldName, "cf_")
 	}
 	return historyFieldName
+}
+
+// buildItemUpdatedActionEvent turns the actual changed fields into the
+// item_updated action payload. The coordinator and the legacy emitter share it
+// so every transport emits the same shape.
+func buildItemUpdatedActionEvent(updated *models.Item, actorUserID int, fieldChanges []HistoryEntry) *models.ActionEvent {
+	oldVals := make(map[string]any)
+	newVals := make(map[string]any)
+	for _, fc := range fieldChanges {
+		fieldName := actionEventFieldName(fc.FieldName)
+		oldVals[fieldName] = fc.OldValue
+		newVals[fieldName] = fc.NewValue
+	}
+	return &models.ActionEvent{
+		EventType:   models.ActionTriggerItemUpdated,
+		WorkspaceID: updated.WorkspaceID,
+		ItemID:      updated.ID,
+		ActorUserID: actorUserID,
+		ItemTypeID:  updated.ItemTypeID,
+		OldValues:   oldVals,
+		NewValues:   newVals,
+	}
 }
 
 func applyActionContext(event *models.ActionEvent, actionContext *ActionContext) {

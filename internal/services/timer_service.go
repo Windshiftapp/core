@@ -665,16 +665,15 @@ func (s *TimerService) BookDraft(userID, id, expectedVersion int, idempotencyKey
 	// the original worklog.
 	if idempotencyKey != "" {
 		booking, err := s.draftRepo.GetBooking(userID, idempotencyKey)
-		switch {
-		case err == nil:
-			if booking.DraftID != nil && *booking.DraftID == id {
-				return s.worklogs.Get(booking.WorklogID)
-			}
-			return nil, ErrTimerDraftConflict
-		case !errors.Is(err, repository.ErrNotFound):
+		if err == nil {
+			return s.bookingWorklog(id, booking)
+		}
+		if !errors.Is(err, repository.ErrNotFound) {
 			return nil, err
 		}
 	}
+	// Ownership and existence are checked before validation so a foreign or
+	// missing draft keeps its not-found contract regardless of the payload.
 	if _, err := s.draftRepo.GetDraft(id, userID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, ErrTimerDraftNotFound
@@ -697,7 +696,7 @@ func (s *TimerService) BookDraft(userID, id, expectedVersion int, idempotencyKey
 			return nil, ErrTimerForbidden
 		}
 	}
-	worklogID, err := s.draftRepo.BookDraft(id, userID, expectedVersion, repository.CreateWorklogInput{
+	booking, err := s.draftRepo.BookDraft(id, userID, expectedVersion, repository.CreateWorklogInput{
 		ProjectID:       input.ProjectID,
 		UserID:          userID,
 		ItemID:          s.visibleDraftItem(userID, input.ItemID),
@@ -708,31 +707,27 @@ func (s *TimerService) BookDraft(userID, id, expectedVersion int, idempotencyKey
 		DurationMinutes: prepared.DurationMinutes,
 		NowUnix:         time.Now().UTC().Unix(),
 	}, idempotencyKey)
-	if errors.Is(err, repository.ErrDuplicateEntry) {
-		booking, lookupErr := s.draftRepo.GetBooking(userID, idempotencyKey)
-		if lookupErr != nil {
-			return nil, lookupErr
-		}
-		return s.worklogs.Get(booking.WorklogID)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, ErrTimerDraftNotFound
 	}
 	if errors.Is(err, repository.ErrConflict) {
-		if _, gerr := s.draftRepo.GetDraft(id, userID); errors.Is(gerr, repository.ErrNotFound) {
-			// A concurrent booking with the same idempotency key may have won
-			// the race and consumed the draft; replay its worklog instead of
-			// reporting the draft missing.
-			if idempotencyKey != "" {
-				if booking, berr := s.draftRepo.GetBooking(userID, idempotencyKey); berr == nil && booking.DraftID != nil && *booking.DraftID == id {
-					return s.worklogs.Get(booking.WorklogID)
-				}
-			}
-			return nil, ErrTimerDraftNotFound
-		}
 		return nil, ErrTimerDraftConflict
 	}
 	if err != nil {
 		return nil, err
 	}
-	return s.worklogs.Get(worklogID)
+	return s.bookingWorklog(id, booking)
+}
+
+// bookingWorklog resolves a recorded booking to its worklog. It is the single
+// place that compares the recorded draft to the requested one: a booking for a
+// different draft is a conflicting key, never a successful replay. The booking
+// lookup is already scoped to the authenticated user.
+func (s *TimerService) bookingWorklog(draftID int, booking *repository.Booking) (*models.Worklog, error) {
+	if booking.DraftID == nil || *booking.DraftID != draftID {
+		return nil, ErrTimerDraftConflict
+	}
+	return s.worklogs.Get(booking.WorklogID)
 }
 
 // visibleDraftItem drops an item link the caller can no longer view, mirroring

@@ -192,7 +192,7 @@
   onMount(async () => {
     await Promise.all([
       loadData(),
-      moduleSettings.load()
+      moduleSettings.ensureLoaded()
     ]);
 
     // Load test statistics if test management is enabled

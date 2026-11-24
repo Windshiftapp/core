@@ -66,7 +66,8 @@ export const workspaces = {
     ),
   getItemTypes: (id) => fetchV2Data(`/workspaces/${id}/item-types`),
   getWorkflows: (id) => fetchV2Data(`/workspaces/${id}/workflows`),
-  getPriorities: (id) => fetchV2Data(`/workspaces/${id}/priorities`),
+  getPriorities: (id, requestOptions = {}) =>
+    fetchV2Data(`/workspaces/${id}/priorities`, requestOptions),
   // Resolved effective configuration: assigned config set (else the global
   // default), its condition/approval sets, effective screens per mode with
   // hydrated fields, and config-set priorities.

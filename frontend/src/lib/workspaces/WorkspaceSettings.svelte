@@ -106,7 +106,7 @@ import WorkspaceCannedResponses from './WorkspaceCannedResponses.svelte';
   let workspaceLoadVersion = 0;
 
   onMount(async () => {
-    await moduleSettings.load();
+    await moduleSettings.ensureLoaded();
 
     // Redirect from base settings route to general tab
     if (window.location.pathname === `/workspaces/${workspaceId}/settings`) {

@@ -54,26 +54,7 @@ func (e *LegacyItemUpdatedEmitter) EmitItemUpdated(original, updated *models.Ite
 		if statusChanged {
 			e.action.EmitActionEvent(newStatusTransitionActionEvent(original, updated, actorUserID))
 		} else {
-			e.action.EmitActionEvent(&models.ActionEvent{
-				EventType:   models.ActionTriggerItemUpdated,
-				WorkspaceID: updated.WorkspaceID,
-				ItemID:      updated.ID,
-				ActorUserID: actorUserID,
-				ItemTypeID:  updated.ItemTypeID,
-				OldValues: map[string]any{
-					"status_id":   original.StatusID,
-					"assignee_id": original.AssigneeID,
-					"title":       original.Title,
-					"priority_id": original.PriorityID,
-				},
-				NewValues: map[string]any{
-					"status_id":   updated.StatusID,
-					"assignee_id": updated.AssigneeID,
-					"title":       updated.Title,
-					"priority_id": updated.PriorityID,
-					"creator_id":  updated.CreatorID,
-				},
-			})
+			e.action.EmitActionEvent(buildItemUpdatedActionEvent(updated, actorUserID, fieldChanges))
 		}
 	}
 

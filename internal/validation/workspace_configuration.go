@@ -32,11 +32,16 @@ func IsPriorityAllowedInWorkspace(q WorkspaceConfigurationQueryer, workspaceID, 
 		"SELECT configuration_set_id FROM workspace_configuration_sets WHERE workspace_id = ?",
 		workspaceID,
 	).Scan(&configSetID)
-	if errors.Is(err, sql.ErrNoRows) || configSetID == nil {
+	if errors.Is(err, sql.ErrNoRows) {
+		// An unassigned workspace uses the global catalog.
 		return true, nil
 	}
 	if err != nil {
 		return false, fmt.Errorf("failed to query workspace config set: %w", err)
+	}
+	if configSetID == nil {
+		// A NULL assignment is normal for an unassigned workspace.
+		return true, nil
 	}
 
 	var allowed bool

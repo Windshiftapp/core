@@ -1,5 +1,4 @@
 import { assets } from '../api/assets.js';
-import { priorities } from '../api/configuration.js';
 import { iterations, milestones } from '../api/planning.js';
 import { customerOrganisations, portalCustomers } from '../api/portal.js';
 import { teams } from '../api/teams.js';
@@ -36,21 +35,7 @@ const OPTION_LOADERS = {
   milestones: (workspaceId, options) =>
     milestones.getAll({ workspace_id: workspaceId, include_global: true }, options),
   iterations: (workspaceId, options) => iterations.getAll({ workspace_id: workspaceId }, options),
-  priorities: async (workspaceId, options) => {
-    const workspace = await workspaces.get(workspaceId, options);
-    options.signal.throwIfAborted();
-    const configurationSetId = workspace?.configuration_set_id;
-    if (!configurationSetId) return priorities.getAll({}, options);
-
-    const configuredPriorities = await priorities.getAll(
-      {
-        configuration_set_id: configurationSetId,
-      },
-      options
-    );
-    options.signal.throwIfAborted();
-    return configuredPriorities.length > 0 ? configuredPriorities : priorities.getAll({}, options);
-  },
+  priorities: (workspaceId, options) => workspaces.getPriorities(workspaceId, options),
   projects: (workspaceId, options) => workspaces.getProjects(workspaceId, options),
   portalCustomers: (_workspaceId, options) => portalCustomers.getAll({}, options),
   customerOrganisations: async (_workspaceId, options) =>

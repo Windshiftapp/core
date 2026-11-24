@@ -624,9 +624,9 @@ func (s *CatalogMutationService) preparePriority(item *models.Priority, excludeI
 	if exists {
 		return NewServiceError(http.StatusConflict, "priority name already exists")
 	}
-	if item.IsDefault {
-		return s.priorities.ClearOtherDefaults(excludeID)
-	}
+	// Default-status transfer and membership replacement happen with the save in
+	// one transaction; preparation must stay read-only so a failed save cannot
+	// leave the catalog without a default.
 	return nil
 }
 

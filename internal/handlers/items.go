@@ -44,7 +44,7 @@ func NewItemHandler(db database.Database, permissionService *services.Permission
 	if notificationService != nil {
 		notify = notificationService.EmitEvent
 	}
-	itemUpdate.SetFallbackEmitter(services.NewLegacyItemUpdatedEmitter(db, notify, nil, nil))
+	itemUpdate.SetEmitter(services.NewLegacyItemUpdatedEmitter(db, notify, nil, nil))
 	itemDeletion := services.NewItemDeletionApplicationService(db, permissionService)
 	itemDeletion.SetCache(itemCache, hierarchy)
 	return &ItemHandler{
@@ -57,7 +57,7 @@ func NewItemHandler(db database.Database, permissionService *services.Permission
 
 func (h *ItemHandler) SetWebhookSender(sender *webhook.WebhookSender) {
 	h.webhookSender = sender
-	h.itemUpdate.SetFallbackWebhook(sender)
+	h.itemUpdate.SetEmitterWebhook(sender)
 }
 
 func (h *ItemHandler) SetMentionService(mentionService *services.MentionService) {
@@ -68,7 +68,7 @@ func (h *ItemHandler) SetMentionService(mentionService *services.MentionService)
 func (h *ItemHandler) SetActionService(actionService interface {
 	EmitActionEvent(event *models.ActionEvent)
 }) {
-	h.itemUpdate.SetFallbackAction(actionService)
+	h.itemUpdate.SetEmitterAction(actionService)
 }
 
 func (h *ItemHandler) SetEventCoordinator(coordinator *services.EventCoordinator) {

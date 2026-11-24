@@ -1,15 +1,22 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 import { setup } from '../api/admin.js';
+
+const DEFAULT_SETTINGS = {
+  time_tracking_enabled: true,
+  test_management_enabled: true,
+  workspace_managed_agents: true,
+};
 
 // Create the module settings store with default values
 function createModuleSettingsStore() {
-  const { subscribe, set, update } = writable({
-    time_tracking_enabled: true,
-    test_management_enabled: true,
-    workspace_managed_agents: true,
+  const store = writable({
+    ...DEFAULT_SETTINGS,
     loaded: false,
     loading: false,
   });
+  const { subscribe, set, update } = store;
+  // Shared in-flight request so concurrent ensureLoaded() callers fetch once.
+  let inFlight = null;
 
   return {
     subscribe,
@@ -23,31 +30,30 @@ function createModuleSettingsStore() {
       });
     },
 
-    // Load module settings from API (only if not already loaded)
-    async load() {
-      update((state) => {
-        if (state.loaded || state.loading) {
-          return state; // Already loaded or loading
+    // Load module settings once. The shell hydrates this store during
+    // authenticated bootstrap, so this is normally a no-op; it exists for
+    // pre-bootstrap callers. A failed fetch stays unloaded so the next call
+    // retries instead of serving defaults as if they were the server value.
+    async ensureLoaded() {
+      if (get(store).loaded) return;
+      if (inFlight) return inFlight;
+      update((state) => ({ ...state, loading: true }));
+      inFlight = (async () => {
+        try {
+          const settings = await setup.getModuleSettings();
+          set({
+            ...settings,
+            loaded: true,
+            loading: false,
+          });
+        } catch (error) {
+          console.error('Failed to load module settings:', error);
+          update((state) => ({ ...state, loading: false }));
+        } finally {
+          inFlight = null;
         }
-        return { ...state, loading: true };
-      });
-
-      try {
-        const settings = await setup.getModuleSettings();
-        set({
-          ...settings,
-          loaded: true,
-          loading: false,
-        });
-      } catch (error) {
-        console.error('Failed to load module settings:', error);
-        // Keep default values but mark as loaded to prevent retrying constantly
-        update((state) => ({
-          ...state,
-          loaded: true,
-          loading: false,
-        }));
-      }
+      })();
+      return inFlight;
     },
 
     // Update module settings both in store and API
@@ -67,13 +73,12 @@ function createModuleSettingsStore() {
     // Force reload from API
     async reload() {
       set({
-        time_tracking_enabled: true,
-        test_management_enabled: true,
-        workspace_managed_agents: true,
+        ...DEFAULT_SETTINGS,
         loaded: false,
         loading: false,
       });
-      await this.load();
+      inFlight = null;
+      await this.ensureLoaded();
     },
   };
 }

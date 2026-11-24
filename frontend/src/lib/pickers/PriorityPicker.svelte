@@ -1,11 +1,9 @@
 <script>
-  import { onMount } from 'svelte';
-  import { priorities as prioritiesApi } from '../api/configuration.js';
   import AlertCircle from '@lucide/svelte/icons/alert-circle';
   import { priorityIconMap } from '../utils/icons.js';
   import ItemPicker from './ItemPicker.svelte';
   import { t } from '../stores/i18n.svelte.js';
-  import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
+  import { workspaces } from '../api/workspaces.js';
   import { objectDisplayName } from '../utils/systemLabels.js';
 
   // Props
@@ -43,40 +41,45 @@
     getLabel: (item) => objectDisplayName(item, 'priority')
   };
 
-  // Reactive: Use provided items or fetch when workspaceId changes
+  // Reactive: use provided items, otherwise load the target workspace's
+  // effective priority catalog from the workspace-priorities API. The API owns
+  // configuration-set resolution, so the picker no longer reimplements it and
+  // a single effect (no mount duplicate) owns loading.
   $effect(() => {
     if (items) {
       priorities = [...items].sort((a, b) => a.sort_order - b.sort_order);
       loading = false;
-    } else if (workspaceId) {
-      loadPriorities();
-    }
-  });
-
-  async function loadPriorities() {
-    if (!workspaceId) return;
-
-    try {
-      loading = true;
       error = null;
-
-      const config = await workspaceDataStore.screenConfig(null);
-      const configuredPriorities = config?.priorities || [];
-      priorities = configuredPriorities.length > 0
-        ? configuredPriorities
-        : await prioritiesApi.getAll();
-
-      // Sort by sort_order
-      priorities = priorities.sort((a, b) => a.sort_order - b.sort_order);
-
-    } catch (err) {
-      console.error('Failed to load priorities:', err);
-      error = 'Failed to load priorities';
-      priorities = [];
-    } finally {
-      loading = false;
+      return;
     }
-  }
+    const id = workspaceId;
+    if (!id) {
+      priorities = [];
+      loading = false;
+      return;
+    }
+    let cancelled = false;
+    loading = true;
+    error = null;
+    workspaces
+      .getPriorities(id)
+      .then((result) => {
+        if (cancelled) return;
+        priorities = [...(result || [])].sort((a, b) => a.sort_order - b.sort_order);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Failed to load priorities:', err);
+        error = 'Failed to load priorities';
+        priorities = [];
+      })
+      .finally(() => {
+        if (!cancelled) loading = false;
+      });
+    return () => {
+      cancelled = true;
+    };
+  });
 
   function handlePrioritySelect(priority) {
     const id = priority?.id ?? null;
@@ -87,12 +90,6 @@
   function getIconComponent(iconName) {
     return priorityIconMap[iconName] || AlertCircle;
   }
-
-  onMount(() => {
-    if (!items) {
-      loadPriorities();
-    }
-  });
 </script>
 
 {#if loading}
