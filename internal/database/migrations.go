@@ -3737,7 +3737,7 @@ END $$;
 		Name:    "Restore dropped PostgreSQL cascades and align iteration_types (WI-2366)",
 		CheckPostgres: `SELECT CASE WHEN
 			NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='iteration_types' AND column_name='duration_days')
-			AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='iteration_types' AND column_name='color' AND is_nullable='NO')
+			AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='iteration_types' AND column_name='color' AND is_nullable='NO' AND column_default IS NULL)
 			AND EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='board_configurations'::regclass AND conname='board_configurations_workspace_id_fkey')
 			AND EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='board_configurations'::regclass AND conname='board_configurations_collection_id_fkey')
 			AND EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='test_folders'::regclass AND conname='test_folders_workspace_id_fkey')
@@ -3772,6 +3772,9 @@ END $$;
 
 			UPDATE iteration_types SET color = '#6b7280' WHERE color IS NULL;
 			ALTER TABLE iteration_types ALTER COLUMN color SET NOT NULL;
+			-- The old base_tables stub defaulted color; the fresh schema requires an
+			-- explicit value, so drop it to keep both paths identical.
+			ALTER TABLE iteration_types ALTER COLUMN color DROP DEFAULT;
 			ALTER TABLE iteration_types DROP COLUMN IF EXISTS duration_days;
 		`,
 	},
