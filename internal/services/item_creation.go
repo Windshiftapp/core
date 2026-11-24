@@ -383,7 +383,7 @@ func (c *itemCreation) eventItem(itemID, itemNumber int) (*models.Item, error) {
 	}
 	p := c.params
 	return &models.Item{
-		ID: itemID, WorkspaceID: p.WorkspaceID, WorkspaceItemNumber: itemNumber,
+		ID: itemID, WorkspaceID: p.WorkspaceID, WorkspaceKey: p.WorkspaceKey, WorkspaceItemNumber: itemNumber,
 		ItemTypeID: p.ItemTypeID, Title: p.Title, Description: p.Description,
 		StatusID: c.statusID, PriorityID: c.priorityID, IsTask: p.IsTask,
 		AssigneeID: p.AssigneeID, TeamID: p.TeamID, ReporterID: p.ReporterID, CreatorID: p.CreatorID,

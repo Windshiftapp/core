@@ -83,7 +83,11 @@ func resolvePriorityIDByName(db database.Database, priority string) (*int, error
 
 // ItemCreationParams contains all parameters for creating an item
 type ItemCreationParams struct {
-	WorkspaceID             int
+	WorkspaceID int
+	// WorkspaceKey is the workspace's display key. Callers that validate first
+	// carry it from the validation result so the creation snapshot has the
+	// item key without a second lookup.
+	WorkspaceKey            string
 	Title                   string
 	Description             string
 	Status                  string // Text status (legacy) - mapped to StatusID if StatusID is nil

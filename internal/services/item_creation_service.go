@@ -214,6 +214,7 @@ func (s *ItemCreationService) create(
 	metadata := mergeItemEventMetadata(input.EventMetadata, itemEventMetadata(actorUserID, "application", actionContext))
 	itemID, snapshot, err := createItemWithSnapshot(context.Background(), s.db, ItemCreationParams{
 		WorkspaceID:           input.WorkspaceID,
+		WorkspaceKey:          validationResult.WorkspaceKey,
 		Title:                 input.Title,
 		Description:           input.Description,
 		StatusID:              input.StatusID,
