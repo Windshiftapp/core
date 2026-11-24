@@ -3134,6 +3134,10 @@
                 "description": "The approval set status id value.",
                 "type": "integer"
               },
+              "can_decide": {
+                "description": "The can decide value.",
+                "type": "boolean"
+              },
               "completed_at": {
                 "description": "The completed at value.",
                 "format": "date-time",
@@ -3390,6 +3394,10 @@
                 "approval_set_status_id": {
                   "description": "The approval set status id value.",
                   "type": "integer"
+                },
+                "can_decide": {
+                  "description": "The can decide value.",
+                  "type": "boolean"
                 },
                 "completed_at": {
                   "description": "The completed at value.",
@@ -13556,6 +13564,10 @@
                 "approval_set_status_id": {
                   "description": "The approval set status id value.",
                   "type": "integer"
+                },
+                "can_decide": {
+                  "description": "The can decide value.",
+                  "type": "boolean"
                 },
                 "completed_at": {
                   "description": "The completed at value.",
@@ -67066,6 +67078,10 @@
                 "description": "The approval set status id value.",
                 "type": "integer"
               },
+              "can_decide": {
+                "description": "The can decide value.",
+                "type": "boolean"
+              },
               "completed_at": {
                 "description": "The completed at value.",
                 "format": "date-time",
@@ -67404,6 +67420,10 @@
                     "description": "The approval set status id value.",
                     "type": "integer"
                   },
+                  "can_decide": {
+                    "description": "The can decide value.",
+                    "type": "boolean"
+                  },
                   "completed_at": {
                     "description": "The completed at value.",
                     "format": "date-time",
@@ -67680,6 +67700,10 @@
                 "description": "The approval set status id value.",
                 "type": "integer"
               },
+              "can_decide": {
+                "description": "The can decide value.",
+                "type": "boolean"
+              },
               "completed_at": {
                 "description": "The completed at value.",
                 "format": "date-time",
@@ -67948,6 +67972,10 @@
                 "description": "The approval set status id value.",
                 "type": "integer"
               },
+              "can_decide": {
+                "description": "The can decide value.",
+                "type": "boolean"
+              },
               "completed_at": {
                 "description": "The completed at value.",
                 "format": "date-time",
@@ -68202,6 +68230,10 @@
               "approval_set_status_id": {
                 "description": "The approval set status id value.",
                 "type": "integer"
+              },
+              "can_decide": {
+                "description": "The can decide value.",
+                "type": "boolean"
               },
               "completed_at": {
                 "description": "The completed at value.",
