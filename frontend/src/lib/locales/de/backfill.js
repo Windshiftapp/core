@@ -80,6 +80,9 @@ export default {
     "senderAuthOff": "Aus – From-Header vertrauen",
     "senderAuthHelp": "Streng hält E-Mails zurück, deren Absenderadresse kein übereinstimmendes SPF-, DKIM- oder DMARC-Ergebnis hat, damit sich ein gefälschter Absender nicht an einem Thread beteiligen oder als Kunde ausgeben kann. Nur deaktivieren, wenn der Mailanbieter keine Authentifizierungs-Header hinzufügt.",
     "senderAuthIntakeHelp": "Überschreibt die Absenderauthentifizierungs-Richtlinie des Postfachs für E-Mails in diesem Ordner. Auf dem Postfachstandard belassen, sofern dieser Ordner keine andere Richtlinie benötigt.",
+    "trustedAuthServers": "Vertrauenswürdige Authentifizierungsserver",
+    "trustedAuthServersPlaceholder": "mx.google.com, outbound.protection.outlook.com",
+    "trustedAuthServersHelp": "Kommagetrennte Namen von Authentifizierungsservern (authserv-id), deren SPF-, DKIM- und DMARC-Ergebnisse dieses Postfach vertraut. Leer lassen, um sie aus Anbieter und Mailhost abzuleiten. Wenn kein vertrauenswürdiger Server ermittelt werden kann, hält der strenge Modus jede Nachricht zurück.",
     "dispositionLeave": "Im Postfach belassen",
     "dispositionMarkRead": "Als gelesen markieren",
     "emailLog": {
@@ -104,6 +107,7 @@ export default {
       "outboxStatus": "Status",
       "outboxTo": "An",
       "rateLimited": "Ratenbegrenzt",
+      "heldUnauthenticated": "Zurückgehalten: nicht authentifizierter Absender",
       "rateLimitedCount": "{count} Nachricht(en) durch das Absender-Ratenlimit zurückgehalten und warten auf erneute Einreihung.",
       "requeue": "Erneut einreihen und wiederholen",
       "requeueing": "Wird erneut eingereiht...",

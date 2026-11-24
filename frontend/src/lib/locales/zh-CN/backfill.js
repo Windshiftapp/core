@@ -80,6 +80,9 @@ export default {
     "senderAuthOff": "关闭 — 信任 From 标头",
     "senderAuthHelp": "严格模式会暂扣发件人地址没有通过 SPF、DKIM 或 DMARC 对齐验证的邮件，防止伪造的发件人加入会话或冒充客户。仅在邮件服务商不添加身份验证标头时关闭。",
     "senderAuthIntakeHelp": "为此文件夹中的邮件覆盖邮箱的发件人身份验证策略。除非此文件夹需要不同的策略，否则请保留邮箱默认设置。",
+    "trustedAuthServers": "受信任的身份验证服务器",
+    "trustedAuthServersPlaceholder": "mx.google.com, outbound.protection.outlook.com",
+    "trustedAuthServersHelp": "逗号分隔的身份验证服务器名称（authserv-id），此邮箱信任其 SPF、DKIM 和 DMARC 结果。留空则从服务商和邮件主机推断。若无法确定受信任的服务器，严格模式会暂扣每封邮件。",
     "dispositionLeave": "保留在邮箱中",
     "dispositionMarkRead": "标记为已读",
     "emailLog": {
@@ -104,6 +107,7 @@ export default {
       "outboxStatus": "状态",
       "outboxTo": "收件人",
       "rateLimited": "已限流",
+      "heldUnauthenticated": "已暂扣：发件人未通过身份验证",
       "rateLimitedCount": "{count} 条消息因发件人速率限制被扣留，等待重新入队。",
       "requeue": "重新入队并重试",
       "requeueing": "正在重新入队...",

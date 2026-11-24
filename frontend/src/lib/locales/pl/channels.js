@@ -269,6 +269,9 @@ export default {
     senderAuthOff: 'Wyłączone — ufaj nagłówkowi From',
     senderAuthHelp: 'Tryb ścisły wstrzymuje wiadomości, których adres nadawcy nie ma zgodnego wyniku SPF, DKIM lub DMARC, aby podszywający się nadawca nie mógł dołączyć do wątku ani podać się za klienta. Wyłącz tylko wtedy, gdy dostawca poczty nie dodaje nagłówków uwierzytelniających.',
     senderAuthIntakeHelp: 'Zastępuje politykę uwierzytelniania nadawcy skrzynki dla wiadomości w tym folderze. Pozostaw domyślne ustawienie skrzynki, chyba że ten folder wymaga innej polityki.',
+    trustedAuthServers: 'Zaufane serwery uwierzytelniania',
+    trustedAuthServersPlaceholder: 'mx.google.com, outbound.protection.outlook.com',
+    trustedAuthServersHelp: 'Nazwy serwerów uwierzytelniania (authserv-id) oddzielone przecinkami, którym ta skrzynka ufa w zakresie wyników SPF, DKIM i DMARC. Pozostaw puste, aby wywnioskować je od dostawcy i hosta poczty. Gdy nie można ustalić zaufanego serwera, tryb ścisły wstrzymuje każdą wiadomość.',
     intakesTitle: 'Przyjmowanie',
     intakesHelp:
       'Każde przyjmowanie odczytuje jeden folder w tej skrzynce i tworzy elementy w jednej przestrzeni roboczej i typie elementu. Powiąż portal, aby udostępnić te zgłoszenia jego klientom. Jedna skrzynka może zasilać kilka przyjmowań, ale tylko przez odrębne foldery. Utworzenie przyjmowania wymaga zarządzania tą skrzynką, docelową przestrzenią roboczą i wszelkimi powiązanymi portalami.',
@@ -404,6 +407,7 @@ export default {
       next: 'Następna',
       page: 'Strona {page} z {total}',
       rateLimited: 'Limit tempa',
+      heldUnauthenticated: 'Wstrzymano: nieuwierzytelniony nadawca',
       rateLimitedCount: '{count} wiadomości wstrzymanych przez limit tempa na nadawcę i oczekujących na ponowne zakolejkowanie.',
       requeue: 'Zakolejkuj ponownie i spróbuj ponownie',
       requeueing: 'Ponowne kolejkuje...',

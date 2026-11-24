@@ -93,6 +93,11 @@ const (
 	// a new ticket. The tracking row is marked rate_limited_at and the
 	// original mail is left in the mailbox for operator requeue.
 	ActionRateLimited ProcessingAction = "rate_limited"
+	// ActionHeldForAuth means a strict sender-authentication policy held the
+	// message: the From address could not be authenticated. The original mail
+	// is left in the mailbox so an operator can review it after correcting the
+	// policy or the mailbox configuration.
+	ActionHeldForAuth ProcessingAction = "held_for_auth"
 )
 
 // Provider defines the interface for email providers (Microsoft, Google, Generic)

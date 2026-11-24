@@ -1097,6 +1097,10 @@ type EmailMessageRow struct {
 	// SenderAuth is the SPF/DKIM/DMARC outcome recorded for the message, e.g.
 	// "dmarc=pass" or "none". Empty for rows written before the check existed.
 	SenderAuth string
+	// SkippedReason is set when intake deliberately did not turn the message
+	// into an item or comment, e.g. "unauthenticated_sender". Empty for mail
+	// that was processed normally.
+	SkippedReason string
 }
 
 // CountEmailMessages returns the number of email_message_tracking rows for a
@@ -1130,7 +1134,7 @@ func (r *ChannelRepository) ListEmailMessages(ctx context.Context, channelID int
 	queryArgs = append(queryArgs, pageSize, offset)
 
 	rows, err := r.db.QueryContext(ctx,
-		"SELECT emt.id, emt.from_email, emt.from_name, COALESCE(emt.subject, ''), emt.item_id, emt.comment_id, emt.processed_at, emt.rate_limited_at, COALESCE(emt.sender_auth, ''), i.workspace_item_number, i.workspace_id, w.key as workspace_key "+
+		"SELECT emt.id, emt.from_email, emt.from_name, COALESCE(emt.subject, ''), emt.item_id, emt.comment_id, emt.processed_at, emt.rate_limited_at, COALESCE(emt.sender_auth, ''), COALESCE(emt.skipped_reason, ''), i.workspace_item_number, i.workspace_id, w.key as workspace_key "+
 			"FROM email_message_tracking emt "+
 			"LEFT JOIN items i ON emt.item_id = i.id "+
 			"LEFT JOIN workspaces w ON i.workspace_id = w.id "+
@@ -1149,7 +1153,7 @@ func (r *ChannelRepository) ListEmailMessages(ctx context.Context, channelID int
 		var itemID, commentID, workspaceID, workspaceItemNumber sql.NullInt64
 		var fromName, workspaceKey sql.NullString
 		var rateLimitedAt sql.NullTime
-		if err := rows.Scan(&msg.ID, &msg.FromEmail, &fromName, &msg.Subject, &itemID, &commentID, &msg.ProcessedAt, &rateLimitedAt, &msg.SenderAuth, &workspaceItemNumber, &workspaceID, &workspaceKey); err != nil {
+		if err := rows.Scan(&msg.ID, &msg.FromEmail, &fromName, &msg.Subject, &itemID, &commentID, &msg.ProcessedAt, &rateLimitedAt, &msg.SenderAuth, &msg.SkippedReason, &workspaceItemNumber, &workspaceID, &workspaceKey); err != nil {
 			return nil, fmt.Errorf("scan email_message_tracking row: %w", err)
 		}
 		if fromName.Valid {

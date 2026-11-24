@@ -438,6 +438,19 @@
                   <AlertTriangle class="w-3 h-3" />
                   {t('channel.emailLog.rateLimited')}
                 </span>
+              {:else if msg.skipped_reason}
+                <!-- inline-style-guard-exempt: held-mail badge mirrors the rate-limited badge's warning surface. -->
+                <span
+                  class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                  style="background: var(--ds-surface-warning, rgba(234, 88, 12, 0.12)); color: var(--ds-text-warning, var(--ds-text));"
+                  title={msg.skipped_reason}
+                  data-testid="email-log-skipped-badge"
+                >
+                  <AlertTriangle class="w-3 h-3" />
+                  {msg.skipped_reason === 'unauthenticated_sender'
+                    ? t('channel.emailLog.heldUnauthenticated')
+                    : msg.skipped_reason}
+                </span>
               {:else if msg.item_id}
                 {@const href = getItemHref(msg)}
                 <svelte:element this={href ? 'a' : 'span'} href={href} class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full {href ? 'hover:opacity-80' : ''}" style="background: var(--ds-surface-selected, rgba(59, 130, 246, 0.1)); color: var(--ds-text-accent, var(--ds-text)); {href ? 'text-decoration: none;' : ''}">

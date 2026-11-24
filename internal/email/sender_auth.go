@@ -1,6 +1,12 @@
 package email
 
-import "strings"
+import (
+	"strings"
+
+	"golang.org/x/net/publicsuffix"
+
+	"windshift/internal/models"
+)
 
 // SenderAuthPolicy controls whether the From address of inbound mail must be
 // backed by a passing, aligned SPF, DKIM, or DMARC result before intake trusts
@@ -40,6 +46,57 @@ func IsValidSenderAuthPolicy(value string) bool {
 	}
 }
 
+// ResolveTrustedAuthServIDs returns the receiver hosts whose
+// Authentication-Results and Received-SPF headers are trusted for a mailbox.
+// These are the mailbox-specific receiver boundary: the final delivery agent
+// prepends its own result above its Received header, so a result is trusted
+// only when it sits above a Received hop from one of these hosts.
+//
+// Operators can list the hosts explicitly. Otherwise they are derived from the
+// provider and the configured mail host. An empty result means no boundary can
+// be established; strict mode then holds everything rather than trusting an
+// arbitrary header.
+func ResolveTrustedAuthServIDs(config *models.ChannelConfig) []string {
+	if config == nil {
+		return nil
+	}
+	var trusted []string
+	trusted = append(trusted, config.EmailTrustedAuthServIDs...)
+
+	switch strings.ToLower(strings.TrimSpace(config.EmailOAuthProviderType)) {
+	case models.EmailProviderTypeGoogle:
+		trusted = append(trusted, "mx.google.com")
+	case models.EmailProviderTypeMicrosoft:
+		trusted = append(trusted, "mx.microsoft.com", "outbound.protection.outlook.com")
+	}
+
+	imapHost := strings.ToLower(strings.TrimSpace(config.IMAPHost))
+	switch {
+	case strings.Contains(imapHost, "gmail"):
+		trusted = append(trusted, "mx.google.com")
+	case strings.Contains(imapHost, "outlook"), strings.Contains(imapHost, "office365"):
+		trusted = append(trusted, "mx.microsoft.com", "outbound.protection.outlook.com")
+	}
+	if imapHost != "" {
+		trusted = append(trusted, imapHost)
+		if org := organizationalDomain(imapHost); org != "" {
+			trusted = append(trusted, org)
+		}
+	}
+
+	// The monitored address's domain is the last resort: a self-hosted mailbox
+	// is usually served by a host in the same organizational domain.
+	if address := firstNonEmpty(config.EmailOAuthMailbox, config.EmailOAuthEmail, config.IMAPUsername); address != "" {
+		if domain := emailDomain(address); domain != "" {
+			trusted = append(trusted, domain)
+			if org := organizationalDomain(domain); org != "" {
+				trusted = append(trusted, org)
+			}
+		}
+	}
+	return normalizeTrustedHosts(trusted)
+}
+
 // SenderAuthMethod identifies the mechanism a result came from.
 type SenderAuthMethod string
 
@@ -77,12 +134,14 @@ func (r SenderAuthResult) Summary() string {
 // Authentication-Results (falling back to Received-SPF) and reports whether
 // the From domain is authenticated by an aligned SPF, DKIM, or DMARC pass.
 //
-// Only headers that precede the first Received header are trusted: the final
-// receiving MTA prepends its own Authentication-Results above the Received
-// header it adds, so an Authentication-Results injected by the sender sits
-// below a Received header and is ignored. When the message was not parsed from
-// raw bytes (HeaderOrder is empty) the topmost header is used.
-func EvaluateSenderAuthentication(message *ParsedEmail) SenderAuthResult {
+// Only results that appear above a trusted receiver hop are considered, and an
+// Authentication-Results header is trusted only when its authserv-id is one of
+// trustedReceivers. Both conditions are required: the position rejects a
+// result injected below the receiving MTA's Received header, and the
+// authserv-id rejects an upstream MTA's result that happens to sit above the
+// boundary. When no trusted receiver hop exists the message is treated as
+// unauthenticated.
+func EvaluateSenderAuthentication(message *ParsedEmail, trustedReceivers []string) SenderAuthResult {
 	if message == nil {
 		return SenderAuthResult{Outcome: "none", Detail: "no message"}
 	}
@@ -91,9 +150,17 @@ func EvaluateSenderAuthentication(message *ParsedEmail) SenderAuthResult {
 		return SenderAuthResult{Outcome: "none", Detail: "sender address has no domain"}
 	}
 
+	boundary := trustedReceiverBoundary(message, trustedReceivers)
+	if boundary < 0 {
+		return SenderAuthResult{
+			Outcome: "none",
+			Detail:  "no trusted receiver boundary for " + fromDomain,
+		}
+	}
+
 	var fallback *SenderAuthResult
-	for _, raw := range trustedHeaderValues(message, "Authentication-Results") {
-		result, verified := evaluateAuthenticationResults(raw, fromDomain)
+	for _, raw := range headerValuesAbove(message, "Authentication-Results", boundary) {
+		result, verified := evaluateAuthenticationResults(raw, fromDomain, trustedReceivers)
 		if verified {
 			return result
 		}
@@ -102,7 +169,7 @@ func EvaluateSenderAuthentication(message *ParsedEmail) SenderAuthResult {
 			fallback = &remembered
 		}
 	}
-	for _, raw := range trustedHeaderValues(message, "Received-SPF") {
+	for _, raw := range headerValuesAbove(message, "Received-SPF", boundary) {
 		result, verified := evaluateReceivedSPF(raw, fromDomain)
 		if verified {
 			return result
@@ -131,17 +198,26 @@ type authMethod struct {
 // evaluateAuthenticationResults parses one Authentication-Results value and
 // reports whether it carries an aligned pass. The bool is true only for a
 // verified result; the returned result describes the outcome either way.
-func evaluateAuthenticationResults(value, fromDomain string) (SenderAuthResult, bool) {
-	methods := parseAuthenticationResults(value)
+func evaluateAuthenticationResults(value, fromDomain string, trustedReceivers []string) (SenderAuthResult, bool) {
+	authservID, methods := parseAuthenticationResults(value)
+	if len(methods) == 0 {
+		return SenderAuthResult{Outcome: "none", Detail: "no SPF, DKIM, or DMARC clause"}, false
+	}
+	if !authServIDTrusted(authservID, trustedReceivers) {
+		return SenderAuthResult{
+			Outcome: "untrusted",
+			Detail:  "result from untrusted authentication server " + authservID,
+		}, false
+	}
 
 	// DMARC first: a pass already encodes alignment between the From domain and
 	// a passing SPF or DKIM signature. When the receiver records header.from,
-	// still confirm it matches the From domain.
+	// still confirm it matches the actual From domain.
 	for _, method := range methods {
 		if method.name != "dmarc" || method.result != "pass" {
 			continue
 		}
-		if claimed := emailDomain(method.props["header.from"]); claimed != "" && !domainsAligned(fromDomain, claimed) {
+		if claimed := emailDomain(method.props["header.from"]); claimed != "" && !strings.EqualFold(claimed, fromDomain) {
 			continue
 		}
 		return SenderAuthResult{
@@ -152,13 +228,14 @@ func evaluateAuthenticationResults(value, fromDomain string) (SenderAuthResult, 
 		}, true
 	}
 
-	// DKIM: the signing domain must align with the From domain.
+	// DKIM: the signing domain must share the From domain's organizational
+	// domain under DMARC relaxed alignment.
 	for _, method := range methods {
 		if method.name != "dkim" || method.result != "pass" {
 			continue
 		}
 		domain := dkimSigningDomain(method.props)
-		if domain != "" && domainsAligned(fromDomain, domain) {
+		if domain != "" && organizationalDomainsAligned(fromDomain, domain) {
 			return SenderAuthResult{
 				Verified: true,
 				Method:   SenderAuthMethodDKIM,
@@ -168,13 +245,14 @@ func evaluateAuthenticationResults(value, fromDomain string) (SenderAuthResult, 
 		}
 	}
 
-	// SPF: the envelope (MAIL FROM) domain must align with the From domain.
+	// SPF: the envelope (MAIL FROM) domain must share the From domain's
+	// organizational domain under DMARC relaxed alignment.
 	for _, method := range methods {
 		if method.name != "spf" || method.result != "pass" {
 			continue
 		}
 		domain := emailDomain(method.props["smtp.mailfrom"])
-		if domain != "" && domainsAligned(fromDomain, domain) {
+		if domain != "" && organizationalDomainsAligned(fromDomain, domain) {
 			return SenderAuthResult{
 				Verified: true,
 				Method:   SenderAuthMethodSPF,
@@ -187,41 +265,143 @@ func evaluateAuthenticationResults(value, fromDomain string) (SenderAuthResult, 
 	return summarizeAuthenticationResults(methods), false
 }
 
-// parseAuthenticationResults tokenizes an Authentication-Results value into
-// method clauses. The first semicolon-delimited segment is the authserv-id and
-// is skipped. Parenthesized comments are removed first so a comment can never
-// masquerade as a property.
-func parseAuthenticationResults(value string) []authMethod {
-	clauses := strings.Split(stripAuthenticationComments(value), ";")
+// parseAuthenticationResults returns the authserv-id and the method clauses of
+// an Authentication-Results value. Parsing respects RFC 8601: clauses are
+// separated by semicolons outside quoted strings and comments, and a method is
+// accepted only as the first token of a clause, so a quoted diagnostic or
+// property value can never be read as a verdict.
+func parseAuthenticationResults(value string) (string, []authMethod) {
+	clauses := splitAuthResultsClauses(value)
+	if len(clauses) == 0 {
+		return "", nil
+	}
+	authservID := strings.ToLower(firstToken(clauses[0]))
 	var out []authMethod
-	for i, clause := range clauses {
-		if i == 0 {
-			continue // authserv-id
+	for _, clause := range clauses[1:] {
+		tokens := tokenizeAuthClause(clause)
+		if len(tokens) == 0 {
+			continue
 		}
-		var current *authMethod
-		for _, field := range strings.Fields(clause) {
-			name, rawValue, ok := strings.Cut(field, "=")
+		name, rawValue, ok := strings.Cut(tokens[0], "=")
+		if !ok {
+			continue
+		}
+		name = strings.ToLower(strings.TrimSpace(name))
+		if name != "spf" && name != "dkim" && name != "dmarc" {
+			continue
+		}
+		method := authMethod{
+			name:   name,
+			result: strings.ToLower(trimQuoted(rawValue)),
+			props:  map[string]string{},
+		}
+		for _, token := range tokens[1:] {
+			prop, propValue, ok := strings.Cut(token, "=")
 			if !ok {
 				continue
 			}
-			name = strings.ToLower(strings.TrimSpace(name))
-			rawValue = strings.Trim(strings.TrimSpace(rawValue), `"`)
-			switch name {
-			case "spf", "dkim", "dmarc":
-				out = append(out, authMethod{
-					name:   name,
-					result: strings.ToLower(rawValue),
-					props:  map[string]string{},
-				})
-				current = &out[len(out)-1]
-			default:
-				if current != nil && name != "" {
-					current.props[name] = rawValue
-				}
+			method.props[strings.ToLower(strings.TrimSpace(prop))] = trimQuoted(propValue)
+		}
+		out = append(out, method)
+	}
+	return authservID, out
+}
+
+// splitAuthResultsClauses splits on semicolons that are outside quoted strings
+// and parenthesized comments.
+func splitAuthResultsClauses(value string) []string {
+	var clauses []string
+	var current strings.Builder
+	depth := 0
+	inQuote := false
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		switch {
+		case inQuote:
+			current.WriteByte(c)
+			switch {
+			case c == '\\' && i+1 < len(value):
+				i++
+				current.WriteByte(value[i])
+			case c == '"':
+				inQuote = false
 			}
+		case depth > 0:
+			current.WriteByte(c)
+			switch {
+			case c == '\\' && i+1 < len(value):
+				i++
+				current.WriteByte(value[i])
+			case c == '(':
+				depth++
+			case c == ')':
+				depth--
+			}
+		case c == '"':
+			inQuote = true
+			current.WriteByte(c)
+		case c == '(':
+			depth++
+			current.WriteByte(c)
+		case c == ';':
+			clauses = append(clauses, current.String())
+			current.Reset()
+		default:
+			current.WriteByte(c)
 		}
 	}
-	return out
+	clauses = append(clauses, current.String())
+	return clauses
+}
+
+// tokenizeAuthClause splits a clause into whitespace-separated tokens,
+// preserving quoted strings and skipping parenthesized comments.
+func tokenizeAuthClause(clause string) []string {
+	var tokens []string
+	var current strings.Builder
+	depth := 0
+	inQuote := false
+	flush := func() {
+		if current.Len() > 0 {
+			tokens = append(tokens, current.String())
+			current.Reset()
+		}
+	}
+	for i := 0; i < len(clause); i++ {
+		c := clause[i]
+		switch {
+		case inQuote:
+			current.WriteByte(c)
+			switch {
+			case c == '\\' && i+1 < len(clause):
+				i++
+				current.WriteByte(clause[i])
+			case c == '"':
+				inQuote = false
+			}
+		case depth > 0:
+			switch {
+			case c == '\\' && i+1 < len(clause):
+				i++
+			case c == '(':
+				depth++
+			case c == ')':
+				depth--
+			}
+		case c == '"':
+			inQuote = true
+			current.WriteByte(c)
+		case c == '(':
+			flush()
+			depth++
+		case c == ' ' || c == '\t' || c == '\r' || c == '\n':
+			flush()
+		default:
+			current.WriteByte(c)
+		}
+	}
+	flush()
+	return tokens
 }
 
 // summarizeAuthenticationResults picks the most relevant observed outcome for
@@ -243,7 +423,9 @@ func summarizeAuthenticationResults(methods []authMethod) SenderAuthResult {
 }
 
 // evaluateReceivedSPF parses a Received-SPF value. It only contributes an SPF
-// outcome: the header carries no DKIM or DMARC information.
+// outcome: the header carries no DKIM or DMARC information. A pass without an
+// envelope-from was evaluated against HELO, which authenticates the sending
+// host rather than the envelope sender, so it cannot establish the From domain.
 func evaluateReceivedSPF(value, fromDomain string) (SenderAuthResult, bool) {
 	cleaned := stripAuthenticationComments(value)
 	fields := strings.Fields(cleaned)
@@ -251,6 +433,14 @@ func evaluateReceivedSPF(value, fromDomain string) (SenderAuthResult, bool) {
 		return SenderAuthResult{Method: SenderAuthMethodSPF, Outcome: "none", Detail: "empty Received-SPF"}, false
 	}
 	result := strings.ToLower(strings.TrimSuffix(fields[0], ":"))
+	envelopeFrom := trimQuoted(receivedSPFProperty(cleaned, "envelope-from"))
+	if envelopeFrom == "" {
+		return SenderAuthResult{
+			Method:  SenderAuthMethodSPF,
+			Outcome: result,
+			Detail:  "received-spf=" + result + " has no envelope-from (HELO identity is not the sender)",
+		}, false
+	}
 	if result != "pass" {
 		return SenderAuthResult{
 			Method:  SenderAuthMethodSPF,
@@ -258,8 +448,8 @@ func evaluateReceivedSPF(value, fromDomain string) (SenderAuthResult, bool) {
 			Detail:  "received-spf=" + result,
 		}, false
 	}
-	domain := emailDomain(receivedSPFProperty(cleaned, "envelope-from"))
-	if domain != "" && domainsAligned(fromDomain, domain) {
+	domain := emailDomain(envelopeFrom)
+	if domain != "" && organizationalDomainsAligned(fromDomain, domain) {
 		return SenderAuthResult{
 			Verified: true,
 			Method:   SenderAuthMethodSPF,
@@ -280,18 +470,35 @@ func stripAuthenticationComments(value string) string {
 	var b strings.Builder
 	b.Grow(len(value))
 	depth := 0
-	for _, r := range value {
-		switch r {
-		case '(':
-			depth++
-		case ')':
-			if depth > 0 {
+	inQuote := false
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		switch {
+		case inQuote:
+			b.WriteByte(c)
+			switch {
+			case c == '\\' && i+1 < len(value):
+				i++
+				b.WriteByte(value[i])
+			case c == '"':
+				inQuote = false
+			}
+		case depth > 0:
+			switch {
+			case c == '\\' && i+1 < len(value):
+				i++
+			case c == '(':
+				depth++
+			case c == ')':
 				depth--
 			}
+		case c == '"':
+			inQuote = true
+			b.WriteByte(c)
+		case c == '(':
+			depth++
 		default:
-			if depth == 0 {
-				b.WriteRune(r)
-			}
+			b.WriteByte(c)
 		}
 	}
 	return b.String()
@@ -305,7 +512,7 @@ func receivedSPFProperty(value, key string) string {
 			continue
 		}
 		if strings.EqualFold(strings.TrimSpace(name), key) {
-			return strings.Trim(strings.TrimSpace(rawValue), `"`)
+			return strings.TrimSpace(rawValue)
 		}
 	}
 	return ""
@@ -340,20 +547,150 @@ func emailDomain(address string) string {
 	return strings.ToLower(address)
 }
 
-// domainsAligned reports whether the authenticated domain aligns with the From
-// domain under DMARC relaxed alignment: identical, or one is a parent of the
-// other on a label boundary.
-func domainsAligned(fromDomain, authenticatedDomain string) bool {
-	fromDomain = strings.ToLower(strings.TrimSpace(fromDomain))
-	authenticatedDomain = strings.ToLower(strings.TrimSpace(authenticatedDomain))
-	if fromDomain == "" || authenticatedDomain == "" {
+// organizationalDomain returns the registrable domain of a host using the
+// public suffix list, falling back to the host itself for IP literals, single
+// labels, and unknown suffixes.
+func organizationalDomain(host string) string {
+	host = normalizeHost(host)
+	if host == "" {
+		return ""
+	}
+	if org, err := publicsuffix.EffectiveTLDPlusOne(host); err == nil {
+		return org
+	}
+	return host
+}
+
+// organizationalDomainsAligned reports whether two domains share an
+// organizational domain, which is DMARC relaxed alignment.
+func organizationalDomainsAligned(fromDomain, authenticatedDomain string) bool {
+	fromOrg := organizationalDomain(fromDomain)
+	authOrg := organizationalDomain(authenticatedDomain)
+	return fromOrg != "" && fromOrg == authOrg
+}
+
+// trustedReceiverBoundary returns the position of the first Received header
+// whose from/by host is a trusted receiver, or -1 when none exists. A result
+// is trusted only when it appears before this position.
+func trustedReceiverBoundary(message *ParsedEmail, trustedReceivers []string) int {
+	if len(message.HeaderOrder) == 0 || len(trustedReceivers) == 0 {
+		return -1
+	}
+	received := headerValues(message, "Received")
+	seen := 0
+	for i, key := range message.HeaderOrder {
+		if !strings.EqualFold(key, "Received") {
+			continue
+		}
+		if seen < len(received) && receivedFromTrustedHost(received[seen], trustedReceivers) {
+			return i
+		}
+		seen++
+	}
+	return -1
+}
+
+// headerValuesAbove returns the values of a header that appear before the
+// boundary position in the recorded header order.
+func headerValuesAbove(message *ParsedEmail, name string, boundary int) []string {
+	values := headerValues(message, name)
+	if len(values) == 0 {
+		return nil
+	}
+	var out []string
+	seen := 0
+	for i, key := range message.HeaderOrder {
+		if i >= boundary {
+			break
+		}
+		if strings.EqualFold(key, name) {
+			if seen < len(values) {
+				out = append(out, values[seen])
+			}
+			seen++
+		}
+	}
+	return out
+}
+
+// receivedFromTrustedHost reports whether a Received header's from/by host is a
+// trusted receiver.
+func receivedFromTrustedHost(value string, trustedReceivers []string) bool {
+	for _, host := range receivedHosts(value) {
+		for _, trusted := range trustedReceivers {
+			if hostMatches(host, trusted) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// receivedHosts extracts the from/by hosts from a Received header.
+func receivedHosts(value string) []string {
+	fields := strings.Fields(value)
+	var hosts []string
+	for i, field := range fields {
+		switch strings.ToLower(strings.TrimSuffix(field, ":")) {
+		case "from", "by":
+			if i+1 >= len(fields) {
+				continue
+			}
+			if host := normalizeHost(fields[i+1]); host != "" {
+				hosts = append(hosts, host)
+			}
+		}
+	}
+	return hosts
+}
+
+// authServIDTrusted reports whether an Authentication-Results authserv-id is a
+// trusted receiver.
+func authServIDTrusted(authservID string, trustedReceivers []string) bool {
+	authservID = normalizeHost(authservID)
+	if authservID == "" {
 		return false
 	}
-	if fromDomain == authenticatedDomain {
-		return true
+	for _, trusted := range trustedReceivers {
+		if hostMatches(authservID, trusted) {
+			return true
+		}
 	}
-	return strings.HasSuffix(fromDomain, "."+authenticatedDomain) ||
-		strings.HasSuffix(authenticatedDomain, "."+fromDomain)
+	return false
+}
+
+// hostMatches reports whether host equals trusted or is a subdomain of it.
+func hostMatches(host, trusted string) bool {
+	host = normalizeHost(host)
+	trusted = normalizeHost(trusted)
+	if host == "" || trusted == "" {
+		return false
+	}
+	return host == trusted || strings.HasSuffix(host, "."+trusted)
+}
+
+// normalizeHost lowercases a host and strips brackets, quotes, and a trailing
+// dot.
+func normalizeHost(host string) string {
+	host = strings.TrimSpace(host)
+	host = strings.Trim(host, "[]()<>\"")
+	host = strings.TrimSuffix(host, ".")
+	return strings.ToLower(host)
+}
+
+// normalizeTrustedHosts lowercases and de-duplicates a trusted host list.
+func normalizeTrustedHosts(hosts []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, host := range hosts {
+		host = normalizeHost(host)
+		if host == "" || seen[host] {
+			continue
+		}
+		seen[host] = true
+		out = append(out, host)
+	}
+	return out
 }
 
 // headerValues returns the values of a header, looked up case-insensitively
@@ -370,26 +707,25 @@ func headerValues(message *ParsedEmail, name string) []string {
 	return nil
 }
 
-// trustedHeaderValues returns the values of name that appear before the first
-// Received header. When the message has no recorded header order (constructed
-// in tests or by an older parser) every value is returned.
-func trustedHeaderValues(message *ParsedEmail, name string) []string {
-	values := headerValues(message, name)
-	if len(values) == 0 || len(message.HeaderOrder) == 0 {
-		return values
+// firstToken returns the first whitespace-delimited token of a string.
+func firstToken(value string) string {
+	for _, field := range strings.Fields(value) {
+		return field
 	}
-	var trusted []string
-	seen := 0
-	for _, key := range message.HeaderOrder {
-		if strings.EqualFold(key, "Received") {
-			return trusted
-		}
-		if strings.EqualFold(key, name) {
-			if seen < len(values) {
-				trusted = append(trusted, values[seen])
-			}
-			seen++
+	return ""
+}
+
+// trimQuoted removes surrounding double quotes and whitespace from a value.
+func trimQuoted(value string) string {
+	return strings.Trim(strings.TrimSpace(value), `"`)
+}
+
+// firstNonEmpty returns the first non-empty string.
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
 		}
 	}
-	return trusted
+	return ""
 }

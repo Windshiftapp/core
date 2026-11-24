@@ -524,6 +524,7 @@ func (es *EmailScheduler) pollIntake(
 	maxUID := sinceUID
 	processedCount := 0
 	rateLimitedCount := 0
+	heldCount := 0
 	errorCount := 0
 	var lastBatchError string
 	var offenderUID uint32
@@ -581,11 +582,15 @@ func (es *EmailScheduler) pollIntake(
 
 		// Rate-limited mail is left untouched in the mailbox (unread, not
 		// deleted) so an operator can requeue it; the watermark still advances
-		// past it so one flooding sender cannot wedge the intake. Deduplicated
-		// mail still gets the configured disposition: an earlier run may have
-		// created the ticket but expired before marking or deleting it.
+		// past it so one flooding sender cannot wedge the intake. Mail held by a
+		// strict sender-authentication policy is preserved the same way: it may
+		// be the only copy of a legitimate message, and deleting it would make
+		// the hold unrecoverable. Deduplicated mail still gets the configured
+		// disposition: an earlier run may have created the ticket but expired
+		// before marking or deleting it.
 		rateLimited := result.Action == email.ActionRateLimited
-		if !rateLimited {
+		held := result.Action == email.ActionHeldForAuth
+		if !rateLimited && !held {
 			switch disposition {
 			case models.EmailDispositionMarkRead:
 				if markErr := client.MarkAsRead(msg.UID); markErr != nil {
@@ -601,9 +606,12 @@ func (es *EmailScheduler) pollIntake(
 		if msg.UID > maxUID {
 			maxUID = msg.UID
 		}
-		if rateLimited {
+		switch {
+		case rateLimited:
 			rateLimitedCount++
-		} else {
+		case held:
+			heldCount++
+		default:
 			processedCount++
 		}
 	}
@@ -643,6 +651,7 @@ func (es *EmailScheduler) pollIntake(
 		"intake_id", intake.ID,
 		"processed", processedCount,
 		"rate_limited", rateLimitedCount,
+		"held_for_auth", heldCount,
 		"errors", errorCount,
 	)
 

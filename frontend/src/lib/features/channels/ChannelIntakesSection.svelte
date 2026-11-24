@@ -101,11 +101,9 @@
     if (editing.status === 'needs_attention') {
       editing.status = 'disabled';
     }
-    // Strict is the backend default for an empty value; normalize a stored
-    // "strict" so the select always has a matching option.
-    if (editing.sender_authentication !== 'off') {
-      editing.sender_authentication = '';
-    }
+    // sender_authentication is loaded verbatim so an explicit "strict" is not
+    // silently turned into "inherit" on an unrelated edit; inherit and strict
+    // differ whenever the mailbox default is "off".
     loadItemTypesForWorkspace(editing.workspace_id);
   }
 

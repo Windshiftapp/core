@@ -170,6 +170,12 @@ type ChannelConfig struct {
 	// From domain does not pass an aligned SPF, DKIM, or DMARC check; "off"
 	// disables the check for providers that do not add authentication headers.
 	EmailSenderAuthentication string `json:"email_sender_authentication,omitempty"`
+	// EmailTrustedAuthServIDs lists the authentication servers (authserv-id)
+	// whose Authentication-Results / Received-SPF headers this mailbox trusts.
+	// They are the receiver boundary that proves a result was added by the
+	// delivering MTA. Empty derives the hosts from the provider and mail host;
+	// when nothing can be derived, strict mode holds every message.
+	EmailTrustedAuthServIDs []string `json:"email_trusted_authserv_ids,omitempty"`
 
 	// Portal Configuration
 	PortalSlug          string   `json:"portal_slug,omitempty"`        // URL-friendly identifier (e.g., "support-portal")

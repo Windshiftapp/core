@@ -108,6 +108,9 @@ export default {
     "senderAuthOff": "Désactivé — faire confiance à l'en-tête From",
     "senderAuthHelp": "Le mode strict retient les e-mails dont l'adresse d'expédition n'a pas de résultat SPF, DKIM ou DMARC aligné, afin qu'un expéditeur usurpé ne puisse pas rejoindre un fil ni se faire passer pour un client. À désactiver uniquement si votre fournisseur de messagerie n'ajoute pas d'en-têtes d'authentification.",
     "senderAuthIntakeHelp": "Remplace la politique d'authentification de l'expéditeur de la boîte pour les e-mails de ce dossier. Laissez la valeur par défaut de la boîte sauf si ce dossier nécessite une politique différente.",
+    "trustedAuthServers": "Serveurs d'authentification de confiance",
+    "trustedAuthServersPlaceholder": "mx.google.com, outbound.protection.outlook.com",
+    "trustedAuthServersHelp": "Noms de serveurs d'authentification (authserv-id) séparés par des virgules dont cette boîte fait confiance aux résultats SPF, DKIM et DMARC. Laisser vide pour les déduire du fournisseur et de l'hôte de messagerie. Lorsqu'aucun serveur de confiance ne peut être établi, le mode strict retient chaque message.",
     "dispositionLeave": "Laisser dans la boîte",
     "dispositionMarkRead": "Marquer comme lu",
     "emailLog": {
@@ -132,6 +135,7 @@ export default {
       "outboxStatus": "Statut",
       "outboxTo": "À",
       "rateLimited": "Limité en débit",
+      "heldUnauthenticated": "Retenu : expéditeur non authentifié",
       "rateLimitedCount": "{count} message(s) retenue(s) par la limite de débit par expéditeur et en attente de remise en file.",
       "requeue": "Remettre en file et réessayer",
       "requeueing": "Remise en file...",

@@ -2021,6 +2021,7 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 		WorkspaceKey        string     `json:"workspace_key,omitempty"`
 		WorkspaceItemNumber int        `json:"workspace_item_number,omitempty"`
 		SenderAuth          string     `json:"sender_auth,omitempty"`
+		SkippedReason       string     `json:"skipped_reason,omitempty"`
 		Redacted            bool       `json:"redacted,omitempty"`
 	}
 
@@ -2055,6 +2056,7 @@ func (h *ChannelHandler) GetEmailLog(w http.ResponseWriter, r *http.Request) {
 			WorkspaceKey:        m.WorkspaceKey,
 			WorkspaceItemNumber: m.WorkspaceItemNumber,
 			SenderAuth:          m.SenderAuth,
+			SkippedReason:       m.SkippedReason,
 		}
 		// Redact sender/subject PII for rows whose target workspace the channel
 		// manager can't view. Channel-management permission alone is not enough

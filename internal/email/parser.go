@@ -155,7 +155,16 @@ func (p *Parser) Parse(msg *FetchedMessage) *ParsedEmail {
 // header block.
 func parseHeaderOrder(raw []byte) []string {
 	var order []string
-	for _, line := range bytes.Split(raw, []byte("\n")) {
+	// Walk line by line with IndexByte rather than bytes.Split so a large body
+	// is never split into a slice of lines just to read the header block.
+	for len(raw) > 0 {
+		line := raw
+		if newline := bytes.IndexByte(raw, '\n'); newline >= 0 {
+			line = raw[:newline]
+			raw = raw[newline+1:]
+		} else {
+			raw = nil
+		}
 		line = bytes.TrimRight(line, "\r")
 		if len(line) == 0 {
 			break // end of the header block

@@ -127,6 +127,13 @@ func (p *Processor) ProcessEmailWithIntake(
 		return nil, fmt.Errorf("failed to claim tracking row: %w", err)
 	}
 	if claim == trackingClaimCompleted {
+		// A message held by a strict sender-authentication policy must stay held
+		// on redelivery: the scheduler preserves held mail rather than applying
+		// the delete/mark-read disposition.
+		if p.trackingRowHeldForAuth(ctx, channelID, dedupKey) {
+			slog.Debug("email already held for sender authentication", "message_id", email.MessageID, "dedup_key", dedupKey)
+			return &ProcessingResult{Action: ActionHeldForAuth, SkipReason: skipReasonUnauthenticatedSender}, nil
+		}
 		slog.Debug("email already processed", "message_id", email.MessageID, "dedup_key", dedupKey)
 		return &ProcessingResult{Action: ActionAlreadyExists}, nil
 	}
@@ -157,7 +164,7 @@ func (p *Processor) ProcessEmailWithIntake(
 	// DKIM, or DMARC check instead of attributing it to a portal customer or an
 	// existing thread (WI-2362). The message is recorded on the tracking row so
 	// the admin diagnostics view can show what was held and why.
-	authResult := EvaluateSenderAuthentication(email)
+	authResult := EvaluateSenderAuthentication(email, ResolveTrustedAuthServIDs(config))
 	if policy := ResolveSenderAuthPolicy(config.EmailSenderAuthentication); policy == SenderAuthStrict && !authResult.Verified {
 		p.markSenderAuthHeld(ctx, channelID, dedupKey, authResult)
 		slog.Warn("held inbound email: sender not authenticated",
@@ -167,7 +174,7 @@ func (p *Processor) ProcessEmailWithIntake(
 			"auth", authResult.Summary(),
 			"detail", authResult.Detail,
 		)
-		return &ProcessingResult{Action: ActionSkipped, SkipReason: skipReasonUnauthenticatedSender}, nil
+		return &ProcessingResult{Action: ActionHeldForAuth, SkipReason: skipReasonUnauthenticatedSender}, nil
 	}
 	p.recordSenderAuth(ctx, channelID, dedupKey, authResult)
 
@@ -407,6 +414,19 @@ func (p *Processor) recordSenderAuth(ctx context.Context, channelID int, dedupKe
 		slog.Warn("failed to record sender authentication",
 			"error", err, "channel_id", channelID, "dedup_key", dedupKey, "auth", auth.Summary())
 	}
+}
+
+// trackingRowHeldForAuth reports whether a completed tracking row was held by
+// the sender-authentication policy rather than turned into an item or comment.
+func (p *Processor) trackingRowHeldForAuth(ctx context.Context, channelID int, dedupKey string) bool {
+	var reason sql.NullString
+	if err := p.db.QueryRowContext(ctx, `
+		SELECT skipped_reason FROM email_message_tracking
+		WHERE channel_id = ? AND dedup_key = ?
+	`, channelID, dedupKey).Scan(&reason); err != nil {
+		return false
+	}
+	return reason.Valid && reason.String == skipReasonUnauthenticatedSender
 }
 
 // markSenderAuthHeld finalizes the claimed tracking row for mail a strict
