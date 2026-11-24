@@ -127,13 +127,6 @@ func (p *Processor) ProcessEmailWithIntake(
 		return nil, fmt.Errorf("failed to claim tracking row: %w", err)
 	}
 	if claim == trackingClaimCompleted {
-		// A message held by a strict sender-authentication policy must stay held
-		// on redelivery: the scheduler preserves held mail rather than applying
-		// the delete/mark-read disposition.
-		if p.trackingRowHeldForAuth(ctx, channelID, dedupKey) {
-			slog.Debug("email already held for sender authentication", "message_id", email.MessageID, "dedup_key", dedupKey)
-			return &ProcessingResult{Action: ActionHeldForAuth, SkipReason: skipReasonUnauthenticatedSender}, nil
-		}
 		slog.Debug("email already processed", "message_id", email.MessageID, "dedup_key", dedupKey)
 		return &ProcessingResult{Action: ActionAlreadyExists}, nil
 	}
@@ -159,39 +152,38 @@ func (p *Processor) ProcessEmailWithIntake(
 		}, nil
 	}
 
-	// 1c. Sender authentication. The From header is attacker-controlled, so a
-	// strict policy holds mail whose From domain did not pass an aligned SPF,
-	// DKIM, or DMARC check instead of attributing it to a portal customer or an
-	// existing thread (WI-2362). The message is recorded on the tracking row so
-	// the admin diagnostics view can show what was held and why.
-	authResult := EvaluateSenderAuthentication(email, ResolveTrustedAuthServIDs(config))
-	if policy := ResolveSenderAuthPolicy(config.EmailSenderAuthentication); policy == SenderAuthStrict && !authResult.Verified {
-		p.markSenderAuthHeld(ctx, channelID, dedupKey, authResult)
-		slog.Warn("held inbound email: sender not authenticated",
-			"channel_id", channelID,
-			"message_id", email.MessageID,
-			"from", email.From.Address,
-			"auth", authResult.Summary(),
-			"detail", authResult.Detail,
-		)
-		return &ProcessingResult{Action: ActionHeldForAuth, SkipReason: skipReasonUnauthenticatedSender}, nil
-	}
-	p.recordSenderAuth(ctx, channelID, dedupKey, authResult)
+	// 1c. Record the receiving provider's authentication outcome for the admin
+	// diagnostics view. Intake does not gate on SPF/DKIM/DMARC (WI-2365):
+	// filtering belongs to the receiving provider, and the claimed From is
+	// never trusted as an identity regardless of the verdict.
+	p.recordSenderAuth(ctx, channelID, dedupKey, EvaluateSenderAuthentication(email, ResolveTrustedAuthServIDs(config)))
 
-	// 2. Find or create portal customer by email
+	// 1d. Authorize the reply before any customer or access side effect. A
+	// reply may append to an existing private request only when it references a
+	// Windshift-issued outbound Message-ID whose intended recipient is the
+	// claimed sender, and that sender is still authorized (WI-2365). A
+	// customer-generated inbound ID, a legacy thread reference, a missing
+	// header, or a prior unverified sender never authorizes, so those messages
+	// start a separate staff-visible request instead.
+	var parentItemID *int
+	if email.IsReply() {
+		parentItemID = p.findParentItem(ctx, email)
+	}
+
+	// 2. Resolve the sender to a portal customer. An authorized reply proves
+	// the sender controls the address Windshift wrote to, so it also restores
+	// channel access; a brand new request records a contact address only and
+	// grants no portal or thread access from the claimed From.
 	customerID, err := p.findOrCreatePortalCustomer(ctx, email.From.Address, email.From.Name, channelID, config)
 	if err != nil {
 		p.releaseTrackingClaim(ctx, channelID, dedupKey)
 		return nil, fmt.Errorf("failed to find/create portal customer: %w", err)
 	}
-
-	// 3. Check if this is a reply (find parent item by In-Reply-To/References).
-	// Matching is item-scoped on purpose: a reply quoting a portal ticket's
-	// Message-IDs lands on the email channel while the ticket lives on the
-	// portal channel (WI-1546). The participant guard is the security boundary.
-	var parentItemID *int
-	if email.IsReply() {
-		parentItemID = p.findParentItem(ctx, email)
+	if parentItemID != nil {
+		if err := p.grantChannelAccess(ctx, customerID, channelID, email.From.Address, config); err != nil {
+			p.releaseTrackingClaim(ctx, channelID, dedupKey)
+			return nil, fmt.Errorf("grant customer access for authorized reply: %w", err)
+		}
 	}
 
 	// Flood protection gates NEW conversations only; replies keep flowing.
@@ -396,15 +388,10 @@ func (p *Processor) markSystemMailSkipped(ctx context.Context, channelID int, de
 	}
 }
 
-// skipReasonUnauthenticatedSender is persisted in
-// email_message_tracking.skipped_reason when a strict sender-authentication
-// policy held mail whose From address could not be authenticated. It is
-// rendered by the admin email-intake diagnostics view.
-const skipReasonUnauthenticatedSender = "unauthenticated_sender"
-
 // recordSenderAuth stamps the authentication outcome on the claimed tracking
 // row so the channel email log and admin diagnostics can show how the sender
-// was authenticated. Best effort: a failure here never changes ingestion.
+// was authenticated. It is diagnostic only: intake no longer gates on the
+// verdict (WI-2365). Best effort: a failure here never changes ingestion.
 func (p *Processor) recordSenderAuth(ctx context.Context, channelID int, dedupKey string, auth SenderAuthResult) {
 	if _, err := p.db.ExecWriteContext(ctx, `
 		UPDATE email_message_tracking
@@ -416,41 +403,15 @@ func (p *Processor) recordSenderAuth(ctx context.Context, channelID int, dedupKe
 	}
 }
 
-// trackingRowHeldForAuth reports whether a completed tracking row was held by
-// the sender-authentication policy rather than turned into an item or comment.
-func (p *Processor) trackingRowHeldForAuth(ctx context.Context, channelID int, dedupKey string) bool {
-	var reason sql.NullString
-	if err := p.db.QueryRowContext(ctx, `
-		SELECT skipped_reason FROM email_message_tracking
-		WHERE channel_id = ? AND dedup_key = ?
-	`, channelID, dedupKey).Scan(&reason); err != nil {
-		return false
-	}
-	return reason.Valid && reason.String == skipReasonUnauthenticatedSender
-}
-
-// markSenderAuthHeld finalizes the claimed tracking row for mail a strict
-// policy refused to attribute to the From address. completed_at keeps the
-// message deduplicated (the item and comment refs stay NULL) and skipped_reason
-// is the admin diagnostics hook.
-func (p *Processor) markSenderAuthHeld(ctx context.Context, channelID int, dedupKey string, auth SenderAuthResult) {
-	if _, err := p.db.ExecWriteContext(ctx, `
-		UPDATE email_message_tracking
-		SET sender_auth = ?, skipped_reason = ?, completed_at = CURRENT_TIMESTAMP
-		WHERE channel_id = ? AND dedup_key = ? AND completed_at IS NULL
-	`, auth.Summary(), skipReasonUnauthenticatedSender, channelID, dedupKey); err != nil {
-		slog.Warn("failed to mark unauthenticated email held",
-			"error", err, "channel_id", channelID, "dedup_key", dedupKey, "auth", auth.Summary())
-	}
-}
-
 // findOrCreatePortalCustomer resolves the sender to a portal customer by
-// email, creating one on first contact, and grants channel access.
+// email, creating one on first contact. It records a contact address only:
+// portal access is granted separately, and only after an authorized reply has
+// proven the sender controls the address Windshift wrote to (WI-2365).
 func (p *Processor) findOrCreatePortalCustomer(
 	ctx context.Context,
 	email, name string,
-	channelID int,
-	config *models.ChannelConfig,
+	_ int,
+	_ *models.ChannelConfig,
 ) (int, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	name = strings.TrimSpace(name)
@@ -469,10 +430,6 @@ func (p *Processor) findOrCreatePortalCustomer(
 	}
 	if created {
 		slog.Info("created portal customer from email", "customer_id", customerID, "email", email)
-	}
-
-	if err := p.grantChannelAccess(ctx, customerID, channelID, email, config); err != nil {
-		return 0, err
 	}
 	return customerID, nil
 }
@@ -574,63 +531,78 @@ func (p *Processor) connectedPortalAdmitsEmail(ctx context.Context, portalChanne
 	return true
 }
 
-// findParentItem looks up the original item from In-Reply-To or References headers.
+// findAuthorizedReplyParent returns the item a reply is allowed to append to.
 //
-// Matching is item-scoped across channels: Message-IDs are globally unique,
-// and a conversation must survive its customer switching channels (portal
-// ticket, reply by email). Channel scoping would permanently silo the
-// customer's reply on the intake channel (WI-1547).
-//
-// Thread-hijack defense: the In-Reply-To / References headers are entirely
-// attacker-controlled. If we trusted them naively, anyone who leaks or guesses
-// a Message-ID used anywhere could post a "reply" onto that item from a new
-// email address, exposing private conversations to a third party. The
-// participant guard is the security boundary: we match only when the sender is
-// demonstrably part of the item's conversation — a prior participant on its
-// tracked thread (any channel) or the original creator via the portal-customer
-// linkage.
-func (p *Processor) findParentItem(ctx context.Context, email *ParsedEmail) *int {
-	threadIDs := email.GetThreadIDs()
+// Authorization is a Windshift-issued, recipient-bound outbound Message-ID:
+// the reply must reference it through In-Reply-To/References, and the claimed
+// sender must be its intended recipient and still be the item's creator or an
+// active external participant. Those headers are attacker-controlled, so an
+// inbound (customer-generated) ID, a legacy thread reference, a missing
+// header, or a prior unverified sender never authorizes: those replies start a
+// separate staff-visible request instead of touching the private conversation
+// (WI-2365).
+func (p *Processor) findAuthorizedReplyParent(ctx context.Context, email *ParsedEmail) (int, bool) {
 	senderEmail := normalizedEmail(email.From.Address)
-
-	for _, messageID := range threadIDs {
-		var itemID int
+	if senderEmail == "" {
+		return 0, false
+	}
+	for _, messageID := range email.GetThreadIDs() {
 		canonicalID := canonicalMessageID(messageID)
-		bareID := bareMessageID(messageID)
 		if canonicalID == "" {
 			continue
 		}
-		err := p.db.QueryRowContext(ctx, `
-			SELECT item_id FROM email_message_tracking
-			WHERE message_id IN (?, ?) AND item_id IS NOT NULL
-		`, canonicalID, bareID).Scan(&itemID)
-		if err != nil {
+		itemID, recipient, ok := p.lookupReplyKey(ctx, canonicalID)
+		if !ok {
 			continue
 		}
-		if !p.senderIsThreadParticipant(ctx, itemID, senderEmail) {
-			slog.Warn("ignoring reply: sender is not a known thread participant",
+		if normalizedEmail(recipient) != senderEmail {
+			slog.Warn("ignoring reply: reply key belongs to another recipient",
 				"item_id", itemID,
 				"message_id", messageID,
 				"sender", senderEmail,
 			)
 			continue
 		}
-		slog.Debug("found parent item for reply", "message_id", messageID, "item_id", itemID)
-		return &itemID
+		if !p.senderIsThreadParticipant(ctx, itemID, senderEmail) {
+			slog.Warn("ignoring reply: sender is no longer authorized",
+				"item_id", itemID,
+				"message_id", messageID,
+				"sender", senderEmail,
+			)
+			continue
+		}
+		slog.Debug("found authorized reply parent", "message_id", messageID, "item_id", itemID)
+		return itemID, true
 	}
-
-	return nil
+	return 0, false
 }
 
-// senderIsThreadParticipant reports whether senderEmail is allowed to post
-// onto the given item via an email reply. The checks are item-scoped: the
-// original creator, a current external request participant (WI-1136, including
-// a re-added one), or a prior sender on the thread. An explicit participant
-// removal revokes the implicit thread-membership grant so removing someone is
-// not undone by an old reply in their mailbox. The anchor rows minted for
-// portal tickets carry from_email=” so they can never satisfy the
-// prior-participant clause implicitly.
-func (p *Processor) senderIsThreadParticipant(ctx context.Context, itemID int, senderEmail string) bool {
+// lookupReplyKey resolves a Message-ID to the request and intended recipient of
+// a Windshift-issued outbound delivery. The durable reply outbox persists item,
+// recipient and Message-ID together, so it is the sole source of reply keys: an
+// inbound (customer-generated) Message-ID is never found here (WI-2365).
+func (p *Processor) lookupReplyKey(ctx context.Context, canonicalID string) (itemID int, recipient string, ok bool) {
+	bareID := bareMessageID(canonicalID)
+	err := p.db.QueryRowContext(ctx, `
+		SELECT item_id, to_email FROM email_reply_outbox
+		WHERE message_id IN (?, ?) AND item_id IS NOT NULL AND to_email <> ''
+		ORDER BY id DESC
+		LIMIT 1
+	`, canonicalID, bareID).Scan(&itemID, &recipient)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			slog.Warn("failed to look up reply key", "message_id", canonicalID, "error", err)
+		}
+		return 0, "", false
+	}
+	return itemID, recipient, true
+}
+
+// senderStillAuthorized reports whether senderEmail may post onto the item now
+// that a reply key named them. The item creator and current external
+// participants are authorized; an explicit removal revokes the grant, and a
+// prior sender on the thread is not an identity (WI-2365).
+func (p *Processor) senderStillAuthorized(_ context.Context, itemID int, senderEmail string) bool {
 	if senderEmail == "" {
 		return false
 	}
@@ -640,24 +612,29 @@ func (p *Processor) senderIsThreadParticipant(ctx context.Context, itemID int, s
 			return true
 		}
 	}
-	// Explicit external request participant, including a re-added one.
-	participants := repository.NewItemParticipantRepository(p.db)
-	if isParticipant, err := participants.IsParticipantEmail(itemID, senderEmail); err == nil && isParticipant {
-		return true
-	}
-	// An explicit removal revokes implicit thread membership.
-	if removed, err := participants.WasParticipantRemoved(itemID, senderEmail); err == nil && removed {
-		return false
-	}
-	// Prior participant on this item's thread (inbound or outbound, any channel).
-	var priorCount int
-	if err := p.db.QueryRowContext(ctx, `
-		SELECT COUNT(*) FROM email_message_tracking
-		WHERE item_id = ? AND LOWER(from_email) = ?
-	`, itemID, senderEmail).Scan(&priorCount); err == nil && priorCount > 0 {
+	// Current external request participant. A re-added participant counts;
+	// an explicit removal leaves no participant row, so it fails closed.
+	if isParticipant, err := repository.NewItemParticipantRepository(p.db).IsParticipantEmail(itemID, senderEmail); err == nil && isParticipant {
 		return true
 	}
 	return false
+}
+
+// findParentItem resolves the item an email reply is authorized to append to,
+// or nil when the reply must start a separate request. It is the entry point
+// for the recipient-bound reply-key lookup; see findAuthorizedReplyParent for
+// the authorization contract.
+func (p *Processor) findParentItem(ctx context.Context, email *ParsedEmail) *int {
+	if itemID, ok := p.findAuthorizedReplyParent(ctx, email); ok {
+		return &itemID
+	}
+	return nil
+}
+
+// senderIsThreadParticipant reports whether senderEmail may still reply onto
+// the item once a reply key has named them; see senderStillAuthorized.
+func (p *Processor) senderIsThreadParticipant(ctx context.Context, itemID int, senderEmail string) bool {
+	return p.senderStillAuthorized(ctx, itemID, senderEmail)
 }
 
 // normalizedEmail lowercases and trims, matching how the processor stores and
