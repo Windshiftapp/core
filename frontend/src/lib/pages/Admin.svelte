@@ -177,9 +177,9 @@
         searchInput?.blur();
       }
     } else if (event.key === 'Enter' && filteredGroups.length > 0 && filteredGroups[0].items.length > 0) {
-      // Navigate to first item when pressing Enter
-      const firstItem = filteredGroups[0].items[0];
-      handleTabClick(firstItem.id);
+      event.preventDefault();
+      if (adminNavigationOpen) closeAdminNavigation(true);
+      handleTabClick(filteredGroups[0].items[0].id);
     } else if (event.key === 'ArrowDown') {
       event.preventDefault();
       // Focus first navigation item

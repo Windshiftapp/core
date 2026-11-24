@@ -21,7 +21,8 @@
   import OnCallTab from './OnCallTab.svelte';
   import ServiceHoursTab from './ServiceHoursTab.svelte';
 
-  let { teamId, section = 'overview' } = $props();
+  let { teamId: routeTeamId, section = 'overview' } = $props();
+  const teamId = $derived(routeTeamId);
 
   let team = $state(null);
   let myRole = $state(null);
@@ -85,10 +86,10 @@
     activeTab = section;
   });
 
-  // Switching tabs keeps this component mounted (#542), so a move to another
-  // team arrives as a teamId change rather than a remount.
+  // Section changes reuse the team. A different team needs its own role.
   $effect(() => {
     const id = teamId;
+    myRole = null;
     untrack(() => {
       loadTeam(id);
       loadMyRole(id);
