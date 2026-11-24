@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { untrack } from 'svelte';
   import IconPhoneCheck from '@tabler/icons-svelte-runes/icons/phone-check';
   import IconUsersGroup from '@tabler/icons-svelte-runes/icons/users-group';
   import IconUsers from '@tabler/icons-svelte-runes/icons/users';
@@ -21,7 +21,8 @@
   import OnCallTab from './OnCallTab.svelte';
   import ServiceHoursTab from './ServiceHoursTab.svelte';
 
-  let { teamId, section = 'overview' } = $props();
+  let { teamId: routeTeamId, section = 'overview' } = $props();
+  const teamId = $derived(routeTeamId);
 
   let team = $state(null);
   let myRole = $state(null);
@@ -33,28 +34,33 @@
   );
   const canEdit = $derived(hasGlobalManage || myRole === 'admin');
 
-  async function loadTeam() {
+  // Responses for a team the user has already left are dropped.
+  async function loadTeam(id = teamId) {
     loading = true;
     try {
-      team = await teams.get(Number(teamId));
+      const loaded = await teams.get(Number(id));
+      if (id !== teamId) return;
+      team = loaded;
       error = '';
     } catch (err) {
+      if (id !== teamId) return;
       error = err.message || t('teams.failedToLoad');
       team = null;
     } finally {
-      loading = false;
+      if (id === teamId) loading = false;
     }
   }
 
-  async function loadMyRole() {
+  async function loadMyRole(id = teamId) {
     const userId = $authStore.currentUser?.id;
     if (!userId) return;
     try {
       const myTeams = await teams.getTeamsForUser(userId);
-      const match = (myTeams || []).find((t) => t.id === Number(teamId));
+      if (id !== teamId) return;
+      const match = (myTeams || []).find((t) => t.id === Number(id));
       myRole = match?.role || null;
     } catch (err) {
-      myRole = null;
+      if (id === teamId) myRole = null;
     }
   }
 
@@ -80,9 +86,14 @@
     activeTab = section;
   });
 
-  onMount(() => {
-    loadTeam();
-    loadMyRole();
+  // Section changes reuse the team. A different team needs its own role.
+  $effect(() => {
+    const id = teamId;
+    myRole = null;
+    untrack(() => {
+      loadTeam(id);
+      loadMyRole(id);
+    });
   });
 
   function reload() {
