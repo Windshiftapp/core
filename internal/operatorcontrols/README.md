@@ -153,7 +153,8 @@ success, error and cancellation.
 `script_memory_mb` (default 128) as a hard per-script heap budget: the worker
 sets its own Go memory limit, an in-worker monitor interrupts a runaway
 allocation, and on Linux the parent additionally kills the worker when its
-resident set passes its baseline plus the budget. A killed or over-budget
-worker fails the node with a bounded error, and the API process is unaffected.
+resident set passes its baseline plus the budget and a small runtime allowance.
+A killed or over-budget worker fails the node with a bounded error, and the API
+process is unaffected.
 Condition scripts still evaluate in-process; they are admin-gated and capped by
 `script_timeout_ms` and the 10 KiB source limit.

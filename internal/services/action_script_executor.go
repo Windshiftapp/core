@@ -312,7 +312,7 @@ func (e *ExecuteScriptExecutor) runWorker(ctx context.Context, request scriptWor
 			if request.MemoryBytes > 0 {
 				if rss, rssErr := proc.RSSBytes(); rssErr == nil && rss > 0 {
 					watchdogOnce.Do(func() {
-						go watchWorkerMemory(proc, rss+request.MemoryBytes, watchdogStop, &memoryExceeded)
+						go watchWorkerMemory(proc, rss+request.MemoryBytes+scriptWorkerRSSOverhead, watchdogStop, &memoryExceeded)
 					})
 				}
 			}

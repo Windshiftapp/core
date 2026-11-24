@@ -30,6 +30,10 @@ const (
 	defaultScriptMemoryMB    = 128
 	scriptMemoryPollInterval = 25 * time.Millisecond
 	scriptWorkerKillGrace    = 2 * time.Second
+	// scriptWorkerRSSOverhead is the non-heap headroom the parent allows on top
+	// of the heap budget before the RSS backstop kills a worker, so the worker's
+	// own heap monitor normally fires first.
+	scriptWorkerRSSOverhead = 32 << 20
 )
 
 // Worker protocol message kinds.
