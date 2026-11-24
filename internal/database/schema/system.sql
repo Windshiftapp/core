@@ -284,7 +284,11 @@ CREATE TABLE IF NOT EXISTS board_configurations (
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-	FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE
+	FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE,
+	CONSTRAINT board_configurations_exactly_one_owner CHECK (
+		(workspace_id IS NOT NULL AND collection_id IS NULL) OR
+		(workspace_id IS NULL AND collection_id IS NOT NULL)
+	)
 );
 
 CREATE TABLE IF NOT EXISTS board_columns (
@@ -309,8 +313,10 @@ CREATE TABLE IF NOT EXISTS board_column_statuses (
 	UNIQUE(board_column_id, status_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_board_configurations_workspace_id ON board_configurations(workspace_id);
-CREATE INDEX IF NOT EXISTS idx_board_configurations_collection_id ON board_configurations(collection_id);
+-- One configuration per owner. Partial unique indexes also back the
+-- workspace/collection lookups, so no separate plain index is needed.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_board_configurations_workspace ON board_configurations(workspace_id) WHERE workspace_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_board_configurations_collection ON board_configurations(collection_id) WHERE collection_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_board_columns_board_configuration_id ON board_columns(board_configuration_id);
 CREATE INDEX IF NOT EXISTS idx_board_columns_display_order ON board_columns(display_order);
 CREATE INDEX IF NOT EXISTS idx_board_column_statuses_board_column_id ON board_column_statuses(board_column_id);
@@ -408,19 +414,10 @@ CREATE INDEX IF NOT EXISTS idx_item_watches_item_id ON item_watches(item_id);
 CREATE INDEX IF NOT EXISTS idx_item_watches_user_id ON item_watches(user_id);
 CREATE INDEX IF NOT EXISTS idx_item_watches_user_active ON item_watches(user_id, is_active);
 
--- Request types and fields for portal/channel routing
-CREATE TABLE IF NOT EXISTS request_types (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	name TEXT NOT NULL UNIQUE,
-	description TEXT,
-	icon TEXT DEFAULT 'MessageSquare',
-	color TEXT DEFAULT '#3B82F6',
-	is_default BOOLEAN DEFAULT false,
-	display_order INTEGER DEFAULT 0,
-	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
+-- request_type_fields for portal/channel routing. request_types itself is
+-- created by request_types.sql (channel-scoped and per item type); the old
+-- globally-unique declaration that lived here never applied because that file
+-- loads first, so it has been removed.
 CREATE TABLE IF NOT EXISTS request_type_fields (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	request_type_id INTEGER NOT NULL,

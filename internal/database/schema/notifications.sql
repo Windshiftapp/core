@@ -61,7 +61,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_notifications_delivery_key ON notifications
 -- Email templates: per-sender HTML/text/subject Go templates editable from the
 -- admin UI. `name` is the lookup key consumed by senders (e.g. "magic_link",
 -- "notification_batch"). Default rows are seeded from Go code so the same
--- modernized templates ship to both SQLite and Postgres installs.
+-- modernized templates ship to both SQLite and Postgres installs. template_type
+-- still selects rows for the notification cache refresh, so it is not dead.
 CREATE TABLE IF NOT EXISTS notification_templates (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	name TEXT NOT NULL UNIQUE,
@@ -72,7 +73,7 @@ CREATE TABLE IF NOT EXISTS notification_templates (
 	is_system BOOLEAN DEFAULT FALSE,
 	is_active BOOLEAN DEFAULT TRUE,
 	is_customized BOOLEAN NOT NULL DEFAULT FALSE, -- true once an admin saves an edit; unmodified seeds fall back to the localized built-in default
-	template_type TEXT, -- legacy, unused
+	template_type TEXT, -- read by the notification cache refresh
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

@@ -99,6 +99,9 @@ func (r *BoardConfigurationRepository) getConfig(where string, arg any) (*models
 // workspace (exactly one of the two must be non-nil), plus its columns and
 // status mappings, in a single transaction. Returns the new configuration id.
 func (r *BoardConfigurationRepository) Create(collectionID, workspaceID *int, req *models.BoardConfigurationRequest) (int, error) {
+	if (collectionID == nil) == (workspaceID == nil) {
+		return 0, fmt.Errorf("board configuration requires exactly one owner")
+	}
 	configBytes, err := marshalBoardConfigFields(req)
 	if err != nil {
 		return 0, err

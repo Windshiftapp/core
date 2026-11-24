@@ -47,15 +47,9 @@ CREATE TABLE IF NOT EXISTS time_projects (
 	FOREIGN KEY (category_id) REFERENCES time_project_categories(id) ON DELETE SET NULL
 );
 
-CREATE TABLE IF NOT EXISTS workspace_time_project_categories (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	workspace_id INTEGER NOT NULL,
-	time_project_category_id INTEGER NOT NULL,
-	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-	FOREIGN KEY (time_project_category_id) REFERENCES time_project_categories(id) ON DELETE CASCADE,
-	UNIQUE(workspace_id, time_project_category_id)
-);
+-- workspace_time_project_categories is created by workspace.sql (it depends on
+-- workspaces). The duplicate declaration and indexes that lived here never
+-- applied because workspace.sql loads first, so they have been removed.
 
 CREATE TABLE IF NOT EXISTS time_worklogs (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,8 +69,6 @@ CREATE TABLE IF NOT EXISTS time_worklogs (
 CREATE INDEX IF NOT EXISTS idx_time_projects_customer_id ON time_projects(customer_id);
 CREATE INDEX IF NOT EXISTS idx_time_projects_category_id ON time_projects(category_id);
 CREATE INDEX IF NOT EXISTS idx_time_projects_status ON time_projects(status);
-CREATE INDEX IF NOT EXISTS idx_workspace_time_project_categories_workspace_id ON workspace_time_project_categories(workspace_id);
-CREATE INDEX IF NOT EXISTS idx_workspace_time_project_categories_category_id ON workspace_time_project_categories(time_project_category_id);
 CREATE INDEX IF NOT EXISTS idx_time_worklogs_project_id ON time_worklogs(project_id);
 CREATE INDEX IF NOT EXISTS idx_time_worklogs_date ON time_worklogs(date);
 CREATE INDEX IF NOT EXISTS idx_time_worklogs_item_id ON time_worklogs(item_id);

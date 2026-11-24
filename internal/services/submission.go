@@ -41,7 +41,7 @@ type SubmittedItemInput struct {
 func CreateSubmittedItem(db database.Database, in SubmittedItemInput) (int64, error) {
 	initialStatus := defaultSubmittedItemStatus
 	if in.ValidationResult.ItemTypeID != nil {
-		status, err := GetInitialStatusForItemType(db, *in.ValidationResult.ItemTypeID)
+		status, err := GetInitialStatusForItemType(db, in.WorkspaceID, *in.ValidationResult.ItemTypeID)
 		if err != nil {
 			slog.Warn("could not determine initial status for item type", slog.String("component", in.LogComponent), slog.Int("item_type_id", *in.ValidationResult.ItemTypeID), slog.Any("error", err))
 		} else {

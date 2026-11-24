@@ -3727,7 +3727,222 @@ END $$;
 			CREATE UNIQUE INDEX IF NOT EXISTS uq_priorities_single_default ON priorities(is_default) WHERE is_default = true;
 		`,
 	},
-}
+	{
+		// WI-2366: base_tables_postgres.sql declared these tables before their
+		// owning domain files, so CREATE TABLE IF NOT EXISTS silently discarded
+		// four cascading foreign keys and the stricter iteration_types shape on
+		// PostgreSQL. Reconcile rows whose parents are gone, restore the keys,
+		// and align iteration_types with the SQLite/Go definition.
+		Version: "20261205_postgres_schema_authority",
+		Name:    "Restore dropped PostgreSQL cascades and align iteration_types (WI-2366)",
+		CheckPostgres: `SELECT CASE WHEN
+			NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='iteration_types' AND column_name='duration_days')
+			AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='iteration_types' AND column_name='color' AND is_nullable='NO' AND column_default IS NULL)
+			AND EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='board_configurations'::regclass AND conname='board_configurations_workspace_id_fkey')
+			AND EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='board_configurations'::regclass AND conname='board_configurations_collection_id_fkey')
+			AND EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='test_folders'::regclass AND conname='test_folders_workspace_id_fkey')
+			AND EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='test_labels'::regclass AND conname='test_labels_workspace_id_fkey')
+		THEN 1 ELSE 0 END`,
+		Postgres: `
+			DELETE FROM board_configurations bc
+			WHERE (bc.workspace_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM workspaces w WHERE w.id = bc.workspace_id))
+			   OR (bc.collection_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM collections c WHERE c.id = bc.collection_id));
+
+			DELETE FROM test_folders tf
+			WHERE NOT EXISTS (SELECT 1 FROM workspaces w WHERE w.id = tf.workspace_id);
+
+			DELETE FROM test_labels tl
+			WHERE NOT EXISTS (SELECT 1 FROM workspaces w WHERE w.id = tl.workspace_id);
+
+			DO $$
+			BEGIN
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='board_configurations'::regclass AND conname='board_configurations_workspace_id_fkey') THEN
+					ALTER TABLE board_configurations ADD CONSTRAINT board_configurations_workspace_id_fkey FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE;
+				END IF;
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='board_configurations'::regclass AND conname='board_configurations_collection_id_fkey') THEN
+					ALTER TABLE board_configurations ADD CONSTRAINT board_configurations_collection_id_fkey FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE;
+				END IF;
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='test_folders'::regclass AND conname='test_folders_workspace_id_fkey') THEN
+					ALTER TABLE test_folders ADD CONSTRAINT test_folders_workspace_id_fkey FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE;
+				END IF;
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='test_labels'::regclass AND conname='test_labels_workspace_id_fkey') THEN
+					ALTER TABLE test_labels ADD CONSTRAINT test_labels_workspace_id_fkey FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE;
+				END IF;
+			END $$;
+
+			UPDATE iteration_types SET color = '#6b7280' WHERE color IS NULL;
+			ALTER TABLE iteration_types ALTER COLUMN color SET NOT NULL;
+			-- The old base_tables stub defaulted color; the fresh schema requires an
+			-- explicit value, so drop it to keep both paths identical.
+			ALTER TABLE iteration_types ALTER COLUMN color DROP DEFAULT;
+			ALTER TABLE iteration_types DROP COLUMN IF EXISTS duration_days;
+		`,
+	},
+	{
+		// WI-2366: SQLite declared workspace_agent_bindings.created_by_user_id
+		// NOT NULL while its foreign key was ON DELETE SET NULL, so deleting a
+		// distinct creator failed on SQLite but succeeded (leaving NULL) on
+		// PostgreSQL. The creator is a soft audit ref, matching
+		// workspace_agent_skills and runner_registration_tokens: the binding
+		// survives and the reference becomes NULL. SQLite cannot drop NOT NULL
+		// in place, so ApplySQLite rebuilds the table.
+		Version:       "20261206_agent_binding_creator_nullable",
+		Name:          "Let an agent binding outlive its creator on SQLite (WI-2366)",
+		CheckSQLite:   `SELECT CASE WHEN (SELECT "notnull" FROM pragma_table_info('workspace_agent_bindings') WHERE name='created_by_user_id') = 0 THEN 1 ELSE 0 END`,
+		CheckPostgres: `SELECT CASE WHEN (SELECT is_nullable FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='workspace_agent_bindings' AND column_name='created_by_user_id') = 'YES' THEN 1 ELSE 0 END`,
+		SQLite:        "agent-binding-creator-nullable:v1",
+		ApplySQLite:   applySQLiteBindingCreatorNullable,
+		Postgres:      `ALTER TABLE workspace_agent_bindings ALTER COLUMN created_by_user_id DROP NOT NULL;`,
+	},
+	{
+		// WI-2366: a board configuration belongs to exactly one workspace or
+		// collection, but neither engine enforced that, so an ownerless row or
+		// two rows for one owner made the single-row owner lookup
+		// nondeterministic. Merge duplicates by moving their columns onto the
+		// surviving configuration, drop unreachable ownerless rows, then add the
+		// exactly-one-owner check and one unique key per owner.
+		Version:       "20261207_board_configuration_ownership",
+		Name:          "Enforce one owner and one configuration per board owner (WI-2366)",
+		CheckSQLite:   `SELECT CASE WHEN (SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name IN ('uq_board_configurations_workspace','uq_board_configurations_collection')) = 2 THEN 1 ELSE 0 END`,
+		CheckPostgres: `SELECT CASE WHEN (SELECT COUNT(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind='i' AND c.relname IN ('uq_board_configurations_workspace','uq_board_configurations_collection') AND n.nspname=current_schema()) = 2 THEN 1 ELSE 0 END`,
+		SQLite:        "board-configuration-ownership:v1",
+		ApplySQLite:   applySQLiteBoardConfigurationOwnership,
+		Postgres:      boardConfigurationOwnershipPostgres,
+	},
+	{
+		// WI-2366: item type membership lived in two places. The junction
+		// configuration_set_item_types carries per-set workflow overrides and is
+		// the intended source of truth; item_types.configuration_set_id was a
+		// scalar mirror. Backfill the junction only for custom (non-built-in)
+		// scalar-only rows: built-in membership is defined by the seed, which
+		// deliberately leaves Initiative out of the simplified default set, so a
+		// blind backfill would change that. Then drop the scalar and its index.
+		Version:       "20261208_item_type_membership_authority",
+		Name:          "Make configuration_set_item_types the item-type membership source (WI-2366)",
+		CheckSQLite:   `SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM pragma_table_info('item_types') WHERE name='configuration_set_id') THEN 1 ELSE 0 END`,
+		CheckPostgres: `SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='item_types' AND column_name='configuration_set_id') THEN 1 ELSE 0 END`,
+		SQLite: `
+			INSERT INTO configuration_set_item_types (configuration_set_id, item_type_id)
+			SELECT it.configuration_set_id, it.id
+			FROM item_types it
+			JOIN configuration_sets cs ON cs.id = it.configuration_set_id
+			WHERE it.configuration_set_id IS NOT NULL
+			  AND it.builtin_key IS NULL
+			  AND NOT EXISTS (
+				SELECT 1 FROM configuration_set_item_types csit WHERE csit.item_type_id = it.id
+			  );
+			DROP INDEX IF EXISTS idx_item_types_configuration_set_id;
+			ALTER TABLE item_types DROP COLUMN configuration_set_id;
+		`,
+		Postgres: `
+			INSERT INTO configuration_set_item_types (configuration_set_id, item_type_id)
+			SELECT it.configuration_set_id, it.id
+			FROM item_types it
+			JOIN configuration_sets cs ON cs.id = it.configuration_set_id
+			WHERE it.configuration_set_id IS NOT NULL
+			  AND it.builtin_key IS NULL
+			  AND NOT EXISTS (
+				SELECT 1 FROM configuration_set_item_types csit WHERE csit.item_type_id = it.id
+			  );
+			DROP INDEX IF EXISTS idx_item_types_configuration_set_id;
+			ALTER TABLE item_types DROP COLUMN configuration_set_id;
+		`,
+	},
+	{
+		// WI-2366: PostgreSQL declared both UNIQUE(configuration_set_id,
+		// notification_setting_id) and a single-column unique index on
+		// configuration_set_id. The single-column key is the upsert target and
+		// already rejects everything the two-column rule does. Collapse duplicate
+		// sets first (the two-column rule allowed them), then drop the constraint.
+		Version: "20261209_notification_setting_unique",
+		Name:    "Drop the redundant two-column notification-setting uniqueness (WI-2366)",
+		CheckPostgres: `SELECT CASE WHEN
+			EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind='i' AND c.relname='uq_config_set_notification_setting_one_per_set' AND n.nspname=current_schema())
+			AND NOT EXISTS (
+				SELECT 1 FROM pg_constraint c
+				WHERE c.conrelid='configuration_set_notification_settings'::regclass AND c.contype='u'
+				  AND (SELECT array_agg(a.attname::text ORDER BY k.ord) FROM unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord) JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.attnum) = ARRAY['configuration_set_id','notification_setting_id']
+			)
+		THEN 1 ELSE 0 END`,
+		Postgres: `
+			DELETE FROM configuration_set_notification_settings
+			WHERE id NOT IN (
+				SELECT MIN(id) FROM configuration_set_notification_settings GROUP BY configuration_set_id
+			);
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_config_set_notification_setting_one_per_set
+				ON configuration_set_notification_settings(configuration_set_id);
+			DO $$
+			DECLARE cname text;
+			BEGIN
+				SELECT c.conname INTO cname
+				FROM pg_constraint c
+				WHERE c.conrelid='configuration_set_notification_settings'::regclass AND c.contype='u'
+				  AND (SELECT array_agg(a.attname::text ORDER BY k.ord) FROM unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord) JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.attnum) = ARRAY['configuration_set_id','notification_setting_id']
+				LIMIT 1;
+				IF cname IS NOT NULL THEN
+					EXECUTE format('ALTER TABLE configuration_set_notification_settings DROP CONSTRAINT %I', cname);
+				END IF;
+			END $$;
+		`,
+	}}
+
+// boardConfigurationReconcileSQL normalizes board configurations to exactly one
+// owner, merges duplicates onto the lowest-id survivor, and deletes unreachable
+// ownerless rows. Moving a duplicate's board_columns first keeps them; a plain
+// delete would cascade them away with the configuration.
+const boardConfigurationReconcileSQL = `
+-- A dual-owner row is invalid. Keep the workspace owner (the repository's
+-- create precedence) and drop the collection owner so the exactly-one-owner
+-- check can hold.
+UPDATE board_configurations SET collection_id = NULL
+WHERE workspace_id IS NOT NULL AND collection_id IS NOT NULL;
+
+UPDATE board_columns
+SET board_configuration_id = (
+	SELECT MIN(survivor.id)
+	FROM board_configurations dup
+	JOIN board_configurations survivor
+	  ON (dup.workspace_id IS NOT NULL AND survivor.workspace_id = dup.workspace_id)
+	  OR (dup.collection_id IS NOT NULL AND survivor.collection_id = dup.collection_id)
+	WHERE dup.id = board_columns.board_configuration_id
+)
+WHERE board_configuration_id IN (
+	SELECT dup.id FROM board_configurations dup
+	WHERE (dup.workspace_id IS NOT NULL AND dup.id <> (SELECT MIN(s.id) FROM board_configurations s WHERE s.workspace_id = dup.workspace_id))
+	   OR (dup.collection_id IS NOT NULL AND dup.id <> (SELECT MIN(s.id) FROM board_configurations s WHERE s.collection_id = dup.collection_id))
+);
+
+DELETE FROM board_configurations
+WHERE (workspace_id IS NOT NULL AND id <> (SELECT MIN(s.id) FROM board_configurations s WHERE s.workspace_id = board_configurations.workspace_id))
+   OR (collection_id IS NOT NULL AND id <> (SELECT MIN(s.id) FROM board_configurations s WHERE s.collection_id = board_configurations.collection_id))
+   OR (workspace_id IS NULL AND collection_id IS NULL);
+
+-- SQLite runs this with foreign keys off, so the deletes above do not cascade.
+-- Remove columns (and their status mappings) left without a configuration so a
+-- later board that reuses the freed id cannot inherit them.
+DELETE FROM board_columns
+WHERE NOT EXISTS (SELECT 1 FROM board_configurations cfg WHERE cfg.id = board_columns.board_configuration_id);
+
+DELETE FROM board_column_statuses
+WHERE NOT EXISTS (SELECT 1 FROM board_columns bc WHERE bc.id = board_column_statuses.board_column_id);
+`
+
+const boardConfigurationOwnershipPostgres = boardConfigurationReconcileSQL + `
+DO $$
+BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='board_configurations'::regclass AND conname='board_configurations_exactly_one_owner') THEN
+		ALTER TABLE board_configurations ADD CONSTRAINT board_configurations_exactly_one_owner CHECK (
+			(workspace_id IS NOT NULL AND collection_id IS NULL) OR
+			(workspace_id IS NULL AND collection_id IS NOT NULL)
+		);
+	END IF;
+END $$;
+
+DROP INDEX IF EXISTS idx_board_configurations_workspace_id;
+DROP INDEX IF EXISTS idx_board_configurations_collection_id;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_board_configurations_workspace ON board_configurations(workspace_id) WHERE workspace_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_board_configurations_collection ON board_configurations(collection_id) WHERE collection_id IS NOT NULL;
+`
 
 // domainEventClaimableIndexMigration adds the partial index the claim query
 // orders by, and makes next_attempt_at the single eligibility time for leased
@@ -6188,6 +6403,231 @@ func applySQLiteActiveTimerNullableProject(db Database) (retErr error) {
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit active_timers rebuild: %w", err)
+	}
+	return nil
+}
+
+// readSQLiteSequence returns the AUTOINCREMENT high-water mark for table. It
+// reports false when the table has no sqlite_sequence row (never inserted, or
+// the sequence table is absent).
+func readSQLiteSequence(ctx context.Context, conn *sql.Conn, table string) (int64, bool) {
+	var seq int64
+	if err := conn.QueryRowContext(ctx, "SELECT seq FROM sqlite_sequence WHERE name = ?", table).Scan(&seq); err != nil {
+		return 0, false
+	}
+	return seq, true
+}
+
+// sqliteSequenceFloorStatements keep a rebuilt AUTOINCREMENT table's rowid
+// high-water mark at least floor. A DROP+RENAME rebuild only reflects the
+// copied rows in sqlite_sequence, so without this a later insert can reuse the
+// id of a row deleted before the migration. Historical references such as
+// agent_runs.binding_id would then count against an unrelated new row.
+func sqliteSequenceFloorStatements(table string, floor int64) []string {
+	return []string{
+		fmt.Sprintf("UPDATE sqlite_sequence SET seq = %d WHERE name = '%s' AND seq < %d", floor, table, floor),
+		fmt.Sprintf("INSERT INTO sqlite_sequence(name, seq) SELECT '%s', %d WHERE NOT EXISTS (SELECT 1 FROM sqlite_sequence WHERE name = '%s')", table, floor, table),
+	}
+}
+
+// applySQLiteBindingCreatorNullable rebuilds workspace_agent_bindings so
+// created_by_user_id accepts NULL. The column's ON DELETE SET NULL foreign key
+// and a NOT NULL declaration cannot both hold, so a creator deletion either
+// failed or nulled the row depending on the engine. SQLite cannot drop the NOT
+// NULL in place; copy the rows into a fresh table and swap it in, recreating
+// every index.
+func applySQLiteBindingCreatorNullable(db Database) (retErr error) {
+	sqliteDB, ok := db.(*SQLiteDB)
+	if !ok {
+		return fmt.Errorf("expected SQLite database, got %T", db)
+	}
+
+	ctx := context.Background()
+	conn, err := sqliteDB.writeConn.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire SQLite write connection: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	var foreignKeysEnabled bool
+	if err := conn.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&foreignKeysEnabled); err != nil {
+		return fmt.Errorf("read foreign_keys pragma: %w", err)
+	}
+	if foreignKeysEnabled {
+		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=OFF"); err != nil {
+			return fmt.Errorf("disable foreign keys: %w", err)
+		}
+		defer func() {
+			if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=ON"); retErr == nil && err != nil {
+				retErr = fmt.Errorf("restore foreign keys: %w", err)
+			}
+		}()
+	}
+
+	bindingSeq, hasBindingSeq := readSQLiteSequence(ctx, conn, "workspace_agent_bindings")
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin workspace_agent_bindings rebuild: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	statements := []string{
+		`CREATE TABLE workspace_agent_bindings_migration (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			workspace_id INTEGER NOT NULL,
+			acting_user_id INTEGER NOT NULL,
+			acting_user_kind TEXT NOT NULL
+				CHECK (acting_user_kind IN ('agent','centralized_service')),
+			profile_type TEXT NOT NULL DEFAULT 'legacy'
+				CHECK (profile_type IN ('standard','coding','legacy')),
+			lifecycle TEXT NOT NULL DEFAULT 'ready'
+				CHECK (lifecycle IN ('draft','ready','paused','archived')),
+			profile_version INTEGER NOT NULL DEFAULT 1 CHECK (profile_version > 0),
+			identity_class TEXT NOT NULL DEFAULT 'centralized_service'
+				CHECK (identity_class IN ('user_owned','centralized_service','workspace_managed')),
+			purpose TEXT NOT NULL DEFAULT '',
+			capability_groups_json TEXT NOT NULL DEFAULT '[]',
+			archived_at DATETIME,
+			archived_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+			last_known_name TEXT NOT NULL DEFAULT '',
+			last_known_handle TEXT NOT NULL DEFAULT '',
+			last_known_avatar TEXT NOT NULL DEFAULT '',
+			repo_slug TEXT,
+			repo_base_ref TEXT,
+			llm_connection_id INTEGER,
+			token_scopes_json TEXT NOT NULL DEFAULT '[]',
+			token_ttl_minutes INTEGER NOT NULL DEFAULT 60,
+			max_runs_per_day INTEGER NOT NULL DEFAULT 0,
+			scm_connection_id INTEGER REFERENCES workspace_scm_connections(id) ON DELETE SET NULL,
+			target_pool_id INTEGER,
+			instructions TEXT NOT NULL DEFAULT '',
+			runner_image TEXT,
+			created_by_user_id INTEGER,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+			FOREIGN KEY (acting_user_id) REFERENCES users(id) ON DELETE CASCADE,
+			FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+		)`,
+		`INSERT INTO workspace_agent_bindings_migration (
+			id, workspace_id, acting_user_id, acting_user_kind, profile_type, lifecycle,
+			profile_version, identity_class, purpose, capability_groups_json, archived_at,
+			archived_by_user_id, last_known_name, last_known_handle, last_known_avatar,
+			repo_slug, repo_base_ref, llm_connection_id, token_scopes_json, token_ttl_minutes,
+			max_runs_per_day, scm_connection_id, target_pool_id, instructions, runner_image,
+			created_by_user_id, created_at, updated_at)
+		SELECT id, workspace_id, acting_user_id, acting_user_kind, profile_type, lifecycle,
+			profile_version, identity_class, purpose, capability_groups_json, archived_at,
+			archived_by_user_id, last_known_name, last_known_handle, last_known_avatar,
+			repo_slug, repo_base_ref, llm_connection_id, token_scopes_json, token_ttl_minutes,
+			max_runs_per_day, scm_connection_id, target_pool_id, instructions, runner_image,
+			created_by_user_id, created_at, updated_at FROM workspace_agent_bindings`,
+		`DROP TABLE workspace_agent_bindings`,
+		`ALTER TABLE workspace_agent_bindings_migration RENAME TO workspace_agent_bindings`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_workspace_agent_bindings_workspace_acting ON workspace_agent_bindings(workspace_id, acting_user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_workspace_agent_bindings_workspace ON workspace_agent_bindings(workspace_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_workspace_agent_bindings_workspace_lifecycle ON workspace_agent_bindings(workspace_id, lifecycle)`,
+		`CREATE INDEX IF NOT EXISTS idx_workspace_agent_bindings_scm_connection ON workspace_agent_bindings(scm_connection_id)`,
+	}
+	if hasBindingSeq {
+		statements = append(statements, sqliteSequenceFloorStatements("workspace_agent_bindings", bindingSeq)...)
+	}
+	for _, statement := range statements {
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("rebuild workspace_agent_bindings: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit workspace_agent_bindings rebuild: %w", err)
+	}
+	return nil
+}
+
+// applySQLiteBoardConfigurationOwnership reconciles duplicate and ownerless
+// board configurations, then rebuilds the table with the exactly-one-owner
+// check the fresh schema declares. SQLite cannot add a CHECK constraint in
+// place, so the rows are copied into a fresh table and swapped.
+func applySQLiteBoardConfigurationOwnership(db Database) (retErr error) {
+	sqliteDB, ok := db.(*SQLiteDB)
+	if !ok {
+		return fmt.Errorf("expected SQLite database, got %T", db)
+	}
+
+	ctx := context.Background()
+	conn, err := sqliteDB.writeConn.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire SQLite write connection: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	var foreignKeysEnabled bool
+	if err := conn.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&foreignKeysEnabled); err != nil {
+		return fmt.Errorf("read foreign_keys pragma: %w", err)
+	}
+	if foreignKeysEnabled {
+		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=OFF"); err != nil {
+			return fmt.Errorf("disable foreign keys: %w", err)
+		}
+		defer func() {
+			if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=ON"); retErr == nil && err != nil {
+				retErr = fmt.Errorf("restore foreign keys: %w", err)
+			}
+		}()
+	}
+
+	boardSeq, hasBoardSeq := readSQLiteSequence(ctx, conn, "board_configurations")
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin board_configurations rebuild: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	statements := []string{
+		boardConfigurationReconcileSQL,
+		`CREATE TABLE board_configurations_migration (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			workspace_id INTEGER,
+			collection_id INTEGER,
+			backlog_status_ids TEXT,
+			list_columns TEXT,
+			roadmap_config TEXT,
+			card_fields TEXT,
+			view_settings TEXT,
+			show_rightmost_column_last_50 BOOLEAN DEFAULT false,
+			completed_item_retention_days INTEGER,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+			FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE,
+			CONSTRAINT board_configurations_exactly_one_owner CHECK (
+				(workspace_id IS NOT NULL AND collection_id IS NULL) OR
+				(workspace_id IS NULL AND collection_id IS NOT NULL)
+			)
+		)`,
+		`INSERT INTO board_configurations_migration (
+			id, workspace_id, collection_id, backlog_status_ids, list_columns, roadmap_config,
+			card_fields, view_settings, show_rightmost_column_last_50, completed_item_retention_days,
+			created_at, updated_at)
+		SELECT id, workspace_id, collection_id, backlog_status_ids, list_columns, roadmap_config,
+			card_fields, view_settings, show_rightmost_column_last_50, completed_item_retention_days,
+			created_at, updated_at FROM board_configurations`,
+		`DROP TABLE board_configurations`,
+		`ALTER TABLE board_configurations_migration RENAME TO board_configurations`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS uq_board_configurations_workspace ON board_configurations(workspace_id) WHERE workspace_id IS NOT NULL`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS uq_board_configurations_collection ON board_configurations(collection_id) WHERE collection_id IS NOT NULL`,
+	}
+	if hasBoardSeq {
+		statements = append(statements, sqliteSequenceFloorStatements("board_configurations", boardSeq)...)
+	}
+	for _, statement := range statements {
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("rebuild board_configurations: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit board_configurations rebuild: %w", err)
 	}
 	return nil
 }
