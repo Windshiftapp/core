@@ -88,9 +88,6 @@ export class CollectionEditorOptionsStore {
   /** @type {Map<string, { value: any, fetchedAt: number }>} */
   #assetCache = new Map();
   #generation = 0;
-  // Per-pending-key generations so invalidating one family cannot be undone by
-  // a load that was already in flight when the invalidation happened.
-  #keyGenerations = new Map();
   #controller = new AbortController();
 
   get(workspaceId) {
@@ -173,12 +170,9 @@ export class CollectionEditorOptionsStore {
     }));
 
     const generation = this.#generation;
-    const keyGeneration = this.#keyGeneration(pendingKey);
     const promise = Promise.resolve(loader(id, { signal: this.#controller.signal }))
       .then((result) => {
-        if (generation !== this.#generation || keyGeneration !== this.#keyGeneration(pendingKey)) {
-          return [];
-        }
+        if (generation !== this.#generation) return [];
         const options = Array.isArray(result) ? result : [];
         this.#update(id, (entry) => ({
           ...entry,
@@ -194,9 +188,7 @@ export class CollectionEditorOptionsStore {
         return options;
       })
       .catch((error) => {
-        if (generation !== this.#generation || keyGeneration !== this.#keyGeneration(pendingKey)) {
-          return [];
-        }
+        if (generation !== this.#generation) return [];
         console.error(
           `CollectionEditorOptionsStore: failed to load ${field} for workspace ${id}`,
           error
@@ -204,9 +196,7 @@ export class CollectionEditorOptionsStore {
         return [];
       })
       .finally(() => {
-        if (generation !== this.#generation || keyGeneration !== this.#keyGeneration(pendingKey)) {
-          return;
-        }
+        if (generation !== this.#generation) return;
         this.#pending.delete(pendingKey);
         this.#update(id, (entry) => ({
           ...entry,
@@ -281,15 +271,6 @@ export class CollectionEditorOptionsStore {
     const id = normalizeWorkspaceId(workspaceId);
     if (!id) return;
 
-    // Discard any in-flight load for the invalidated scope so it cannot write
-    // its pre-invalidation result back into the cache.
-    const pendingPrefix = field ? `${id}:${field}` : `${id}:`;
-    for (const key of [...this.#pending.keys()]) {
-      if (!key.startsWith(pendingPrefix)) continue;
-      this.#keyGenerations.set(key, this.#keyGeneration(key) + 1);
-      this.#pending.delete(key);
-    }
-
     if (!field) {
       const next = { ...this.byWorkspace };
       delete next[id];
@@ -301,14 +282,9 @@ export class CollectionEditorOptionsStore {
       ...entry,
       [field]: [],
       loaded: { ...entry.loaded, [field]: false },
-      loading: { ...entry.loading, [field]: false },
       fetchedAt: { ...entry.fetchedAt, [field]: 0 },
       complete: { ...entry.complete, [field]: false },
     }));
-  }
-
-  #keyGeneration(key) {
-    return this.#keyGenerations.get(key) ?? 0;
   }
 
   reset() {
@@ -316,7 +292,6 @@ export class CollectionEditorOptionsStore {
     this.#controller.abort();
     this.#controller = new AbortController();
     this.#pending.clear();
-    this.#keyGenerations.clear();
     this.#assetCache.clear();
     this.byWorkspace = {};
   }

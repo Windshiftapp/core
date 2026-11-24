@@ -870,15 +870,21 @@ func (s *ItemApplicationService) Create(ctx context.Context, actor AuditActor, i
 	if err != nil {
 		return nil, err
 	}
+	if result.Item == nil {
+		// The row committed but the post-commit detail read failed. The
+		// transaction's ID is the create result, so report the stored identity
+		// instead of a failure a caller would retry.
+		return &models.Item{ID: int(result.ID)}, nil
+	}
 	items := []models.Item{*result.Item}
 	if err := s.enrich(ctx, actor.UserID, items); err != nil {
-		// The item is committed. Return it alongside the error so an adapter can
-		// audit and report the stored row instead of retrying and duplicating it.
-		return result.Item, err
+		// Enrichment only decorates the response; the item is committed.
+		slog.Warn("enrich created item", slog.Int64("item_id", result.ID), slog.Any("error", err))
+		return result.Item, nil
 	}
 	items[0].DescriptionHTML, err = markdown.Render(items[0].Description)
 	if err != nil {
-		return result.Item, fmt.Errorf("render item description: %w", err)
+		slog.Warn("render created item description", slog.Int64("item_id", result.ID), slog.Any("error", err))
 	}
 	return &items[0], nil
 }

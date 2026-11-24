@@ -3,7 +3,7 @@ package services
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
+	"log/slog"
 	"time"
 
 	"windshift/internal/database"
@@ -63,6 +63,10 @@ type ItemCreateInput struct {
 type ItemCreateResult struct {
 	Item              *models.Item
 	MandatoryTemplate MandatoryTemplateInfo
+	// ID is the row created by the transaction. It is always set, even when the
+	// post-commit detail read fails, so a caller can report and audit the stored
+	// item instead of retrying and duplicating it.
+	ID int64
 }
 
 // ItemCreationValidationError identifies validation performed before the
@@ -242,10 +246,16 @@ func (s *ItemCreationService) create(
 		return nil, err
 	}
 
+	// The transaction's ID is the create result. The detail read only feeds the
+	// response and the live side-effect pipeline, so a failure must not turn a
+	// committed create into an error a caller would retry.
+	result := &ItemCreateResult{ID: itemID, MandatoryTemplate: mandatoryTemplate}
 	item, err := repository.NewItemRepository(s.db).FindByIDWithDetails(int(itemID))
 	if err != nil {
-		return nil, fmt.Errorf("load created item: %w", err)
+		slog.Error("load created item after commit", slog.Int64("item_id", itemID), slog.Any("error", err))
+		return result, nil
 	}
+	result.Item = item
 	// Imported facts are historical: skip the live notification/webhook/automation
 	// pipeline even though validation and persistence used the canonical path.
 	if !itemevents.IsImportOrigin(metadata.ActorKind, metadata.SourceKind) {
@@ -255,5 +265,5 @@ func (s *ItemCreationService) create(
 			s.emitter.EmitItemCreated(item, actorUserID, actorUsername)
 		}
 	}
-	return &ItemCreateResult{Item: item, MandatoryTemplate: mandatoryTemplate}, nil
+	return result, nil
 }

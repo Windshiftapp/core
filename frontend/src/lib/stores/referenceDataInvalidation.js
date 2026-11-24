@@ -9,10 +9,10 @@ import { workspaceDataStore } from './workspaceDataStore.svelte.js';
  * Each rule names what to clear after a successful mutation of a matching
  * endpoint:
  * - `store`: a `workspaceDataStore` field,
- * - `editor`: a `collectionEditorOptions` family (or list of families),
+ * - `editor`: a `collectionEditorOptions` family,
  * - `screenConfigs`: cached effective configurations,
- * - `screenConfigsForWorkspace`: cached effective configurations for one workspace,
- * - `workspaceCatalogs`: re-fetch the active workspace's bootstrap catalogs,
+ * - `configurationChanged`: reload the assigned workspace through the store's
+ *   reset/initialization lifecycle and reset the editor caches,
  * - `fullRefresh`: everything (used for cross-cutting changes).
  *
  * Matching is deliberately coarse: re-fetching an unchanged family is cheap and
@@ -42,16 +42,9 @@ const REFERENCE_ENDPOINTS = [
   { match: /\/(?:labels)(?:\/|$)/, store: 'labels' },
   { match: /\/(?:configuration-sets|screens|workflows)(?:\/|$)/, screenConfigs: true },
   // Workspace-scoped assignment (WI-1359): PUT /workspaces/:id/configuration-set.
-  // The singular endpoint changes only that workspace's effective
-  // configuration: its screens, its editor priorities and statuses, and the
-  // workspace-scoped catalogs (statuses and item types) read from the
-  // bootstrap. Keep it scoped so other workspaces stay warm.
-  {
-    match: /\/configuration-set(?:\/|$)/,
-    editor: ['priorities', 'statuses'],
-    screenConfigsForWorkspace: true,
-    workspaceCatalogs: true,
-  },
+  // The singular endpoint reassigns the workspace, so reload it through the
+  // normal lifecycle and reset the editor caches.
+  { match: /\/configuration-set(?:\/|$)/, configurationChanged: true },
   // Object translations change display names across several directories.
   { match: /\/(?:object-translations)(?:\/|$)/, fullRefresh: true },
   { match: /^\/workspaces\/\d+$/, store: 'workspace' },
@@ -94,18 +87,12 @@ export function applyReferenceInvalidation(
       void store.invalidate(rule.store);
     }
     if (rule.editor) {
-      const families = Array.isArray(rule.editor) ? rule.editor : [rule.editor];
-      for (const family of families) {
-        if (workspaceId == null) editorOptions.invalidateFamily(family);
-        else editorOptions.invalidate(workspaceId, family);
-      }
+      if (workspaceId == null) editorOptions.invalidateFamily(rule.editor);
+      else editorOptions.invalidate(workspaceId, rule.editor);
     }
     if (rule.screenConfigs) store.invalidateScreenConfigs?.();
-    if (rule.screenConfigsForWorkspace && workspaceId != null) {
-      store.invalidateScreenConfigsFor?.(workspaceId);
-    }
-    if (rule.workspaceCatalogs && workspaceId != null) {
-      void store.invalidateWorkspaceCatalogs?.(workspaceId);
+    if (rule.configurationChanged && workspaceId != null) {
+      invalidateWorkspaceConfiguration(workspaceId, { store, editorOptions });
     }
   }
 
@@ -113,13 +100,21 @@ export function applyReferenceInvalidation(
 }
 
 /**
- * Apply the per-workspace configuration-change invalidation without a matching
- * API mutation event. The migration path reassigns the workspace inside its own
- * POST, whose plural endpoint only clears screen configs, so the caller names
- * the affected workspaces explicitly.
+ * Apply an assigned-configuration change for one workspace. The migration path
+ * reassigns the workspace inside its own POST, whose plural endpoint only clears
+ * screen configs, so the caller names the affected workspaces explicitly. This
+ * is also the rule the direct assignment endpoint matches.
  */
-export function invalidateWorkspaceConfiguration(workspaceId, caches) {
-  return applyReferenceInvalidation(`/workspaces/${workspaceId}/configuration-set`, caches);
+export function invalidateWorkspaceConfiguration(
+  workspaceId,
+  { store = workspaceDataStore, editorOptions = collectionEditorOptions } = {}
+) {
+  if (workspaceId == null) return false;
+  // Reset the editor caches, then reload the active workspace through the
+  // store's reset/initialization lifecycle, which rejects superseded reads.
+  editorOptions.reset?.();
+  void store.reloadForConfigurationChange?.(workspaceId);
+  return true;
 }
 
 /** Subscribe the app shell to successful mutations. Returns an unsubscribe. */

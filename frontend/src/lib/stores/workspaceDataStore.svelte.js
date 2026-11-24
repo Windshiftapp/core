@@ -10,7 +10,6 @@ import {
   isExpectedBackgroundSyncError,
   onBackgroundSyncAvailable,
 } from '../utils/backgroundSync.js';
-import { surfaceError } from './toasts.svelte.js';
 
 const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const USER_DISPLAY_BATCH_SIZE = 200;
@@ -36,9 +35,6 @@ class WorkspaceDataStore {
   /** @type {Map<string, Promise<object>>} */
   #screenConfigPromises = new Map();
   #screenConfigEpoch = 0;
-  // Per-workspace epochs so invalidating one workspace leaves another
-  // workspace's in-flight reads eligible for caching.
-  #screenConfigWorkspaceEpoch = new Map();
   /** @type {Map<string, true>} Insertion order is least-recently-used first. */
   #screenConfigAccess = new Map();
   /** @type {Map<number, {promise: Promise<object|null>, resolve: (user: object|null) => void}>} */
@@ -321,7 +317,6 @@ class WorkspaceDataStore {
     this.#screenConfigAccess.clear();
     this.planningCompleteness = null;
     this.#screenConfigPromises.clear();
-    this.#screenConfigWorkspaceEpoch.clear();
     this.resetUserDisplayCache();
     this.#bootstrapPromises.clear();
     this.lastRefreshedAt = null;
@@ -502,17 +497,13 @@ class WorkspaceDataStore {
     if (pending) return pending;
 
     const epoch = this.#screenConfigEpoch;
-    const workspaceEpoch = this.#screenConfigWorkspaceEpochFor(workspaceId);
     const promise = workspaces
       .getEffectiveConfig(workspaceId, itemTypeId, {
         ...FOREGROUND_READ,
         signal: this.#controller.signal,
       })
       .then((config) => {
-        if (
-          this.#screenConfigEpoch === epoch &&
-          this.#screenConfigWorkspaceEpochFor(workspaceId) === workspaceEpoch
-        ) {
+        if (this.#screenConfigEpoch === epoch) {
           this.#storeScreenConfig(key, config);
         }
         return config;
@@ -535,52 +526,26 @@ class WorkspaceDataStore {
   }
 
   /**
-   * Drop the cached effective configurations for one workspace (after its
-   * assigned configuration set changed). Only that workspace's epoch moves, so
-   * an in-flight pre-change read for this workspace is discarded while a
-   * pending read for another workspace is still cached when it resolves.
+   * Apply an assigned-configuration change for one workspace. Drops cached
+   * effective configurations and, when the workspace is active, reloads it
+   * through the normal reset/initialization lifecycle. The reset advances the
+   * generation, so a bootstrap read that started before the change cannot
+   * install its stale catalogs afterwards. A configuration change is rare, so
+   * the extra reads are preferable to a second invalidation counter.
    */
-  invalidateScreenConfigsFor(workspaceId) {
-    if (workspaceId == null || workspaceId === 'global') return;
+  async reloadForConfigurationChange(workspaceId) {
     const id = Number(workspaceId);
     if (!Number.isInteger(id) || id <= 0) return;
-    const prefix = `${workspaceId}:`;
-    this.#screenConfigWorkspaceEpoch.set(id, (this.#screenConfigWorkspaceEpoch.get(id) ?? 0) + 1);
-    const remaining = {};
-    for (const [key, config] of Object.entries(this.screenConfigs)) {
-      if (!key.startsWith(prefix)) remaining[key] = config;
+    if (this.workspaceId !== id) {
+      // Not active: drop the cached effective configurations; the next
+      // activation bootstraps fresh through initialize().
+      this.invalidateScreenConfigs();
+      return;
     }
-    this.screenConfigs = remaining;
-    for (const key of [...this.#screenConfigAccess.keys()]) {
-      if (key.startsWith(prefix)) this.#screenConfigAccess.delete(key);
-    }
-    for (const key of [...this.#screenConfigPromises.keys()]) {
-      if (key.startsWith(prefix)) this.#screenConfigPromises.delete(key);
-    }
-  }
-
-  #screenConfigWorkspaceEpochFor(workspaceId) {
-    const id = Number(workspaceId);
-    return Number.isInteger(id) && id > 0 ? (this.#screenConfigWorkspaceEpoch.get(id) ?? 0) : 0;
-  }
-
-  /**
-   * Re-fetch the active workspace's bootstrap catalogs (statuses, item types,
-   * priorities, projects, ...) after its assigned configuration set changed.
-   * The bootstrap is the only workspace-scoped source for item types;
-   * `invalidate('itemTypes')` reads the global catalog instead. A no-op for a
-   * workspace that is not active, which bootstraps fresh on next activation.
-   */
-  async invalidateWorkspaceCatalogs(workspaceId) {
-    const id = Number(workspaceId);
-    if (!Number.isInteger(id) || id <= 0 || this.workspaceId !== id) return;
-    const generation = this.#generation;
-    try {
-      await this._fetchAll(id, generation);
-    } catch (err) {
-      if (generation !== this.#generation) return;
-      surfaceError(err, { context: 'refreshAssignedWorkspaceCatalogs', silent: true });
-    }
+    // Active: reset and reload through the normal lifecycle so the generation
+    // advances and a bootstrap read from before the change is discarded.
+    this.reset();
+    await this.initialize(id);
   }
 
   #storeScreenConfig(key, config) {
@@ -611,15 +576,11 @@ class WorkspaceDataStore {
         const itemTypeId = itemTypePart === 'default' ? null : Number(itemTypePart);
         if (!Number.isInteger(workspaceId) || workspaceId <= 0) return;
         const epoch = this.#screenConfigEpoch;
-        const workspaceEpoch = this.#screenConfigWorkspaceEpochFor(workspaceId);
         try {
           const config = await workspaces.getEffectiveConfig(workspaceId, itemTypeId, {
             signal: this.#controller.signal,
           });
-          if (
-            this.#screenConfigEpoch === epoch &&
-            this.#screenConfigWorkspaceEpochFor(workspaceId) === workspaceEpoch
-          ) {
+          if (this.#screenConfigEpoch === epoch) {
             this.#storeScreenConfig(key, config);
           }
         } catch (err) {
