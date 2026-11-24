@@ -29253,6 +29253,10 @@
                         "description": "The requests per minute value.",
                         "type": "integer"
                       },
+                      "script_memory_mb": {
+                        "description": "The script memory mb value.",
+                        "type": "integer"
+                      },
                       "script_timeout_ms": {
                         "description": "The script timeout ms value.",
                         "type": "integer"

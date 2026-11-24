@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/grafana/sobek"
@@ -45,15 +46,15 @@ type ActionScriptWriteMarker interface {
 }
 
 // ExecuteScriptExecutor implements the execute_script node type. Each run gets
-// a fresh Sobek runtime bound to the effective action executor; REST calls go
-// through a short-lived bearer token minted for that executor and revoked in
-// cleanup.
+// a fresh Sobek runtime in a dedicated worker process, so a hostile allocation
+// is bounded by the worker's heap budget instead of the API server's. REST calls
+// go through a short-lived bearer token minted for the effective executor in the
+// parent and revoked in cleanup; the worker never sees the token or the
+// database.
 //
-// Trusted authors only: Sobek runs in-process and has no hard per-script heap
-// limit, so time and output budgets do not make a hostile allocation safe.
-// Restricting authorship to action managers and requiring action.set_actor for
-// executable edits of privileged actions is the current mitigation; process
-// isolation would be a prerequisite before accepting untrusted authors.
+// The worker enforces a wall-clock limit and a heap budget, and on Linux the
+// parent kills it if its resident set passes the budget. A script that exceeds
+// either budget fails the node with a bounded error.
 //
 // Side effects are not transactional. A script that mutates state and then
 // fails has already committed those writes, matching every other action node.
@@ -67,6 +68,7 @@ type ExecuteScriptExecutor struct {
 	dispatcher ScriptAPIDispatcher
 	marker     ActionScriptWriteMarker
 	logger     *slog.Logger
+	launcher   ScriptWorkerLauncher
 }
 
 // NewExecuteScriptExecutor wires the executor with the shared token manager
@@ -77,6 +79,7 @@ func NewExecuteScriptExecutor(tokens ActionScriptTokenManager, dispatcher Script
 		tokens:     tokens,
 		dispatcher: dispatcher,
 		logger:     slog.Default(),
+		launcher:   defaultScriptWorkerLauncher,
 	}
 }
 
@@ -88,16 +91,23 @@ func (e *ExecuteScriptExecutor) WithWriteMarker(marker ActionScriptWriteMarker) 
 	return e
 }
 
+// WithLauncher overrides the isolated worker launcher. Tests use it to run the
+// worker in-process; production uses the subprocess launcher.
+func (e *ExecuteScriptExecutor) WithLauncher(launcher ScriptWorkerLauncher) *ExecuteScriptExecutor {
+	e.launcher = launcher
+	return e
+}
+
 // NodeType pins the dispatch key.
 func (e *ExecuteScriptExecutor) NodeType() models.ActionNodeType {
 	return models.ActionNodeExecuteScript
 }
 
-// scriptRun holds the mutable state of one node execution. It is created per
-// Execute call and never shared across executions, so scripts cannot observe
-// each other's state.
-type scriptRun struct {
-	vm             *sobek.Runtime
+// scriptHost holds the parent-side mutable state of one node execution. It is
+// created per Execute call and never shared across executions. The Sobek realm
+// lives in the isolated worker; this struct owns the credentials, budgets,
+// console buffer, and reconciliation flags the worker reports against.
+type scriptHost struct {
 	runCtx         context.Context
 	tokens         ActionScriptTokenManager
 	dispatcher     ScriptAPIDispatcher
@@ -179,41 +189,39 @@ func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.Exe
 		maxCalls = maxScriptAPICalls
 	}
 
+	// Compile in the parent so a syntax error fails fast without spawning a
+	// worker. The worker compiles the same wrapper again before running it.
 	wrapped := "(function() {\n" + source + "\n})()"
-	program, err := sobek.Compile("action_script", wrapped, false)
-	if err != nil {
+	if _, err := sobek.Compile("action_script", wrapped, false); err != nil {
 		return fmt.Errorf("execute_script: syntax error: %w", err)
 	}
 
-	timeoutCtx, cancel := context.WithTimeout(actionRequestContext(ctx), time.Duration(timeoutMs)*time.Millisecond)
-	defer cancel()
+	runCtx, cancelRun := context.WithTimeout(actionRequestContext(ctx), time.Duration(timeoutMs)*time.Millisecond)
+	defer cancelRun()
+	// The worker outlives the run deadline by a short grace so it can report its
+	// own timeout or memory failure before the parent force-kills it.
+	killCtx, cancelKill := context.WithTimeout(actionRequestContext(ctx), time.Duration(timeoutMs)*time.Millisecond+scriptWorkerKillGrace)
+	defer cancelKill()
 
-	run := &scriptRun{
+	host := &scriptHost{
 		tokens:         e.tokens,
 		dispatcher:     e.dispatcher,
 		marker:         e.marker,
 		executionLogID: ctx.ExecutionLogID,
 		actorUserID:    ctx.EffectiveActorID,
 		maxAPICalls:    maxCalls,
-		runCtx:         WithActionScriptProvenance(timeoutCtx, provenanceFromExecution(ctx, node.ID)),
+		runCtx:         WithActionScriptProvenance(runCtx, provenanceFromExecution(ctx, node.ID)),
 		reconciliation: &ctx.ReconciliationRequired,
 		writeMarked:    &ctx.ScriptWriteMarked,
 	}
 
-	vm := sobek.New()
-	run.vm = vm
-	if err := bindScriptGlobals(vm, run, ctx); err != nil {
-		return fmt.Errorf("execute_script: bind runtime: %w", err)
-	}
-
-	// Revocation is deferred so it runs even if result conversion panics. A
-	// getter evaluated while converting the return value is still script code
-	// and must not outlive the credential.
+	// Revocation is deferred so it runs even if the worker fails. The credential
+	// is minted lazily on the first bridge call and must not outlive the node.
 	defer func() {
-		if run.cred == nil {
+		if host.cred == nil {
 			return
 		}
-		if revokeErr := RevokeActionScriptCredential(e.tokens, run.cred, ctx.EffectiveActorID); revokeErr != nil {
+		if revokeErr := RevokeActionScriptCredential(e.tokens, host.cred, ctx.EffectiveActorID); revokeErr != nil {
 			actionID := 0
 			if ctx.Action != nil {
 				actionID = ctx.Action.ID
@@ -226,25 +234,26 @@ func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.Exe
 		}
 	}()
 
-	output, runErr := runScriptProgram(vm, program, timeoutCtx)
+	request := scriptWorkerMessage{
+		Type:        scriptMessageRun,
+		Source:      source,
+		TimeoutMS:   timeoutMs,
+		MemoryBytes: e.scriptMemoryBytes(),
+		Globals:     scriptGlobals(ctx),
+	}
+	output, runErr := e.runWorker(killCtx, request, host)
+
 	if stepResult.Output == nil {
 		stepResult.Output = make(map[string]any)
 	}
-	stepResult.Output["api_calls"] = run.apiCalls
-	stepResult.Output["console"] = run.console
-	if run.consoleCut {
+	stepResult.Output["api_calls"] = host.apiCalls
+	stepResult.Output["console"] = host.console
+	if host.consoleCut {
 		stepResult.Output["console_truncated"] = true
 	}
 
-	if run.fatal != nil {
-		return run.fatal
-	}
 	if runErr != nil {
-		var interrupted *sobek.InterruptedError
-		if errors.As(runErr, &interrupted) && interrupted.Value() == errScriptTimeout {
-			return fmt.Errorf("execute_script: timed out after %dms", timeoutMs)
-		}
-		return fmt.Errorf("execute_script: %w", runErr)
+		return runErr
 	}
 
 	ctx.Variables[outputVar] = output
@@ -253,41 +262,128 @@ func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.Exe
 	return nil
 }
 
-// bindScriptGlobals installs the explicit, closed set of bindings a script can
-// reach. No Go service, pointer, or shared execution map is exposed.
-func bindScriptGlobals(vm *sobek.Runtime, run *scriptRun, ctx *models.ExecutionContext) error {
-	bindings := map[string]any{
-		"windshift": map[string]any{
-			"api": map[string]any{
-				"request": run.apiRequest,
-			},
-		},
-		"console": map[string]any{
-			"log":   run.consoleFn("log"),
-			"info":  run.consoleFn("info"),
-			"warn":  run.consoleFn("warn"),
-			"error": run.consoleFn("error"),
-			"debug": run.consoleFn("debug"),
-		},
-		"context": scriptContextView(ctx),
+// runWorker starts one isolated worker, sends the run request, and serves the
+// bridge until the worker reports a result or failure. The worker owns the
+// Sobek realm; this function owns credentials, budgets, and policy.
+func (e *ExecuteScriptExecutor) runWorker(ctx context.Context, request scriptWorkerMessage, host *scriptHost) (any, error) {
+	launcher := e.launcher
+	if launcher == nil {
+		launcher = defaultScriptWorkerLauncher
 	}
-	for name, value := range bindings {
-		if err := vm.Set(name, value); err != nil {
-			return fmt.Errorf("set %s: %w", name, err)
+	proc, err := launcher.Launch(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("execute_script: %w", err)
+	}
+	defer func() {
+		_ = proc.Kill()
+		_ = proc.Wait()
+	}()
+
+	encoder := json.NewEncoder(proc.Stdin())
+	decoder := json.NewDecoder(proc.Stdout())
+	if err := encoder.Encode(request); err != nil {
+		return nil, fmt.Errorf("execute_script: send script to worker: %w", err)
+	}
+
+	var memoryExceeded atomic.Bool
+	watchdogStop := make(chan struct{})
+	defer close(watchdogStop)
+	var watchdogOnce sync.Once
+
+	for {
+		var msg scriptWorkerMessage
+		if err := decoder.Decode(&msg); err != nil {
+			if memoryExceeded.Load() {
+				return nil, memoryLimitError(request.MemoryBytes)
+			}
+			if host.fatal != nil {
+				return nil, host.fatal
+			}
+			if ctx.Err() != nil {
+				if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+					return nil, fmt.Errorf("execute_script: timed out after %dms", request.TimeoutMS)
+				}
+				return nil, ctx.Err()
+			}
+			return nil, errors.New("execute_script: script worker exited without a result")
 		}
+		switch msg.Type {
+		case scriptMessageReady:
+			if request.MemoryBytes > 0 {
+				if rss, rssErr := proc.RSSBytes(); rssErr == nil && rss > 0 {
+					watchdogOnce.Do(func() {
+						go watchWorkerMemory(proc, rss+request.MemoryBytes, watchdogStop, &memoryExceeded)
+					})
+				}
+			}
+		case scriptMessageConsole:
+			host.appendConsole(msg.Level + ": " + msg.Message)
+		case scriptMessageAPIRequest:
+			if err := encoder.Encode(host.handleAPIRequest(msg)); err != nil {
+				return nil, fmt.Errorf("execute_script: reply to worker: %w", err)
+			}
+		case scriptMessageResult:
+			var output any
+			if len(msg.Output) > 0 {
+				if err := json.Unmarshal(msg.Output, &output); err != nil {
+					return nil, fmt.Errorf("execute_script: decode worker result: %w", err)
+				}
+			}
+			return output, nil
+		case scriptMessageError:
+			return nil, host.workerError(msg, request.TimeoutMS, request.MemoryBytes)
+		}
+	}
+}
+
+// workerError maps a worker-reported failure to the node's terminal error. A
+// policy failure returns the parent's stored fatal error so callers still see
+// the concrete *ErrScriptAPIPolicy; anything else is bounded worker text.
+func (h *scriptHost) workerError(msg scriptWorkerMessage, timeoutMS int, memoryBytes int64) error {
+	switch msg.ErrorKind {
+	case scriptErrorTimeout:
+		return fmt.Errorf("execute_script: timed out after %dms", timeoutMS)
+	case scriptErrorMemory:
+		return memoryLimitError(memoryBytes)
+	case scriptErrorPolicy:
+		if h.fatal != nil {
+			return h.fatal
+		}
+		return scriptAPIPolicyErrorf("%s", msg.Message)
+	default:
+		return fmt.Errorf("execute_script: %s", msg.Message)
+	}
+}
+
+// scriptMemoryBytes resolves the per-script heap budget. Zero means the
+// operator left the limit unset, so the default applies.
+func (e *ExecuteScriptExecutor) scriptMemoryBytes() int64 {
+	memoryMB := defaultScriptMemoryMB
+	if limit := e.controls.Limits().ScriptMemoryMB; limit > 0 {
+		memoryMB = limit
+	}
+	return int64(memoryMB) * 1024 * 1024
+}
+
+// memoryLimitError is the bounded, explainable failure recorded when a script
+// exceeds its heap budget.
+func memoryLimitError(memoryBytes int64) error {
+	return fmt.Errorf("execute_script: script worker memory limit of %d MiB exceeded", memoryBytes/(1024*1024))
+}
+
+// scriptGlobals is the explicit, closed set of values the worker exposes to
+// the script. No Go service, pointer, or shared execution map is serialized.
+func scriptGlobals(ctx *models.ExecutionContext) map[string]any {
+	globals := map[string]any{
+		"context":       scriptContextView(ctx),
+		"actor_user_id": ctx.EffectiveActorID,
 	}
 	if ctx.Event != nil {
-		if err := vm.Set("item_id", ctx.Event.ItemID); err != nil {
-			return err
-		}
-		if err := vm.Set("workspace_id", ctx.Event.WorkspaceID); err != nil {
-			return err
-		}
-		if err := vm.Set("trigger_user_id", ctx.Event.ActorUserID); err != nil {
-			return err
-		}
+		globals["item_id"] = ctx.Event.ItemID
+		globals["workspace_id"] = ctx.Event.WorkspaceID
+		globals["trigger_user_id"] = ctx.Event.ActorUserID
 	}
-	return vm.Set("actor_user_id", ctx.EffectiveActorID)
+	return globals
 }
 
 // scriptContextView is the read-only, detached JSON view of the execution. It
@@ -316,60 +412,42 @@ func scriptContextView(ctx *models.ExecutionContext) map[string]any {
 	return view
 }
 
-// apiRequest is the single host call exposed to scripts. It validates the
-// method and path, enforces the call budget, lazily mints the executor
-// credential, and dispatches through the canonical v2 handler. Policy
-// violations are fatal: they interrupt the VM so a try/catch cannot swallow
-// them.
-func (r *scriptRun) apiRequest(call sobek.FunctionCall) sobek.Value {
-	if r.fatal != nil {
-		return sobek.Undefined()
-	}
-	if err := r.runCtx.Err(); err != nil {
-		r.fail(err)
-		return sobek.Undefined()
-	}
-	options := call.Argument(0)
-	if scriptValueMissing(options) {
-		panic(r.vm.NewTypeError("windshift.api.request(options) requires an options object"))
-	}
-	obj := options.ToObject(r.vm)
-	methodVal := scriptObjectGet(obj, "method")
-	pathVal := scriptObjectGet(obj, "path")
-	if scriptValueMissing(methodVal) || scriptValueMissing(pathVal) {
-		panic(r.vm.NewTypeError("windshift.api.request requires method and path"))
-	}
-	method := strings.TrimSpace(methodVal.String())
-	path := pathVal.String()
-
-	var body []byte
-	if bodyVal := scriptObjectGet(obj, "body"); !scriptValueMissing(bodyVal) {
-		encoded, err := json.Marshal(bodyVal.Export())
-		if err != nil {
-			panic(r.vm.NewTypeError("body must be JSON-serializable: " + err.Error()))
+// handleAPIRequest is the parent half of the bridge. It validates the method
+// and path, enforces the call budget, lazily mints the executor credential, and
+// dispatches through the canonical v2 handler. Policy violations are returned
+// as fatal responses, so the worker interrupts the VM and a try/catch cannot
+// swallow them.
+func (h *scriptHost) handleAPIRequest(req scriptWorkerMessage) scriptWorkerMessage {
+	fatal := func(err error) scriptWorkerMessage {
+		if h.fatal == nil {
+			h.fatal = err
 		}
-		if len(encoded) > maxScriptRequestBodyBytes {
-			r.fail(scriptAPIPolicyErrorf("request body exceeds %d bytes", maxScriptRequestBodyBytes))
-			return sobek.Undefined()
-		}
-		body = encoded
+		return scriptWorkerMessage{Type: scriptMessageAPIFatal, ID: req.ID, Message: err.Error()}
+	}
+	if h.fatal != nil {
+		return scriptWorkerMessage{Type: scriptMessageAPIFatal, ID: req.ID, Message: h.fatal.Error()}
+	}
+	if err := h.runCtx.Err(); err != nil {
+		return fatal(err)
+	}
+	method := strings.TrimSpace(req.Method)
+	path := req.Path
+	if len(req.Body) > maxScriptRequestBodyBytes {
+		return fatal(scriptAPIPolicyErrorf("request body exceeds %d bytes", maxScriptRequestBodyBytes))
 	}
 
-	r.apiCalls++
-	if r.apiCalls > r.maxAPICalls {
-		r.fail(scriptAPIPolicyErrorf("api call budget of %d exceeded", r.maxAPICalls))
-		return sobek.Undefined()
+	h.apiCalls++
+	if h.apiCalls > h.maxAPICalls {
+		return fatal(scriptAPIPolicyErrorf("api call budget of %d exceeded", h.maxAPICalls))
 	}
 
 	// Validate before minting or dispatching so a disallowed route fails closed
 	// without spending a credential or a network round trip.
 	if _, err := ValidateScriptAPIRequest(method, path); err != nil {
-		r.fail(err)
-		return sobek.Undefined()
+		return fatal(err)
 	}
-	if err := r.runCtx.Err(); err != nil {
-		r.fail(err)
-		return sobek.Undefined()
+	if err := h.runCtx.Err(); err != nil {
+		return fatal(err)
 	}
 
 	// Persist the write-ahead marker and mark the execution non-replayable
@@ -377,35 +455,51 @@ func (r *scriptRun) apiRequest(call sobek.FunctionCall) sobek.Value {
 	// when it returns an error or the worker dies mid-call, so replay must be
 	// blocked from this point unless the flow later completes successfully.
 	if isMutatingScriptMethod(method) {
-		if err := r.markWritePending(); err != nil {
-			r.fail(fmt.Errorf("execute_script: persist write marker: %w", err))
-			return sobek.Undefined()
+		if err := h.markWritePending(); err != nil {
+			return fatal(fmt.Errorf("execute_script: persist write marker: %w", err))
 		}
-		if r.reconciliation != nil {
-			*r.reconciliation = true
+		if h.reconciliation != nil {
+			*h.reconciliation = true
 		}
 	}
 
-	cred, err := r.ensureCredential()
+	cred, err := h.ensureCredential()
 	if err != nil {
-		r.fail(err)
-		return sobek.Undefined()
+		return fatal(err)
 	}
-	if err := r.runCtx.Err(); err != nil {
-		r.fail(err)
-		return sobek.Undefined()
+	if err := h.runCtx.Err(); err != nil {
+		return fatal(err)
 	}
 
-	response, err := r.dispatcher.Dispatch(r.runCtx, cred.Token, ScriptAPIRequest{Method: method, Path: path, Body: body})
+	response, err := h.dispatcher.Dispatch(h.runCtx, cred.Token, ScriptAPIRequest{Method: method, Path: path, Body: req.Body})
 	if err != nil {
 		var policy *ErrScriptAPIPolicy
 		if errors.As(err, &policy) {
-			r.fail(err)
-			return sobek.Undefined()
+			return fatal(err)
 		}
-		panic(r.vm.NewGoError(fmt.Errorf("windshift.api.request failed: %w", err)))
+		return scriptWorkerMessage{Type: scriptMessageAPIRecover, ID: req.ID, Message: err.Error()}
 	}
-	return r.responseValue(response)
+	return scriptWorkerMessage{
+		Type:      scriptMessageAPIResponse,
+		ID:        req.ID,
+		Status:    response.Status,
+		Truncated: response.Truncated,
+		Response:  scriptResponseBody(response.Body),
+	}
+}
+
+// scriptResponseBody keeps a valid JSON body verbatim and otherwise encodes it
+// as a JSON string, so the worker can rebuild the same JS shape the in-process
+// bridge produced.
+func scriptResponseBody(body []byte) json.RawMessage {
+	if len(body) > 0 && json.Valid(body) {
+		return json.RawMessage(body)
+	}
+	encoded, err := json.Marshal(string(body))
+	if err != nil {
+		return nil
+	}
+	return encoded
 }
 
 // isMutatingScriptMethod reports whether a permitted bridge method changes
@@ -421,11 +515,11 @@ func isMutatingScriptMethod(method string) bool {
 
 // ensureCredential mints at most one credential per node execution, lazily so a
 // script that makes no API calls pays no token cost.
-func (r *scriptRun) ensureCredential() (*ActionScriptCredential, error) {
-	r.credOnce.Do(func() {
-		r.cred, r.credErr = MintActionScriptCredential(r.runCtx, r.tokens, r.actorUserID)
+func (h *scriptHost) ensureCredential() (*ActionScriptCredential, error) {
+	h.credOnce.Do(func() {
+		h.cred, h.credErr = MintActionScriptCredential(h.runCtx, h.tokens, h.actorUserID)
 	})
-	return r.cred, r.credErr
+	return h.cred, h.credErr
 }
 
 // markWritePending persists the reconciliation marker once per execution. The
@@ -433,70 +527,32 @@ func (r *scriptRun) ensureCredential() (*ActionScriptCredential, error) {
 // mutating node in a flow reuses the first node's persisted marker instead of
 // re-updating a log that is already reconciliation_required. It is a no-op when
 // there is no durable execution log to recover.
-func (r *scriptRun) markWritePending() error {
-	if r.marker == nil || r.executionLogID <= 0 {
+func (h *scriptHost) markWritePending() error {
+	if h.marker == nil || h.executionLogID <= 0 {
 		return nil
 	}
-	if r.writeMarked != nil && *r.writeMarked {
+	if h.writeMarked != nil && *h.writeMarked {
 		return nil
 	}
-	if err := r.marker.MarkScriptWritePending(r.executionLogID); err != nil {
+	if err := h.marker.MarkScriptWritePending(h.executionLogID); err != nil {
 		return err
 	}
-	if r.writeMarked != nil {
-		*r.writeMarked = true
+	if h.writeMarked != nil {
+		*h.writeMarked = true
 	}
 	return nil
 }
 
-// fail records the first fatal policy error and interrupts the VM. Interrupts
-// are uncatchable, so an authorization or budget violation cannot be turned
-// into a successful step.
-func (r *scriptRun) fail(err error) {
-	if r.fatal == nil {
-		r.fatal = err
-	}
-	r.vm.Interrupt(err)
-}
-
-// responseValue converts a bounded API response into a detached JS object.
-func (r *scriptRun) responseValue(response ScriptAPIResponse) sobek.Value {
-	result := r.vm.NewObject()
-	_ = result.Set("status", response.Status)
-	_ = result.Set("ok", response.Status >= 200 && response.Status < 300)
-	_ = result.Set("truncated", response.Truncated)
-	var decoded any
-	if len(response.Body) > 0 && json.Unmarshal(response.Body, &decoded) == nil {
-		_ = result.Set("body", decoded)
-	} else {
-		_ = result.Set("body", string(response.Body))
-	}
-	return result
-}
-
-// consoleFn returns a bounded console sink. Output is truncated rather than
-// dropped silently once the byte budget is exhausted.
-func (r *scriptRun) consoleFn(level string) func(sobek.FunctionCall) sobek.Value {
-	return func(call sobek.FunctionCall) sobek.Value {
-		parts := make([]string, 0, len(call.Arguments))
-		for _, arg := range call.Arguments {
-			parts = append(parts, scriptValueString(arg))
-		}
-		r.appendConsole(level + ": " + strings.Join(parts, " "))
-		return sobek.Undefined()
-	}
-}
-
-func (r *scriptRun) appendConsole(line string) {
+func (h *scriptHost) appendConsole(line string) {
 	if len(line) > maxScriptConsoleEntryBytes {
 		line = line[:maxScriptConsoleEntryBytes] + "…[truncated]"
 	}
-	if len(r.console) >= maxScriptConsoleEntries || r.consoleBytes+len(line) > maxScriptConsoleBytes {
-		r.consoleCut = true
+	if len(h.console) >= maxScriptConsoleEntries || h.consoleBytes+len(line) > maxScriptConsoleBytes {
+		h.consoleCut = true
 		return
 	}
-	r.console = append(r.console, line)
-	r.consoleBytes += len(line)
+	h.console = append(h.console, line)
+	h.consoleBytes += len(line)
 }
 
 // scriptValueString renders a console argument as bounded text. Objects are

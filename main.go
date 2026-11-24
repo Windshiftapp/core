@@ -29,6 +29,7 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/middleware"
 	"windshift/internal/server"
+	"windshift/internal/services"
 	"windshift/internal/tui"
 	"windshift/internal/utils"
 
@@ -61,6 +62,14 @@ func printBanner() {
 }
 
 func main() {
+	// The isolated script worker is selected by environment so the same binary
+	// can host both roles. It must run before config, logging, or the database
+	// are touched: a worker owns no server state.
+	if os.Getenv(services.EnvScriptWorker) == "1" {
+		services.RunScriptWorker(os.Stdin, os.Stdout)
+		return
+	}
+
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
 		// TLS_CERT/TLS_KEY are the supported way to tell both the server and
 		// this subcommand that the internal listener terminates TLS directly.

@@ -80,6 +80,7 @@ type Limits struct {
 	RequestsPerMinute     int64 `json:"requests_per_minute,omitempty"`
 	ScriptTimeoutMS       int   `json:"script_timeout_ms,omitempty"`
 	ConcurrentScripts     int   `json:"concurrent_scripts,omitempty"`
+	ScriptMemoryMB        int   `json:"script_memory_mb,omitempty"`
 	AutomationStepsPerDay int64 `json:"automation_steps_per_day,omitempty"`
 	MailRecipientsPerDay  int64 `json:"mail_recipients_per_day,omitempty"`
 	AITokensPerDay        int64 `json:"ai_tokens_per_day,omitempty"`
@@ -133,6 +134,7 @@ func (p Policy) Validate() error {
 		"concurrent_requests": int64(limits.ConcurrentRequests), "concurrent_streams": int64(limits.ConcurrentStreams),
 		"requests_per_minute": limits.RequestsPerMinute, "script_timeout_ms": int64(limits.ScriptTimeoutMS),
 		"concurrent_scripts": int64(limits.ConcurrentScripts), "automation_steps_per_day": limits.AutomationStepsPerDay,
+		"script_memory_mb":        int64(limits.ScriptMemoryMB),
 		"mail_recipients_per_day": limits.MailRecipientsPerDay, "ai_tokens_per_day": limits.AITokensPerDay,
 		"concurrent_ai": int64(limits.ConcurrentAI),
 	} {
