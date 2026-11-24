@@ -920,6 +920,7 @@ class ItemDetailStore {
   ) {
     if (!this.item) return;
     const token = this.#loadToken;
+    const itemId = this.item.id;
     if (
       !this.#saveOwner ||
       this.#saveOwner.token !== token ||
@@ -955,7 +956,12 @@ class ItemDetailStore {
       );
       sync();
       await pending;
-      if (this.#saveOwner === owner && this.#loadToken === token) this.cancelEditing(field);
+      // A live reconcile can reload the same item while the save is in flight
+      // and bump #loadToken. The committed field must still close its editor;
+      // only navigating to a different item should leave editing untouched.
+      if (this.#saveOwner === owner && String(this.item?.id) === String(itemId)) {
+        this.cancelEditing(field);
+      }
     } finally {
       sync();
       if (this.#saveOwner === owner && this.#loadToken === token) this.#runPendingRefresh();
