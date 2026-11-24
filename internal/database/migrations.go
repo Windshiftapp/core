@@ -3822,11 +3822,11 @@ END $$;
 			INSERT INTO configuration_set_item_types (configuration_set_id, item_type_id)
 			SELECT it.configuration_set_id, it.id
 			FROM item_types it
+			JOIN configuration_sets cs ON cs.id = it.configuration_set_id
 			WHERE it.configuration_set_id IS NOT NULL
 			  AND it.builtin_key IS NULL
 			  AND NOT EXISTS (
-				SELECT 1 FROM configuration_set_item_types csit
-				WHERE csit.configuration_set_id = it.configuration_set_id AND csit.item_type_id = it.id
+				SELECT 1 FROM configuration_set_item_types csit WHERE csit.item_type_id = it.id
 			  );
 			DROP INDEX IF EXISTS idx_item_types_configuration_set_id;
 			ALTER TABLE item_types DROP COLUMN configuration_set_id;
@@ -3835,11 +3835,11 @@ END $$;
 			INSERT INTO configuration_set_item_types (configuration_set_id, item_type_id)
 			SELECT it.configuration_set_id, it.id
 			FROM item_types it
+			JOIN configuration_sets cs ON cs.id = it.configuration_set_id
 			WHERE it.configuration_set_id IS NOT NULL
 			  AND it.builtin_key IS NULL
 			  AND NOT EXISTS (
-				SELECT 1 FROM configuration_set_item_types csit
-				WHERE csit.configuration_set_id = it.configuration_set_id AND csit.item_type_id = it.id
+				SELECT 1 FROM configuration_set_item_types csit WHERE csit.item_type_id = it.id
 			  );
 			DROP INDEX IF EXISTS idx_item_types_configuration_set_id;
 			ALTER TABLE item_types DROP COLUMN configuration_set_id;
@@ -3883,11 +3883,17 @@ END $$;
 		`,
 	}}
 
-// boardConfigurationReconcileSQL merges duplicate board configurations onto the
-// lowest-id survivor and deletes unreachable ownerless rows. Moving a
-// duplicate's board_columns first keeps them; a plain delete would cascade
-// them away with the configuration.
+// boardConfigurationReconcileSQL normalizes board configurations to exactly one
+// owner, merges duplicates onto the lowest-id survivor, and deletes unreachable
+// ownerless rows. Moving a duplicate's board_columns first keeps them; a plain
+// delete would cascade them away with the configuration.
 const boardConfigurationReconcileSQL = `
+-- A dual-owner row is invalid. Keep the workspace owner (the repository's
+-- create precedence) and drop the collection owner so the exactly-one-owner
+-- check can hold.
+UPDATE board_configurations SET collection_id = NULL
+WHERE workspace_id IS NOT NULL AND collection_id IS NOT NULL;
+
 UPDATE board_columns
 SET board_configuration_id = (
 	SELECT MIN(survivor.id)
@@ -3907,6 +3913,15 @@ DELETE FROM board_configurations
 WHERE (workspace_id IS NOT NULL AND id <> (SELECT MIN(s.id) FROM board_configurations s WHERE s.workspace_id = board_configurations.workspace_id))
    OR (collection_id IS NOT NULL AND id <> (SELECT MIN(s.id) FROM board_configurations s WHERE s.collection_id = board_configurations.collection_id))
    OR (workspace_id IS NULL AND collection_id IS NULL);
+
+-- SQLite runs this with foreign keys off, so the deletes above do not cascade.
+-- Remove columns (and their status mappings) left without a configuration so a
+-- later board that reuses the freed id cannot inherit them.
+DELETE FROM board_columns
+WHERE NOT EXISTS (SELECT 1 FROM board_configurations cfg WHERE cfg.id = board_columns.board_configuration_id);
+
+DELETE FROM board_column_statuses
+WHERE NOT EXISTS (SELECT 1 FROM board_columns bc WHERE bc.id = board_column_statuses.board_column_id);
 `
 
 const boardConfigurationOwnershipPostgres = boardConfigurationReconcileSQL + `
@@ -6389,6 +6404,29 @@ func applySQLiteActiveTimerNullableProject(db Database) (retErr error) {
 	return nil
 }
 
+// readSQLiteSequence returns the AUTOINCREMENT high-water mark for table. It
+// reports false when the table has no sqlite_sequence row (never inserted, or
+// the sequence table is absent).
+func readSQLiteSequence(ctx context.Context, conn *sql.Conn, table string) (int64, bool) {
+	var seq int64
+	if err := conn.QueryRowContext(ctx, "SELECT seq FROM sqlite_sequence WHERE name = ?", table).Scan(&seq); err != nil {
+		return 0, false
+	}
+	return seq, true
+}
+
+// sqliteSequenceFloorStatements keep a rebuilt AUTOINCREMENT table's rowid
+// high-water mark at least floor. A DROP+RENAME rebuild only reflects the
+// copied rows in sqlite_sequence, so without this a later insert can reuse the
+// id of a row deleted before the migration. Historical references such as
+// agent_runs.binding_id would then count against an unrelated new row.
+func sqliteSequenceFloorStatements(table string, floor int64) []string {
+	return []string{
+		fmt.Sprintf("UPDATE sqlite_sequence SET seq = %d WHERE name = '%s' AND seq < %d", floor, table, floor),
+		fmt.Sprintf("INSERT INTO sqlite_sequence(name, seq) SELECT '%s', %d WHERE NOT EXISTS (SELECT 1 FROM sqlite_sequence WHERE name = '%s')", table, floor, table),
+	}
+}
+
 // applySQLiteBindingCreatorNullable rebuilds workspace_agent_bindings so
 // created_by_user_id accepts NULL. The column's ON DELETE SET NULL foreign key
 // and a NOT NULL declaration cannot both hold, so a creator deletion either
@@ -6422,6 +6460,8 @@ func applySQLiteBindingCreatorNullable(db Database) (retErr error) {
 			}
 		}()
 	}
+
+	bindingSeq, hasBindingSeq := readSQLiteSequence(ctx, conn, "workspace_agent_bindings")
 
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
@@ -6487,6 +6527,9 @@ func applySQLiteBindingCreatorNullable(db Database) (retErr error) {
 		`CREATE INDEX IF NOT EXISTS idx_workspace_agent_bindings_workspace_lifecycle ON workspace_agent_bindings(workspace_id, lifecycle)`,
 		`CREATE INDEX IF NOT EXISTS idx_workspace_agent_bindings_scm_connection ON workspace_agent_bindings(scm_connection_id)`,
 	}
+	if hasBindingSeq {
+		statements = append(statements, sqliteSequenceFloorStatements("workspace_agent_bindings", bindingSeq)...)
+	}
 	for _, statement := range statements {
 		if _, err := tx.ExecContext(ctx, statement); err != nil {
 			return fmt.Errorf("rebuild workspace_agent_bindings: %w", err)
@@ -6530,6 +6573,8 @@ func applySQLiteBoardConfigurationOwnership(db Database) (retErr error) {
 		}()
 	}
 
+	boardSeq, hasBoardSeq := readSQLiteSequence(ctx, conn, "board_configurations")
+
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin board_configurations rebuild: %w", err)
@@ -6569,6 +6614,9 @@ func applySQLiteBoardConfigurationOwnership(db Database) (retErr error) {
 		`ALTER TABLE board_configurations_migration RENAME TO board_configurations`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS uq_board_configurations_workspace ON board_configurations(workspace_id) WHERE workspace_id IS NOT NULL`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS uq_board_configurations_collection ON board_configurations(collection_id) WHERE collection_id IS NOT NULL`,
+	}
+	if hasBoardSeq {
+		statements = append(statements, sqliteSequenceFloorStatements("board_configurations", boardSeq)...)
 	}
 	for _, statement := range statements {
 		if _, err := tx.ExecContext(ctx, statement); err != nil {
