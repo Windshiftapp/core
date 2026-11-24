@@ -259,15 +259,6 @@ export default {
     dispositionDeleteHelp:
       'Verwijder de e-mail uit de mailbox nadat het item is aangemaakt (gebruik met voorzichtigheid).',
     dispositionInherit: 'Mailboxstandaard gebruiken',
-    senderAuthentication: 'Afzenderverificatie',
-    senderAuthInherit: 'Mailboxstandaard gebruiken',
-    senderAuthStrict: 'Streng — niet-geverifieerde e-mail tegenhouden',
-    senderAuthOff: 'Uit — de From-header vertrouwen',
-    senderAuthHelp: 'Streng houdt e-mail tegen waarvan het afzenderadres geen overeenkomend SPF-, DKIM- of DMARC-resultaat heeft, zodat een vervalste afzender niet kan deelnemen aan een thread of zich kan voordoen als klant. Schakel dit alleen uit als je e-mailprovider geen verificatieheaders toevoegt.',
-    senderAuthIntakeHelp: 'Overschrijft het afzenderverificatiebeleid van de mailbox voor e-mail in deze map. Laat de mailboxstandaard staan tenzij deze map een ander beleid nodig heeft.',
-    trustedAuthServers: 'Vertrouwde authenticatieservers',
-    trustedAuthServersPlaceholder: 'mx.google.com, outbound.protection.outlook.com',
-    trustedAuthServersHelp: 'Door komma gescheiden namen van authenticatieservers (authserv-id) waarvan deze mailbox de SPF-, DKIM- en DMARC-resultaten vertrouwt. Laat leeg om ze af te leiden van de provider en mailhost. Als er geen vertrouwde server kan worden vastgesteld, houdt de strenge modus elk bericht tegen.',
     intakesTitle: 'Intakes',
     intakesHelp:
       'Elke intake leest één map op deze mailbox en maakt items aan in één werkruimte en itemtype. Koppel een portaal om die verzoeken aan de klanten te tonen. Eén mailbox kan meerdere intakes voeden, maar alleen via verschillende mappen. Voor het aanmaken van een intake moet je deze mailbox, de doelwerkruimte en een gekoppeld portaal beheren.',

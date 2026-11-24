@@ -552,30 +552,48 @@ func (p *Processor) findAuthorizedReplyParent(ctx context.Context, email *Parsed
 			continue
 		}
 		itemID, recipient, ok := p.lookupReplyKey(ctx, canonicalID)
-		if !ok {
-			continue
+		if ok {
+			if normalizedEmail(recipient) != senderEmail {
+				slog.Warn("ignoring reply: reply key belongs to another recipient",
+					"item_id", itemID,
+					"message_id", messageID,
+					"sender", senderEmail,
+				)
+				continue
+			}
+			if !p.senderIsThreadParticipant(ctx, itemID, senderEmail) {
+				slog.Warn("ignoring reply: sender is no longer authorized",
+					"item_id", itemID,
+					"message_id", messageID,
+					"sender", senderEmail,
+				)
+				continue
+			}
+			slog.Debug("found authorized reply parent", "message_id", messageID, "item_id", itemID)
+			return itemID, true
 		}
-		if normalizedEmail(recipient) != senderEmail {
-			slog.Warn("ignoring reply: reply key belongs to another recipient",
-				"item_id", itemID,
-				"message_id", messageID,
-				"sender", senderEmail,
-			)
-			continue
+		// Pre-upgrade outbound IDs carry no recipient. They are tolerated only
+		// on the existing ticket they were recorded on; a new ticket has no such
+		// row and therefore must present an exact reply key.
+		if itemID, ok := p.lookupLegacyReplyItem(ctx, canonicalID); ok {
+			if !p.senderIsThreadParticipant(ctx, itemID, senderEmail) {
+				slog.Warn("ignoring legacy reply: sender is not authorized",
+					"item_id", itemID,
+					"message_id", messageID,
+					"sender", senderEmail,
+				)
+				continue
+			}
+			slog.Debug("found authorized legacy reply parent", "message_id", messageID, "item_id", itemID)
+			return itemID, true
 		}
-		if !p.senderIsThreadParticipant(ctx, itemID, senderEmail) {
-			slog.Warn("ignoring reply: sender is no longer authorized",
-				"item_id", itemID,
-				"message_id", messageID,
-				"sender", senderEmail,
-			)
-			continue
-		}
-		slog.Debug("found authorized reply parent", "message_id", messageID, "item_id", itemID)
-		return itemID, true
 	}
 	return 0, false
 }
+
+// ReplyKeyValidity bounds how long a Windshift-issued outbound Message-ID may
+// authorize a reply. Outbox rows are retained longer (90 days) for audit.
+const ReplyKeyValidity = 30 * 24 * time.Hour
 
 // lookupReplyKey resolves a Message-ID to the request and intended recipient of
 // a Windshift-issued outbound delivery. The durable reply outbox persists item,
@@ -586,9 +604,10 @@ func (p *Processor) lookupReplyKey(ctx context.Context, canonicalID string) (ite
 	err := p.db.QueryRowContext(ctx, `
 		SELECT item_id, to_email FROM email_reply_outbox
 		WHERE message_id IN (?, ?) AND item_id IS NOT NULL AND to_email <> ''
+		  AND COALESCE(delivered_at, created_at) >= ?
 		ORDER BY id DESC
 		LIMIT 1
-	`, canonicalID, bareID).Scan(&itemID, &recipient)
+	`, canonicalID, bareID, time.Now().Add(-ReplyKeyValidity)).Scan(&itemID, &recipient)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			slog.Warn("failed to look up reply key", "message_id", canonicalID, "error", err)
@@ -596,6 +615,31 @@ func (p *Processor) lookupReplyKey(ctx context.Context, canonicalID string) (ite
 		return 0, "", false
 	}
 	return itemID, recipient, true
+}
+
+// lookupLegacyReplyItem resolves a pre-WI-2365 outbound Message-ID to the
+// ticket it was recorded on. Those rows carry no recipient and have no
+// recipient-bound outbox row, so they are tolerated only on the existing
+// ticket that recorded them; synthetic anchors (from_email = ”) never
+// authorize.
+func (p *Processor) lookupLegacyReplyItem(ctx context.Context, canonicalID string) (int, bool) {
+	bareID := bareMessageID(canonicalID)
+	var itemID int
+	err := p.db.QueryRowContext(ctx, `
+		SELECT t.item_id FROM email_message_tracking t
+		WHERE t.message_id IN (?, ?) AND t.direction = 'outbound' AND t.item_id IS NOT NULL
+		  AND t.from_email <> ''
+		  AND NOT EXISTS (SELECT 1 FROM email_reply_outbox o WHERE o.message_id = t.message_id)
+		ORDER BY t.id DESC
+		LIMIT 1
+	`, canonicalID, bareID).Scan(&itemID)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			slog.Warn("failed to look up legacy reply id", "message_id", canonicalID, "error", err)
+		}
+		return 0, false
+	}
+	return itemID, true
 }
 
 // senderStillAuthorized reports whether senderEmail may post onto the item now

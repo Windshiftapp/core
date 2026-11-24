@@ -22,7 +22,6 @@ type intakeRequest struct {
 	ItemTypeID            *int   `json:"item_type_id"`
 	RateLimitPerHour      *int   `json:"rate_limit_per_hour"`
 	ProcessingDisposition string `json:"processing_disposition"`
-	SenderAuthentication  string `json:"sender_authentication"`
 	SendConfirmation      bool   `json:"send_confirmation"`
 	ImportExistingMail    bool   `json:"import_existing_mail"`
 	Status                string `json:"status"`
@@ -147,9 +146,6 @@ func (h *ChannelHandler) validateIntakeRequest(ctx context.Context, actorID, mai
 	if req.RateLimitPerHour != nil && *req.RateLimitPerHour < 0 {
 		return nil, fmt.Errorf("%w: rate_limit_per_hour must be 0 (unlimited) or a positive number", errIntakeInvalid)
 	}
-	if !email.IsValidSenderAuthPolicy(req.SenderAuthentication) {
-		return nil, fmt.Errorf("%w: sender_authentication must be strict or off", errIntakeInvalid)
-	}
 	status := req.Status
 	if status == "" {
 		status = models.IntakeStatusEnabled
@@ -195,7 +191,6 @@ func (h *ChannelHandler) validateIntakeRequest(ctx context.Context, actorID, mai
 		ItemTypeID:            req.ItemTypeID,
 		RateLimitPerHour:      req.RateLimitPerHour,
 		ProcessingDisposition: req.ProcessingDisposition,
-		SenderAuthentication:  req.SenderAuthentication,
 		SendConfirmation:      req.SendConfirmation,
 		ImportExistingMail:    req.ImportExistingMail,
 		Status:                status,

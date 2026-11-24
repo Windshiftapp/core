@@ -432,7 +432,6 @@ func legacyIntakeFromConfig(config *models.ChannelConfig) *models.Intake {
 		ItemTypeID:            config.EmailItemTypeID,
 		RateLimitPerHour:      config.EmailRateLimitPerHour,
 		ProcessingDisposition: config.EmailProcessingDisposition,
-		SenderAuthentication:  config.EmailSenderAuthentication,
 		Status:                models.IntakeStatusEnabled,
 	}
 }
@@ -463,11 +462,6 @@ func (es *EmailScheduler) pollIntake(
 	// whatever the mailbox config carries (enum or legacy booleans).
 	if intake.ProcessingDisposition != "" {
 		effective.EmailProcessingDisposition = intake.ProcessingDisposition
-	}
-	// Likewise an empty sender-authentication policy inherits the mailbox
-	// default, whose own empty value is strict.
-	if intake.SenderAuthentication != "" {
-		effective.EmailSenderAuthentication = intake.SenderAuthentication
 	}
 
 	mailbox := intake.Folder
@@ -524,7 +518,6 @@ func (es *EmailScheduler) pollIntake(
 	maxUID := sinceUID
 	processedCount := 0
 	rateLimitedCount := 0
-	heldCount := 0
 	errorCount := 0
 	var lastBatchError string
 	var offenderUID uint32
@@ -582,15 +575,11 @@ func (es *EmailScheduler) pollIntake(
 
 		// Rate-limited mail is left untouched in the mailbox (unread, not
 		// deleted) so an operator can requeue it; the watermark still advances
-		// past it so one flooding sender cannot wedge the intake. Mail held by a
-		// strict sender-authentication policy is preserved the same way: it may
-		// be the only copy of a legitimate message, and deleting it would make
-		// the hold unrecoverable. Deduplicated mail still gets the configured
-		// disposition: an earlier run may have created the ticket but expired
-		// before marking or deleting it.
+		// past it so one flooding sender cannot wedge the intake. Deduplicated
+		// mail still gets the configured disposition: an earlier run may have
+		// created the ticket but expired before marking or deleting it.
 		rateLimited := result.Action == email.ActionRateLimited
-		held := result.Action == email.ActionHeldForAuth
-		if !rateLimited && !held {
+		if !rateLimited {
 			switch disposition {
 			case models.EmailDispositionMarkRead:
 				if markErr := client.MarkAsRead(msg.UID); markErr != nil {
@@ -609,8 +598,6 @@ func (es *EmailScheduler) pollIntake(
 		switch {
 		case rateLimited:
 			rateLimitedCount++
-		case held:
-			heldCount++
 		default:
 			processedCount++
 		}
@@ -651,7 +638,6 @@ func (es *EmailScheduler) pollIntake(
 		"intake_id", intake.ID,
 		"processed", processedCount,
 		"rate_limited", rateLimitedCount,
-		"held_for_auth", heldCount,
 		"errors", errorCount,
 	)
 

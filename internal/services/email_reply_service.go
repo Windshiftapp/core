@@ -212,11 +212,11 @@ func (s *EmailReplyService) handleCommentCreated(params HandleCommentParams, del
 		}
 		// Recipient-specific threading keeps the reply key scoped to this
 		// recipient: another participant's outbound Message-ID is never copied
-		// into References or In-Reply-To.
+		// into References or In-Reply-To. An item whose original mail had no
+		// Message-ID still gets its reply: the minted Message-ID below is the
+		// reply key, and empty threading headers must not silently drop the
+		// customer's reply.
 		inReplyTo, references := threadHeadersForRecipient(records, recipient.Email)
-		if inReplyTo == "" {
-			continue
-		}
 		referencesJSON, err := json.Marshal(references)
 		if err != nil {
 			return fmt.Errorf("encode email references: %w", err)
@@ -563,10 +563,10 @@ func (s *EmailReplyService) sendItemNotice(item *models.Item, toEmail, toName, s
 	if err != nil {
 		return false, "", fmt.Errorf("query email tracking for customer notice: %w", err)
 	}
-	inReplyTo, references := threadHeadersForRecipient(records, toEmail)
-	if inReplyTo == "" {
+	if len(records) == 0 {
 		return false, "no_thread", nil
 	}
+	inReplyTo, references := threadHeadersForRecipient(records, toEmail)
 	var originalSubject sql.NullString
 	for _, rec := range records {
 		if rec.Subject.Valid && rec.Subject.String != "" {
@@ -617,6 +617,36 @@ func (s *EmailReplyService) sendItemNotice(item *models.Item, toEmail, toName, s
 		return false, "", fmt.Errorf("mint notice Message-ID: %w", err)
 	}
 	replyToEmail, replyToName := s.resolveReplyToAddress(item.ID, *item.ChannelID)
+	referencesJSON, err := json.Marshal(references)
+	if err != nil {
+		referencesJSON = []byte("[]")
+	}
+
+	// Persist the reply key before crossing the SMTP boundary. If the send
+	// succeeds but the process dies before recording the key, the customer
+	// holds a Message-ID Windshift never learned. The notice is sent directly,
+	// so the row is stored as already delivered; a send failure leaves an
+	// unused key, which authorizes nothing.
+	if _, err := s.db.ExecWrite(`
+		INSERT INTO email_reply_outbox (
+			kind, channel_id, item_id, to_email, to_name, subject,
+			html_body, text_body, message_id, in_reply_to, references_json,
+			from_email, from_name, reply_to_email, reply_to_name,
+			next_attempt_at, delivered_at, created_at, updated_at
+		) VALUES ('notice', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+		          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		ON CONFLICT DO NOTHING
+	`, *item.ChannelID, item.ID, toEmail, toName, emailSubject,
+		htmlBody, textBody, messageID, inReplyTo, string(referencesJSON),
+		s.getSMTPFromEmail(), authorName, replyToEmail, replyToName); err != nil {
+		slog.Warn("failed to persist customer notice reply key",
+			slog.String("component", "email_reply_service"),
+			slog.Int("item_id", item.ID),
+			slog.String("message_id", messageID),
+			slog.Any("error", err),
+		)
+	}
+
 	if err := s.smtpSender.SendThreadedEmail(smtp.ThreadedEmailParams{
 		ToEmail:      toEmail,
 		ToName:       toName,
@@ -632,15 +662,8 @@ func (s *EmailReplyService) sendItemNotice(item *models.Item, toEmail, toName, s
 		return false, "", fmt.Errorf("send customer notice: %w", err)
 	}
 
-	// Record the notice's own Message-ID so a reply that carries only
-	// In-Reply-To (no References) still resolves to this item instead of
-	// starting a new ticket, and persist it in the outbox as a recipient-bound
-	// reply key so an inbound reply can authorize against it (WI-2365).
-	// Best-effort: the mail is already sent.
-	referencesJSON, err := json.Marshal(references)
-	if err != nil {
-		referencesJSON = []byte("[]")
-	}
+	// Audit record after a successful send: the notice's Message-ID and thread
+	// placement for the channel email log. Best-effort.
 	if _, err := s.db.ExecWrite(`
 		INSERT INTO email_message_tracking (
 			channel_id, message_id, dedup_key, in_reply_to, from_email, from_name, subject,
@@ -649,27 +672,6 @@ func (s *EmailReplyService) sendItemNotice(item *models.Item, toEmail, toName, s
 		ON CONFLICT(channel_id, dedup_key) DO NOTHING
 	`, *item.ChannelID, messageID, messageID, inReplyTo, s.getSMTPFromEmail(), authorName, emailSubject, item.ID); err != nil {
 		slog.Warn("failed to record customer notice in email tracking; replies may not thread",
-			slog.String("component", "email_reply_service"),
-			slog.Int("item_id", item.ID),
-			slog.String("message_id", messageID),
-			slog.Any("error", err),
-		)
-	}
-	// The notice is sent directly rather than queued, so its outbox row is
-	// recorded as already delivered: it is a reply key, not pending work.
-	if _, err := s.db.ExecWrite(`
-		INSERT INTO email_reply_outbox (
-			kind, channel_id, item_id, to_email, to_name, subject,
-			html_body, text_body, message_id, in_reply_to, references_json,
-			from_email, from_name, reply_to_email, reply_to_name,
-			next_attempt_at, delivered_at, created_at, updated_at
-		) VALUES ('notice', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-		          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-		ON CONFLICT DO NOTHING
-	`, *item.ChannelID, item.ID, toEmail, toName, emailSubject,
-		htmlBody, textBody, messageID, inReplyTo, string(referencesJSON),
-		s.getSMTPFromEmail(), authorName, replyToEmail, replyToName); err != nil {
-		slog.Warn("failed to record customer notice reply key",
 			slog.String("component", "email_reply_service"),
 			slog.Int("item_id", item.ID),
 			slog.String("message_id", messageID),
@@ -865,8 +867,10 @@ func (s *EmailReplyService) ProcessPendingReplies(ctx context.Context, limit int
 			delivered++
 		}
 	}
-	// Delivered rows are retained briefly for idempotence/audit, then pruned.
-	cutoff := time.Now().Add(-30 * 24 * time.Hour)
+	// Delivered rows stay as reply keys for 90 days even though a key is only
+	// honored for 30 (see email.ReplyKeyValidity): the extra window keeps the
+	// row available for audit and diagnostics before it is pruned.
+	cutoff := time.Now().Add(-90 * 24 * time.Hour)
 	if _, err := s.db.ExecWrite(`DELETE FROM email_reply_outbox WHERE delivered_at IS NOT NULL AND delivered_at < ?`, cutoff); err != nil {
 		slog.Warn("failed to prune delivered email reply outbox rows", "error", err)
 	}

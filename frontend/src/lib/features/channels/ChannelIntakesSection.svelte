@@ -65,7 +65,6 @@
       item_type_id: null,
       rate_limit_per_hour: '',
       processing_disposition: '',
-      sender_authentication: '',
       send_confirmation: false,
       import_existing_mail: false,
       status: 'enabled'
@@ -101,9 +100,6 @@
     if (editing.status === 'needs_attention') {
       editing.status = 'disabled';
     }
-    // sender_authentication is loaded verbatim so an explicit "strict" is not
-    // silently turned into "inherit" on an unrelated edit; inherit and strict
-    // differ whenever the mailbox default is "off".
     loadItemTypesForWorkspace(editing.workspace_id);
   }
 
@@ -148,7 +144,6 @@
           ? null
           : Number(editing.rate_limit_per_hour),
       processing_disposition: editing.processing_disposition || '',
-      sender_authentication: editing.sender_authentication || '',
       send_confirmation: !!editing.send_confirmation,
       import_existing_mail: !!editing.import_existing_mail,
       status: editing.status || 'enabled'
@@ -384,22 +379,6 @@
             options={statusOptions}
             bind:value={editing.status}
           />
-        </div>
-
-        <div>
-          <SelectField
-            label={t('channel.senderAuthentication')}
-            labelColor="default"
-            id="intake-sender-authentication"
-            dataTestid="channel-intake-sender-authentication"
-            options={[
-              { value: '', label: t('channel.senderAuthInherit') },
-              { value: 'strict', label: t('channel.senderAuthStrict') },
-              { value: 'off', label: t('channel.senderAuthOff') }
-            ]}
-            bind:value={editing.sender_authentication}
-          />
-          <DescriptionText>{t('channel.senderAuthIntakeHelp')}</DescriptionText>
         </div>
 
         <Checkbox

@@ -36,9 +36,6 @@ func ValidateConfigForEnable(channel *models.Channel, config *models.ChannelConf
 	if !IsValidEmailDisposition(config.EmailProcessingDisposition) {
 		return fmt.Errorf("%w: email_processing_disposition must be leave, mark_read, or delete", ErrConfigNotReady)
 	}
-	if !IsValidSenderAuthPolicy(config.EmailSenderAuthentication) {
-		return fmt.Errorf("%w: email_sender_authentication must be strict or off", ErrConfigNotReady)
-	}
 
 	switch strings.ToLower(config.EmailAuthMethod) {
 	case "oauth":

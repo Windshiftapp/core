@@ -263,15 +263,6 @@ export default {
     dispositionDeleteHelp:
       'Usuń wiadomość ze skrzynki po utworzeniu elementu (używaj ostrożnie).',
     dispositionInherit: 'Użyj domyślnego ustawienia skrzynki',
-    senderAuthentication: 'Uwierzytelnianie nadawcy',
-    senderAuthInherit: 'Użyj domyślnego ustawienia skrzynki',
-    senderAuthStrict: 'Ścisłe — wstrzymuj nieuwierzytelnione wiadomości',
-    senderAuthOff: 'Wyłączone — ufaj nagłówkowi From',
-    senderAuthHelp: 'Tryb ścisły wstrzymuje wiadomości, których adres nadawcy nie ma zgodnego wyniku SPF, DKIM lub DMARC, aby podszywający się nadawca nie mógł dołączyć do wątku ani podać się za klienta. Wyłącz tylko wtedy, gdy dostawca poczty nie dodaje nagłówków uwierzytelniających.',
-    senderAuthIntakeHelp: 'Zastępuje politykę uwierzytelniania nadawcy skrzynki dla wiadomości w tym folderze. Pozostaw domyślne ustawienie skrzynki, chyba że ten folder wymaga innej polityki.',
-    trustedAuthServers: 'Zaufane serwery uwierzytelniania',
-    trustedAuthServersPlaceholder: 'mx.google.com, outbound.protection.outlook.com',
-    trustedAuthServersHelp: 'Nazwy serwerów uwierzytelniania (authserv-id) oddzielone przecinkami, którym ta skrzynka ufa w zakresie wyników SPF, DKIM i DMARC. Pozostaw puste, aby wywnioskować je od dostawcy i hosta poczty. Gdy nie można ustalić zaufanego serwera, tryb ścisły wstrzymuje każdą wiadomość.',
     intakesTitle: 'Przyjmowanie',
     intakesHelp:
       'Każde przyjmowanie odczytuje jeden folder w tej skrzynce i tworzy elementy w jednej przestrzeni roboczej i typie elementu. Powiąż portal, aby udostępnić te zgłoszenia jego klientom. Jedna skrzynka może zasilać kilka przyjmowań, ale tylko przez odrębne foldery. Utworzenie przyjmowania wymaga zarządzania tą skrzynką, docelową przestrzenią roboczą i wszelkimi powiązanymi portalami.',

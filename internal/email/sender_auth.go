@@ -8,43 +8,11 @@ import (
 	"windshift/internal/models"
 )
 
-// SenderAuthPolicy controls whether the From address of inbound mail must be
-// backed by a passing, aligned SPF, DKIM, or DMARC result before intake trusts
-// it. The From header is entirely attacker-controlled; without this check
-// anyone who can deliver a message can claim to be a known customer and either
-// join a private thread or create a request in their name (WI-2362).
-type SenderAuthPolicy string
-
-const (
-	// SenderAuthStrict holds mail whose From domain is not authenticated. It is
-	// the default for any channel or intake that does not configure a policy,
-	// so a missing or misspelled value can never silently disable the check.
-	SenderAuthStrict SenderAuthPolicy = "strict"
-	// SenderAuthOff trusts the From header the way intake did before sender
-	// authentication existed. Intended for mailbox providers that do not add
-	// Authentication-Results / Received-SPF headers.
-	SenderAuthOff SenderAuthPolicy = "off"
-)
-
-// ResolveSenderAuthPolicy returns the effective policy. Anything other than an
-// explicit "off" resolves to strict.
-func ResolveSenderAuthPolicy(value string) SenderAuthPolicy {
-	if strings.EqualFold(strings.TrimSpace(value), string(SenderAuthOff)) {
-		return SenderAuthOff
-	}
-	return SenderAuthStrict
-}
-
-// IsValidSenderAuthPolicy reports whether value is a recognized policy or the
-// empty default sentinel.
-func IsValidSenderAuthPolicy(value string) bool {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "", string(SenderAuthStrict), string(SenderAuthOff):
-		return true
-	default:
-		return false
-	}
-}
+// Sender authentication evaluation is diagnostic only (WI-2365): intake never
+// holds or drops mail on the SPF/DKIM/DMARC verdict, and the claimed From is
+// never an identity. The result is recorded on the tracking row for the admin
+// diagnostics view. Authorization to append to a private conversation comes
+// from a recipient-bound outbound Message-ID instead.
 
 // ResolveTrustedAuthServIDs returns the receiver hosts whose
 // Authentication-Results and Received-SPF headers are trusted for a mailbox.

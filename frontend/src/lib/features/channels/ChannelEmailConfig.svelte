@@ -39,8 +39,6 @@
       item_type_id: null,
       mailbox: 'INBOX',
       processing_disposition: 'mark_read',
-      sender_authentication: '',
-      trusted_authserv_ids: '',
       rate_limit_per_hour: null,
       enabled: false
     }),
@@ -148,15 +146,7 @@
     // limit) and per-intake disposition overrides live on intakes.
     const baseConfig = {
       email_auth_method: formData.auth_method,
-      email_processing_disposition: formData.processing_disposition || 'mark_read',
-      // Empty means strict on the backend; send the explicit value the admin chose.
-      email_sender_authentication: formData.sender_authentication || '',
-      email_trusted_authserv_ids: formData.trusted_authserv_ids
-        ? formData.trusted_authserv_ids
-            .split(',')
-            .map((host) => host.trim())
-            .filter(Boolean)
-        : undefined
+      email_processing_disposition: formData.processing_disposition || 'mark_read'
     };
 
     if (formData.auth_method === 'oauth') {
@@ -438,34 +428,6 @@
         bind:value={formData.processing_disposition}
       />
       <DescriptionText>{t('channel.dispositionHelp')}</DescriptionText>
-    </div>
-
-    <!-- Mailbox-level sender-authentication default; an intake may override it. -->
-    <div class="pt-4 border-t border-ds-border">
-      <SelectField
-        label={t('channel.senderAuthentication')}
-        labelColor="default"
-        id="email-sender-authentication"
-        options={[
-          { value: '', label: t('channel.senderAuthStrict') },
-          { value: 'off', label: t('channel.senderAuthOff') }
-        ]}
-        bind:value={formData.sender_authentication}
-      />
-      <DescriptionText>{t('channel.senderAuthHelp')}</DescriptionText>
-      {#if formData.sender_authentication !== 'off'}
-        <div class="mt-3">
-          <TextField
-            label={t('channel.trustedAuthServers')}
-            labelColor="default"
-            id="email-trusted-authserv-ids"
-            placeholder={t('channel.trustedAuthServersPlaceholder')}
-            dataTestid="email-trusted-authserv-ids"
-            bind:value={formData.trusted_authserv_ids}
-          />
-          <DescriptionText>{t('channel.trustedAuthServersHelp')}</DescriptionText>
-        </div>
-      {/if}
     </div>
 
     <!-- Intakes: routing is separate from the connection. One mailbox can feed

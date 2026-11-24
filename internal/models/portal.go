@@ -165,16 +165,11 @@ type ChannelConfig struct {
 	// (DefaultEmailRateLimitPerHour), 0 = unlimited, n = n. Replies to
 	// existing threads are never rate-limited.
 	EmailRateLimitPerHour *int `json:"email_rate_limit_per_hour,omitempty"`
-	// EmailSenderAuthentication is the mailbox default policy for trusting the
-	// inbound From address. "strict" (the default when empty) holds mail whose
-	// From domain does not pass an aligned SPF, DKIM, or DMARC check; "off"
-	// disables the check for providers that do not add authentication headers.
-	EmailSenderAuthentication string `json:"email_sender_authentication,omitempty"`
 	// EmailTrustedAuthServIDs lists the authentication servers (authserv-id)
 	// whose Authentication-Results / Received-SPF headers this mailbox trusts.
 	// They are the receiver boundary that proves a result was added by the
-	// delivering MTA. Empty derives the hosts from the provider and mail host;
-	// when nothing can be derived, strict mode holds every message.
+	// delivering MTA. The result is recorded for diagnostics only; intake never
+	// gates on it (WI-2365).
 	EmailTrustedAuthServIDs []string `json:"email_trusted_authserv_ids,omitempty"`
 
 	// Portal Configuration
