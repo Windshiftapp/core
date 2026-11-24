@@ -213,7 +213,7 @@ CREATE TABLE IF NOT EXISTS workspace_agent_bindings (
     target_pool_id INTEGER, -- soft ref to action_capabilities (runner_pool); NULL = local in-process run (WI-195)
     instructions TEXT NOT NULL DEFAULT '', -- appended to the run's initial prompt as the agent's role/persona (WI-258)
     runner_image TEXT, -- custom coding-agent container image for remote (pool) runs; NULL = the runner's default windshift-agent image (WI-450)
-    created_by_user_id INTEGER NOT NULL,
+    created_by_user_id INTEGER, -- soft audit ref; NULL once the creator is deleted
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,

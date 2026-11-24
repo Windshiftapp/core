@@ -231,8 +231,7 @@ CREATE TABLE IF NOT EXISTS priorities (
 CREATE TABLE IF NOT EXISTS item_types (
 	id SERIAL PRIMARY KEY,
 	builtin_key TEXT,
-	configuration_set_id INTEGER, -- Made nullable for many-to-many relationship
-	name TEXT NOT NULL UNIQUE, -- Changed to global unique (not per config set)
+	name TEXT NOT NULL UNIQUE, -- Global unique; set membership lives in configuration_set_item_types
 	description TEXT,
 	is_default BOOLEAN DEFAULT false,
 	icon TEXT DEFAULT 'FileText',
@@ -265,117 +264,23 @@ CREATE TABLE IF NOT EXISTS status_categories (
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- From milestones_postgres.sql
-CREATE TABLE IF NOT EXISTS milestone_categories (
-	id SERIAL PRIMARY KEY,
-	name TEXT NOT NULL UNIQUE,
-	color TEXT NOT NULL,  -- Hex color code (e.g., "#3b82f6")
-	description TEXT,
-	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
--- From permissions_postgres.sql
-CREATE TABLE IF NOT EXISTS permissions (
-	id SERIAL PRIMARY KEY,
-	permission_key TEXT UNIQUE NOT NULL,
-	permission_name TEXT NOT NULL,
-	description TEXT,
-	scope TEXT NOT NULL CHECK (scope IN ('global', 'workspace')),
-	is_system BOOLEAN DEFAULT false,
-	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
+-- Tables owned by a domain schema file are created there, not here. A
+-- duplicate CREATE TABLE IF NOT EXISTS in this file would win the bootstrap
+-- race (this file runs first) and silently discard the owner's foreign keys,
+-- constraints and column shape. Keep base_tables limited to tables with no
+-- foreign-key dependencies.
 
 -- workspace_roles is fully defined in permissions_postgres.sql (which runs
 -- after this file). The previous duplicate definition here was missing the
 -- permissions_enabled column, and CREATE TABLE IF NOT EXISTS would silently
 -- skip the proper definition once base_tables had already created the stub.
 
--- From system_postgres.sql
-CREATE TABLE IF NOT EXISTS system_settings (
-	id SERIAL PRIMARY KEY,
-	key TEXT NOT NULL UNIQUE,
-	value TEXT,
-	value_type TEXT DEFAULT 'string', -- string, boolean, integer, json
-	description TEXT,
-	category TEXT DEFAULT 'general',
-	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_system_settings_category ON system_settings(category);
-
-CREATE TABLE IF NOT EXISTS themes (
-	id SERIAL PRIMARY KEY,
-	builtin_key TEXT,
-	name TEXT NOT NULL,
-	description TEXT,
-	is_default BOOLEAN DEFAULT false,
-	is_active BOOLEAN DEFAULT false,
-	nav_background_color_light TEXT NOT NULL DEFAULT '#ffffff',
-	nav_text_color_light TEXT NOT NULL DEFAULT '#374151',
-	nav_background_color_dark TEXT NOT NULL DEFAULT '#1f2937',
-	nav_text_color_dark TEXT NOT NULL DEFAULT '#f3f4f6',
-	logo_url TEXT,
-	logo_url_dark TEXT,
-	logo_full_url TEXT,
-	logo_full_url_dark TEXT,
-	brand_layout TEXT NOT NULL DEFAULT 'mark_text',
-	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_themes_builtin_key ON themes(builtin_key) WHERE builtin_key IS NOT NULL;
-
-CREATE TABLE IF NOT EXISTS board_configurations (
-	id SERIAL PRIMARY KEY,
-	workspace_id INTEGER,
-	collection_id INTEGER,
-	backlog_status_ids JSONB,
-	list_columns JSONB,
-	roadmap_config JSONB,
-	card_fields JSONB,
-	view_settings JSONB,
-	show_rightmost_column_last_50 BOOLEAN DEFAULT false,
-	completed_item_retention_days INTEGER,
-	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
--- From content_postgres.sql
-CREATE TABLE IF NOT EXISTS attachment_settings (
-	id SERIAL PRIMARY KEY,
-	max_file_size INTEGER NOT NULL DEFAULT 52428800, -- 50MB default
-	allowed_mime_types TEXT, -- JSON array of allowed MIME types
-	attachment_path TEXT NOT NULL,
-	enabled BOOLEAN DEFAULT true,
-	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS link_types (
-	id SERIAL PRIMARY KEY,
-	builtin_key TEXT,
-	name TEXT NOT NULL UNIQUE,
-	description TEXT,
-	forward_label TEXT NOT NULL,
-	reverse_label TEXT NOT NULL,
-	color TEXT DEFAULT '#6b7280',
-	is_system BOOLEAN DEFAULT false,
-	active BOOLEAN DEFAULT true,
-	allowed_entity_types TEXT DEFAULT NULL,
-	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_link_types_builtin_key ON link_types(builtin_key) WHERE builtin_key IS NOT NULL;
-
 -- Email templates: per-sender HTML/text/subject Go templates editable from the
 -- admin UI. `name` is the lookup key consumed by senders (e.g. "magic_link",
--- "notification_batch"). The legacy template_type/event_type/template_body/
--- template_variables/channel_type columns are kept for backwards compatibility
--- but are no longer read or written by application code.
+-- "notification_batch"). template_type still selects rows for the notification
+-- cache refresh, so it is not dead. The remaining legacy columns (event_type,
+-- template_subject, template_body, template_variables, channel_type) are unread
+-- but retained pending a deliberate audit of existing template rows.
 CREATE TABLE IF NOT EXISTS notification_templates (
 	id SERIAL PRIMARY KEY,
 	name TEXT NOT NULL UNIQUE,
@@ -386,7 +291,7 @@ CREATE TABLE IF NOT EXISTS notification_templates (
 	is_system BOOLEAN DEFAULT false,
 	is_active BOOLEAN DEFAULT true,
 	is_customized BOOLEAN NOT NULL DEFAULT false, -- true once an admin saves an edit; unmodified seeds fall back to the localized built-in default
-	template_type TEXT, -- legacy, unused
+	template_type TEXT, -- read by the notification cache refresh
 	event_type TEXT, -- legacy, unused
 	template_subject TEXT, -- legacy, unused
 	template_body TEXT, -- legacy, unused
@@ -410,52 +315,6 @@ CREATE TABLE IF NOT EXISTS notification_template_translations (
 	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 	UNIQUE(template_id, locale),
 	FOREIGN KEY (template_id) REFERENCES notification_templates(id) ON DELETE CASCADE
-);
-
--- From tests_postgres.sql (simplified for base tables - full definition with FKs in tests_postgres.sql)
-CREATE TABLE IF NOT EXISTS test_folders (
-	id SERIAL PRIMARY KEY,
-	workspace_id INTEGER NOT NULL,
-	parent_id INTEGER REFERENCES test_folders(id) ON DELETE SET NULL,
-	name TEXT NOT NULL,
-	description TEXT,
-	sort_order INTEGER DEFAULT 0,
-	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_test_folders_parent_id ON test_folders(parent_id);
-
-CREATE TABLE IF NOT EXISTS test_labels (
-	id SERIAL PRIMARY KEY,
-	workspace_id INTEGER NOT NULL,
-	name TEXT NOT NULL,
-	color TEXT NOT NULL DEFAULT '#3B82F6',
-	description TEXT DEFAULT '',
-	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-	UNIQUE(workspace_id, name)
-);
-
--- From iterations_postgres.sql
-CREATE TABLE IF NOT EXISTS iteration_types (
-	id SERIAL PRIMARY KEY,
-	name TEXT NOT NULL UNIQUE,
-	color TEXT DEFAULT '#6b7280',
-	duration_days INTEGER NOT NULL DEFAULT 14,
-	description TEXT,
-	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-	updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
--- From portal_postgres.sql
-CREATE TABLE IF NOT EXISTS contact_roles (
-	id SERIAL PRIMARY KEY,
-	name TEXT NOT NULL UNIQUE,
-	description TEXT,
-	is_system BOOLEAN DEFAULT false,
-	sort_order INTEGER NOT NULL DEFAULT 0,
-	created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ============================================

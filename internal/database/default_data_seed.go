@@ -232,11 +232,12 @@ func seedDefaultData(w seedWriter) error {
 		}
 	}
 
-	// 11. Item types.
+	// 11. Item types. Membership is recorded only in configuration_set_item_types
+	// (step 12); the deprecated item_types.configuration_set_id scalar is gone.
 	for _, itemType := range defaultItemTypes {
 		if _, err := w.Exec(
-			"INSERT INTO item_types (builtin_key, configuration_set_id, name, description, icon, color, hierarchy_level, sort_order, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-			itemType.builtinKey, configSetID, itemType.name, itemType.description, itemType.icon, itemType.color, itemType.hierarchyLevel, itemType.sortOrder, true,
+			"INSERT INTO item_types (builtin_key, name, description, icon, color, hierarchy_level, sort_order, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+			itemType.builtinKey, itemType.name, itemType.description, itemType.icon, itemType.color, itemType.hierarchyLevel, itemType.sortOrder, true,
 		); err != nil {
 			return fmt.Errorf("failed to create default item type %s: %w", itemType.name, err)
 		}

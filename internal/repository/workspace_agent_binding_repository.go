@@ -137,7 +137,7 @@ func (r *WorkspaceAgentBindingRepository) Insert(ctx context.Context, b *models.
 		nullStringArg(b.RepoSlug), nullStringArg(b.RepoBaseRef),
 		nullIntArg(b.LLMConnectionID), nullIntArg(b.SCMConnectionID), nullIntArg(b.TargetPoolID),
 		string(scopesJSON), b.TokenTTLMinutes, b.MaxRunsPerDay,
-		b.Instructions, nullStringArg(b.RunnerImage), b.CreatedByUserID,
+		b.Instructions, nullStringArg(b.RunnerImage), nullIntArg(b.CreatedByUserID),
 	).Scan(&id)
 	if err != nil {
 		if database.IsUniqueConstraintError(err) {
@@ -400,8 +400,16 @@ func (r *WorkspaceAgentBindingRepository) UpdateAgentConfig(ctx context.Context,
 // instructions, and the repository set. The acting identity, workspace, target
 // pool, and runner image are NOT touched here (identity is immutable; runner
 // image has its own presence-aware setter). The primary repo is mirrored onto
-// the deprecated scalar columns, matching Insert (WI-450).
+// the deprecated scalar columns, matching Insert (WI-450). The parent version
+// bump and the repository replacement share one transaction so a failure can
+// never publish a new profile_version with the old or a partial repository list.
+// Retiring the scalar mirror (deriving the legacy fields from the primary child
+// instead) is deferred until its rollback window closes (WI-2366).
 func (r *WorkspaceAgentBindingRepository) UpdateConfig(ctx context.Context, b *models.WorkspaceAgentBinding) error {
+	db, ok := r.db.(database.Database)
+	if !ok {
+		return fmt.Errorf("update binding config: repository is not bound to a database")
+	}
 	scopesJSON, err := json.Marshal(b.TokenScopes)
 	if err != nil {
 		return fmt.Errorf("marshal token scopes: %w", err)
@@ -418,25 +426,27 @@ func (r *WorkspaceAgentBindingRepository) UpdateConfig(ctx context.Context, b *m
 		b.RepoBaseRef = p.RepoBaseRef
 		b.SCMConnectionID = p.SCMConnectionID
 	}
-	if _, err := r.db.ExecWriteContext(ctx, `
-		UPDATE workspace_agent_bindings
-		SET llm_connection_id = ?, scm_connection_id = ?, repo_slug = ?, repo_base_ref = ?,
-		    token_scopes_json = ?, token_ttl_minutes = ?, max_runs_per_day = ?,
-		    instructions = ?, capability_groups_json = ?,
-		    lifecycle = CASE WHEN lifecycle = 'archived' THEN lifecycle ELSE 'draft' END,
-		    profile_version = profile_version + 1,
-		    updated_at = CURRENT_TIMESTAMP
-		WHERE id = ? AND workspace_id = ?
-	`,
-		nullIntArg(b.LLMConnectionID), nullIntArg(b.SCMConnectionID),
-		nullStringArg(b.RepoSlug), nullStringArg(b.RepoBaseRef),
-		string(scopesJSON), b.TokenTTLMinutes, b.MaxRunsPerDay,
-		b.Instructions, string(capabilitiesJSON), b.ID, b.WorkspaceID,
-	); err != nil {
-		return fmt.Errorf("update binding config: %w", err)
-	}
-	if err := r.ReplaceBindingRepos(ctx, b.ID, repos); err != nil {
-		return fmt.Errorf("replace binding repos: %w", err)
+	if err := database.WithTx(db, func(tx database.Tx) error {
+		if _, err := tx.ExecWriteContext(ctx, `
+			UPDATE workspace_agent_bindings
+			SET llm_connection_id = ?, scm_connection_id = ?, repo_slug = ?, repo_base_ref = ?,
+			    token_scopes_json = ?, token_ttl_minutes = ?, max_runs_per_day = ?,
+			    instructions = ?, capability_groups_json = ?,
+			    lifecycle = CASE WHEN lifecycle = 'archived' THEN lifecycle ELSE 'draft' END,
+			    profile_version = profile_version + 1,
+			    updated_at = CURRENT_TIMESTAMP
+			WHERE id = ? AND workspace_id = ?
+		`,
+			nullIntArg(b.LLMConnectionID), nullIntArg(b.SCMConnectionID),
+			nullStringArg(b.RepoSlug), nullStringArg(b.RepoBaseRef),
+			string(scopesJSON), b.TokenTTLMinutes, b.MaxRunsPerDay,
+			b.Instructions, string(capabilitiesJSON), b.ID, b.WorkspaceID,
+		); err != nil {
+			return fmt.Errorf("update binding config: %w", err)
+		}
+		return NewWorkspaceAgentBindingRepositoryTx(tx).ReplaceBindingRepos(ctx, b.ID, repos)
+	}); err != nil {
+		return err
 	}
 	b.Repos = repos
 	return nil
@@ -476,8 +486,9 @@ func (r *WorkspaceAgentBindingRepository) Delete(ctx context.Context, id, worksp
 // responsible for validating the repos (slug shape, one primary, no dupes)
 // before calling — the partial unique index on is_primary and the
 // (binding_id, repo_slug) unique index are the last line of defense and
-// surface as a generic error. Like ReplaceBindingSkills this is not wrapped
-// in an explicit tx; on create the service deletes the binding if this fails.
+// surface as a generic error. It runs against whatever store the repository was
+// built with; UpdateConfig passes a transaction so the delete and inserts land
+// with the parent version bump, and Insert deletes the binding if this fails.
 func (r *WorkspaceAgentBindingRepository) ReplaceBindingRepos(ctx context.Context, bindingID int, repos []models.BindingRepo) error {
 	if _, err := r.db.ExecWriteContext(ctx, `DELETE FROM workspace_agent_binding_repos WHERE binding_id = ?`, bindingID); err != nil {
 		return fmt.Errorf("clear binding repos: %w", err)
@@ -636,7 +647,7 @@ func scanBindingRows(rows *sql.Rows) (*models.WorkspaceAgentBinding, error) {
 func scanBindingFrom(scanner bindingRowScanner) (*models.WorkspaceAgentBinding, error) {
 	b := &models.WorkspaceAgentBinding{}
 	var repoSlug, repoBaseRef, runnerImage sql.NullString
-	var llmConn, scmConn, targetPool, archivedBy sql.NullInt64
+	var llmConn, scmConn, targetPool, archivedBy, createdBy sql.NullInt64
 	var archivedAt sql.NullTime
 	var scopesJSON, capabilityGroupsJSON string
 	if err := scanner.Scan(
@@ -645,7 +656,7 @@ func scanBindingFrom(scanner bindingRowScanner) (*models.WorkspaceAgentBinding, 
 		&b.Purpose, &capabilityGroupsJSON,
 		&repoSlug, &repoBaseRef,
 		&llmConn, &scmConn, &targetPool, &scopesJSON, &b.TokenTTLMinutes, &b.MaxRunsPerDay,
-		&b.Instructions, &runnerImage, &b.CreatedByUserID,
+		&b.Instructions, &runnerImage, &createdBy,
 		&archivedAt, &archivedBy,
 		&b.LastKnownName, &b.LastKnownHandle, &b.LastKnownAvatar,
 		&b.DisplayName, &b.Handle, &b.AvatarURL,
@@ -673,6 +684,10 @@ func scanBindingFrom(scanner bindingRowScanner) (*models.WorkspaceAgentBinding, 
 	if targetPool.Valid {
 		v := int(targetPool.Int64)
 		b.TargetPoolID = &v
+	}
+	if createdBy.Valid {
+		v := int(createdBy.Int64)
+		b.CreatedByUserID = &v
 	}
 	if scopesJSON != "" {
 		_ = json.Unmarshal([]byte(scopesJSON), &b.TokenScopes)

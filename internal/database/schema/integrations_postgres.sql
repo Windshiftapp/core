@@ -146,6 +146,10 @@ CREATE TABLE IF NOT EXISTS zammad_connections (
 	correlation_field TEXT NOT NULL DEFAULT 'windshift_item_key',
 	closed_state_ids TEXT NOT NULL DEFAULT '[]',
 	completion_status_id INTEGER REFERENCES statuses(id) ON DELETE SET NULL,
+	-- Legacy connection-level scope. Runtime queries use action_credentials and
+	-- action_credential_workspaces; migration 20260901_zammad_canonical_workspace_scope
+	-- reads this state to backfill managed credentials. Retire only after every
+	-- supported upgrade has run that backfill (WI-2366).
 	-- migration: 20260829_zammad_integration
 	applies_to_all_workspaces BOOLEAN NOT NULL DEFAULT false,
 	last_tested_at TIMESTAMPTZ,
@@ -157,7 +161,9 @@ CREATE TABLE IF NOT EXISTS zammad_connections (
 
 CREATE INDEX IF NOT EXISTS idx_zammad_connections_credential ON zammad_connections(credential_id);
 
--- Workspace membership scope for connection-scoped credentials.
+-- Legacy workspace membership for connection-scoped credentials. Superseded by
+-- action_credential_workspaces; retained only for the 20260901 backfill. Retire
+-- once every supported upgrade has run it (WI-2366).
 -- migration: 20260829_zammad_integration
 CREATE TABLE IF NOT EXISTS zammad_connection_workspaces (
 	provider_id TEXT NOT NULL REFERENCES zammad_connections(provider_id) ON DELETE CASCADE,
