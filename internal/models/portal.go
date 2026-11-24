@@ -165,6 +165,11 @@ type ChannelConfig struct {
 	// (DefaultEmailRateLimitPerHour), 0 = unlimited, n = n. Replies to
 	// existing threads are never rate-limited.
 	EmailRateLimitPerHour *int `json:"email_rate_limit_per_hour,omitempty"`
+	// EmailSenderAuthentication is the mailbox default policy for trusting the
+	// inbound From address. "strict" (the default when empty) holds mail whose
+	// From domain does not pass an aligned SPF, DKIM, or DMARC check; "off"
+	// disables the check for providers that do not add authentication headers.
+	EmailSenderAuthentication string `json:"email_sender_authentication,omitempty"`
 
 	// Portal Configuration
 	PortalSlug          string   `json:"portal_slug,omitempty"`        // URL-friendly identifier (e.g., "support-portal")

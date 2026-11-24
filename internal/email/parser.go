@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"mime"
 	"net/mail"
+	"net/textproto"
 	"regexp"
 	"strings"
 
@@ -123,6 +124,7 @@ func (p *Parser) Parse(msg *FetchedMessage) *ParsedEmail {
 			for key, values := range headers.Header {
 				parsed.RawHeaders[key] = values
 			}
+			parsed.HeaderOrder = parseHeaderOrder(msg.Raw)
 		}
 	}
 
@@ -145,6 +147,33 @@ func (p *Parser) Parse(msg *FetchedMessage) *ParsedEmail {
 	}
 
 	return parsed
+}
+
+// parseHeaderOrder records the header field names of a raw message in order,
+// including duplicates. Continuation lines (leading space or tab) are folded
+// into the preceding field. Parsing stops at the blank line that ends the
+// header block.
+func parseHeaderOrder(raw []byte) []string {
+	var order []string
+	for _, line := range bytes.Split(raw, []byte("\n")) {
+		line = bytes.TrimRight(line, "\r")
+		if len(line) == 0 {
+			break // end of the header block
+		}
+		if line[0] == ' ' || line[0] == '\t' {
+			continue // folded continuation of the previous field
+		}
+		colon := bytes.IndexByte(line, ':')
+		if colon <= 0 {
+			continue
+		}
+		name := textproto.CanonicalMIMEHeaderKey(string(line[:colon]))
+		if name == "" {
+			continue
+		}
+		order = append(order, name)
+	}
+	return order
 }
 
 // parseBody parses the email body, extracting text content and attachments

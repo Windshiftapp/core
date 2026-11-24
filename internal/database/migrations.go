@@ -3727,6 +3727,29 @@ END $$;
 			CREATE UNIQUE INDEX IF NOT EXISTS uq_priorities_single_default ON priorities(is_default) WHERE is_default = true;
 		`,
 	},
+	{
+		// WI-2362: inbound mail authenticated its From address only through the
+		// attacker-controlled header. sender_auth records the SPF/DKIM/DMARC
+		// outcome on each tracking row, and intakes.sender_authentication lets an
+		// operator relax the default strict policy per intake. Empty
+		// sender_authentication means strict, so existing intakes need no backfill;
+		// operators whose provider does not add authentication headers must set it
+		// to 'off' explicitly.
+		Version: "20261204_email_sender_authentication",
+		Name:    "Record inbound sender authentication and per-intake policy (WI-2362)",
+		CheckSQLite: "SELECT CASE WHEN (" + sqliteColumnCheck("email_message_tracking", "sender_auth") +
+			") > 0 AND (" + sqliteColumnCheck("intakes", "sender_authentication") + ") > 0 THEN 1 ELSE 0 END",
+		CheckPostgres: "SELECT CASE WHEN (" + pgColumnCheck("email_message_tracking", "sender_auth") +
+			") > 0 AND (" + pgColumnCheck("intakes", "sender_authentication") + ") > 0 THEN 1 ELSE 0 END",
+		SQLite: `
+			ALTER TABLE email_message_tracking ADD COLUMN sender_auth TEXT;
+			ALTER TABLE intakes ADD COLUMN sender_authentication TEXT NOT NULL DEFAULT '';
+		`,
+		Postgres: `
+			ALTER TABLE email_message_tracking ADD COLUMN IF NOT EXISTS sender_auth TEXT;
+			ALTER TABLE intakes ADD COLUMN IF NOT EXISTS sender_authentication TEXT NOT NULL DEFAULT '';
+		`,
+	},
 }
 
 // domainEventClaimableIndexMigration adds the partial index the claim query

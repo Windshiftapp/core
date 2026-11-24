@@ -32,6 +32,10 @@ type Intake struct {
 	ItemTypeID            *int   `json:"item_type_id,omitempty"`
 	RateLimitPerHour      *int   `json:"rate_limit_per_hour,omitempty"`
 	ProcessingDisposition string `json:"processing_disposition,omitempty"`
+	// SenderAuthentication overrides the mailbox's inbound sender-authentication
+	// policy for this intake. Empty inherits the mailbox default; see
+	// ChannelConfig.EmailSenderAuthentication.
+	SenderAuthentication string `json:"sender_authentication,omitempty"`
 	// SendConfirmation emails the sender a receipt when this intake creates a
 	// new item. Off by default.
 	SendConfirmation bool `json:"send_confirmation"`

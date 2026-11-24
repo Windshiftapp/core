@@ -65,6 +65,7 @@
       item_type_id: null,
       rate_limit_per_hour: '',
       processing_disposition: '',
+      sender_authentication: '',
       send_confirmation: false,
       import_existing_mail: false,
       status: 'enabled'
@@ -99,6 +100,11 @@
     editing = { ...blankIntake(), ...intake };
     if (editing.status === 'needs_attention') {
       editing.status = 'disabled';
+    }
+    // Strict is the backend default for an empty value; normalize a stored
+    // "strict" so the select always has a matching option.
+    if (editing.sender_authentication !== 'off') {
+      editing.sender_authentication = '';
     }
     loadItemTypesForWorkspace(editing.workspace_id);
   }
@@ -144,6 +150,7 @@
           ? null
           : Number(editing.rate_limit_per_hour),
       processing_disposition: editing.processing_disposition || '',
+      sender_authentication: editing.sender_authentication || '',
       send_confirmation: !!editing.send_confirmation,
       import_existing_mail: !!editing.import_existing_mail,
       status: editing.status || 'enabled'
@@ -379,6 +386,22 @@
             options={statusOptions}
             bind:value={editing.status}
           />
+        </div>
+
+        <div>
+          <SelectField
+            label={t('channel.senderAuthentication')}
+            labelColor="default"
+            id="intake-sender-authentication"
+            dataTestid="channel-intake-sender-authentication"
+            options={[
+              { value: '', label: t('channel.senderAuthInherit') },
+              { value: 'strict', label: t('channel.senderAuthStrict') },
+              { value: 'off', label: t('channel.senderAuthOff') }
+            ]}
+            bind:value={editing.sender_authentication}
+          />
+          <DescriptionText>{t('channel.senderAuthIntakeHelp')}</DescriptionText>
         </div>
 
         <Checkbox

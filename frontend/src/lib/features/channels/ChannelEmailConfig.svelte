@@ -39,6 +39,7 @@
       item_type_id: null,
       mailbox: 'INBOX',
       processing_disposition: 'mark_read',
+      sender_authentication: '',
       rate_limit_per_hour: null,
       enabled: false
     }),
@@ -146,7 +147,9 @@
     // limit) and per-intake disposition overrides live on intakes.
     const baseConfig = {
       email_auth_method: formData.auth_method,
-      email_processing_disposition: formData.processing_disposition || 'mark_read'
+      email_processing_disposition: formData.processing_disposition || 'mark_read',
+      // Empty means strict on the backend; send the explicit value the admin chose.
+      email_sender_authentication: formData.sender_authentication || ''
     };
 
     if (formData.auth_method === 'oauth') {
@@ -428,6 +431,21 @@
         bind:value={formData.processing_disposition}
       />
       <DescriptionText>{t('channel.dispositionHelp')}</DescriptionText>
+    </div>
+
+    <!-- Mailbox-level sender-authentication default; an intake may override it. -->
+    <div class="pt-4 border-t border-ds-border">
+      <SelectField
+        label={t('channel.senderAuthentication')}
+        labelColor="default"
+        id="email-sender-authentication"
+        options={[
+          { value: '', label: t('channel.senderAuthStrict') },
+          { value: 'off', label: t('channel.senderAuthOff') }
+        ]}
+        bind:value={formData.sender_authentication}
+      />
+      <DescriptionText>{t('channel.senderAuthHelp')}</DescriptionText>
     </div>
 
     <!-- Intakes: routing is separate from the connection. One mailbox can feed

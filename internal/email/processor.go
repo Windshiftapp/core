@@ -152,6 +152,25 @@ func (p *Processor) ProcessEmailWithIntake(
 		}, nil
 	}
 
+	// 1c. Sender authentication. The From header is attacker-controlled, so a
+	// strict policy holds mail whose From domain did not pass an aligned SPF,
+	// DKIM, or DMARC check instead of attributing it to a portal customer or an
+	// existing thread (WI-2362). The message is recorded on the tracking row so
+	// the admin diagnostics view can show what was held and why.
+	authResult := EvaluateSenderAuthentication(email)
+	if policy := ResolveSenderAuthPolicy(config.EmailSenderAuthentication); policy == SenderAuthStrict && !authResult.Verified {
+		p.markSenderAuthHeld(ctx, channelID, dedupKey, authResult)
+		slog.Warn("held inbound email: sender not authenticated",
+			"channel_id", channelID,
+			"message_id", email.MessageID,
+			"from", email.From.Address,
+			"auth", authResult.Summary(),
+			"detail", authResult.Detail,
+		)
+		return &ProcessingResult{Action: ActionSkipped, SkipReason: skipReasonUnauthenticatedSender}, nil
+	}
+	p.recordSenderAuth(ctx, channelID, dedupKey, authResult)
+
 	// 2. Find or create portal customer by email
 	customerID, err := p.findOrCreatePortalCustomer(ctx, email.From.Address, email.From.Name, channelID, config)
 	if err != nil {
@@ -367,6 +386,41 @@ func (p *Processor) markSystemMailSkipped(ctx context.Context, channelID int, de
 	`, string(info.Category), channelID, dedupKey); err != nil {
 		slog.Warn("failed to mark system email skipped",
 			"error", err, "channel_id", channelID, "dedup_key", dedupKey, "category", info.Category)
+	}
+}
+
+// skipReasonUnauthenticatedSender is persisted in
+// email_message_tracking.skipped_reason when a strict sender-authentication
+// policy held mail whose From address could not be authenticated. It is
+// rendered by the admin email-intake diagnostics view.
+const skipReasonUnauthenticatedSender = "unauthenticated_sender"
+
+// recordSenderAuth stamps the authentication outcome on the claimed tracking
+// row so the channel email log and admin diagnostics can show how the sender
+// was authenticated. Best effort: a failure here never changes ingestion.
+func (p *Processor) recordSenderAuth(ctx context.Context, channelID int, dedupKey string, auth SenderAuthResult) {
+	if _, err := p.db.ExecWriteContext(ctx, `
+		UPDATE email_message_tracking
+		SET sender_auth = ?
+		WHERE channel_id = ? AND dedup_key = ?
+	`, auth.Summary(), channelID, dedupKey); err != nil {
+		slog.Warn("failed to record sender authentication",
+			"error", err, "channel_id", channelID, "dedup_key", dedupKey, "auth", auth.Summary())
+	}
+}
+
+// markSenderAuthHeld finalizes the claimed tracking row for mail a strict
+// policy refused to attribute to the From address. completed_at keeps the
+// message deduplicated (the item and comment refs stay NULL) and skipped_reason
+// is the admin diagnostics hook.
+func (p *Processor) markSenderAuthHeld(ctx context.Context, channelID int, dedupKey string, auth SenderAuthResult) {
+	if _, err := p.db.ExecWriteContext(ctx, `
+		UPDATE email_message_tracking
+		SET sender_auth = ?, skipped_reason = ?, completed_at = CURRENT_TIMESTAMP
+		WHERE channel_id = ? AND dedup_key = ? AND completed_at IS NULL
+	`, auth.Summary(), skipReasonUnauthenticatedSender, channelID, dedupKey); err != nil {
+		slog.Warn("failed to mark unauthenticated email held",
+			"error", err, "channel_id", channelID, "dedup_key", dedupKey, "auth", auth.Summary())
 	}
 }
 

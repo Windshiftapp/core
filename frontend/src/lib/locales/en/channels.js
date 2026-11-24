@@ -259,6 +259,14 @@ export default {
     dispositionDeleteHelp:
       'Remove the email from the mailbox after creating the item (use with caution).',
     dispositionInherit: 'Use the mailbox default',
+    senderAuthentication: 'Sender authentication',
+    senderAuthInherit: 'Use the mailbox default',
+    senderAuthStrict: 'Strict \u2014 hold unauthenticated mail',
+    senderAuthOff: 'Off \u2014 trust the From header',
+    senderAuthHelp:
+      'Strict holds mail whose From address fails or lacks an aligned SPF, DKIM, or DMARC result, so a spoofed sender cannot join a thread or impersonate a customer. Turn it off only if your mail provider does not add authentication headers.',
+    senderAuthIntakeHelp:
+      'Overrides the mailbox sender-authentication policy for mail in this folder. Leave on the mailbox default unless this folder needs a different policy.',
     intakesTitle: 'Intakes',
     intakesHelp:
       'Each intake reads one folder on this mailbox and creates items in one workspace and item type. Link a portal to expose those requests to its customers. One mailbox can feed several intakes, but only via distinct folders. Creating an intake requires managing this mailbox, the target workspace, and any linked portal.',

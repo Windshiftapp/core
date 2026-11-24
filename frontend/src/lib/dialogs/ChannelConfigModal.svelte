@@ -114,6 +114,7 @@
     item_type_id: null,
     mailbox: 'INBOX',
     processing_disposition: 'mark_read',
+    sender_authentication: '',
     rate_limit_per_hour: null,
     enabled: false
   });
@@ -240,6 +241,9 @@
               : config.email_mark_as_read === false
                 ? 'leave'
                 : 'mark_read'),
+          // Strict is the backend default for an empty value; normalize a
+          // stored "strict" so the select always has a matching option.
+          sender_authentication: config.email_sender_authentication === 'off' ? 'off' : '',
           rate_limit_per_hour: config.email_rate_limit_per_hour ?? null,
           enabled: channel.status === 'enabled'
         };

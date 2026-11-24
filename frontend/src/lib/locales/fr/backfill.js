@@ -102,6 +102,12 @@ export default {
     "dispositionDeleteHelp": "Retirer l'e-mail de la boîte après la création de l'élément (à utiliser avec prudence).",
     "dispositionHelp": "Que faire d'un e-mail une fois converti en élément.",
     "dispositionInherit": "Utiliser la valeur par défaut de la boîte",
+    "senderAuthentication": "Authentification de l'expéditeur",
+    "senderAuthInherit": "Utiliser la valeur par défaut de la boîte",
+    "senderAuthStrict": "Strict — retenir les e-mails non authentifiés",
+    "senderAuthOff": "Désactivé — faire confiance à l'en-tête From",
+    "senderAuthHelp": "Le mode strict retient les e-mails dont l'adresse d'expédition n'a pas de résultat SPF, DKIM ou DMARC aligné, afin qu'un expéditeur usurpé ne puisse pas rejoindre un fil ni se faire passer pour un client. À désactiver uniquement si votre fournisseur de messagerie n'ajoute pas d'en-têtes d'authentification.",
+    "senderAuthIntakeHelp": "Remplace la politique d'authentification de l'expéditeur de la boîte pour les e-mails de ce dossier. Laissez la valeur par défaut de la boîte sauf si ce dossier nécessite une politique différente.",
     "dispositionLeave": "Laisser dans la boîte",
     "dispositionMarkRead": "Marquer comme lu",
     "emailLog": {

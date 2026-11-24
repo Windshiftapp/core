@@ -74,6 +74,12 @@ export default {
     "dispositionDeleteHelp": "Die E-Mail nach dem Erstellen des Vorgangs aus dem Postfach entfernen (mit Vorsicht verwenden).",
     "dispositionHelp": "Was mit einer E-Mail geschehen soll, nachdem sie in einen Vorgang umgewandelt wurde.",
     "dispositionInherit": "Postfachstandard verwenden",
+    "senderAuthentication": "Absenderauthentifizierung",
+    "senderAuthInherit": "Postfachstandard verwenden",
+    "senderAuthStrict": "Streng – nicht authentifizierte E-Mails zurückhalten",
+    "senderAuthOff": "Aus – From-Header vertrauen",
+    "senderAuthHelp": "Streng hält E-Mails zurück, deren Absenderadresse kein übereinstimmendes SPF-, DKIM- oder DMARC-Ergebnis hat, damit sich ein gefälschter Absender nicht an einem Thread beteiligen oder als Kunde ausgeben kann. Nur deaktivieren, wenn der Mailanbieter keine Authentifizierungs-Header hinzufügt.",
+    "senderAuthIntakeHelp": "Überschreibt die Absenderauthentifizierungs-Richtlinie des Postfachs für E-Mails in diesem Ordner. Auf dem Postfachstandard belassen, sofern dieser Ordner keine andere Richtlinie benötigt.",
     "dispositionLeave": "Im Postfach belassen",
     "dispositionMarkRead": "Als gelesen markieren",
     "emailLog": {

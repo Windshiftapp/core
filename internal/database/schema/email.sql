@@ -51,6 +51,9 @@ CREATE TABLE IF NOT EXISTS intakes (
 	item_type_id INTEGER, -- item type created for the routing workspace
 	rate_limit_per_hour INTEGER,
 	processing_disposition TEXT NOT NULL DEFAULT '',
+	-- sender_authentication overrides the mailbox's inbound sender
+	-- authentication policy for this intake. Empty inherits the mailbox default.
+	sender_authentication TEXT NOT NULL DEFAULT '',
 	send_confirmation BOOLEAN NOT NULL DEFAULT false,
 	import_existing_mail BOOLEAN NOT NULL DEFAULT false,
 	status TEXT NOT NULL DEFAULT 'enabled',
@@ -142,11 +145,18 @@ CREATE TABLE IF NOT EXISTS email_message_tracking (
 	-- reprocessing the same email. It is only cleared when the channel is
 	-- deleted and cascades the tracking rows.
 	completed_at DATETIME,
-	-- skipped_reason records machine-generated mail (bounces, auto-replies)
-	-- that intake deliberately did not turn into a ticket. The value is a
-	-- SystemMailCategory; NULL for mail that was processed normally. Surfaced
-	-- by the admin email-intake diagnostics view.
+	-- skipped_reason records mail intake deliberately did not turn into a
+	-- ticket: machine-generated mail (bounces, auto-replies) and, under a
+	-- strict sender-authentication policy, mail whose From address could not
+	-- be authenticated. The value is a SystemMailCategory or
+	-- 'unauthenticated_sender'; NULL for mail that was processed normally.
+	-- Surfaced by the admin email-intake diagnostics view.
 	skipped_reason TEXT,
+	-- sender_auth records the outcome of evaluating the message's SPF, DKIM,
+	-- and DMARC results against the From domain, e.g. 'dmarc=pass', 'spf=fail',
+	-- or 'none'. NULL for rows written before the check existed. Surfaced by
+	-- the channel email log and admin diagnostics.
+	sender_auth TEXT,
 	processed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,

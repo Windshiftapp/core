@@ -49,6 +49,8 @@ CREATE TABLE IF NOT EXISTS intakes (
 	item_type_id INTEGER,
 	rate_limit_per_hour INTEGER,
 	processing_disposition TEXT NOT NULL DEFAULT '',
+	-- sender_authentication: see email.sql for the column contract.
+	sender_authentication TEXT NOT NULL DEFAULT '',
 	send_confirmation BOOLEAN NOT NULL DEFAULT false,
 	import_existing_mail BOOLEAN NOT NULL DEFAULT false,
 	status TEXT NOT NULL DEFAULT 'enabled',
@@ -118,8 +120,9 @@ CREATE TABLE IF NOT EXISTS email_message_tracking (
 	uid_validity BIGINT NOT NULL DEFAULT 0,
 	rate_limited_at TIMESTAMPTZ,
 	completed_at TIMESTAMPTZ,
-	-- skipped_reason: see email.sql for the column contract.
+	-- skipped_reason/sender_auth: see email.sql for the column contract.
 	skipped_reason TEXT,
+	sender_auth TEXT,
 	processed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,

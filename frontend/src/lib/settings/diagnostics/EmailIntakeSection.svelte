@@ -16,6 +16,7 @@
   const CATEGORY_LABELS = {
     delivery_failure: 'Delivery failure',
     auto_reply: 'Auto-reply',
+    unauthenticated_sender: 'Unauthenticated sender',
   };
 
   let window = $state('24h');
@@ -45,13 +46,14 @@
   }
 
   function categoryVariant(category) {
-    return category === 'delivery_failure' ? 'danger' : 'neutral';
+    if (category === 'delivery_failure') return 'danger';
+    return category === 'unauthenticated_sender' ? 'warning' : 'neutral';
   }
 </script>
 
 <DiagnosticsSection
-  title="Email intake: system-generated mail"
-  subtitle="Bounces and auto-replies that arrived by email and were deliberately not turned into work items. They are kept here so delivery failures and responder loops stay visible without cluttering the backlog."
+  title="Email intake: held and skipped mail"
+  subtitle="Bounces, auto-replies, and (under a strict sender-authentication policy) mail whose sender could not be authenticated. These messages were deliberately not turned into work items and are kept here so delivery failures, responder loops, and spoofing attempts stay visible without cluttering the backlog."
   dataTestId="diagnostics-email-intake"
   onLoad={load}
   lastRefreshed={lastRefreshed}
@@ -65,7 +67,7 @@
           <IconInbox size={20} stroke={1.75} style="color: var(--ds-icon-subtle);" />
           <div>
             <div class="text-sm font-medium" style="color: var(--ds-text);">
-              {total} skipped message{total === 1 ? '' : 's'}
+              {total} held or skipped message{total === 1 ? '' : 's'}
             </div>
             <div class="text-xs" style="color: var(--ds-text-subtle);">
               Not created as work items; recorded for diagnostics only.
@@ -92,7 +94,7 @@
     {#if !view.loading && !view.error && total === 0}
       <Card variant="outlined">
         <p class="text-sm" style="color: var(--ds-text-subtle);">
-          No system-generated mail was skipped in this window.
+          No held or skipped mail in this window.
         </p>
       </Card>
     {:else if !view.error}
@@ -132,6 +134,11 @@
                     <Badge variant={categoryVariant(message.category)} size="xs">
                       {categoryLabel(message.category)}
                     </Badge>
+                    {#if message.sender_auth}
+                      <div class="text-xs mt-1 text-ds-text-subtle">
+                        {message.sender_auth}
+                      </div>
+                    {/if}
                   </td>
                   <td class="py-2 pr-4" style="color: var(--ds-text);">
                     {#if message.from_name}

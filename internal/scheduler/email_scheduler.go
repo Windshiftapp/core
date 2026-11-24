@@ -432,6 +432,7 @@ func legacyIntakeFromConfig(config *models.ChannelConfig) *models.Intake {
 		ItemTypeID:            config.EmailItemTypeID,
 		RateLimitPerHour:      config.EmailRateLimitPerHour,
 		ProcessingDisposition: config.EmailProcessingDisposition,
+		SenderAuthentication:  config.EmailSenderAuthentication,
 		Status:                models.IntakeStatusEnabled,
 	}
 }
@@ -462,6 +463,11 @@ func (es *EmailScheduler) pollIntake(
 	// whatever the mailbox config carries (enum or legacy booleans).
 	if intake.ProcessingDisposition != "" {
 		effective.EmailProcessingDisposition = intake.ProcessingDisposition
+	}
+	// Likewise an empty sender-authentication policy inherits the mailbox
+	// default, whose own empty value is strict.
+	if intake.SenderAuthentication != "" {
+		effective.EmailSenderAuthentication = intake.SenderAuthentication
 	}
 
 	mailbox := intake.Folder

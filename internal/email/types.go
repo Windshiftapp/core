@@ -36,6 +36,12 @@ type ParsedEmail struct {
 	HTMLBody    string
 	Attachments []Attachment
 	RawHeaders  map[string][]string
+	// HeaderOrder lists the message's header field names in the order they
+	// appear, duplicates included. It lets sender authentication trust only
+	// Authentication-Results headers added above the receiving MTA's Received
+	// header rather than one injected by the sender. Empty when the message was
+	// not parsed from raw bytes.
+	HeaderOrder []string
 }
 
 // EmailAddress represents an email address with optional display name
