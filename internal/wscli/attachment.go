@@ -1,10 +1,8 @@
 package wscli
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -140,27 +138,26 @@ Examples:
 	},
 }
 
-// maxItemAttachmentUpload mirrors the route's fixed multipart request cap.
-// Configurable limits and MIME validation remain server-side to avoid stale CLI policy.
-const maxItemAttachmentUpload = 32 << 20
-
+// attachmentUploadCmd uploads one or more local files to a work item. Size
+// limits are enforced server-side: the route bounds the body by the effective
+// attachment setting, so a client-side ceiling would reject files the server
+// accepts. Only cheap local checks remain (see checkUploadableFiles).
 var attachmentUploadCmd = &cobra.Command{
 	Use:   "upload <id|KEY-123> <file> [file...]",
 	Short: "Upload one or more files to a work item",
 	Long: `Upload local files as attachments on a work item.
 
-Every file is checked (exists, readable, within the upload endpoint's
-32 MB request limit) before the first upload is attempted, so a typo in
-the last path does not leave you with a partial batch. Files upload in
-the order given; if one fails mid-batch the command reports which files
-did land and exits non-zero.
+Every file is checked (exists, readable, not a directory, non-empty) before
+the first upload is attempted, so a typo in the last path does not leave you
+with a partial batch. Files upload in the order given; if one fails mid-batch
+the command reports which files did land and exits non-zero.
 
-Your server enforces further restrictions that this command cannot check
-up front: an administrator-configured size limit and allowed MIME types,
-a fixed blocklist of executable extensions (.exe, .sh, .js, .svg, ...),
-a requirement that files have an extension matching their actual content,
-and a global switch that can turn attachments off entirely. Those are
-reported with the server's own explanation.
+Your server enforces the size limit (an administrator-configured maximum with
+an operator ceiling) plus restrictions this command cannot check up front:
+allowed MIME types, a fixed blocklist of executable extensions (.exe, .sh,
+.js, .svg, ...), a requirement that files have an extension matching their
+actual content, and a global switch that can turn attachments off entirely.
+Those are reported with the server's own explanation.
 
 Examples:
   ws attachment upload PROJ-45 mockup.png
@@ -219,7 +216,8 @@ func uploadOneAttachment(client *Client, itemID int, path string) (*Attachment, 
 
 // checkUploadableFiles validates every path up front so the command fails
 // before touching the network when any of them is missing, a directory, or
-// too large for the upload route to accept.
+// empty. File size is left to the server: the effective attachment limit is
+// server state, and a stale local copy would reject files the server accepts.
 func checkUploadableFiles(paths []string) error {
 	for _, path := range paths {
 		info, err := os.Stat(path)
@@ -232,10 +230,6 @@ func checkUploadableFiles(paths []string) error {
 		if info.Size() == 0 {
 			return fmt.Errorf("cannot upload %s: file is empty", path)
 		}
-		// The request cap includes the multipart envelope.
-		if total := info.Size() + multipartEnvelopeSize(filepath.Base(path)); total > maxItemAttachmentUpload {
-			return fmt.Errorf("cannot upload %s: %d bytes exceeds the upload endpoint's %d MB request limit", path, info.Size(), maxItemAttachmentUpload>>20)
-		}
 		// Verify readability before the batch starts.
 		f, err := os.Open(path) //nolint:gosec // G304: path supplied by the user on the command line, intentional
 		if err != nil {
@@ -244,21 +238,6 @@ func checkUploadableFiles(paths []string) error {
 		_ = f.Close()
 	}
 	return nil
-}
-
-// multipartEnvelopeSize returns the exact number of bytes the multipart
-// wrapper adds around a file part named filename. The boundary is random but
-// fixed-length, so this is deterministic for a given filename.
-func multipartEnvelopeSize(filename string) int64 {
-	var buf bytes.Buffer
-	mp := multipart.NewWriter(&buf)
-	if _, err := mp.CreateFormFile("file", filename); err != nil {
-		return 0
-	}
-	if err := mp.Close(); err != nil {
-		return 0
-	}
-	return int64(buf.Len())
 }
 
 // translateItemAttachmentError adds the file being uploaded as context and

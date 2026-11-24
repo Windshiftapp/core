@@ -15,6 +15,13 @@ import (
 	"windshift/internal/models"
 )
 
+// AttachmentMultipartOverheadBytes bounds the multipart framing around a
+// single uploaded file: boundary markers, part headers, and the small
+// accompanying form fields (entity type, category, ...). HTTP handlers cap the
+// request body at the effective file limit plus this allowance so a file
+// exactly at the configured limit is not rejected by its own framing.
+const AttachmentMultipartOverheadBytes = 1 << 20
+
 type attachmentFileInput struct {
 	originalFilename string
 	data             []byte

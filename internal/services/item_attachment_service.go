@@ -86,11 +86,18 @@ func (s *ItemAttachmentService) UploadPolicy() (ItemAttachmentUploadPolicy, erro
 	if err != nil {
 		return ItemAttachmentUploadPolicy{}, err
 	}
+	return uploadPolicyFromSettings(settings), nil
+}
+
+// uploadPolicyFromSettings projects the stored settings into the public-safe
+// policy shape. Malformed MIME settings are treated as no restriction, matching
+// the upload validation path.
+func uploadPolicyFromSettings(settings *models.AttachmentSettings) ItemAttachmentUploadPolicy {
 	policy := ItemAttachmentUploadPolicy{Enabled: settings.Enabled, MaxFileSize: settings.MaxFileSize}
 	if settings.AllowedMimeTypes != "" && json.Valid([]byte(settings.AllowedMimeTypes)) {
 		_ = json.Unmarshal([]byte(settings.AllowedMimeTypes), &policy.AllowedMimeTypes)
 	}
-	return policy, nil
+	return policy
 }
 
 func (s *ItemAttachmentService) ListItemAttachments(userID, itemID, limit, offset int) ([]models.Attachment, int, error) {

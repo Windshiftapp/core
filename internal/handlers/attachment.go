@@ -22,6 +22,7 @@ import (
 	"windshift/internal/fileserve"
 	"windshift/internal/logger"
 	"windshift/internal/models"
+	"windshift/internal/operatorcontrols"
 	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/utils"
@@ -436,13 +437,31 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Cap the request before parsing.
-	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
+	settings, err := h.getAttachmentSettings()
+	if err != nil {
+		slog.Error("failed to load attachment settings", slog.String("component", "attachments"), slog.Any("error", err))
+		respondInternalError(w, r, fmt.Errorf("failed to get attachment settings: %w", err))
+		return
+	}
+	if !settings.Enabled || settings.MaxFileSize <= 0 {
+		respondServiceUnavailable(w, r, "Attachments are disabled")
+		return
+	}
+	slog.Debug("attachment settings loaded", slog.String("component", "attachments"), slog.Bool("enabled", settings.Enabled), slog.Int64("max_size", settings.MaxFileSize))
+
+	// Cap the request at the effective per-file limit plus multipart framing
+	// before parsing; the per-file limit itself is enforced after reading.
+	maxBody := settings.MaxFileSize + services.AttachmentMultipartOverheadBytes
+	r.Body = http.MaxBytesReader(w, r.Body, maxBody)
 
 	slog.Debug("parsing multipart form", slog.String("component", "attachments"))
 	// #nosec G120 -- the body is already capped by MaxBytesReader above; the int arg is the in-memory threshold, not the upper bound
-	err := r.ParseMultipartForm(32 << 20)
+	err = r.ParseMultipartForm(32 << 20)
 	if err != nil {
+		if isRequestBodyTooLarge(err) {
+			respondRequestTooLarge(w, r)
+			return
+		}
 		slog.Error("failed to parse form data", slog.String("component", "attachments"), slog.Any("error", err))
 		respondBadRequest(w, r, "Failed to parse form data: "+err.Error())
 		return
@@ -545,20 +564,6 @@ func (h *AttachmentHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		respondValidationError(w, r, fmt.Sprintf(
 			"File extension %s is not allowed for %s uploads. Only image files are accepted",
 			strings.ToLower(filepath.Ext(fileHeader.Filename)), entityType))
-		return
-	}
-
-	slog.Debug("getting attachment settings", slog.String("component", "attachments"))
-	settings, err := h.getAttachmentSettings()
-	if err != nil {
-		slog.Error("failed to get attachment settings", slog.String("component", "attachments"), slog.Any("error", err))
-		respondInternalError(w, r, fmt.Errorf("failed to get attachment settings: %w", err))
-		return
-	}
-	slog.Debug("attachment settings loaded", slog.String("component", "attachments"), slog.Bool("enabled", settings.Enabled), slog.Int64("max_size", settings.MaxFileSize))
-
-	if !settings.Enabled {
-		respondServiceUnavailable(w, r, "Attachments are disabled")
 		return
 	}
 
@@ -1334,7 +1339,8 @@ func (h *AttachmentHandler) generateUniqueFilename(originalFilename string) (str
 	return randomStr + ext, nil
 }
 
-// getAttachmentSettings retrieves current attachment settings
+// getAttachmentSettings retrieves current attachment settings with any
+// operator-imposed ceiling applied.
 func (h *AttachmentHandler) getAttachmentSettings() (*models.AttachmentSettings, error) {
 	settings := &models.AttachmentSettings{
 		MaxFileSize:      52428800, // 50MB default
@@ -1349,13 +1355,12 @@ func (h *AttachmentHandler) getAttachmentSettings() (*models.AttachmentSettings,
 		FROM attachment_settings ORDER BY id DESC LIMIT 1
 	`).Scan(&settings.MaxFileSize, &settings.AllowedMimeTypes, &settings.AttachmentPath, &settings.Enabled)
 
-	if errors.Is(err, sql.ErrNoRows) {
-		// No settings in database, use defaults
-		return settings, nil
-	}
-	if err != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 
+	if ceiling := operatorcontrols.From(h.db).Limits().AttachmentBytes; ceiling > 0 && settings.MaxFileSize > ceiling {
+		settings.MaxFileSize = ceiling
+	}
 	return settings, nil
 }

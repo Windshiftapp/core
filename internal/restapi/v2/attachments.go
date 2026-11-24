@@ -36,7 +36,17 @@ func uploadPageAttachment(deps Deps) Handler {
 		if err != nil {
 			return err
 		}
-		const maxBody = int64(32 << 20)
+		policy, err := deps.PageAttachments.UploadPolicy()
+		if err != nil {
+			return internalError(err)
+		}
+		if !policy.Enabled || policy.MaxFileSize <= 0 {
+			return pageAttachmentError(services.ErrPageAttachmentUploadDisabled)
+		}
+		// Bound the body by the effective file limit plus multipart framing so a
+		// file exactly at the limit is accepted; the per-file limit is enforced
+		// after reading.
+		maxBody := policy.MaxFileSize + services.AttachmentMultipartOverheadBytes
 		r.Body = http.MaxBytesReader(w, r.Body, maxBody)
 		// The request body is bounded above; ParseMultipartForm's argument only controls memory use.
 		//nolint:gosec // G120 does not recognize the MaxBytesReader assignment.
@@ -48,9 +58,12 @@ func uploadPageAttachment(deps Deps) Handler {
 			return newError(http.StatusBadRequest, "invalid_request", "file is required")
 		}
 		defer func() { _ = file.Close() }()
-		data, err := io.ReadAll(file)
+		data, err := io.ReadAll(io.LimitReader(file, policy.MaxFileSize+1))
 		if err != nil {
 			return internalError(err)
+		}
+		if int64(len(data)) > policy.MaxFileSize {
+			return newError(http.StatusRequestEntityTooLarge, "payload_too_large", "Attachment exceeds the configured size limit")
 		}
 		// The file is fully received; bound the storage and database work that
 		// follows instead of charging its transfer time to the budget.
@@ -121,7 +134,7 @@ func uploadItemAttachment(attachments attachmentApplication) Handler {
 		if !policy.Enabled || policy.MaxFileSize <= 0 {
 			return attachmentError(services.ErrItemAttachmentDisabled)
 		}
-		maxBody := policy.MaxFileSize + (1 << 20)
+		maxBody := policy.MaxFileSize + services.AttachmentMultipartOverheadBytes
 		r.Body = http.MaxBytesReader(w, r.Body, maxBody)
 		// The request body is bounded above; ParseMultipartForm's argument only controls memory use.
 		//nolint:gosec // G120 does not recognize the MaxBytesReader assignment.

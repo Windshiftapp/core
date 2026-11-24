@@ -323,9 +323,21 @@ func (h *PortalHandler) AddRequestAttachment(w http.ResponseWriter, r *http.Requ
 		respondServiceUnavailable(w, r, "Attachments are not enabled on this server")
 		return
 	}
+	policy, err := svc.UploadPolicy()
+	if err != nil {
+		respondInternalError(w, r, err)
+		return
+	}
+	if !policy.Enabled || policy.MaxFileSize <= 0 {
+		respondServiceUnavailable(w, r, "Attachments are not enabled on this server")
+		return
+	}
 
-	// Cap the request before parsing, mirroring the internal upload endpoint.
-	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
+	// Cap the request at the effective per-file limit plus multipart framing,
+	// mirroring the internal upload endpoint; the per-file limit is enforced
+	// after reading.
+	maxBody := policy.MaxFileSize + services.AttachmentMultipartOverheadBytes
+	r.Body = http.MaxBytesReader(w, r.Body, maxBody)
 	// #nosec G120 -- the body is already capped by MaxBytesReader above; the int arg is the in-memory threshold, not the upper bound
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		if isRequestBodyTooLarge(err) {
@@ -341,9 +353,13 @@ func (h *PortalHandler) AddRequestAttachment(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	defer func() { _ = file.Close() }()
-	data, err := io.ReadAll(file)
+	data, err := io.ReadAll(io.LimitReader(file, policy.MaxFileSize+1))
 	if err != nil {
 		respondInternalError(w, r, fmt.Errorf("read portal attachment: %w", err))
+		return
+	}
+	if int64(len(data)) > policy.MaxFileSize {
+		respondRequestTooLarge(w, r)
 		return
 	}
 

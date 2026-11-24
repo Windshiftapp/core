@@ -28,6 +28,16 @@ import (
 // formSubmissionMaxBytes caps the public form submission body. A submission
 // can carry a description plus custom-field values, so it gets 1 MiB of
 // headroom while still bounding per-request memory on this public endpoint.
+//
+// Public forms are the one multi-file upload surface, so their limits are an
+// aggregate policy rather than the per-file attachment setting used by every
+// authenticated single-file upload:
+//   - publicFormMultipartMaxBytes caps the entire anonymous submission;
+//   - publicFormMaxAttachmentBytes clamps each part below that aggregate; and
+//   - publicFormMaxAttachmentCount caps how many parts may be sent.
+//
+// The effective attachment setting still applies per file on top of
+// publicFormMaxAttachmentBytes; see publicFormAttachmentConfig.
 const (
 	formSubmissionMaxBytes       = 1 << 20
 	publicFormMultipartMaxBytes  = 32 << 20

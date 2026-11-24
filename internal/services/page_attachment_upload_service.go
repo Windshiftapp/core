@@ -55,6 +55,20 @@ func NewPageAttachmentUploadService(db database.Database, storage *blobstore.Sto
 	}
 }
 
+// UploadPolicy returns the current public-safe upload limits. Page and item
+// uploads share the system-wide attachment settings, so the policy matches the
+// item upload policy including any operator-imposed ceiling.
+func (s *PageAttachmentUploadService) UploadPolicy() (ItemAttachmentUploadPolicy, error) {
+	if !s.storage.Enabled() {
+		return ItemAttachmentUploadPolicy{}, nil
+	}
+	settings, err := loadAttachmentSettings(s.db)
+	if err != nil {
+		return ItemAttachmentUploadPolicy{}, err
+	}
+	return uploadPolicyFromSettings(settings), nil
+}
+
 // PageAttachmentUploadInput contains the validated HTTP upload payload.
 type PageAttachmentUploadInput struct {
 	PageID           int

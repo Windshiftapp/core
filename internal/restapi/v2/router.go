@@ -529,6 +529,7 @@ type attachmentApplication interface {
 }
 
 type pageAttachmentApplication interface {
+	UploadPolicy() (services.ItemAttachmentUploadPolicy, error)
 	UploadPageAttachment(context.Context, services.PageAttachmentUploadInput) (models.AttachmentUploadResponse, error)
 	OpenPageAttachment(context.Context, int, int, bool) (*services.ItemAttachmentBinary, error)
 }
