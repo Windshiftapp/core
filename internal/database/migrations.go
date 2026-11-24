@@ -3786,6 +3786,7 @@ END $$;
 			CREATE INDEX IF NOT EXISTS idx_email_message_tracking_key_generation ON email_message_tracking(key_generation);
 		`,
 	},
+	{
 		// WI-2366: base_tables_postgres.sql declared these tables before their
 		// owning domain files, so CREATE TABLE IF NOT EXISTS silently discarded
 		// four cascading foreign keys and the stricter iteration_types shape on
