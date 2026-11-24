@@ -146,7 +146,9 @@ Per-run broker quotas and conversation admission remain separate controls.
 Enabled condition and action scripts share the instance-wide `concurrent_scripts`
 admission pool. `script_timeout_ms` caps both runtimes and action-script REST
 deadlines; node settings can only narrow the ceiling. Permits are released on
-success, error and cancellation.
+success, error and cancellation. When `concurrent_scripts` is unset, action
+workers fall back to a finite default of 4: each execution is a process, so an
+unset limit must not mean unbounded spawning.
 
 `execute_script` action nodes run in a separate worker process per execution
 (selected by `WINDSHIFT_SCRIPT_WORKER=1` on the server binary). The worker gets
@@ -155,6 +157,8 @@ sets its own Go memory limit, an in-worker monitor interrupts a runaway
 allocation, and on Linux the parent additionally kills the worker when its
 resident set passes its baseline plus the budget and a small runtime allowance.
 A killed or over-budget worker fails the node with a bounded error, and the API
-process is unaffected.
+process is unaffected. The timeout is one absolute instant shared by the parent
+and the worker, so startup time counts against the budget, and the parent
+refuses a worker frame larger than 1 MiB before decoding it.
 Condition scripts still evaluate in-process; they are admin-gated and capped by
 `script_timeout_ms` and the 10 KiB source limit.

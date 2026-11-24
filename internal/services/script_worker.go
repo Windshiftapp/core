@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -27,14 +28,48 @@ const EnvScriptWorker = "WINDSHIFT_SCRIPT_WORKER"
 // per-script ceiling; the kill grace lets a worker report its own timeout or
 // memory failure before the parent force-kills it.
 const (
-	defaultScriptMemoryMB    = 128
+	defaultScriptMemoryMB = 128
+	// defaultScriptConcurrency is the action-script admission ceiling when the
+	// operator leaves concurrent_scripts unset. Each execution is a process, so
+	// an unset limit must not mean unbounded spawning.
+	defaultScriptConcurrency = 4
 	scriptMemoryPollInterval = 25 * time.Millisecond
 	scriptWorkerKillGrace    = 2 * time.Second
 	// scriptWorkerRSSOverhead is the non-heap headroom the parent allows on top
 	// of the heap budget before the RSS backstop kills a worker, so the worker's
 	// own heap monitor normally fires first.
 	scriptWorkerRSSOverhead = 32 << 20
+	// scriptWorkerMaxFrameBytes bounds one newline-delimited JSON frame on the
+	// worker pipe. The parent rejects an over-budget frame before decoding it, so
+	// a script cannot make the API process allocate on script-controlled input.
+	scriptWorkerMaxFrameBytes = 1 << 20
 )
+
+// errScriptWorkerFrameTooLarge marks a protocol frame that exceeded the wire
+// budget. The parent fails the node instead of decoding it.
+var errScriptWorkerFrameTooLarge = errors.New("script worker frame exceeds wire budget")
+
+// readScriptWorkerFrame reads one newline-terminated JSON frame, failing once
+// the accumulated bytes pass max. It never holds more than max+1 bytes of the
+// peer's output, so a hostile frame is rejected before json.Unmarshal runs.
+func readScriptWorkerFrame(reader *bufio.Reader, limit int) ([]byte, error) {
+	frame := make([]byte, 0, 512)
+	for {
+		chunk, err := reader.ReadSlice('\n')
+		if len(frame)+len(chunk) > limit {
+			return nil, errScriptWorkerFrameTooLarge
+		}
+		frame = append(frame, chunk...)
+		switch {
+		case err == nil:
+			return frame, nil
+		case errors.Is(err, bufio.ErrBufferFull):
+			continue
+		default:
+			return frame, err
+		}
+	}
+}
 
 // Worker protocol message kinds.
 const (
@@ -69,10 +104,11 @@ type scriptWorkerMessage struct {
 	Type string `json:"type"`
 
 	// run
-	Source      string         `json:"source,omitempty"`
-	TimeoutMS   int            `json:"timeout_ms,omitempty"`
-	MemoryBytes int64          `json:"memory_bytes,omitempty"`
-	Globals     map[string]any `json:"globals,omitempty"`
+	Source           string         `json:"source,omitempty"`
+	TimeoutMS        int            `json:"timeout_ms,omitempty"`
+	DeadlineUnixNano int64          `json:"deadline_unix_nano,omitempty"`
+	MemoryBytes      int64          `json:"memory_bytes,omitempty"`
+	Globals          map[string]any `json:"globals,omitempty"`
 
 	// console
 	Level   string `json:"level,omitempty"`
@@ -104,9 +140,14 @@ func RunScriptWorker(in io.Reader, out io.Writer) {
 		_ = encoder.Encode(msg)
 	}
 
-	decoder := json.NewDecoder(in)
+	reader := bufio.NewReader(in)
+	frame, err := readScriptWorkerFrame(reader, scriptWorkerMaxFrameBytes)
+	if err != nil {
+		send(scriptWorkerMessage{Type: scriptMessageError, ErrorKind: scriptErrorRuntime, Message: "script worker: invalid run request"})
+		return
+	}
 	var request scriptWorkerMessage
-	if err := decoder.Decode(&request); err != nil || request.Type != scriptMessageRun {
+	if err := json.Unmarshal(frame, &request); err != nil || request.Type != scriptMessageRun {
 		send(scriptWorkerMessage{Type: scriptMessageError, ErrorKind: scriptErrorRuntime, Message: "script worker: invalid run request"})
 		return
 	}
@@ -115,7 +156,7 @@ func RunScriptWorker(in io.Reader, out io.Writer) {
 	}
 	send(scriptWorkerMessage{Type: scriptMessageReady})
 
-	output, err := runWorkerScript(decoder, send, request)
+	output, err := runWorkerScript(reader, send, request)
 	if err != nil {
 		kind, message := classifyWorkerError(err)
 		send(scriptWorkerMessage{Type: scriptMessageError, ErrorKind: kind, Message: message})
@@ -128,7 +169,7 @@ func RunScriptWorker(in io.Reader, out io.Writer) {
 // runs the script under the timeout and memory watchdogs. The realm is never
 // reused: sobek cannot reset a mutated realm, and a fresh process per
 // execution is what keeps one script from observing another's state.
-func runWorkerScript(decoder *json.Decoder, send func(scriptWorkerMessage), request scriptWorkerMessage) (json.RawMessage, error) {
+func runWorkerScript(reader *bufio.Reader, send func(scriptWorkerMessage), request scriptWorkerMessage) (json.RawMessage, error) {
 	vm := sobek.New()
 	for name, value := range request.Globals {
 		if err := vm.Set(name, value); err != nil {
@@ -136,7 +177,7 @@ func runWorkerScript(decoder *json.Decoder, send func(scriptWorkerMessage), requ
 		}
 	}
 
-	bridge := &workerBridge{vm: vm, decoder: decoder, send: send}
+	bridge := &workerBridge{vm: vm, reader: reader, send: send}
 	if err := vm.Set("windshift", map[string]any{
 		"api": map[string]any{"request": bridge.apiRequest},
 	}); err != nil {
@@ -157,8 +198,20 @@ func runWorkerScript(decoder *json.Decoder, send func(scriptWorkerMessage), requ
 		return nil, fmt.Errorf("syntax error: %w", err)
 	}
 
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(request.TimeoutMS)*time.Millisecond)
+	// One absolute deadline covers setup, JS, and REST calls. The parent sets
+	// it before launch, so a worker that spends its budget initializing cannot
+	// still run a fresh full timeout afterwards.
+	deadline := time.Now().Add(time.Duration(request.TimeoutMS) * time.Millisecond)
+	if request.DeadlineUnixNano > 0 {
+		deadline = time.Unix(0, request.DeadlineUnixNano)
+	}
+	timeoutCtx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
+	// The deadline is absolute and may already have passed if startup consumed
+	// the budget. Fail before running so a slow start cannot still execute JS.
+	if err := timeoutCtx.Err(); err != nil {
+		return nil, err
+	}
 
 	stopMonitor := make(chan struct{})
 	defer close(stopMonitor)
@@ -210,10 +263,10 @@ func (e *scriptPolicyViolation) Error() string { return "script api policy viola
 // answers, so the parent stays the sole authority on credentials, budgets, and
 // policy.
 type workerBridge struct {
-	vm      *sobek.Runtime
-	decoder *json.Decoder
-	send    func(scriptWorkerMessage)
-	nextID  int
+	vm     *sobek.Runtime
+	reader *bufio.Reader
+	send   func(scriptWorkerMessage)
+	nextID int
 }
 
 func (b *workerBridge) apiRequest(call sobek.FunctionCall) sobek.Value {
@@ -248,8 +301,13 @@ func (b *workerBridge) apiRequest(call sobek.FunctionCall) sobek.Value {
 	b.send(scriptWorkerMessage{Type: scriptMessageAPIRequest, ID: id, Method: method, Path: path, Body: body})
 
 	var response scriptWorkerMessage
-	if err := b.decoder.Decode(&response); err != nil {
+	frame, err := readScriptWorkerFrame(b.reader, scriptWorkerMaxFrameBytes)
+	if err != nil {
 		b.vm.Interrupt(fmt.Errorf("script worker: api bridge closed: %w", err))
+		return sobek.Undefined()
+	}
+	if err := json.Unmarshal(frame, &response); err != nil {
+		b.vm.Interrupt(errors.New("script worker: invalid api bridge message"))
 		return sobek.Undefined()
 	}
 	if response.ID != id {
@@ -315,6 +373,9 @@ func (b *workerBridge) consoleFn(level string) func(sobek.FunctionCall) sobek.Va
 // classifyWorkerError maps a worker-side error to the protocol failure kind and
 // a bounded message. It never formats a script-backed value.
 func classifyWorkerError(err error) (kind, message string) {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return scriptErrorTimeout, "script execution timed out"
+	}
 	var interrupted *sobek.InterruptedError
 	if errors.As(err, &interrupted) {
 		switch value := interrupted.Value().(type) {

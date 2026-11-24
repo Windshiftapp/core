@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -145,7 +146,7 @@ func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.Exe
 	if ctx == nil {
 		return errors.New("execute_script: execution context is required")
 	}
-	release, err := e.controls.Acquire(actionRequestContext(ctx), "scripts", e.controls.Limits().ConcurrentScripts)
+	release, err := e.controls.Acquire(actionRequestContext(ctx), "scripts", e.scriptConcurrencyLimit())
 	if err != nil {
 		return err
 	}
@@ -196,11 +197,14 @@ func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.Exe
 		return fmt.Errorf("execute_script: syntax error: %w", err)
 	}
 
-	runCtx, cancelRun := context.WithTimeout(actionRequestContext(ctx), time.Duration(timeoutMs)*time.Millisecond)
+	// One absolute deadline covers worker startup, JS, and REST calls. The same
+	// instant reaches the worker, so a slow start cannot hand a script a second
+	// full timeout, and the worker is force-killed a short grace later so it can
+	// still report its own failure.
+	deadline := time.Now().Add(time.Duration(timeoutMs) * time.Millisecond)
+	runCtx, cancelRun := context.WithDeadline(actionRequestContext(ctx), deadline)
 	defer cancelRun()
-	// The worker outlives the run deadline by a short grace so it can report its
-	// own timeout or memory failure before the parent force-kills it.
-	killCtx, cancelKill := context.WithTimeout(actionRequestContext(ctx), time.Duration(timeoutMs)*time.Millisecond+scriptWorkerKillGrace)
+	killCtx, cancelKill := context.WithDeadline(actionRequestContext(ctx), deadline.Add(scriptWorkerKillGrace))
 	defer cancelKill()
 
 	host := &scriptHost{
@@ -235,11 +239,12 @@ func (e *ExecuteScriptExecutor) Execute(node *models.ActionNode, ctx *models.Exe
 	}()
 
 	request := scriptWorkerMessage{
-		Type:        scriptMessageRun,
-		Source:      source,
-		TimeoutMS:   timeoutMs,
-		MemoryBytes: e.scriptMemoryBytes(),
-		Globals:     scriptGlobals(ctx),
+		Type:             scriptMessageRun,
+		Source:           source,
+		TimeoutMS:        timeoutMs,
+		DeadlineUnixNano: deadline.UnixNano(),
+		MemoryBytes:      e.scriptMemoryBytes(),
+		Globals:          scriptGlobals(ctx),
 	}
 	output, runErr := e.runWorker(killCtx, request, host)
 
@@ -280,7 +285,7 @@ func (e *ExecuteScriptExecutor) runWorker(ctx context.Context, request scriptWor
 	}()
 
 	encoder := json.NewEncoder(proc.Stdin())
-	decoder := json.NewDecoder(proc.Stdout())
+	reader := bufio.NewReader(proc.Stdout())
 	if err := encoder.Encode(request); err != nil {
 		return nil, fmt.Errorf("execute_script: send script to worker: %w", err)
 	}
@@ -291,8 +296,11 @@ func (e *ExecuteScriptExecutor) runWorker(ctx context.Context, request scriptWor
 	var watchdogOnce sync.Once
 
 	for {
-		var msg scriptWorkerMessage
-		if err := decoder.Decode(&msg); err != nil {
+		frame, err := readScriptWorkerFrame(reader, scriptWorkerMaxFrameBytes)
+		if err != nil {
+			if errors.Is(err, errScriptWorkerFrameTooLarge) {
+				return nil, errors.New("execute_script: script worker frame exceeds wire budget")
+			}
 			if memoryExceeded.Load() {
 				return nil, memoryLimitError(request.MemoryBytes)
 			}
@@ -306,6 +314,10 @@ func (e *ExecuteScriptExecutor) runWorker(ctx context.Context, request scriptWor
 				return nil, ctx.Err()
 			}
 			return nil, errors.New("execute_script: script worker exited without a result")
+		}
+		var msg scriptWorkerMessage
+		if err := json.Unmarshal(frame, &msg); err != nil {
+			return nil, errors.New("execute_script: script worker sent an invalid frame")
 		}
 		switch msg.Type {
 		case scriptMessageReady:
@@ -353,6 +365,17 @@ func (h *scriptHost) workerError(msg scriptWorkerMessage, timeoutMS int, memoryB
 	default:
 		return fmt.Errorf("execute_script: %s", msg.Message)
 	}
+}
+
+// scriptConcurrencyLimit resolves the instance's script admission ceiling. An
+// unset operator limit falls back to a finite default: the per-worker heap
+// budget does not bound aggregate CPU or memory, so an unset limit must not
+// mean unbounded process spawning.
+func (e *ExecuteScriptExecutor) scriptConcurrencyLimit() int {
+	if limit := e.controls.Limits().ConcurrentScripts; limit > 0 {
+		return limit
+	}
+	return defaultScriptConcurrency
 }
 
 // scriptMemoryBytes resolves the per-script heap budget. Zero means the
