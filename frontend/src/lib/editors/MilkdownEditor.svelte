@@ -23,7 +23,7 @@
     insertTableCommand
   } from '@milkdown/kit/preset/gfm';
   import { tableBlock, tableBlockConfig } from '@milkdown/kit/component/table-block';
-  import { isInTable, deleteTable } from '@milkdown/kit/prose/tables';
+  import { deleteTable } from '@milkdown/kit/prose/tables';
   import { TextSelection } from '@milkdown/kit/prose/state';
   import { lift } from '@milkdown/kit/prose/commands';
   import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
@@ -234,16 +234,27 @@
     if (editor) editor.action(callCommand(toggleTaskListCommand.key));
   }
 
-  // Read the formatting context of the live selection. Commands read
-  // `view.state.selection`, so this stays accurate even while a portaled menu
-  // holds DOM focus.
-  function refreshSelectionContext() {
+  // Walk the ancestors of a selection head to find a table row. Used instead
+  // of `isInTable(state)` so the selection event can be applied directly.
+  function selectionInTable(selection) {
+    const head = selection.$head ?? selection.$from;
+    for (let depth = head.depth; depth > 0; depth -= 1) {
+      if (head.node(depth).type.spec.tableRole === 'row') return true;
+    }
+    return false;
+  }
+
+  // Read the formatting context of a selection. Defaults to the live editor
+  // selection, but the listener passes the exact selection from its event so a
+  // selection-only change cannot race a later read of the view state.
+  function refreshSelectionContext(selection = null) {
     if (!editor) return;
     try {
       selectionContext = editor.action((ctx) => {
         const view = ctx.get(editorViewCtx);
         const { state } = view;
-        const from = state.selection.$from;
+        const active = selection ?? state.selection;
+        const from = active.$from;
         const linkType = state.schema.marks.link;
         const linkMark = linkType ? from.marks().find((mark) => mark.type === linkType) : null;
         let inBlockquote = false;
@@ -255,7 +266,7 @@
         }
         return {
           headingLevel: from.parent.type.name === 'heading' ? from.parent.attrs.level : 0,
-          inTable: isInTable(state),
+          inTable: selectionInTable(active),
           inBlockquote,
           inCodeBlock,
           linkHref: linkMark?.attrs.href ?? null
@@ -852,13 +863,10 @@
           });
           // `updated` only fires for document changes, so a click into an
           // existing table (selection-only) would leave the toolbar context
-          // stale. Refresh from the selection event instead; defer to a
-          // microtask so the view holds the post-transaction state.
-          ctx.get(listenerCtx).selectionUpdated(() => {
+          // stale. Apply the selection from the event directly.
+          ctx.get(listenerCtx).selectionUpdated((_updateCtx, selection) => {
             if (disposed) return;
-            queueMicrotask(() => {
-              if (!disposed) refreshSelectionContext();
-            });
+            refreshSelectionContext(selection);
           });
           // Context may not be initialized for update.
           ctx.set(editorViewOptionsCtx, {
@@ -1214,7 +1222,7 @@
   onfocusout={handleEditorFocusOut}
 >
   {#if toolbarVisible}
-    <div class="milkdown-toolbar" tabindex="-1" data-testid="milkdown-toolbar">
+    <div class="milkdown-toolbar" tabindex="-1" data-testid="milkdown-toolbar" data-in-table={selectionContext.inTable ? 'true' : 'false'}>
       <Tooltip content={t('editors.bold')} placement="bottom">
         {#snippet children()}
           <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleBold} aria-label={t('editors.bold')}>
@@ -1255,9 +1263,6 @@
         triggerLabel={t('editors.heading')}
         triggerTestid="milkdown-heading-menu"
         bind:isOpen={headingMenuOpen}
-        onOpenChange={(open) => {
-          if (open) refreshSelectionContext();
-        }}
       />
       <Tooltip content={t('editors.blockquote')} placement="bottom">
         {#snippet children()}
@@ -1298,9 +1303,6 @@
         triggerLabel={t('editors.table')}
         triggerTestid="milkdown-table-menu"
         bind:isOpen={tableMenuOpen}
-        onOpenChange={(open) => {
-          if (open) refreshSelectionContext();
-        }}
       />
       <div class="toolbar-divider"></div>
       <Tooltip content={t('editors.bulletList')} placement="bottom">

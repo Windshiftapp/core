@@ -42,6 +42,22 @@
   opacity: 0;
 }
 
+/* The component hides the handles 200ms after the pointer leaves the table
+   block, which fires while the pointer crosses the gap to a control that sits
+   just outside the table. Keep a hovered handle visible so it stays clickable,
+   and widen the add buttons' hit area so the crossing is short. Declared after
+   the [data-show='false'] rule so it wins the cascade at equal specificity. */
+.milkdown-editor .ProseMirror .milkdown-table-block .handle:hover,
+.milkdown-editor .ProseMirror .milkdown-table-block .handle:focus-within {
+  opacity: 1;
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .line-handle .add-button::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
 .milkdown-editor .ProseMirror .milkdown-table-block svg {
   fill: var(--ds-icon-subtle);
 }
