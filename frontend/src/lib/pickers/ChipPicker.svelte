@@ -19,6 +19,7 @@
     disabled = false,
     required = false,
     searchable = false,
+    dropdownWidth = undefined,
     searchFields = ['name'],
     triggerSnippet = null,
     itemSnippet = null,
@@ -219,11 +220,12 @@
     use:ownedPopup={{ trigger: () => triggerRef, close: closePicker, keepTabStops: false }}
     data-testid={testId ? `${testId}-dropdown` : undefined}
     class="z-[70] rounded-lg shadow-lg flex flex-col overflow-hidden"
+    style:width={dropdownWidth}
     style="
       background-color: var(--ds-surface-raised);
       border: 1px solid var(--ds-border);
       min-width: 200px;
-      max-width: 320px;
+      max-width: {dropdownWidth ?? '320px'};
     "
   >
     <!-- Search Input (optional) -->

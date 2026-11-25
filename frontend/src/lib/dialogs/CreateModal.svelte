@@ -736,6 +736,7 @@
             getLabel={(p) => p.id === NO_PARENT ? '' : p.title}
             placeholder={`${t('createModal.new')} ${currentTypeName}`}
             searchable={true}
+            dropdownWidth="28rem"
             testId="create-parent-chip"
             onSearchChange={onParentSearchChange}
             onSelect={selectParent}
@@ -747,7 +748,7 @@
                 {@const itemType = workItemFormStore.itemTypes.find((ty) => ty.id === item.item_type_id)}
                 {#if itemType}<ItemTypeIcon {itemType} />{/if}
                 <ItemKey {item} workspace={{ key: item.workspace_key }} clickable={false} />
-                <span class="text-sm truncate">{item.title}</span>
+                <span class="text-sm truncate" title={item.title}>{item.title}</span>
               {/if}
             {/snippet}
           </ChipPicker>
