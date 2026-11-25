@@ -350,7 +350,7 @@
       return loadOutcomes.loaded;
     }
 
-    loading = true;
+    // resetContext sets loading for a new item. Refreshes keep the panel in place.
     error = '';
     try {
       const [loadedConnections, loadedLinks] = await Promise.all([

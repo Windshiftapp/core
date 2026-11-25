@@ -161,7 +161,8 @@
     return list.filter((milestone) => allowedCategoryIds.includes(milestone.category_id));
   }
 
-  // The item's owning workspace scopes every lazily loaded editor option.
+  // Field saves replace the item object. Panel loaders depend on its IDs.
+  const detailItemId = $derived(item?.id);
   const detailWorkspaceId = $derived(item?.workspace_id ?? workspace?.id ?? null);
   const editorOptionsEntry = $derived(collectionEditorOptions.get(detailWorkspaceId));
 
@@ -1350,8 +1351,8 @@
     {/if}
 
     <!-- Integration Links (Notion, etc.) -->
-    {#if item?.id && item?.workspace_id}
-      <ZammadItemPanel itemId={item.id} workspaceId={item.workspace_id} {canEdit} />
+    {#if detailItemId && item?.workspace_id}
+      <ZammadItemPanel itemId={detailItemId} workspaceId={detailWorkspaceId} {canEdit} />
     {/if}
 
     <!-- Customer context (WI-1139): requester, organisation history, and
