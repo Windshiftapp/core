@@ -3962,6 +3962,33 @@ END $$;
 				END IF;
 			END $$;
 		`,
+	},
+	{
+		// ProcessPendingReplies filters on delivered_at, discarded_at and
+		// next_attempt_at together. After the recipient-bound reply-key indexes
+		// were added, SQLite stopped using the two-column pending index for that
+		// query and scanned the table instead. Widening the index covers the
+		// whole predicate (WI-2365).
+		Version: "20261210_email_reply_outbox_pending_index",
+		Name:    "Cover the reply-outbox dispatcher predicate in the pending index (WI-2365)",
+		CheckSQLite: `SELECT CASE WHEN EXISTS (
+			SELECT 1 FROM sqlite_master
+			WHERE type='index' AND name='idx_email_reply_outbox_pending' AND sql LIKE '%discarded_at%'
+		) THEN 1 ELSE 0 END`,
+		CheckPostgres: `SELECT CASE WHEN EXISTS (
+			SELECT 1 FROM pg_indexes
+			WHERE schemaname=current_schema() AND indexname='idx_email_reply_outbox_pending' AND indexdef LIKE '%discarded_at%'
+		) THEN 1 ELSE 0 END`,
+		SQLite: `
+			DROP INDEX IF EXISTS idx_email_reply_outbox_pending;
+			CREATE INDEX idx_email_reply_outbox_pending
+				ON email_reply_outbox(delivered_at, discarded_at, next_attempt_at, created_at);
+		`,
+		Postgres: `
+			DROP INDEX IF EXISTS idx_email_reply_outbox_pending;
+			CREATE INDEX idx_email_reply_outbox_pending
+				ON email_reply_outbox(delivered_at, discarded_at, next_attempt_at, created_at);
+		`,
 	}}
 
 // boardConfigurationReconcileSQL normalizes board configurations to exactly one

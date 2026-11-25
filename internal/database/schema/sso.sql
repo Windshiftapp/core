@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS sso_providers (
 	account_type TEXT NOT NULL DEFAULT 'internal',
 	customer_organisation_id INTEGER REFERENCES customer_organisations(id) ON DELETE RESTRICT,
 	auto_provision_users BOOLEAN DEFAULT FALSE, -- Create users on first SSO login
-	require_verified_email BOOLEAN DEFAULT TRUE, -- Trust provider-managed email when verification status is absent
+	require_verified_email BOOLEAN DEFAULT TRUE, -- Trust provider-managed email: auto-links to existing accounts by email even when the provider reports the address unverified
 	-- Claim/attribute mappings (JSON for flexibility)
 	attribute_mapping TEXT DEFAULT '{"email":"email","name":"name","given_name":"given_name","family_name":"family_name","username":"preferred_username","email_verified":"email_verified"}',
 	-- SAML-specific fields

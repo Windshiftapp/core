@@ -2370,11 +2370,13 @@ func initializeWebAuthnConfigs(cfg Config, isDevelopment bool, effectivePort str
 		switch {
 		// A single-label hostname is common in Docker, homelab DNS, and local
 		// test installations, but it cannot be used as an RP ID by the current
-		// WebAuthn implementation. Keep the application healthy and make the
+		// WebAuthn implementation. An IP address is also rejected: WebAuthn
+		// requires a domain, so passkeys stay off for installations whose only
+		// address is an IP. Keep the application healthy and make the
 		// limitation actionable; passkeys remain available when the operator
-		// uses localhost, an IP address, or a dotted hostname.
+		// uses localhost or a dotted hostname.
 		case errors.As(err, &invalidRPIDErr):
-			slog.Warn("WebAuthn disabled because the configured RP ID is not valid; set BASE_URL or WEBAUTHN_RP_ID to localhost, an IP address, or a dotted hostname to enable passkeys",
+			slog.Warn("WebAuthn disabled because the configured RP ID is not valid; set BASE_URL or WEBAUTHN_RP_ID to localhost or a dotted hostname to enable passkeys",
 				"rp_id", invalidRPIDErr.RPID,
 				"error", invalidRPIDErr)
 		case errors.As(err, &missingOriginsErr):

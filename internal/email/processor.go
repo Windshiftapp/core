@@ -664,26 +664,27 @@ func (p *Processor) lookupLegacyReplyItem(ctx context.Context, canonicalID strin
 // participants are authorized; an explicit removal revokes the grant, and a
 // prior sender on the thread is not an identity (WI-2365).
 func (p *Processor) senderStillAuthorized(_ context.Context, itemID int, senderEmail string) bool {
-	if senderEmail == "" {
+	sender := normalizedEmail(senderEmail)
+	if sender == "" {
 		return false
 	}
 	// Unverified contact recorded on the item: the reply key's recipient match
 	// already proved control of the address, so the contact may append.
 	var contactEmail sql.NullString
 	if err := p.db.QueryRow(`SELECT contact_email FROM items WHERE id = ?`, itemID).Scan(&contactEmail); err == nil {
-		if contactEmail.Valid && normalizedEmail(contactEmail.String) == senderEmail {
+		if contactEmail.Valid && normalizedEmail(contactEmail.String) == sender {
 			return true
 		}
 	}
 	// Original creator via portal customer.
 	if creatorEmail, err := repository.NewItemRepository(p.db).GetPortalCustomerEmailForItem(itemID); err == nil {
-		if normalizedEmail(creatorEmail) == senderEmail {
+		if normalizedEmail(creatorEmail) == sender {
 			return true
 		}
 	}
 	// Current external request participant. A re-added participant counts;
 	// an explicit removal leaves no participant row, so it fails closed.
-	if isParticipant, err := repository.NewItemParticipantRepository(p.db).IsParticipantEmail(itemID, senderEmail); err == nil && isParticipant {
+	if isParticipant, err := repository.NewItemParticipantRepository(p.db).IsParticipantEmail(itemID, sender); err == nil && isParticipant {
 		return true
 	}
 	return false

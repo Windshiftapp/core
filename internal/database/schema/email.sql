@@ -222,8 +222,12 @@ CREATE TABLE IF NOT EXISTS email_reply_outbox (
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
 );
 
+-- The dispatcher query (ProcessPendingReplies) filters on delivered_at,
+-- discarded_at and next_attempt_at together. Once the reply-key indexes
+-- existed, SQLite chose a table scan for that query, so the pending index
+-- covers the full predicate and the row id is read from the index.
 CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_pending
-	ON email_reply_outbox(delivered_at, next_attempt_at);
+	ON email_reply_outbox(delivered_at, discarded_at, next_attempt_at, created_at);
 
 -- Reply-key lookup by Message-ID and thread assembly by item. Without these,
 -- every inbound reply scans the retained outbox.

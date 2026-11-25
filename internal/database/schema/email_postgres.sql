@@ -181,8 +181,10 @@ CREATE TABLE IF NOT EXISTS email_reply_outbox (
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
 );
 
+-- Covers the dispatcher query's full predicate (delivered_at, discarded_at,
+-- next_attempt_at) plus its created_at ordering.
 CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_pending
-	ON email_reply_outbox(delivered_at, next_attempt_at);
+	ON email_reply_outbox(delivered_at, discarded_at, next_attempt_at, created_at);
 
 -- Reply-key lookup by Message-ID and thread assembly by item.
 CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_message_id
