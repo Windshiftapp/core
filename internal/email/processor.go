@@ -158,13 +158,8 @@ func (p *Processor) ProcessEmailWithIntake(
 	// never trusted as an identity regardless of the verdict.
 	p.recordSenderAuth(ctx, channelID, dedupKey, EvaluateSenderAuthentication(email, ResolveTrustedAuthServIDs(config)))
 
-	// 1d. Authorize the reply before any customer or access side effect. A
-	// reply may append to an existing private request only when it references a
-	// Windshift-issued outbound Message-ID whose intended recipient is the
-	// claimed sender, and that sender is still authorized (WI-2365). A
-	// customer-generated inbound ID, a legacy thread reference, a missing
-	// header, or a prior unverified sender never authorizes, so those messages
-	// start a separate staff-visible request instead.
+	// Check thread references before granting customer access. A reply that
+	// cannot be matched is kept separate from both the thread and the portal.
 	var parentItemID *int
 	if email.IsReply() {
 		parentItemID = p.findParentItem(ctx, email)
@@ -182,41 +177,25 @@ func (p *Processor) ProcessEmailWithIntake(
 		return &ProcessingResult{Action: ActionRateLimited}, nil
 	}
 
-	// 2. Only an authorized reply has proven the sender controls the address
-	// Windshift wrote to. Resolve them to a portal customer and restore access;
-	// a new request records an unverified contact on the item instead and never
-	// acquires a portal owner from the claimed From.
-	var customerID int
-	if parentItemID != nil {
-		customerID, err = p.findOrCreatePortalCustomer(ctx, email.From.Address, email.From.Name, channelID, config)
-		if err != nil {
-			p.releaseTrackingClaim(ctx, channelID, dedupKey)
-			return nil, fmt.Errorf("failed to find/create portal customer: %w", err)
-		}
-		if err := p.grantChannelAccess(ctx, customerID, channelID, email.From.Address, config); err != nil {
-			p.releaseTrackingClaim(ctx, channelID, dedupKey)
-			return nil, fmt.Errorf("grant customer access for authorized reply: %w", err)
-		}
-	}
-
-	// 4. Create item or add comment
 	var result *ProcessingResult
 	if parentItemID != nil {
-		// This is a reply - add comment to existing item
+		customerID, customerErr := p.resolveIntakeCustomer(ctx, email.From, channelID, p.admittedPortal(ctx, config, email.From.Address))
+		if customerErr != nil {
+			p.releaseTrackingClaim(ctx, channelID, dedupKey)
+			return nil, customerErr
+		}
 		result, err = p.addCommentFromReply(ctx, email, *parentItemID, customerID)
+		if err == nil {
+			result.CustomerID = &customerID
+			p.linkVerifiedContact(ctx, *parentItemID, customerID, email.From.Address)
+		}
 	} else {
-		// This is a new conversation - create item
 		result, err = p.createItemFromEmail(ctx, email, channelID, config, intakeID)
 	}
 
 	if err != nil {
 		p.releaseTrackingClaim(ctx, channelID, dedupKey)
 		return nil, err
-	}
-
-	if parentItemID != nil {
-		result.CustomerID = &customerID
-		p.linkVerifiedContact(ctx, *parentItemID, customerID, email.From.Address)
 	}
 
 	// 5. Finalize tracking with the created item/comment ID. If this UPDATE
@@ -237,6 +216,10 @@ func (p *Processor) ProcessEmailWithIntake(
 	// receipts back and forth with the mailbox. The receipt is queued in the
 	// durable outbox, so a slow or failing SMTP server never stalls polling.
 	if result.Action == ActionItemCreated && result.ItemID != nil && intake != nil && intake.SendConfirmation && p.confirmationSender != nil && !isAutomatedEmail(email) && !email.IsReply() {
+		var customerID int
+		if result.CustomerID != nil {
+			customerID = *result.CustomerID
+		}
 		if err := p.confirmationSender.EnqueueIntakeConfirmation(*result.ItemID, customerID); err != nil {
 			slog.Warn("failed to queue intake confirmation email",
 				"error", err,
@@ -407,16 +390,8 @@ func (p *Processor) recordSenderAuth(ctx context.Context, channelID int, dedupKe
 	}
 }
 
-// findOrCreatePortalCustomer resolves the sender to a portal customer by
-// email, creating one on first contact. It records a contact address only:
-// portal access is granted separately, and only after an authorized reply has
-// proven the sender controls the address Windshift wrote to (WI-2365).
-func (p *Processor) findOrCreatePortalCustomer(
-	ctx context.Context,
-	email, name string,
-	_ int,
-	_ *models.ChannelConfig,
-) (int, error) {
+// findOrCreatePortalCustomer preserves an existing customer's identity and provenance.
+func (p *Processor) findOrCreatePortalCustomer(ctx context.Context, email, name string) (int, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	name = strings.TrimSpace(name)
 
@@ -438,35 +413,28 @@ func (p *Processor) findOrCreatePortalCustomer(
 	return customerID, nil
 }
 
-// grantChannelAccess grants the portal customer access to the email channel
-// and, when configured, the connected portal channel. Granting access to the
-// connected portal is gated by that portal's own PortalAllowedDomains and
-// PortalRegistrationMode so email ingestion can't bypass portal-side policy
-// (e.g. a "manual registration only" portal must not auto-admit arbitrary
-// senders just because they emailed the ingest channel).
-func (p *Processor) grantChannelAccess(ctx context.Context, customerID, channelID int, senderEmail string, config *models.ChannelConfig) error {
-	repo := repository.NewPortalCustomerRepository(p.db)
-	// Grant access to email channel
-	if _, err := repo.EnsureChannelAccess(customerID, channelID); err != nil {
-		return fmt.Errorf("grant customer access to email channel: %w", err)
-	}
-
-	if config.EmailConnectedPortalID == nil {
-		return nil
-	}
-	portalID := *config.EmailConnectedPortalID
-	if !p.connectedPortalAdmitsEmail(ctx, portalID, senderEmail) {
-		slog.Info("portal policy rejects sender; skipping connected-portal access",
-			"customer_id", customerID,
-			"portal_channel_id", portalID,
-			"sender", senderEmail,
-		)
-		return nil
-	}
-	if _, err := repo.EnsureChannelAccess(customerID, portalID); err != nil {
-		return fmt.Errorf("grant customer access to connected portal: %w", err)
+func (p *Processor) admittedPortal(ctx context.Context, config *models.ChannelConfig, address string) *int {
+	if id := config.EmailConnectedPortalID; id != nil && p.connectedPortalAdmitsEmail(ctx, *id, normalizedEmail(address)) {
+		return id
 	}
 	return nil
+}
+
+func (p *Processor) resolveIntakeCustomer(ctx context.Context, from EmailAddress, channelID int, admittedPortalID *int) (int, error) {
+	customerID, err := p.findOrCreatePortalCustomer(ctx, from.Address, from.Name)
+	if err != nil {
+		return 0, fmt.Errorf("resolve intake customer: %w", err)
+	}
+	repo := repository.NewPortalCustomerRepository(p.db)
+	if _, err := repo.EnsureChannelAccess(customerID, channelID); err != nil {
+		return 0, fmt.Errorf("grant customer access to email channel: %w", err)
+	}
+	if admittedPortalID != nil {
+		if _, err := repo.EnsureChannelAccess(customerID, *admittedPortalID); err != nil {
+			return 0, fmt.Errorf("grant customer access to connected portal: %w", err)
+		}
+	}
+	return customerID, nil
 }
 
 // connectedPortalAdmitsEmail returns true when the connected portal's policy
@@ -764,12 +732,7 @@ func (p *Processor) createItemFromEmail(
 		}
 	}
 
-	// Build item parameters. Leave StatusID nil so services.CreateItem resolves
-	// it from the workspace workflow. PriorityID is supplied only when the
-	// channel explicitly configured a workspace-valid override; otherwise the
-	// shared service resolves the workspace default. The sender is recorded as
-	// an unverified contact, not a portal owner: the claimed From must not make
-	// the request appear in a customer's portal or organisation sharing (WI-2365).
+	// The shared service resolves the initial status and any default priority.
 	params := services.ItemCreationParams{
 		WorkspaceID:   workspaceID,
 		Title:         sanitize.PlainTextField.Sanitize(email.GetSubjectForItem()),
@@ -778,10 +741,22 @@ func (p *Processor) createItemFromEmail(
 		PriorityID:    config.EmailDefaultPriorityID,
 		RequestTypeID: requestTypeID,
 		IntakeID:      intakeID,
-		ContactEmail:  email.From.Address,
-		ContactName:   email.From.Name,
 		ChannelID:     &channelID,
 		EventMetadata: itemevents.System("email"),
+	}
+	// Only fresh mail can open a portal request. An unmatched reply stays
+	// staff-visible, even if its sender is already a portal customer.
+	if !email.IsReply() {
+		if portalID := p.admittedPortal(ctx, config, email.From.Address); portalID != nil {
+			customerID, resolveErr := p.resolveIntakeCustomer(ctx, email.From, channelID, portalID)
+			if resolveErr != nil {
+				return nil, resolveErr
+			}
+			params.CreatorPortalCustomerID = &customerID
+		}
+	}
+	if params.CreatorPortalCustomerID == nil {
+		params.ContactEmail, params.ContactName = email.From.Address, email.From.Name
 	}
 
 	// Create the item via the shared service entry point.
@@ -814,8 +789,9 @@ func (p *Processor) createItemFromEmail(
 	}
 
 	return &ProcessingResult{
-		Action: ActionItemCreated,
-		ItemID: &id,
+		Action:     ActionItemCreated,
+		ItemID:     &id,
+		CustomerID: params.CreatorPortalCustomerID,
 	}, nil
 }
 

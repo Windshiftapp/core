@@ -122,10 +122,8 @@ func (s *EmailReplyService) handleCommentCreated(params HandleCommentParams, del
 	// unverified email contact has no anchor: the inbound message is the root.
 	maybeRecordPortalThreadAnchor(s.db, int64(params.ItemID), item.ChannelID, item.CreatorPortalCustomerID, item.Title)
 
-	// Recipients: the verified creator, or the item's unverified contact until a
-	// reply key proves the address, plus every external request participant
-	// (WI-1136). Each gets its own outbox row so replies attribute per
-	// recipient, and the intake participant guard accepts them as repliers.
+	// Send to the portal requester (or contact address) and each external
+	// participant. Separate outbox rows keep reply keys recipient-specific.
 	customerEmail, customerName, ok := s.requesterRecipient(item)
 	if !ok {
 		slog.Debug("no addressable requester for item, skipping reply",
@@ -775,8 +773,7 @@ func (s *EmailReplyService) EnqueueIntakeConfirmation(itemID, customerID int) er
 	if item.ChannelID == nil {
 		return nil
 	}
-	// A receipt goes to the verified portal customer when there is one, or to
-	// the item's unverified contact address until a reply key verifies it.
+	// Send the receipt to the portal requester or the item's contact address.
 	var customerEmail, customerName string
 	if customerID > 0 {
 		if err := s.db.QueryRow(`SELECT email, COALESCE(name, '') FROM portal_customers WHERE id = ?`, customerID).Scan(&customerEmail, &customerName); err != nil {
