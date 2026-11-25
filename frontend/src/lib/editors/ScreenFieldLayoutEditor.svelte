@@ -6,14 +6,14 @@
   import { onDestroy } from 'svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { screenEditorStore } from '../stores/screenEditorStore.svelte.js';
-  import { SYSTEM_FIELDS } from '../stores/fieldConfig.js';
   import { isAlwaysVisibleSystemField } from '../utils/screenFields.js';
   import Input from '../components/Input.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import DragHandleDots from '../components/DragHandleDots.svelte';
   import DraggableFieldRow from '../components/DraggableFieldRow.svelte';
   import FieldRemovalAction from '../components/FieldRemovalAction.svelte';
-  import { createFieldLayoutDrag } from './fieldLayoutDrag.js';
+  import FieldTypeIcon from '../components/FieldTypeIcon.svelte';
+  import { createFieldLayoutDrag, dragAvailableField } from './fieldLayoutDrag.js';
 
   let { screen } = $props();
 
@@ -24,8 +24,6 @@
   let fieldDragState = $derived(screenEditorStore.fieldDragState);
 
   const screenDrag = createFieldLayoutDrag({
-    availableSelector: '[data-available-field]',
-    availableDataKey: 'availableField',
     selectedSelector: '[data-screen-field]',
     dropZoneSelector: '[data-drop-zone]',
     selectedType: 'screen-field',
@@ -110,13 +108,11 @@
             handleClass="w-4 h-4 group-hover:text-[var(--ds-icon-accent)]"
             handleColor="var(--ds-text-subtle)"
           >
-            <div class="flex-1">
-              <div class="font-medium flex items-center gap-2" style="color: var(--ds-text);">
+            <div class="flex-1 flex items-center gap-2 min-w-0">
+              <FieldTypeIcon fieldType={screenEditorStore.getFieldTypeKey(field)} />
+              <span class="font-medium truncate" style="color: var(--ds-text);">
                 {screenEditorStore.getFieldDisplayName(field)}
-                <span class="text-xs px-1.5 py-0.5 rounded" style="color: var(--ds-text-subtle); background-color: var(--ds-background-neutral);">
-                  {field.field_type === 'system' ? t('screensPage.system') : t('screensPage.custom')}
-                </span>
-              </div>
+              </span>
             </div>
 
             <div class="flex items-center gap-3 flex-shrink-0">
@@ -160,6 +156,7 @@
     <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('screensPage.dragFieldsHint')}</p>
 
     <Input
+      dataTestid="screen-field-search"
       placeholder={t('screensPage.searchFields')}
       value={fieldSearchQuery}
       oninput={(e) => setFieldSearchQuery(e.target.value)}
@@ -167,7 +164,7 @@
     />
 
     <div class="space-y-1 min-h-96 max-h-[70vh] overflow-y-auto">
-      {#each searchFilteredFields as field, index}
+      {#each searchFilteredFields as field, index (field.identifier)}
         {#if index === 0 || field.category !== searchFilteredFields[index - 1].category}
           <div class="text-xs font-semibold uppercase tracking-wider mt-4 mb-2 first:mt-0" style="color: var(--ds-text-subtle);">
             {field.category === 'System Fields' ? t('screensPage.systemFields') : field.category === 'Custom Fields' ? t('screensPage.customFields') : field.category}
@@ -175,7 +172,8 @@
         {/if}
 
         <div
-          data-available-field={JSON.stringify(field)}
+          use:dragAvailableField={() => field}
+          data-testid={`screen-available-field-${field.identifier}`}
           class="available-field group flex items-center gap-3 px-4 py-3 rounded border transition-all duration-200 cursor-grab active:cursor-grabbing"
           style="border-color: var(--ds-border); background-color: var(--ds-background-input); user-select: none; -webkit-user-select: none;"
         >
@@ -184,17 +182,9 @@
             <DragHandleDots class="w-4 h-4 group-hover:text-[var(--ds-icon-accent)]" color="var(--ds-text-subtle)" />
           </div>
 
-          <div class="flex-1">
-            <div class="font-medium" style="color: var(--ds-text);">{field.name}</div>
-            <div class="text-sm" style="color: var(--ds-text-subtle);">
-              {#if field.type === 'system'}
-                {SYSTEM_FIELDS.find(sf => sf.identifier === field.identifier)?.type || field.identifier}
-                • {t('screensPage.system')}
-              {:else}
-                {field.fieldType}
-                • {t('screensPage.custom')}
-              {/if}
-            </div>
+          <div class="flex-1 flex items-center gap-2 min-w-0">
+            <FieldTypeIcon fieldType={screenEditorStore.getFieldTypeKey(field)} />
+            <span class="font-medium truncate" style="color: var(--ds-text);">{field.name}</span>
           </div>
         </div>
       {/each}

@@ -496,7 +496,7 @@
 						<TextField
 							label={t('users.firstName')}
 							id="first_name"
-							required
+							required={!formData.is_agent}
 							labelColor="default"
 							bind:value={formData.first_name}
 						/>
@@ -506,7 +506,7 @@
 						<TextField
 							label={t('users.lastName')}
 							id="last_name"
-							required
+							required={!formData.is_agent}
 							labelColor="default"
 							bind:value={formData.last_name}
 						/>

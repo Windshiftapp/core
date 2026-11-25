@@ -10,7 +10,7 @@
   import FieldRemovalAction from '../components/FieldRemovalAction.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import Checkbox from '../components/Checkbox.svelte';
-  import { createFieldLayoutDrag } from './fieldLayoutDrag.js';
+  import { createFieldLayoutDrag, dragAvailableField } from './fieldLayoutDrag.js';
 
   let {
     isOpen = $bindable(false),
@@ -93,8 +93,6 @@
   }
 
   const fieldDrag = createFieldLayoutDrag({
-    availableSelector: '[data-available-field-editor]',
-    availableDataKey: 'availableFieldEditor',
     selectedSelector: '[data-selected-field-editor]',
     dropZoneSelector: '[data-drop-zone-editor]',
     selectedType: 'selected-field',
@@ -214,7 +212,7 @@
               {@const identifier = field.identifier || field.id?.toString()}
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div
-                data-available-field-editor={JSON.stringify({ ...field, identifier })}
+                use:dragAvailableField={() => ({ ...field, identifier })}
                 class="available-field-row group flex items-center gap-3 px-3 py-2 rounded border transition-all duration-200 cursor-grab hover:border-ds-border-focused active:cursor-grabbing"
               >
                 <!-- Drag Handle -->

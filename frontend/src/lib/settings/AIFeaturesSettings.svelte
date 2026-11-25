@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import Spinner from '../components/Spinner.svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
+  import PageHeader from '../layout/PageHeader.svelte';
 
   import { aiFeatures } from '../api/ai.js';
   import { t } from '../stores/i18n.svelte.js';
@@ -127,6 +128,11 @@
     }
   }
 </script>
+
+<PageHeader
+  title={t('settings.aiFeatures.title')}
+  subtitle={t('settings.aiFeatures.subtitle')}
+/>
 
 {#if loading}
   <StateDisplay type="loading" />

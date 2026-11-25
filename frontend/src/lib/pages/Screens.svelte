@@ -168,9 +168,9 @@
       slot: 'name'
     },
     {
-      key: 'created_at',
-      label: t('common.created'),
-      render: (screen) => formatDateSimple(screen.created_at),
+      key: 'updated_at',
+      label: t('common.updated'),
+      render: (screen) => formatDateSimple(screen.updated_at),
       textColor: 'var(--ds-text-subtle)'
     },
     {

@@ -1,24 +1,38 @@
 <script>
-  import { currentRoute } from '../router.js';
+  import { currentRoute, updateQueryParams } from '../router.js';
   import PermissionManager from '../settings/PermissionManager.svelte';
-  import TabNav from '../components/TabNav.svelte';
+  import Tabs from '../components/Tabs.svelte';
   import { t } from '../stores/i18n.svelte.js';
+  import ShieldCheck from '@lucide/svelte/icons/shield-check';
 
   // Active subtab is read from the URL query so deep links keep working.
-  let subtab = $derived($currentRoute.query?.subtab || 'permissions');
+  const VALID_TABS = new Set(['permissions']);
+  // Permission sets hidden for now - using role-based permissions instead
+  // { id: 'permission-sets', label: t('permissions.permissionSet') + 's' }
 
-  let tabs = $derived([
-    { id: 'permissions', label: t('permissions.title') }
-    // Permission sets hidden for now - using role-based permissions instead
-    // { id: 'permission-sets', label: t('permissions.permissionSet') + 's' }
+  let subtab = $state('permissions');
+
+  const tabs = $derived([
+    { id: 'permissions', label: t('permissions.title'), icon: ShieldCheck }
   ]);
+
+  function tabFromRoute(route) {
+    const requestedTab = route.query?.subtab;
+    return VALID_TABS.has(requestedTab) ? requestedTab : 'permissions';
+  }
+
+  function setRouteTab(tab) {
+    if (!VALID_TABS.has(tab)) return;
+    updateQueryParams({ subtab: tab === 'permissions' ? null : tab });
+  }
+
+  $effect(() => {
+    subtab = tabFromRoute($currentRoute);
+  });
 </script>
 
-<div class="space-y-6">
-  <TabNav {tabs} basePath="/admin/permissions" paramName="subtab" defaultTab="permissions" />
-
-  <!-- Tab Content -->
-  <div>
+<div class="space-y-4">
+  <Tabs {tabs} bind:activeTab={subtab} onTabChange={({ tab }) => setRouteTab(tab)}>
     {#if subtab === 'permissions'}
       <PermissionManager />
     {/if}
@@ -26,5 +40,5 @@
     <!-- {:else if subtab === 'permission-sets'}
       <PermissionSetManager />
     -->
-  </div>
+  </Tabs>
 </div>

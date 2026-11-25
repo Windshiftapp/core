@@ -7,14 +7,27 @@ import {
   extractClosestEdge,
 } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 
+/** Bind a drag source to the field currently rendered in this row. */
+export function dragAvailableField(element, getField) {
+  const destroy = draggable({
+    element,
+    getInitialData: () => ({ field: getField(), type: 'available-field' }),
+    onDragStart: () => {
+      element.style.opacity = '0.5';
+    },
+    onDrop: () => {
+      element.style.opacity = '';
+    },
+  });
+  return { destroy };
+}
+
 /**
  * Wire the pragmatic-drag-and-drop behaviour for a field-layout editor:
  * available fields drag into selected fields, and selected fields reorder with
  * top/bottom edge detection. Shared by FieldLayoutEditor and the Screens page.
  *
  * @param {{
- *   availableSelector: string,
- *   availableDataKey: string,
  *   selectedSelector: string,
  *   dropZoneSelector: string,
  *   selectedType: string,
@@ -28,8 +41,6 @@ import {
  */
 export function createFieldLayoutDrag(config) {
   const {
-    availableSelector,
-    availableDataKey,
     selectedSelector,
     dropZoneSelector,
     selectedType,
@@ -53,26 +64,6 @@ export function createFieldLayoutDrag(config) {
 
   function setup() {
     cleanup();
-
-    // Available fields are drag sources only.
-    /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll(availableSelector)).forEach(
-      (element) => {
-        const fieldData = JSON.parse(element.dataset[availableDataKey]);
-
-        const cleanupFn = draggable({
-          element,
-          getInitialData: () => ({ field: fieldData, type: 'available-field' }),
-          onDragStart: () => {
-            element.style.opacity = '0.5';
-          },
-          onDrop: () => {
-            element.style.opacity = '';
-          },
-        });
-
-        setupCleanups.push(cleanupFn);
-      }
-    );
 
     // Selected fields are both drag sources and edge-aware drop targets.
     /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll(selectedSelector)).forEach(

@@ -267,6 +267,11 @@ func (s *ScreenProvisioningService) ReplaceScreenFields(actor AuditActor, screen
 			return nil, fmt.Errorf("update screen fields: %w", err)
 		}
 	}
+	// Field layout is part of the screen; bump its timestamp so the list's
+	// "Updated" column reflects field edits, not just renames.
+	if _, err = tx.Exec("UPDATE screens SET updated_at = ? WHERE id = ?", time.Now(), screenID); err != nil {
+		return nil, fmt.Errorf("update screen fields: %w", err)
+	}
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("update screen fields: %w", err)
 	}

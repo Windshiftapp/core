@@ -26,7 +26,7 @@
 </script>
 
 <div class="border-b" style="border-color: var(--ds-border);">
-  <nav class="-mb-px flex gap-x-8 overflow-x-auto p-1" aria-label={ariaLabel}>
+  <nav class="-mb-px flex gap-x-8 overflow-x-auto" aria-label={ariaLabel}>
     {#each tabs as tab}
       <Link
         href={toExternal(tabPath(tab.id))}

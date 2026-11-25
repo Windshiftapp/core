@@ -51,12 +51,8 @@
 			},
 			onResize: (height) => {
 				const newHeight = Math.max(height, 400);
-				console.log(`[IframePluginLoader] onResize received: ${height}, computed: ${newHeight}, current: ${iframeHeight}`);
 				if (Math.abs(newHeight - iframeHeight) > 2) {
-					console.log(`[IframePluginLoader] Applying height: ${newHeight} (was ${iframeHeight})`);
 					iframeHeight = newHeight;
-				} else {
-					console.log(`[IframePluginLoader] Skipped (diff=${Math.abs(newHeight - iframeHeight)})`);
 				}
 			},
 			onShowUserPicker: handleUserPickerOpen

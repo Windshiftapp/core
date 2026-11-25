@@ -415,6 +415,21 @@ class ScreenEditorStore extends DragStateStore {
     return field.field_name || field.field_identifier;
   }
 
+  // Concrete type of a field, used for the type icon/tooltip. Accepts both the
+  // available-field shape (type/fieldType/identifier) and the screen-field
+  // shape (field_type/field_identifier). System types come from the shared
+  // config; custom types from the loaded definitions.
+  getFieldTypeKey(field) {
+    if (!field) return '';
+    const kind = field.field_type ?? field.type;
+    const identifier = field.field_identifier ?? field.identifier;
+    if (kind === 'system') {
+      return SYSTEM_FIELDS.find((sf) => sf.identifier === identifier)?.type || 'text';
+    }
+    const definition = this.customFields.find((cf) => cf.id === parseInt(identifier, 10));
+    return definition?.field_type ?? field.fieldType ?? 'text';
+  }
+
   // === Form Controls ===
 
   resetForm() {

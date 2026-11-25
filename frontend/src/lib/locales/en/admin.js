@@ -171,7 +171,7 @@ export default {
       },
       packs: {
         title: 'Framework Packs',
-        description: 'Install built-in configuration-set and content packs into a workspace',
+        description: 'Browse the configuration-set and content packs built into this server',
       },
     },
 
@@ -179,7 +179,7 @@ export default {
     featurePacks: {
       title: 'Framework Packs',
       subtitle:
-        'Install a built-in pack to provision a workspace with its configuration set and content',
+        'Configuration-set and content packs built into this server. Choose one when creating a workspace.',
       loading: 'Loading packs…',
       empty: 'This server ships no built-in packs.',
       loadFailed: 'Failed to load built-in packs',

@@ -11,22 +11,6 @@
   import Circle from '@lucide/svelte/icons/circle';
   import Database from '@lucide/svelte/icons/database';
   import Settings from '@lucide/svelte/icons/settings';
-  import Type from '@lucide/svelte/icons/type';
-  import AlignLeft from '@lucide/svelte/icons/align-left';
-  import FileText from '@lucide/svelte/icons/file-text';
-  import ChevronDownCircle from '@lucide/svelte/icons/chevron-down-circle';
-  import ListChecks from '@lucide/svelte/icons/list-checks';
-  import Hash from '@lucide/svelte/icons/hash';
-  import Banknote from '@lucide/svelte/icons/banknote';
-  import Calendar from '@lucide/svelte/icons/calendar';
-  import User from '@lucide/svelte/icons/user';
-  import Repeat from '@lucide/svelte/icons/repeat';
-  import Flag from '@lucide/svelte/icons/flag';
-  import Box from '@lucide/svelte/icons/box';
-  import Globe from '@lucide/svelte/icons/globe';
-  import Building2 from '@lucide/svelte/icons/building-2';
-  import Link2 from '@lucide/svelte/icons/link-2';
-  import CheckSquare from '@lucide/svelte/icons/square-check';
   import Button from '../components/Button.svelte';
   import Input from '../components/Input.svelte';
   import DataTable from '../components/DataTable.svelte';
@@ -51,7 +35,8 @@
   import XIcon from '@lucide/svelte/icons/x';
   import DescriptionText from '../components/DescriptionText.svelte';
   import { customFieldFormData, customFieldUpdatePayload, linkingFieldOptions, loadCustomFieldsOverview } from './customFieldsData.js';
-  import { BOOLEAN_CUSTOM_FIELD_TYPE, canonicalCustomFieldType, isBooleanCustomFieldType } from '../utils/customFieldTypes.js';
+  import { canonicalCustomFieldType, isBooleanCustomFieldType } from '../utils/customFieldTypes.js';
+  import { CUSTOM_FIELD_TYPES } from '../utils/fieldTypeMeta.js';
   import { currencyOptions } from '../utils/money.js';
 	import TextField from '../components/TextField.svelte';
 	import SelectField from '../components/SelectField.svelte';
@@ -95,26 +80,10 @@
   let currentPage = $derived(parseInt($currentRoute.query?.page) || 1);
   let itemsPerPage = $derived(parseInt($currentRoute.query?.pageSize) || 25);
 
-  const fieldTypes = [
-    { value: 'text', label: 'Single Line Text', icon: Type, iconColor: '#4A90D9' },
-    { value: 'textarea', label: 'Multi Line Text', icon: AlignLeft, iconColor: '#5B6ABF' },
-    { value: 'richtext', label: 'Rich Text (Markdown)', icon: FileText, iconColor: '#7C6FD9' },
-    { value: 'select', label: 'Single Select', icon: ChevronDownCircle, iconColor: '#E8853D' },
-    { value: 'multiselect', label: 'Multi Select', icon: ListChecks, iconColor: '#D46B2F' },
-    { value: 'number', label: 'Number', icon: Hash, iconColor: '#4CAF7D' },
-    { value: 'money', label: 'Money', icon: Banknote, iconColor: '#2F9E8F' },
-    { value: 'date', label: 'Date', icon: Calendar, iconColor: '#9B6DB7' },
-    { value: 'user', label: 'User', icon: User, iconColor: '#5BA4C9' },
-    { value: 'multi_user', label: 'Multi User', icon: User, iconColor: '#4D9DC5' },
-    { value: 'iteration', label: 'Iteration', icon: Repeat, iconColor: '#D95B5B' },
-    { value: 'milestone', label: 'Milestone', icon: Flag, iconColor: '#C9A84C' },
-    { value: 'multi_milestone', label: 'Multi Milestone', icon: Flag, iconColor: '#C9A84C' },
-    { value: 'asset', label: 'Asset', icon: Box, iconColor: '#7B8A9E' },
-    { value: 'portalcustomer', label: 'Portal Customer', icon: Globe, iconColor: '#E07BAF' },
-    { value: 'customerorganisation', label: 'Customer Organisation', icon: Building2, iconColor: '#8B7EC8' },
-    { value: BOOLEAN_CUSTOM_FIELD_TYPE, label: t('fields.checkbox'), icon: CheckSquare, iconColor: '#2F9E8F' },
-    { value: 'linking', label: 'Linking', icon: Link2, iconColor: '#3B82F6' }
-  ];
+  // Shared catalog; the checkbox label stays localized here.
+  const fieldTypes = CUSTOM_FIELD_TYPES.map((type) =>
+    isBooleanCustomFieldType(type.value) ? { ...type, label: t('fields.checkbox') } : type
+  );
 
   const fieldTypePickerPositioning = {
     strategy: 'fixed',

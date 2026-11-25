@@ -915,8 +915,11 @@ func (as *ActionService) executeActionForEvent(executionCtx context.Context, act
 	)
 
 	// Automation runs are audited (WI-1142): routing and assignment decisions
-	// made by rules must be reconstructable from the central audit trail.
-	emitServiceAudit(as.db, AuditActor{UserID: event.ActorUserID},
+	// made by rules must be reconstructable from the central audit trail. The
+	// actor is the effective actor (the action's actor_user_id override when
+	// set, otherwise the triggering user) and its username is resolved here so
+	// the raw row identifies the user the same way other automation audits do.
+	emitServiceAudit(as.db, automationAuditActor(as.db, ctx.EffectiveActorID, "workspace_action"),
 		logger.ActionAutomationExecute, logger.ResourceAutomation, &action.ID, action.Name, map[string]any{
 			"item_id":          event.ItemID,
 			"trigger_event":    string(event.EventType),

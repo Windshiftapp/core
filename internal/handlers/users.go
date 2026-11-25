@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math/big"
 	"net/http"
+	"strings"
 	"time"
 
 	"windshift/internal/auth"
@@ -51,10 +52,13 @@ func (h *UserHandler) invalidateUserSessions(userID int) {
 // explicit opt-in so the resulting state is visible at create time instead
 // of surprising the admin after the fact.
 type CreateUserRequest struct {
-	Email     string `json:"email" validate:"required,email,max=255"`
-	Username  string `json:"username" validate:"required,min=3,max=32"`
-	FirstName string `json:"first_name" validate:"required,max=50"`
-	LastName  string `json:"last_name" validate:"required,max=50"`
+	Email    string `json:"email" validate:"required,email,max=255"`
+	Username string `json:"username" validate:"required,min=3,max=32"`
+	// First/last name are optional for agents (they are identified by
+	// username/email), so the requirement is enforced in the handlers
+	// rather than with a struct tag that cannot see IsAgent.
+	FirstName string `json:"first_name" validate:"max=50"`
+	LastName  string `json:"last_name" validate:"max=50"`
 	AvatarURL string `json:"avatar_url,omitempty"`
 	Password  string `json:"password,omitempty"` // Plaintext password, will be hashed
 	IsActive  *bool  `json:"is_active,omitempty"`
@@ -123,6 +127,20 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if err := utils.Validate(req); err != nil {
 		respondValidationError(w, r, err.Error())
 		return
+	}
+
+	// Interactive users need a display name for member lists, mentions and
+	// audit bylines. Service users (agents) are identified by their
+	// username/email and may legitimately have no first/last name.
+	if !req.IsAgent {
+		if strings.TrimSpace(req.FirstName) == "" {
+			respondValidationError(w, r, "First name is required")
+			return
+		}
+		if strings.TrimSpace(req.LastName) == "" {
+			respondValidationError(w, r, "Last name is required")
+			return
+		}
 	}
 
 	// Hash password if provided
@@ -221,6 +239,16 @@ func (h *UserHandler) InviteUser(w http.ResponseWriter, r *http.Request) {
 
 	if err := utils.Validate(req); err != nil {
 		respondValidationError(w, r, err.Error())
+		return
+	}
+
+	// Invitations always create interactive users, who need a display name.
+	if strings.TrimSpace(req.FirstName) == "" {
+		respondValidationError(w, r, "First name is required")
+		return
+	}
+	if strings.TrimSpace(req.LastName) == "" {
+		respondValidationError(w, r, "Last name is required")
 		return
 	}
 

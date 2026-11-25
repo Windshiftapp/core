@@ -1,29 +1,44 @@
 <script>
-  import { currentRoute } from '../../router.js';
-  import TabNav from '../../components/TabNav.svelte';
+  import { currentRoute, updateQueryParams } from '../../router.js';
+  import Tabs from '../../components/Tabs.svelte';
   import StatusCategoryManager from '../../settings/StatusCategoryManager.svelte';
   import StatusManager from '../../settings/StatusManager.svelte';
   import { t } from '../../stores/i18n.svelte.js';
+  import CircleDot from '@lucide/svelte/icons/circle-dot';
+  import Tags from '@lucide/svelte/icons/tags';
 
-  // Get active subtab from URL query params, default to 'statuses'
-  let subtab = $derived($currentRoute.query?.subtab || 'statuses');
+  // Active subtab lives in the URL query so deep links keep working, matching
+  // the local-state-plus-URL-sync pattern used by ActionCapabilitiesManager.
+  const VALID_TABS = new Set(['statuses', 'status-categories']);
 
-  let tabs = $derived([
-    { id: 'statuses', label: t('statuses.statuses') },
-    { id: 'status-categories', label: t('statuses.statusCategories') }
+  let subtab = $state('statuses');
+
+  const tabs = $derived([
+    { id: 'statuses', label: t('statuses.statuses'), icon: CircleDot },
+    { id: 'status-categories', label: t('statuses.statusCategories'), icon: Tags }
   ]);
+
+  function tabFromRoute(route) {
+    const requestedTab = route.query?.subtab;
+    return VALID_TABS.has(requestedTab) ? requestedTab : 'statuses';
+  }
+
+  function setRouteTab(tab) {
+    if (!VALID_TABS.has(tab)) return;
+    updateQueryParams({ subtab: tab === 'statuses' ? null : tab });
+  }
+
+  $effect(() => {
+    subtab = tabFromRoute($currentRoute);
+  });
 </script>
 
-<div class="space-y-6">
-  <!-- Tab Navigation -->
-  <TabNav {tabs} basePath="/admin/statuses" defaultTab="statuses" />
-
-  <!-- Tab Content -->
-  <div>
+<div class="space-y-4">
+  <Tabs {tabs} bind:activeTab={subtab} onTabChange={({ tab }) => setRouteTab(tab)}>
     {#if subtab === 'status-categories'}
       <StatusCategoryManager />
-    {:else if subtab === 'statuses'}
+    {:else}
       <StatusManager />
     {/if}
-  </div>
+  </Tabs>
 </div>
