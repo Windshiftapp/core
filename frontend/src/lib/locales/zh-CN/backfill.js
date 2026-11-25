@@ -98,6 +98,7 @@ export default {
       "outboxStatus": "状态",
       "outboxTo": "收件人",
       "rateLimited": "已限流",
+      "heldUnauthenticated": "已暂扣：发件人未通过身份验证",
       "rateLimitedCount": "{count} 条消息因发件人速率限制被扣留，等待重新入队。",
       "requeue": "重新入队并重试",
       "requeueing": "正在重新入队...",

@@ -51,6 +51,9 @@ CREATE TABLE IF NOT EXISTS intakes (
 	item_type_id INTEGER, -- item type created for the routing workspace
 	rate_limit_per_hour INTEGER,
 	processing_disposition TEXT NOT NULL DEFAULT '',
+	-- sender_authentication overrides the mailbox's inbound sender
+	-- authentication policy for this intake. Empty inherits the mailbox default.
+	sender_authentication TEXT NOT NULL DEFAULT '',
 	send_confirmation BOOLEAN NOT NULL DEFAULT false,
 	import_existing_mail BOOLEAN NOT NULL DEFAULT false,
 	status TEXT NOT NULL DEFAULT 'enabled',
@@ -122,6 +125,11 @@ CREATE TABLE IF NOT EXISTS email_message_tracking (
 	subject TEXT,
 	item_id INTEGER,
 	comment_id INTEGER,
+	-- key_generation marks the reply-key scheme that issued an outbound
+	-- Message-ID: 1 is the recipient-bound scheme (WI-2365), 0 is a
+	-- pre-upgrade row. Only generation >= 1 authorizes a reply, and the marker
+	-- survives outbox pruning so a pruned key can never become valid again.
+	key_generation INTEGER NOT NULL DEFAULT 0,
 	-- attachments_status records whether the email's attachments survived
 	-- processing. NULL = no attachments / not yet computed. 'ok' = all stored.
 	-- 'partial' = some stored, some dropped due to fatal write/insert errors
@@ -142,11 +150,18 @@ CREATE TABLE IF NOT EXISTS email_message_tracking (
 	-- reprocessing the same email. It is only cleared when the channel is
 	-- deleted and cascades the tracking rows.
 	completed_at DATETIME,
-	-- skipped_reason records machine-generated mail (bounces, auto-replies)
-	-- that intake deliberately did not turn into a ticket. The value is a
-	-- SystemMailCategory; NULL for mail that was processed normally. Surfaced
-	-- by the admin email-intake diagnostics view.
+	-- skipped_reason records mail intake deliberately did not turn into a
+	-- ticket: machine-generated mail (bounces, auto-replies) and, under a
+	-- strict sender-authentication policy, mail whose From address could not
+	-- be authenticated. The value is a SystemMailCategory or
+	-- 'unauthenticated_sender'; NULL for mail that was processed normally.
+	-- Surfaced by the admin email-intake diagnostics view.
 	skipped_reason TEXT,
+	-- sender_auth records the outcome of evaluating the message's SPF, DKIM,
+	-- and DMARC results against the From domain, e.g. 'dmarc=pass', 'spf=fail',
+	-- or 'none'. NULL for rows written before the check existed. Surfaced by
+	-- the channel email log and admin diagnostics.
+	sender_auth TEXT,
 	processed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
 	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL,
@@ -155,6 +170,7 @@ CREATE TABLE IF NOT EXISTS email_message_tracking (
 
 CREATE INDEX IF NOT EXISTS idx_email_message_tracking_channel_id ON email_message_tracking(channel_id);
 CREATE INDEX IF NOT EXISTS idx_email_message_tracking_message_id ON email_message_tracking(message_id);
+CREATE INDEX IF NOT EXISTS idx_email_message_tracking_key_generation ON email_message_tracking(key_generation);
 CREATE INDEX IF NOT EXISTS idx_email_message_tracking_in_reply_to ON email_message_tracking(in_reply_to);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_email_message_tracking_dedup ON email_message_tracking(channel_id, dedup_key);
 CREATE INDEX IF NOT EXISTS idx_email_message_tracking_sender ON email_message_tracking(from_email);
@@ -179,6 +195,8 @@ CREATE TABLE IF NOT EXISTS email_reply_outbox (
 	html_body TEXT NOT NULL,
 	text_body TEXT NOT NULL,
 	message_id TEXT NOT NULL,
+	-- key_generation: see email_message_tracking for the reply-key contract.
+	key_generation INTEGER NOT NULL DEFAULT 0,
 	in_reply_to TEXT NOT NULL DEFAULT '',
 	references_json TEXT NOT NULL DEFAULT '[]',
 	from_email TEXT NOT NULL,
@@ -206,6 +224,13 @@ CREATE TABLE IF NOT EXISTS email_reply_outbox (
 
 CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_pending
 	ON email_reply_outbox(delivered_at, next_attempt_at);
+
+-- Reply-key lookup by Message-ID and thread assembly by item. Without these,
+-- every inbound reply scans the retained outbox.
+CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_message_id
+	ON email_reply_outbox(message_id);
+CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_item_created
+	ON email_reply_outbox(item_id, created_at);
 
 -- One outbound reply per comment recipient (WI-1136): the creator plus every
 -- external request participant gets their own row.

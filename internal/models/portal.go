@@ -165,6 +165,12 @@ type ChannelConfig struct {
 	// (DefaultEmailRateLimitPerHour), 0 = unlimited, n = n. Replies to
 	// existing threads are never rate-limited.
 	EmailRateLimitPerHour *int `json:"email_rate_limit_per_hour,omitempty"`
+	// EmailTrustedAuthServIDs lists the authentication servers (authserv-id)
+	// whose Authentication-Results / Received-SPF headers this mailbox trusts.
+	// They are the receiver boundary that proves a result was added by the
+	// delivering MTA. The result is recorded for diagnostics only; intake never
+	// gates on it (WI-2365).
+	EmailTrustedAuthServIDs []string `json:"email_trusted_authserv_ids,omitempty"`
 
 	// Portal Configuration
 	PortalSlug          string   `json:"portal_slug,omitempty"`        // URL-friendly identifier (e.g., "support-portal")

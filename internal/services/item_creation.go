@@ -388,6 +388,7 @@ func (c *itemCreation) eventItem(itemID, itemNumber int) (*models.Item, error) {
 		StatusID: c.statusID, PriorityID: c.priorityID, IsTask: p.IsTask,
 		AssigneeID: p.AssigneeID, TeamID: p.TeamID, ReporterID: p.ReporterID, CreatorID: p.CreatorID,
 		CreatorPortalCustomerID: p.CreatorPortalCustomerID, ChannelID: p.ChannelID,
+		ContactEmail: p.ContactEmail, ContactName: p.ContactName,
 		RequestTypeID: p.RequestTypeID, IntakeID: p.IntakeID, PortalOrgShared: p.PortalOrgShared,
 		ParentID: p.ParentID, IterationID: p.IterationID,
 		ProjectID: p.ProjectID, InheritProject: p.InheritProject, TimeProjectID: p.TimeProjectID,

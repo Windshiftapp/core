@@ -98,6 +98,7 @@ export default {
       "outboxStatus": "Status",
       "outboxTo": "An",
       "rateLimited": "Ratenbegrenzt",
+      "heldUnauthenticated": "Zurückgehalten: nicht authentifizierter Absender",
       "rateLimitedCount": "{count} Nachricht(en) durch das Absender-Ratenlimit zurückgehalten und warten auf erneute Einreihung.",
       "requeue": "Erneut einreihen und wiederholen",
       "requeueing": "Wird erneut eingereiht...",

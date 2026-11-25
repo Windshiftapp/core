@@ -394,6 +394,7 @@ export default {
       next: 'Volgende',
       page: 'Pagina {page} van {total}',
       rateLimited: 'Limiet bereikt',
+      heldUnauthenticated: 'Tegenhouden: niet-geverifieerde afzender',
       rateLimitedCount: '{count} bericht(en) tegengehouden door de limiet per afzender en wachtend op herplaatsing.',
       requeue: 'Herplaatsen en opnieuw proberen',
       requeueing: 'Herplaatsen...',

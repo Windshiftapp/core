@@ -3728,6 +3728,65 @@ END $$;
 		`,
 	},
 	{
+		// WI-2362: inbound mail authenticated its From address only through the
+		// attacker-controlled header. sender_auth records the SPF/DKIM/DMARC
+		// outcome on each tracking row, and intakes.sender_authentication lets an
+		// operator relax the default strict policy per intake. Empty
+		// sender_authentication means strict, so existing intakes need no backfill;
+		// operators whose provider does not add authentication headers must set it
+		// to 'off' explicitly.
+		Version: "20261204_email_sender_authentication",
+		Name:    "Record inbound sender authentication and per-intake policy (WI-2362)",
+		CheckSQLite: "SELECT CASE WHEN (" + sqliteColumnCheck("email_message_tracking", "sender_auth") +
+			") > 0 AND (" + sqliteColumnCheck("intakes", "sender_authentication") + ") > 0 THEN 1 ELSE 0 END",
+		CheckPostgres: "SELECT CASE WHEN (" + pgColumnCheck("email_message_tracking", "sender_auth") +
+			") > 0 AND (" + pgColumnCheck("intakes", "sender_authentication") + ") > 0 THEN 1 ELSE 0 END",
+		SQLite: `
+			ALTER TABLE email_message_tracking ADD COLUMN sender_auth TEXT;
+			ALTER TABLE intakes ADD COLUMN sender_authentication TEXT NOT NULL DEFAULT '';
+		`,
+		Postgres: `
+			ALTER TABLE email_message_tracking ADD COLUMN IF NOT EXISTS sender_auth TEXT;
+			ALTER TABLE intakes ADD COLUMN IF NOT EXISTS sender_authentication TEXT NOT NULL DEFAULT '';
+		`,
+	},
+	{
+		// WI-2365: only a recipient-bound outbound Message-ID may authorize an
+		// email reply. key_generation marks rows issued under that scheme (>= 1);
+		// pre-upgrade rows default to 0 and never authorize. The marker lives on
+		// the tracking row too so it survives outbox pruning. contact_email/
+		// contact_name keep an unverified inbound sender off the customer's
+		// portal identity until a reply key proves control of the address.
+		Version: "20261205_email_reply_keys",
+		Name:    "Recipient-bound reply keys and unverified email contacts (WI-2365)",
+		CheckSQLite: "SELECT CASE WHEN (" + sqliteColumnCheck("email_reply_outbox", "key_generation") +
+			") > 0 AND (" + sqliteColumnCheck("email_message_tracking", "key_generation") +
+			") > 0 AND (" + sqliteColumnCheck("items", "contact_email") +
+			") > 0 AND (" + sqliteIndexCheck("idx_email_reply_outbox_message_id") + ") > 0 THEN 1 ELSE 0 END",
+		CheckPostgres: "SELECT CASE WHEN (" + pgColumnCheck("email_reply_outbox", "key_generation") +
+			") > 0 AND (" + pgColumnCheck("email_message_tracking", "key_generation") +
+			") > 0 AND (" + pgColumnCheck("items", "contact_email") +
+			") > 0 AND (" + pgIndexCheck("idx_email_reply_outbox_message_id") + ") > 0 THEN 1 ELSE 0 END",
+		SQLite: `
+			ALTER TABLE email_reply_outbox ADD COLUMN key_generation INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE email_message_tracking ADD COLUMN key_generation INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE items ADD COLUMN contact_email TEXT;
+			ALTER TABLE items ADD COLUMN contact_name TEXT;
+			CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_message_id ON email_reply_outbox(message_id);
+			CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_item_created ON email_reply_outbox(item_id, created_at);
+			CREATE INDEX IF NOT EXISTS idx_email_message_tracking_key_generation ON email_message_tracking(key_generation);
+		`,
+		Postgres: `
+			ALTER TABLE email_reply_outbox ADD COLUMN IF NOT EXISTS key_generation INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE email_message_tracking ADD COLUMN IF NOT EXISTS key_generation INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE items ADD COLUMN IF NOT EXISTS contact_email TEXT;
+			ALTER TABLE items ADD COLUMN IF NOT EXISTS contact_name TEXT;
+			CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_message_id ON email_reply_outbox(message_id);
+			CREATE INDEX IF NOT EXISTS idx_email_reply_outbox_item_created ON email_reply_outbox(item_id, created_at);
+			CREATE INDEX IF NOT EXISTS idx_email_message_tracking_key_generation ON email_message_tracking(key_generation);
+		`,
+	},
+	{
 		// WI-2366: base_tables_postgres.sql declared these tables before their
 		// owning domain files, so CREATE TABLE IF NOT EXISTS silently discarded
 		// four cascading foreign keys and the stricter iteration_types shape on
@@ -3793,6 +3852,25 @@ END $$;
 		SQLite:        "agent-binding-creator-nullable:v1",
 		ApplySQLite:   applySQLiteBindingCreatorNullable,
 		Postgres:      `ALTER TABLE workspace_agent_bindings ALTER COLUMN created_by_user_id DROP NOT NULL;`,
+	},
+	{
+		// WI-2365 review: the legacy (generation 0) fallback must stay closed on a
+		// ticket that has issued a recipient-bound key, even after the outbox row
+		// is pruned. Outbox rows are deleted 90 days after delivery, so a guard
+		// that only looks there reopens the legacy path once the last key is
+		// pruned. This per-item marker is never pruned.
+		Version: "20261206_email_reply_key_marker",
+		Name:    "Record that a ticket issued a recipient-bound reply key (WI-2365)",
+		CheckSQLite: "SELECT CASE WHEN (" + sqliteColumnCheck("items", "reply_key_issued_at") +
+			") > 0 THEN 1 ELSE 0 END",
+		CheckPostgres: "SELECT CASE WHEN (" + pgColumnCheck("items", "reply_key_issued_at") +
+			") > 0 THEN 1 ELSE 0 END",
+		SQLite: `
+			ALTER TABLE items ADD COLUMN reply_key_issued_at DATETIME;
+		`,
+		Postgres: `
+			ALTER TABLE items ADD COLUMN IF NOT EXISTS reply_key_issued_at TIMESTAMPTZ;
+		`,
 	},
 	{
 		// WI-2366: a board configuration belongs to exactly one workspace or

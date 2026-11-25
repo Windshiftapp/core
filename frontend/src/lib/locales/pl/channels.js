@@ -398,6 +398,7 @@ export default {
       next: 'Następna',
       page: 'Strona {page} z {total}',
       rateLimited: 'Limit tempa',
+      heldUnauthenticated: 'Wstrzymano: nieuwierzytelniony nadawca',
       rateLimitedCount: '{count} wiadomości wstrzymanych przez limit tempa na nadawcę i oczekujących na ponowne zakolejkowanie.',
       requeue: 'Zakolejkuj ponownie i spróbuj ponownie',
       requeueing: 'Ponowne kolejkuje...',

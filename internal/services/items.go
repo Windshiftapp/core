@@ -108,18 +108,22 @@ type ItemCreationParams struct {
 	ReporterID              *int // Reporter/submitter of the item
 	CreatorID               *int
 	CreatorPortalCustomerID *int
-	ChannelID               *int       // Portal-specific: track portal/channel
-	RequestTypeID           *int       // Portal-specific: track request type
-	IntakeID                *int       // Email-specific: intake that created this item (WI-1644)
-	PortalOrgShared         bool       // Portal-specific: creator shared the request with their organisation (WI-1139)
-	DueDate                 *time.Time // Due date for the item
-	StartDate               *time.Time // Start date for the item
-	EndDate                 *time.Time // End date for the item
-	RelatedWorkItemID       *int       // For personal tasks: related work item
-	StoryPoints             *float64   // Story points for velocity tracking
-	EstimateMinutes         *int       // Time estimate in minutes (compared against logged worklog time)
-	CustomFieldValuesJSON   string     // JSON string of custom field values
-	VirtualFieldDataJSON    string     // JSON string of request-type virtual values
+	// ContactEmail/ContactName carry an unverified inbound email sender that is
+	// not yet a portal identity (WI-2365).
+	ContactEmail          string
+	ContactName           string
+	ChannelID             *int       // Portal-specific: track portal/channel
+	RequestTypeID         *int       // Portal-specific: track request type
+	IntakeID              *int       // Email-specific: intake that created this item (WI-1644)
+	PortalOrgShared       bool       // Portal-specific: creator shared the request with their organisation (WI-1139)
+	DueDate               *time.Time // Due date for the item
+	StartDate             *time.Time // Start date for the item
+	EndDate               *time.Time // End date for the item
+	RelatedWorkItemID     *int       // For personal tasks: related work item
+	StoryPoints           *float64   // Story points for velocity tracking
+	EstimateMinutes       *int       // Time estimate in minutes (compared against logged worklog time)
+	CustomFieldValuesJSON string     // JSON string of custom field values
+	VirtualFieldDataJSON  string     // JSON string of request-type virtual values
 	// CreatedAt / UpdatedAt override the default `time.Now()` timestamps. Used
 	// by the Jira importer to preserve the original issue chronology so audit
 	// views, reports, and "recent" filters reflect Jira's history rather than

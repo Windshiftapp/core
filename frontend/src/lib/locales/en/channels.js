@@ -394,6 +394,7 @@ export default {
       next: 'Next',
       page: 'Page {page} of {total}',
       rateLimited: 'Rate limited',
+      heldUnauthenticated: 'Held: unauthenticated sender',
       rateLimitedCount: '{count} message(s) held back by the per-sender rate limit and waiting for requeue.',
       requeue: 'Requeue and retry',
       requeueing: 'Requeueing...',

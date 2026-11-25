@@ -362,6 +362,7 @@ export default {
       "next": "بعدی",
       "page": "صفحه {page} از {total}",
       "rateLimited": "نرخ محدود",
+      "heldUnauthenticated": "نگه‌داشته شد: فرستنده تأیید نشده",
       "rateLimitedCount": "{count} پیام به‌دلیل محدودیت نرخ هر فرستنده متوقف شده و در انتظار بازگردانی به صف است.",
       "requeue": "بازگردانی به صف و تلاش مجدد",
       "requeueing": "در حال بازگردانی به صف...",

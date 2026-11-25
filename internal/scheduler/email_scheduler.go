@@ -595,9 +595,10 @@ func (es *EmailScheduler) pollIntake(
 		if msg.UID > maxUID {
 			maxUID = msg.UID
 		}
-		if rateLimited {
+		switch {
+		case rateLimited:
 			rateLimitedCount++
-		} else {
+		default:
 			processedCount++
 		}
 	}

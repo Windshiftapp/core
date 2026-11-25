@@ -36,6 +36,12 @@ type ParsedEmail struct {
 	HTMLBody    string
 	Attachments []Attachment
 	RawHeaders  map[string][]string
+	// HeaderOrder lists the message's header field names in the order they
+	// appear, duplicates included. It lets sender authentication trust only
+	// Authentication-Results headers added above the receiving MTA's Received
+	// header rather than one injected by the sender. Empty when the message was
+	// not parsed from raw bytes.
+	HeaderOrder []string
 }
 
 // EmailAddress represents an email address with optional display name
@@ -87,6 +93,11 @@ const (
 	// a new ticket. The tracking row is marked rate_limited_at and the
 	// original mail is left in the mailbox for operator requeue.
 	ActionRateLimited ProcessingAction = "rate_limited"
+	// ActionHeldForAuth means a strict sender-authentication policy held the
+	// message: the From address could not be authenticated. The original mail
+	// is left in the mailbox so an operator can review it after correcting the
+	// policy or the mailbox configuration.
+	ActionHeldForAuth ProcessingAction = "held_for_auth"
 )
 
 // Provider defines the interface for email providers (Microsoft, Google, Generic)

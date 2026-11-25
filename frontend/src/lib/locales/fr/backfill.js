@@ -126,6 +126,7 @@ export default {
       "outboxStatus": "Statut",
       "outboxTo": "À",
       "rateLimited": "Limité en débit",
+      "heldUnauthenticated": "Retenu : expéditeur non authentifié",
       "rateLimitedCount": "{count} message(s) retenue(s) par la limite de débit par expéditeur et en attente de remise en file.",
       "requeue": "Remettre en file et réessayer",
       "requeueing": "Remise en file...",

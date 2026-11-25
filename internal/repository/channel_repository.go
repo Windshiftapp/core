@@ -1094,6 +1094,13 @@ type EmailMessageRow struct {
 	WorkspaceID         *int
 	WorkspaceItemNumber int
 	WorkspaceKey        string
+	// SenderAuth is the SPF/DKIM/DMARC outcome recorded for the message, e.g.
+	// "dmarc=pass" or "none". Empty for rows written before the check existed.
+	SenderAuth string
+	// SkippedReason is set when intake deliberately did not turn the message
+	// into an item or comment, e.g. "unauthenticated_sender". Empty for mail
+	// that was processed normally.
+	SkippedReason string
 }
 
 // CountEmailMessages returns the number of email_message_tracking rows for a
@@ -1127,7 +1134,7 @@ func (r *ChannelRepository) ListEmailMessages(ctx context.Context, channelID int
 	queryArgs = append(queryArgs, pageSize, offset)
 
 	rows, err := r.db.QueryContext(ctx,
-		"SELECT emt.id, emt.from_email, emt.from_name, COALESCE(emt.subject, ''), emt.item_id, emt.comment_id, emt.processed_at, emt.rate_limited_at, i.workspace_item_number, i.workspace_id, w.key as workspace_key "+
+		"SELECT emt.id, emt.from_email, emt.from_name, COALESCE(emt.subject, ''), emt.item_id, emt.comment_id, emt.processed_at, emt.rate_limited_at, COALESCE(emt.sender_auth, ''), COALESCE(emt.skipped_reason, ''), i.workspace_item_number, i.workspace_id, w.key as workspace_key "+
 			"FROM email_message_tracking emt "+
 			"LEFT JOIN items i ON emt.item_id = i.id "+
 			"LEFT JOIN workspaces w ON i.workspace_id = w.id "+
@@ -1146,7 +1153,7 @@ func (r *ChannelRepository) ListEmailMessages(ctx context.Context, channelID int
 		var itemID, commentID, workspaceID, workspaceItemNumber sql.NullInt64
 		var fromName, workspaceKey sql.NullString
 		var rateLimitedAt sql.NullTime
-		if err := rows.Scan(&msg.ID, &msg.FromEmail, &fromName, &msg.Subject, &itemID, &commentID, &msg.ProcessedAt, &rateLimitedAt, &workspaceItemNumber, &workspaceID, &workspaceKey); err != nil {
+		if err := rows.Scan(&msg.ID, &msg.FromEmail, &fromName, &msg.Subject, &itemID, &commentID, &msg.ProcessedAt, &rateLimitedAt, &msg.SenderAuth, &msg.SkippedReason, &workspaceItemNumber, &workspaceID, &workspaceKey); err != nil {
 			return nil, fmt.Errorf("scan email_message_tracking row: %w", err)
 		}
 		if fromName.Valid {
@@ -1195,6 +1202,7 @@ func emailMessageWhere(channelID int, search string) (whereClause string, args [
 
 // CountRateLimitedEmails returns how many tracking rows for a channel were
 // declined by per-sender flood protection and are awaiting operator requeue.
+// Sender-authentication holds are a separate outcome and are not counted here.
 func (r *ChannelRepository) CountRateLimitedEmails(ctx context.Context, channelID int) (int, error) {
 	var total int
 	if err := r.db.QueryRowContext(ctx,
@@ -1206,17 +1214,22 @@ func (r *ChannelRepository) CountRateLimitedEmails(ctx context.Context, channelI
 	return total, nil
 }
 
-// SystemMailRow is a machine-generated inbound message that intake
-// deliberately did not turn into a ticket (bounce or auto-reply).
+// SystemMailRow is an inbound message intake deliberately did not turn into a
+// ticket: machine-generated mail (bounce or auto-reply) or, under a strict
+// sender-authentication policy, mail whose From address could not be
+// authenticated.
 type SystemMailRow struct {
-	ID          int       `json:"id"`
-	ChannelID   int       `json:"channel_id"`
-	ChannelName string    `json:"channel_name"`
-	IntakeID    *int      `json:"intake_id,omitempty"`
-	FromEmail   string    `json:"from_email"`
-	FromName    string    `json:"from_name"`
-	Subject     string    `json:"subject"`
-	Category    string    `json:"category"`
+	ID          int    `json:"id"`
+	ChannelID   int    `json:"channel_id"`
+	ChannelName string `json:"channel_name"`
+	IntakeID    *int   `json:"intake_id,omitempty"`
+	FromEmail   string `json:"from_email"`
+	FromName    string `json:"from_name"`
+	Subject     string `json:"subject"`
+	Category    string `json:"category"`
+	// SenderAuth is the SPF/DKIM/DMARC outcome that led to the skip, when the
+	// skip was a sender-authentication hold.
+	SenderAuth  string    `json:"sender_auth,omitempty"`
 	ProcessedAt time.Time `json:"processed_at"`
 }
 
@@ -1236,7 +1249,7 @@ func (r *ChannelRepository) ListSystemMail(ctx context.Context, since time.Time,
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT emt.id, emt.channel_id, c.name, emt.intake_id, emt.from_email,
 		       COALESCE(emt.from_name, ''), COALESCE(emt.subject, ''),
-		       emt.skipped_reason, emt.processed_at
+		       emt.skipped_reason, COALESCE(emt.sender_auth, ''), emt.processed_at
 		FROM email_message_tracking emt
 		JOIN channels c ON c.id = emt.channel_id
 		WHERE emt.skipped_reason IS NOT NULL AND emt.processed_at >= ?
@@ -1253,7 +1266,7 @@ func (r *ChannelRepository) ListSystemMail(ctx context.Context, since time.Time,
 		var row SystemMailRow
 		var intakeID sql.NullInt64
 		if err := rows.Scan(&row.ID, &row.ChannelID, &row.ChannelName, &intakeID, &row.FromEmail,
-			&row.FromName, &row.Subject, &row.Category, &row.ProcessedAt); err != nil {
+			&row.FromName, &row.Subject, &row.Category, &row.SenderAuth, &row.ProcessedAt); err != nil {
 			return nil, fmt.Errorf("scan skipped system mail row: %w", err)
 		}
 		if intakeID.Valid {

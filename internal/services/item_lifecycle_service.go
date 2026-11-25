@@ -325,6 +325,24 @@ func (s *ItemLifecycleService) Merge(ctx context.Context, input ItemMergeInput) 
 				if _, err := tx.Exec(`UPDATE email_reply_outbox SET item_id = ? WHERE item_id = ?`, target.ID, plan.item.ID); err != nil {
 					return fmt.Errorf("re-point pending replies from item %d: %w", plan.item.ID, err)
 				}
+				// The reply-key marker is per ticket, and a same-requester merge
+				// makes the canonical the continuation of the duplicate's
+				// conversation. Its generation-0 tracking rows move here too, so the
+				// marker must move as well: otherwise the canonical looks like a
+				// ticket that never issued a key, and the legacy fallback reopens
+				// once the moved outbox rows are pruned (WI-2365).
+				var sourceKeyIssued sql.NullTime
+				if err := tx.QueryRow(`SELECT reply_key_issued_at FROM items WHERE id = ?`, plan.item.ID).Scan(&sourceKeyIssued); err != nil {
+					return fmt.Errorf("load reply-key marker for item %d: %w", plan.item.ID, err)
+				}
+				if sourceKeyIssued.Valid {
+					if _, err := tx.Exec(`
+						UPDATE items SET reply_key_issued_at = ?
+						WHERE id = ? AND reply_key_issued_at IS NULL
+					`, sourceKeyIssued.Time, target.ID); err != nil {
+						return fmt.Errorf("carry reply-key marker to item %d: %w", target.ID, err)
+					}
+				}
 				// External participants follow the content too, or a source-only
 				// participant loses canonical portal access and reply notifications.
 				// Dedupe first: the unique (item_id, portal_customer_id) index
@@ -702,13 +720,23 @@ func (s *ItemLifecycleService) GetMergeRedirect(ctx context.Context, userID, ite
 }
 
 func sameRequester(a, b *models.Item) bool {
-	if a.CreatorPortalCustomerID == nil && b.CreatorPortalCustomerID == nil {
-		return true
+	// A portal customer is a verified, shared identity: two tickets belong to
+	// the same requester only when both name the same customer.
+	if a.CreatorPortalCustomerID != nil || b.CreatorPortalCustomerID != nil {
+		return a.CreatorPortalCustomerID != nil && b.CreatorPortalCustomerID != nil &&
+			*a.CreatorPortalCustomerID == *b.CreatorPortalCustomerID
 	}
-	if a.CreatorPortalCustomerID == nil || b.CreatorPortalCustomerID == nil {
+	// Neither side has a verified owner. An unverified email contact is not a
+	// shared identity: the claimed From proves nothing, so a matching address
+	// may still be two different requesters. Such merges take the
+	// different-requester path (private comments, content kept on the source)
+	// until ownership is verified (WI-2365).
+	if a.ContactEmail != "" || b.ContactEmail != "" {
 		return false
 	}
-	return *a.CreatorPortalCustomerID == *b.CreatorPortalCustomerID
+	// Both tickets were created internally (no portal owner, no email contact),
+	// so they share the workspace rather than an external requester.
+	return true
 }
 
 // sourceItemLinks lists item links attached to the given item on either side.

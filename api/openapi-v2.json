@@ -11324,6 +11324,14 @@
                   "nullable": true,
                   "type": "string"
                 },
+                "contact_email": {
+                  "description": "The contact email value.",
+                  "type": "string"
+                },
+                "contact_name": {
+                  "description": "The contact name value.",
+                  "type": "string"
+                },
                 "created_at": {
                   "description": "The created at value.",
                   "format": "date-time",
@@ -12635,6 +12643,14 @@
                   "description": "The completed at value.",
                   "format": "date-time",
                   "nullable": true,
+                  "type": "string"
+                },
+                "contact_email": {
+                  "description": "The contact email value.",
+                  "type": "string"
+                },
+                "contact_name": {
+                  "description": "The contact name value.",
                   "type": "string"
                 },
                 "created_at": {
@@ -14117,6 +14133,14 @@
                   "nullable": true,
                   "type": "string"
                 },
+                "contact_email": {
+                  "description": "The contact email value.",
+                  "type": "string"
+                },
+                "contact_name": {
+                  "description": "The contact name value.",
+                  "type": "string"
+                },
                 "created_at": {
                   "description": "The created at value.",
                   "format": "date-time",
@@ -15333,6 +15357,14 @@
                   "nullable": true,
                   "type": "string"
                 },
+                "contact_email": {
+                  "description": "The contact email value.",
+                  "type": "string"
+                },
+                "contact_name": {
+                  "description": "The contact name value.",
+                  "type": "string"
+                },
                 "created_at": {
                   "description": "The created at value.",
                   "format": "date-time",
@@ -16342,6 +16374,14 @@
                       "description": "The completed at value.",
                       "format": "date-time",
                       "nullable": true,
+                      "type": "string"
+                    },
+                    "contact_email": {
+                      "description": "The contact email value.",
+                      "type": "string"
+                    },
+                    "contact_name": {
+                      "description": "The contact name value.",
                       "type": "string"
                     },
                     "created_at": {
@@ -17397,6 +17437,14 @@
                       "description": "The completed at value.",
                       "format": "date-time",
                       "nullable": true,
+                      "type": "string"
+                    },
+                    "contact_email": {
+                      "description": "The contact email value.",
+                      "type": "string"
+                    },
+                    "contact_name": {
+                      "description": "The contact name value.",
                       "type": "string"
                     },
                     "created_at": {
@@ -18509,6 +18557,14 @@
                     "description": "The completed at value.",
                     "format": "date-time",
                     "nullable": true,
+                    "type": "string"
+                  },
+                  "contact_email": {
+                    "description": "The contact email value.",
+                    "type": "string"
+                  },
+                  "contact_name": {
+                    "description": "The contact name value.",
                     "type": "string"
                   },
                   "created_at": {
@@ -21696,6 +21752,14 @@
                   "nullable": true,
                   "type": "string"
                 },
+                "contact_email": {
+                  "description": "The contact email value.",
+                  "type": "string"
+                },
+                "contact_name": {
+                  "description": "The contact name value.",
+                  "type": "string"
+                },
                 "created_at": {
                   "description": "The created at value.",
                   "format": "date-time",
@@ -22917,6 +22981,14 @@
                 "description": "The completed at value.",
                 "format": "date-time",
                 "nullable": true,
+                "type": "string"
+              },
+              "contact_email": {
+                "description": "The contact email value.",
+                "type": "string"
+              },
+              "contact_name": {
+                "description": "The contact name value.",
                 "type": "string"
               },
               "created_at": {
@@ -24739,6 +24811,14 @@
                   "nullable": true,
                   "type": "string"
                 },
+                "contact_email": {
+                  "description": "The contact email value.",
+                  "type": "string"
+                },
+                "contact_name": {
+                  "description": "The contact name value.",
+                  "type": "string"
+                },
                 "created_at": {
                   "description": "The created at value.",
                   "format": "date-time",
@@ -25773,6 +25853,14 @@
                   "description": "The completed at value.",
                   "format": "date-time",
                   "nullable": true,
+                  "type": "string"
+                },
+                "contact_email": {
+                  "description": "The contact email value.",
+                  "type": "string"
+                },
+                "contact_name": {
+                  "description": "The contact name value.",
                   "type": "string"
                 },
                 "created_at": {
@@ -45011,6 +45099,14 @@
                   "nullable": true,
                   "type": "string"
                 },
+                "contact_email": {
+                  "description": "The contact email value.",
+                  "type": "string"
+                },
+                "contact_name": {
+                  "description": "The contact name value.",
+                  "type": "string"
+                },
                 "created_at": {
                   "description": "The created at value.",
                   "format": "date-time",
@@ -47633,6 +47729,14 @@
                       "nullable": true,
                       "type": "string"
                     },
+                    "contact_email": {
+                      "description": "The contact email value.",
+                      "type": "string"
+                    },
+                    "contact_name": {
+                      "description": "The contact name value.",
+                      "type": "string"
+                    },
                     "created_at": {
                       "description": "The created at value.",
                       "format": "date-time",
@@ -48686,6 +48790,14 @@
                       "description": "The completed at value.",
                       "format": "date-time",
                       "nullable": true,
+                      "type": "string"
+                    },
+                    "contact_email": {
+                      "description": "The contact email value.",
+                      "type": "string"
+                    },
+                    "contact_name": {
+                      "description": "The contact name value.",
                       "type": "string"
                     },
                     "created_at": {
@@ -49798,6 +49910,14 @@
                     "description": "The completed at value.",
                     "format": "date-time",
                     "nullable": true,
+                    "type": "string"
+                  },
+                  "contact_email": {
+                    "description": "The contact email value.",
+                    "type": "string"
+                  },
+                  "contact_name": {
+                    "description": "The contact name value.",
                     "type": "string"
                   },
                   "created_at": {
@@ -52025,6 +52145,14 @@
                 "description": "The completed at value.",
                 "format": "date-time",
                 "nullable": true,
+                "type": "string"
+              },
+              "contact_email": {
+                "description": "The contact email value.",
+                "type": "string"
+              },
+              "contact_name": {
+                "description": "The contact name value.",
                 "type": "string"
               },
               "created_at": {
@@ -58103,6 +58231,14 @@
                 "nullable": true,
                 "type": "string"
               },
+              "contact_email": {
+                "description": "The contact email value.",
+                "type": "string"
+              },
+              "contact_name": {
+                "description": "The contact name value.",
+                "type": "string"
+              },
               "created_at": {
                 "description": "The created at value.",
                 "format": "date-time",
@@ -59316,6 +59452,14 @@
                 "description": "The completed at value.",
                 "format": "date-time",
                 "nullable": true,
+                "type": "string"
+              },
+              "contact_email": {
+                "description": "The contact email value.",
+                "type": "string"
+              },
+              "contact_name": {
+                "description": "The contact name value.",
                 "type": "string"
               },
               "created_at": {
@@ -75811,6 +75955,14 @@
                         "nullable": true,
                         "type": "string"
                       },
+                      "contact_email": {
+                        "description": "The contact email value.",
+                        "type": "string"
+                      },
+                      "contact_name": {
+                        "description": "The contact name value.",
+                        "type": "string"
+                      },
                       "created_at": {
                         "description": "The created at value.",
                         "format": "date-time",
@@ -76845,6 +76997,14 @@
                   "description": "The completed at value.",
                   "format": "date-time",
                   "nullable": true,
+                  "type": "string"
+                },
+                "contact_email": {
+                  "description": "The contact email value.",
+                  "type": "string"
+                },
+                "contact_name": {
+                  "description": "The contact name value.",
                   "type": "string"
                 },
                 "created_at": {
@@ -78076,6 +78236,14 @@
                       "nullable": true,
                       "type": "string"
                     },
+                    "contact_email": {
+                      "description": "The contact email value.",
+                      "type": "string"
+                    },
+                    "contact_name": {
+                      "description": "The contact name value.",
+                      "type": "string"
+                    },
                     "created_at": {
                       "description": "The created at value.",
                       "format": "date-time",
@@ -79224,6 +79392,14 @@
                       "nullable": true,
                       "type": "string"
                     },
+                    "contact_email": {
+                      "description": "The contact email value.",
+                      "type": "string"
+                    },
+                    "contact_name": {
+                      "description": "The contact name value.",
+                      "type": "string"
+                    },
                     "created_at": {
                       "description": "The created at value.",
                       "format": "date-time",
@@ -80311,6 +80487,14 @@
                         "description": "The completed at value.",
                         "format": "date-time",
                         "nullable": true,
+                        "type": "string"
+                      },
+                      "contact_email": {
+                        "description": "The contact email value.",
+                        "type": "string"
+                      },
+                      "contact_name": {
+                        "description": "The contact name value.",
                         "type": "string"
                       },
                       "created_at": {
@@ -81483,6 +81667,14 @@
                 "nullable": true,
                 "type": "string"
               },
+              "contact_email": {
+                "description": "The contact email value.",
+                "type": "string"
+              },
+              "contact_name": {
+                "description": "The contact name value.",
+                "type": "string"
+              },
               "created_at": {
                 "description": "The created at value.",
                 "format": "date-time",
@@ -82630,6 +82822,14 @@
                 "description": "The completed at value.",
                 "format": "date-time",
                 "nullable": true,
+                "type": "string"
+              },
+              "contact_email": {
+                "description": "The contact email value.",
+                "type": "string"
+              },
+              "contact_name": {
+                "description": "The contact name value.",
                 "type": "string"
               },
               "created_at": {
@@ -84169,6 +84369,14 @@
                     "description": "The completed at value.",
                     "format": "date-time",
                     "nullable": true,
+                    "type": "string"
+                  },
+                  "contact_email": {
+                    "description": "The contact email value.",
+                    "type": "string"
+                  },
+                  "contact_name": {
+                    "description": "The contact name value.",
                     "type": "string"
                   },
                   "created_at": {
@@ -85874,6 +86082,14 @@
                     "nullable": true,
                     "type": "string"
                   },
+                  "contact_email": {
+                    "description": "The contact email value.",
+                    "type": "string"
+                  },
+                  "contact_name": {
+                    "description": "The contact name value.",
+                    "type": "string"
+                  },
                   "created_at": {
                     "description": "The created at value.",
                     "format": "date-time",
@@ -87034,6 +87250,14 @@
                 "nullable": true,
                 "type": "string"
               },
+              "contact_email": {
+                "description": "The contact email value.",
+                "type": "string"
+              },
+              "contact_name": {
+                "description": "The contact name value.",
+                "type": "string"
+              },
               "created_at": {
                 "description": "The created at value.",
                 "format": "date-time",
@@ -88136,6 +88360,14 @@
                       "description": "The completed at value.",
                       "format": "date-time",
                       "nullable": true,
+                      "type": "string"
+                    },
+                    "contact_email": {
+                      "description": "The contact email value.",
+                      "type": "string"
+                    },
+                    "contact_name": {
+                      "description": "The contact name value.",
                       "type": "string"
                     },
                     "created_at": {

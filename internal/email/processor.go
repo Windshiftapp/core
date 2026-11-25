@@ -152,17 +152,19 @@ func (p *Processor) ProcessEmailWithIntake(
 		}, nil
 	}
 
-	// 2. Find or create portal customer by email
-	customerID, err := p.findOrCreatePortalCustomer(ctx, email.From.Address, email.From.Name, channelID, config)
-	if err != nil {
-		p.releaseTrackingClaim(ctx, channelID, dedupKey)
-		return nil, fmt.Errorf("failed to find/create portal customer: %w", err)
-	}
+	// 1c. Record the receiving provider's authentication outcome for the admin
+	// diagnostics view. Intake does not gate on SPF/DKIM/DMARC (WI-2365):
+	// filtering belongs to the receiving provider, and the claimed From is
+	// never trusted as an identity regardless of the verdict.
+	p.recordSenderAuth(ctx, channelID, dedupKey, EvaluateSenderAuthentication(email, ResolveTrustedAuthServIDs(config)))
 
-	// 3. Check if this is a reply (find parent item by In-Reply-To/References).
-	// Matching is item-scoped on purpose: a reply quoting a portal ticket's
-	// Message-IDs lands on the email channel while the ticket lives on the
-	// portal channel (WI-1546). The participant guard is the security boundary.
+	// 1d. Authorize the reply before any customer or access side effect. A
+	// reply may append to an existing private request only when it references a
+	// Windshift-issued outbound Message-ID whose intended recipient is the
+	// claimed sender, and that sender is still authorized (WI-2365). A
+	// customer-generated inbound ID, a legacy thread reference, a missing
+	// header, or a prior unverified sender never authorizes, so those messages
+	// start a separate staff-visible request instead.
 	var parentItemID *int
 	if email.IsReply() {
 		parentItemID = p.findParentItem(ctx, email)
@@ -180,6 +182,23 @@ func (p *Processor) ProcessEmailWithIntake(
 		return &ProcessingResult{Action: ActionRateLimited}, nil
 	}
 
+	// 2. Only an authorized reply has proven the sender controls the address
+	// Windshift wrote to. Resolve them to a portal customer and restore access;
+	// a new request records an unverified contact on the item instead and never
+	// acquires a portal owner from the claimed From.
+	var customerID int
+	if parentItemID != nil {
+		customerID, err = p.findOrCreatePortalCustomer(ctx, email.From.Address, email.From.Name, channelID, config)
+		if err != nil {
+			p.releaseTrackingClaim(ctx, channelID, dedupKey)
+			return nil, fmt.Errorf("failed to find/create portal customer: %w", err)
+		}
+		if err := p.grantChannelAccess(ctx, customerID, channelID, email.From.Address, config); err != nil {
+			p.releaseTrackingClaim(ctx, channelID, dedupKey)
+			return nil, fmt.Errorf("grant customer access for authorized reply: %w", err)
+		}
+	}
+
 	// 4. Create item or add comment
 	var result *ProcessingResult
 	if parentItemID != nil {
@@ -187,7 +206,7 @@ func (p *Processor) ProcessEmailWithIntake(
 		result, err = p.addCommentFromReply(ctx, email, *parentItemID, customerID)
 	} else {
 		// This is a new conversation - create item
-		result, err = p.createItemFromEmail(ctx, email, channelID, config, customerID, intakeID)
+		result, err = p.createItemFromEmail(ctx, email, channelID, config, intakeID)
 	}
 
 	if err != nil {
@@ -195,7 +214,10 @@ func (p *Processor) ProcessEmailWithIntake(
 		return nil, err
 	}
 
-	result.CustomerID = &customerID
+	if parentItemID != nil {
+		result.CustomerID = &customerID
+		p.linkVerifiedContact(ctx, *parentItemID, customerID, email.From.Address)
+	}
 
 	// 5. Finalize tracking with the created item/comment ID. If this UPDATE
 	// fails the item still exists and the preclaim row continues to block
@@ -370,13 +392,30 @@ func (p *Processor) markSystemMailSkipped(ctx context.Context, channelID int, de
 	}
 }
 
+// recordSenderAuth stamps the authentication outcome on the claimed tracking
+// row so the channel email log and admin diagnostics can show how the sender
+// was authenticated. It is diagnostic only: intake no longer gates on the
+// verdict (WI-2365). Best effort: a failure here never changes ingestion.
+func (p *Processor) recordSenderAuth(ctx context.Context, channelID int, dedupKey string, auth SenderAuthResult) {
+	if _, err := p.db.ExecWriteContext(ctx, `
+		UPDATE email_message_tracking
+		SET sender_auth = ?
+		WHERE channel_id = ? AND dedup_key = ?
+	`, auth.Summary(), channelID, dedupKey); err != nil {
+		slog.Warn("failed to record sender authentication",
+			"error", err, "channel_id", channelID, "dedup_key", dedupKey, "auth", auth.Summary())
+	}
+}
+
 // findOrCreatePortalCustomer resolves the sender to a portal customer by
-// email, creating one on first contact, and grants channel access.
+// email, creating one on first contact. It records a contact address only:
+// portal access is granted separately, and only after an authorized reply has
+// proven the sender controls the address Windshift wrote to (WI-2365).
 func (p *Processor) findOrCreatePortalCustomer(
 	ctx context.Context,
 	email, name string,
-	channelID int,
-	config *models.ChannelConfig,
+	_ int,
+	_ *models.ChannelConfig,
 ) (int, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	name = strings.TrimSpace(name)
@@ -395,10 +434,6 @@ func (p *Processor) findOrCreatePortalCustomer(
 	}
 	if created {
 		slog.Info("created portal customer from email", "customer_id", customerID, "email", email)
-	}
-
-	if err := p.grantChannelAccess(ctx, customerID, channelID, email, config); err != nil {
-		return 0, err
 	}
 	return customerID, nil
 }
@@ -500,65 +535,145 @@ func (p *Processor) connectedPortalAdmitsEmail(ctx context.Context, portalChanne
 	return true
 }
 
-// findParentItem looks up the original item from In-Reply-To or References headers.
+// findAuthorizedReplyParent returns the item a reply is allowed to append to.
 //
-// Matching is item-scoped across channels: Message-IDs are globally unique,
-// and a conversation must survive its customer switching channels (portal
-// ticket, reply by email). Channel scoping would permanently silo the
-// customer's reply on the intake channel (WI-1547).
-//
-// Thread-hijack defense: the In-Reply-To / References headers are entirely
-// attacker-controlled. If we trusted them naively, anyone who leaks or guesses
-// a Message-ID used anywhere could post a "reply" onto that item from a new
-// email address, exposing private conversations to a third party. The
-// participant guard is the security boundary: we match only when the sender is
-// demonstrably part of the item's conversation — a prior participant on its
-// tracked thread (any channel) or the original creator via the portal-customer
-// linkage.
-func (p *Processor) findParentItem(ctx context.Context, email *ParsedEmail) *int {
-	threadIDs := email.GetThreadIDs()
+// Authorization is a Windshift-issued, recipient-bound outbound Message-ID:
+// the reply must reference it through In-Reply-To/References, and the claimed
+// sender must be its intended recipient and still be the item's creator or an
+// active external participant. Those headers are attacker-controlled, so an
+// inbound (customer-generated) ID, a legacy thread reference, a missing
+// header, or a prior unverified sender never authorizes: those replies start a
+// separate staff-visible request instead of touching the private conversation
+// (WI-2365).
+func (p *Processor) findAuthorizedReplyParent(ctx context.Context, email *ParsedEmail) (int, bool) {
 	senderEmail := normalizedEmail(email.From.Address)
-
-	for _, messageID := range threadIDs {
-		var itemID int
+	if senderEmail == "" {
+		return 0, false
+	}
+	for _, messageID := range email.GetThreadIDs() {
 		canonicalID := canonicalMessageID(messageID)
-		bareID := bareMessageID(messageID)
 		if canonicalID == "" {
 			continue
 		}
-		err := p.db.QueryRowContext(ctx, `
-			SELECT item_id FROM email_message_tracking
-			WHERE message_id IN (?, ?) AND item_id IS NOT NULL
-		`, canonicalID, bareID).Scan(&itemID)
-		if err != nil {
-			continue
+		itemID, recipient, ok := p.lookupReplyKey(ctx, canonicalID)
+		if ok {
+			if normalizedEmail(recipient) != senderEmail {
+				slog.Warn("ignoring reply: reply key belongs to another recipient",
+					"item_id", itemID,
+					"message_id", messageID,
+					"sender", senderEmail,
+				)
+				continue
+			}
+			if !p.senderIsThreadParticipant(ctx, itemID, senderEmail) {
+				slog.Warn("ignoring reply: sender is no longer authorized",
+					"item_id", itemID,
+					"message_id", messageID,
+					"sender", senderEmail,
+				)
+				continue
+			}
+			slog.Debug("found authorized reply parent", "message_id", messageID, "item_id", itemID)
+			return itemID, true
 		}
-		if !p.senderIsThreadParticipant(ctx, itemID, senderEmail) {
-			slog.Warn("ignoring reply: sender is not a known thread participant",
-				"item_id", itemID,
-				"message_id", messageID,
-				"sender", senderEmail,
-			)
-			continue
+		// Pre-upgrade outbound IDs carry no recipient. They are tolerated only
+		// on the existing ticket they were recorded on; a new ticket has no such
+		// row and therefore must present an exact reply key.
+		if itemID, ok := p.lookupLegacyReplyItem(ctx, canonicalID); ok {
+			if !p.senderIsThreadParticipant(ctx, itemID, senderEmail) {
+				slog.Warn("ignoring legacy reply: sender is not authorized",
+					"item_id", itemID,
+					"message_id", messageID,
+					"sender", senderEmail,
+				)
+				continue
+			}
+			slog.Debug("found authorized legacy reply parent", "message_id", messageID, "item_id", itemID)
+			return itemID, true
 		}
-		slog.Debug("found parent item for reply", "message_id", messageID, "item_id", itemID)
-		return &itemID
 	}
-
-	return nil
+	return 0, false
 }
 
-// senderIsThreadParticipant reports whether senderEmail is allowed to post
-// onto the given item via an email reply. The checks are item-scoped: the
-// original creator, a current external request participant (WI-1136, including
-// a re-added one), or a prior sender on the thread. An explicit participant
-// removal revokes the implicit thread-membership grant so removing someone is
-// not undone by an old reply in their mailbox. The anchor rows minted for
-// portal tickets carry from_email=” so they can never satisfy the
-// prior-participant clause implicitly.
-func (p *Processor) senderIsThreadParticipant(ctx context.Context, itemID int, senderEmail string) bool {
+// ReplyKeyValidity bounds how long a Windshift-issued outbound Message-ID may
+// authorize a reply. Outbox rows are retained longer (90 days) for audit.
+const ReplyKeyValidity = 30 * 24 * time.Hour
+
+// lookupReplyKey resolves a Message-ID to the request and intended recipient of
+// a Windshift-issued outbound delivery. The durable reply outbox persists item,
+// recipient and Message-ID together, so it is the sole source of reply keys: an
+// inbound (customer-generated) Message-ID is never found here (WI-2365).
+func (p *Processor) lookupReplyKey(ctx context.Context, canonicalID string) (itemID int, recipient string, ok bool) {
+	bareID := bareMessageID(canonicalID)
+	err := p.db.QueryRowContext(ctx, `
+		SELECT item_id, to_email FROM email_reply_outbox
+		WHERE message_id IN (?, ?) AND item_id IS NOT NULL AND to_email <> ''
+		  AND key_generation >= 1
+		  AND COALESCE(delivered_at, created_at) >= ?
+		ORDER BY id DESC
+		LIMIT 1
+	`, canonicalID, bareID, time.Now().Add(-ReplyKeyValidity)).Scan(&itemID, &recipient)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			slog.Warn("failed to look up reply key", "message_id", canonicalID, "error", err)
+		}
+		return 0, "", false
+	}
+	return itemID, recipient, true
+}
+
+// lookupLegacyReplyItem resolves a pre-WI-2365 outbound Message-ID to the
+// ticket it was recorded on. Those rows are generation 0 and carry no
+// recipient, so they are tolerated only on a ticket that has never issued a
+// recipient-bound key; synthetic anchors (from_email = ”) never authorize.
+//
+// "Never issued" is decided by the durable items.reply_key_issued_at marker,
+// not by the outbox: delivered outbox rows are pruned after 90 days, so a guard
+// that only looked there would reopen the legacy path once the last key row
+// disappeared (WI-2365). The outbox check stays as a second line of defense for
+// a marker write that failed.
+func (p *Processor) lookupLegacyReplyItem(ctx context.Context, canonicalID string) (int, bool) {
+	bareID := bareMessageID(canonicalID)
+	var itemID int
+	err := p.db.QueryRowContext(ctx, `
+		SELECT t.item_id FROM email_message_tracking t
+		WHERE t.message_id IN (?, ?) AND t.direction = 'outbound' AND t.item_id IS NOT NULL
+		  AND t.key_generation = 0 AND t.from_email <> ''
+		  AND NOT EXISTS (
+		      SELECT 1 FROM items i
+		      WHERE i.id = t.item_id AND i.reply_key_issued_at IS NOT NULL
+		  )
+		  AND NOT EXISTS (
+		      SELECT 1 FROM email_reply_outbox o
+		      WHERE o.item_id = t.item_id AND o.key_generation >= 1
+		  )
+		ORDER BY t.id DESC
+		LIMIT 1
+	`, canonicalID, bareID).Scan(&itemID)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			slog.Warn("failed to look up legacy reply id", "message_id", canonicalID, "error", err)
+		}
+		return 0, false
+	}
+	return itemID, true
+}
+
+// senderStillAuthorized reports whether senderEmail may post onto the item now
+// that a reply key named them. The item creator and current external
+// participants are authorized; an explicit removal revokes the grant, and a
+// prior sender on the thread is not an identity (WI-2365).
+func (p *Processor) senderStillAuthorized(_ context.Context, itemID int, senderEmail string) bool {
 	if senderEmail == "" {
 		return false
+	}
+	// Unverified contact recorded on the item: the reply key's recipient match
+	// already proved control of the address, so the contact may append.
+	var contactEmail sql.NullString
+	if err := p.db.QueryRow(`SELECT contact_email FROM items WHERE id = ?`, itemID).Scan(&contactEmail); err == nil {
+		if contactEmail.Valid && normalizedEmail(contactEmail.String) == senderEmail {
+			return true
+		}
 	}
 	// Original creator via portal customer.
 	if creatorEmail, err := repository.NewItemRepository(p.db).GetPortalCustomerEmailForItem(itemID); err == nil {
@@ -566,24 +681,47 @@ func (p *Processor) senderIsThreadParticipant(ctx context.Context, itemID int, s
 			return true
 		}
 	}
-	// Explicit external request participant, including a re-added one.
-	participants := repository.NewItemParticipantRepository(p.db)
-	if isParticipant, err := participants.IsParticipantEmail(itemID, senderEmail); err == nil && isParticipant {
-		return true
-	}
-	// An explicit removal revokes implicit thread membership.
-	if removed, err := participants.WasParticipantRemoved(itemID, senderEmail); err == nil && removed {
-		return false
-	}
-	// Prior participant on this item's thread (inbound or outbound, any channel).
-	var priorCount int
-	if err := p.db.QueryRowContext(ctx, `
-		SELECT COUNT(*) FROM email_message_tracking
-		WHERE item_id = ? AND LOWER(from_email) = ?
-	`, itemID, senderEmail).Scan(&priorCount); err == nil && priorCount > 0 {
+	// Current external request participant. A re-added participant counts;
+	// an explicit removal leaves no participant row, so it fails closed.
+	if isParticipant, err := repository.NewItemParticipantRepository(p.db).IsParticipantEmail(itemID, senderEmail); err == nil && isParticipant {
 		return true
 	}
 	return false
+}
+
+// linkVerifiedContact promotes an unverified item contact to the portal owner
+// once a reply key proves the sender controls the address. It only acts when
+// the item has no owner and the contact matches the verified sender, so a
+// reply key can never reassign someone else's request.
+func (p *Processor) linkVerifiedContact(ctx context.Context, itemID, customerID int, senderEmail string) {
+	if customerID <= 0 || senderEmail == "" {
+		return
+	}
+	if _, err := p.db.ExecWriteContext(ctx, `
+		UPDATE items
+		SET creator_portal_customer_id = ?, contact_email = NULL, contact_name = NULL, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND creator_portal_customer_id IS NULL AND LOWER(contact_email) = ?
+	`, customerID, itemID, normalizedEmail(senderEmail)); err != nil {
+		slog.Warn("failed to link verified email contact to portal customer",
+			"item_id", itemID, "customer_id", customerID, "error", err)
+	}
+}
+
+// findParentItem resolves the item an email reply is authorized to append to,
+// or nil when the reply must start a separate request. It is the entry point
+// for the recipient-bound reply-key lookup; see findAuthorizedReplyParent for
+// the authorization contract.
+func (p *Processor) findParentItem(ctx context.Context, email *ParsedEmail) *int {
+	if itemID, ok := p.findAuthorizedReplyParent(ctx, email); ok {
+		return &itemID
+	}
+	return nil
+}
+
+// senderIsThreadParticipant reports whether senderEmail may still reply onto
+// the item once a reply key has named them; see senderStillAuthorized.
+func (p *Processor) senderIsThreadParticipant(ctx context.Context, itemID int, senderEmail string) bool {
+	return p.senderStillAuthorized(ctx, itemID, senderEmail)
 }
 
 // normalizedEmail lowercases and trims, matching how the processor stores and
@@ -598,7 +736,6 @@ func (p *Processor) createItemFromEmail(
 	email *ParsedEmail,
 	channelID int,
 	config *models.ChannelConfig,
-	customerID int,
 	intakeID *int,
 ) (*ProcessingResult, error) {
 	workspaceID, itemTypeID, requestTypeID, err := p.resolveEmailIntakeTarget(config)
@@ -629,18 +766,21 @@ func (p *Processor) createItemFromEmail(
 	// Build item parameters. Leave StatusID nil so services.CreateItem resolves
 	// it from the workspace workflow. PriorityID is supplied only when the
 	// channel explicitly configured a workspace-valid override; otherwise the
-	// shared service resolves the workspace default.
+	// shared service resolves the workspace default. The sender is recorded as
+	// an unverified contact, not a portal owner: the claimed From must not make
+	// the request appear in a customer's portal or organisation sharing (WI-2365).
 	params := services.ItemCreationParams{
-		WorkspaceID:             workspaceID,
-		Title:                   sanitize.PlainTextField.Sanitize(email.GetSubjectForItem()),
-		Description:             sanitize.Comment.Sanitize(email.bodyMarkdown(false)),
-		ItemTypeID:              itemTypeID,
-		PriorityID:              config.EmailDefaultPriorityID,
-		RequestTypeID:           requestTypeID,
-		IntakeID:                intakeID,
-		CreatorPortalCustomerID: &customerID,
-		ChannelID:               &channelID,
-		EventMetadata:           itemevents.PortalCustomer(customerID, "email"),
+		WorkspaceID:   workspaceID,
+		Title:         sanitize.PlainTextField.Sanitize(email.GetSubjectForItem()),
+		Description:   sanitize.Comment.Sanitize(email.bodyMarkdown(false)),
+		ItemTypeID:    itemTypeID,
+		PriorityID:    config.EmailDefaultPriorityID,
+		RequestTypeID: requestTypeID,
+		IntakeID:      intakeID,
+		ContactEmail:  email.From.Address,
+		ContactName:   email.From.Name,
+		ChannelID:     &channelID,
+		EventMetadata: itemevents.System("email"),
 	}
 
 	// Create the item via the shared service entry point.
