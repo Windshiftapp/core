@@ -77,11 +77,13 @@ async function ensureLang(lang) {
   return lang;
 }
 
-function detectLang(codeEl) {
-  const cls = codeEl.className || '';
-  const match = cls.match(/language-([\w-]+)/i);
-  if (!match) return null;
-  return match[1].toLowerCase();
+function detectLang(pre, codeEl) {
+  // Milkdown 7 stores the fence language on the <pre> as data-language;
+  // older renderers put a `language-*` class on the <code>.
+  const fromPre = pre?.dataset?.language;
+  if (fromPre) return fromPre.toLowerCase();
+  const match = (codeEl.className || '').match(/language-([\w-]+)/i);
+  return match ? match[1].toLowerCase() : null;
 }
 
 export async function highlightCodeBlocks(root) {
@@ -95,7 +97,7 @@ export async function highlightCodeBlocks(root) {
     const pre = codeEl.parentElement;
     if (!pre || pre.dataset.shiki === '1') continue;
 
-    const rawLang = detectLang(codeEl);
+    const rawLang = detectLang(pre, codeEl);
     const lang = rawLang ? await ensureLang(rawLang) : null;
     const src = codeEl.textContent ?? '';
 
