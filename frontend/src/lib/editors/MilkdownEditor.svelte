@@ -2,8 +2,33 @@
   import { onMount, onDestroy } from 'svelte';
   import { useEventListener } from 'runed';
   import { Editor, rootCtx, defaultValueCtx, editorViewOptionsCtx, editorViewCtx, serializerCtx, remarkPluginsCtx } from '@milkdown/kit/core';
-  import { commonmark, toggleStrongCommand, toggleEmphasisCommand, wrapInBulletListCommand, wrapInOrderedListCommand, toggleInlineCodeCommand } from '@milkdown/kit/preset/commonmark';
-  import { gfm, toggleStrikethroughCommand } from '@milkdown/kit/preset/gfm';
+  import {
+    commonmark,
+    toggleStrongCommand,
+    toggleEmphasisCommand,
+    wrapInBulletListCommand,
+    wrapInOrderedListCommand,
+    toggleInlineCodeCommand,
+    wrapInHeadingCommand,
+    turnIntoTextCommand,
+    wrapInBlockquoteCommand,
+    createCodeBlockCommand,
+    insertHrCommand,
+    toggleLinkCommand,
+    updateLinkCommand
+  } from '@milkdown/kit/preset/commonmark';
+  import {
+    gfm,
+    toggleStrikethroughCommand,
+    insertTableCommand,
+    addRowBeforeCommand,
+    addRowAfterCommand,
+    addColBeforeCommand,
+    addColAfterCommand
+  } from '@milkdown/kit/preset/gfm';
+  import { isInTable, deleteRow, deleteColumn, deleteTable } from '@milkdown/kit/prose/tables';
+  import { TextSelection } from '@milkdown/kit/prose/state';
+  import { lift } from '@milkdown/kit/prose/commands';
   import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
   import { clipboard } from '@milkdown/kit/plugin/clipboard';
   import { history } from '@milkdown/kit/plugin/history';
@@ -23,16 +48,23 @@
   import ImageIcon from '@lucide/svelte/icons/image';
   import IconGraph from '@tabler/icons-svelte-runes/icons/graph';
   import BookOpen from '@lucide/svelte/icons/book-open';
+  import Heading from '@lucide/svelte/icons/heading';
+  import Quote from '@lucide/svelte/icons/quote';
+  import SquareCode from '@lucide/svelte/icons/square-code';
+  import Minus from '@lucide/svelte/icons/minus';
+  import LinkIcon from '@lucide/svelte/icons/link';
+  import TableIcon from '@lucide/svelte/icons/table';
   import { getAssignableUsers, getUsers } from '../api/users.js';
   import { attachments as attachmentsApi } from '../api/misc.js';
   import { pages } from '../api/pages.js';
   import { confirm } from '../composables/useConfirm.js';
   import Tooltip from '../components/Tooltip.svelte';
   import FileInput from '../components/FileInput.svelte';
+  import DropdownMenu from '../layout/DropdownMenu.svelte';
   import MentionPicker from '../pickers/MentionPicker.svelte';
   import { mentionDecorationPlugin } from './milkdown-mention-mark.js';
   import { mentionTextFor, resolveMentionUser } from './mentionResolver.js';
-  import { linkSanitizerPlugin } from './milkdown-link-sanitizer.js';
+  import { isSafeUrl, linkSanitizerPlugin } from './milkdown-link-sanitizer.js';
   import { imageBlockerPlugin } from './milkdown-image-blocker.js';
   import { rewriteBreakHTML } from './milkdown-hardbreak.js';
   import { taskListPlugin, toggleTaskListCommand } from './milkdown-task-list.js';
@@ -85,7 +117,26 @@
   const effectiveEntityId = $derived(entityId || itemId);
 
   let isFocused = $state(false);
-  const toolbarVisible = $derived(showToolbar && !readonly && (!hideToolbarUntilFocus || isFocused));
+
+  // Toolbar popovers and menus live outside the editor's focus ring (the
+  // table/heading menus portal to <body>), so track their open state to keep
+  // the focus-revealed toolbar from collapsing mid-interaction.
+  let headingMenuOpen = $state(false);
+  let tableMenuOpen = $state(false);
+  let linkPopoverOpen = $state(false);
+  let linkUrl = $state('');
+  let linkError = $state('');
+  let linkEditing = $state(false);
+  let linkHasSelection = $state(false);
+  let linkInput = $state(null);
+
+  // Formatting state of the current selection, refreshed on every transaction
+  // so the toolbar can highlight the active heading and table controls.
+  let selectionContext = $state({ headingLevel: 0, inTable: false, inBlockquote: false, inCodeBlock: false, linkHref: null });
+
+  const toolbarVisible = $derived(
+    showToolbar && !readonly && (!hideToolbarUntilFocus || isFocused || headingMenuOpen || tableMenuOpen)
+  );
 
   // Blur collapses the focus-revealed toolbar, which reflows everything below
   // the editor. Hide it on a short delay instead so a click that started on a
@@ -101,6 +152,7 @@
 
   function handleEditorFocusOut(e) {
     if (e.currentTarget.contains(/** @type {Node | null} */ (e.relatedTarget))) return;
+    if (headingMenuOpen || tableMenuOpen) return;
     clearTimeout(toolbarHideTimer);
     toolbarHideTimer = setTimeout(() => {
       toolbarHideTimer = null;
@@ -182,6 +234,251 @@
   function toggleTaskList() {
     if (editor) editor.action(callCommand(toggleTaskListCommand.key));
   }
+
+  // Read the formatting context of the live selection. Commands read
+  // `view.state.selection`, so this stays accurate even while a portaled menu
+  // holds DOM focus.
+  function refreshSelectionContext() {
+    if (!editor) return;
+    try {
+      selectionContext = editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { state } = view;
+        const from = state.selection.$from;
+        const linkType = state.schema.marks.link;
+        const linkMark = linkType ? from.marks().find((mark) => mark.type === linkType) : null;
+        let inBlockquote = false;
+        let inCodeBlock = false;
+        for (let depth = from.depth; depth > 0; depth -= 1) {
+          const name = from.node(depth).type.name;
+          if (name === 'blockquote') inBlockquote = true;
+          if (name === 'code_block') inCodeBlock = true;
+        }
+        return {
+          headingLevel: from.parent.type.name === 'heading' ? from.parent.attrs.level : 0,
+          inTable: isInTable(state),
+          inBlockquote,
+          inCodeBlock,
+          linkHref: linkMark?.attrs.href ?? null
+        };
+      });
+    } catch {
+      // The editor can be torn down between a transaction and this refresh.
+    }
+  }
+
+  function setHeadingLevel(level) {
+    if (!editor) return;
+    if (level === 0 || selectionContext.headingLevel === level) {
+      editor.action(callCommand(turnIntoTextCommand.key));
+    } else {
+      editor.action(callCommand(wrapInHeadingCommand.key, level));
+    }
+    refreshSelectionContext();
+  }
+
+  function toggleBlockquote() {
+    if (!editor) return;
+    if (selectionContext.inBlockquote) {
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        lift(view.state, view.dispatch);
+      });
+    } else {
+      editor.action(callCommand(wrapInBlockquoteCommand.key));
+    }
+    refreshSelectionContext();
+  }
+
+  function toggleCodeBlock() {
+    if (!editor) return;
+    if (selectionContext.inCodeBlock) {
+      editor.action(callCommand(turnIntoTextCommand.key));
+    } else {
+      editor.action(callCommand(createCodeBlockCommand.key));
+    }
+    refreshSelectionContext();
+  }
+
+  function insertDivider() {
+    if (!editor) return;
+    editor.action(callCommand(insertHrCommand.key));
+    refreshSelectionContext();
+  }
+
+  function insertTable() {
+    if (!editor) return;
+    editor.action((ctx) => {
+      const view = ctx.get(editorViewCtx);
+      const insertPos = view.state.selection.from;
+      callCommand(insertTableCommand.key, { row: 3, col: 3 })(ctx);
+      // insertTableCommand leaves the selection after the new table, which
+      // hides the table controls. Find the inserted table and put the cursor in
+      // its first cell (table > row > cell > paragraph starts three in).
+      let tablePos = -1;
+      let nearest = Infinity;
+      view.state.doc.descendants((node, pos) => {
+        if (node.type.name !== 'table') return true;
+        const distance = Math.abs(pos - insertPos);
+        if (distance < nearest) {
+          nearest = distance;
+          tablePos = pos;
+        }
+        return false;
+      });
+      if (tablePos < 0) return;
+      const selection = TextSelection.near(view.state.doc.resolve(tablePos + 3), 1);
+      view.dispatch(view.state.tr.setSelection(selection));
+    });
+    refreshSelectionContext();
+  }
+
+  function addRowAbove() {
+    if (editor) editor.action(callCommand(addRowBeforeCommand.key));
+  }
+
+  function addRowBelow() {
+    if (editor) editor.action(callCommand(addRowAfterCommand.key));
+  }
+
+  function addColumnLeft() {
+    if (editor) editor.action(callCommand(addColBeforeCommand.key));
+  }
+
+  function addColumnRight() {
+    if (editor) editor.action(callCommand(addColAfterCommand.key));
+  }
+
+  function removeTableRow() {
+    if (!editor) return;
+    editor.action((ctx) => {
+      const view = ctx.get(editorViewCtx);
+      deleteRow(view.state, view.dispatch);
+    });
+    refreshSelectionContext();
+  }
+
+  function removeTableColumn() {
+    if (!editor) return;
+    editor.action((ctx) => {
+      const view = ctx.get(editorViewCtx);
+      deleteColumn(view.state, view.dispatch);
+    });
+    refreshSelectionContext();
+  }
+
+  function removeTable() {
+    if (!editor) return;
+    editor.action((ctx) => {
+      const view = ctx.get(editorViewCtx);
+      deleteTable(view.state, view.dispatch);
+    });
+    refreshSelectionContext();
+  }
+
+  function openLinkPopover() {
+    if (!editor) return;
+    const info = editor.action((ctx) => {
+      const view = ctx.get(editorViewCtx);
+      const { state } = view;
+      const { from, to } = state.selection;
+      const linkType = state.schema.marks.link;
+      let href = '';
+      if (linkType) {
+        const startMark = state.selection.$from.marks().find((mark) => mark.type === linkType);
+        if (startMark) {
+          href = startMark.attrs.href || '';
+        } else {
+          state.doc.nodesBetween(from, to === from ? to + 1 : to, (node) => {
+            const mark = linkType.isInSet(node.marks);
+            if (mark) {
+              href = mark.attrs.href || '';
+              return false;
+            }
+            return undefined;
+          });
+        }
+      }
+      return { href, hasSelection: !state.selection.empty };
+    });
+    linkEditing = !!info.href;
+    linkHasSelection = info.hasSelection;
+    linkUrl = info.href || '';
+    linkError = '';
+    linkPopoverOpen = true;
+    requestAnimationFrame(() => linkInput?.focus());
+  }
+
+  function closeLinkPopover() {
+    linkPopoverOpen = false;
+    linkError = '';
+  }
+
+  function applyLink() {
+    if (!editor) return;
+    const href = linkUrl.trim();
+    if (!href || !isSafeUrl(href)) {
+      linkError = t('editors.linkInvalid');
+      return;
+    }
+    if (linkEditing) {
+      editor.action(callCommand(updateLinkCommand.key, { href }));
+    } else if (linkHasSelection) {
+      editor.action(callCommand(toggleLinkCommand.key, { href }));
+    } else {
+      editor.action(insert(`[${href}](${href})`));
+    }
+    closeLinkPopover();
+    refreshSelectionContext();
+  }
+
+  function removeLink() {
+    if (!editor) return;
+    editor.action((ctx) => {
+      const view = ctx.get(editorViewCtx);
+      const { state, dispatch } = view;
+      const linkType = state.schema.marks.link;
+      if (!linkType) return;
+      const { from, to } = state.selection;
+      if (from !== to) {
+        dispatch(state.tr.removeMark(from, to, linkType));
+        return;
+      }
+      // Collapsed selection: remove the mark from the surrounding link node.
+      let pos = -1;
+      state.doc.nodesBetween(from, to + 1, (node, nodePos) => {
+        if (linkType.isInSet(node.marks)) {
+          pos = nodePos;
+          return false;
+        }
+        return undefined;
+      });
+      const node = pos >= 0 ? state.doc.nodeAt(pos) : null;
+      if (node) dispatch(state.tr.removeMark(pos, pos + node.nodeSize, linkType));
+    });
+    closeLinkPopover();
+    refreshSelectionContext();
+  }
+
+  const headingMenuItems = $derived([
+    { id: 'normal', title: t('editors.headingNormal'), selected: selectionContext.headingLevel === 0, testid: 'milkdown-heading-normal', onClick: () => setHeadingLevel(0) },
+    { id: 'h1', title: t('editors.heading1'), selected: selectionContext.headingLevel === 1, testid: 'milkdown-heading-1', onClick: () => setHeadingLevel(1) },
+    { id: 'h2', title: t('editors.heading2'), selected: selectionContext.headingLevel === 2, testid: 'milkdown-heading-2', onClick: () => setHeadingLevel(2) },
+    { id: 'h3', title: t('editors.heading3'), selected: selectionContext.headingLevel === 3, testid: 'milkdown-heading-3', onClick: () => setHeadingLevel(3) }
+  ]);
+
+  const tableMenuItems = $derived([
+    { id: 'insert', title: t('editors.insertTable'), testid: 'milkdown-insert-table', onClick: insertTable },
+    { id: 'insert-divider', type: 'divider' },
+    { id: 'row-above', title: t('editors.addRowAbove'), testid: 'milkdown-add-row-above', disabled: !selectionContext.inTable, onClick: addRowAbove },
+    { id: 'row-below', title: t('editors.addRowBelow'), testid: 'milkdown-add-row-below', disabled: !selectionContext.inTable, onClick: addRowBelow },
+    { id: 'col-left', title: t('editors.addColumnLeft'), testid: 'milkdown-add-column-left', disabled: !selectionContext.inTable, onClick: addColumnLeft },
+    { id: 'col-right', title: t('editors.addColumnRight'), testid: 'milkdown-add-column-right', disabled: !selectionContext.inTable, onClick: addColumnRight },
+    { id: 'edit-divider', type: 'divider' },
+    { id: 'delete-row', title: t('editors.deleteRow'), testid: 'milkdown-delete-row', disabled: !selectionContext.inTable, onClick: removeTableRow },
+    { id: 'delete-column', title: t('editors.deleteColumn'), testid: 'milkdown-delete-column', disabled: !selectionContext.inTable, onClick: removeTableColumn },
+    { id: 'delete-table', title: t('editors.deleteTable'), testid: 'milkdown-delete-table', disabled: !selectionContext.inTable, onClick: removeTable }
+  ]);
 
   // Mention handling functions
   function checkForMentionTrigger(view) {
@@ -585,10 +882,12 @@
           // Detect mentions on all changes: mobile keyboards may omit keyup.
           // Overlap with desktop keyup is safe because the check only reads state.
           ctx.get(listenerCtx).updated((updateCtx) => {
-            if (readonly || disposed) return;
+            if (disposed) return;
             try {
               const view = updateCtx.get(editorViewCtx);
-              if (view) checkForMentionTrigger(view);
+              if (!view) return;
+              refreshSelectionContext();
+              if (!readonly) checkForMentionTrigger(view);
             } catch {
               // Ignore an editor view not yet ready.
             }
@@ -675,6 +974,7 @@
         return;
       }
       editor = created;
+      refreshSelectionContext();
     } catch (error) {
       if (!disposed) {
         console.error('Failed to initialize Milkdown editor:', error);
@@ -968,6 +1268,59 @@
         {/snippet}
       </Tooltip>
       <div class="toolbar-divider"></div>
+      <DropdownMenu
+        triggerIcon={Heading}
+        items={headingMenuItems}
+        showChevron={false}
+        iconOnly={true}
+        placement="bottom-start"
+        triggerClass="toolbar-btn"
+        triggerIconClass="w-3.5 h-3.5"
+        triggerLabel={t('editors.heading')}
+        triggerTestid="milkdown-heading-menu"
+        bind:isOpen={headingMenuOpen}
+      />
+      <Tooltip content={t('editors.blockquote')} placement="bottom">
+        {#snippet children()}
+          <button type="button" class="toolbar-btn" class:active={selectionContext.inBlockquote} tabindex="-1" onclick={toggleBlockquote} aria-label={t('editors.blockquote')} data-testid="milkdown-blockquote">
+            <Quote size={14} />
+          </button>
+        {/snippet}
+      </Tooltip>
+      <Tooltip content={t('editors.codeBlock')} placement="bottom">
+        {#snippet children()}
+          <button type="button" class="toolbar-btn" class:active={selectionContext.inCodeBlock} tabindex="-1" onclick={toggleCodeBlock} aria-label={t('editors.codeBlock')} data-testid="milkdown-code-block">
+            <SquareCode size={14} />
+          </button>
+        {/snippet}
+      </Tooltip>
+      <Tooltip content={t('editors.divider')} placement="bottom">
+        {#snippet children()}
+          <button type="button" class="toolbar-btn" tabindex="-1" onclick={insertDivider} aria-label={t('editors.divider')} data-testid="milkdown-divider">
+            <Minus size={14} />
+          </button>
+        {/snippet}
+      </Tooltip>
+      <Tooltip content={t('common.link')} placement="bottom">
+        {#snippet children()}
+          <button type="button" class="toolbar-btn" class:active={!!selectionContext.linkHref} tabindex="-1" onclick={openLinkPopover} aria-label={t('common.link')} data-testid="milkdown-link">
+            <LinkIcon size={14} />
+          </button>
+        {/snippet}
+      </Tooltip>
+      <DropdownMenu
+        triggerIcon={TableIcon}
+        items={tableMenuItems}
+        showChevron={false}
+        iconOnly={true}
+        placement="bottom-start"
+        triggerClass="toolbar-btn"
+        triggerIconClass="w-3.5 h-3.5"
+        triggerLabel={t('editors.table')}
+        triggerTestid="milkdown-table-menu"
+        bind:isOpen={tableMenuOpen}
+      />
+      <div class="toolbar-divider"></div>
       <Tooltip content={t('editors.bulletList')} placement="bottom">
         {#snippet children()}
           <button type="button" class="toolbar-btn" tabindex="-1" onclick={toggleBulletList} aria-label={t('editors.bulletList')}>
@@ -1015,6 +1368,46 @@
             </button>
           {/snippet}
         </Tooltip>
+      {/if}
+      {#if linkPopoverOpen}
+        <!-- Inline link editor: the wrapper owns it so focus never leaves the
+             editor's focus ring. role="presentation" keeps it out of the
+             accessibility tree. -->
+        <div
+          class="link-popover"
+          role="presentation"
+          data-testid="milkdown-link-popover"
+          onclick={(e) => e.stopPropagation()}
+        >
+          <input
+            bind:this={linkInput}
+            type="text"
+            class="link-input"
+            placeholder={t('editors.linkUrlPlaceholder')}
+            bind:value={linkUrl}
+            data-testid="milkdown-link-input"
+            onkeydown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                applyLink();
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeLinkPopover();
+              }
+            }}
+          />
+          <button type="button" class="link-action" onclick={applyLink} data-testid="milkdown-link-apply">
+            {t('common.apply')}
+          </button>
+          {#if linkEditing}
+            <button type="button" class="link-action" onclick={removeLink} data-testid="milkdown-link-remove">
+              {t('common.remove')}
+            </button>
+          {/if}
+          {#if linkError}
+            <span class="link-error" data-testid="milkdown-link-error">{linkError}</span>
+          {/if}
+        </div>
       {/if}
     </div>
   {/if}
@@ -1175,7 +1568,9 @@
   }
 
   .milkdown-toolbar {
+    position: relative;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 2px;
     padding: 4px 8px;
@@ -1205,11 +1600,71 @@
     color: var(--ds-text);
   }
 
+  .toolbar-btn.active {
+    background: var(--ds-surface-selected);
+    color: var(--ds-text);
+  }
+
   .toolbar-divider {
     width: 1px;
     height: 16px;
     background: var(--ds-border, rgba(0, 0, 0, 0.12));
     margin: 0 4px;
+  }
+
+  .link-popover {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 460px;
+    padding: 6px;
+    background: var(--ds-surface-raised, white);
+    border: 1px solid var(--ds-border, #dfe1e6);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 50;
+  }
+
+  .link-input {
+    flex: 1;
+    min-width: 0;
+    box-sizing: border-box;
+    font-size: 13px;
+    padding: 6px 8px;
+    border: 1px solid var(--ds-border, #dfe1e6);
+    border-radius: 6px;
+    background: var(--ds-background-input, white);
+    color: var(--ds-text, #172b4d);
+  }
+
+  .link-input:focus {
+    outline: none;
+    border-color: var(--ds-border-focused, #2563eb);
+  }
+
+  .link-action {
+    flex-shrink: 0;
+    font-size: 13px;
+    padding: 6px 10px;
+    border: 1px solid var(--ds-border, #dfe1e6);
+    border-radius: 6px;
+    background: var(--ds-surface, white);
+    color: var(--ds-text, #172b4d);
+    cursor: pointer;
+  }
+
+  .link-action:hover {
+    background: var(--ds-surface-hovered, #f4f5f7);
+  }
+
+  .link-error {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--ds-text-danger, #ae2a19);
   }
 
   .milkdown-editor {
