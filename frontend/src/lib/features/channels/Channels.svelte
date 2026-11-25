@@ -1,5 +1,4 @@
 <script>
-  let tabPanelElement = $state(null);
   import { onMount } from 'svelte';
   import StateDisplay from '../../components/StateDisplay.svelte';
   import LazyRootView from '../../components/LazyRootView.svelte';
@@ -29,7 +28,7 @@
   import Lozenge from '../../components/Lozenge.svelte';
   import DataTable from '../../components/DataTable.svelte';
   import ChannelNavigation from './ChannelNavigation.svelte';
-  import TabStrip from '../../components/TabStrip.svelte';
+  import Tabs from '../../components/Tabs.svelte';
   import { channelTypes as channelTypeDefs, allTypesEntry, getChannelTypeIcon } from './channelTypes.js';
   import { channelAdminRoute } from './channelRoutes.js';
   import CategoryModal from '../../dialogs/CategoryModal.svelte';
@@ -62,6 +61,19 @@
   // changes cannot disagree about which channels are visible.
   let activeCategoryId = $derived($currentRoute.params?.categoryId || null);
   let activeTypeFilter = $derived($currentRoute.params?.type || null);
+
+  // Tabs keeps its own selection state; mirror the URL into it so browser
+  // navigation, deep links, and tab clicks all agree on the active type.
+  let activeTab = $state('all');
+  $effect(() => {
+    activeTab = activeTypeFilter ?? 'all';
+  });
+
+  const pageHeading = $derived(
+    activeCategoryId
+      ? ($channelCategoriesStore.find(c => c.id === parseInt(activeCategoryId))?.name || t('common.category'))
+      : t('channels.title')
+  );
 
   // Handlers for embedded tab navigation
   function handleTypeClick(typeId) {
@@ -466,73 +478,112 @@
 
   <!-- Main Content -->
   <div class="flex-1 min-h-0 overflow-y-auto {embedded ? '' : 'p-6'}">
-    <!-- Embedded Tab Navigation -->
     {#if embedded}
-      <!-- Type Tabs with Category filter and Manage button on right -->
-      <TabStrip
-        panelElement={tabPanelElement}
-        tabs={channelTabs}
-        activeTab={activeTypeFilter ?? 'all'}
-        onTabChange={(id) => handleTypeClick(id === 'all' ? null : id)}
-        class="mb-6"
-      >
-        {#snippet trailing()}
-          <span class="text-sm whitespace-nowrap" style="color: var(--ds-text-subtle);">{t('channels.category', 'Category')}:</span>
-          <ItemPicker
-            value={activeCategoryId ? parseInt(activeCategoryId) : null}
-            items={$channelCategoriesStore}
-            placeholder={t('channels.allCategories', 'All Categories')}
-            showUnassigned={true}
-            unassignedLabel={t('channels.allCategories', 'All Categories')}
-            allowClear={false}
-            class="w-48"
-            onSelect={(item) => {
-              if (!item) {
-                navigate('/admin/channels');
-              } else {
-                navigate(`/admin/channels/category/${item.id}`);
-              }
-            }}
-          />
+      <div class="space-y-4">
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <h1 class="text-2xl font-semibold text-ds-text">{pageHeading}</h1>
+            <p class="mt-1 text-sm text-ds-text-subtle">
+              {filteredChannels().length} channel{filteredChannels().length !== 1 ? 's' : ''}
+            </p>
+          </div>
           {#if $isSystemAdmin}
             <Button
-              onclick={() => showCategoryModal = true}
-              variant="ghost"
-              size="small"
-              icon={IconTag}
-              class="whitespace-nowrap flex-shrink-0"
+              onclick={showAddChannelForm}
+              variant="primary"
+              icon={IconPlus}
+              size="medium"
+              dataTestid="channel-create-open"
+              keyboardHint={getShortcutDisplay('channels', 'addChannel')}
+              hotkeyConfig={{ key: toHotkeyString('channels', 'addChannel'), guard: () => !showAddForm && !showConfigModal && !showCategoryModal }}
             >
-              {t('channels.manageCategories', 'Manage')}
+              {t('channels.createChannel')}
             </Button>
           {/if}
-        {/snippet}
-      </TabStrip>
-    {/if}
+        </div>
 
-    <!-- Header -->
-    <div bind:this={tabPanelElement}>
-    {#if activeTypeFilter === 'public-boards'}
-      <LazyRootView loader={loadPublicBoards} label="Public boards" />
+        <Tabs
+          tabs={channelTabs}
+          bind:activeTab
+          onTabChange={({ tab }) => handleTypeClick(tab === 'all' ? null : tab)}
+        >
+          {#if activeTypeFilter === 'public-boards'}
+            <LazyRootView loader={loadPublicBoards} label="Public boards" />
+          {:else}
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div class="relative w-64">
+                <IconSearch class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--ds-text-subtle);" />
+                <Input
+                  type="text"
+                  bind:value={channelSearch}
+                  placeholder={t('channels.searchChannels')}
+                  class="pl-9"
+                  size="small"
+                />
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-sm whitespace-nowrap" style="color: var(--ds-text-subtle);">{t('channels.category', 'Category')}:</span>
+                <ItemPicker
+                  value={activeCategoryId ? parseInt(activeCategoryId) : null}
+                  items={$channelCategoriesStore}
+                  placeholder={t('channels.allCategories', 'All Categories')}
+                  showUnassigned={true}
+                  unassignedLabel={t('channels.allCategories', 'All Categories')}
+                  allowClear={false}
+                  class="w-48"
+                  onSelect={(item) => {
+                    if (!item) {
+                      navigate('/admin/channels');
+                    } else {
+                      navigate(`/admin/channels/category/${item.id}`);
+                    }
+                  }}
+                />
+                {#if $isSystemAdmin}
+                  <Button
+                    onclick={() => showCategoryModal = true}
+                    variant="ghost"
+                    size="small"
+                    icon={IconTag}
+                    class="whitespace-nowrap flex-shrink-0"
+                  >
+                    {t('channels.manageCategories', 'Manage')}
+                  </Button>
+                {/if}
+              </div>
+            </div>
+            {@render channelTable()}
+          {/if}
+        </Tabs>
+      </div>
     {:else}
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        {#if !embedded}
-          <h1 class="text-2xl font-semibold" style="color: var(--ds-text);">
-            {#if activeTypeFilter}
-              {activeTypeFilter === 'portal' ? 'Portal' : activeTypeFilter === 'webhook' ? 'Webhook' : activeTypeFilter} {t('channels.title')}
-            {:else if activeCategoryId}
-              {@const category = $channelCategoriesStore.find(c => c.id === parseInt(activeCategoryId))}
-              {category?.name || t('common.category')}
-            {:else}
-              {t('channels.title')}
-            {/if}
-          </h1>
-          <p class="mt-1 text-sm" style="color: var(--ds-text-subtle);">
+      <div class="flex items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 class="text-2xl font-semibold text-ds-text">{pageHeading}</h1>
+          <p class="mt-1 text-sm text-ds-text-subtle">
             {filteredChannels().length} channel{filteredChannels().length !== 1 ? 's' : ''}
           </p>
-        {:else}
-          <!-- Search Bar (embedded) -->
-          <div class="relative w-64">
+        </div>
+        {#if $isSystemAdmin}
+          <Button
+            onclick={showAddChannelForm}
+            variant="primary"
+            icon={IconPlus}
+            size="medium"
+            dataTestid="channel-create-open"
+            keyboardHint={getShortcutDisplay('channels', 'addChannel')}
+            hotkeyConfig={{ key: toHotkeyString('channels', 'addChannel'), guard: () => !showAddForm && !showConfigModal && !showCategoryModal }}
+          >
+            {t('channels.createChannel')}
+          </Button>
+        {/if}
+      </div>
+
+      {#if activeTypeFilter === 'public-boards'}
+        <LazyRootView loader={loadPublicBoards} label="Public boards" />
+      {:else}
+        <div class="mb-6">
+          <div class="relative max-w-md">
             <IconSearch class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--ds-text-subtle);" />
             <Input
               type="text"
@@ -542,98 +593,69 @@
               size="small"
             />
           </div>
-        {/if}
-      </div>
-      {#if $isSystemAdmin}
-        <Button
-          onclick={showAddChannelForm}
-          variant="primary"
-          icon={IconPlus}
-          size="medium"
-          dataTestid="channel-create-open"
-          keyboardHint={getShortcutDisplay('channels', 'addChannel')}
-          hotkeyConfig={{ key: toHotkeyString('channels', 'addChannel'), guard: () => !showAddForm && !showConfigModal && !showCategoryModal }}
-        >
-          {t('channels.createChannel')}
-        </Button>
-      {/if}
-    </div>
-
-    <!-- Search Bar (non-embedded) -->
-    {#if !embedded}
-      <div class="mb-6">
-        <div class="relative max-w-md">
-          <IconSearch class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--ds-text-subtle);" />
-          <Input
-            type="text"
-            bind:value={channelSearch}
-            placeholder={t('channels.searchChannels')}
-            class="pl-9"
-            size="small"
-          />
         </div>
-      </div>
+        {@render channelTable()}
+      {/if}
     {/if}
-
-    <!-- Data Table -->
-    {#if loading}
-      <StateDisplay type="loading" />
-    {:else if error}
-      <div class="text-center py-16">
-        <div class="text-ds-text-danger text-sm font-medium mb-2">{error}</div>
-        <Button onclick={loadChannels} variant="default" size="small">
-          {t('common.retry')}
-        </Button>
-      </div>
-    {:else}
-      <DataTable
-        columns={channelColumns}
-        data={filteredChannels()}
-        keyField="id"
-        emptyMessage={t('channels.noChannels')}
-        emptyIcon={IconLifebuoy}
-        actionItems={getChannelActionItems}
-        actionTriggerTestid={(channel) => `channel-actions-${channel.id}`}
-        onRowClick={handleRowClick}
-        rowAttrs={(channel) => ({ 'data-testid': `admin-channel-row-${channel.id}` })}
-      >
-        {#snippet name(item)}
-          {@const ChannelIcon = getChannelTypeIcon(item.type)}
-          <div class="flex items-center gap-3">
-            <ChannelIcon class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
-            <div>
-              <div class="font-medium" style="color: var(--ds-text);">{item.name}</div>
-              {#if item.description}
-                <div class="text-xs" style="color: var(--ds-text-subtle);">{item.description}</div>
-              {/if}
-            </div>
-          </div>
-        {/snippet}
-
-        {#snippet type(item)}
-          <span class="capitalize" style="color: var(--ds-text);">{item.type}</span>
-        {/snippet}
-
-        {#snippet status(item)}
-          <div class="flex items-center gap-2">
-            <Lozenge
-              color={getChannelStatusColor(getChannelStatus(item))}
-              text={getChannelStatusLabel(item)}
-            />
-            {#if item.is_default}
-              <Lozenge color="blue" text="System" />
-            {/if}
-            {#if isPluginOwned(item)}
-              <Lozenge color="purple" text="Plugin" />
-            {/if}
-          </div>
-        {/snippet}
-      </DataTable>
-    {/if}
-    {/if}
-    </div>
   </div>
 </div>
+
+{#snippet channelTable()}
+  {#if loading}
+    <StateDisplay type="loading" />
+  {:else if error}
+    <div class="text-center py-16">
+      <div class="text-ds-text-danger text-sm font-medium mb-2">{error}</div>
+      <Button onclick={loadChannels} variant="default" size="small">
+        {t('common.retry')}
+      </Button>
+    </div>
+  {:else}
+    <DataTable
+      columns={channelColumns}
+      data={filteredChannels()}
+      keyField="id"
+      emptyMessage={t('channels.noChannels')}
+      emptyIcon={IconLifebuoy}
+      actionItems={getChannelActionItems}
+      actionTriggerTestid={(channel) => `channel-actions-${channel.id}`}
+      onRowClick={handleRowClick}
+      rowAttrs={(channel) => ({ 'data-testid': `admin-channel-row-${channel.id}` })}
+    >
+      {#snippet name(item)}
+        {@const ChannelIcon = getChannelTypeIcon(item.type)}
+        <div class="flex items-center gap-3">
+          <ChannelIcon class="w-4 h-4 flex-shrink-0" style="color: var(--ds-text-subtle);" />
+          <div>
+            <div class="font-medium" style="color: var(--ds-text);">{item.name}</div>
+            {#if item.description}
+              <div class="text-xs" style="color: var(--ds-text-subtle);">{item.description}</div>
+            {/if}
+          </div>
+        </div>
+      {/snippet}
+
+      {#snippet type(item)}
+        <span class="capitalize" style="color: var(--ds-text);">{item.type}</span>
+      {/snippet}
+
+      {#snippet status(item)}
+        <div class="flex items-center gap-2">
+          <Lozenge
+            color={getChannelStatusColor(getChannelStatus(item))}
+            text={getChannelStatusLabel(item)}
+          />
+          {#if item.is_default}
+            <Lozenge color="blue" text="System" />
+          {/if}
+          {#if isPluginOwned(item)}
+            <Lozenge color="purple" text="Plugin" />
+          {/if}
+        </div>
+      {/snippet}
+    </DataTable>
+  {/if}
+{/snippet}
 
 <!-- Add Channel Modal -->
 <Modal
