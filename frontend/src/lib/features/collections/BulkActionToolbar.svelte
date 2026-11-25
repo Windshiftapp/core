@@ -8,6 +8,7 @@
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import WorkspaceLabelCombobox from '../../pickers/WorkspaceLabelCombobox.svelte';
   import UserPicker from '../../pickers/UserPicker.svelte';
+  import MilestoneCombobox from '../../pickers/MilestoneCombobox.svelte';
 
   // The bottom bulk-action bar shared by the board and list views. Both views
   // pass the same selection object from useItemBulkSelection, so the actions
@@ -109,6 +110,15 @@
       {t('collections.bulkLabels')}
     </Button>
     <Button
+      variant="secondary"
+      size="sm"
+      onclick={selection.openBulkMilestoneModal}
+      disabled={selection.bulkBusy || !selection.selectedItemsEditable}
+      dataTestid={`${testidPrefix}-bulk-milestone`}
+    >
+      {t('collections.bulkMilestone')}
+    </Button>
+    <Button
       variant="ghost"
       size="sm"
       onclick={selection.clearSelection}
@@ -196,6 +206,38 @@
       loading={selection.bulkBusy}
       confirmTestid={`${testidPrefix}-bulk-labels-apply`}
       cancelTestid={`${testidPrefix}-bulk-labels-cancel`}
+    />
+  </Modal>
+
+  <Modal
+    bind:isOpen={selection.bulkMilestoneModalOpen}
+    maxWidth="max-w-lg"
+    closeOnBackdropClick={false}
+    onclose={() => (selection.bulkMilestoneModalOpen = false)}
+    dataTestid={`${testidPrefix}-bulk-milestone-modal`}
+  >
+    <ModalHeader
+      title={t('collections.bulkMilestone')}
+      subtitle={t('collections.bulkMilestoneHint', { count: selection.selectedCount })}
+      onclose={() => (selection.bulkMilestoneModalOpen = false)}
+    />
+    <div class="p-6">
+      <MilestoneCombobox
+        multiple={true}
+        bind:value={selection.bulkMilestoneIds}
+        workspaceId={selection.bulkMilestoneWorkspaceId}
+        placeholder={t('pickers.selectMilestones')}
+        searchTestid={`${testidPrefix}-bulk-milestone-search`}
+        optionTestid={(option) => `${testidPrefix}-bulk-milestone-option-${option.value}`}
+      />
+    </div>
+    <DialogFooter
+      onCancel={() => (selection.bulkMilestoneModalOpen = false)}
+      onConfirm={selection.applyBulkMilestones}
+      confirmLabel={t('collections.bulkMilestoneApply')}
+      loading={selection.bulkBusy}
+      confirmTestid={`${testidPrefix}-bulk-milestone-apply`}
+      cancelTestid={`${testidPrefix}-bulk-milestone-cancel`}
     />
   </Modal>
 {/if}

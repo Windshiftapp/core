@@ -53690,6 +53690,14 @@
             "nullable": true,
             "type": "integer"
           },
+          "milestone_ids": {
+            "description": "Replacement milestone set. An empty array clears all milestones.",
+            "items": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "type": "array"
+          },
           "parent_id": {
             "description": "Replacement parent.",
             "minimum": 1,

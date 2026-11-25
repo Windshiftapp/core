@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"time"
 
@@ -28,14 +29,17 @@ var (
 )
 
 // Bulk-edit accepts the same safe fields as the single-item update surface,
-// excluding workflow status, item type, workspace moves, ordering, and joined
-// milestone sets, all of which have dedicated semantics/endpoints.
+// excluding workflow status, item type, workspace moves, and ordering, all of
+// which have dedicated semantics/endpoints. milestone_ids replaces each item's
+// milestone set, matching the single-item PATCH contract; the join rows are
+// written alongside the scalar update.
 var bulkEditableItemFields = map[string]struct{}{
 	"title": {}, "description": {}, "priority_id": {},
 	"due_date": {}, "start_date": {}, "end_date": {},
 	"iteration_id": {}, "project_id": {}, "inherit_project": {}, "time_project_id": {},
 	"assignee_id": {}, "team_id": {}, "creator_id": {}, "parent_id": {}, "related_work_item_id": {},
 	"story_points": {}, "estimate_minutes": {}, "custom_field_values": {}, "is_task": {},
+	"milestone_ids": {},
 }
 
 type BulkItemFieldError struct {
@@ -200,7 +204,30 @@ func (s *ItemUpdateService) BulkPatchItems(ctx context.Context, req BulkPatchIte
 		if err := validator.ValidateAndApplyUpdates(&updated, fieldsByID[original.ID], req.UserID); err != nil {
 			return nil, fmt.Errorf("item %d validation failed: %w", original.ID, err)
 		}
+		// Milestones live in the item_milestones join, which the scalar item
+		// write cannot reach. Read the current set, validate the target against
+		// this item's workspace, then persist and record it as its own fact.
+		var milestoneOldIDs, milestoneNewIDs []int
+		milestonesChanged := false
+		if _, milestonesRequested := fieldsByID[original.ID]["milestone_ids"]; milestonesRequested {
+			milestoneOldIDs, err = readItemMilestoneIDsForHistory(tx, original.ID)
+			if err != nil {
+				return nil, fmt.Errorf("read item %d milestones: %w", original.ID, err)
+			}
+			milestoneNewIDs = sortedMilestoneIDs(updated.Milestones)
+			if err := validation.ValidatePlanningAssignments(tx, updated.WorkspaceID, milestoneNewIDs, updated.IterationID); err != nil {
+				return nil, fmt.Errorf("item %d validation failed: %w", original.ID, err)
+			}
+			milestonesChanged = !slices.Equal(milestoneOldIDs, milestoneNewIDs)
+		}
 		history := s.compareAndGenerateHistory(original, &updated, req.UserID)
+		if milestonesChanged {
+			history = append(history, HistoryEntry{
+				ItemID: original.ID, UserID: req.UserID, FieldName: "milestones",
+				OldValue: joinIntsCSV(milestoneOldIDs), NewValue: joinIntsCSV(milestoneNewIDs),
+				ChangedAt: time.Now(),
+			})
+		}
 		if len(history) == 0 {
 			continue
 		}
@@ -208,6 +235,12 @@ func (s *ItemUpdateService) BulkPatchItems(ctx context.Context, req BulkPatchIte
 			return nil, fmt.Errorf("update item %d: %w", original.ID, err)
 		}
 		sqlStatements++
+		if milestonesChanged {
+			if err := repository.NewMilestoneAttachRepository(s.db).ReplaceItemMilestonesTx(ctx, tx, original.ID, milestoneNewIDs); err != nil {
+				return nil, fmt.Errorf("replace item %d milestones: %w", original.ID, err)
+			}
+			sqlStatements++
+		}
 		if err := s.recordItemHistory(tx, history); err != nil {
 			return nil, fmt.Errorf("record item %d history: %w", original.ID, err)
 		}
@@ -216,8 +249,14 @@ func (s *ItemUpdateService) BulkPatchItems(ctx context.Context, req BulkPatchIte
 		if metadata.OccurredAt.IsZero() {
 			metadata.OccurredAt = history[0].ChangedAt
 		}
+		changes := itemevents.Changes(original, &updated)
+		if milestonesChanged {
+			changes = append(changes, itemevents.FieldChange{
+				Field: "milestones", OldValue: milestoneOldIDs, NewValue: milestoneNewIDs,
+			})
+		}
 		eventRecords = append(eventRecords, itemevents.UpdateRecord{
-			Item: &updated, Changes: itemevents.Changes(original, &updated), Metadata: metadata,
+			Item: &updated, Changes: changes, Metadata: metadata,
 		})
 		pending = append(pending, UpdateItemResult{OriginalItem: original, FieldChanges: history})
 	}
@@ -275,6 +314,17 @@ func (s *ItemUpdateService) BulkPatchItems(ctx context.Context, req BulkPatchIte
 		SQLStatements:  sqlStatements,
 		Duration:       time.Since(started),
 	}, nil
+}
+
+// sortedMilestoneIDs returns milestone IDs in ascending order so history and
+// change detection compare sets rather than the caller's picker order.
+func sortedMilestoneIDs(milestones []models.Milestone) []int {
+	ids := make([]int, 0, len(milestones))
+	for _, milestone := range milestones {
+		ids = append(ids, milestone.ID)
+	}
+	sort.Ints(ids)
+	return ids
 }
 
 func uniquePositiveSortedIDs(ids []int) []int {

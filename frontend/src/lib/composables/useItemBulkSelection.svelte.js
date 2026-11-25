@@ -231,6 +231,69 @@ export function useItemBulkSelection({
     }
   }
 
+  let bulkMilestoneModalOpen = $state(false);
+  // Milestones are a join table like labels, so the modal starts from the
+  // milestones common to every selected item and applies the user's additions
+  // and removals as per-item patches; milestones that belong to only some items
+  // are left alone.
+  let bulkMilestoneIds = $state([]);
+
+  let bulkMilestoneWorkspaceId = $derived(
+    scopeWorkspaceId() ?? selectedItems[0]?.workspace_id ?? null
+  );
+
+  function itemMilestoneIds(item) {
+    if (Array.isArray(item.milestone_ids)) return item.milestone_ids;
+    return (item.milestones || []).map((milestone) => milestone.id);
+  }
+
+  function commonMilestoneIds() {
+    const targets = selectedItems;
+    if (targets.length === 0) return [];
+    return itemMilestoneIds(targets[0]).filter((id) =>
+      targets.every((item) => itemMilestoneIds(item).includes(id))
+    );
+  }
+
+  function openBulkMilestoneModal() {
+    if (bulkBusy || !selectedItemsEditable) return;
+    bulkMilestoneIds = commonMilestoneIds();
+    bulkMilestoneModalOpen = true;
+  }
+
+  // Each item receives its own next milestone set so non-common milestones are
+  // preserved; the atomic bulk-patch endpoint validates and commits them together.
+  async function applyBulkMilestones() {
+    if (bulkBusy) return;
+    const targets = selectedItems;
+    if (targets.length === 0) return;
+    const commonIds = commonMilestoneIds();
+    const added = bulkMilestoneIds.filter((id) => !commonIds.includes(id));
+    const removed = commonIds.filter((id) => !bulkMilestoneIds.includes(id));
+    bulkMilestoneModalOpen = false;
+    if (added.length === 0 && removed.length === 0) return;
+    bulkBusy = true;
+    try {
+      const patches = targets.map((item) => {
+        const next = new Set(itemMilestoneIds(item));
+        for (const id of added) next.add(id);
+        for (const id of removed) next.delete(id);
+        return { item_id: item.id, set: { milestone_ids: [...next] } };
+      });
+      const result = await itemsApi.bulkPatch(patches);
+      successToast(
+        t('collections.bulkMilestoneSuccess', { count: result?.updated_count ?? targets.length })
+      );
+    } catch (error) {
+      console.error('Bulk milestone update failed:', error);
+      warningToast(error?.message || t('collections.bulkUpdateFailed'));
+    } finally {
+      bulkBusy = false;
+      clearSelection();
+      reload();
+    }
+  }
+
   // Keep only users present in every roster, preserving the first roster's order.
   function intersectUserRosters(rosters) {
     if (rosters.length === 0) return [];
@@ -363,6 +426,21 @@ export function useItemBulkSelection({
     get bulkLabelsWorkspaceId() {
       return bulkLabelsWorkspaceId;
     },
+    get bulkMilestoneModalOpen() {
+      return bulkMilestoneModalOpen;
+    },
+    set bulkMilestoneModalOpen(value) {
+      bulkMilestoneModalOpen = value;
+    },
+    get bulkMilestoneIds() {
+      return bulkMilestoneIds;
+    },
+    set bulkMilestoneIds(value) {
+      bulkMilestoneIds = value;
+    },
+    get bulkMilestoneWorkspaceId() {
+      return bulkMilestoneWorkspaceId;
+    },
     enterSelectionMode,
     exitSelectionMode,
     toggleSelectionMode,
@@ -374,5 +452,7 @@ export function useItemBulkSelection({
     applyBulkLabels,
     openBulkAssigneeModal,
     applyBulkAssignee,
+    openBulkMilestoneModal,
+    applyBulkMilestones,
   };
 }
