@@ -145,7 +145,6 @@ export function createPluginBridge(iframe, options = {}) {
 
       case MESSAGE_TYPES.RESIZE:
         if (typeof message.height === 'number') {
-          console.log(`[PluginBridge] Received plugin:resize height=${message.height}`);
           onResize(message.height);
         }
         break;

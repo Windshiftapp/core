@@ -38,7 +38,6 @@ class PluginBridge {
 	ready() {
 		this.isReady = true;
 		this._sendToHost({ type: MESSAGE_TYPES.READY });
-		console.log('[PluginBridge] Plugin ready, requested theme');
 	}
 
 	/**
@@ -183,7 +182,6 @@ class PluginBridge {
 
 		switch (message.type) {
 			case MESSAGE_TYPES.THEME_UPDATE:
-				console.log('[PluginBridge] Received theme update:', message.variables);
 				this.themeCallbacks.forEach(cb => cb(message.variables));
 				// Auto-apply theme
 				this.applyTheme(message.variables);
@@ -212,10 +210,8 @@ class PluginBridge {
 
 		const sendResize = () => {
 			const height = document.body.scrollHeight;
-			console.log(`[PluginBridge] Measured body.scrollHeight=${height}, lastHeight=${lastHeight}`);
 			if (height !== lastHeight) {
 				lastHeight = height;
-				console.log(`[PluginBridge] Sending resize: ${height}`);
 				this.resize(height);
 			}
 		};
