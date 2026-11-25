@@ -181,7 +181,7 @@
     onSelect={handleSelect}
   >
     {#snippet children()}
-      <span class="cursor-pointer">
+      <span class="cursor-pointer" data-testid="item-status-picker-trigger">
         <Lozenge text={label ?? 'Set status'} customBg={color} />
       </span>
     {/snippet}
