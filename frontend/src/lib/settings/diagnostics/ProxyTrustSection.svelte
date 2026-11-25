@@ -78,12 +78,7 @@
 >
   {#snippet children()}
     {#if data}
-      {#if data.status === 'vulnerable'}
-        <AlertBox
-          variant="error"
-          message="This installation is affected. Legacy proxy trust treats every private, loopback, and link-local peer as a proxy, so a private-network client can choose its own resolved IP and LAN users behind a proxy share one lockout bucket."
-        />
-      {:else if data.status === 'action_required'}
+      {#if data.status === 'action_required'}
         <AlertBox
           variant="warning"
           message="Strict trust is enabled, but an unlisted peer is sending forwarding headers. Those headers are ignored, so its clients are attributed to the proxy address and may lose Secure-cookie and HSTS detection."
