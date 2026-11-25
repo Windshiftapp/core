@@ -52,7 +52,20 @@ jobs:
         # freshness — without the override npm refuses to resolve any package
         # in the lockfile that was published more recently than the cooldown
         # window (the lockfile itself is what we want to verify).
-        run: npm audit signatures --min-release-age=0
+        #
+        # The attestations endpoint intermittently answers with a non-JSON body
+        # ("OK"), which npm surfaces as a FETCH_ERROR. Retry so a registry blip
+        # does not fail the job.
+        run: |
+          for attempt in 1 2 3; do
+            if npm audit signatures --min-release-age=0; then
+              exit 0
+            fi
+            echo "npm audit signatures failed (attempt ${attempt}); retrying in 10s..."
+            sleep 10
+          done
+          echo "npm audit signatures still failing after retries"
+          exit 1
 
       - name: Run Biome check
         run: npm run check
