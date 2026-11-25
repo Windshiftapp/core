@@ -74,7 +74,9 @@ function currencyDisplayNames(locale) {
   }
 }
 
-/** All selectable ISO 4217 codes, sorted, each with a localized display name. */
+/** All selectable ISO 4217 codes, sorted, shown by their code. The localized
+ * name is carried as a search keyword so a combobox can match "Swiss" while
+ * the option itself stays a compact, readable code. */
 export function currencyOptions(locale = getAppLocale()) {
   let codes;
   try {
@@ -91,7 +93,7 @@ export function currencyOptions(locale = getAppLocale()) {
     .sort((a, b) => a.localeCompare(b))
     .map((code) => {
       const name = names?.of(code);
-      return { value: code, label: name ? `${code} — ${name}` : code };
+      return { value: code, label: code, keywords: name || '' };
     });
 }
 

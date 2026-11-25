@@ -921,6 +921,7 @@
               ...currencyOptions()
             ]}
             bind:value={moneyCurrency}
+            searchable
           />
           <DescriptionText>
             Pin the field to one currency, or let each value choose. Amounts render with their own currency, so money fields work on items, assets, and customer records alike.

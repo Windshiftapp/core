@@ -20,6 +20,8 @@
    *   labelColor?: 'default' | 'subtle',
    *   labelClass?: string,
    *   ariaLabel?: string,
+   *   searchable?: boolean,
+   *   searchPlaceholder?: string,
    *   onchange?: (e?: any) => void,
    *   class?: string,
    * }}
@@ -41,6 +43,8 @@
     labelColor = 'subtle',
     labelClass = 'mb-2',
     ariaLabel = undefined,
+    searchable = false,
+    searchPlaceholder = undefined,
     onchange = undefined,
     class: className = ''
   } = $props();
@@ -59,6 +63,8 @@
     {disabled}
     {size}
     {ariaLabel}
+    {searchable}
+    {searchPlaceholder}
     {onchange}
   />
 </FormField>

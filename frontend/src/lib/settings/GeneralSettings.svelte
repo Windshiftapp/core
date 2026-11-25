@@ -115,6 +115,7 @@
           options={currencySelectOptions}
           bind:value={currency}
           dataTestid="general-currency"
+          searchable
         />
 
         <DescriptionText as="div">

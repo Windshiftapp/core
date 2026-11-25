@@ -103,6 +103,7 @@
         ...currencyOptions()
       ]}
       bind:value={formData.currency}
+      searchable
     />
   </div>
 

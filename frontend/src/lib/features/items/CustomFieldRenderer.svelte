@@ -966,7 +966,9 @@
         dataTestid={`custom-field-currency-${field.id}`}
         onchange={(code) => stageMoney(moneyAmount(editorValue), code)}
         class="w-36"
+        menuWidth="13rem"
         size="small"
+        searchable
         {disabled}
       />
     {/if}

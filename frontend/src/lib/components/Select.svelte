@@ -2,8 +2,10 @@
   import { createPopover, melt } from '@melt-ui/svelte';
   import { controlSizeClasses } from '../utils/controlSizes.js';
   import { fieldControl } from '../utils/fieldContext.svelte.js';
+  import { t } from '../stores/i18n.svelte.js';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import Check from '@lucide/svelte/icons/check';
+  import Search from '@lucide/svelte/icons/search';
   import { tick, untrack } from 'svelte';
   import { derived } from 'svelte/store';
   import { createOwnedPopup } from '../utils/overlayScope.js';
@@ -25,6 +27,8 @@
     *   ariaDescribedby?: string,
     *   ariaInvalid?: boolean,
     *   dataTestid?: string,
+    *   searchable?: boolean,
+    *   searchPlaceholder?: string,
    *   onchange?: (e?: any) => void,
    *   onfocus?: (e?: any) => void,
    *   onblur?: (e?: any) => void,
@@ -47,9 +51,12 @@
     dataTestid = undefined,
     onchange = undefined,
     onfocus = undefined,
-    onblur = undefined
+    onblur = undefined,
+    searchable = false,
+    searchPlaceholder = t('placeholders.search')
   } = $props();
   const instanceId = $props.id();
+  const listboxId = `${instanceId}-listbox`;
   const field = fieldControl(() => ({ id, ariaDescribedby, ariaInvalid, required }));
 
   const {
@@ -76,6 +83,20 @@
   let triggerElement = $state(null);
   let listboxElement = $state(null);
   let highlightedIndex = $state(-1);
+  let query = $state('');
+  let searchInput = $state(null);
+
+  // A searchable select filters by the visible label plus optional keywords,
+  // so a currency can show just its code while still matching "Swiss Franc".
+  const filteredOptions = $derived.by(() => {
+    if (!searchable) return options;
+    const term = query.trim().toLowerCase();
+    if (!term) return options;
+    return options.filter((option) => {
+      const keywords = Array.isArray(option.keywords) ? option.keywords.join(' ') : option.keywords || '';
+      return `${option.label ?? ''} ${keywords}`.toLowerCase().includes(term);
+    });
+  });
 
   // Find the selected option label
   const selectedOption = $derived(options.find(o => String(o.value) === String(value)));
@@ -87,12 +108,19 @@
   // Open dropdown and focus selected/first item
   function openDropdown() {
     if (disabled) return;
+    query = '';
     open.set(true);
     tick().then(() => {
-      const selectedIdx = options.findIndex(o => String(o.value) === String(value));
+      const selectedIdx = filteredOptions.findIndex(o => String(o.value) === String(value));
       highlightedIndex = selectedIdx >= 0 ? selectedIdx : 0;
       scrollToHighlighted();
     });
+  }
+
+  function handleSearchInput(event) {
+    query = event.currentTarget.value;
+    highlightedIndex = 0;
+    scrollToHighlighted();
   }
 
   function closeDropdown() {
@@ -150,26 +178,44 @@
 
   function handleListboxKeydown(e) {
     if (e.key === 'Tab') return;
-    const total = options.length;
-    if (total === 0) return;
+    const total = filteredOptions.length;
+    const fromSearch = e.target === searchInput;
 
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      highlightedIndex = (highlightedIndex + 1) % total;
-      scrollToHighlighted();
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      highlightedIndex = highlightedIndex <= 0 ? total - 1 : highlightedIndex - 1;
-      scrollToHighlighted();
-    } else if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      if (highlightedIndex >= 0 && highlightedIndex < total && !options[highlightedIndex].disabled) {
-        selectOption(options[highlightedIndex]);
-      }
-    } else if (e.key === 'Escape') {
+    if (e.key === 'Escape') {
       e.preventDefault();
       closeDropdown();
       triggerElement?.focus({ preventScroll: true });
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (total === 0) return;
+      highlightedIndex = (highlightedIndex + 1) % total;
+      scrollToHighlighted();
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (total === 0) return;
+      highlightedIndex = highlightedIndex <= 0 ? total - 1 : highlightedIndex - 1;
+      scrollToHighlighted();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (highlightedIndex >= 0 && highlightedIndex < total && !filteredOptions[highlightedIndex].disabled) {
+        selectOption(filteredOptions[highlightedIndex]);
+      }
+      return;
+    }
+    // The search field owns printable keys (including Space) and caret moves.
+    if (fromSearch) return;
+    if (total === 0) return;
+    if (e.key === ' ') {
+      e.preventDefault();
+      if (highlightedIndex >= 0 && highlightedIndex < total && !filteredOptions[highlightedIndex].disabled) {
+        selectOption(filteredOptions[highlightedIndex]);
+      }
     } else if (e.key === 'Home') {
       e.preventDefault();
       highlightedIndex = 0;
@@ -186,10 +232,10 @@
   $effect(() => {
     if ($open && !wasOpen) {
       tick().then(() => {
-        if ($open) listboxElement?.focus({ preventScroll: true });
+        if (!$open) return;
+        if (searchable) searchInput?.focus({ preventScroll: true });
+        else listboxElement?.focus({ preventScroll: true });
       });
-    } else if (!$open && wasOpen) {
-      // Return focus to trigger
     }
     wasOpen = $open;
   });
@@ -233,19 +279,42 @@
   <div
     use:melt={$content}
     use:ownedPopup={{ trigger: () => triggerElement, close: closeDropdown, keepTabStops: false }}
-    bind:this={listboxElement}
-    data-testid={id ? `${id}-listbox` : undefined}
     data-popover-owner={portalOwner}
-    role="listbox"
-    tabindex="-1"
-    aria-activedescendant={highlightedIndex >= 0 ? optionId(options[highlightedIndex], highlightedIndex) : undefined}
     onkeydowncapture={handleListboxKeydown}
     class="rounded border shadow-lg flex flex-col overflow-hidden z-[60] focus:outline-none"
     style="background-color: var(--ds-surface-raised); border-color: var(--ds-border); width: {menuWidth || undefined};
            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.15);"
   >
-    <div data-select-scroller class="min-h-0 max-h-60 overflow-y-auto overscroll-contain">
-    {#each options as opt, index (opt.value ?? `opt-${index}`)}
+    {#if searchable}
+      <div class="shrink-0 border-b border-ds-border p-2">
+        <div class="relative">
+          <Search size={14} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-ds-text-subtle" />
+          <input
+            bind:this={searchInput}
+            type="text"
+            value={query}
+            oninput={handleSearchInput}
+            placeholder={searchPlaceholder}
+            aria-label={searchPlaceholder}
+            aria-controls={listboxId}
+            aria-autocomplete="list"
+            autocomplete="off"
+            class="w-full rounded pl-8 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ds-border-focused bg-ds-background-input border border-ds-border text-ds-text"
+          />
+        </div>
+      </div>
+    {/if}
+    <div
+      bind:this={listboxElement}
+      id={listboxId}
+      data-testid={id ? `${id}-listbox` : undefined}
+      role="listbox"
+      tabindex="-1"
+      aria-activedescendant={highlightedIndex >= 0 && filteredOptions[highlightedIndex] ? optionId(filteredOptions[highlightedIndex], highlightedIndex) : undefined}
+      data-select-scroller
+      class="min-h-0 max-h-60 overflow-y-auto overscroll-contain focus:outline-none"
+    >
+    {#each filteredOptions as opt, index (opt.value ?? `opt-${index}`)}
       {@const isSelected = String(opt.value) === String(value)}
       {@const isHighlighted = highlightedIndex === index}
       <div
