@@ -362,8 +362,13 @@ func (s *BindingService) CreateStudioProfile(ctx context.Context, req CreateStud
 	if err != nil {
 		return nil, err
 	}
+	// A non-zero acting_user_id always means the caller explicitly picked a
+	// centralized service identity, even while workspace-managed identities
+	// are enabled. Workspace-managed is the fallback only when the module is
+	// enabled and no identity was chosen.
+	useWorkspaceManaged := managed && req.ActingUserID <= 0
 	var centralized *ActingIdentity
-	if !managed {
+	if !useWorkspaceManaged {
 		centralized, err = s.identity.Resolve(ctx, req.CreatedByUserID, req.ActingUserID, req.WorkspaceID)
 		if err != nil {
 			return nil, err
@@ -385,7 +390,7 @@ func (s *BindingService) CreateStudioProfile(ctx context.Context, req CreateStud
 	created, err := database.WithTxResult(s.db, func(tx database.Tx) (*models.WorkspaceAgentBinding, error) {
 		var actingUserID int
 		identityClass := models.AgentIdentityCentralized
-		if managed {
+		if useWorkspaceManaged {
 			createdID, err := createWorkspaceManagedAgentIdentity(ctx, tx, req)
 			if err != nil {
 				return nil, err

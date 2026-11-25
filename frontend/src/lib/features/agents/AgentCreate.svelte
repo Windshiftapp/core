@@ -73,12 +73,14 @@
 
   const selectedTemplate = $derived(templates.find((template) => template.key === templateKey));
   const draftStorageKey = $derived(`agent-studio-create:${workspaceId}`);
+  const workspaceManagedAgents = $derived($moduleSettings.workspace_managed_agents ?? true);
   const canSubmit = $derived(
     !saving
       && templateKey
       && name.trim()
       && /^[a-z0-9][a-z0-9._-]{2,31}$/.test(handle.trim())
       && llmConnectionId
+      && (workspaceManagedAgents || Number(actingUserId) > 0)
   );
   const llmOptions = $derived([
     { value: null, label: 'Select an LLM connection', disabled: true },
@@ -87,8 +89,12 @@
       label: [connection.name, connection.model].filter(Boolean).join(' · '),
     })),
   ]);
+  // Workspace-managed identities are only offered when the module is
+  // enabled. When it is disabled the backend requires an allowlisted
+  // centralized service identity, so the picker must not offer the
+  // workspace-managed option.
   const identityOptions = $derived([
-    { value: 0, label: 'Workspace-managed identity' },
+    ...(workspaceManagedAgents ? [{ value: 0, label: 'Workspace-managed identity' }] : []),
     ...candidates.map((candidate) => ({
       value: candidate.user_id,
       label: candidate.name || candidate.username || `User #${candidate.user_id}`,
@@ -175,6 +181,7 @@
       if (templates.length) selectTemplate(templates[0]);
       if (llmConnections.length === 1) llmConnectionId = llmConnections[0].id;
       restoreDraft();
+      ensureIdentitySelection();
       draftReady = true;
     } catch (err) {
       error = err.message || 'Agent Studio could not be loaded.';
@@ -256,6 +263,15 @@
         // Ignore unavailable browser storage.
       }
     }
+  }
+
+  function ensureIdentitySelection() {
+    // When workspace-managed identities are enabled, value 0 (or a saved
+    // centralized candidate) is valid. When disabled, the selection must
+    // resolve to one of the allowlisted centralized candidates.
+    if (workspaceManagedAgents) return;
+    if (candidates.some((candidate) => candidate.user_id === actingUserId)) return;
+    actingUserId = candidates.length ? candidates[0].user_id : 0;
   }
 
   async function cancelPendingRunnerSetup() {
@@ -484,19 +500,30 @@
             />
           </FormField>
 
-          {#if candidates.length}
+          {#if identityOptions.length}
             <FormField
               id="agent-identity"
               label="Identity"
-              helper="Workspace-managed is preferred; centralized identities remain available when required."
+              required={!workspaceManagedAgents}
+              helper={workspaceManagedAgents
+                ? 'Workspace-managed is preferred; centralized identities remain available when required.'
+                : 'Workspace-managed identities are disabled. Choose the centralized service identity this agent acts as.'}
               class="md:col-span-2"
             >
               <Select
                 id="agent-create-identity"
                 bind:value={actingUserId}
                 options={identityOptions}
+                dataTestid="agent-create-identity"
               />
             </FormField>
+          {:else}
+            <div class="md:col-span-2">
+              <AlertBox
+                variant="warning"
+                message="Workspace-managed identities are disabled and no centralized service identity is available for this workspace. Ask a system administrator to allowlist one."
+              />
+            </div>
           {/if}
 
           <FormField
