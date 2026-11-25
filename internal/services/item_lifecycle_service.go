@@ -325,6 +325,24 @@ func (s *ItemLifecycleService) Merge(ctx context.Context, input ItemMergeInput) 
 				if _, err := tx.Exec(`UPDATE email_reply_outbox SET item_id = ? WHERE item_id = ?`, target.ID, plan.item.ID); err != nil {
 					return fmt.Errorf("re-point pending replies from item %d: %w", plan.item.ID, err)
 				}
+				// The reply-key marker is per ticket, and a same-requester merge
+				// makes the canonical the continuation of the duplicate's
+				// conversation. Its generation-0 tracking rows move here too, so the
+				// marker must move as well: otherwise the canonical looks like a
+				// ticket that never issued a key, and the legacy fallback reopens
+				// once the moved outbox rows are pruned (WI-2365).
+				var sourceKeyIssued sql.NullTime
+				if err := tx.QueryRow(`SELECT reply_key_issued_at FROM items WHERE id = ?`, plan.item.ID).Scan(&sourceKeyIssued); err != nil {
+					return fmt.Errorf("load reply-key marker for item %d: %w", plan.item.ID, err)
+				}
+				if sourceKeyIssued.Valid {
+					if _, err := tx.Exec(`
+						UPDATE items SET reply_key_issued_at = ?
+						WHERE id = ? AND reply_key_issued_at IS NULL
+					`, sourceKeyIssued.Time, target.ID); err != nil {
+						return fmt.Errorf("carry reply-key marker to item %d: %w", target.ID, err)
+					}
+				}
 				// External participants follow the content too, or a source-only
 				// participant loses canonical portal access and reply notifications.
 				// Dedupe first: the unique (item_id, portal_customer_id) index
