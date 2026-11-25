@@ -184,6 +184,15 @@ export default defineConfig({
               includeDependenciesRecursively: false,
             },
             {
+              // `@floating-ui/dom` is shared by Milkdown's table controls and
+              // @melt-ui/svelte. Without its own group the recursive milkdown
+              // group absorbs it, so every melt-ui consumer statically pulls
+              // the whole lazy editor chunk into the app shell.
+              name: 'floating-ui',
+              test: /@floating-ui\//,
+              priority: 20,
+            },
+            {
               name: 'milkdown',
               test: /@milkdown/,
             },

@@ -1,0 +1,203 @@
+/* Hover controls for the Milkdown table-block NodeView (add/delete row and
+   column, column alignment, and drag handles). The component ships no styles,
+   so this adapts the official Crepe table theme to the Windshift tokens.
+   `renderButton` supplies the icons; color comes from CSS here. */
+
+.milkdown-editor .ProseMirror .milkdown-table-block {
+  display: block;
+  margin: 4px 0;
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .selectedCell::after {
+  background-color: var(--ds-background-selected);
+  opacity: 0.4;
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .selectedCell ::selection {
+  background: transparent;
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .drag-preview {
+  background-color: var(--ds-surface-raised);
+  opacity: 0.4;
+  position: absolute;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  outline: 1px solid var(--ds-interactive);
+  outline-offset: -1px;
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .drag-preview[data-show="false"] {
+  display: none;
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .handle {
+  position: absolute;
+  font-size: 14px;
+  transition: opacity ease-in-out 0.2s;
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .handle[data-show="false"] {
+  opacity: 0;
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block svg {
+  fill: var(--ds-icon-subtle);
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .cell-handle {
+  z-index: 50;
+  left: -999px;
+  top: -999px;
+  cursor: grab;
+  background-color: var(--ds-surface-raised);
+  color: var(--ds-icon-subtle);
+  border-radius: 100px;
+  box-shadow: var(--ds-shadow-raised);
+  transition: background-color 0.2s ease-in-out;
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .cell-handle:hover {
+  background-color: var(--ds-surface-hovered);
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .cell-handle:has(.button-group:hover) {
+  background-color: var(--ds-surface-raised);
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .cell-handle[data-role="col-drag-handle"] {
+  transform: translateY(50%);
+  padding: 0 6px;
+  width: 28px;
+  height: 16px;
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .cell-handle[data-role="row-drag-handle"] {
+  transform: translateX(50%);
+  padding: 6px 0;
+  width: 16px;
+  height: 28px;
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .cell-handle .button-group {
+  position: absolute;
+  transform: translateX(-50%);
+  left: 50%;
+  top: -52px;
+  display: flex;
+  background-color: var(--ds-surface-raised);
+  border: 1px solid var(--ds-border);
+  border-radius: 8px;
+  box-shadow: var(--ds-shadow-overlay);
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .cell-handle .button-group::after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  height: 8px;
+  background-color: transparent;
+  width: 100%;
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .cell-handle .button-group[data-show="false"] {
+  display: none;
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .cell-handle .button-group button {
+  cursor: pointer;
+  margin: 6px;
+  padding: 4px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  color: var(--ds-icon-subtle);
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .cell-handle .button-group button svg {
+  width: 24px;
+  height: 24px;
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .cell-handle .button-group button:hover {
+  border-radius: 8px;
+  background-color: var(--ds-surface-hovered);
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .cell-handle .button-group button:active {
+  background: var(--ds-background-selected);
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .line-handle {
+  z-index: 20;
+  background-color: var(--ds-interactive);
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .line-handle .add-button {
+  cursor: pointer;
+  background-color: var(--ds-surface-raised);
+  color: var(--ds-icon-subtle);
+  border: none;
+  border-radius: 100px;
+  box-shadow: var(--ds-shadow-raised);
+  transition: background-color 0.2s ease-in-out;
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .line-handle .add-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .line-handle .add-button:hover {
+  background-color: var(--ds-surface-hovered);
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .line-handle .add-button:active {
+  background: var(--ds-background-selected);
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .line-handle[data-role="x-line-drag-handle"] {
+  height: 1px;
+  z-index: 2;
+}
+
+.milkdown-editor
+  .ProseMirror
+  .milkdown-table-block
+  .line-handle[data-role="x-line-drag-handle"]
+  .add-button {
+  position: absolute;
+  transform: translateX(-50%) translateY(-50%);
+  padding: 6px 0;
+  width: 16px;
+  height: 28px;
+}
+
+.milkdown-editor .ProseMirror .milkdown-table-block .line-handle[data-role="y-line-drag-handle"] {
+  width: 1px;
+  z-index: 1;
+}
+
+.milkdown-editor
+  .ProseMirror
+  .milkdown-table-block
+  .line-handle[data-role="y-line-drag-handle"]
+  .add-button {
+  position: absolute;
+  transform: translateY(-50%) translateX(-50%);
+  padding: 0 6px;
+  width: 28px;
+  height: 16px;
+}
+
+.milkdown-editor
+  .ProseMirror
+  .milkdown-table-block
+  .line-handle[data-display-type="indicator"]
+  .add-button {
+  display: none;
+}

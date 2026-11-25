@@ -20,13 +20,10 @@
   import {
     gfm,
     toggleStrikethroughCommand,
-    insertTableCommand,
-    addRowBeforeCommand,
-    addRowAfterCommand,
-    addColBeforeCommand,
-    addColAfterCommand
+    insertTableCommand
   } from '@milkdown/kit/preset/gfm';
-  import { isInTable, deleteRow, deleteColumn, deleteTable } from '@milkdown/kit/prose/tables';
+  import { tableBlock, tableBlockConfig } from '@milkdown/kit/component/table-block';
+  import { isInTable, deleteTable } from '@milkdown/kit/prose/tables';
   import { TextSelection } from '@milkdown/kit/prose/state';
   import { lift } from '@milkdown/kit/prose/commands';
   import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
@@ -37,6 +34,7 @@
   import { replaceAll } from '@milkdown/utils';
   import { nord } from '@milkdown/theme-nord';
   import '@milkdown/theme-nord/style.css';
+  import './milkdown-table-block.css';
   import { imageBlockComponent } from '@milkdown/kit/component/image-block';
   import Bold from '@lucide/svelte/icons/bold';
   import Italic from '@lucide/svelte/icons/italic';
@@ -68,6 +66,7 @@
   import { imageBlockerPlugin } from './milkdown-image-blocker.js';
   import { rewriteBreakHTML } from './milkdown-hardbreak.js';
   import { taskListPlugin, toggleTaskListCommand } from './milkdown-task-list.js';
+  import { tableBlockIcons } from './milkdown-table-block-icons.js';
   import { excalidrawBlock } from './milkdown-excalidraw-block.svelte.js';
   import PageDiagramModal from '../features/pages/PageDiagramModal.svelte';
   import { highlightCodeBlocks } from './code-highlight.js';
@@ -333,40 +332,6 @@
     refreshSelectionContext();
   }
 
-  function addRowAbove() {
-    if (editor) editor.action(callCommand(addRowBeforeCommand.key));
-  }
-
-  function addRowBelow() {
-    if (editor) editor.action(callCommand(addRowAfterCommand.key));
-  }
-
-  function addColumnLeft() {
-    if (editor) editor.action(callCommand(addColBeforeCommand.key));
-  }
-
-  function addColumnRight() {
-    if (editor) editor.action(callCommand(addColAfterCommand.key));
-  }
-
-  function removeTableRow() {
-    if (!editor) return;
-    editor.action((ctx) => {
-      const view = ctx.get(editorViewCtx);
-      deleteRow(view.state, view.dispatch);
-    });
-    refreshSelectionContext();
-  }
-
-  function removeTableColumn() {
-    if (!editor) return;
-    editor.action((ctx) => {
-      const view = ctx.get(editorViewCtx);
-      deleteColumn(view.state, view.dispatch);
-    });
-    refreshSelectionContext();
-  }
-
   function removeTable() {
     if (!editor) return;
     editor.action((ctx) => {
@@ -469,14 +434,7 @@
 
   const tableMenuItems = $derived([
     { id: 'insert', title: t('editors.insertTable'), testid: 'milkdown-insert-table', onClick: insertTable },
-    { id: 'insert-divider', type: 'divider' },
-    { id: 'row-above', title: t('editors.addRowAbove'), testid: 'milkdown-add-row-above', disabled: !selectionContext.inTable, onClick: addRowAbove },
-    { id: 'row-below', title: t('editors.addRowBelow'), testid: 'milkdown-add-row-below', disabled: !selectionContext.inTable, onClick: addRowBelow },
-    { id: 'col-left', title: t('editors.addColumnLeft'), testid: 'milkdown-add-column-left', disabled: !selectionContext.inTable, onClick: addColumnLeft },
-    { id: 'col-right', title: t('editors.addColumnRight'), testid: 'milkdown-add-column-right', disabled: !selectionContext.inTable, onClick: addColumnRight },
     { id: 'edit-divider', type: 'divider' },
-    { id: 'delete-row', title: t('editors.deleteRow'), testid: 'milkdown-delete-row', disabled: !selectionContext.inTable, onClick: removeTableRow },
-    { id: 'delete-column', title: t('editors.deleteColumn'), testid: 'milkdown-delete-column', disabled: !selectionContext.inTable, onClick: removeTableColumn },
     { id: 'delete-table', title: t('editors.deleteTable'), testid: 'milkdown-delete-table', disabled: !selectionContext.inTable, onClick: removeTable }
   ]);
 
@@ -892,6 +850,16 @@
               // Ignore an editor view not yet ready.
             }
           });
+          // `updated` only fires for document changes, so a click into an
+          // existing table (selection-only) would leave the toolbar context
+          // stale. Refresh from the selection event instead; defer to a
+          // microtask so the view holds the post-transaction state.
+          ctx.get(listenerCtx).selectionUpdated(() => {
+            if (disposed) return;
+            queueMicrotask(() => {
+              if (!disposed) refreshSelectionContext();
+            });
+          });
           // Context may not be initialized for update.
           ctx.set(editorViewOptionsCtx, {
             editable: () => !readonly,
@@ -945,6 +913,13 @@
               uploader: async () => [],
             }));
           }
+
+          // The table-block hover controls default to `+`/`-`/`=` glyphs;
+          // swap in the shared inline icon set.
+          ctx.update(tableBlockConfig.key, (config) => ({
+            ...config,
+            renderButton: (renderType) => tableBlockIcons[renderType] ?? config.renderButton(renderType),
+          }));
         })
         .config(nord)
         .use(commonmark)
@@ -954,6 +929,7 @@
         .use(history)
         .use(upload)  // Include upload in main chain per docs
         .use(imageBlockComponent)  // Enable image resizing
+        .use(tableBlock)               // Row/column hover controls and drag handles
         .use(mentionDecorationPlugin)  // Add mention chip decorations
         .use(taskListPlugin)           // Render/toggle GFM task-list checkboxes
         .use(toggleTaskListCommand)    // Task List toolbar command
@@ -1279,6 +1255,9 @@
         triggerLabel={t('editors.heading')}
         triggerTestid="milkdown-heading-menu"
         bind:isOpen={headingMenuOpen}
+        onOpenChange={(open) => {
+          if (open) refreshSelectionContext();
+        }}
       />
       <Tooltip content={t('editors.blockquote')} placement="bottom">
         {#snippet children()}
@@ -1319,6 +1298,9 @@
         triggerLabel={t('editors.table')}
         triggerTestid="milkdown-table-menu"
         bind:isOpen={tableMenuOpen}
+        onOpenChange={(open) => {
+          if (open) refreshSelectionContext();
+        }}
       />
       <div class="toolbar-divider"></div>
       <Tooltip content={t('editors.bulletList')} placement="bottom">
@@ -1686,6 +1668,7 @@
   }
 
   :global(.milkdown-editor .milkdown) {
+    position: relative;
     padding: 0.75rem;
     min-height: 150px;
     /* Override Nord theme CSS variables for typography */
