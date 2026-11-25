@@ -10437,7 +10437,67 @@
     "/screens": {
       "get": {
         "description": "List screens. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
-        "parameters": [],
+        "parameters": [
+          {
+            "Name": "page",
+            "In": "query",
+            "Description": "One-based page number.",
+            "Required": false,
+            "Schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "page_size",
+            "In": "query",
+            "Description": "Maximum number of resources to return.",
+            "Required": false,
+            "Schema": {
+              "default": 50,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "Name": "search",
+            "In": "query",
+            "Description": "Case-insensitive substring match on screen name and description.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "include_fields",
+            "In": "query",
+            "Description": "Includes each screen's configured field layout in the response.",
+            "Required": false,
+            "Schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "Name": "sort",
+            "In": "query",
+            "Description": "Sort field; prefix with '-' for descending order.",
+            "Required": false,
+            "Schema": {
+              "enum": [
+                "name",
+                "-name",
+                "created_at",
+                "-created_at",
+                "updated_at",
+                "-updated_at"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "401": {},
           "403": {},
@@ -12696,6 +12756,15 @@
             "Required": false,
             "Schema": {
               "type": "string"
+            }
+          },
+          {
+            "Name": "personal",
+            "In": "query",
+            "Description": "Restricts results to personal (true) or non-personal (false) workspaces. Omit to include both.",
+            "Required": false,
+            "Schema": {
+              "type": "boolean"
             }
           }
         ],

@@ -15,20 +15,45 @@
   import TextField from '../components/TextField.svelte';
   import TextareaField from '../components/TextareaField.svelte';
   import DataTable from '../components/DataTable.svelte';
+  import SearchInput from '../components/SearchInput.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Modal from '../dialogs/Modal.svelte';
   import ModalHeader from '../dialogs/ModalHeader.svelte';
   import DialogFooter from '../dialogs/DialogFooter.svelte';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
+  import { useDebouncedAction } from '../composables/useDebouncedAction.svelte.js';
   import LocalizedObjectFields from '../settings/LocalizedObjectFields.svelte';
   import { objectDisplayValue } from '../utils/systemLabels.js';
   import ScreenFieldLayoutEditor from '../editors/ScreenFieldLayoutEditor.svelte';
 
   // Bind to store values
   let screens = $derived(screenEditorStore.screens);
+  let screensTotal = $derived(screenEditorStore.screensTotal);
   let showCreateForm = $derived(screenEditorStore.showCreateForm);
   let editingScreen = $derived(screenEditorStore.editingScreen);
   let formData = $derived(screenEditorStore.formData);
+  // Server-side directory paging/search. The store owns the query state so
+  // create/edit/delete reloads stay on the current page and filter.
+  let searchQuery = $state(screenEditorStore.screensSearch);
+  let currentPage = $state(screenEditorStore.screensPage);
+  const runSearch = useDebouncedAction((value) => {
+    currentPage = 1;
+    screenEditorStore.setScreenSearch(value);
+  }, 250);
+
+  function onSearchInput() {
+    runSearch(searchQuery);
+  }
+
+  function onPageChange(page) {
+    screenEditorStore.setScreenPage(page);
+  }
+
+  // Mirror the store's page so a delete that steps back a page keeps the
+  // DataTable's controls in sync.
+  $effect(() => {
+    currentPage = screenEditorStore.screensPage;
+  });
   // Which screen's fields are open, and the editor instance so the header
   // actions can drive its save/cancel. The editor owns loading the fields.
   let fieldEditorScreen = $state(null);
@@ -256,10 +281,25 @@
       />
     </Modal>
 
+    <div class="flex flex-wrap items-end gap-3 mb-4">
+      <SearchInput
+        bind:value={searchQuery}
+        on_input={onSearchInput}
+        placeholder={t('placeholders.search')}
+        class="min-w-[220px] flex-1 max-w-xs"
+        dataTestid="screens-search"
+      />
+    </div>
+
     <DataTable
       columns={screenColumns}
       data={screens}
       keyField="id"
+      pagination
+      totalItems={screensTotal}
+      pageSize={screenEditorStore.screensPageSize}
+      bind:currentPage={currentPage}
+      onPageChange={onPageChange}
       emptyMessage={t('screensPage.noScreens')}
       emptyIcon={Circle}
       actionItems={buildScreenDropdownItems}

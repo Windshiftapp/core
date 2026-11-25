@@ -1,5 +1,6 @@
 import { API_BASE, fetchAPI, fetchAPIV2, fetchV2Data } from './core.js';
 import { createCrudClient } from './createCrudClient.js';
+import { buildQueryString } from './utils.js';
 
 export const configurationSets = {
   ...createCrudClient('/configuration-sets'),
@@ -51,6 +52,11 @@ export const configurationSets = {
 
 export const screens = {
   ...createCrudClient('/screens'),
+  // Single paged directory read: { page, page_size, search } in,
+  // { data, pagination } out. Server-side search keeps large screen catalogs
+  // reachable without loading every screen into the admin table.
+  getPage: (filters = {}, requestOptions = {}) =>
+    fetchAPIV2(`/screens${buildQueryString(filters)}`, requestOptions),
   getAllWithFields: () => fetchAPI('/screens?include_fields=true'),
   getFields: (id, requestOptions = {}) => fetchAPI(`/screens/${id}/fields`, requestOptions),
   updateFields: (id, data) =>

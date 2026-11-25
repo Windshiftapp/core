@@ -300,20 +300,21 @@ func (r *WorkspaceRepository) FindByIDBasic(id int) (*models.Workspace, error) {
 	return &workspace, nil
 }
 
-// WorkspaceCandidateStatus carries the (id, active) pair needed to decide
-// visibility without materializing full workspace rows.
+// WorkspaceCandidateStatus carries the (id, active, personal) fields needed to
+// decide visibility without materializing full workspace rows.
 type WorkspaceCandidateStatus struct {
-	ID     int
-	Active bool
+	ID         int
+	Active     bool
+	IsPersonal bool
 }
 
-// ListCandidateStatuses returns (id, active) for the same candidate set as
-// FindAll(userID, false) — every non-personal workspace plus the user's own
-// personal workspace — so visibility can be filtered in memory and only the
-// visible IDs handed to a paged query.
+// ListCandidateStatuses returns (id, active, is_personal) for the same
+// candidate set as FindAll(userID, false) — every non-personal workspace plus
+// the user's own personal workspace — so visibility can be filtered in memory
+// and only the visible IDs handed to a paged query.
 func (r *WorkspaceRepository) ListCandidateStatuses(userID int) ([]WorkspaceCandidateStatus, error) {
 	rows, err := r.db.Query(`
-		SELECT id, COALESCE(active, false)
+		SELECT id, COALESCE(active, false), COALESCE(is_personal, false)
 		FROM workspaces
 		WHERE is_personal = false OR is_personal IS NULL OR owner_id = ?
 	`, userID)
@@ -325,7 +326,7 @@ func (r *WorkspaceRepository) ListCandidateStatuses(userID int) ([]WorkspaceCand
 	var statuses []WorkspaceCandidateStatus
 	for rows.Next() {
 		var status WorkspaceCandidateStatus
-		if err := rows.Scan(&status.ID, &status.Active); err != nil {
+		if err := rows.Scan(&status.ID, &status.Active, &status.IsPersonal); err != nil {
 			return nil, fmt.Errorf("failed to scan workspace candidate: %w", err)
 		}
 		statuses = append(statuses, status)

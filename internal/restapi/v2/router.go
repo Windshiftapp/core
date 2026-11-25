@@ -1208,6 +1208,11 @@ func applyParameterCorrections(route *Route) {
 		})
 	case "GET /workspaces":
 		upsertParameter(route, stringQuery("ids", "Comma-separated workspace IDs to resolve directly, at most 200. When set, the response contains exactly those workspaces the caller can view; search and pagination are ignored."))
+		upsertParameter(route, ParameterMetadata{Name: "personal", In: "query", Description: "Restricts results to personal (true) or non-personal (false) workspaces. Omit to include both.", Schema: map[string]any{"type": "boolean"}})
+	case "GET /screens":
+		upsertParameter(route, stringQuery("search", "Case-insensitive substring match on screen name and description."))
+		upsertParameter(route, enumQuery("sort", "Sort field; prefix with '-' for descending order.", "name", "-name", "created_at", "-created_at", "updated_at", "-updated_at"))
+		upsertParameter(route, booleanQuery("include_fields", "Includes each screen's configured field layout in the response.", false))
 	case "GET /query-language/values":
 		source := enumQuery("source", "Completion value catalog to search.",
 			"workspaces", "statuses", "status_categories", "priorities", "users", "milestones", "iterations", "projects", "item_types", "labels")

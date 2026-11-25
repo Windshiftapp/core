@@ -62,6 +62,9 @@ type CatalogPageParams struct {
 	Sort   string
 	Desc   bool
 	Search string
+	// Personal, when set, restricts the page to personal (true) or
+	// non-personal (false) workspaces. Nil leaves the filter off.
+	Personal *bool
 	// IDs, when set, restricts the page to exactly these resources. Callers
 	// use it to resolve a known id set in one read instead of one read per id.
 	IDs []int
@@ -82,6 +85,9 @@ func (s *CatalogReadService) ListWorkspaces(userID int, page CatalogPageParams) 
 	}
 	visibleIDs := make([]int, 0, len(candidates))
 	for _, candidate := range candidates {
+		if page.Personal != nil && candidate.IsPersonal != *page.Personal {
+			continue
+		}
 		allowed, err := workspaceVisibleWith(visibility, candidate.ID, candidate.Active)
 		if err != nil {
 			return nil, 0, err

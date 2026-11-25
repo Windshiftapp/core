@@ -27,6 +27,13 @@ class ScreenEditorStore extends DragStateStore {
   // === Screens List ===
   screens = $state([]);
   loading = $state(false);
+  // Server-side directory paging/search state (WI-1446 follow-up).
+  screensTotal = $state(0);
+  screensPage = $state(1);
+  screensPageSize = 50;
+  screensSearch = $state('');
+  // Guards against a slow earlier request overwriting a newer page/search.
+  #screensLoadGeneration = 0;
 
   // === Custom Fields Reference ===
   customFields = $state([]);
@@ -110,17 +117,37 @@ class ScreenEditorStore extends DragStateStore {
 
   // === Data Loading ===
 
-  async loadScreens() {
+  async loadScreens({ page = this.screensPage, search = this.screensSearch } = {}) {
+    const generation = ++this.#screensLoadGeneration;
     try {
       this.loading = true;
-      const result = await screens.getAll();
-      this.screens = result || [];
+      const document = await screens.getPage({
+        page,
+        page_size: this.screensPageSize,
+        search,
+      });
+      // A newer page/search request owns the list; drop this stale response.
+      if (generation !== this.#screensLoadGeneration) return;
+      this.screens = document?.data ?? [];
+      this.screensTotal = document?.pagination?.total_items ?? 0;
+      this.screensPage = page;
+      this.screensSearch = search;
     } catch (err) {
+      if (generation !== this.#screensLoadGeneration) return;
       console.error('Failed to load screens:', err);
       this.screens = [];
+      this.screensTotal = 0;
     } finally {
-      this.loading = false;
+      if (generation === this.#screensLoadGeneration) this.loading = false;
     }
+  }
+
+  async setScreenSearch(search) {
+    await this.loadScreens({ page: 1, search });
+  }
+
+  async setScreenPage(page) {
+    await this.loadScreens({ page, search: this.screensSearch });
   }
 
   async loadCustomFields() {
@@ -172,7 +199,11 @@ class ScreenEditorStore extends DragStateStore {
 
     try {
       await screens.delete(screen.id);
-      await this.loadScreens();
+      // Stepping back keeps the table on a populated page when the last row
+      // of the final page is removed.
+      const targetPage =
+        this.screens.length === 1 && this.screensPage > 1 ? this.screensPage - 1 : this.screensPage;
+      await this.loadScreens({ page: targetPage, search: this.screensSearch });
     } catch (err) {
       console.error('Failed to delete screen:', err);
       throw err;
@@ -457,8 +488,12 @@ class ScreenEditorStore extends DragStateStore {
   // === Full Reset ===
 
   reset() {
+    this.#screensLoadGeneration += 1;
     this.screens = [];
     this.loading = false;
+    this.screensTotal = 0;
+    this.screensPage = 1;
+    this.screensSearch = '';
     this.customFields = [];
     this.editingScreenFields = null;
     this.screenFields = [];

@@ -158,6 +158,13 @@ func listWorkspaces(catalog catalogReader) pageOperation[workspaceDTO] {
 		pageParams := catalogPage(page)
 		pageParams.Search = clampSearch(r.URL.Query().Get("search"))
 		pageParams.IDs = ids
+		if r.URL.Query().Has("personal") {
+			personal, err := optionalBoolQuery(r, "personal")
+			if err != nil {
+				return nil, Pagination{}, 0, err
+			}
+			pageParams.Personal = &personal
+		}
 		user, err := principal(r)
 		if err != nil {
 			return nil, Pagination{}, 0, err

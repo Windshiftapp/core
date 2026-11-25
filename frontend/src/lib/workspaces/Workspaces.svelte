@@ -12,9 +12,11 @@
   import { workspaceIconMap } from '../utils/icons.js';
   import Button from '../components/Button.svelte';
   import DataTable from '../components/DataTable.svelte';
+  import SearchInput from '../components/SearchInput.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
   import Lozenge from '../components/Lozenge.svelte';
   import { toHotkeyString, getShortcutDisplay } from '../utils/keyboardShortcuts.js';
+  import { useDebouncedAction } from '../composables/useDebouncedAction.svelte.js';
   import { workspacesStore } from '../stores/workspaces.svelte.js';
   import { permissionStore, isSystemAdmin } from '../stores/permissions.svelte.js';
   import { formatDateSimple } from '../utils/dateFormatter.js';
@@ -27,19 +29,50 @@
   // Use centralized icon map for workspace icons
   const iconMap = workspaceIconMap;
 
-  // The admin directory needs the complete list, not the store's cached first
-  // page, so it fetches all pages itself at the v2 page-size cap. WI-1446
-  // replaces this with server-side paging and search.
+  // Server-side directory paging and search (WI-1446). The admin table reads
+  // one page at a time and excludes personal workspaces server-side so the
+  // pagination total matches the visible rows.
+  const pageSize = 50;
   let workspaceRows = $state([]);
+  let workspaceTotal = $state(0);
+  let currentPage = $state(1);
+  let searchQuery = $state('');
+  // Guards against a slow earlier request overwriting a newer page/search.
+  let loadGeneration = 0;
 
-  async function loadWorkspaceRows() {
+  async function loadWorkspaceRows(page = currentPage, search = searchQuery) {
+    const generation = ++loadGeneration;
     try {
-      const all = await workspaces.getAll({}, { pageSize: 1000 });
-      workspaceRows = (all || []).filter((ws) => !ws.is_personal);
+      const document = await workspaces.getPage({
+        page,
+        page_size: pageSize,
+        search,
+        personal: false,
+      });
+      if (generation !== loadGeneration) return;
+      workspaceRows = document?.data ?? [];
+      workspaceTotal = document?.pagination?.total_items ?? 0;
+      currentPage = page;
+      searchQuery = search;
     } catch (error) {
+      if (generation !== loadGeneration) return;
       console.error('Failed to load workspaces:', error);
       workspaceRows = [];
+      workspaceTotal = 0;
     }
+  }
+
+  const runSearch = useDebouncedAction((value) => {
+    currentPage = 1;
+    loadWorkspaceRows(1, value);
+  }, 250);
+
+  function onSearchInput() {
+    runSearch(searchQuery);
+  }
+
+  function onPageChange(page) {
+    loadWorkspaceRows(page, searchQuery);
   }
 
   onMount(() => {
@@ -65,7 +98,11 @@
       try {
         await workspaces.delete(workspace.id);
         workspacesStore.remove(workspace.id);
-        await loadWorkspaceRows();
+        // Stepping back keeps the table on a populated page when the last row
+        // of the final page is removed.
+        const targetPage =
+          workspaceRows.length === 1 && currentPage > 1 ? currentPage - 1 : currentPage;
+        await loadWorkspaceRows(targetPage, searchQuery);
       } catch (error) {
         console.error('Failed to delete workspace:', error);
         errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
@@ -158,12 +195,24 @@
 
 
     <div class="{noPadding ? '' : 'px-6 pb-6'}">
+      <div class="flex flex-wrap items-end gap-3 mb-4">
+        <SearchInput
+          bind:value={searchQuery}
+          on_input={onSearchInput}
+          placeholder={t('nav.searchWorkspaces')}
+          class="min-w-[220px] flex-1 max-w-xs"
+          dataTestid="workspaces-search"
+        />
+      </div>
       <DataTable
         columns={workspaceColumns}
         data={workspaceRows}
         keyField="id"
         pagination={true}
-        pageSize={50}
+        totalItems={workspaceTotal}
+        pageSize={pageSize}
+        bind:currentPage={currentPage}
+        onPageChange={onPageChange}
         emptyMessage={t('workspaces.empty')}
         emptyIcon={Circle}
         actionItems={buildWorkspaceDropdownItems}

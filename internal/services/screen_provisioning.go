@@ -86,6 +86,78 @@ func (s *ScreenProvisioningService) ListScreens(includeFields bool) ([]models.Sc
 	return screens, nil
 }
 
+// ListScreensPage returns one search-filtered page of screens plus the total
+// number of matches. Search matches name and description case-insensitively,
+// mirroring the workspace directory search so the admin list can page and
+// filter server-side instead of materializing every screen.
+func (s *ScreenProvisioningService) ListScreensPage(includeFields bool, search, sort string, desc bool, limit, offset int) ([]models.Screen, int, error) {
+	where := ""
+	args := make([]any, 0, 4)
+	if trimmed := strings.TrimSpace(search); trimmed != "" {
+		pattern := "%" + escapeScreenSearch(trimmed) + "%"
+		where = ` WHERE LOWER(name) LIKE LOWER(?) ESCAPE '\' OR LOWER(description) LIKE LOWER(?) ESCAPE '\'`
+		args = append(args, pattern, pattern)
+	}
+
+	var total int
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM screens"+where, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	sortColumn := "LOWER(name)"
+	switch sort {
+	case "created_at":
+		sortColumn = "created_at"
+	case "updated_at":
+		sortColumn = "updated_at"
+	}
+	direction := " ASC"
+	if desc {
+		direction = " DESC"
+	}
+
+	query := `SELECT id, COALESCE(builtin_key, ''), name, description, created_at, updated_at FROM screens` +
+		where + " ORDER BY " + sortColumn + direction + ", id ASC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var screens []models.Screen
+	for rows.Next() {
+		var screen models.Screen
+		if err := rows.Scan(&screen.ID, &screen.BuiltinKey, &screen.Name, &screen.Description, &screen.CreatedAt, &screen.UpdatedAt); err != nil {
+			return nil, 0, err
+		}
+		screens = append(screens, screen)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	if screens == nil {
+		screens = []models.Screen{}
+	}
+	if includeFields {
+		fieldsByScreen, err := s.getAllScreenFields()
+		if err != nil {
+			return nil, 0, err
+		}
+		for i := range screens {
+			screens[i].Fields = ensureAlwaysVisibleScreenFields(screens[i].ID, fieldsByScreen[screens[i].ID])
+		}
+	}
+	return screens, total, nil
+}
+
+// escapeScreenSearch neutralizes LIKE wildcards in user search text so a
+// literal % or _ does not widen the match.
+func escapeScreenSearch(value string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(value)
+}
+
 // GetScreen loads one screen with its field and system-field configuration.
 func (s *ScreenProvisioningService) GetScreen(id int) (*models.Screen, error) {
 	var screen models.Screen

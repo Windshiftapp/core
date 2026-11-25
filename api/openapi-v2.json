@@ -30317,10 +30317,14 @@
               "type": "object"
             },
             "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
           }
         },
         "required": [
-          "data"
+          "data",
+          "pagination"
         ],
         "type": "object"
       },
@@ -124426,7 +124430,67 @@
       "get": {
         "description": "List screens. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
         "operationId": "getScreens",
-        "parameters": [],
+        "parameters": [
+          {
+            "description": "One-based page number.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Maximum number of resources to return.",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Case-insensitive substring match on screen name and description.",
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Includes each screen's configured field layout in the response.",
+            "in": "query",
+            "name": "include_fields",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Sort field; prefix with '-' for descending order.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "enum": [
+                "name",
+                "-name",
+                "created_at",
+                "-created_at",
+                "updated_at",
+                "-updated_at"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -129039,6 +129103,15 @@
             "required": false,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "description": "Restricts results to personal (true) or non-personal (false) workspaces. Omit to include both.",
+            "in": "query",
+            "name": "personal",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],

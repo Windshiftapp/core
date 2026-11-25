@@ -73,19 +73,27 @@ func registerScreenRoutes(b *routeBuilder, deps Deps) {
 	read := []string{"screens:read"}
 	write := []string{"screens:write"}
 
-	b.Read("/screens", AuthAuthenticated, read, func(r *http.Request) ([]screenDTO, error) {
-		screens, err := deps.Screens.ListScreens(r.URL.Query().Get("include_fields") == "true")
+	b.Page("/screens", AuthAuthenticated, read, func(r *http.Request) ([]screenDTO, Pagination, int, error) {
+		page, err := ParsePagination(r, map[string]bool{"name": true, "created_at": true, "updated_at": true}, "name")
 		if err != nil {
-			return nil, screenMutationError(err)
+			return nil, Pagination{}, 0, err
+		}
+		screens, total, err := deps.Screens.ListScreensPage(
+			r.URL.Query().Get("include_fields") == "true",
+			clampSearch(r.URL.Query().Get("search")),
+			page.Sort, page.Desc, page.PageSize, page.Offset,
+		)
+		if err != nil {
+			return nil, Pagination{}, 0, screenMutationError(err)
 		}
 		items := make([]screenDTO, len(screens))
 		for i := range screens {
 			items[i] = screenDTOFromModel(&screens[i])
 		}
 		if err := localizeCatalog(r, deps.ObjectTranslations, "screen", &items); err != nil {
-			return nil, err
+			return nil, Pagination{}, 0, err
 		}
-		return items, nil
+		return items, page, total, nil
 	})
 
 	b.Read("/screens/{screen_id}", AuthAuthenticated, read, func(r *http.Request) (screenDTO, error) {
