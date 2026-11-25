@@ -4,6 +4,7 @@
   import StateDisplay from '../components/StateDisplay.svelte';
   import Shield from '@lucide/svelte/icons/shield';
   import Calendar from '@lucide/svelte/icons/calendar';
+  import Globe from '@lucide/svelte/icons/globe';
   import ImageIcon from '@lucide/svelte/icons/image';
   import Terminal from '@lucide/svelte/icons/terminal';
   import Key from '@lucide/svelte/icons/key';
@@ -295,41 +296,74 @@
   {#if loading}
     <StateDisplay type="loading" />
   {:else}
-    <!-- Calendar Feed Settings -->
-    <Panel padding="spacious">
-      <h2 class="mb-3 font-semibold">Public boards</h2>
-      <Toggle id="security-public-boards-enabled" dataTestid="security-public-boards-enabled" bind:checked={publicBoardsEnabled} disabled={saving} onchange={handlePublicBoardsToggle} label="Allow external board publications" />
-      <DescriptionText>Pausing retains publication settings and URLs. Re-enabling resumes boards that have not been disabled or revoked.</DescriptionText>
-      {#if !publicBoardsEnabled}<AlertBox variant="warning" message="External board access is paused on this instance." />{/if}
-    </Panel>
+    <!-- Public Boards Settings -->
     <Panel padding="spacious">
       <div class="flex items-start gap-4">
-        <div class="p-2 rounded-lg" style="background-color: var(--ds-background-neutral);">
-          <Calendar class="w-5 h-5" style="color: var(--ds-icon);" />
+        <div class="p-2 rounded-lg bg-ds-background-neutral">
+          <Globe class="w-5 h-5 text-ds-icon" />
         </div>
         <div class="min-w-0 flex-1">
           <div class="flex items-center justify-between gap-4">
             <div class="min-w-0">
-              <h3 class="text-base font-medium" style="color: var(--ds-text);">{t('settings.security.calendarFeeds')}</h3>
-              <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
-                {t('settings.security.calendarFeedsDesc')}
+              <h3 class="text-base font-medium text-ds-text">Public boards</h3>
+              <p class="text-sm mt-1 text-ds-text-subtle">
+                Allow external board publications
               </p>
             </div>
             <Toggle
-              bind:checked={calendarFeedEnabled}
+              id="security-public-boards-enabled"
+              dataTestid="security-public-boards-enabled"
+              bind:checked={publicBoardsEnabled}
               disabled={saving}
-              onchange={handleCalendarToggle}
+              onchange={handlePublicBoardsToggle}
+              ariaLabel="Allow external board publications"
             />
           </div>
 
-          {#if !calendarFeedEnabled}
+          <p class="text-xs mt-2 text-ds-text-subtle">
+            Pausing retains publication settings and URLs. Re-enabling resumes boards that have not been disabled or revoked.
+          </p>
+
+          {#if !publicBoardsEnabled}
             <div class="mt-3">
-              <AlertBox variant="warning" message={t('settings.security.calendarFeedsWarning')} />
+              <AlertBox variant="warning" message="External board access is paused on this instance." />
             </div>
           {/if}
         </div>
       </div>
     </Panel>
+
+    <!-- Calendar Feed Settings -->
+    <div class="mt-4">
+      <Panel padding="spacious">
+        <div class="flex items-start gap-4">
+          <div class="p-2 rounded-lg" style="background-color: var(--ds-background-neutral);">
+            <Calendar class="w-5 h-5" style="color: var(--ds-icon);" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center justify-between gap-4">
+              <div class="min-w-0">
+                <h3 class="text-base font-medium" style="color: var(--ds-text);">{t('settings.security.calendarFeeds')}</h3>
+                <p class="text-sm mt-1" style="color: var(--ds-text-subtle);">
+                  {t('settings.security.calendarFeedsDesc')}
+                </p>
+              </div>
+              <Toggle
+                bind:checked={calendarFeedEnabled}
+                disabled={saving}
+                onchange={handleCalendarToggle}
+              />
+            </div>
+
+            {#if !calendarFeedEnabled}
+              <div class="mt-3">
+                <AlertBox variant="warning" message={t('settings.security.calendarFeedsWarning')} />
+              </div>
+            {/if}
+          </div>
+        </div>
+      </Panel>
+    </div>
 
     <!-- External Markdown Images -->
     <div class="mt-4">
