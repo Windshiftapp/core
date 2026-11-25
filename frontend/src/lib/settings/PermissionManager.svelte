@@ -107,6 +107,17 @@
     );
   }
 
+  // System admin grants are protected: an admin can never revoke their own
+  // grant (self-lockout), and the last remaining admin cannot be revoked at
+  // all. When revocation is not allowed we hide the button instead of showing
+  // a disabled control that silently does nothing.
+  function canRevokeUserPermission(item, user) {
+    if (item.permission_key !== 'system.admin') return true;
+    if (user.id === ($authStore?.currentUser?.id ?? null)) return false;
+    if (getUsersWithPermission(item.id).length <= 1) return false;
+    return true;
+  }
+
   function openAssignModal(permission) {
     assignTarget = permission;
     assignType = 'user';
@@ -291,14 +302,15 @@
               {#if user.is_system_admin}
                 <Crown class="w-3 h-3" style="color: var(--ds-text-warning);" />
               {/if}
-              <button
-                class="ml-1 revoke-btn"
-                onclick={() => revokePermissionFromUser(user.id, item.id, item.permission_key)}
-                title={t('settings.permissions.revokePermission')}
-                disabled={item.permission_key === 'system.admin' && getUsersWithPermission(item.id).length <= 1}
-              >
-                <X class="w-3 h-3" />
-              </button>
+              {#if canRevokeUserPermission(item, user)}
+                <button
+                  class="ml-1 revoke-btn"
+                  onclick={() => revokePermissionFromUser(user.id, item.id, item.permission_key)}
+                  title={t('settings.permissions.revokePermission')}
+                >
+                  <X class="w-3 h-3" />
+                </button>
+              {/if}
             </Lozenge>
           {:else}
             <span class="text-sm italic" style="color: var(--ds-text-subtle);">{t('settings.permissions.noUsersAssigned')}</span>

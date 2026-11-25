@@ -181,7 +181,7 @@ func (h *PermissionHandler) RevokeGlobalPermission(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// Don't allow revoking system admin from the last admin
+	// Don't allow revoking system admin from yourself or from the last admin
 	permissionKey, err := h.repo.GetKey(permissionID)
 	if err != nil {
 		respondInternalError(w, r, err)
@@ -189,6 +189,11 @@ func (h *PermissionHandler) RevokeGlobalPermission(w http.ResponseWriter, r *htt
 	}
 
 	if permissionKey == models.PermissionSystemAdmin {
+		if currentUser := utils.GetCurrentUser(r); currentUser != nil && currentUser.ID == userID {
+			respondForbidden(w, r)
+			return
+		}
+
 		adminCount, err := h.repo.CountSystemAdminGrants()
 		if err != nil {
 			respondInternalError(w, r, err)
