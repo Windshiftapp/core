@@ -97,7 +97,7 @@
 </script>
 
 {#if reactions.length > 0 || canReact}
-	<div bind:this={root} class="relative mt-1.5 flex flex-wrap items-center gap-1" data-testid="comment-reactions">
+	<div bind:this={root} class="relative mt-1 flex flex-wrap items-center gap-1" data-testid="comment-reactions">
 		{#each reactions as group (group.reaction)}
 			<Tooltip content={tooltip(group)} placement="top">
 				<button

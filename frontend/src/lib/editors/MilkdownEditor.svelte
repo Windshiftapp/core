@@ -1684,7 +1684,18 @@
     min-height: auto;
   }
 
-  :global(.milkdown-editor.compact .milkdown) {
+  /* Readonly editors are display containers, not input fields: the surrounding
+     layout owns spacing, so drop the document's leading/trailing block margins
+     instead of stacking them on top of the container padding. */
+  :global(.milkdown-editor.readonly .ProseMirror > :first-child) {
+    margin-top: 0;
+  }
+
+  :global(.milkdown-editor.readonly .ProseMirror > :last-child) {
+    margin-bottom: 0;
+  }
+
+  :global(.milkdown-editor.compact:not(.readonly) .milkdown) {
     min-height: 80px;
   }
 
