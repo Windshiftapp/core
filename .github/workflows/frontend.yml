@@ -54,15 +54,16 @@ jobs:
         # window (the lockfile itself is what we want to verify).
         #
         # The attestations endpoint intermittently answers with a non-JSON body
-        # ("OK"), which npm surfaces as a FETCH_ERROR. Retry so a registry blip
-        # does not fail the job.
+        # ("OK"), which npm surfaces as a FETCH_ERROR. A blip can last a minute
+        # or more, so retry with a growing backoff before failing the job.
         run: |
-          for attempt in 1 2 3; do
+          for attempt in 1 2 3 4 5; do
             if npm audit signatures --min-release-age=0; then
               exit 0
             fi
-            echo "npm audit signatures failed (attempt ${attempt}); retrying in 10s..."
-            sleep 10
+            delay=$((attempt * 10))
+            echo "npm audit signatures failed (attempt ${attempt}); retrying in ${delay}s..."
+            sleep "$delay"
           done
           echo "npm audit signatures still failing after retries"
           exit 1
