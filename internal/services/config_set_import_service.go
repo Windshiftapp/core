@@ -916,6 +916,8 @@ func (s *ConfigSetImportService) rewriteConditionConfigForImport(condType string
 			delete(out, "group_name")
 		}
 		s.rewriteFieldRefForImport(out, customFieldNameToID)
+	case models.ConditionTypeUserIs:
+		s.rewriteFieldRefForImport(out, customFieldNameToID)
 	case models.ConditionTypeFieldValue:
 		if name, ok := out["custom_field_name"].(string); ok && name != "" {
 			if id, ok := customFieldNameToID[lowerStr(name)]; ok {

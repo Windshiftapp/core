@@ -12,14 +12,18 @@ import (
 )
 
 // WorkflowGuard is one source condition or validator attached to a transition.
-// A guard with a ConditionType is recreated as a Windshift condition; a guard
-// without one is unmappable and keeps the transition locked for review.
+// A guard with a ConditionType is recreated as a Windshift condition; one
+// without is unmappable and keeps the transition locked for review, unless it
+// is Ignored because Jira has no Windshift equivalent to map onto.
 type WorkflowGuard struct {
 	Kind          string         // normalized source kind, for metadata
 	Mode          string         // "condition" or "validator"
 	ConditionType string         // Windshift condition type when mappable
 	Config        map[string]any // Windshift condition config when mappable
 	ErrorMessage  string
+	// Ignored marks a Jira built-in with no Windshift equivalent. It is kept
+	// for import fidelity but never recreated and never review-locked.
+	Ignored bool
 }
 
 // Mappable reports whether the guard can be recreated faithfully.
@@ -68,7 +72,7 @@ func (s *Service) CreateDetailedWorkflowConfiguration(
 			var conditionSetID *int
 			needsConditionSet := false
 			for _, edge := range definition.Edges {
-				if edge.ReviewLocked || len(edge.Guards) > 0 {
+				if edge.ReviewLocked || hasActionableWorkflowGuards(edge.Guards) {
 					needsConditionSet = true
 					break
 				}
@@ -93,7 +97,7 @@ func (s *Service) CreateDetailedWorkflowConfiguration(
 					continue
 				}
 				switch {
-				case len(edge.Guards) > 0:
+				case hasActionableWorkflowGuards(edge.Guards):
 					if err := applyWorkflowGuards(tx, *conditionSetID, transitionID, edge.Guards); err != nil {
 						return err
 					}
@@ -186,7 +190,8 @@ func lockWorkflowTransitionForReview(store mappingStore, conditionSetID, transit
 
 // ApplyWorkflowGuards recreates the mappable guards as Windshift conditions and,
 // when any guard is unmappable, adds a never-passing validator so the transition
-// stays locked for review instead of being silently broadened.
+// stays locked for review instead of being silently broadened. Ignored guards
+// are skipped.
 func (s *Service) ApplyWorkflowGuards(conditionSetID, transitionID int, guards []WorkflowGuard) error {
 	return database.WithTx(s.db, func(tx database.Tx) error {
 		return applyWorkflowGuards(tx, conditionSetID, transitionID, guards)
@@ -205,6 +210,9 @@ func applyWorkflowGuards(store mappingStore, conditionSetID, transitionID int, g
 	order := 1
 	hasUnmapped := false
 	for _, guard := range guards {
+		if guard.Ignored {
+			continue
+		}
 		if !guard.Mappable() {
 			hasUnmapped = true
 			continue
@@ -238,6 +246,18 @@ func applyWorkflowGuards(store mappingStore, conditionSetID, transitionID int, g
 		}
 	}
 	return nil
+}
+
+// hasActionableWorkflowGuards reports whether any guard needs import work: one
+// to recreate or one that still requires review. Guards ignored for having no
+// Windshift equivalent do not count.
+func hasActionableWorkflowGuards(guards []WorkflowGuard) bool {
+	for _, guard := range guards {
+		if !guard.Ignored {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Service) ConservativeInitialStatus(statusIDs []int) (int, error) {

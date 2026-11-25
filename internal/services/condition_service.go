@@ -231,6 +231,8 @@ func (s *ConditionService) evaluateCondition(ctx context.Context, c conditionRow
 		return s.evaluateUserInRole(c.Config, userID, item)
 	case models.ConditionTypeUserInGroup:
 		return s.evaluateUserInGroup(c.Config, userID, item)
+	case models.ConditionTypeUserIs:
+		return s.evaluateUserIs(c.Config, userID, item)
 	case models.ConditionTypeFieldValue:
 		return s.evaluateFieldValue(c.Config, item)
 	case models.ConditionTypeScript:
@@ -331,6 +333,21 @@ func (s *ConditionService) evaluateUserInGroup(configJSON string, userID int, it
 		}
 	}
 	return false, nil
+}
+
+// evaluateUserIs checks that the current user is the user referenced by the
+// condition's field (for example the item's assignee or creator).
+func (s *ConditionService) evaluateUserIs(configJSON string, userID int, item map[string]any) (bool, error) {
+	var cfg models.ConditionUserIsConfig
+	if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
+		return false, fmt.Errorf("invalid user_is config: %w", err)
+	}
+
+	referencedUserID, err := resolveUserID(cfg.FieldRef, userID, item)
+	if err != nil {
+		return false, nil //nolint:nilerr // unresolvable user means condition fails
+	}
+	return referencedUserID == userID, nil
 }
 
 func (s *ConditionService) evaluateFieldValue(configJSON string, item map[string]any) (bool, error) {

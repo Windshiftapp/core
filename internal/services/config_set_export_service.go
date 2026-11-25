@@ -469,6 +469,8 @@ func (s *ConfigSetExportService) rewriteConditionConfigForExport(ctx context.Con
 			}
 		}
 		s.rewriteFieldRef(cfg, customFieldNames, ctx)
+	case models.ConditionTypeUserIs:
+		s.rewriteFieldRef(cfg, customFieldNames, ctx)
 	case models.ConditionTypeFieldValue:
 		// field_identifier may be either a numeric custom-field id or a
 		// regular column name; only rewrite if it parses as an integer that

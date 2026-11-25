@@ -668,7 +668,7 @@ type TransitionCondition struct {
 type Condition struct {
 	ID                       int             `json:"id"`
 	ConditionSetTransitionID int             `json:"condition_set_transition_id"`
-	ConditionType            string          `json:"condition_type"` // user_in_role, user_in_group, field_value, script
+	ConditionType            string          `json:"condition_type"` // user_in_role, user_in_group, user_is, field_value, script
 	Config                   json.RawMessage `json:"config"`
 	DisplayOrder             int             `json:"display_order"`
 	Mode                     string          `json:"mode"`                    // "condition" or "validator"
@@ -679,6 +679,7 @@ type Condition struct {
 const (
 	ConditionTypeUserInRole  = "user_in_role"
 	ConditionTypeUserInGroup = "user_in_group"
+	ConditionTypeUserIs      = "user_is"
 	ConditionTypeFieldValue  = "field_value"
 	ConditionTypeScript      = "script"
 )
@@ -703,6 +704,13 @@ type ConditionUserInRoleConfig struct {
 type ConditionUserInGroupConfig struct {
 	FieldRef
 	GroupID int `json:"group_id"`
+}
+
+// ConditionUserIsConfig is the config for user_is conditions: the current user
+// must be the user referenced by the embedded FieldRef (creator, assignee, a
+// whitelisted regular field, or a custom user field).
+type ConditionUserIsConfig struct {
+	FieldRef
 }
 
 // ConditionFieldValueConfig is the config for field_value conditions

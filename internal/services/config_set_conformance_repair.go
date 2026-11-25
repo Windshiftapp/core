@@ -816,6 +816,8 @@ func (r *conformanceRepairer) rewriteConditionConfig(c ConfigSetTplCondition) ma
 	case models.ConditionTypeUserInGroup:
 		rewrite("group_name", "group_id", "groups", "group_name")
 		rewriteCustomFieldRef()
+	case models.ConditionTypeUserIs:
+		rewriteCustomFieldRef()
 	case models.ConditionTypeFieldValue:
 		if name, ok := out["custom_field_name"].(string); ok && name != "" {
 			if id, _ := r.lookupID("custom_field_definitions", "name", name); id > 0 {

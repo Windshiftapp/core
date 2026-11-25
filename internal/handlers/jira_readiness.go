@@ -253,7 +253,12 @@ func (h *JiraImportHandler) jiraConfigurationReadinessFindings(
 					nonInitialTransitionCount++
 				}
 				if transition.ValidatorCount > 0 || transition.ConditionCount > 0 {
-					guardedCount++
+					// Counts-only sources cannot say which guard kind they saw, so they
+					// still count. Descriptor sources exclude built-ins the importer
+					// deliberately ignores.
+					if len(transition.Guards) == 0 || hasNonIgnorableJiraGuard(transition.Guards) {
+						guardedCount++
+					}
 				}
 				actionCount += transition.ActionCount
 				triggerCount += transition.TriggerCount
@@ -271,7 +276,7 @@ func (h *JiraImportHandler) jiraConfigurationReadinessFindings(
 				Entity:     "Workflow rule visibility",
 				Category:   "workflow_rule",
 				Severity:   jira.SeverityLossy,
-				Reason:     "Jira's current workflow read API does not expose complete condition trees. The graph imports, but rules that cannot be identified are not recreated; only transitions with exposed conditions or validators receive a generated review lock.",
+				Reason:     "Jira's current workflow read API does not expose complete condition trees. The graph imports, but rules that cannot be identified are not recreated; only transitions with unmappable conditions or validators receive a generated review lock, and Jira built-ins with no Windshift equivalent are ignored.",
 				UsageCount: nonInitialTransitionCount,
 			})
 		}
@@ -280,7 +285,7 @@ func (h *JiraImportHandler) jiraConfigurationReadinessFindings(
 				Entity:     "Workflow conditions and validators",
 				Category:   "workflow_rule",
 				Severity:   jira.SeverityBlocked,
-				Reason:     "Jira reports conditions or validators on these transitions, but its read API does not return the full rule tree. Topology imports either way; guards that map onto the Windshift condition model are recreated, and the remainder import behind a generated review lock so an operator can review and rebuild them.",
+				Reason:     "Jira reports conditions or validators on these transitions, but its read API does not return the full rule tree. Guards that map onto the Windshift condition model are recreated and the remainder import behind a generated review lock; Jira built-ins with no Windshift equivalent, such as workflow permissions, are ignored.",
 				UsageCount: guardedCount,
 			})
 		}

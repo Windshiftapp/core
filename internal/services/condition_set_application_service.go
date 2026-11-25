@@ -317,6 +317,14 @@ func validateConditionInput(condition models.Condition) error {
 		if config.GroupID == 0 {
 			return governanceValidation("user_in_group requires group_id")
 		}
+	case models.ConditionTypeUserIs:
+		var config models.ConditionUserIsConfig
+		if json.Unmarshal(condition.Config, &config) != nil {
+			return governanceValidation("invalid user_is config")
+		}
+		if err := validateConditionFieldRef(config.FieldRef, "user_is"); err != nil {
+			return err
+		}
 	case models.ConditionTypeFieldValue:
 		var config models.ConditionFieldValueConfig
 		if json.Unmarshal(condition.Config, &config) != nil || config.FieldIdentifier == "" || config.Pattern == "" {

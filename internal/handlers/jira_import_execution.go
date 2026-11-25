@@ -2122,10 +2122,12 @@ func authoritativeJiraWorkflowEdges(
 		if explicitlyGuarded {
 			group.guardedTransitions++
 		}
-		// Do not turn incomplete source visibility into a synthetic deny rule.
-		// Only a guard that Jira explicitly reports should require review.
-		reviewLocked := explicitlyGuarded
 		guards := mapJiraWorkflowGuards(transition.Guards, principals)
+		// When the source exposes guard descriptors, the mapper decides what to
+		// recreate and what still needs review, so raw counts do not lock anything
+		// on their own. Counts-only sources (the designer API) keep the whole
+		// transition locked because the guard kind is unknown.
+		reviewLocked := explicitlyGuarded && len(transition.Guards) == 0
 		toStatusID, ok := statusMap[transition.ToStatusID]
 		if !ok {
 			continue

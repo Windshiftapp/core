@@ -49,6 +49,10 @@
     { id: 'custom_field', name: 'Custom Field' },
   ];
 
+  // user_is compares the current user against the referenced user, so the
+  // trivially-true "Current User" source is not offered.
+  const userIsSourceOptions = userSourceOptions.filter((option) => option.id !== 'current_user');
+
   // Form state
   let formData = $state({
     name: '',
@@ -89,6 +93,7 @@
   const conditionTypes = [
     { id: 'user_in_role', name: 'User in Role' },
     { id: 'user_in_group', name: 'User in Group' },
+    { id: 'user_is', name: 'User Is' },
     { id: 'field_value', name: 'Field Value' },
     { id: 'script', name: 'Script' }
   ];
@@ -311,6 +316,7 @@
       let config = {};
       if (newType === 'user_in_role') config = { source: 'current_user', role_id: null };
       else if (newType === 'user_in_group') config = { source: 'current_user', group_id: null };
+      else if (newType === 'user_is') config = { source: 'assignee' };
       else if (newType === 'field_value') config = { field_identifier: '', pattern: '' };
       else if (newType === 'script') config = { script: '', timeout_ms: 1000 };
       newConditions[condIndex] = { ...newConditions[condIndex], condition_type: newType, config, mode: newConditions[condIndex].mode || 'condition' };
@@ -372,6 +378,10 @@
           const src = c.config?.source || 'current_user';
           const group = groups.find(g => g.id === c.config?.group_id);
           return `${modePrefix}${src.replace('_', ' ')} in group "${group?.name || '?'}"`;
+        }
+        case 'user_is': {
+          const src = c.config?.source || 'assignee';
+          return `${modePrefix}Current user is ${src.replace('_', ' ')}`;
         }
         case 'field_value': return `${modePrefix}Field "${c.config?.field_identifier || '?'}" matches pattern`;
         case 'script': return `${modePrefix}Script condition`;
@@ -687,6 +697,27 @@
                                     getValue={(g) => g.id}
                                     getLabel={(g) => g.name}
                                     onSelect={(g) => updateConditionConfig(tc.transition_id, condIdx, 'group_id', g?.id || null)}
+                                  />
+                                  </FormField>
+                                </div>
+                              </div>
+                              {@render conditionUserField(cond, tc.transition_id, condIdx)}
+
+                            {:else if cond.condition_type === 'user_is'}
+                              <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                  <FormField class="contents">
+                                  <Label color="default" class="text-xs mb-1">{t('conditionSets.userEvaluated')}</Label>
+                                  <NativeSelect
+                                    value={cond.config?.source || 'assignee'}
+                                    options={userIsSourceOptions.map((option) => ({ value: option.id, label: option.name }))}
+                                    onchange={(value) => {
+                                      updateConditionConfig(tc.transition_id, condIdx, 'source', value);
+                                      if (value !== 'custom_field') {
+                                        updateConditionConfig(tc.transition_id, condIdx, 'field_id', null);
+                                      }
+                                    }}
+                                    size="small"
                                   />
                                   </FormField>
                                 </div>
