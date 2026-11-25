@@ -275,9 +275,7 @@ func (p *Parser) walkMultipart(entity *goMessage.Entity, parsed *ParsedEmail) er
 	return nil
 }
 
-// handleAttachment processes an attachment
 func (p *Parser) handleAttachment(entity *goMessage.Entity, mediaType string, parsed *ParsedEmail) error {
-	// Get filename from Content-Disposition or Content-Type
 	filename := ""
 
 	disposition, params, _ := entity.Header.ContentDisposition()
@@ -291,23 +289,24 @@ func (p *Parser) handleAttachment(entity *goMessage.Entity, mediaType string, pa
 	}
 
 	if filename == "" {
-		// Skip parts without filename (likely inline content)
-		return nil
+		if !strings.HasPrefix(mediaType, "image/") {
+			return nil
+		}
+		// Mail clients can embed a screenshot as a MIME image with no filename.
+		filename = fmt.Sprintf("image-%d", len(parsed.Attachments)+1)
+		if extensions, err := mime.ExtensionsByType(mediaType); err == nil && len(extensions) > 0 {
+			filename += extensions[0]
+		}
 	}
 
-	// Decode filename if encoded
 	dec := &mime.WordDecoder{CharsetReader: goMessage.CharsetReader}
 	if decoded, err := dec.DecodeHeader(filename); err == nil {
 		filename = decoded
 	}
 
-	// Strip control characters. On-disk we write a UUID so path traversal
-	// is already prevented, but the original filename is displayed verbatim
-	// in the UI — CR/LF/NUL/tab bytes in an attacker-crafted filename can
-	// break UI layout or set up stored-XSS if the frontend ever drops escaping.
+	// The original filename is displayed in the UI.
 	filename = sanitizeAttachmentFilename(filename)
 
-	// Read attachment data (with size limit)
 	data, err := io.ReadAll(io.LimitReader(entity.Body, p.maxAttachmentSize+1))
 	if err != nil {
 		return fmt.Errorf("failed to read attachment: %w", err)
