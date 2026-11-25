@@ -9,6 +9,7 @@
   import Trash2 from '@lucide/svelte/icons/trash-2';
   import Search from '@lucide/svelte/icons/search';
   import Button from '../components/Button.svelte';
+  import DataTable from '../components/DataTable.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Panel from '../components/Panel.svelte';
   import PageHeader from '../layout/PageHeader.svelte';
@@ -17,7 +18,8 @@
 
   /**
    * List page shared by the approval-set and condition-set managers: header,
-   * search, loading/empty/result states, and per-row edit/delete actions.
+   * search, loading/empty/result states, and a column table whose rows expose
+   * edit/delete through an actions menu.
    *
    * @type {{
    *   config: {
@@ -40,10 +42,11 @@
    *     rowTestidPrefix: string,
    *     errorLabel: string,
    *   },
-   *   meta?: import('svelte').Snippet<[any]>,
+   *   columns?: Array<any>,
+   *   cellSnippets?: Record<string, any>,
    * }}
    */
-  let { config, meta } = $props();
+  let { config, columns = [], cellSnippets = {} } = $props();
 
   let items = $state([]);
   let loading = $state(true);
@@ -59,6 +62,13 @@
         item.workflow_name?.toLowerCase().includes(query)
     );
   });
+
+  // The actions column is owned by this scaffold so every list gets the same
+  // menu trigger; callers only describe their data columns.
+  const tableColumns = $derived([
+    ...columns,
+    { key: 'actions', label: t('common.actions'), align: 'text-right' }
+  ]);
 
   onMount(async () => {
     await loadData();
@@ -101,6 +111,26 @@
       console.error(`Failed to delete ${config.errorLabel}:`, error);
       errorToast(t('dialogs.alerts.failedToDelete', { error: error.message || error }));
     }
+  }
+
+  function buildRowActions(item) {
+    return [
+      {
+        id: 'edit',
+        icon: Edit,
+        title: t('common.edit'),
+        testid: `${config.rowTestidPrefix}-edit-${item.id}`,
+        onClick: () => startEditing(item),
+      },
+      {
+        id: 'delete',
+        icon: Trash2,
+        title: t('common.delete'),
+        testid: `${config.rowTestidPrefix}-delete-${item.id}`,
+        color: 'var(--ds-text-danger)',
+        onClick: () => deleteItem(item),
+      },
+    ];
   }
 </script>
 
@@ -161,44 +191,15 @@
     />
   </Panel>
 {:else}
-  <div class="space-y-3" data-testid={config.listTestid}>
-    {#each filtered as item (item.id)}
-      <Panel padding="spacious" hoverable>
-        <div class="flex items-center justify-between" data-testid={`${config.rowTestidPrefix}-row-${item.id}`}>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-3 mb-2">
-              <h3 class="text-lg font-medium" style="color: var(--ds-text);">{item.name}</h3>
-            </div>
-
-            {#if item.description}
-              <p class="text-sm mb-3" style="color: var(--ds-text-subtle);">{item.description}</p>
-            {/if}
-
-            {@render meta?.(item)}
-          </div>
-
-          <div class="flex items-center gap-2 ml-4 flex-shrink-0">
-            <Button
-              variant="default"
-              size="small"
-              icon={Edit}
-              onclick={() => startEditing(item)}
-              dataTestid={`${config.rowTestidPrefix}-edit-${item.id}`}
-            >
-              {t('common.edit')}
-            </Button>
-            <Button
-              variant="danger-ghost"
-              size="small"
-              icon={Trash2}
-              onclick={() => deleteItem(item)}
-              dataTestid={`${config.rowTestidPrefix}-delete-${item.id}`}
-            >
-              {t('common.delete')}
-            </Button>
-          </div>
-        </div>
-      </Panel>
-    {/each}
+  <div data-testid={config.listTestid}>
+    <DataTable
+      columns={tableColumns}
+      data={filtered}
+      keyField="id"
+      actionItems={buildRowActions}
+      actionTriggerTestid={(item) => `${config.rowTestidPrefix}-actions-${item.id}`}
+      rowAttrs={(item) => ({ 'data-testid': `${config.rowTestidPrefix}-row-${item.id}` })}
+      {...cellSnippets}
+    />
   </div>
 {/if}

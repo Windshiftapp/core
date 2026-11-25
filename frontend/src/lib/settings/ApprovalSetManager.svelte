@@ -25,25 +25,36 @@
     rowTestidPrefix: 'approval-set',
     errorLabel: 'approval sets',
   };
+
+  const columns = [
+    { key: 'name', label: t('common.name'), sortable: true, slot: 'name' },
+    {
+      key: 'workflow_name',
+      label: t('approvalSets.workflow'),
+      sortable: true,
+      render: (s) => s.workflow_name || t('common.none'),
+    },
+    { key: 'gated', label: t('approvalSets.statuses'), slot: 'gated' },
+  ];
 </script>
 
-<SetListPage {config}>
-  {#snippet meta(s)}
-    <div class="flex items-center gap-4 text-sm">
-      <div class="flex items-center gap-1.5">
-        <span style="color: var(--ds-text-subtle);">{t('approvalSets.workflow')}:</span>
-        <span class="font-medium" style="color: var(--ds-text);">
-          {s.workflow_name || t('common.none')}
-        </span>
-      </div>
-      {#if (s.gated_statuses || []).length > 0}
-        <div class="flex items-center gap-1.5 flex-wrap">
-          <span style="color: var(--ds-text-subtle);">{t('approvalSets.statuses')}:</span>
-          {#each s.gated_statuses as gs (gs.status_id)}
-            <Lozenge customBg={gs.category_color || '#3b82f6'} text={gs.status_name} />
-          {/each}
-        </div>
-      {/if}
-    </div>
-  {/snippet}
-</SetListPage>
+<SetListPage {config} {columns} cellSnippets={{ name: nameCell, gated: gatedCell }} />
+
+{#snippet nameCell(s)}
+  <div>
+    <div class="font-medium" style="color: var(--ds-text);">{s.name}</div>
+    {#if s.description}
+      <div class="text-xs mt-0.5" style="color: var(--ds-text-subtle);">{s.description}</div>
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet gatedCell(s)}
+  <div class="flex items-center gap-1.5 flex-wrap">
+    {#each s.gated_statuses || [] as gs (gs.status_id)}
+      <Lozenge customBg={gs.category_color || '#3b82f6'} text={gs.status_name} />
+    {:else}
+      <span style="color: var(--ds-text-subtle);">{t('common.none')}</span>
+    {/each}
+  </div>
+{/snippet}

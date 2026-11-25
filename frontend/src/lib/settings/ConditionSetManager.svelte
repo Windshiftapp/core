@@ -26,25 +26,36 @@
     rowTestidPrefix: 'condition-set',
     errorLabel: 'condition sets',
   };
+
+  const columns = [
+    { key: 'name', label: t('common.name'), sortable: true, slot: 'name' },
+    {
+      key: 'workflow_name',
+      label: t('conditionSets.workflow'),
+      sortable: true,
+      render: (cs) => cs.workflow_name || t('common.none'),
+    },
+    { key: 'gated', label: t('conditionSets.transitions'), slot: 'gated' },
+  ];
 </script>
 
-<SetListPage {config}>
-  {#snippet meta(cs)}
-    <div class="flex items-center gap-4 text-sm">
-      <div class="flex items-center gap-1.5">
-        <span style="color: var(--ds-text-subtle);">{t('conditionSets.workflow')}:</span>
-        <span class="font-medium" style="color: var(--ds-text);">
-          {cs.workflow_name || t('common.none')}
-        </span>
-      </div>
-      {#if (cs.gated_transitions || []).length > 0}
-        <div class="flex items-center gap-1.5 flex-wrap">
-          <span style="color: var(--ds-text-subtle);">{t('conditionSets.transitions')}:</span>
-          {#each cs.gated_transitions as gt (gt.transition_id)}
-            <Lozenge color="blue" text={`${transitionFromLabel(gt)} → ${gt.to_status_name}`} />
-          {/each}
-        </div>
-      {/if}
-    </div>
-  {/snippet}
-</SetListPage>
+<SetListPage {config} {columns} cellSnippets={{ name: nameCell, gated: gatedCell }} />
+
+{#snippet nameCell(cs)}
+  <div>
+    <div class="font-medium" style="color: var(--ds-text);">{cs.name}</div>
+    {#if cs.description}
+      <div class="text-xs mt-0.5" style="color: var(--ds-text-subtle);">{cs.description}</div>
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet gatedCell(cs)}
+  <div class="flex items-center gap-1.5 flex-wrap">
+    {#each cs.gated_transitions || [] as gt (gt.transition_id)}
+      <Lozenge color="blue" text={`${transitionFromLabel(gt)} → ${gt.to_status_name}`} />
+    {:else}
+      <span style="color: var(--ds-text-subtle);">{t('common.none')}</span>
+    {/each}
+  </div>
+{/snippet}
