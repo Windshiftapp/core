@@ -200,13 +200,14 @@ func (h *JiraImportHandler) importJiraBoards(ctx context.Context, jobID, project
 		return
 	}
 	for _, board := range boards.Values {
-		config, err := client.GetBoardConfiguration(ctx, board.ID)
-		if err != nil {
-			slog.Warn("Failed to load Jira board configuration; importing minimal board collection",
+		config, configErr := client.GetBoardConfiguration(ctx, board.ID)
+		configReadFailed := configErr != nil
+		if configReadFailed {
+			slog.Warn("Failed to load Jira board configuration; importing an empty board for review",
 				slog.String("component", "jira"),
 				slog.String("project", projectKey),
 				slog.Int("boardID", board.ID),
-				slog.Any("error", err))
+				slog.Any("error", configErr))
 		}
 
 		jql := ""
@@ -228,30 +229,41 @@ func (h *JiraImportHandler) importJiraBoards(ctx context.Context, jobID, project
 				filterMeta["jira_filter_jql"] = filter.JQL
 			}
 		}
-		if strings.TrimSpace(jql) == "" && !filterReadFailed {
+		if strings.TrimSpace(jql) == "" && !filterReadFailed && !configReadFailed {
 			jql = fmt.Sprintf("project = %s", projectKey)
 		}
 
-		// A board whose filter exists but could not be read has unknown
-		// membership. Treat it as empty for review instead of widening it to
-		// project = … .
+		// A board whose configuration or filter could not be read has unknown
+		// membership, including any sub-query. Treat it as empty for review
+		// instead of widening it to project = … .
 		resolution := jiraFilterResolution{MembershipComplete: true}
-		if filterReadFailed {
+		switch {
+		case configReadFailed:
+			resolution = jiraFilterResolution{
+				QL:                 jira.UnsupportedJQLSelector(workspaceID),
+				MembershipComplete: false,
+				Unsupported:        []string{"board configuration could not be read; the filter and sub-query are unknown"},
+				Decision:           jira.JQLScopeIndeterminate,
+			}
+			h.recordJiraBoardMembershipUnknown(jobID, board.ID, workspaceID, "jira_board_configuration_unavailable",
+				"The board configuration could not be read, so its filter and sub-query are unknown and the board was imported empty for review.", config)
+		case filterReadFailed:
 			resolution = jiraFilterResolution{
 				QL:                 jira.UnsupportedJQLSelector(workspaceID),
 				MembershipComplete: false,
 				Unsupported:        []string{"board filter could not be read; membership is unknown"},
 				Decision:           jira.JQLScopeIndeterminate,
 			}
-			h.recordJiraBoardFilterFinding(jobID, board.ID, workspaceID, config)
-		} else {
+			h.recordJiraBoardMembershipUnknown(jobID, board.ID, workspaceID, "jira_board_filter_unavailable",
+				"The board's saved filter could not be read, so its membership is unknown and the board was imported empty for review.", config)
+		default:
 			resolution = resolveJiraFilterQL(jql, workspaceID, workspaceProjectKeys)
 		}
 
 		// A sub-query further restricts the board. Apply it when representable;
 		// otherwise the board stays empty for review. A board with a sub-query
 		// gets its own collection so the standalone filter keeps its membership.
-		boardSpecific := filterReadFailed
+		boardSpecific := filterReadFailed || configReadFailed
 		if config != nil && config.SubQuery != nil && strings.TrimSpace(config.SubQuery.Query) != "" {
 			boardSpecific = true
 			subQuery := strings.TrimSpace(config.SubQuery.Query)
@@ -387,16 +399,16 @@ func (h *JiraImportHandler) ensureJiraCollection(jobID, jiraID, jiraKey, name, d
 	return h.imports.EnsureCollection(jobID, jiraID, jiraKey, name, description, ql, defaultSort, workspaceID, createdByUserID, metadata)
 }
 
-// recordJiraBoardFilterFinding makes an unreadable board filter explicit. The
-// board is imported empty, and the diagnostic names the source filter so an
-// administrator can restore the predicate.
-func (h *JiraImportHandler) recordJiraBoardFilterFinding(jobID string, boardID, workspaceID int, config *jira.JiraBoardConfiguration) {
+// recordJiraBoardMembershipUnknown makes an unreadable board configuration or
+// filter explicit. The board is imported empty, and the diagnostic names the
+// source filter so an administrator can restore the predicate.
+func (h *JiraImportHandler) recordJiraBoardMembershipUnknown(jobID string, boardID, workspaceID int, code, reason string, config *jira.JiraBoardConfiguration) {
 	filterID := ""
 	if config != nil && config.Filter != nil {
 		filterID = string(config.Filter.ID)
 	}
-	_ = h.recordMapping(jobID, "fidelity_finding", fmt.Sprintf("board-filter:%d:ws%d", boardID, workspaceID), "The board's saved filter could not be read, so its membership is unknown and the board was imported empty for review.", 0, map[string]any{
-		"code":           "jira_board_filter_unavailable",
+	_ = h.recordMapping(jobID, "fidelity_finding", fmt.Sprintf("board-filter:%d:ws%d", boardID, workspaceID), reason, 0, map[string]any{
+		"code":           code,
 		"severity":       "warning",
 		"disposition":    "unavailable",
 		"jira_board_id":  boardID,

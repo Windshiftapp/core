@@ -22,6 +22,7 @@ type CollectionRecord struct {
 	Name        string
 	Description string
 	QLQuery     string
+	DefaultSort itemorder.Sort
 	WorkspaceID *int
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
@@ -389,14 +390,14 @@ func (r *CollectionRepository) GetByID(id int) (*CollectionRecord, error) {
 	var rec CollectionRecord
 	var workspaceID sql.NullInt64
 	var createdBy sql.NullInt64
-	var slug sql.NullString
+	var slug, defaultSort sql.NullString
 	err := r.db.QueryRow(`
-		SELECT id, name, COALESCE(description, ''), COALESCE(ql_query, ''), workspace_id, is_public, is_private, created_by,
+		SELECT id, name, COALESCE(description, ''), COALESCE(ql_query, ''), default_sort, workspace_id, is_public, is_private, created_by,
 		       public_slug, created_at, updated_at
 		FROM collections
 		WHERE id = ?
 	`, id).Scan(
-		&rec.ID, &rec.Name, &rec.Description, &rec.QLQuery,
+		&rec.ID, &rec.Name, &rec.Description, &rec.QLQuery, &defaultSort,
 		&workspaceID, &rec.IsPublic, &rec.IsPrivate, &createdBy,
 		&slug, &rec.CreatedAt, &rec.UpdatedAt,
 	)
@@ -406,6 +407,7 @@ func (r *CollectionRepository) GetByID(id int) (*CollectionRecord, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get collection by id: %w", err)
 	}
+	rec.DefaultSort = unmarshalCollectionSort(defaultSort.String)
 	hydrateCollectionNulls(&rec, workspaceID, createdBy)
 	if slug.Valid {
 		rec.Slug = slug.String

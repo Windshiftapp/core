@@ -609,6 +609,11 @@ func (r *ItemRepository) buildItemListPagePlan(
 		plan.countQuery = "SELECT COUNT(*) FROM items WHERE workspace_id = ? AND merged_into_item_id IS NULL"
 		plan.countArgs = workspaceArgs
 		plan.pageFromClause = "FROM items i "
+		if itemListOrderNeedsPriorities(params) {
+			// The cached workspace count stays join-free; only page selection
+			// needs the priority urgency column.
+			plan.pageFromClause = "FROM items i LEFT JOIN priorities pri ON i.priority_id = pri.id "
+		}
 		plan.pageWhereClause = "WHERE i.workspace_id = ? AND i.merged_into_item_id IS NULL"
 		plan.pageArgs = workspaceArgs
 		plan.workspaceCountID = workspaceID
@@ -1048,10 +1053,28 @@ func semanticDirection(asc bool) itemorder.Direction {
 	return itemorder.Desc
 }
 
+// itemListOrderNeedsPriorities reports whether the requested order references
+// the priorities join, so the workspace page fast path must add it.
+func itemListOrderNeedsPriorities(params ItemListParams) bool {
+	if params.SortBy == itemorder.FieldPriority {
+		return true
+	}
+	for _, term := range params.SortTerms {
+		if term.Field == itemorder.FieldPriority {
+			return true
+		}
+	}
+	return false
+}
+
 // itemSortExpression maps a target sort field to its comparable SQL expression
 // and reports whether the expression's natural order is inverted relative to
 // the semantic direction. Priority urgency is the only inverted field: a lower
 // sort_order is more urgent, while DESC means most urgent first.
+//
+// Rank maps to frac_index, the canonical manual rank the importer writes. The
+// legacy lexorank column is left NULL by the importer, so ordering by it would
+// tie every imported row and fall back to the item-ID tie-break.
 func itemSortExpression(field string) (expr string, inverted bool) {
 	switch field {
 	case itemorder.FieldPriority:
@@ -1061,7 +1084,7 @@ func itemSortExpression(field string) (expr string, inverted bool) {
 	case itemorder.FieldUpdatedAt:
 		return "i.updated_at", false
 	case itemorder.FieldRank:
-		return "i.rank", false
+		return "i.frac_index", false
 	default:
 		return "", false
 	}

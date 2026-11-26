@@ -37,7 +37,7 @@
     serializeBoardGroupBy,
   } from './boardSwimlanes.js';
   import { buildBoardConfigurationPayload } from './boardConfigPayload.js';
-  import { buildBoardColumnModel } from './boardColumnModel.js';
+  import { buildBoardColumnModel, boardSortDisablesManualReorder } from './boardColumnModel.js';
   import {
     milestoneAssignableToWorkspace,
     milestoneDropRemovals,
@@ -1973,7 +1973,7 @@
       // the displayed order is not frac_index, so a same-column drag cannot map
       // to a rank move. Cross-column drags above have already transitioned
       // status; a same-column drag is a no-op and just refreshes.
-      if (sortMode === 'bubble' || (sortMode === 'default' && collectionDefaultSortActive)) {
+      if (boardSortDisablesManualReorder(sortMode, collectionDefaultSortActive)) {
         if (isSameStatus && !wouldChangeBoardLane(preparedItem, laneTarget)) {
           infoToast(
             t('collections.manual_sort_unavailable'),

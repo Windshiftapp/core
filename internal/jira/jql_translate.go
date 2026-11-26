@@ -384,11 +384,7 @@ func translateJQLNullCheck(clause string) (string, bool) {
 	if len(m) != 4 {
 		return "", false
 	}
-	field := normalizeJQLField(m[1])
-	if field == "project" {
-		return "", false
-	}
-	qlField, _, ok := jqlFieldMapping(field)
+	qlField, ok := jqlNullCheckField(normalizeJQLField(m[1]))
 	if !ok {
 		return "", false
 	}
@@ -396,6 +392,25 @@ func translateJQLNullCheck(clause string) (string, bool) {
 		return qlField + " IS NOT NULL", true
 	}
 	return qlField + " IS NULL", true
+}
+
+// jqlNullCheckField maps an `IS [NOT] EMPTY` predicate to a target field whose
+// column is a scalar reference, so the null check has the same meaning as the
+// source. It is deliberately narrower than jqlFieldMapping: a transformed or
+// multi-value mapping (for example component -> labels:component) has no
+// equivalent null check, so it stays unsupported instead of matching the wrong
+// rows.
+func jqlNullCheckField(field string) (string, bool) {
+	switch field {
+	case "assignee", "assigneeid":
+		return "assignee", true
+	case "priority", "priorityid":
+		return "priority", true
+	case "status", "statusid":
+		return "status", true
+	default:
+		return "", false
+	}
 }
 
 // translateJQLAssigneeClause translates the viewer-relative assignee predicate.
@@ -474,10 +489,6 @@ func jqlFieldMapping(field string) (qlField string, valueMapper func(string) (st
 		}, true
 	case "key", "issuekey":
 		return "key", identity, true
-	case "assignee", "assigneeid":
-		// Only null checks reach this mapping; equality is handled by
-		// translateJQLAssigneeClause so a named user is never quoted as a literal.
-		return "assignee", identity, true
 	}
 	return "", nil, false
 }

@@ -7549,6 +7549,28 @@
                     "nullable": true,
                     "type": "integer"
                   },
+                  "default_sort": {
+                    "description": "The default sort value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "direction": {
+                          "description": "The direction value.",
+                          "type": "string"
+                        },
+                        "field": {
+                          "description": "The field value.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "direction",
+                        "field"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
                   "description": {
                     "description": "The description value.",
                     "type": "string"
@@ -36338,6 +36360,28 @@
                     "description": "The created by value.",
                     "nullable": true,
                     "type": "integer"
+                  },
+                  "default_sort": {
+                    "description": "The default sort value.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "direction": {
+                          "description": "The direction value.",
+                          "type": "string"
+                        },
+                        "field": {
+                          "description": "The field value.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "direction",
+                        "field"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
                   },
                   "description": {
                     "description": "The description value.",
