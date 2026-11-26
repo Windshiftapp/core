@@ -181,6 +181,25 @@ func (s *SQLiteDB) QueryRowContext(ctx context.Context, query string, args ...an
 	return s.DB.QueryRowContext(ctx, query, args...)
 }
 
+// QueryReadContext executes a known read-only statement on the reader pool.
+// Callers use this for reads whose text the classifier cannot resolve in
+// their favor (a leading WITH is treated as a write there so a
+// write-returning CTE cannot slip onto a reader). Only pass statements that
+// do not modify data: a write sent here loses single-writer serialization.
+func (s *SQLiteDB) QueryReadContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	rows, err := s.DB.QueryContext(ctx, query, toUTCArgs(args)...)
+	if err == nil {
+		ObserveRequestQuerySuccess()
+	}
+	return rows, err
+}
+
+// QueryRowReadContext executes a known read-only statement on the reader
+// pool. Same contract as QueryReadContext.
+func (s *SQLiteDB) QueryRowReadContext(ctx context.Context, query string, args ...any) *sql.Row {
+	return s.DB.QueryRowContext(ctx, query, toUTCArgs(args)...)
+}
+
 // ExecContext executes a query with context that doesn't return rows
 // Always uses write connection for safety (all Exec operations are writes)
 func (s *SQLiteDB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {

@@ -71,7 +71,7 @@ func (r *ItemRepository) HasChildrenByItemIDContext(ctx context.Context, itemIDs
 		for _, id := range workspaceIDs {
 			args = append(args, id)
 		}
-		rows, err := r.db.QueryContext(ctx,
+		rows, err := r.db.QueryReadContext(ctx,
 			"SELECT DISTINCT parent_id FROM items WHERE parent_id IN ("+placeholders+
 				") AND workspace_id IN ("+wsPlaceholders+") AND merged_into_item_id IS NULL",
 			args...)
@@ -104,7 +104,7 @@ func (r *ItemRepository) CountByHierarchyLevelContext(ctx context.Context, param
 		` LEFT JOIN hierarchy_levels hl ON hl.level = COALESCE(it.hierarchy_level, 0) ` +
 		whereClause +
 		` GROUP BY COALESCE(it.hierarchy_level, 0), hl.name ORDER BY level`
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	rows, err := r.db.QueryReadContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count hierarchy levels: %w", err)
 	}
@@ -192,7 +192,7 @@ func (r *ItemRepository) HierarchyDescendantsContext(ctx context.Context, params
 		" JOIN page ON page.id = i.id" +
 		" ORDER BY page.root_id, page.depth, i.frac_index"
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	rows, err := r.db.QueryReadContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query hierarchy descendants: %w", err)
 	}
