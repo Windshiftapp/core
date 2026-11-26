@@ -53,7 +53,7 @@ func (r *ItemRepository) OverviewChartBuckets(ctx context.Context, q OverviewCha
 		buckets = append(buckets, bucket)
 	}
 	read := func(query string, queryArgs []any, completed bool) error {
-		rows, err := r.db.QueryContext(ctx, query, queryArgs...)
+		rows, err := r.db.QueryReadContext(ctx, query, queryArgs...)
 		if err != nil {
 			return fmt.Errorf("aggregate overview charts: %w", err)
 		}

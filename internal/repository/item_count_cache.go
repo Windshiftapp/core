@@ -89,7 +89,7 @@ func cachedItemListCount(ctx context.Context, db database.Database, workspaceID 
 		loadCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), itemListCountCacheLoadTimeout)
 		defer cancel()
 		var count int
-		if err := db.QueryRowContext(loadCtx, query, args...).Scan(&count); err != nil {
+		if err := db.QueryRowReadContext(loadCtx, query, args...).Scan(&count); err != nil {
 			return 0, err
 		}
 

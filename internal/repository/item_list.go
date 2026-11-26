@@ -326,7 +326,7 @@ func (r *ItemRepository) FindAllWithDetailsPageContext(ctx context.Context, para
 		if err != nil {
 			return ItemListPage{}, fmt.Errorf("failed to count items: %w", err)
 		}
-	} else if err := r.db.QueryRowContext(ctx, pagePlan.countQuery, pagePlan.countArgs...).Scan(&total); err != nil {
+	} else if err := r.db.QueryRowReadContext(ctx, pagePlan.countQuery, pagePlan.countArgs...).Scan(&total); err != nil {
 		return ItemListPage{}, fmt.Errorf("failed to count items: %w", err)
 	}
 
@@ -390,7 +390,7 @@ func (r *ItemRepository) FindAllWithDetailsPageContext(ctx context.Context, para
 	// transition lookup.
 	pageQuery := "WITH page_items AS (" + itemListPageIDQuery(pagePlan, orderByClause, fetchLimit, offset) + ") "
 	fullQuery := pageQuery + selectClause + fromClause + " JOIN page_items page ON page.id = i.id" + orderByClause
-	rows, err := pageQueryer.QueryContext(ctx, fullQuery, pagePlan.pageArgs...)
+	rows, err := queryItemListPage(ctx, pageQueryer, fullQuery, pagePlan.pageArgs...)
 	if err != nil {
 		return ItemListPage{}, fmt.Errorf("failed to query items: %w", err)
 	}
@@ -441,7 +441,7 @@ func (r *ItemRepository) FindIDPageContext(ctx context.Context, params ItemListP
 		if err != nil {
 			return ItemIDPage{}, fmt.Errorf("failed to count item ids: %w", err)
 		}
-	} else if err := r.db.QueryRowContext(ctx, plan.countQuery, plan.countArgs...).Scan(&total); err != nil {
+	} else if err := r.db.QueryRowReadContext(ctx, plan.countQuery, plan.countArgs...).Scan(&total); err != nil {
 		return ItemIDPage{}, fmt.Errorf("failed to count item ids: %w", err)
 	}
 
@@ -455,7 +455,7 @@ func (r *ItemRepository) FindIDPageContext(ctx context.Context, params ItemListP
 	offset := max(params.Pagination.Offset, 0)
 	query := itemListPageIDQuery(plan, r.buildOrderByClause(params), limit, offset)
 
-	rows, err := r.db.QueryContext(ctx, query, plan.pageArgs...)
+	rows, err := r.db.QueryReadContext(ctx, query, plan.pageArgs...)
 	if err != nil {
 		return ItemIDPage{}, fmt.Errorf("failed to query item ids: %w", err)
 	}
@@ -527,6 +527,22 @@ func decodeItemListCursor(raw string) (itemListCursor, error) {
 
 type itemListPageQueryer interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+// itemListReadQueryer is implemented by database.Database (reader pool) but
+// not by a transaction, which already owns its connection and snapshot.
+type itemListReadQueryer interface {
+	QueryReadContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+// queryItemListPage runs a list read on the reader pool when the queryer is
+// the database. A cursor continuation runs in a read transaction, which
+// already owns its connection and snapshot, so it keeps its own QueryContext.
+func queryItemListPage(ctx context.Context, queryer itemListPageQueryer, query string, args ...any) (*sql.Rows, error) {
+	if reader, ok := queryer.(itemListReadQueryer); ok {
+		return reader.QueryReadContext(ctx, query, args...)
+	}
+	return queryer.QueryContext(ctx, query, args...)
 }
 
 func beginItemListCursorTransaction(ctx context.Context, db database.Database) (database.Tx, error) {
@@ -632,7 +648,7 @@ func (r *ItemRepository) FindDistinctWorkspaceIDsContext(ctx context.Context, pa
 		` + ItemListFilterFromClause() + whereClause + `
 		ORDER BY i.workspace_id`
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	rows, err := r.db.QueryReadContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query distinct item workspaces: %w", err)
 	}
@@ -951,7 +967,7 @@ func (r *ItemRepository) CountQLQueries(ctx context.Context, workspaceIDs []int,
 		fmt.Fprintf(&builder, "SELECT %d AS idx, COUNT(*) AS n %s %s", i, from, where)
 		args = append(args, whereArgs...)
 	}
-	rows, err := r.db.QueryContext(ctx, builder.String(), args...)
+	rows, err := r.db.QueryReadContext(ctx, builder.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("count queue queries: %w", err)
 	}
@@ -1292,7 +1308,7 @@ func (r *ItemRepository) GetBacklogStatusIDsContext(ctx context.Context, workspa
 	}
 	if scopeID > 0 {
 		var backlogStatusIDsJSON sql.NullString
-		err := r.db.QueryRowContext(ctx, `
+		err := r.db.QueryRowReadContext(ctx, `
 			SELECT backlog_status_ids
 			FROM board_configurations
 			WHERE `+scopeColumn+` = ?
@@ -1313,7 +1329,7 @@ func (r *ItemRepository) GetBacklogStatusIDsContext(ctx context.Context, workspa
 	}
 
 	// Fall back to global "Open" statuses only (not "In Progress")
-	rows, err := r.db.QueryContext(ctx, `
+	rows, err := r.db.QueryReadContext(ctx, `
 		SELECT DISTINCT s.id
 		FROM statuses s
 		JOIN status_categories sc ON s.category_id = sc.id

@@ -53,6 +53,18 @@ type Database interface {
 	// QueryRowContext executes a query with context that returns at most one row
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 
+	// QueryReadContext executes a known read-only query with context.
+	// For SQLite: always uses the reader pool, bypassing the statement-text
+	// classifier that QueryContext needs for row-returning writes.
+	// For PostgreSQL: uses the shared pool.
+	// Callers must only pass statements that do not modify data; a write sent
+	// here would lose SQLite's single-writer serialization.
+	QueryReadContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+
+	// QueryRowReadContext executes a known read-only query with context that
+	// returns at most one row. Same routing contract as QueryReadContext.
+	QueryRowReadContext(ctx context.Context, query string, args ...any) *sql.Row
+
 	// ExecContext executes a query with context that doesn't return rows
 	// For SQLite: routes to write connection for safety
 	// For PostgreSQL: uses standard connection pool

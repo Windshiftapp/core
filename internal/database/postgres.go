@@ -472,6 +472,18 @@ func (p *PostgresDB) QueryRowContext(ctx context.Context, query string, args ...
 	return p.db.QueryRowContext(ctx, query, args...)
 }
 
+// QueryReadContext executes a known read-only query with context. PostgreSQL
+// has a single MVCC pool, so this is the same as QueryContext.
+func (p *PostgresDB) QueryReadContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return p.QueryContext(ctx, query, args...)
+}
+
+// QueryRowReadContext executes a known read-only query with context that
+// returns at most one row. Same single pool as QueryRowContext.
+func (p *PostgresDB) QueryRowReadContext(ctx context.Context, query string, args ...any) *sql.Row {
+	return p.QueryRowContext(ctx, query, args...)
+}
+
 // ExecContext executes a query with context that doesn't return rows
 func (p *PostgresDB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	query = ConvertPlaceholders(query)
