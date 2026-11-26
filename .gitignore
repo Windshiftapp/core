@@ -18,32 +18,14 @@ cx
 /data/
 
 # Test sources live in the adjacent private core-tests repository and are
-# overlaid onto this checkout by its runners.
+# overlaid onto this checkout by its runners. Never add tests, fixtures, mocks
+# or test-only helpers here.
 *_test.go
-!/internal/database/gitlab_schema_test.go
-!/internal/scm/gitlab_test.go
-!/internal/services/planning_milestones_release_test.go
-!/internal/utils/repository_path_test.go
 *_test.sh
 *.test.js
 *.test.ts
 *.spec.js
 *.spec.ts
-
-# Public regression coverage for the locale runtime ships with the implementation.
-!frontend/src/lib/stores/calendar.spec.js
-!internal/services/calendar_preferences_test.go
-!internal/restapi/v2/calendar_preferences_test.go
-!frontend/src/lib/stores/i18n-utils.spec.js
-!frontend/src/lib/mobile/mobile-i18n.spec.js
-!frontend/scripts/hardcoded-i18n-ast.spec.js
-!frontend/src/lib/api/integrations.spec.js
-# Email-origin request classification (WI-2365): the internal-note control must
-# stay available on helpdesk-email requests, so this helper is covered in-tree.
-!frontend/src/lib/utils/requestOrigin.spec.js
-!frontend/src/lib/features/items/zammadPanelContext.spec.js
-!frontend/src/lib/features/items/ZammadLinkResolver.spec.js
-!internal/repository/zammad_repository_test.go
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out

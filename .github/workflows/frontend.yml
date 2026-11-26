@@ -74,8 +74,8 @@ jobs:
       - name: Run Svelte typecheck
         run: npm run typecheck
 
-      - name: Run frontend tests
-        run: npm run test:run
+      # Unit tests live in the private core-tests repository and run there
+      # against this checkout; this repository ships no test sources.
 
   build:
     name: Build
