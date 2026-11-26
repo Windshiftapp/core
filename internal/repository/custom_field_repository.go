@@ -167,7 +167,7 @@ func (r *CustomFieldRepository) Create(cf *models.CustomFieldDefinition, now tim
 	cf.FieldType = models.CanonicalCustomFieldType(cf.FieldType)
 	var id int64
 	//nolint:misspell // database uses British spelling (applies_to_customer_organisations)
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO custom_field_definitions (name, field_type, description, required, options, display_order,
 		                                       applies_to_portal_customers, applies_to_customer_organisations,
 		                                       created_at, updated_at)
@@ -185,7 +185,7 @@ func (r *CustomFieldRepository) Create(cf *models.CustomFieldDefinition, now tim
 func (r *CustomFieldRepository) CreateMirror(name, optionsJSON string, now time.Time) (int64, error) {
 	var id int64
 	//nolint:misspell // database uses British spelling
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO custom_field_definitions (name, field_type, description, required, options, display_order,
 		                                       applies_to_portal_customers, applies_to_customer_organisations,
 		                                       created_at, updated_at)

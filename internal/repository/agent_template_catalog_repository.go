@@ -125,7 +125,7 @@ func (r *AgentTemplateCatalogRepository) Create(ctx context.Context, entry *mode
 	if entry.DefaultType == "" {
 		entry.DefaultType = models.AgentProfileStandard
 	}
-	err := r.db.QueryRowContext(ctx, `
+	err := r.db.QueryRowWriteContext(ctx, `
 		INSERT INTO agent_template_catalog (template_key, name, default_type, instructions, enabled, created_by_user_id)
 		VALUES (?, ?, ?, ?, ?, ?)
 		RETURNING id, created_at, updated_at
@@ -145,7 +145,7 @@ func (r *AgentTemplateCatalogRepository) Create(ctx context.Context, entry *mode
 
 // Update applies a partial update to an existing override row by id.
 func (r *AgentTemplateCatalogRepository) Update(ctx context.Context, entry *models.AgentTemplateCatalogEntry) error {
-	err := r.db.QueryRowContext(ctx, `
+	err := r.db.QueryRowWriteContext(ctx, `
 		UPDATE agent_template_catalog
 		SET name = ?, default_type = ?, instructions = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?

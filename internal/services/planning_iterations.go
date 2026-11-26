@@ -261,7 +261,7 @@ func (s *PlanningService) CreateIteration(params CreateIterationParams) (*Iterat
 	}
 
 	var id int64
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowWrite(`
 		INSERT INTO iterations (name, description, start_date, end_date, status, type_id, is_global, workspace_id)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, params.Name, params.Description, params.StartDate, params.EndDate, params.Status, params.TypeID, params.IsGlobal, params.WorkspaceID).Scan(&id)

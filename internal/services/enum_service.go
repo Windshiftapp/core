@@ -288,7 +288,7 @@ func (s *EnumService) Create(entity any, r *http.Request) (EnumEntity, error) {
 
 	query += " RETURNING id"
 	var id int64
-	err := s.db.QueryRow(query, args...).Scan(&id)
+	err := s.db.QueryRowWrite(query, args...).Scan(&id)
 	if err != nil {
 		// Check for unique constraint violation (database-level)
 		if database.IsUniqueConstraintError(err) {

@@ -36,6 +36,8 @@ type workspaceAgentSkillStore interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryRowWrite(query string, args ...any) *sql.Row
+	QueryRowWriteContext(ctx context.Context, query string, args ...any) *sql.Row
 	ExecWrite(query string, args ...any) (sql.Result, error)
 	ExecWriteContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
@@ -77,7 +79,7 @@ func scanSkill(scanner interface{ Scan(...any) error }) (*models.WorkspaceAgentS
 // Insert persists a new skill and returns its id.
 func (r *WorkspaceAgentSkillRepository) Insert(ctx context.Context, s *models.WorkspaceAgentSkill) (int, error) {
 	var id int64
-	err := r.db.QueryRowContext(ctx, `
+	err := r.db.QueryRowWriteContext(ctx, `
 		INSERT INTO workspace_agent_skills (workspace_id, name, description, body, enabled, created_by_user_id)
 		VALUES (?, ?, ?, ?, ?, ?)
 		RETURNING id

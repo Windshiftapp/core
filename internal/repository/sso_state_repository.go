@@ -77,7 +77,7 @@ func (r *SSOStateRepository) Delete(id int) error {
 func (r *SSOStateRepository) Consume(state string, providerID int, now time.Time) (*SSOStateToken, error) {
 	var token SSOStateToken
 	var nonce sql.NullString
-	err := r.db.QueryRow(`DELETE FROM sso_state_tokens
+	err := r.db.QueryRowWrite(`DELETE FROM sso_state_tokens
 		WHERE state = ? AND provider_id = ? AND expires_at > ?
 		RETURNING id, nonce, redirect_uri, remember_me, resource_kind, resource_id`, state, providerID, now).
 		Scan(&token.ID, &nonce, &token.RedirectURI, &token.RememberMe, &token.ResourceKind, &token.ResourceID)

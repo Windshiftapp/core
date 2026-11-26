@@ -137,7 +137,7 @@ func (r *TimeProjectCategoryRepository) Create(c *models.TimeProjectCategory) er
 
 	now := time.Now()
 	var id int64
-	err = r.db.QueryRow(`
+	err = r.db.QueryRowWrite(`
 		INSERT INTO time_project_categories (name, description, color, display_order, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
 	`, c.Name, c.Description, c.Color, displayOrder, now, now).Scan(&id)

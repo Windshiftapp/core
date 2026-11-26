@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -49,38 +48,6 @@ func toUTCArgs(args []any) []any {
 	return out
 }
 
-// writeQueryPrefixes are statement starts that always need the dedicated
-// write connection. WITH is included as an accepted false-positive: a
-// read-only CTE will get routed to the writer (cheap, harmless), but a
-// write-returning CTE that wasn't routed (the old behavior) would lose
-// single-writer serialization (expensive, broken).
-var writeQueryPrefixes = []string{
-	"INSERT",
-	"UPDATE",
-	"DELETE",
-	"REPLACE",
-	"MERGE",
-	"WITH",
-	"CREATE",
-	"ALTER",
-	"DROP",
-	"VACUUM",
-	"TRUNCATE",
-}
-
-// isWriteQuery returns true if the query is a write operation. SQLite's
-// single-writer model means we must route writes through the dedicated
-// write connection; missing a write here silently loses serialization.
-func isWriteQuery(query string) bool {
-	trimmed := strings.ToUpper(strings.TrimSpace(query))
-	for _, p := range writeQueryPrefixes {
-		if strings.HasPrefix(trimmed, p) {
-			return true
-		}
-	}
-	return false
-}
-
 // SQLiteDB wraps the existing DB struct to implement the Database interface
 type SQLiteDB struct {
 	*DB
@@ -120,7 +87,9 @@ func (s *SQLiteDB) GetDriverName() string {
 	return "sqlite"
 }
 
-// Query executes a query that returns rows
+// Query executes a read-only query that returns rows. Reader connections run
+// with query_only=ON, so a write sent here fails instead of bypassing the
+// writer. Use QueryWrite or QueryWriteContext for row-returning writes.
 func (s *SQLiteDB) Query(query string, args ...any) (*sql.Rows, error) {
 	rows, err := s.DB.Query(query, toUTCArgs(args)...)
 	if err == nil {
@@ -129,16 +98,25 @@ func (s *SQLiteDB) Query(query string, args ...any) (*sql.Rows, error) {
 	return rows, err
 }
 
-// QueryRow executes a query that returns at most one row.
-// Write queries (INSERT/UPDATE/DELETE) are routed through the dedicated write
-// connection so that INSERT ... RETURNING does not race with other writers.
-// last review: ser, 210426, OPTIMIZE: Check whether the write fallback is still needed
+// QueryRow executes a read-only query that returns at most one row. See Query.
 func (s *SQLiteDB) QueryRow(query string, args ...any) *sql.Row {
-	args = toUTCArgs(args)
-	if isWriteQuery(query) {
-		return s.writeConn.QueryRow(query, args...)
+	return s.DB.QueryRow(query, toUTCArgs(args)...)
+}
+
+// QueryWrite executes a write statement that returns rows on the dedicated
+// write connection, so INSERT ... RETURNING does not race with other writers.
+func (s *SQLiteDB) QueryWrite(query string, args ...any) (*sql.Rows, error) {
+	rows, err := s.writeConn.Query(query, toUTCArgs(args)...)
+	if err == nil {
+		ObserveRequestQuerySuccess()
 	}
-	return s.DB.QueryRow(query, args...)
+	return rows, err
+}
+
+// QueryRowWrite executes a write statement that returns at most one row on the
+// dedicated write connection.
+func (s *SQLiteDB) QueryRowWrite(query string, args ...any) *sql.Row {
+	return s.writeConn.QueryRow(query, toUTCArgs(args)...)
 }
 
 // Exec executes a query that doesn't return rows
@@ -151,41 +129,39 @@ func (s *SQLiteDB) Exec(query string, args ...any) (sql.Result, error) {
 	return result, err
 }
 
-// QueryContext executes a query with context that returns rows.
-// Write-returning queries (e.g. WITH ... INSERT/UPDATE/DELETE ... RETURNING)
-// must route through the write connection so they don't lose single-writer
-// serialization. Mirrors QueryRowContext, which already applies isWriteQuery.
+// QueryContext executes a read-only query with context that returns rows.
 func (s *SQLiteDB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	args = toUTCArgs(args)
-	var rows *sql.Rows
-	var err error
-	if isWriteQuery(query) {
-		rows, err = s.writeConn.QueryContext(ctx, query, args...)
-	} else {
-		rows, err = s.DB.QueryContext(ctx, query, args...)
-	}
+	rows, err := s.DB.QueryContext(ctx, query, toUTCArgs(args)...)
 	if err == nil {
 		ObserveRequestQuerySuccess()
 	}
 	return rows, err
 }
 
-// QueryRowContext executes a query with context that returns at most one row.
-// Write queries (INSERT/UPDATE/DELETE) are routed through the dedicated write
-// connection so that INSERT ... RETURNING does not race with other writers.
+// QueryRowContext executes a read-only query with context that returns at most
+// one row.
 func (s *SQLiteDB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
-	args = toUTCArgs(args)
-	if isWriteQuery(query) {
-		return s.writeConn.QueryRowContext(ctx, query, args...)
+	return s.DB.QueryRowContext(ctx, query, toUTCArgs(args)...)
+}
+
+// QueryWriteContext executes a write statement that returns rows with context
+// on the dedicated write connection.
+func (s *SQLiteDB) QueryWriteContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	rows, err := s.writeConn.QueryContext(ctx, query, toUTCArgs(args)...)
+	if err == nil {
+		ObserveRequestQuerySuccess()
 	}
-	return s.DB.QueryRowContext(ctx, query, args...)
+	return rows, err
+}
+
+// QueryRowWriteContext executes a write statement that returns at most one row
+// with context on the dedicated write connection.
+func (s *SQLiteDB) QueryRowWriteContext(ctx context.Context, query string, args ...any) *sql.Row {
+	return s.writeConn.QueryRowContext(ctx, query, toUTCArgs(args)...)
 }
 
 // QueryReadContext executes a known read-only statement on the reader pool.
-// Callers use this for reads whose text the classifier cannot resolve in
-// their favor (a leading WITH is treated as a write there so a
-// write-returning CTE cannot slip onto a reader). Only pass statements that
-// do not modify data: a write sent here loses single-writer serialization.
+// Reader connections enforce it with query_only=ON.
 func (s *SQLiteDB) QueryReadContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	rows, err := s.DB.QueryContext(ctx, query, toUTCArgs(args)...)
 	if err == nil {
@@ -194,8 +170,8 @@ func (s *SQLiteDB) QueryReadContext(ctx context.Context, query string, args ...a
 	return rows, err
 }
 
-// QueryRowReadContext executes a known read-only statement on the reader
-// pool. Same contract as QueryReadContext.
+// QueryRowReadContext executes a known read-only statement on the reader pool.
+// Same contract as QueryReadContext.
 func (s *SQLiteDB) QueryRowReadContext(ctx context.Context, query string, args ...any) *sql.Row {
 	return s.DB.QueryRowContext(ctx, query, toUTCArgs(args)...)
 }

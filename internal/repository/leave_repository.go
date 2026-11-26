@@ -179,7 +179,7 @@ func (r *LeaveRepository) IsUserOnLeave(userID int) (isOnLeave bool, substituteP
 func (r *LeaveRepository) Create(userID int, substituteUserID *int, startDate, endDate, reason string) (int, error) {
 	now := time.Now()
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO user_leave_periods (user_id, substitute_user_id, start_date, end_date, reason, is_active, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, true, ?, ?) RETURNING id
 	`, userID, substituteUserID, startDate, endDate, reason, now, now).Scan(&id)

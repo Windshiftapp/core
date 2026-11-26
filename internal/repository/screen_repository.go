@@ -259,7 +259,7 @@ func (r *ScreenRepository) ensureImportedFieldScreen(
 	err := r.db.QueryRow("SELECT id FROM screens WHERE name = ?", name).Scan(&screenID)
 	if errors.Is(err, sql.ErrNoRows) {
 		var newID int64
-		if err := r.db.QueryRow(`
+		if err := r.db.QueryRowWrite(`
 			INSERT INTO screens (name, description, created_at, updated_at)
 			VALUES (?, 'Imported Jira field layout', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 			RETURNING id

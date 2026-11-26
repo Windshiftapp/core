@@ -303,7 +303,7 @@ func (s *CustomerOrganisationPermissionService) AddManager(customerOrgID int, ma
 	}
 
 	var id int64
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowWrite(`
 		INSERT INTO customer_organisation_managers (customer_organisation_id, manager_type, manager_id, granted_by)
 		VALUES (?, ?, ?, ?) RETURNING id
 	`, customerOrgID, managerType, managerID, grantedBy).Scan(&id)
@@ -339,7 +339,7 @@ func (s *CustomerOrganisationPermissionService) AddMember(customerOrgID int, mem
 	}
 
 	var id int64
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowWrite(`
 		INSERT INTO customer_organisation_members (customer_organisation_id, member_type, member_id, granted_by)
 		VALUES (?, ?, ?, ?) RETURNING id
 	`, customerOrgID, memberType, memberID, grantedBy).Scan(&id)

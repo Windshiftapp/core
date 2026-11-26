@@ -45,7 +45,7 @@ type postgresSeedWriter struct{ Tx }
 
 func (p postgresSeedWriter) insertReturningID(query string, args ...any) (int64, error) {
 	var id int64
-	err := p.QueryRow(query+" RETURNING id", args...).Scan(&id)
+	err := p.QueryRowWrite(query+" RETURNING id", args...).Scan(&id)
 	return id, err
 }
 

@@ -25,6 +25,7 @@ type userExecutor interface {
 	QueryRow(string, ...any) *sql.Row
 	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 	QueryRowContext(context.Context, string, ...any) *sql.Row
+	QueryRowWrite(string, ...any) *sql.Row
 	ExecWrite(string, ...any) (sql.Result, error)
 }
 
@@ -592,7 +593,7 @@ func (r *UserRepository) Create(p CreateUserParams) (int64, error) {
 		provenance = "user"
 	}
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO users (email, username, first_name, last_name, is_active, avatar_url, password_hash, requires_password_reset, is_agent, email_verified, agent_owner_user_id, agent_provenance, oauth_client_id, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, p.Email, p.Username, p.FirstName, p.LastName, p.IsActive,

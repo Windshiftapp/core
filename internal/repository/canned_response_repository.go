@@ -79,7 +79,7 @@ func (r *CannedResponseRepository) Create(cr *models.CannedResponse) (*models.Ca
 	now := time.Now()
 	cr.CreatedAt, cr.UpdatedAt = now, now
 	var id int
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO canned_responses
 			(workspace_id, name, body, is_private, is_active, created_by, updated_by, used_count, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?) RETURNING id

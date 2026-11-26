@@ -122,6 +122,7 @@ func (r *RequestTypeRepository) GetEmailIntakeForChannel(channelID int) (*models
 // import ensure path can run inside one transaction.
 type requestTypeStore interface {
 	QueryRow(query string, args ...any) *sql.Row
+	QueryRowWrite(query string, args ...any) *sql.Row
 	ExecWrite(query string, args ...any) (sql.Result, error)
 }
 
@@ -305,7 +306,7 @@ func (r *RequestTypeRepository) CreateTx(tx database.Tx, rt *models.RequestType)
 func createRequestType(store requestTypeStore, rt *models.RequestType) (int64, error) {
 	now := time.Now()
 	var id int64
-	err := store.QueryRow(`
+	err := store.QueryRowWrite(`
 		INSERT INTO request_types (channel_id, name, description, item_type_id, icon, color, display_order, is_active, visibility_group_ids, visibility_org_ids, workspace_id, title_template, kind, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, rt.ChannelID, rt.Name, rt.Description, rt.ItemTypeID, rt.Icon, rt.Color, rt.DisplayOrder, rt.IsActive,

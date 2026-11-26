@@ -120,7 +120,7 @@ func (s *SessionStore) getSession(sessionID, sessionType string, ownerID *int) (
 	}
 	query += ` RETURNING session_data, expires_at`
 
-	err := s.db.QueryRow(query, args...).Scan(&sessionJSON, &expiresAt)
+	err := s.db.QueryRowWrite(query, args...).Scan(&sessionJSON, &expiresAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("session not found")
 	}

@@ -299,7 +299,7 @@ func (r *SCMWorkspaceRepository) GetConnectionWorkspaceAndProvider(connID int) (
 // Empty patterns are stored as NULL.
 func (r *SCMWorkspaceRepository) CreateConnection(workspaceID, scmProviderID int, defaultBranchPattern, itemKeyPattern string, createdBy *int) (int, error) {
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO workspace_scm_connections (
 			workspace_id, scm_provider_id, enabled,
 			default_branch_pattern, item_key_pattern, created_by
@@ -523,7 +523,7 @@ func (r *SCMWorkspaceRepository) ListConnectionAuthStatusesForWorkspace(workspac
 // LinkRepository links a repository to a connection and returns the new row id.
 func (r *SCMWorkspaceRepository) LinkRepository(connID int, externalID, name, url, defaultBranch string) (int, error) {
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO workspace_repositories (
 			workspace_scm_connection_id, repository_external_id,
 			repository_name, repository_url, default_branch, is_active

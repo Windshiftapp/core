@@ -1722,7 +1722,7 @@ func (s *SyncService) CreateItemSCMLink(ctx context.Context, itemID, workspaceRe
 	}
 
 	var linkID int
-	err = s.db.QueryRowContext(ctx, `
+	err = s.db.QueryRowWriteContext(ctx, `
 		INSERT INTO item_scm_links (
 			item_id, workspace_repository_id, link_type, external_id,
 			external_url, title, state, detection_source, created_at, updated_at

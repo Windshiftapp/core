@@ -326,6 +326,7 @@ func (tm *TokenManager) CreatePreparedTokenInTx(tx database.Tx, userID int, requ
 
 type tokenRowStore interface {
 	QueryRow(query string, args ...any) *sql.Row
+	QueryRowWrite(query string, args ...any) *sql.Row
 }
 
 func checkTokenUser(store tokenRowStore, userID int) error {
@@ -363,7 +364,7 @@ func (tm *TokenManager) insertPreparedToken(store tokenRowStore, userID int, req
 
 	// RETURNING is supported by both SQLite 3.35+ and PostgreSQL.
 	var tokenID int64
-	err = store.QueryRow(`
+	err = store.QueryRowWrite(`
 		INSERT INTO api_tokens (
 			user_id, name, token_hash, token_prefix, permissions, expires_at,
 			is_temporary, oauth_client_id, oauth_resource

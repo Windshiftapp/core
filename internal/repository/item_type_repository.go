@@ -288,7 +288,7 @@ func (r *ItemTypeRepository) ConfigurationSetExists(id int) (bool, error) {
 func (r *ItemTypeRepository) Create(it *models.ItemType, configSetIDs []int) (int, error) {
 	now := time.Now()
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO item_types (name, description, is_default, icon, color, hierarchy_level, sort_order, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, it.Name, it.Description, it.IsDefault, it.Icon, it.Color, it.HierarchyLevel, it.SortOrder, now, now).Scan(&id)

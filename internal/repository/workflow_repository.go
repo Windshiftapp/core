@@ -133,7 +133,7 @@ func (r *WorkflowRepository) NameExistsExcluding(name string, excludeID int) (bo
 func (r *WorkflowRepository) Create(name, description string, isDefault bool) (int, error) {
 	now := time.Now()
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO workflows (name, description, is_default, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?) RETURNING id
 	`, name, description, isDefault, now, now).Scan(&id)

@@ -422,7 +422,7 @@ func (r *WorkspaceRoleRepository) WorkspaceName(workspaceID int) string {
 // display order. Returns the new role id.
 func (r *WorkspaceRoleRepository) CreateCustomRole(name, description string, now time.Time) (int, error) {
 	var id64 int64
-	if err := r.db.QueryRow(`
+	if err := r.db.QueryRowWrite(`
 		INSERT INTO workspace_roles (name, description, is_system, permissions_enabled, display_order, created_at, updated_at)
 		VALUES (?, ?, false, false, COALESCE((SELECT MAX(display_order) + 1 FROM workspace_roles), 1), ?, ?)
 		RETURNING id

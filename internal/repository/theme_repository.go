@@ -98,7 +98,7 @@ func (r *ThemeRepository) Create(req models.ThemeCreateRequest, now time.Time) (
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`
 	var id int
-	if err := r.db.QueryRow(query, req.Name, req.Description, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark, req.LogoURL, req.LogoURLDark, req.LogoFullURL, req.LogoFullURLDark, req.BrandLayout, now, now).Scan(&id); err != nil {
+	if err := r.db.QueryRowWrite(query, req.Name, req.Description, req.NavBackgroundColorLight, req.NavTextColorLight, req.NavBackgroundColorDark, req.NavTextColorDark, req.LogoURL, req.LogoURLDark, req.LogoFullURL, req.LogoFullURLDark, req.BrandLayout, now, now).Scan(&id); err != nil {
 		return 0, fmt.Errorf("create theme: %w", err)
 	}
 	return id, nil

@@ -224,7 +224,7 @@ func (r *AssetActionRepository) populateNodesAndEdges(actions []*models.AssetAct
 // Create creates a new asset action
 func (r *AssetActionRepository) Create(action *models.AssetAction) (int, error) {
 	var id int
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO asset_actions (set_id, name, description, is_enabled, trigger_type, trigger_config, created_by, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
@@ -370,7 +370,7 @@ func (r *AssetActionRepository) GetEdgesByActionID(actionID int) ([]models.Asset
 // CreateNode inserts a single asset action node and returns its id.
 func (r *AssetActionRepository) CreateNode(node models.AssetActionNode) (int, error) {
 	var id int
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO asset_action_nodes (action_id, node_type, node_config, position_x, position_y, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
 	`, node.ActionID, node.NodeType, node.NodeConfig, node.PositionX, node.PositionY).Scan(&id)
@@ -383,7 +383,7 @@ func (r *AssetActionRepository) CreateNode(node models.AssetActionNode) (int, er
 // CreateEdge inserts a single asset action edge and returns its id.
 func (r *AssetActionRepository) CreateEdge(edge models.AssetActionEdge) (int, error) {
 	var id int
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO asset_action_edges (action_id, source_node_id, target_node_id, edge_type, source_handle, target_handle, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) RETURNING id
 	`, edge.ActionID, edge.SourceNodeID, edge.TargetNodeID, edge.EdgeType, edge.SourceHandle, edge.TargetHandle).Scan(&id)
@@ -420,7 +420,7 @@ func (r *AssetActionRepository) SaveActionWithNodesAndEdges(action *models.Asset
 // CreateExecutionLog creates a new asset action execution log entry
 func (r *AssetActionRepository) CreateExecutionLog(log *models.AssetActionExecutionLog) (int, error) {
 	var id int
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO asset_action_execution_logs (action_id, asset_id, trigger_event, status, started_at, durable_event_key)
 		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
 	`,

@@ -138,7 +138,7 @@ func (r *TestFolderRepository) FindParentAndSortOrder(id, workspaceID int) (pare
 // Create inserts a new folder and returns its id.
 func (r *TestFolderRepository) Create(folder *models.TestFolder) (int, error) {
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO test_folders (workspace_id, name, parent_id, description, sort_order, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,

@@ -109,7 +109,7 @@ func (s *TestSCMHookService) SetupMockRepo(workspaceID int, repoName string) (*T
 		if !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
-		if err := s.db.QueryRow(`
+		if err := s.db.QueryRowWrite(`
 			INSERT INTO scm_providers(slug, name, provider_type, auth_method, enabled)
 			VALUES ('test-mock', 'Test Mock SCM', 'github', 'pat', true)
 			RETURNING id
@@ -127,7 +127,7 @@ func (s *TestSCMHookService) SetupMockRepo(workspaceID int, repoName string) (*T
 		if !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
-		if err := s.db.QueryRow(`
+		if err := s.db.QueryRowWrite(`
 			INSERT INTO workspace_scm_connections(workspace_id, scm_provider_id, enabled)
 			VALUES (?, ?, true)
 			RETURNING id
@@ -145,7 +145,7 @@ func (s *TestSCMHookService) SetupMockRepo(workspaceID int, repoName string) (*T
 		if !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
-		if err := s.db.QueryRow(`
+		if err := s.db.QueryRowWrite(`
 			INSERT INTO workspace_repositories(
 				workspace_scm_connection_id, repository_external_id,
 				repository_name, repository_url, default_branch, is_active

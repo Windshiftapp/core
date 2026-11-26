@@ -182,7 +182,7 @@ func createActionCredential(writer capabilityWriter, c *models.ActionCredential)
 	c.CreatedAt = now
 	c.UpdatedAt = now
 	var id int64
-	err := writer.QueryRow(`
+	err := writer.QueryRowWrite(`
 		INSERT INTO action_credentials
 			(name, credential_type, applies_to_all_workspaces, created_by, encrypted_secret,
 			 secret_prefix, secret_metadata, is_enabled, created_at, updated_at)

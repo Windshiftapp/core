@@ -192,7 +192,7 @@ func (r *LinkTypeRepository) GetByID(id int) (*models.LinkType, error) {
 func (r *LinkTypeRepository) Create(lt *models.LinkType) (int, time.Time, error) {
 	now := time.Now()
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO link_types (name, description, forward_label, reverse_label, color, is_system, active, allowed_entity_types, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, lt.Name, lt.Description, lt.ForwardLabel, lt.ReverseLabel, lt.Color,

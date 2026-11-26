@@ -251,7 +251,7 @@ func (s *ProviderStore) Create(provider *SSOProvider) error {
 	`
 
 	var id int64
-	err = s.db.QueryRow(query,
+	err = s.db.QueryRowWrite(query,
 		provider.Slug,
 		provider.Name,
 		provider.ProviderType,

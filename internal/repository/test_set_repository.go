@@ -299,7 +299,7 @@ func (r *TestSetRepository) FindByID(id, workspaceID int) (*models.TestSet, erro
 func (r *TestSetRepository) Create(workspaceID int, set *models.TestSet) (id int, createdAt time.Time, err error) {
 	now := time.Now()
 	var newID int64
-	err = r.db.QueryRow(`
+	err = r.db.QueryRowWrite(`
 		INSERT INTO test_sets (workspace_id, name, description, milestone_id, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
 	`, workspaceID, set.Name, set.Description, set.MilestoneID, now, now).Scan(&newID)

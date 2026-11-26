@@ -219,60 +219,15 @@ func NewDB(dataSourceName string, readConns, writeConns int) (*DB, error) {
 	}
 
 	connectionString := dataSourceName +
-		separator + "_pragma=busy_timeout(5000)" +
-		"&_journal_mode=WAL" +
-		"&_pragma=foreign_keys(ON)" +
-		"&_txlock=immediate" +
-		// Use SQLite-parsable UTC timestamps; startup repairs legacy rows.
-		"&_time_format=sqlite" +
-		"&_timezone=UTC" +
-		"&_pragma=synchronous(NORMAL)" +
-		"&_pragma=temp_store(MEMORY)" +
-		"&_pragma=cache_size(-16000)" +
-		"&_pragma=mmap_size(0)" + // Disable mmap for better Docker compatibility
-		"&_pragma=journal_size_limit(6144000)"
+		separator + sqliteSharedParams
 
-	db, err := sql.Open("sqlite", connectionString)
+	// Open the write pool first. Its DSN switches the database to WAL before a
+	// reader connection exists: changing the journal mode needs exclusive
+	// access, and a reader that opened a fresh file first would keep rollback
+	// mode cached. The reader pool then applies query_only from the DSN on
+	// every physical connection, including a replacement.
+	writeConn, err := sql.Open("sqlite", connectionString+sqliteWriterParams)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
-	}
-
-	if err = db.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping database: %w", err)
-	}
-
-	// Explicitly set critical pragmas that must persist
-	pragmas := []string{
-		"PRAGMA journal_mode=WAL",
-		"PRAGMA synchronous=NORMAL",
-		"PRAGMA busy_timeout=5000",
-		"PRAGMA foreign_keys=ON",
-		"PRAGMA temp_store=MEMORY",
-		"PRAGMA cache_size=-262144", // 256MB cache
-		"PRAGMA mmap_size=0",        // Disable mmap for better Docker compatibility
-		"PRAGMA journal_size_limit=6144000",
-	}
-
-	for _, pragma := range pragmas {
-		if _, err = db.Exec(pragma); err != nil {
-			slog.Warn("failed to set pragma", slog.String("component", "database"), slog.String("pragma", pragma), slog.Any("error", err))
-		}
-	}
-
-	// Set connection pool settings for SQLite (configured via --max-read-conns).
-	// Keep the reader pool warm: a small idle cap made the pool close and reopen
-	// connections continuously under load, re-running the pragmas on each reopen.
-	db.SetMaxOpenConns(readConns)
-	db.SetMaxIdleConns(readConns)
-	// Match the Postgres pool: retire idle and long-lived connections so a
-	// connection that outlives a file swap or schema change is not reused.
-	db.SetConnMaxLifetime(30 * time.Minute)
-	db.SetConnMaxIdleTime(5 * time.Minute)
-
-	// Create dedicated write connection with only 1 max connection to serialize writes
-	writeConn, err := sql.Open("sqlite", connectionString)
-	if err != nil {
-		_ = db.Close()
 		return nil, fmt.Errorf("failed to open write connection: %w", err)
 	}
 
@@ -284,7 +239,6 @@ func NewDB(dataSourceName string, readConns, writeConns int) (*DB, error) {
 	writeConn.SetConnMaxIdleTime(5 * time.Minute)
 
 	if err := writeConn.Ping(); err != nil {
-		_ = db.Close()
 		_ = writeConn.Close()
 		return nil, fmt.Errorf("failed to ping write connection: %w", err)
 	}
@@ -301,8 +255,61 @@ func NewDB(dataSourceName string, readConns, writeConns int) (*DB, error) {
 		}
 	}
 
+	db, err := sql.Open("sqlite", connectionString+sqliteReaderParams)
+	if err != nil {
+		_ = writeConn.Close()
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+
+	if err = db.Ping(); err != nil {
+		_ = writeConn.Close()
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	// Set connection pool settings for SQLite (configured via --max-read-conns).
+	// Keep the reader pool warm: a small idle cap made the pool close and reopen
+	// connections continuously under load.
+	db.SetMaxOpenConns(readConns)
+	db.SetMaxIdleConns(readConns)
+	// Match the Postgres pool: retire idle and long-lived connections so a
+	// connection that outlives a file swap or schema change is not reused.
+	db.SetConnMaxLifetime(30 * time.Minute)
+	db.SetConnMaxIdleTime(5 * time.Minute)
+
 	return &DB{DB: db, writeConn: writeConn, instanceID: newDatabaseInstanceID()}, nil
 }
+
+const (
+	// sqliteSharedParams apply to both pools. Timestamps are stored in SQLite's
+	// parsable UTC format; startup repairs legacy rows.
+	sqliteSharedParams = "&_time_format=sqlite&_timezone=UTC"
+
+	// sqliteReaderParams apply to every physical reader connection, including
+	// replacements. query_only makes the reader pool reject writes, which is
+	// what removes the need to route by statement text. Read transactions use
+	// the default deferred locking mode; the writer takes the immediate lock.
+	sqliteReaderParams = "&_txlock=deferred" +
+		"&_pragma=busy_timeout(5000)" +
+		"&_pragma=foreign_keys(ON)" +
+		"&_pragma=temp_store(MEMORY)" +
+		"&_pragma=cache_size(-16000)" +
+		"&_pragma=mmap_size(0)" + // Disable mmap for better Docker compatibility
+		"&_pragma=query_only(ON)"
+
+	// sqliteWriterParams apply to every write-pool connection. Only the writer
+	// changes the journal mode and synchronous level; a reader must never be
+	// asked to modify the database.
+	sqliteWriterParams = "&_txlock=immediate" +
+		"&_journal_mode=WAL" +
+		"&_pragma=journal_mode(WAL)" +
+		"&_pragma=busy_timeout(5000)" +
+		"&_pragma=foreign_keys(ON)" +
+		"&_pragma=synchronous(NORMAL)" +
+		"&_pragma=temp_store(MEMORY)" +
+		"&_pragma=cache_size(-16000)" +
+		"&_pragma=mmap_size(0)" + // Disable mmap for better Docker compatibility
+		"&_pragma=journal_size_limit(6144000)"
+)
 
 // InstanceID distinguishes database pools created during this process.
 func (db *DB) InstanceID() uint64 {
@@ -330,8 +337,9 @@ func (db *DB) Initialize() error {
 }
 
 // initializeDefaultData creates the default data for a fresh installation.
+// The seed runs on the write pool: reader connections are query_only.
 func (db *DB) initializeDefaultData() error {
-	return seedFreshInstall(db.DB, func(tx *sql.Tx) seedWriter {
+	return seedFreshInstall(db.writeConn, func(tx *sql.Tx) seedWriter {
 		return sqliteSeedWriter{NewSQLiteTx(tx)}
 	})
 }

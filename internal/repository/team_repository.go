@@ -135,7 +135,7 @@ func (r *TeamRepository) Create(name, description, icon, color, avatarURL string
 	now := time.Now()
 	var id int64
 
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO teams (name, description, is_active, icon, color, avatar_url, created_by, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING id

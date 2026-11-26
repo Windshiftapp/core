@@ -295,7 +295,7 @@ func (h *SCMItemLinksHandler) CreateItemSCMLink(w http.ResponseWriter, r *http.R
 	}
 
 	var id int64
-	err = h.db.QueryRow(`
+	err = h.db.QueryRowWrite(`
 		INSERT INTO item_scm_links (
 			item_id, workspace_repository_id, link_type, external_id,
 			external_url, title, state, author_name, detection_source

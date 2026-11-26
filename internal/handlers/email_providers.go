@@ -321,7 +321,7 @@ func (h *EmailProviderHandler) CreateEmailProvider(w http.ResponseWriter, r *htt
 
 	// Insert provider
 	var id int64
-	err := h.db.QueryRow(`
+	err := h.db.QueryRowWrite(`
 		INSERT INTO email_providers (
 			name, slug, type, is_enabled,
 			oauth_client_id, oauth_client_secret_encrypted, oauth_scopes, oauth_tenant_id,

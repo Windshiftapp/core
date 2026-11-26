@@ -243,7 +243,7 @@ func (r *IntakeRepository) Create(ctx context.Context, in *models.Intake) (int, 
 		status = models.IntakeStatusEnabled
 	}
 	var id int
-	err := r.db.QueryRowContext(ctx, `
+	err := r.db.QueryRowWriteContext(ctx, `
 		INSERT INTO intakes (
 			mailbox_id, folder, workspace_id, portal_channel_id, request_type_id, item_type_id,
 			rate_limit_per_hour, processing_disposition, send_confirmation, import_existing_mail, status, status_reason, created_at, updated_at

@@ -133,7 +133,7 @@ func (r *CustomerOrganisationRepository) Create(c *models.CustomerOrganisation) 
 	now := time.Now()
 	var id int64
 	//nolint:misspell // British spelling matches the table name.
-	err = r.db.QueryRow(`
+	err = r.db.QueryRowWrite(`
 		INSERT INTO customer_organisations (name, email, description, active, avatar_url, custom_field_values, settings, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, c.Name, c.Email, c.Description, c.Active, c.AvatarURL, cfv, settings, now, now).Scan(&id)

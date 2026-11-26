@@ -59,6 +59,7 @@ type CreateItemLinkParams struct {
 type itemLinkQuerier interface {
 	Query(query string, args ...any) (*sql.Rows, error)
 	QueryRow(query string, args ...any) *sql.Row
+	QueryRowWrite(query string, args ...any) *sql.Row
 }
 
 // ErrInvalidLinkTypeForEntities is returned when the requested link type
@@ -154,7 +155,7 @@ func createItemLink(db itemLinkQuerier, params CreateItemLinkParams) (int64, err
 
 	// Insert with ON CONFLICT DO NOTHING to handle duplicates gracefully
 	var linkID int64
-	err = db.QueryRow(`
+	err = db.QueryRowWrite(`
 		INSERT INTO item_links (link_type_id, source_type, source_id, target_type, target_id, created_by, custom_field_id, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT DO NOTHING

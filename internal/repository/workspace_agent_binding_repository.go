@@ -23,6 +23,7 @@ type workspaceAgentBindingStore interface {
 	Exec(query string, args ...any) (sql.Result, error)
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+	QueryRowWriteContext(ctx context.Context, query string, args ...any) *sql.Row
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	ExecWrite(query string, args ...any) (sql.Result, error)
 	ExecWriteContext(ctx context.Context, query string, args ...any) (sql.Result, error)
@@ -123,7 +124,7 @@ func (r *WorkspaceAgentBindingRepository) Insert(ctx context.Context, b *models.
 	}
 	// RETURNING id (not LastInsertId) for Postgres compatibility.
 	var id int64
-	err = r.db.QueryRowContext(ctx, `
+	err = r.db.QueryRowWriteContext(ctx, `
 		INSERT INTO workspace_agent_bindings
 			(workspace_id, acting_user_id, acting_user_kind,
 			 profile_type, lifecycle, profile_version, identity_class, purpose, capability_groups_json,

@@ -302,7 +302,7 @@ func cleanupDB(path string) {
 func createWorkspace(db database.Database) (int, error) {
 	now := time.Now()
 	var id int
-	err := db.QueryRow(
+	err := db.QueryRowWrite(
 		`INSERT INTO workspaces (name, key, active, created_at, updated_at)
 		 VALUES (?, ?, 1, ?, ?) RETURNING id`,
 		"CF Stress", "CFS", now, now,

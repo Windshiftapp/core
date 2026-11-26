@@ -134,7 +134,7 @@ func (r *PermissionSetRepository) CountConfigSetUsage(id int) (int, error) {
 func (r *PermissionSetRepository) Create(name, description string, createdBy int, permissionIDs []int) (int64, error) {
 	now := time.Now()
 	var permSetID int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO permission_sets (name, description, is_system, created_by, created_at, updated_at)
 		VALUES (?, ?, false, ?, ?, ?) RETURNING id
 	`, name, description, createdBy, now, now).Scan(&permSetID)

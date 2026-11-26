@@ -70,7 +70,7 @@ func (r *ZammadRepository) CreateOAuthState(state, providerID string, initiatedB
 // expired state, or a state for another connection cannot observe it.
 func (r *ZammadRepository) ConsumeOAuthState(state string) (*ZammadOAuthState, error) {
 	consumed := &ZammadOAuthState{}
-	err := r.db.QueryRow(`DELETE FROM zammad_oauth_state
+	err := r.db.QueryRowWrite(`DELETE FROM zammad_oauth_state
 		WHERE state = ? AND expires_at > CURRENT_TIMESTAMP
 		RETURNING provider_id, initiated_by, oauth_generation`, state).Scan(&consumed.ProviderID, &consumed.InitiatedBy, &consumed.OAuthGeneration)
 	if errors.Is(err, sql.ErrNoRows) {

@@ -828,7 +828,7 @@ func (s *IssueSyncService) CreateSyncConfig(ctx context.Context, createdByUserID
 	}
 
 	var configID int
-	err = s.db.QueryRowContext(ctx, `
+	err = s.db.QueryRowWriteContext(ctx, `
 		INSERT INTO issue_sync_configs (
 			workspace_repository_id, sync_enabled,
 			status_mapping, reverse_status_mapping,

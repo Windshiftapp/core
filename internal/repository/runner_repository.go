@@ -36,7 +36,7 @@ func (r *RunnerRepository) InsertRegistrationToken(ctx context.Context, poolID i
 	// RETURNING id (not LastInsertId) so this works on Postgres as well as
 	// SQLite — the pq/pgx driver does not support LastInsertId.
 	var id int64
-	err := r.db.QueryRowContext(ctx, `
+	err := r.db.QueryRowWriteContext(ctx, `
 		INSERT INTO runner_registration_tokens(pool_capability_id, token_hash, token_prefix, description, created_by_user_id, expires_at)
 		VALUES (?, ?, ?, ?, ?, ?)
 		RETURNING id
@@ -175,7 +175,7 @@ func (r *RunnerRepository) ListInstancesForPool(ctx context.Context, poolID int)
 func (r *RunnerRepository) InsertInstance(ctx context.Context, poolID int, name, credentialHash string, now time.Time) (int, error) {
 	// RETURNING id (not LastInsertId) for Postgres compatibility.
 	var id int64
-	err := r.db.QueryRowContext(ctx, `
+	err := r.db.QueryRowWriteContext(ctx, `
 		INSERT INTO runner_instances(pool_capability_id, name, credential_hash, status, registered_at)
 		VALUES (?, ?, ?, ?, ?)
 		RETURNING id

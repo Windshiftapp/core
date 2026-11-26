@@ -54,11 +54,10 @@ type Database interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 
 	// QueryReadContext executes a known read-only query with context.
-	// For SQLite: always uses the reader pool, bypassing the statement-text
-	// classifier that QueryContext needs for row-returning writes.
+	// For SQLite: always uses the reader pool.
 	// For PostgreSQL: uses the shared pool.
-	// Callers must only pass statements that do not modify data; a write sent
-	// here would lose SQLite's single-writer serialization.
+	// Callers must only pass statements that do not modify data; SQLite
+	// reader connections run with query_only=ON and reject writes.
 	QueryReadContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 
 	// QueryRowReadContext executes a known read-only query with context that
@@ -79,6 +78,24 @@ type Database interface {
 	// For SQLite: uses dedicated write connection (serialized)
 	// For PostgreSQL: uses standard connection pool (MVCC handles concurrency)
 	ExecWriteContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+
+	// QueryWrite executes a write statement that returns rows, such as
+	// INSERT/UPDATE/DELETE ... RETURNING.
+	// For SQLite: uses the dedicated write connection (serialized)
+	// For PostgreSQL: uses the shared pool (MVCC handles concurrency)
+	QueryWrite(query string, args ...any) (*sql.Rows, error)
+
+	// QueryWriteContext executes a write statement that returns rows with context.
+	// Same routing contract as QueryWrite.
+	QueryWriteContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+
+	// QueryRowWrite executes a write statement that returns at most one row.
+	// Same routing contract as QueryWrite.
+	QueryRowWrite(query string, args ...any) *sql.Row
+
+	// QueryRowWriteContext executes a write statement that returns at most one
+	// row with context. Same routing contract as QueryWrite.
+	QueryRowWriteContext(ctx context.Context, query string, args ...any) *sql.Row
 
 	// Begin starts a new transaction (returns wrapped transaction)
 	Begin() (Tx, error)
@@ -133,6 +150,22 @@ type Tx interface {
 	// Transactions already run on SQLite's dedicated write connection; this method
 	// exists so write-oriented helpers can share database.Database/Tx call sites.
 	ExecWriteContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+
+	// QueryWrite executes a write statement that returns rows within the transaction.
+	// The statement stays on the transaction and sees its earlier writes.
+	QueryWrite(query string, args ...any) (*sql.Rows, error)
+
+	// QueryWriteContext executes a write statement that returns rows within the
+	// transaction. Same contract as QueryWrite.
+	QueryWriteContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+
+	// QueryRowWrite executes a write statement that returns at most one row
+	// within the transaction. Same contract as QueryWrite.
+	QueryRowWrite(query string, args ...any) *sql.Row
+
+	// QueryRowWriteContext executes a write statement that returns at most one
+	// row within the transaction. Same contract as QueryWrite.
+	QueryRowWriteContext(ctx context.Context, query string, args ...any) *sql.Row
 
 	// Prepare prepares a statement within the transaction
 	Prepare(query string) (*sql.Stmt, error)

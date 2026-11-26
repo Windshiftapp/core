@@ -214,7 +214,7 @@ func (tm *SCIMTokenManager) CreateToken(createdByUserID int, request models.SCIM
 
 	// Insert token into database
 	var tokenID int64
-	err = tm.db.QueryRow(`
+	err = tm.db.QueryRowWrite(`
 		INSERT INTO scim_tokens (name, token_hash, token_prefix, is_active, created_by, expires_at)
 		VALUES (?, ?, ?, true, ?, ?)
 		RETURNING id

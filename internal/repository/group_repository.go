@@ -207,7 +207,7 @@ func (r *GroupRepository) NameExists(name string, excludeID int) (bool, error) {
 // ErrDuplicateEntry when the name violates the unique constraint.
 func (r *GroupRepository) Create(name, description string, createdBy *int, now time.Time) (int64, error) {
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO groups (name, description, is_active, created_by, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
 	`, name, description, true, createdBy, now, now).Scan(&id)
@@ -335,7 +335,7 @@ func (r *GroupRepository) MembershipExists(groupID, userID int) (bool, error) {
 // AddMember inserts a group membership and returns its ID.
 func (r *GroupRepository) AddMember(groupID, userID int, addedBy *int, now time.Time) (int64, error) {
 	var membershipID int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO group_members (group_id, user_id, added_by, added_at, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
 	`, groupID, userID, addedBy, now, now, now).Scan(&membershipID)

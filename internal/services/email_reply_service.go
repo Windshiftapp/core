@@ -228,7 +228,7 @@ func (s *EmailReplyService) handleCommentCreated(params HandleCommentParams, del
 			return fmt.Errorf("mint reply Message-ID: %w", err)
 		}
 		var outboxID int
-		err = s.db.QueryRow(`
+		err = s.db.QueryRowWrite(`
 			INSERT INTO email_reply_outbox (
 				comment_id, channel_id, item_id, to_email, to_name, subject,
 				html_body, text_body, message_id, key_generation, in_reply_to, references_json,
@@ -680,7 +680,7 @@ func (s *EmailReplyService) sendItemNotice(item *models.Item, toEmail, toName, s
 	s.outboxMu.Lock()
 	defer s.outboxMu.Unlock()
 	var outboxID int
-	if err := s.db.QueryRow(`
+	if err := s.db.QueryRowWrite(`
 		INSERT INTO email_reply_outbox (
 			kind, channel_id, item_id, to_email, to_name, subject,
 			html_body, text_body, message_id, key_generation, in_reply_to, references_json,
@@ -963,7 +963,7 @@ func (s *EmailReplyService) deliverPendingReply(ctx context.Context, outboxID in
 	// prevents two application instances from selecting and sending the same
 	// pending reply. A crashed worker releases itself when the lease expires.
 	leaseUntil := time.Now().Add(5 * time.Minute)
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowWrite(`
 		UPDATE email_reply_outbox
 		SET next_attempt_at = ?, lease_owner = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ? AND delivered_at IS NULL AND discarded_at IS NULL

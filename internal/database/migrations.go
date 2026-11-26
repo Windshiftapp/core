@@ -5939,7 +5939,7 @@ func backfillIntakesFromChannels(db Database) error {
 		}
 
 		var intakeID int
-		err := db.QueryRow(`
+		err := db.QueryRowWrite(`
 			INSERT INTO intakes (
 				mailbox_id, folder, target_type, target_id, request_type_id, item_type_id,
 				rate_limit_per_hour, processing_disposition, status, created_at, updated_at

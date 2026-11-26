@@ -191,7 +191,7 @@ func (s *AttachmentService) CreateRecord(params CreateAttachmentParams) (int64, 
 	}
 
 	var attachmentID int64
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowWrite(`
 		INSERT INTO attachments (item_id, entity_type, filename, original_filename, file_path, mime_type, file_size, uploaded_by, uploaded_by_portal_customer_id, has_thumbnail, thumbnail_path, category, is_internal)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, itemID, params.EntityType, params.Filename, params.OriginalFilename, params.FilePath,

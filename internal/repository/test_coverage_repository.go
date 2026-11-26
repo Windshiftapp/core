@@ -102,7 +102,7 @@ func (r *TestCoverageRepository) CreateConfigForWorkspace(workspaceID int, typeI
 
 	now := time.Now()
 	var id int64
-	err = r.db.QueryRow(`
+	err = r.db.QueryRowWrite(`
 		INSERT INTO test_coverage_configurations (workspace_id, requirement_item_type_ids, created_at, updated_at)
 		VALUES (?, ?, ?, ?) RETURNING id`,
 		workspaceID, typeIDsBytes, now, now,
@@ -130,7 +130,7 @@ func (r *TestCoverageRepository) CreateConfigForCollection(collectionID int, typ
 
 	now := time.Now()
 	var id int64
-	err = r.db.QueryRow(`
+	err = r.db.QueryRowWrite(`
 		INSERT INTO test_coverage_configurations (collection_id, requirement_item_type_ids, created_at, updated_at)
 		VALUES (?, ?, ?, ?) RETURNING id`,
 		collectionID, typeIDsBytes, now, now,
