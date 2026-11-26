@@ -122,10 +122,24 @@ function compareMilestoneLanes(a, b) {
   return Number(a.id) - Number(b.id);
 }
 
-// Canonical milestone lane order: target date ascending, undated last, then
-// name and id as stable tie-breakers.
+// Manual position from milestone administration (drag-and-drop). Position is
+// scoped per (is_global, workspace_id, category_id); milestones without one
+// (embedded on cards, cross-workspace boards) compare equal at 0.
+function milestoneLanePosition(milestone) {
+  const position = Number(milestone?.position);
+  return Number.isFinite(position) ? position : 0;
+}
+
+// Canonical milestone lane order: the manual order from milestone
+// administration, falling back to the timeline order (target date ascending,
+// undated last, then name and id) as a stable tie-breaker. The timeline order
+// alone is used when no milestone carries a position.
 export function sortMilestonesForLanes(milestones = []) {
-  return [...milestones].sort(compareMilestoneLanes);
+  return [...milestones].sort((a, b) => {
+    const byPosition = milestoneLanePosition(a) - milestoneLanePosition(b);
+    if (byPosition !== 0) return byPosition;
+    return compareMilestoneLanes(a, b);
+  });
 }
 
 // The board and public board place a card in one milestone lane. Resolve the
