@@ -232,6 +232,8 @@
               triggerStyle="color: var(--ds-text-subtle);"
               iconOnly
               showChevron={false}
+              triggerLabel={t('collections.boardCardActions', { title: item.title })}
+              triggerTooltip={t('collections.boardCardActions', { title: item.title })}
               triggerTestid={`board-card-move-menu-${item.id}`}
             />
           </div>

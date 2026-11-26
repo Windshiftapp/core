@@ -9,6 +9,7 @@
   import AlertBox from '../components/AlertBox.svelte';
   import Input from '../components/Input.svelte';
   import FormField from '../components/FormField.svelte';
+  import Tooltip from '../components/Tooltip.svelte';
   import Cloud from '@lucide/svelte/icons/cloud';
   import Server from '@lucide/svelte/icons/server';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -554,17 +555,20 @@
                   placeholder={deploymentType === 'datacenter' ? 'Your Jira personal access token' : 'Your Jira API token'}
                   disabled={connection.isConnecting}
                 />
-                <button
-                  type="button"
-                  class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover-bg"
-                  onclick={() => showToken = !showToken}
-                >
-                  {#if showToken}
-                    <EyeOff size={16} style="color: var(--ds-text-subtle);" />
-                  {:else}
-                    <Eye size={16} style="color: var(--ds-text-subtle);" />
-                  {/if}
-                </button>
+                <Tooltip content={showToken ? t('jiraImport.form.hideToken') : t('jiraImport.form.showToken')}>
+                  <button
+                    type="button"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover-bg"
+                    aria-label={showToken ? t('jiraImport.form.hideToken') : t('jiraImport.form.showToken')}
+                    onclick={() => showToken = !showToken}
+                  >
+                    {#if showToken}
+                      <EyeOff size={16} style="color: var(--ds-text-subtle);" />
+                    {:else}
+                      <Eye size={16} style="color: var(--ds-text-subtle);" />
+                    {/if}
+                  </button>
+                </Tooltip>
               </div>
               <DescriptionText>
                 {#if tokenHelpLink}

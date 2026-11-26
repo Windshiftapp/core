@@ -103,8 +103,8 @@
     class="w-full h-10 rounded flex items-center {expanded
       ? 'justify-start px-3'
       : 'justify-center'} cursor-pointer nav-button {$open ? 'nav-button-selected' : ''}"
-    title={t('notifications.title')}
-    aria-label={t('notifications.title')}
+    title={unreadCount > 0 ? t('notifications.unreadCount', { count: unreadCount }) : t('notifications.title')}
+    aria-label={unreadCount > 0 ? t('notifications.unreadCount', { count: unreadCount }) : t('notifications.title')}
   >
     <span class="relative">
       <Bell class="w-5 h-5 flex-shrink-0" />

@@ -18,6 +18,7 @@
   import Label from '../components/Label.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import EmptyState from '../components/EmptyState.svelte';
+  import Tooltip from '../components/Tooltip.svelte';
   import LocalizedObjectFields from './LocalizedObjectFields.svelte';
   import TextareaField from '../components/TextareaField.svelte';
   import TextField from '../components/TextField.svelte';
@@ -311,13 +312,16 @@
                 <div class="flex items-center pb-1.5">
                   <Checkbox bind:checked={rule.is_enabled} label={t('common.enable')} size="small" />
                 </div>
-                <button
-                  type="button"
-                  onclick={() => removeEventRule(index)}
-                  class="text-ds-text-danger hover:opacity-80 transition-colors pb-1.5"
-                >
-                  <Trash2 class="w-4 h-4" />
-                </button>
+                <Tooltip content={t('common.remove')}>
+                  <button
+                    type="button"
+                    onclick={() => removeEventRule(index)}
+                    aria-label={t('common.remove')}
+                    class="text-ds-text-danger hover:opacity-80 transition-colors pb-1.5"
+                  >
+                    <Trash2 class="w-4 h-4" />
+                  </button>
+                </Tooltip>
               </div>
 
               {#if rule.event_type === 'sla.warning' && $currentWorkspace}

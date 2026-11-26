@@ -298,6 +298,8 @@
                 triggerText=""
                 triggerIcon={MoreHorizontal}
                 triggerClass="p-2 rounded hover-bg transition-colors"
+                triggerLabel={t('workspaces.customers.customerActions', { name: customer.name })}
+                triggerTooltip={t('workspaces.customers.customerActions', { name: customer.name })}
                 items={buildCustomerActions(customer)}
                 align="right"
               />

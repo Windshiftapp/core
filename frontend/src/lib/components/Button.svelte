@@ -205,7 +205,7 @@
 
 <!-- Main render: wrap with tooltip if title is provided -->
 {#if title}
-  <Tooltip content={title} triggerElement={buttonEl}>
+  <Tooltip content={title} triggerElement={buttonEl} triggerOnWrapper={effectiveDisabled} wrapperFocusable={effectiveDisabled}>
     {@render buttonElement()}
   </Tooltip>
 {:else}

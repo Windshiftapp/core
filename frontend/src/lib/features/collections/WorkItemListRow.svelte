@@ -5,6 +5,7 @@
   import LazyRender from '../../components/LazyRender.svelte';
   import ListCellRenderer from './ListCellRenderer.svelte';
   import { isMenuTriggerEvent } from '../../utils/menuTrigger.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let {
     item,
@@ -98,6 +99,8 @@
         {/each}
         <div>
           <DropdownMenu triggerText="" triggerIcon={MoreHorizontal}
+            triggerLabel={t('common.actions')}
+            triggerTooltip={t('common.actions')}
             triggerClass="p-2 rounded action-btn transition-colors" items={actions} />
         </div>
       </div>

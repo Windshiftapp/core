@@ -19,6 +19,7 @@
   import { agentRuns } from '../../api/agentRuns.js';
   import { agentSkills } from '../../api/agentSkills.js';
   import { updateQueryParams } from '../../router.js';
+  import { t } from '../../stores/i18n.svelte.js';
   import { workspacePermissions } from '../../stores/workspacePermissions.svelte.js';
   import PageHeader from '../../layout/PageHeader.svelte';
   import DropdownMenu from '../../layout/DropdownMenu.svelte';
@@ -719,7 +720,7 @@
                   triggerClass="w-8 h-8 flex items-center justify-center rounded-md transition-colors"
                   triggerStyle="background-color: var(--ds-surface); color: var(--ds-text-subtle);"
                   triggerTestid="agent-profile-actions"
-                  triggerLabel="Agent actions"
+                  triggerLabel={t('agents.profileActions')}
                   items={profileActionItems()}
                   maxWidth="max-w-48"
                   showChevron={false}

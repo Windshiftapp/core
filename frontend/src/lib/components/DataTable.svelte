@@ -7,6 +7,7 @@
   import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import EmptyState from './EmptyState.svelte';
+  import Tooltip from './Tooltip.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { sanitizeHtml } from '../utils/sanitize.ts';
   import { isMenuTriggerEvent } from '../utils/menuTrigger.js';
@@ -22,6 +23,9 @@
     emptyIcon = null,
     actionItems = null,
     actionTriggerTestid = null,
+    /** Localized name/tooltip for the row-actions menu trigger. A string or a
+     *  function `(item) => string` for row-specific context (e.g. "Actions for WI-123"). */
+    actionLabel = null,
     onRowClick = null,
     selectedItemId = null,
     pagination = false,
@@ -159,6 +163,11 @@
       onRowClick(item);
     }
   }
+
+  function getActionLabel(item) {
+    if (typeof actionLabel === 'function') return actionLabel(item);
+    return actionLabel || t('components.dataTable.rowActions');
+  }
 </script>
 
 <div class="overflow-hidden {containerClass}" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
@@ -218,6 +227,8 @@
                         maxWidth="max-w-48"
                         showChevron={false}
                         iconOnly={true}
+                        triggerLabel={getActionLabel(item)}
+                        triggerTooltip={getActionLabel(item)}
                         triggerTestid={actionTriggerTestid ? actionTriggerTestid(item) : ''}
                       />
                     </div>
@@ -250,27 +261,33 @@
           {t('components.dataTable.showingRange', { start: startItem, end: endItem, total: totalCount })}
         </span>
         <div class="flex items-center gap-2">
-          <button
-            onclick={prevPage}
-            disabled={currentPage === 1}
-            data-testid="table-pagination-prev"
-            class="p-1.5 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            style="background: var(--ds-background-neutral); color: var(--ds-text);"
-          >
-            <ChevronLeft class="w-4 h-4" />
-          </button>
+          <Tooltip content={t('components.pagination.previousPage')}>
+            <button
+              onclick={prevPage}
+              disabled={currentPage === 1}
+              aria-label={t('components.pagination.previousPage')}
+              data-testid="table-pagination-prev"
+              class="p-1.5 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              style="background: var(--ds-background-neutral); color: var(--ds-text);"
+            >
+              <ChevronLeft class="w-4 h-4" />
+            </button>
+          </Tooltip>
           <span class="text-sm px-2" style="color: var(--ds-text-subtle);" data-testid="table-pagination-status">
             {t('components.pagination.pageOf', { current: currentPage, total: totalPages })}
           </span>
-          <button
-            onclick={nextPage}
-            disabled={currentPage >= totalPages}
-            data-testid="table-pagination-next"
-            class="p-1.5 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            style="background: var(--ds-background-neutral); color: var(--ds-text);"
-          >
-            <ChevronRight class="w-4 h-4" />
-          </button>
+          <Tooltip content={t('components.pagination.nextPage')}>
+            <button
+              onclick={nextPage}
+              disabled={currentPage >= totalPages}
+              aria-label={t('components.pagination.nextPage')}
+              data-testid="table-pagination-next"
+              class="p-1.5 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              style="background: var(--ds-background-neutral); color: var(--ds-text);"
+            >
+              <ChevronRight class="w-4 h-4" />
+            </button>
+          </Tooltip>
         </div>
       </div>
     {/if}

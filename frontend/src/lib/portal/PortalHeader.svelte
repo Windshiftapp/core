@@ -321,7 +321,9 @@
             }}
             class="relative h-9 w-9 inline-flex items-center justify-center rounded-full border transition-colors"
             style="color: {shellText}; border-color: {hasVisualBackground ? 'rgba(255,255,255,0.28)' : 'var(--ds-border)'}; background-color: {hasVisualBackground ? 'rgba(255,255,255,0.1)' : 'var(--ds-surface-card)'};"
-            aria-label="Open account menu"
+            aria-label={portalRequestsStore.openCount + portalApprovalsStore.pendingCount > 0
+              ? t('portal.openAccountMenuWithCounts', { requests: portalRequestsStore.openCount, approvals: portalApprovalsStore.pendingCount })
+              : t('portal.openAccountMenu')}
           >
             <span
               data-testid="portal-user-avatar-fallback"
@@ -358,6 +360,7 @@
             onclick={handleLoginClick}
             class="h-9 inline-flex items-center gap-2 rounded-md px-3 text-sm font-medium"
             style="color: {shellText}; background-color: {shellControl};"
+            aria-label={t('portal.signIn')}
           >
             <User class="w-4 h-4" />
             <span class="hidden sm:inline">{t('portal.signIn')}</span>

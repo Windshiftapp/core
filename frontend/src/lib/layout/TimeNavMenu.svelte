@@ -165,6 +165,7 @@
   triggerGap="gap-3"
   triggerText={$uiStore.navExpanded ? t('nav.timeAndProjects') : ''}
   triggerLabel={t('nav.timeAndProjects')}
+  triggerTooltip={t('nav.timeAndProjects')}
   triggerClass="w-full h-10 rounded flex items-center {$uiStore.navExpanded ? 'justify-start px-3' : 'justify-center'} cursor-pointer nav-button {isActive ? 'nav-button-selected' : ''}"
   triggerTestid="time-nav-trigger"
   items={items}

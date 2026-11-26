@@ -414,6 +414,7 @@
       data-testid={item.testId}
       class="ws-nav-item w-10 h-10 rounded flex items-center justify-center transition-colors no-underline"
       class:active={item.isActive}
+      aria-label={item.label}
     >
       <ItemIcon size={20} />
     </a>

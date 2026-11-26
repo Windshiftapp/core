@@ -985,24 +985,30 @@
               </Tooltip>
               <div class="flex items-center gap-1">
                 {#if canManageTests && selectedFolder === folder.id}
-                  <div
-                    onclick={(e) => { e.stopPropagation(); showEditFolderForm(folder); }}
-                    class="folder-action-edit p-1 cursor-pointer rounded"
-                    role="button"
-                    tabindex="0"
-                    onkeydown={(e) => e.key === 'Enter' && showEditFolderForm(folder)}
-                  >
-                    <IconEdit size="12" />
-                  </div>
-                  <div
-                    onclick={(e) => { e.stopPropagation(); deleteFolder(folder.id); }}
-                    class="folder-action-danger p-1 cursor-pointer rounded"
-                    role="button"
-                    tabindex="0"
-                    onkeydown={(e) => e.key === 'Enter' && deleteFolder(folder.id)}
-                  >
-                    <IconTrash size="12" />
-                  </div>
+                  <Tooltip content={t('testing.editFolder')}>
+                    <div
+                      onclick={(e) => { e.stopPropagation(); showEditFolderForm(folder); }}
+                      class="folder-action-edit p-1 cursor-pointer rounded"
+                      role="button"
+                      tabindex="0"
+                      aria-label={t('testing.editFolder')}
+                      onkeydown={(e) => e.key === 'Enter' && showEditFolderForm(folder)}
+                    >
+                      <IconEdit size="12" />
+                    </div>
+                  </Tooltip>
+                  <Tooltip content={t('testing.deleteFolder')}>
+                    <div
+                      onclick={(e) => { e.stopPropagation(); deleteFolder(folder.id); }}
+                      class="folder-action-danger p-1 cursor-pointer rounded"
+                      role="button"
+                      tabindex="0"
+                      aria-label={t('testing.deleteFolder')}
+                      onkeydown={(e) => e.key === 'Enter' && deleteFolder(folder.id)}
+                    >
+                      <IconTrash size="12" />
+                    </div>
+                  </Tooltip>
                 {/if}
                 <span class="text-xs min-w-[20px] text-right" style="color: var(--ds-text-subtle);">
                   {getFolderDisplayCount(folder, depth)}
@@ -1129,6 +1135,8 @@
                         triggerClass="p-1.5 rounded transition-colors hover:bg-[var(--ds-background-neutral-hovered)]"
                         triggerStyle="color: var(--ds-text-subtle);"
                         placement="bottom"
+                        triggerLabel={t('testing.testCaseActions')}
+                        triggerTooltip={t('testing.testCaseActions')}
                         items={buildTestCaseActions(testCase)}
                       />
                     {/if}

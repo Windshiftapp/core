@@ -170,6 +170,8 @@
             triggerText=""
             triggerIcon={MoreHorizontal}
             triggerClass="p-2 rounded hover-bg transition-colors"
+            triggerLabel={t('notifications.actions')}
+            triggerTooltip={t('notifications.actions')}
             items={buildActionItems()}
             placement="bottom-end"
           />

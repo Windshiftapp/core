@@ -14,6 +14,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import EnabledStatus from './EnabledStatus.svelte';
   import EntityManagerPage from './EntityManagerPage.svelte';
+  import Tooltip from '../components/Tooltip.svelte';
 
   let llmConnections = $state([]);
   let workspaces = $state([]);
@@ -546,9 +547,11 @@
             class="flex-1"
             size="small"
           />
-          <button class="p-1 rounded hover:opacity-80" style="color: var(--ds-text-danger);" onclick={() => removeEnvVar(i)}>
-            <Trash2 size={14} />
-          </button>
+          <Tooltip content={t('common.remove')}>
+            <button class="p-1 rounded hover:opacity-80" style="color: var(--ds-text-danger);" aria-label={t('common.remove')} onclick={() => removeEnvVar(i)}>
+              <Trash2 size={14} />
+            </button>
+          </Tooltip>
         </div>
       {/each}
     </div>
@@ -606,9 +609,11 @@
             class="flex-1"
             size="small"
           />
-          <button class="p-1 rounded hover:opacity-80" style="color: var(--ds-text-danger);" onclick={() => removePattern(i)}>
-            <Trash2 size={14} />
-          </button>
+          <Tooltip content={t('common.remove')}>
+            <button class="p-1 rounded hover:opacity-80" style="color: var(--ds-text-danger);" aria-label={t('common.remove')} onclick={() => removePattern(i)}>
+              <Trash2 size={14} />
+            </button>
+          </Tooltip>
         </div>
       {/each}
     </div>
@@ -639,9 +644,11 @@
             class="flex-1"
             size="small"
           />
-          <button class="p-1 rounded hover:opacity-80" style="color: var(--ds-text-danger);" onclick={() => removeHeader(i)}>
-            <Trash2 size={14} />
-          </button>
+          <Tooltip content={t('common.remove')}>
+            <button class="p-1 rounded hover:opacity-80" style="color: var(--ds-text-danger);" aria-label={t('common.remove')} onclick={() => removeHeader(i)}>
+              <Trash2 size={14} />
+            </button>
+          </Tooltip>
         </div>
       {/each}
     </div>
@@ -717,9 +724,11 @@
               bind:value={ref.credential_id}
             />
           </div>
-          <button class="p-1 rounded hover:opacity-80" style="color: var(--ds-text-danger);" onclick={() => removeSecretHeaderRef(i)}>
-            <Trash2 size={14} />
-          </button>
+          <Tooltip content={t('common.remove')}>
+            <button class="p-1 rounded hover:opacity-80" style="color: var(--ds-text-danger);" aria-label={t('common.remove')} onclick={() => removeSecretHeaderRef(i)}>
+              <Trash2 size={14} />
+            </button>
+          </Tooltip>
         </div>
       {/each}
     </div>

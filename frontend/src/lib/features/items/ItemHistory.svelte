@@ -343,7 +343,7 @@
 							{#if group.is_agent || isAIChatAttributed(group)}
 								{#if isAIChatAttributed(group) && group.agent_run_id}
 									{@const runDetail = agentRunDetail(group)}
-									<Tooltip placement="top" contentClass="px-2 py-1.5 text-xs max-w-xs">
+									<Tooltip placement="top" contentClass="px-2 py-1.5 text-xs max-w-xs" toggleOnClick>
 										{#snippet tip()}
 											<div class="agent-detail">
 												<div class="agent-detail-title">{t('history.viaAIChat')}</div>
@@ -367,12 +367,19 @@
 												{/if}
 											</div>
 										{/snippet}
-										<span role="presentation" onmouseenter={() => loadRunTelemetry(group.agent_run_id)}>
+										<button
+											type="button"
+											class="inline-flex items-center bg-transparent border-0 p-0"
+											aria-label={t('history.viaAIChat')}
+											onmouseenter={() => loadRunTelemetry(group.agent_run_id)}
+											onfocus={() => loadRunTelemetry(group.agent_run_id)}
+											onclick={() => loadRunTelemetry(group.agent_run_id)}
+										>
 											<Bot class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" data-testid="item-history-agent-marker" />
-										</span>
+										</button>
 									</Tooltip>
 								{:else}
-									<Tooltip content={agentTooltipContent(group)} placement="top">
+									<Tooltip content={agentTooltipContent(group)} placement="top" wrapperFocusable toggleOnClick>
 										<Bot class="w-3.5 h-3.5" style="color: var(--ds-text-subtle);" data-testid="item-history-agent-marker" />
 									</Tooltip>
 								{/if}

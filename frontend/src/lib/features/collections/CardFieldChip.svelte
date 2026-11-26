@@ -3,6 +3,7 @@
   import Clock from '@lucide/svelte/icons/clock';
   import ParentChip from '../../components/ParentChip.svelte';
   import Chip from '../../components/Chip.svelte';
+  import Tooltip from '../../components/Tooltip.svelte';
   import { formatDate, formatDateOnly, formatDateShort, formatStatusAge } from '../../utils/dateFormatter.js';
   import { resolveOptionLabel, resolveOptionLabels } from '../../utils/optionUtils.js';
   import { durationToString } from '../../utils/timeUtils.js';
@@ -123,9 +124,12 @@
       </Chip>
     {/each}
     {#if itemLabels.length > 3}
-      <Chip appearance="metadata" title="Additional labels">
-        +{itemLabels.length - 3}
-      </Chip>
+      {@const omittedLabels = itemLabels.slice(3).map((label) => label.name).join(', ')}
+      <Tooltip content="{t('common.labels')}: {omittedLabels}" wrapperFocusable>
+        <Chip appearance="metadata">
+          +{itemLabels.length - 3}
+        </Chip>
+      </Tooltip>
     {/if}
   {:else if cardField.field_identifier === 'status' && item.status_id}
     {@const st = statuses.find(s => s.id === item.status_id)}
@@ -197,9 +201,11 @@
         {customFieldUserNames[0]}
       </Chip>
     {:else if customFieldDef.field_type === 'multi_user' && customFieldUserNames.length > 0}
-      <Chip appearance="metadata" title={customFieldDef.name}>
-        {customFieldUserNames[0]}{#if customFieldUserNames.length > 1} +{customFieldUserNames.length - 1}{/if}
-      </Chip>
+      <Tooltip content="{customFieldDef.name}: {customFieldUserNames.join(', ')}" wrapperFocusable>
+        <Chip appearance="metadata">
+          {customFieldUserNames[0]}{#if customFieldUserNames.length > 1} +{customFieldUserNames.length - 1}{/if}
+        </Chip>
+      </Tooltip>
     {:else if customFieldDef.field_type === 'multi_milestone'}
       {@const milestoneCount = Array.isArray(customFieldValue) ? customFieldValue.length : 0}
       <Chip appearance="metadata" title={customFieldDef.name}>

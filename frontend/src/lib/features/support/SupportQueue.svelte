@@ -732,6 +732,8 @@
                 triggerIcon={MoreHorizontal}
                 iconOnly
                 triggerClass="p-1.5 rounded action-btn transition-colors"
+                triggerLabel={t('supportQueue.queueActions')}
+                triggerTooltip={t('supportQueue.queueActions')}
                 triggerTestid={`support-queue-menu-${queueRef(entry)}`}
                 items={queueMenuItems(entry)}
               />

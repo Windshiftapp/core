@@ -21,6 +21,7 @@
   import Input from '../../components/Input.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Button from '../../components/Button.svelte';
+  import Tooltip from '../../components/Tooltip.svelte';
 
   /**
    * Optional row-click delegate: when provided (mobile shell), tapping a row
@@ -492,20 +493,26 @@
                       class="flex-1"
                       size="small"
                     />
-                    <button
-                      onclick={saveTodo}
-                      disabled={!newTodoTitle.trim()}
-                      class="p-2 text-ds-text-success hover:opacity-80 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed add-btn"
-                    >
-                      <Check class="w-5 h-5" />
-                    </button>
-                    <button
-                      onclick={cancelAddingTodo}
-                      class="p-2 rounded transition-colors cancel-btn"
-                      style="color: var(--ds-text-subtle);"
-                    >
-                      <X class="w-5 h-5" />
-                    </button>
+                    <Tooltip content={t('common.save')}>
+                      <button
+                        onclick={saveTodo}
+                        disabled={!newTodoTitle.trim()}
+                        aria-label={t('common.save')}
+                        class="p-2 text-ds-text-success hover:opacity-80 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed add-btn"
+                      >
+                        <Check class="w-5 h-5" />
+                      </button>
+                    </Tooltip>
+                    <Tooltip content={t('common.cancel')}>
+                      <button
+                        onclick={cancelAddingTodo}
+                        aria-label={t('common.cancel')}
+                        class="p-2 rounded transition-colors cancel-btn"
+                        style="color: var(--ds-text-subtle);"
+                      >
+                        <X class="w-5 h-5" />
+                      </button>
+                    </Tooltip>
                   </div>
                 {:else}
                   <button
@@ -553,13 +560,16 @@
                       {#snippet trailing()}
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
-                        <div class="flex-shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" onclick={(e) => e.stopPropagation()}>
-                          <button
-                            onclick={() => deleteTodo(todo, true)}
-                            class="p-1 text-ds-text-danger hover:opacity-80 rounded transition-colors delete-btn"
-                          >
-                            <Trash2 class="w-4 h-4" />
-                          </button>
+                        <div class="flex-shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity" onclick={(e) => e.stopPropagation()}>
+                          <Tooltip content={t('todo.deleteTask')}>
+                            <button
+                              onclick={() => deleteTodo(todo, true)}
+                              aria-label={t('todo.deleteTask')}
+                              class="p-1 text-ds-text-danger hover:opacity-80 rounded transition-colors delete-btn"
+                            >
+                              <Trash2 class="w-4 h-4" />
+                            </button>
+                          </Tooltip>
                         </div>
                       {/snippet}
                     </WorkItemRow>
@@ -617,13 +627,16 @@
                       {#snippet trailing()}
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
-                        <div class="flex-shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" onclick={(e) => e.stopPropagation()}>
-                          <button
-                            onclick={() => deleteTodo(item, false)}
-                            class="p-1 text-ds-text-danger hover:opacity-80 rounded transition-colors delete-btn"
-                          >
-                            <Trash2 class="w-4 h-4" />
-                          </button>
+                        <div class="flex-shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity" onclick={(e) => e.stopPropagation()}>
+                          <Tooltip content={t('items.deleteItem')}>
+                            <button
+                              onclick={() => deleteTodo(item, false)}
+                              aria-label={t('items.deleteItem')}
+                              class="p-1 text-ds-text-danger hover:opacity-80 rounded transition-colors delete-btn"
+                            >
+                              <Trash2 class="w-4 h-4" />
+                            </button>
+                          </Tooltip>
                         </div>
                       {/snippet}
                     </WorkItemRow>

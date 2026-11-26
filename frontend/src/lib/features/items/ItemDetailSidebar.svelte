@@ -675,6 +675,8 @@
           triggerText=""
           triggerIcon={MoreHorizontal}
           triggerTestid="item-detail-actions-menu"
+          triggerLabel={t('common.actions')}
+          triggerTooltip={t('common.actions')}
           triggerClass="flex items-center justify-center p-1.5 rounded-md transition-colors"
           triggerStyle="color: var(--ds-text-subtle);"
           items={dropdownItems}

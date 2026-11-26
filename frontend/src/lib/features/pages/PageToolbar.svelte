@@ -128,6 +128,8 @@
         iconOnly={true}
         placement="bottom-end"
         triggerClass="h-8 w-8 justify-center border-none bg-transparent p-0 text-ds-text-subtle hover:bg-ds-background-neutral-hovered hover:text-ds-text"
+        triggerLabel={t('pages.toolbarActions')}
+        triggerTooltip={t('pages.toolbarActions')}
         triggerTestid="page-toolbar-kebab"
       />
     {/if}

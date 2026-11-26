@@ -196,30 +196,29 @@
   <div class="flex flex-col items-stretch px-2.5 space-y-1 py-4">
 
     <!-- Workspaces -->
-    <Tooltip content={t('nav.workspaces')} placement="right" disabled={$uiStore.navExpanded}>
-      <div class="w-full">
-        <DropdownMenu
-          triggerIcon={IconGridDots}
-          triggerIconClass="w-5 h-5"
-          triggerGap="gap-3"
-          triggerText={$uiStore.navExpanded ? t('nav.workspaces') : ''}
-          triggerLabel={t('nav.workspaces')}
-          triggerClass="w-full h-10 rounded flex items-center {$uiStore.navExpanded
-            ? 'justify-start px-3'
-            : 'justify-center'} cursor-pointer nav-button {isWorkspaceRoute($currentRoute.view) ? 'nav-button-selected' : ''} {!$workspacesStore.loaded ? 'opacity-50 cursor-wait' : ''}"
-          triggerTestid="workspaces-dropdown-trigger"
-          items={workspacesDropdownItems}
-          maxWidth="max-w-xs"
-          showChevron={false}
-          placement="right-start"
-          iconOnly={!$uiStore.navExpanded}
-          triggerAlignment={$uiStore.navExpanded ? 'start' : 'center'}
-          isOpen={activeSurface === 'workspaces'}
-          onOpen={loadRecentWorkspaceOrder}
-          onOpenChange={(open) => setPopoverSurface('workspaces', open)}
-        />
-      </div>
-    </Tooltip>
+    <div class="w-full">
+      <DropdownMenu
+        triggerIcon={IconGridDots}
+        triggerIconClass="w-5 h-5"
+        triggerGap="gap-3"
+        triggerText={$uiStore.navExpanded ? t('nav.workspaces') : ''}
+        triggerLabel={t('nav.workspaces')}
+        triggerTooltipPlacement="right"
+        triggerClass="w-full h-10 rounded flex items-center {$uiStore.navExpanded
+          ? 'justify-start px-3'
+          : 'justify-center'} cursor-pointer nav-button {isWorkspaceRoute($currentRoute.view) ? 'nav-button-selected' : ''} {!$workspacesStore.loaded ? 'opacity-50 cursor-wait' : ''}"
+        triggerTestid="workspaces-dropdown-trigger"
+        items={workspacesDropdownItems}
+        maxWidth="max-w-xs"
+        showChevron={false}
+        placement="right-start"
+        iconOnly={!$uiStore.navExpanded}
+        triggerAlignment={$uiStore.navExpanded ? 'start' : 'center'}
+        isOpen={activeSurface === 'workspaces'}
+        onOpen={loadRecentWorkspaceOrder}
+        onOpenChange={(open) => setPopoverSurface('workspaces', open)}
+      />
+    </div>
 
     <!-- Main Nav Links -->
     {#each filteredMainNav as item (item.id)}
@@ -291,19 +290,21 @@
   <!-- Bottom Section -->
   <div class="flex flex-col items-stretch px-2.5 space-y-1 pt-2">
     <!-- Nav Toggle Button -->
-    <button
-      data-testid="nav-toggle-button"
-      onclick={() => uiStore.toggleNavExpanded()}
-      class="flex items-center {$uiStore.navExpanded ? 'justify-start px-3' : 'justify-center'} w-full h-10 mb-2 rounded cursor-pointer nav-button"
-      aria-label={$uiStore.navExpanded ? t('nav.collapse') : t('nav.expand')}
-    >
-      {#if $uiStore.navExpanded}
-        <IconLayoutSidebarLeftCollapse class="w-5 h-5 flex-shrink-0" />
-        <span class="ml-3 text-sm whitespace-nowrap">{t('nav.collapse')}</span>
-      {:else}
-        <IconLayoutSidebarLeftExpand class="w-5 h-5" />
-      {/if}
-    </button>
+    <Tooltip content={$uiStore.navExpanded ? t('nav.collapse') : t('nav.expand')} placement="right" class="contents">
+      <button
+        data-testid="nav-toggle-button"
+        onclick={() => uiStore.toggleNavExpanded()}
+        class="flex items-center {$uiStore.navExpanded ? 'justify-start px-3' : 'justify-center'} w-full h-10 mb-2 rounded cursor-pointer nav-button"
+        aria-label={$uiStore.navExpanded ? t('nav.collapse') : t('nav.expand')}
+      >
+        {#if $uiStore.navExpanded}
+          <IconLayoutSidebarLeftCollapse class="w-5 h-5 flex-shrink-0" />
+          <span class="ml-3 text-sm whitespace-nowrap">{t('nav.collapse')}</span>
+        {:else}
+          <IconLayoutSidebarLeftExpand class="w-5 h-5" />
+        {/if}
+      </button>
+    </Tooltip>
     <!-- Bottom Nav Links -->
     {#each filteredBottomNav as item (item.id)}
       <NavLink
@@ -328,14 +329,13 @@
     </Tooltip>
 
     <!-- User Profile Avatar -->
-    <Tooltip content={t('nav.profile')} placement="right" disabled={$uiStore.navExpanded}>
-      <UserAvatar
-        expanded={$uiStore.navExpanded}
-        label={t('nav.profile')}
-        isOpen={activeSurface === 'profile'}
-        onOpenChange={(open) => setPopoverSurface('profile', open)}
-      />
-    </Tooltip>
+    <UserAvatar
+      expanded={$uiStore.navExpanded}
+      label={t('nav.profile')}
+      tooltipPlacement="right"
+      isOpen={activeSurface === 'profile'}
+      onOpenChange={(open) => setPopoverSurface('profile', open)}
+    />
   </div>
 {/snippet}
 
