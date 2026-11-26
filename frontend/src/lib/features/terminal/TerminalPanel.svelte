@@ -15,6 +15,7 @@
   import WsTomlProvisioner from './WsTomlProvisioner.svelte';
   import { publicBaseURL } from '../../runtime/contextPath.js';
   import { isTauri as getIsTauri } from '../../utils/isTauri.js';
+  import { t } from '../../stores/i18n.svelte.js';
 
   let terminalContainer = $state(null);
   let isDropTarget = $state(false);
@@ -549,7 +550,12 @@
       <div class="ml-auto flex items-center gap-2 px-2">
         <span class="text-xs" style="color: #565f89;">{workspace.name}</span>
         {#if workspacePathStore.wsTomlStatus === 'found'}
-          <span class="flex items-center gap-1 px-2 py-0.5 rounded text-xs" style="background-color: rgba(158, 206, 106, 0.15); color: #9ece6a;">
+          <span
+            class="flex items-center gap-1 px-2 py-0.5 rounded text-xs"
+            style="background-color: rgba(158, 206, 106, 0.15); color: #9ece6a;"
+            title={t('terminal.wsTomlFound')}
+            aria-label={t('terminal.wsTomlFound')}
+          >
             <IconCheck class="w-3 h-3" />
             ws.toml
           </span>
@@ -557,6 +563,8 @@
           <button
             class="flex items-center gap-1 px-2 py-0.5 rounded text-xs cursor-pointer transition-colors"
             style="background-color: rgba(224, 175, 104, 0.15); color: #e0af68;"
+            title={t('terminal.wsTomlSetup')}
+            aria-label={t('terminal.wsTomlSetup')}
             onclick={() => { showProvisioner = true; }}
           >
             <IconAlertTriangle class="w-3 h-3" />

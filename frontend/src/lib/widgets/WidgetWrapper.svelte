@@ -242,7 +242,8 @@
           triggerIcon={MoreHorizontal}
           iconOnly={true}
           showChevron={false}
-          triggerLabel={t('widgets.resizeAriaLabel')}
+          triggerLabel={t('widgets.widgetActions')}
+          triggerTooltip={t('widgets.widgetActions')}
           triggerClass="!p-1 text-ds-text-subtle hover:text-ds-text hover:bg-ds-surface-hovered rounded"
           triggerTestid="widget-width-menu"
           placement="bottom-end"

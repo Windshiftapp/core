@@ -12,6 +12,7 @@
   import Checkbox from '../components/Checkbox.svelte';
   import Input from '../components/Input.svelte';
   import ItemTypeIcon from '../components/ItemTypeIcon.svelte';
+  import Tooltip from '../components/Tooltip.svelte';
   import { useRowRetention } from '../virtualization/useRowRetention.svelte';
 
   let {
@@ -39,12 +40,23 @@
     triggerActive = false,
     triggerTestid = '',
     triggerLabel = '',
+    /** Localized hint shown on hover/focus of an icon-only trigger. Also used
+     *  as the accessible-name fallback when no label or trigger text exists. */
+    triggerTooltip = '',
+    /** Placement of the trigger tooltip (see the Tooltip component). */
+    triggerTooltipPlacement = 'bottom',
     isOpen = $bindable(false),
     onOpenChange = null,
     children = undefined
   } = $props();
 
   const isDisabled = $derived(disabled || (items.length === 0 && !children));
+
+  // Show a hint when the trigger has no visible text (icon-only or collapsed).
+  // `triggerTooltip` wins; otherwise a name-only trigger reuses its label.
+  const resolvedTooltip = $derived(
+    triggerTooltip || (triggerLabel && !triggerText ? triggerLabel : '')
+  );
 
   // Create popover (replaces createDropdownMenu to avoid typeahead focus-stealing)
   const controlledOpen = toStore(
@@ -186,8 +198,7 @@
   }
 </script>
 
-<!-- Trigger Button -->
-<div class="relative">
+{#snippet triggerButton()}
   <button
     type="button"
     bind:this={triggerElement}
@@ -197,8 +208,8 @@
     data-active={triggerActive ? 'true' : undefined}
     data-open={$open ? 'true' : undefined}
     data-menu-trigger
-    aria-label={triggerLabel || triggerText || undefined}
-    title={triggerText || undefined}
+    aria-label={triggerLabel || triggerText || resolvedTooltip || undefined}
+    title={resolvedTooltip ? undefined : triggerText || undefined}
     onkeydown={(e) => e.stopPropagation()}
     class="menu-trigger {triggerAvatar ? 'p-0' : iconOnly ? '' : triggerClass ? '' : 'px-4 py-2'} rounded text-sm font-medium transition flex items-center {alignmentClass} {triggerGap} flex-shrink-0 {triggerBgColor ? getTextColorForBackground(triggerBgColor) : ''} {triggerClass} {isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}"
     style={triggerBgColor ? `background-color: ${triggerBgColor}; ${triggerStyle}` : triggerStyle}
@@ -248,6 +259,17 @@
       {/if}
     {/if}
   </button>
+{/snippet}
+
+<!-- Trigger Button -->
+<div class="relative">
+  {#if resolvedTooltip}
+    <Tooltip content={resolvedTooltip} suppressOpen={$open} triggerElement={triggerElement} placement={triggerTooltipPlacement} class="contents">
+      {@render triggerButton()}
+    </Tooltip>
+  {:else}
+    {@render triggerButton()}
+  {/if}
 </div>
 
 <!-- Dropdown Menu -->

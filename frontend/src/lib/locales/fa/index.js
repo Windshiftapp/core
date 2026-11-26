@@ -24,6 +24,7 @@ import agents from './agents.js';
 import dashboard from './dashboard.js';
 import zammad from './zammad.js';
 import mobile from './mobile.js';
+import tooltips from './tooltips.js';
 import email from './email.js';
 
 export default createLocale({
@@ -48,4 +49,5 @@ export default createLocale({
   zammad,
   mobile,
   email,
+  tooltips,
 });

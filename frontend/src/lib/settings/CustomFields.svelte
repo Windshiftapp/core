@@ -728,6 +728,8 @@
         maxWidth="max-w-48"
         showChevron={false}
         iconOnly={true}
+        triggerLabel={t('common.actions')}
+        triggerTooltip={t('common.actions')}
       />
     </div>
   {/snippet}

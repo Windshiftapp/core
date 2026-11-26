@@ -886,18 +886,18 @@
           </button>
           <span class="kebab-slot">
             {#if kebabItems(page).length > 0}
-              <Tooltip content={t('common.actions')} placement="bottom" class="inline-flex">
-                <DropdownMenu
-                  triggerIcon={Dots}
-                  triggerIconClass="w-4 h-4"
-                  items={kebabItems(page)}
-                  showChevron={false}
-                  iconOnly={true}
-                  placement="bottom-end"
-                  triggerClass="kebab-trigger"
-                  triggerTestid="page-kebab"
-                />
-              </Tooltip>
+              <DropdownMenu
+                triggerIcon={Dots}
+                triggerIconClass="w-4 h-4"
+                items={kebabItems(page)}
+                showChevron={false}
+                iconOnly={true}
+                placement="bottom-end"
+                triggerClass="kebab-trigger"
+                triggerLabel={t('common.actions')}
+                triggerTooltip={t('common.actions')}
+                triggerTestid="page-kebab"
+              />
             {/if}
           </span>
         </li>

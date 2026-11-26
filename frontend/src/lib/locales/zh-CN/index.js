@@ -21,6 +21,7 @@ import adminOperations from './adminOperations.js';
 import dashboard from './dashboard.js';
 import zammad from './zammad.js';
 import mobile from './mobile.js';
+import tooltips from './tooltips.js';
 import backfill from './backfill.js';
 
 export default createLocale({
@@ -47,4 +48,5 @@ export default createLocale({
   zammad,
   mobile,
   backfill,
+  tooltips,
 });

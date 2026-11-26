@@ -900,6 +900,8 @@
               <DropdownMenu
                 items={calendarMenuItems}
                 triggerIcon={MoreHorizontal}
+                triggerLabel={t('time.calendarActions')}
+                triggerTooltip={t('time.calendarActions')}
                 placement="bottom"
               />
             </div>

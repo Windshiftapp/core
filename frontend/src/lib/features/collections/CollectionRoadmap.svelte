@@ -22,6 +22,7 @@
   import StaticViewBackground from '../../layout/StaticViewBackground.svelte';
   import SubFilterBar from './SubFilterBar.svelte';
   import Select from '../../components/Select.svelte';
+  import Tooltip from '../../components/Tooltip.svelte';
   import Toggle from '../../components/Toggle.svelte';
   import RoadmapItemPreview from './RoadmapItemPreview.svelte';
   import CollectionHierarchyLoadMore from './CollectionHierarchyLoadMore.svelte';
@@ -1337,14 +1338,17 @@
           </div>
 
           <!-- Navigation -->
-          <button
-            data-testid="roadmap-scroll-left"
-            class="p-1.5 rounded transition-colors"
-            style="color: var(--ctx-text-subtle, var(--ds-text-subtle));"
-            onclick={scrollLeft}
-          >
-            <ChevronLeft class="w-4 h-4" />
-          </button>
+          <Tooltip content={t('collections.roadmapScrollLeft')}>
+            <button
+              data-testid="roadmap-scroll-left"
+              class="p-1.5 rounded transition-colors"
+              style="color: var(--ctx-text-subtle, var(--ds-text-subtle));"
+              aria-label={t('collections.roadmapScrollLeft')}
+              onclick={scrollLeft}
+            >
+              <ChevronLeft class="w-4 h-4" />
+            </button>
+          </Tooltip>
           <button
             data-testid="roadmap-today"
             class="px-2 py-1 text-xs font-medium rounded transition-colors"
@@ -1353,14 +1357,17 @@
           >
             {t('collections.roadmapToday')}
           </button>
-          <button
-            data-testid="roadmap-scroll-right"
-            class="p-1.5 rounded transition-colors"
-            style="color: var(--ctx-text-subtle, var(--ds-text-subtle));"
-            onclick={scrollRight}
-          >
-            <ChevronRight class="w-4 h-4" />
-          </button>
+          <Tooltip content={t('collections.roadmapScrollRight')}>
+            <button
+              data-testid="roadmap-scroll-right"
+              class="p-1.5 rounded transition-colors"
+              style="color: var(--ctx-text-subtle, var(--ds-text-subtle));"
+              aria-label={t('collections.roadmapScrollRight')}
+              onclick={scrollRight}
+            >
+              <ChevronRight class="w-4 h-4" />
+            </button>
+          </Tooltip>
         </div>
 
         <div class="flex items-center justify-end">
@@ -1467,6 +1474,8 @@
                           data-testid="roadmap-toggle-{item.id}"
                           role="button"
                           tabindex="-1"
+                          aria-label={hierarchy.isExpanded(item.id) ? t('collections.roadmapCollapse') : t('collections.roadmapExpand')}
+                          aria-expanded={hierarchy.isExpanded(item.id)}
                           onclick={(e) => { e.stopPropagation(); toggleExpanded(item.id); }}
                           onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleExpanded(item.id); } }}
                         >

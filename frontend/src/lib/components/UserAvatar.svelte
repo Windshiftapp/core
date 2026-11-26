@@ -25,6 +25,8 @@
     // Profile, Security) — used on the mobile surface where those routes render
     // the full desktop UI. Theme + Sign Out remain.
     minimal = false,
+    /** Placement of the trigger tooltip when the avatar is collapsed. */
+    tooltipPlacement = 'bottom',
     isOpen = $bindable(false),
     onOpenChange = null,
   } = $props();
@@ -116,6 +118,7 @@
   triggerAvatar={showAvatar ? authStore.currentUser?.avatar_url : null}
   triggerText={expanded && label ? label : ''}
   triggerLabel={label || t('nav.profile')}
+  triggerTooltipPlacement={tooltipPlacement}
   triggerIcon={!showAvatar ? User : null}
   triggerIconClass="w-5 h-5"
   triggerClass={showAvatar

@@ -111,17 +111,19 @@
 
 {#snippet collapsedFooter()}
   <div class="w-8 border-t mb-2" style="border-color: var(--ds-border);"></div>
-  <Tooltip content="Back to Collections" placement="right">
+  <Tooltip content={t('collections.backToCollections')} placement="right">
     <a
       href="/collections"
+      aria-label={t('collections.backToCollections')}
       class="nav-link w-10 h-10 rounded flex items-center justify-center cursor-pointer transition-colors mb-1 no-underline"
     >
       <FolderOpen size={20} />
     </a>
   </Tooltip>
-  <Tooltip content="Expand sidebar" placement="right">
+  <Tooltip content={t('nav.expandSidebar')} placement="right">
     <button
       onclick={() => uiStore.wsSidebarCollapsed = false}
+      aria-label={t('nav.expandSidebar')}
       class="nav-link w-10 h-10 rounded flex items-center justify-center transition-colors"
     >
       <IconChevronRight size={20} />
@@ -133,7 +135,7 @@
 {#snippet expandedFooter()}
   <div class="px-4 pt-4 border-t" style="border-color: var(--ds-border);">
     <Button variant="default" icon={FolderOpen} href="/collections" class="w-full justify-center">
-      Back to Collections
+      {t('collections.backToCollections')}
     </Button>
   </div>
   {@render resizeHandle()}
@@ -144,7 +146,7 @@
   <ScrollableSidebar
     class="relative h-full flex-shrink-0 border-r items-center py-4"
     style="width: 48px; {sidebarBgStyle}"
-    aria-label="Collection navigation"
+    aria-label={t('collections.navigation')}
     footer={collapsedFooter}
     reserveScrollbarSpace={false}
     scrollClass="w-full"
@@ -157,6 +159,7 @@
           <a
             href={getNavUrl(view.id)}
             data-testid="collection-nav-{view.id}"
+            aria-label={view.label}
             class="nav-link w-10 h-10 rounded flex items-center justify-center transition-colors no-underline"
             class:active={isActive}
           >
@@ -169,9 +172,10 @@
       <div class="w-8 border-t my-1" style="border-color: var(--ds-border);"></div>
 
       <!-- Edit Collection -->
-      <Tooltip content="Edit Collection" placement="right">
+      <Tooltip content={t('collections.editCollection')} placement="right">
         <a
           href={`/collections/${collectionId}`}
+          aria-label={t('collections.editCollection')}
           class="nav-link w-10 h-10 rounded flex items-center justify-center transition-colors no-underline"
           class:active={$currentRoute.view === 'collections-edit'}
         >
@@ -184,6 +188,7 @@
           <a
             href={navConfigUrl}
             data-testid="collection-nav-config-link"
+            aria-label={t('navConfig.configureTitle')}
             class="nav-link w-10 h-10 rounded flex items-center justify-center transition-colors no-underline"
             class:active={isNavConfigActive}
           >
@@ -198,7 +203,7 @@
   <ScrollableSidebar
     class="relative h-full flex-shrink-0 border-r py-4"
     style="width: {sidebarWidth}px; min-width: {MIN_WIDTH}px; max-width: {MAX_WIDTH}px; {sidebarBgStyle}"
-    aria-label="Collection navigation"
+    aria-label={t('collections.navigation')}
     header={expandedHeader}
     footer={expandedFooter}
     scrollClass="px-4"
@@ -228,13 +233,14 @@
         </div>
 
         <!-- Edit Collection -->
-        <Tooltip content="Edit collection query and settings" placement="right">
+        <Tooltip content={t('collections.editCollection')} placement="right">
           <a
             href={`/collections/${collectionId}`}
+            aria-label={t('collections.editCollection')}
             class="nav-link w-full text-left cursor-pointer px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 workspace-nav-item mt-2 no-underline"
           >
             <Pencil class="w-4 h-4" />
-            Edit Collection
+            {t('collections.editCollection')}
           </a>
         </Tooltip>
 

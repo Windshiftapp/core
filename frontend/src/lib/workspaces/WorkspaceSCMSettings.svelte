@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import Spinner from '../components/Spinner.svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
+  import Tooltip from '../components/Tooltip.svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import { workspaceSCM } from '../api/scm.js';
   import Button from '../components/Button.svelte';
@@ -483,22 +484,28 @@
                             >
                               <Settings class="w-4 h-4" />
                             </button>
-                            <a
-                              href={safeHref(repo.repository_url)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              class="p-1 rounded hover:bg-opacity-50"
-                              style="color: var(--ds-text-subtle);"
-                            >
-                              <ExternalLink class="w-4 h-4" />
-                            </a>
-                            <button
-                              class="p-1 rounded hover:bg-opacity-50"
-                              style="color: var(--ds-text-danger);"
-                              onclick={() => unlinkRepo(conn.id, repo)}
-                            >
-                              <X class="w-4 h-4" />
-                            </button>
+                            <Tooltip content={t('scmSettings.openRepository')}>
+                              <a
+                                href={safeHref(repo.repository_url)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={t('scmSettings.openRepository')}
+                                class="p-1 rounded hover:bg-opacity-50"
+                                style="color: var(--ds-text-subtle);"
+                              >
+                                <ExternalLink class="w-4 h-4" />
+                              </a>
+                            </Tooltip>
+                            <Tooltip content={t('scmSettings.unlinkRepository')}>
+                              <button
+                                class="p-1 rounded hover:bg-opacity-50"
+                                style="color: var(--ds-text-danger);"
+                                aria-label={t('scmSettings.unlinkRepository')}
+                                onclick={() => unlinkRepo(conn.id, repo)}
+                              >
+                                <X class="w-4 h-4" />
+                              </button>
+                            </Tooltip>
                           </div>
                         </div>
                         {#if editingRepoSettings?.id === repo.id}

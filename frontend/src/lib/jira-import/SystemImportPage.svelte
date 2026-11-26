@@ -19,6 +19,7 @@
   import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
   import DropdownMenu from '../layout/DropdownMenu.svelte';
   import FormField from '../components/FormField.svelte';
+  import Tooltip from '../components/Tooltip.svelte';
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import Link from '@lucide/svelte/icons/link';
   import Clock from '@lucide/svelte/icons/clock';
@@ -611,18 +612,21 @@
             placeholder={isEditDataCenter ? 'Your Jira personal access token' : 'Your Jira API token'}
             disabled={isSavingConnection}
           />
-          <button
-            type="button"
-            data-testid="jira-import-edit-token-toggle"
-            class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover-bg"
-            onclick={() => editShowToken = !editShowToken}
-          >
-            {#if editShowToken}
-              <EyeOff size={16} style="color: var(--ds-text-subtle);" />
-            {:else}
-              <Eye size={16} style="color: var(--ds-text-subtle);" />
-            {/if}
-          </button>
+          <Tooltip content={editShowToken ? t('jiraImport.form.hideToken') : t('jiraImport.form.showToken')}>
+            <button
+              type="button"
+              data-testid="jira-import-edit-token-toggle"
+              class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover-bg"
+              aria-label={editShowToken ? t('jiraImport.form.hideToken') : t('jiraImport.form.showToken')}
+              onclick={() => editShowToken = !editShowToken}
+            >
+              {#if editShowToken}
+                <EyeOff size={16} style="color: var(--ds-text-subtle);" />
+              {:else}
+                <Eye size={16} style="color: var(--ds-text-subtle);" />
+              {/if}
+            </button>
+          </Tooltip>
         </div>
       </FormField>
     </div>

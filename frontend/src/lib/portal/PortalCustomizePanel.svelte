@@ -427,10 +427,11 @@
   <!-- Vertical Navigation Sidebar -->
   <div class="w-16 border-r flex flex-col items-center py-4" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
     <!-- Edit Mode Toggle -->
-    <Tooltip content="Edit Mode" placement="right">
+    <Tooltip content={t('layout.editMode')} placement="right">
       {#snippet children()}
         <button
           onclick={() => portalStore.toggleEditing()}
+          aria-label={t('layout.editMode')}
           class="w-10 h-10 rounded flex items-center justify-center cursor-pointer transition-all"
           style="background-color: {portalStore.isEditing ? 'var(--ds-background-neutral)' : 'transparent'};"
           data-testid="portal-edit-mode-toggle"
@@ -447,6 +448,7 @@
       {#snippet children()}
         <button
           onclick={() => portalStore.activeSection = 'hero-gradient'}
+          aria-label={t('portal.customize.heroGradient')}
           class="w-10 h-10 rounded flex items-center justify-center cursor-pointer transition-all mb-1"
           style="background-color: {portalStore.activeSection === 'hero-gradient' ? 'var(--ds-background-neutral)' : 'transparent'};"
         >
@@ -460,6 +462,7 @@
       {#snippet children()}
         <button
           onclick={() => portalStore.activeSection = 'navigation'}
+          aria-label={t('portal.customize.navigation')}
           class="w-10 h-10 rounded flex items-center justify-center cursor-pointer transition-all mb-1"
           style="background-color: {portalStore.activeSection === 'navigation' ? 'var(--ds-background-neutral)' : 'transparent'};"
         >
@@ -474,6 +477,7 @@
       {#snippet children()}
         <button
           onclick={() => portalStore.activeSection = 'request-types'}
+          aria-label={t('portal.customize.requestTypes')}
           class="w-10 h-10 rounded flex items-center justify-center cursor-pointer transition-all mb-1"
           style="background-color: {portalStore.activeSection === 'request-types' ? 'var(--ds-background-neutral)' : 'transparent'};"
         >
@@ -489,6 +493,7 @@
           <button
             onclick={() => portalStore.activeSection = 'asset-reports'}
             data-testid="portal-customize-asset-reports-section"
+            aria-label={t('portal.customize.assetReports')}
             class="w-10 h-10 rounded flex items-center justify-center cursor-pointer transition-all mb-1"
             style="background-color: {portalStore.activeSection === 'asset-reports' ? 'var(--ds-background-neutral)' : 'transparent'};"
           >
@@ -504,6 +509,7 @@
         <button
           onclick={() => portalStore.activeSection = 'knowledge-base'}
           data-testid="portal-customize-kb-section"
+          aria-label={t('portal.customize.knowledgeBase')}
           class="w-10 h-10 rounded flex items-center justify-center cursor-pointer transition-all"
           style="background-color: {portalStore.activeSection === 'knowledge-base' ? 'var(--ds-background-neutral)' : 'transparent'};"
         >
@@ -810,6 +816,8 @@
                       showChevron={false}
                       iconOnly={true}
                       placement="bottom-end"
+                      triggerLabel={t('common.actions')}
+                      triggerTooltip={t('common.actions')}
                       items={[
                         {
                           title: t('common.edit'),

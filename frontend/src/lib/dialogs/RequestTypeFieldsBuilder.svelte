@@ -23,6 +23,7 @@
   import Textarea from '../components/Textarea.svelte';
   import PortalModal from './PortalModal.svelte';
   import DraggableFieldRow from '../components/DraggableFieldRow.svelte';
+  import Tooltip from '../components/Tooltip.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import Checkbox from '../components/Checkbox.svelte';
   import DescriptionText from '../components/DescriptionText.svelte';
@@ -902,14 +903,17 @@
                       size="small"
                       class="flex-1"
                     />
-                    <button
-                      onclick={() => removeVirtualFieldOption(i)}
-                      class="p-1.5 rounded"
-                      style="color: var(--ds-status-error);"
-                      disabled={virtualFieldOptions.length === 1}
-                    >
-                      <Trash2 class="w-4 h-4" />
-                    </button>
+                    <Tooltip content={t('common.remove')}>
+                      <button
+                        onclick={() => removeVirtualFieldOption(i)}
+                        aria-label={t('common.remove')}
+                        class="p-1.5 rounded"
+                        style="color: var(--ds-status-error);"
+                        disabled={virtualFieldOptions.length === 1}
+                      >
+                        <Trash2 class="w-4 h-4" />
+                      </button>
+                    </Tooltip>
                   </div>
                 {/each}
                 <button

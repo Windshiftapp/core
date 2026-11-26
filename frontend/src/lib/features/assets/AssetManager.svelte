@@ -707,6 +707,8 @@
           iconOnly={true}
           showChevron={false}
           triggerClass="p-2 rounded hover-bg"
+          triggerLabel={t('assets.setActions')}
+          triggerTooltip={t('assets.setActions')}
           triggerTestid="asset-manager-set-actions"
           items={[
             { id: 'edit', title: t('assets.editSet'), icon: IconEdit, testid: 'asset-manager-edit-set', onClick: () => showEditSetForm(selectedSet) },

@@ -12,6 +12,7 @@ import EmptyState from '../components/EmptyState.svelte';
   import { portalCustomizationStore as portalStore } from '../stores/portal.svelte.js';
   import { iconMap } from '../stores/portalPresentation.js';
   import { t } from '../stores/i18n.svelte.js';
+  import Tooltip from '../components/Tooltip.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
   import { buildRowActionHref } from './rowActions.js';
   import { toExternal } from '../runtime/contextPath.js';
@@ -311,25 +312,31 @@ import EmptyState from '../components/EmptyState.svelte';
         {t('common.showingXofY', { from: (page - 1) * pageSize + 1, to: Math.min(page * pageSize, totalCount), total: totalCount })}
       </span>
       <div class="flex items-center gap-2">
-        <button
-          onclick={prevPage}
-          disabled={page <= 1}
-          class="p-2 rounded transition-colors disabled:opacity-40"
-          style="color: var(--ds-text-subtle);"
-        >
-          <ChevronLeft class="w-4 h-4" />
-        </button>
+        <Tooltip content={t('components.pagination.previousPage')}>
+          <button
+            onclick={prevPage}
+            disabled={page <= 1}
+            aria-label={t('components.pagination.previousPage')}
+            class="p-2 rounded transition-colors disabled:opacity-40"
+            style="color: var(--ds-text-subtle);"
+          >
+            <ChevronLeft class="w-4 h-4" />
+          </button>
+        </Tooltip>
         <span class="text-sm" style="color: var(--ds-text);">
           {page} / {totalPages}
         </span>
-        <button
-          onclick={nextPage}
-          disabled={page >= totalPages}
-          class="p-2 rounded transition-colors disabled:opacity-40"
-          style="color: var(--ds-text-subtle);"
-        >
-          <ChevronRight class="w-4 h-4" />
-        </button>
+        <Tooltip content={t('components.pagination.nextPage')}>
+          <button
+            onclick={nextPage}
+            disabled={page >= totalPages}
+            aria-label={t('components.pagination.nextPage')}
+            class="p-2 rounded transition-colors disabled:opacity-40"
+            style="color: var(--ds-text-subtle);"
+          >
+            <ChevronRight class="w-4 h-4" />
+          </button>
+        </Tooltip>
       </div>
     </div>
   {/if}

@@ -7,6 +7,7 @@
   import X from '@lucide/svelte/icons/x';
   import Search from '@lucide/svelte/icons/search';
   import Spinner from '../components/Spinner.svelte';
+  import Tooltip from '../components/Tooltip.svelte';
   import { t } from '../stores/i18n.svelte.js';
   import { controlSizeClasses } from '../utils/controlSizes.js';
   import { useRowRetention } from '../virtualization/useRowRetention.svelte';
@@ -613,10 +614,13 @@
           {:else}
             <span class="font-medium truncate max-w-[150px]" dir="auto">{labelFor(item)}</span>
           {/if}
-          <button type="button" onclick={(e) => removeItem(e, itemValue(item))}
-                  class="picker-clear rounded p-0.5 transition-colors" {disabled}>
-            <X class="w-3 h-3" style="color: var(--ds-text-subtle);" />
-          </button>
+          <Tooltip content={t('pickers.removeSelection', { label: labelFor(item) })}>
+            <button type="button" onclick={(e) => removeItem(e, itemValue(item))}
+                    aria-label={t('pickers.removeSelection', { label: labelFor(item) })}
+                    class="picker-clear rounded p-0.5 transition-colors" {disabled}>
+              <X class="w-3 h-3" style="color: var(--ds-text-subtle);" />
+            </button>
+          </Tooltip>
         </div>
       {/each}
       <input bind:this={inputRef} use:melt={$input} id={field.id} type="text"
