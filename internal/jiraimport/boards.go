@@ -4,12 +4,14 @@ import (
 	"errors"
 	"strings"
 
+	"windshift/internal/itemorder"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 )
 
 func (s *Service) EnsureCollection(
 	jobID, jiraID, jiraKey, name, description, ql string,
+	defaultSort itemorder.Sort,
 	workspaceID, createdByUserID int,
 	metadata map[string]any,
 ) (int, bool) {
@@ -28,14 +30,16 @@ func (s *Service) EnsureCollection(
 			creator = &createdByUserID
 		}
 		collection = &models.Collection{
-			Name: name, Description: description, QLQuery: ql, WorkspaceID: &workspaceID,
+			Name: name, Description: description, QLQuery: ql, DefaultSort: defaultSort, WorkspaceID: &workspaceID,
 		}
 		err = s.collections.CreateForImport(collection, creator)
 		action = "create"
 	} else if err == nil && (strings.TrimSpace(collection.Description) != strings.TrimSpace(description) ||
-		strings.TrimSpace(collection.QLQuery) != strings.TrimSpace(ql)) {
+		strings.TrimSpace(collection.QLQuery) != strings.TrimSpace(ql) ||
+		!collectionSortEqual(collection.DefaultSort, defaultSort)) {
 		collection.Description = description
 		collection.QLQuery = ql
+		collection.DefaultSort = defaultSort
 		err = s.collections.Update(collection.ID, collection)
 		action = "update_existing"
 	}
@@ -51,6 +55,20 @@ func (s *Service) EnsureCollection(
 		return 0, false
 	}
 	return collection.ID, true
+}
+
+// collectionSortEqual reports whether two saved sort vectors are identical, so
+// a re-import only rewrites the collection when the source order changed.
+func collectionSortEqual(left, right itemorder.Sort) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Service) StatusCategoryIDs(statusIDs []int) (map[int]int, error) {

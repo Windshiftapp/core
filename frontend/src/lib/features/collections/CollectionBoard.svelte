@@ -37,7 +37,7 @@
     serializeBoardGroupBy,
   } from './boardSwimlanes.js';
   import { buildBoardConfigurationPayload } from './boardConfigPayload.js';
-  import { buildBoardColumnModel } from './boardColumnModel.js';
+  import { buildBoardColumnModel, boardSortDisablesManualReorder } from './boardColumnModel.js';
   import {
     milestoneAssignableToWorkspace,
     milestoneDropRemovals,
@@ -252,7 +252,12 @@
   let collapsedColumns = $state({});
 
   // Rank enables manual ordering; bubble prioritizes recent activity.
-  let sortMode = $state('rank');
+  let sortMode = $state('default');
+  // True when the collection carries an imported default sort, which makes the
+  // displayed order non-manual and disables same-column drag reordering.
+  let collectionDefaultSortActive = $derived(
+    (collectionStore.boardCollection?.default_sort?.length ?? 0) > 0
+  );
 
   // Edge-based drag state
   let dragState = $state(new Map()); // Track drag state for each item: { isDragging: boolean, closestEdge: 'top'|'bottom'|null }
@@ -1069,18 +1074,23 @@
     return `board-sort-mode-${boardPreferenceScope()}`;
   }
 
+  // Distinguish "no stored preference" (follow the collection's imported
+  // default) from an explicit Rank or Bubble choice, including legacy values.
   function loadSortMode() {
     const stored = collectionPreferences.viewStateValue(workspaceId, collectionId, 'board', 'sort_mode');
-    if (stored !== undefined) return stored === 'bubble' ? 'bubble' : 'rank';
+    if (stored !== undefined) return stored === 'bubble' ? 'bubble' : stored === 'rank' ? 'rank' : 'default';
     try {
-      return localStorage.getItem(sortModeStorageKey()) === 'bubble' ? 'bubble' : 'rank';
+      const legacy = localStorage.getItem(sortModeStorageKey());
+      if (legacy === 'bubble') return 'bubble';
+      if (legacy === 'rank') return 'rank';
     } catch (e) {
-      return 'rank';
+      // Storage is optional; fall through to the collection default.
     }
+    return 'default';
   }
 
   function setSortMode(mode) {
-    sortMode = mode === 'bubble' ? 'bubble' : 'rank';
+    sortMode = mode === 'bubble' ? 'bubble' : mode === 'rank' ? 'rank' : 'default';
     collectionPreferences.patchViewState(workspaceId, collectionId, 'board', { sort_mode: sortMode });
     collectionStore.setBoardSortMode(sortMode);
   }
@@ -1208,6 +1218,14 @@
   });
 
   let sortByMenuItems = $derived([
+    {
+      id: 'sort-default',
+      testid: 'board-sort-default',
+      title: t('boardControls.collectionDefaultMode'),
+      subtitle: t('boardControls.collectionDefaultModeDescription'),
+      selected: sortMode === 'default',
+      onClick: () => setSortMode('default')
+    },
     {
       id: 'sort-rank',
       testid: 'board-sort-rank',
@@ -1951,11 +1969,11 @@
 
       preparedItem = await applyLaneTarget(preparedItem, laneTarget);
 
-      // Bubble Mode disables manual rank ordering. Cross-column drags above have
-      // already transitioned status (which bumps the card to the top via
-      // last_active_at); a same-column drag is a no-op. Either way, skip the
-      // frac_index reorder and just refresh.
-      if (sortMode === 'bubble') {
+      // Bubble Mode and an imported default sort disable manual rank ordering:
+      // the displayed order is not frac_index, so a same-column drag cannot map
+      // to a rank move. Cross-column drags above have already transitioned
+      // status; a same-column drag is a no-op and just refreshes.
+      if (boardSortDisablesManualReorder(sortMode, collectionDefaultSortActive)) {
         if (isSameStatus && !wouldChangeBoardLane(preparedItem, laneTarget)) {
           infoToast(
             t('collections.manual_sort_unavailable'),
@@ -2080,7 +2098,7 @@
                     items={sortByMenuItems}
                     disabled={collectionStore.loading}
                     triggerIcon={ArrowDownUp}
-                    triggerText={sortMode === 'bubble' ? t('boardControls.sortBubble') : t('boardControls.sortBy')}
+                    triggerText={sortMode === 'bubble' ? t('boardControls.sortBubble') : sortMode === 'default' ? t('boardControls.collectionDefaultMode') : t('boardControls.sortBy')}
                     placement="bottom-end"
                     maxWidth="max-w-xs"
                     triggerClass={segment}

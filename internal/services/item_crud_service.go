@@ -14,6 +14,7 @@ import (
 	"windshift/internal/cql"
 	"windshift/internal/database"
 	"windshift/internal/itemevents"
+	"windshift/internal/itemorder"
 	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/validation"
@@ -543,24 +544,24 @@ func (s *ItemCRUDService) SearchContext(ctx context.Context, query string, works
 	return s.repo.SearchContext(ctx, query, workspaceIDs, pagination)
 }
 
-func (s *ItemCRUDService) resolveCollectionQLContext(ctx context.Context, qlQuery string, collectionID int) (resolvedQL string, isCollection bool, err error) {
+func (s *ItemCRUDService) resolveCollectionQLContext(ctx context.Context, qlQuery string, collectionID int) (resolvedQL string, isCollection bool, defaultSort itemorder.Sort, err error) {
 	if qlQuery != "" {
-		return qlQuery, false, nil
+		return qlQuery, false, nil, nil
 	}
 	if collectionID <= 0 {
-		return "", false, nil
+		return "", false, nil, nil
 	}
-	_, collectionQL, err := s.workspaceRepo.GetCollectionQueryContext(ctx, collectionID)
+	_, collectionQL, collectionSort, err := s.workspaceRepo.GetCollectionQueryContext(ctx, collectionID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			return "", false, fmt.Errorf("%w: %d", ErrCollectionNotFound, collectionID)
+			return "", false, nil, fmt.Errorf("%w: %d", ErrCollectionNotFound, collectionID)
 		}
-		return "", false, fmt.Errorf("failed to get collection query: %w", err)
+		return "", false, nil, fmt.Errorf("failed to get collection query: %w", err)
 	}
 	if strings.TrimSpace(collectionQL) != "" {
-		return collectionQL, true, nil
+		return collectionQL, true, collectionSort, nil
 	}
-	return "", true, nil
+	return "", true, collectionSort, nil
 }
 
 func (s *ItemCRUDService) evaluateQLContext(requestCtx context.Context, qlQuery string, functionCtx cql.FunctionContext) (qlSQL string, qlArgs []any, err error) {
@@ -588,10 +589,11 @@ type resolvedItemListQL struct {
 	sql                string
 	args               []any
 	collectionResolved bool
+	defaultSort        itemorder.Sort
 }
 
 func (s *ItemCRUDService) resolveItemListQLContext(ctx context.Context, qlQuery string, collectionID int, subQL string, userID int) (resolvedItemListQL, error) {
-	qlQuery, collectionResolved, err := s.resolveCollectionQLContext(ctx, qlQuery, collectionID)
+	qlQuery, collectionResolved, defaultSort, err := s.resolveCollectionQLContext(ctx, qlQuery, collectionID)
 	if err != nil {
 		return resolvedItemListQL{}, err
 	}
@@ -606,7 +608,7 @@ func (s *ItemCRUDService) resolveItemListQLContext(ctx context.Context, qlQuery 
 	if err != nil {
 		return resolvedItemListQL{}, err
 	}
-	return resolvedItemListQL{sql: qlSQL, args: qlArgs, collectionResolved: collectionResolved}, nil
+	return resolvedItemListQL{sql: qlSQL, args: qlArgs, collectionResolved: collectionResolved, defaultSort: defaultSort}, nil
 }
 
 // BacklogParams contains parameters for retrieving backlog items
@@ -670,16 +672,19 @@ func (s *ItemCRUDService) GetBacklogItemsContext(ctx context.Context, params Bac
 
 // ListWithQLParams contains parameters for listing items with QL support
 type ListWithQLParams struct {
-	WorkspaceID      int    // Single workspace filter (0 = all accessible)
-	CollectionID     int    // Collection to resolve QL from (0 = none)
-	QLQuery          string // Direct QL query (overrides collection)
-	SubQLQuery       string // Sub-filter QL query (ANDed with base QL)
-	WorkspaceIDs     []int  // Accessible workspace IDs for security filtering
-	UserID           int    // Authenticated user ID for currentUser() resolution
-	Filters          ItemFilters
-	Pagination       PaginationParams
-	SortBy           string
-	SortAsc          bool
+	WorkspaceID  int    // Single workspace filter (0 = all accessible)
+	CollectionID int    // Collection to resolve QL from (0 = none)
+	QLQuery      string // Direct QL query (overrides collection)
+	SubQLQuery   string // Sub-filter QL query (ANDed with base QL)
+	WorkspaceIDs []int  // Accessible workspace IDs for security filtering
+	UserID       int    // Authenticated user ID for currentUser() resolution
+	Filters      ItemFilters
+	Pagination   PaginationParams
+	SortBy       string
+	SortAsc      bool
+	// SortTerms is an explicit multi-key request sort. When empty, a resolved
+	// collection's saved default applies before the native rank order.
+	SortTerms        itemorder.Sort
 	OmitDescriptions bool
 }
 
@@ -719,12 +724,21 @@ func (s *ItemCRUDService) ListWithQLPageContext(ctx context.Context, params List
 		filters.WorkspaceID = &params.WorkspaceID
 	}
 
+	// Precedence: explicit request sort, then the collection's saved default,
+	// then the native rank order. An explicit request sort is either the signed
+	// single-key SortBy or an explicit SortTerms vector.
+	sortTerms := params.SortTerms
+	if params.SortBy == "" && len(sortTerms) == 0 {
+		sortTerms = resolvedQL.defaultSort
+	}
+
 	return s.repo.FindAllWithDetailsPageContext(ctx, ItemListParams{
 		WorkspaceIDs:     params.WorkspaceIDs,
 		Filters:          filters,
 		Pagination:       params.Pagination,
 		SortBy:           params.SortBy,
 		SortAsc:          params.SortAsc,
+		SortTerms:        sortTerms,
 		OmitDescriptions: params.OmitDescriptions,
 	})
 }

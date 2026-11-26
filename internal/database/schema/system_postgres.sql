@@ -180,6 +180,7 @@ CREATE TABLE IF NOT EXISTS collections (
 	description TEXT,
 	ql_query TEXT,
 	filter_state TEXT,
+	default_sort TEXT,
 	is_public BOOLEAN DEFAULT false,
 	is_private BOOLEAN NOT NULL DEFAULT false,
 	public_milestone_swimlanes BOOLEAN NOT NULL DEFAULT false,

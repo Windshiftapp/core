@@ -3,12 +3,14 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/itemorder"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 )
@@ -20,6 +22,7 @@ type CollectionRecord struct {
 	Name        string
 	Description string
 	QLQuery     string
+	DefaultSort itemorder.Sort
 	WorkspaceID *int
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
@@ -39,7 +42,7 @@ func NewCollectionRepository(db database.Database) *CollectionRepository {
 }
 
 const collectionModelSelect = `SELECT c.id, c.name, COALESCE(c.description, ''), COALESCE(c.ql_query, ''),
-       c.filter_state, c.is_public, c.is_private, c.public_milestone_swimlanes, c.workspace_id, c.category_id, c.created_by,
+       c.filter_state, c.default_sort, c.is_public, c.is_private, c.public_milestone_swimlanes, c.workspace_id, c.category_id, c.created_by,
        c.public_slug, c.created_at, c.updated_at,
        COALESCE(u.first_name || ' ' || u.last_name, ''), COALESCE(u.email, ''),
        COALESCE(cc.name, ''), COALESCE(cc.color, ''),
@@ -56,10 +59,10 @@ type collectionModelScanner interface {
 func scanCollectionModel(scanner collectionModelScanner) (models.Collection, error) {
 	var collection models.Collection
 	var workspaceID, categoryID, createdBy sql.NullInt64
-	var publicSlug, filterState sql.NullString
+	var publicSlug, filterState, defaultSort sql.NullString
 	err := scanner.Scan(
 		&collection.ID, &collection.Name, &collection.Description, &collection.QLQuery,
-		&filterState, &collection.IsPublic, &collection.IsPrivate, &collection.PublicMilestoneSwimlanes,
+		&filterState, &defaultSort, &collection.IsPublic, &collection.IsPrivate, &collection.PublicMilestoneSwimlanes,
 		&workspaceID, &categoryID, &createdBy,
 		&publicSlug, &collection.CreatedAt, &collection.UpdatedAt,
 		&collection.CreatorName, &collection.CreatorEmail,
@@ -88,7 +91,38 @@ func scanCollectionModel(scanner collectionModelScanner) (models.Collection, err
 	if filterState.Valid {
 		collection.FilterState = &filterState.String
 	}
+	collection.DefaultSort = unmarshalCollectionSort(defaultSort.String)
 	return collection, nil
+}
+
+// unmarshalCollectionSort decodes a persisted sort vector, treating malformed
+// or unsupported values as no saved default rather than failing the read.
+func unmarshalCollectionSort(raw string) itemorder.Sort {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	var terms itemorder.Sort
+	if err := json.Unmarshal([]byte(raw), &terms); err != nil {
+		return nil
+	}
+	if len(terms) == 0 || terms.Validate() != nil {
+		return nil
+	}
+	return terms
+}
+
+// marshalCollectionSort renders the persisted sort vector, or nil so an empty
+// vector clears the column rather than storing "[]".
+func marshalCollectionSort(sort itemorder.Sort) any {
+	if len(sort) == 0 {
+		return nil
+	}
+	encoded, err := json.Marshal(sort)
+	if err != nil {
+		return nil
+	}
+	return string(encoded)
 }
 
 // CollectionListFilter narrows the cookie-auth collection list.
@@ -182,9 +216,9 @@ func (r *CollectionRepository) CreateForImport(collection *models.Collection, us
 	var id int64
 	err := r.db.QueryRow(`
 		INSERT INTO collections
-			(name, description, ql_query, filter_state, is_public, is_private, public_milestone_swimlanes, workspace_id, category_id, created_by, public_slug, board_enabled, board_ever_published, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
-	`, collection.Name, collection.Description, collection.QLQuery, collection.FilterState,
+			(name, description, ql_query, filter_state, default_sort, is_public, is_private, public_milestone_swimlanes, workspace_id, category_id, created_by, public_slug, board_enabled, board_ever_published, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+	`, collection.Name, collection.Description, collection.QLQuery, collection.FilterState, marshalCollectionSort(collection.DefaultSort),
 		collection.IsPublic, collection.IsPrivate, collection.PublicMilestoneSwimlanes, collection.WorkspaceID, collection.CategoryID, userID, collection.PublicSlug, collection.IsPublic, collection.IsPublic).Scan(&id)
 	if err != nil {
 		return fmt.Errorf("create imported collection: %w", err)
@@ -226,9 +260,9 @@ func (r *CollectionRepository) Create(collection *models.Collection, userID int,
 	var id int64
 	err := database.WithTx(r.db, func(tx database.Tx) error {
 		if err := tx.QueryRow(`
-		 INSERT INTO collections (name, description, ql_query, filter_state, is_public, is_private, public_milestone_swimlanes, workspace_id, category_id, created_by, public_slug, board_enabled, board_ever_published, sharing_changed_at, sharing_changed_by, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
-		`, collection.Name, collection.Description, collection.QLQuery, collection.FilterState,
+		 INSERT INTO collections (name, description, ql_query, filter_state, default_sort, is_public, is_private, public_milestone_swimlanes, workspace_id, category_id, created_by, public_slug, board_enabled, board_ever_published, sharing_changed_at, sharing_changed_by, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+		`, collection.Name, collection.Description, collection.QLQuery, collection.FilterState, marshalCollectionSort(collection.DefaultSort),
 			collection.IsPublic, collection.IsPrivate, collection.PublicMilestoneSwimlanes, collection.WorkspaceID, collection.CategoryID, userID, collection.PublicSlug, collection.IsPublic, collection.IsPublic, collection.SharingChangedAt, collection.SharingChangedBy).Scan(&id); err != nil {
 			return err
 		}
@@ -269,11 +303,11 @@ func (r *CollectionRepository) Update(id int, collection *models.Collection, aud
 		}
 		result, err := tx.Exec(`
 			UPDATE collections
-			SET name = ?, description = ?, ql_query = ?, filter_state = ?, is_public = ?, is_private = ?, public_milestone_swimlanes = ?, workspace_id = ?, category_id = ?, public_slug = ?, updated_at = CURRENT_TIMESTAMP,
+			SET name = ?, description = ?, ql_query = ?, filter_state = ?, default_sort = ?, is_public = ?, is_private = ?, public_milestone_swimlanes = ?, workspace_id = ?, category_id = ?, public_slug = ?, updated_at = CURRENT_TIMESTAMP,
 			board_enabled = ?, board_standalone_enabled = ?, board_ever_published = board_ever_published OR ?, sharing_revision = sharing_revision + 1,
 			sharing_changed_at = ?, sharing_changed_by = ?
 			WHERE id = ? AND sharing_revision = ?
-		`, collection.Name, collection.Description, collection.QLQuery, collection.FilterState,
+		`, collection.Name, collection.Description, collection.QLQuery, collection.FilterState, marshalCollectionSort(collection.DefaultSort),
 			collection.IsPublic, collection.IsPrivate, collection.PublicMilestoneSwimlanes, collection.WorkspaceID, collection.CategoryID, collection.PublicSlug,
 			collection.BoardEnabled, collection.BoardStandaloneEnabled, collection.BoardEnabled, collection.SharingChangedAt, collection.SharingChangedBy, id, collection.SharingRevision)
 		if err != nil {
@@ -356,14 +390,14 @@ func (r *CollectionRepository) GetByID(id int) (*CollectionRecord, error) {
 	var rec CollectionRecord
 	var workspaceID sql.NullInt64
 	var createdBy sql.NullInt64
-	var slug sql.NullString
+	var slug, defaultSort sql.NullString
 	err := r.db.QueryRow(`
-		SELECT id, name, COALESCE(description, ''), COALESCE(ql_query, ''), workspace_id, is_public, is_private, created_by,
+		SELECT id, name, COALESCE(description, ''), COALESCE(ql_query, ''), default_sort, workspace_id, is_public, is_private, created_by,
 		       public_slug, created_at, updated_at
 		FROM collections
 		WHERE id = ?
 	`, id).Scan(
-		&rec.ID, &rec.Name, &rec.Description, &rec.QLQuery,
+		&rec.ID, &rec.Name, &rec.Description, &rec.QLQuery, &defaultSort,
 		&workspaceID, &rec.IsPublic, &rec.IsPrivate, &createdBy,
 		&slug, &rec.CreatedAt, &rec.UpdatedAt,
 	)
@@ -373,6 +407,7 @@ func (r *CollectionRepository) GetByID(id int) (*CollectionRecord, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get collection by id: %w", err)
 	}
+	rec.DefaultSort = unmarshalCollectionSort(defaultSort.String)
 	hydrateCollectionNulls(&rec, workspaceID, createdBy)
 	if slug.Valid {
 		rec.Slug = slug.String

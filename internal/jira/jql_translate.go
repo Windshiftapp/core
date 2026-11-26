@@ -4,25 +4,31 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"windshift/internal/itemorder"
 )
 
 var (
-	jqlOrderByPattern      = regexp.MustCompile(`(?i)\s+ORDER\s+BY\s+.+$`)
 	jqlSimpleClausePattern = regexp.MustCompile(`(?is)^\s*([A-Za-z][A-Za-z0-9_ -]*?)\s*(=|!=|<>|~|NOT\s+IN|IN)\s*(.+?)\s*$`)
+	jqlNullCheckPattern    = regexp.MustCompile(`(?is)^\s*([A-Za-z][A-Za-z0-9_ -]*?)\s+IS\s+(NOT\s+)?(EMPTY|NULL)\s*$`)
 	jqlOuterParensPattern  = regexp.MustCompile(`^\((.*)\)$`)
 	jqlWhitespacePattern   = regexp.MustCompile(`\s+`)
 	jqlIdentifierSafe      = regexp.MustCompile(`^[A-Za-z0-9_.:-]+$`)
 )
 
 // JQLTranslation is the outcome of translating a Jira JQL expression. QL is the
-// Windshift selector; Unsupported lists clauses that could not be translated.
-// MembershipComplete is false when an unsupported clause changes which issues
-// the expression matches, so callers must not execute QL as the full predicate.
+// Windshift selector; Unsupported lists predicate clauses that could not be
+// translated. MembershipComplete is false when an unsupported clause changes
+// which issues the expression matches, so callers must not execute QL as the
+// full predicate. Order carries the validated, ordered sort vector parsed from
+// ORDER BY; OrderingDiagnostics explains why an unsupported vector is absent.
 // An unsupported ORDER BY alone leaves membership complete.
 type JQLTranslation struct {
-	QL                 string
-	Unsupported        []string
-	MembershipComplete bool
+	QL                  string
+	Unsupported         []string
+	MembershipComplete  bool
+	Order               itemorder.Sort
+	OrderingDiagnostics []string
 }
 
 // TranslateJQLToWindshiftQL translates a Jira JQL expression into Windshift QL
@@ -31,7 +37,27 @@ type JQLTranslation struct {
 // selector inactive rather than widening it.
 func TranslateJQLToWindshiftQL(jql string, workspaceID int) (ql string, unsupported []string) {
 	translation := TranslateJQL(jql, workspaceID)
-	return translation.QL, translation.Unsupported
+	unsupported = append([]string{}, translation.Unsupported...)
+	// This compatibility wrapper serves consumers such as SLA goal import that
+	// execute a predicate and cannot carry a saved order. Keep ORDER BY visible
+	// as an unsupported clause so a supported collection sort never silently
+	// activates a goal with different semantics. Collection import uses
+	// TranslateJQL directly and consumes Order.
+	if len(translation.Order) > 0 {
+		unsupported = append(unsupported, "ORDER BY "+formatJQLOrder(translation.Order))
+	}
+	unsupported = append(unsupported, translation.OrderingDiagnostics...)
+	return translation.QL, unsupported
+}
+
+// formatJQLOrder renders a validated vector back to source spelling for
+// diagnostics. It never reaches a target query.
+func formatJQLOrder(order itemorder.Sort) string {
+	terms := make([]string, 0, len(order))
+	for _, term := range order {
+		terms = append(terms, term.Field+" "+strings.ToUpper(string(term.Direction)))
+	}
+	return strings.Join(terms, ", ")
 }
 
 // TranslateJQL translates a Jira JQL expression and reports whether the
@@ -45,9 +71,11 @@ func TranslateJQL(jql string, workspaceID int) JQLTranslation {
 	if jql == "" {
 		return result
 	}
-	if match := jqlOrderByPattern.FindString(jql); match != "" {
-		result.Unsupported = append(result.Unsupported, strings.TrimSpace(match))
-		jql = strings.TrimSpace(jqlOrderByPattern.ReplaceAllString(jql, ""))
+	jql, orderText := splitJQLOrderBy(jql)
+	if orderText != "" {
+		order, diagnostics := parseJQLOrderTerms(orderText)
+		result.Order = order
+		result.OrderingDiagnostics = diagnostics
 	}
 	if jql == "" {
 		return result
@@ -99,7 +127,7 @@ type JQLProjectScope struct {
 // AnalyzeJQLProjectScope extracts the project predicate from a JQL expression.
 func AnalyzeJQLProjectScope(jql string) JQLProjectScope {
 	scope := JQLProjectScope{Analyzed: true}
-	jql = strings.TrimSpace(jqlOrderByPattern.ReplaceAllString(strings.TrimSpace(jql), ""))
+	jql, _ = splitJQLOrderBy(strings.TrimSpace(jql))
 	if jql == "" {
 		return scope
 	}
@@ -291,6 +319,9 @@ func translateJQLClause(clause string) (string, bool) {
 	if containsTopLevelJQLKeyword(clause, "OR") || containsTopLevelJQLKeyword(clause, "AND") {
 		return "", false
 	}
+	if nullQL, ok := translateJQLNullCheck(clause); ok {
+		return nullQL, true
+	}
 	m := jqlSimpleClausePattern.FindStringSubmatch(clause)
 	if len(m) != 4 {
 		return "", false
@@ -298,6 +329,10 @@ func translateJQLClause(clause string) (string, bool) {
 	field := normalizeJQLField(m[1])
 	op := normalizeJQLOperator(m[2])
 	rawValue := strings.TrimSpace(m[3])
+
+	if field == "assignee" || field == "assigneeid" {
+		return translateJQLAssigneeClause(op, rawValue)
+	}
 
 	if field == "project" {
 		if op == "=" || op == "IN" {
@@ -339,6 +374,63 @@ func translateJQLClause(clause string) (string, bool) {
 		return fmt.Sprintf("%s ~ %s", qlField, quoteQLValue(mapped)), true
 	}
 	return fmt.Sprintf("%s %s %s", qlField, op, quoteQLValue(mapped)), true
+}
+
+// translateJQLNullCheck handles `<field> IS [NOT] EMPTY|NULL`, which the
+// comparison grammar does not cover. EMPTY and NULL are equivalent for the
+// target fields that support null checks.
+func translateJQLNullCheck(clause string) (string, bool) {
+	m := jqlNullCheckPattern.FindStringSubmatch(clause)
+	if len(m) != 4 {
+		return "", false
+	}
+	qlField, ok := jqlNullCheckField(normalizeJQLField(m[1]))
+	if !ok {
+		return "", false
+	}
+	if strings.TrimSpace(m[2]) != "" {
+		return qlField + " IS NOT NULL", true
+	}
+	return qlField + " IS NULL", true
+}
+
+// jqlNullCheckField maps an `IS [NOT] EMPTY` predicate to a target field whose
+// column is a scalar reference, so the null check has the same meaning as the
+// source. It is deliberately narrower than jqlFieldMapping: a transformed or
+// multi-value mapping (for example component -> labels:component) has no
+// equivalent null check, so it stays unsupported instead of matching the wrong
+// rows.
+func jqlNullCheckField(field string) (string, bool) {
+	switch field {
+	case "assignee", "assigneeid":
+		return "assignee", true
+	case "priority", "priorityid":
+		return "priority", true
+	case "status", "statusid":
+		return "status", true
+	default:
+		return "", false
+	}
+}
+
+// translateJQLAssigneeClause translates the viewer-relative assignee predicate.
+// Only currentUser() has an equivalent target expression; a named user without a
+// proven mapping stays unsupported rather than being quoted as a literal.
+func translateJQLAssigneeClause(op, rawValue string) (string, bool) {
+	if op != "=" && op != "!=" {
+		return "", false
+	}
+	value := strings.TrimSpace(rawValue)
+	if len(value) >= 2 {
+		first, last := value[0], value[len(value)-1]
+		if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
+			return "", false
+		}
+	}
+	if !strings.EqualFold(value, "currentUser()") {
+		return "", false
+	}
+	return fmt.Sprintf("assignee %s currentUser()", op), true
 }
 
 func normalizeJQLField(field string) string {
@@ -504,6 +596,158 @@ func containsTopLevelJQLKeyword(value, keyword string) bool {
 		}
 	}
 	return false
+}
+
+// splitJQLOrderBy separates a JQL expression into its predicate and the text
+// following a top-level ORDER BY. The keyword is only recognized outside quotes
+// and parentheses, so a literal "ORDER BY" inside a quoted summary stays part of
+// the predicate. A malformed or missing BY leaves the whole expression as the
+// predicate.
+func splitJQLOrderBy(jql string) (predicate, orderText string) {
+	runes := []rune(jql)
+	quote := rune(0)
+	depth := 0
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		if quote != 0 {
+			if r == '\\' && i+1 < len(runes) {
+				i++
+				continue
+			}
+			if r == quote {
+				quote = 0
+			}
+			continue
+		}
+		switch r {
+		case '\'', '"':
+			quote = r
+		case '(':
+			depth++
+		case ')':
+			if depth > 0 {
+				depth--
+			}
+		default:
+			if depth != 0 || !hasJQLKeywordAt(runes, i, "ORDER") {
+				continue
+			}
+			j := i + len("ORDER")
+			for j < len(runes) && isJQLSpace(runes[j]) {
+				j++
+			}
+			if !hasJQLKeywordAt(runes, j, "BY") {
+				continue
+			}
+			return strings.TrimSpace(string(runes[:i])), strings.TrimSpace(string(runes[j+len("BY"):]))
+		}
+	}
+	return strings.TrimSpace(jql), ""
+}
+
+func isJQLSpace(r rune) bool {
+	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
+}
+
+// parseJQLOrderTerms parses an ORDER BY body into validated target sort terms.
+// A vector with any untranslatable term is rejected as a unit: a partial order
+// would be presented as the source order when it is not. Terms keep their
+// source spelling and explicit direction; omitted directions default to the
+// Jira field default (ascending).
+func parseJQLOrderTerms(orderText string) (order itemorder.Sort, diagnostics []string) {
+	parts := splitJQLTopLevel(orderText, ',')
+	order = make(itemorder.Sort, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		fields := strings.Fields(part)
+		if len(fields) == 0 || len(fields) > 2 {
+			return nil, []string{"unrecognized ORDER BY term: " + part}
+		}
+		target, ok := jqlSortField(fields[0])
+		if !ok {
+			return nil, []string{"unsupported ORDER BY field: " + fields[0]}
+		}
+		direction := itemorder.Asc
+		if len(fields) == 2 {
+			switch strings.ToUpper(fields[1]) {
+			case "ASC":
+				direction = itemorder.Asc
+			case "DESC":
+				direction = itemorder.Desc
+			default:
+				return nil, []string{"unsupported ORDER BY direction: " + fields[1]}
+			}
+		}
+		order = append(order, itemorder.Term{Field: target, Direction: direction})
+	}
+	if len(order) == 0 {
+		return nil, []string{"empty ORDER BY clause"}
+	}
+	if err := order.Validate(); err != nil {
+		return nil, []string{err.Error()}
+	}
+	return order, nil
+}
+
+// jqlSortField maps a source ORDER BY field to its target comparator. Rank is
+// the only Jira Agile field with a native equivalent; the rest are common Jira
+// system fields.
+func jqlSortField(field string) (string, bool) {
+	switch normalizeJQLField(field) {
+	case "priority":
+		return itemorder.FieldPriority, true
+	case "created", "createddate":
+		return itemorder.FieldCreatedAt, true
+	case "updated", "updateddate":
+		return itemorder.FieldUpdatedAt, true
+	case "rank":
+		return itemorder.FieldRank, true
+	default:
+		return "", false
+	}
+}
+
+// splitJQLTopLevel splits on a separator that appears outside quotes and
+// parentheses, so a comma inside a quoted value or function call is preserved.
+func splitJQLTopLevel(value string, sep rune) []string {
+	runes := []rune(value)
+	quote := rune(0)
+	depth := 0
+	start := 0
+	parts := make([]string, 0, 4)
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		if quote != 0 {
+			if r == '\\' && i+1 < len(runes) {
+				i++
+				continue
+			}
+			if r == quote {
+				quote = 0
+			}
+			continue
+		}
+		switch r {
+		case '\'', '"':
+			quote = r
+		case '(':
+			depth++
+		case ')':
+			if depth > 0 {
+				depth--
+			}
+		case sep:
+			if depth == 0 {
+				parts = append(parts, string(runes[start:i]))
+				start = i + 1
+			}
+		}
+	}
+	parts = append(parts, string(runes[start:]))
+	return parts
 }
 
 // JQL boolean parsing

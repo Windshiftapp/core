@@ -3989,6 +3989,14 @@ END $$;
 			CREATE INDEX idx_email_reply_outbox_pending
 				ON email_reply_outbox(delivered_at, discarded_at, next_attempt_at, created_at);
 		`,
+	},
+	{
+		Version:       "20261211_collection_default_sort",
+		Name:          "Persist the ordered default sort of an imported collection (WI-2371)",
+		CheckSQLite:   sqliteColumnCheck("collections", "default_sort"),
+		CheckPostgres: pgColumnCheck("collections", "default_sort"),
+		SQLite:        "ALTER TABLE collections ADD COLUMN default_sort TEXT",
+		Postgres:      "ALTER TABLE collections ADD COLUMN IF NOT EXISTS default_sort TEXT",
 	}}
 
 // boardConfigurationReconcileSQL normalizes board configurations to exactly one

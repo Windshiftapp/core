@@ -301,6 +301,8 @@ export default {
     groupByValue: 'Group by: {name}',
     sortBy: 'Sort by',
     sortBubble: 'Sort: Bubble',
+    collectionDefaultMode: 'Collection default',
+    collectionDefaultModeDescription: "Use the collection's saved order",
     rankMode: 'Rank mode',
     rankModeDescription: 'Manual drag-and-drop order',
     bubbleMode: 'Bubble mode',

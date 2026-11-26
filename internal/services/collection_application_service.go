@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/itemorder"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
@@ -79,14 +80,15 @@ type BoardConfigurationScope struct {
 }
 
 type BoardConfigurationCollection struct {
-	ID          int     `json:"id"`
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	QLQuery     string  `json:"ql_query"`
-	IsPublic    bool    `json:"is_public"`
-	WorkspaceID *int    `json:"workspace_id,omitempty"`
-	CreatedBy   *int    `json:"created_by,omitempty"`
-	PublicSlug  *string `json:"public_slug,omitempty"`
+	ID          int            `json:"id"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	QLQuery     string         `json:"ql_query"`
+	DefaultSort itemorder.Sort `json:"default_sort,omitempty"`
+	IsPublic    bool           `json:"is_public"`
+	WorkspaceID *int           `json:"workspace_id,omitempty"`
+	CreatedBy   *int           `json:"created_by,omitempty"`
+	PublicSlug  *string        `json:"public_slug,omitempty"`
 }
 
 type BoardConfigurationBootstrap struct {
@@ -1175,7 +1177,7 @@ func ValidatePublicBoardCardFields(fields []models.ListColumn) error {
 func boardCollection(collection *repository.CollectionRecord) *BoardConfigurationCollection {
 	result := &BoardConfigurationCollection{
 		ID: collection.ID, Name: collection.Name, Description: collection.Description,
-		QLQuery: collection.QLQuery, IsPublic: collection.IsPublic,
+		QLQuery: collection.QLQuery, DefaultSort: collection.DefaultSort, IsPublic: collection.IsPublic,
 		WorkspaceID: collection.WorkspaceID, CreatedBy: collection.CreatedBy,
 	}
 	if collection.Slug != "" {

@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"windshift/internal/itemorder"
+)
 
 // Item represents a unit of work with hierarchical support.
 type Item struct {
@@ -469,8 +473,12 @@ type Collection struct {
 	Description string  `json:"description"`
 	QLQuery     string  `json:"ql_query"`
 	FilterState *string `json:"filter_state"`
-	IsPublic    bool    `json:"is_public"`
-	IsPrivate   bool    `json:"is_private"`
+	// DefaultSort is the saved, ordered multi-key sort applied when a caller
+	// opens the collection without an explicit request sort. Nil means the
+	// native rank order stays in effect.
+	DefaultSort itemorder.Sort `json:"default_sort,omitempty"`
+	IsPublic    bool           `json:"is_public"`
+	IsPrivate   bool           `json:"is_private"`
 	// PublicMilestoneSwimlanes groups the anonymous public board by milestone.
 	PublicMilestoneSwimlanes bool    `json:"public_milestone_swimlanes"`
 	WorkspaceID              *int    `json:"workspace_id"`

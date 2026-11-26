@@ -1,3 +1,11 @@
+// Manual same-column reordering is only valid when the displayed order is the
+// directly editable manual rank. Bubble Mode and an imported collection default
+// order are not, so a same-column drop must not write a rank move that would
+// leave the card in place.
+export function boardSortDisablesManualReorder(sortMode, hasCollectionDefaultSort) {
+  return sortMode === 'bubble' || (sortMode === 'default' && hasCollectionDefaultSort);
+}
+
 function itemRecencyValue(item) {
   return new Date(item.last_active_at || item.updated_at || item.created_at || 0).getTime() || 0;
 }

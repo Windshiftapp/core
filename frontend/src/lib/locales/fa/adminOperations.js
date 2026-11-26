@@ -300,6 +300,8 @@ export default {
     "groupByValue": "گروه بر اساس: {name}",
     "sortBy": "مرتب سازی بر اساس",
     "sortBubble": "مرتب سازی: حباب",
+    "collectionDefaultMode": "پیش‌فرض مجموعه",
+    "collectionDefaultModeDescription": "استفاده از ترتیب ذخیره‌شده مجموعه",
     "rankMode": "حالت رتبه",
     "rankModeDescription": "ترتیب دستی کشیدن و رها کردن",
     "bubbleMode": "حالت حباب",
