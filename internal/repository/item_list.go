@@ -13,6 +13,7 @@ import (
 
 	"windshift/internal/cql"
 	"windshift/internal/database"
+	"windshift/internal/itemorder"
 	"windshift/internal/models"
 	"windshift/internal/search"
 )
@@ -44,11 +45,15 @@ func parseDBTime(s string) (time.Time, bool) {
 
 // ItemListParams contains parameters for listing items
 type ItemListParams struct {
-	WorkspaceIDs     []int
-	Filters          ItemFilters
-	Pagination       PaginationParams
-	SortBy           string
-	SortAsc          bool
+	WorkspaceIDs []int
+	Filters      ItemFilters
+	Pagination   PaginationParams
+	SortBy       string
+	SortAsc      bool
+	// SortTerms is an ordered multi-key sort resolved from a collection default.
+	// It takes precedence over SortBy/SortAsc. An empty vector keeps the native
+	// order and is the only cursor-eligible order.
+	SortTerms        itemorder.Sort
 	OmitDescriptions bool
 }
 
@@ -190,7 +195,7 @@ var systemFieldSortColumns = map[string]string{
 	"key":            "i.workspace_item_number",
 	"title":          "i.title",
 	"status":         "i.status_id",
-	"priority":       "i.priority_id",
+	"priority":       "pri.sort_order", // urgency; buildOrderByClause inverts the direction
 	"assignee":       "i.assignee_id",
 	"team":           "i.team_id",
 	"milestone":      "(SELECT MIN(milestone_id) FROM item_milestones WHERE item_id = i.id)",
@@ -354,7 +359,7 @@ func (r *ItemRepository) FindAllWithDetailsPageContext(ctx context.Context, para
 		pageQueryer = pageTx
 	}
 
-	orderByClause := r.buildOrderByClause(params.SortBy, params.SortAsc)
+	orderByClause := r.buildOrderByClause(params)
 
 	limit := params.Pagination.Limit
 	if limit <= 0 {
@@ -448,7 +453,7 @@ func (r *ItemRepository) FindIDPageContext(ctx context.Context, params ItemListP
 		limit = 1000
 	}
 	offset := max(params.Pagination.Offset, 0)
-	query := itemListPageIDQuery(plan, r.buildOrderByClause(params.SortBy, params.SortAsc), limit, offset)
+	query := itemListPageIDQuery(plan, r.buildOrderByClause(params), limit, offset)
 
 	rows, err := r.db.QueryContext(ctx, query, plan.pageArgs...)
 	if err != nil {
@@ -492,7 +497,11 @@ func itemListCursorEligible(params ItemListParams) bool {
 		return false
 	}
 	// The keyset predicate below matches only the canonical default order. A
-	// caller asking for another sort keeps the established offset contract.
+	// caller asking for another sort, including a multi-key collection default,
+	// keeps the established offset contract.
+	if len(params.SortTerms) > 0 {
+		return false
+	}
 	return params.SortBy == "" || (params.SortBy == "frac_index" && params.SortAsc)
 }
 
@@ -958,9 +967,14 @@ func (r *ItemRepository) CountQLQueries(ctx context.Context, workspaceIDs []int,
 }
 
 // buildOrderByClause constructs the ORDER BY clause.
-// It supports system field identifiers (from systemFieldSortColumns) and custom field IDs
-// (which sort via JSON extraction from i.custom_field_values).
-func (r *ItemRepository) buildOrderByClause(sortBy string, sortAsc bool) string {
+// A saved multi-key vector takes precedence over the single signed request sort.
+// It supports system field identifiers (from systemFieldSortColumns) and custom
+// field IDs (which sort via JSON extraction from i.custom_field_values).
+func (r *ItemRepository) buildOrderByClause(params ItemListParams) string {
+	if len(params.SortTerms) > 0 {
+		return buildOrderByTerms(params.SortTerms)
+	}
+	sortBy, sortAsc := params.SortBy, params.SortAsc
 	if sortBy == "" {
 		return r.defaultOrderBy()
 	}
@@ -973,6 +987,13 @@ func (r *ItemRepository) buildOrderByClause(sortBy string, sortAsc bool) string 
 	// Preserve the canonical rank order for ascending fractional indexes.
 	if sortBy == "frac_index" && sortAsc {
 		return r.defaultOrderBy()
+	}
+
+	// Priority compares urgency, not the numeric priority ID. A priority with a
+	// lower sort_order is more urgent, so a semantic DESC (highest urgency
+	// first) is an ascending sort_order. Items without a priority sort last.
+	if sortBy == "priority" {
+		return buildOrderByTerms(itemorder.Sort{{Field: itemorder.FieldPriority, Direction: semanticDirection(sortAsc)}})
 	}
 	if sortBy == "last_active_at" {
 		// Bubble Mode is paginated, so its ordering must be both null-safe and
@@ -1018,6 +1039,64 @@ func (r *ItemRepository) buildOrderByClause(sortBy string, sortAsc bool) string 
 	}
 
 	return fmt.Sprintf(" ORDER BY %s %s, i.id ASC", expr, direction)
+}
+
+func semanticDirection(asc bool) itemorder.Direction {
+	if asc {
+		return itemorder.Asc
+	}
+	return itemorder.Desc
+}
+
+// itemSortExpression maps a target sort field to its comparable SQL expression
+// and reports whether the expression's natural order is inverted relative to
+// the semantic direction. Priority urgency is the only inverted field: a lower
+// sort_order is more urgent, while DESC means most urgent first.
+func itemSortExpression(field string) (expr string, inverted bool) {
+	switch field {
+	case itemorder.FieldPriority:
+		return "pri.sort_order", true
+	case itemorder.FieldCreatedAt:
+		return "i.created_at", false
+	case itemorder.FieldUpdatedAt:
+		return "i.updated_at", false
+	case itemorder.FieldRank:
+		return "i.rank", false
+	default:
+		return "", false
+	}
+}
+
+// buildOrderByTerms compiles an ordered vector into one ORDER BY clause. Every
+// term emits an explicit null-last prefix so SQLite and PostgreSQL agree, and a
+// stable item-ID tie-break applies only after all declared keys tie. The clause
+// is used for page-ID selection and hydration alike, so a page cannot reorder
+// within itself.
+func buildOrderByTerms(terms itemorder.Sort) string {
+	clauses := make([]string, 0, len(terms)*2+1)
+	for _, term := range terms {
+		expr, inverted := itemSortExpression(term.Field)
+		if expr == "" {
+			continue
+		}
+		direction := "ASC"
+		if term.Direction == itemorder.Desc {
+			direction = "DESC"
+		}
+		if inverted {
+			if direction == "ASC" {
+				direction = "DESC"
+			} else {
+				direction = "ASC"
+			}
+		}
+		clauses = append(clauses, fmt.Sprintf("(%s IS NULL) ASC", expr), fmt.Sprintf("%s %s", expr, direction))
+	}
+	if len(clauses) == 0 {
+		return ` ORDER BY i.frac_index ASC`
+	}
+	clauses = append(clauses, "i.id ASC")
+	return " ORDER BY " + strings.Join(clauses, ", ")
 }
 
 func (r *ItemRepository) defaultOrderBy() string {

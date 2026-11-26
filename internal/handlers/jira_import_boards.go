@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"windshift/internal/itemorder"
 	"windshift/internal/jira"
 	"windshift/internal/models"
 )
@@ -43,28 +44,46 @@ func jiraWorkspaceProjectKeys(mappings []WorkspaceMapping, currentProjectKey str
 	return keys
 }
 
+// jiraFilterResolution is the structured outcome of translating saved-filter or
+// board JQL for one workspace. Membership and ordering are separate: a filter
+// can match the right issues while its source order cannot be reproduced, and
+// the importer must say which happened.
+type jiraFilterResolution struct {
+	QL                  string
+	Unsupported         []string
+	MembershipComplete  bool
+	Scope               jira.JQLProjectScope
+	Decision            jira.JQLProjectScopeDecision
+	Order               itemorder.Sort
+	OrderingDiagnostics []string
+}
+
 // resolveJiraFilterQL translates saved-filter or board JQL for one workspace,
-// honoring the project predicate. It returns the selector, the unsupported
-// clauses, whether the selector preserves membership, and the scope decision.
-// A JQLScopeUnrelated result means the filter targets only other projects.
-func resolveJiraFilterQL(jql string, workspaceID int, workspaceProjectKeys []string) (ql string, unsupported []string, membershipComplete bool, scope jira.JQLProjectScope, decision jira.JQLProjectScopeDecision) {
-	scope = jira.AnalyzeJQLProjectScope(jql)
-	decision = jira.DecideJQLProjectScope(scope, workspaceProjectKeys)
+// honoring the project predicate. A JQLScopeUnrelated result means the filter
+// targets only other projects.
+func resolveJiraFilterQL(jql string, workspaceID int, workspaceProjectKeys []string) jiraFilterResolution {
+	scope := jira.AnalyzeJQLProjectScope(jql)
+	decision := jira.DecideJQLProjectScope(scope, workspaceProjectKeys)
+	resolution := jiraFilterResolution{Scope: scope, Decision: decision, MembershipComplete: true}
 	if decision == jira.JQLScopeUnrelated {
-		return "", nil, false, scope, decision
+		resolution.MembershipComplete = false
+		return resolution
 	}
 	translation := jira.TranslateJQL(jql, workspaceID)
-	membershipComplete = translation.MembershipComplete
+	resolution.Unsupported = translation.Unsupported
+	resolution.MembershipComplete = translation.MembershipComplete
+	resolution.Order = translation.Order
+	resolution.OrderingDiagnostics = translation.OrderingDiagnostics
 	if decision == jira.JQLScopeNarrowed || decision == jira.JQLScopeIndeterminate {
 		// A project predicate that workspace-scoped QL cannot express would
 		// otherwise widen the collection to the whole workspace.
-		membershipComplete = false
+		resolution.MembershipComplete = false
 	}
-	ql = translation.QL
-	if !membershipComplete {
-		ql = jira.UnsupportedJQLSelector(workspaceID)
+	resolution.QL = translation.QL
+	if !resolution.MembershipComplete {
+		resolution.QL = jira.UnsupportedJQLSelector(workspaceID)
 	}
-	return ql, translation.Unsupported, membershipComplete, scope, decision
+	return resolution
 }
 
 func (h *JiraImportHandler) importJiraSavedFilters(ctx context.Context, jobID, projectKey string, workspaceID int, workspaceProjectKeys []string, client jira.Client, createdByUserID int) {
@@ -105,40 +124,32 @@ func (h *JiraImportHandler) importJiraSavedFilters(ctx context.Context, jobID, p
 		// The saved-filter list is not project-scoped (Data Center returns every
 		// favorite), so the project predicate decides whether this filter belongs
 		// to the current workspace at all.
-		ql, unsupported, membershipComplete, scope, decision := resolveJiraFilterQL(filter.JQL, workspaceID, workspaceProjectKeys)
-		if decision == jira.JQLScopeUnrelated {
+		resolution := resolveJiraFilterQL(filter.JQL, workspaceID, workspaceProjectKeys)
+		if resolution.Decision == jira.JQLScopeUnrelated {
 			slog.Debug("Skipping Jira saved filter scoped to other projects",
 				slog.String("component", "jira"),
 				slog.String("project", projectKey),
 				slog.String("filterID", filter.ID),
-				slog.Any("filter_projects", scope.Include))
+				slog.Any("filter_projects", resolution.Scope.Include))
 			continue
 		}
-		description := jiraFilterCollectionDescription(filter, unsupported, membershipComplete)
-		metadata := map[string]any{
-			"jira_entity": "filter",
-			"jira_jql":    filter.JQL,
-		}
+		description := jiraFilterCollectionDescription(filter, resolution)
+		metadata := jiraFilterMetadata(resolution)
+		metadata["jira_entity"] = "filter"
+		metadata["jira_jql"] = filter.JQL
 		if filter.ViewURL != "" {
 			metadata["view_url"] = filter.ViewURL
 		}
-		if len(unsupported) > 0 {
-			metadata["unsupported_jql"] = unsupported
+		if resolution.Scope.HasClause {
+			metadata["jira_project_predicate"] = append(append([]string{}, resolution.Scope.Include...), resolution.Scope.Exclude...)
 		}
-		if scope.HasClause {
-			metadata["jira_project_predicate"] = append(append([]string{}, scope.Include...), scope.Exclude...)
-		}
-		if !membershipComplete {
-			metadata["needs_review"] = true
-			metadata["unsupported_membership"] = true
-		}
-		if decision == jira.JQLScopeNarrowed || decision == jira.JQLScopeIndeterminate {
-			metadata["jira_project_scope"] = jiraProjectScopeLabel(decision)
-			h.recordJiraFilterScopeFinding(jobID, filter.ID, workspaceID, scope, decision)
+		if resolution.Decision == jira.JQLScopeNarrowed || resolution.Decision == jira.JQLScopeIndeterminate {
+			metadata["jira_project_scope"] = jiraProjectScopeLabel(resolution.Decision)
+			h.recordJiraFilterScopeFinding(jobID, filter.ID, workspaceID, resolution.Scope, resolution.Decision)
 		}
 		// Identity includes the workspace: the same Jira filter can legitimately
 		// back one collection per workspace it targets.
-		collectionID, ok := h.ensureJiraCollection(jobID, jiraFilterCollectionID(filter.ID, workspaceID), filter.ID, jiraCollectionName("Jira Filter", filter.Name, filter.ID), description, ql, workspaceID, createdByUserID, metadata)
+		collectionID, ok := h.ensureJiraCollection(jobID, jiraFilterCollectionID(filter.ID, workspaceID), filter.ID, jiraCollectionName("Jira Filter", filter.Name, filter.ID), description, resolution.QL, resolution.Order, workspaceID, createdByUserID, metadata)
 		if ok {
 			slog.Debug("Imported Jira saved filter", slog.String("component", "jira"), slog.String("filterID", filter.ID), slog.Int("collectionID", collectionID))
 		}
@@ -200,9 +211,11 @@ func (h *JiraImportHandler) importJiraBoards(ctx context.Context, jobID, project
 
 		jql := ""
 		filterMeta := map[string]any{}
+		filterReadFailed := false
 		if config != nil && config.Filter != nil && strings.TrimSpace(string(config.Filter.ID)) != "" {
 			filter, filterErr := client.GetFilter(ctx, string(config.Filter.ID))
 			if filterErr != nil {
+				filterReadFailed = true
 				slog.Warn("Failed to load Jira board filter JQL",
 					slog.String("component", "jira"),
 					slog.Int("boardID", board.ID),
@@ -215,36 +228,65 @@ func (h *JiraImportHandler) importJiraBoards(ctx context.Context, jobID, project
 				filterMeta["jira_filter_jql"] = filter.JQL
 			}
 		}
-		if strings.TrimSpace(jql) == "" {
+		if strings.TrimSpace(jql) == "" && !filterReadFailed {
 			jql = fmt.Sprintf("project = %s", projectKey)
 		}
 
-		ql, unsupported, membershipComplete, _, decision := resolveJiraFilterQL(jql, workspaceID, workspaceProjectKeys)
-		metadata := map[string]any{
-			"jira_entity":   "board",
-			"jira_board_id": board.ID,
-			"jira_type":     board.Type,
-			"jira_jql":      jql,
+		// A board whose filter exists but could not be read has unknown
+		// membership. Treat it as empty for review instead of widening it to
+		// project = … .
+		resolution := jiraFilterResolution{MembershipComplete: true}
+		if filterReadFailed {
+			resolution = jiraFilterResolution{
+				QL:                 jira.UnsupportedJQLSelector(workspaceID),
+				MembershipComplete: false,
+				Unsupported:        []string{"board filter could not be read; membership is unknown"},
+				Decision:           jira.JQLScopeIndeterminate,
+			}
+			h.recordJiraBoardFilterFinding(jobID, board.ID, workspaceID, config)
+		} else {
+			resolution = resolveJiraFilterQL(jql, workspaceID, workspaceProjectKeys)
 		}
+
+		// A sub-query further restricts the board. Apply it when representable;
+		// otherwise the board stays empty for review. A board with a sub-query
+		// gets its own collection so the standalone filter keeps its membership.
+		boardSpecific := filterReadFailed
+		if config != nil && config.SubQuery != nil && strings.TrimSpace(config.SubQuery.Query) != "" {
+			boardSpecific = true
+			subQuery := strings.TrimSpace(config.SubQuery.Query)
+			subResolution := resolveJiraFilterQL(subQuery, workspaceID, workspaceProjectKeys)
+			if resolution.MembershipComplete && subResolution.MembershipComplete &&
+				resolution.Decision != jira.JQLScopeUnrelated && subResolution.Decision != jira.JQLScopeUnrelated {
+				resolution.QL = "(" + resolution.QL + ") AND (" + subResolution.QL + ")"
+				resolution.Unsupported = append(resolution.Unsupported, subResolution.Unsupported...)
+				resolution.OrderingDiagnostics = append(resolution.OrderingDiagnostics, subResolution.OrderingDiagnostics...)
+			} else {
+				resolution.QL = jira.UnsupportedJQLSelector(workspaceID)
+				resolution.MembershipComplete = false
+				resolution.Unsupported = append(resolution.Unsupported, "board sub-query could not be fully translated: "+subQuery)
+			}
+		}
+
+		metadata := jiraFilterMetadata(resolution)
+		metadata["jira_entity"] = "board"
+		metadata["jira_board_id"] = board.ID
+		metadata["jira_type"] = board.Type
+		metadata["jira_jql"] = jql
 		for k, v := range filterMeta {
 			metadata[k] = v
 		}
-		if len(unsupported) > 0 {
-			metadata["unsupported_jql"] = unsupported
-		}
-		if !membershipComplete {
-			metadata["needs_review"] = true
-			metadata["unsupported_membership"] = true
-		}
 
 		// A board's saved filter may already be imported as a standalone
-		// collection; reuse it instead of creating a duplicate.
+		// collection; reuse it when the membership is identical.
 		collectionID := 0
-		if filterID, ok := filterMeta["jira_filter_id"].(string); ok && strings.TrimSpace(filterID) != "" {
-			collectionID = h.existingMappedEntity(jobID, "collection", jiraFilterCollectionID(filterID, workspaceID))
+		if !boardSpecific {
+			if filterID, ok := filterMeta["jira_filter_id"].(string); ok && strings.TrimSpace(filterID) != "" {
+				collectionID = h.existingMappedEntity(jobID, "collection", jiraFilterCollectionID(filterID, workspaceID))
+			}
 		}
 		if collectionID == 0 {
-			if decision == jira.JQLScopeUnrelated {
+			if resolution.Decision == jira.JQLScopeUnrelated {
 				// The board's filter targets other projects, so a collection
 				// scoped to this workspace would have the wrong membership.
 				slog.Debug("Skipping Jira board whose filter is scoped to other projects",
@@ -254,7 +296,7 @@ func (h *JiraImportHandler) importJiraBoards(ctx context.Context, jobID, project
 				continue
 			}
 			var ok bool
-			collectionID, ok = h.ensureJiraCollection(jobID, fmt.Sprintf("board:%d", board.ID), strconv.Itoa(board.ID), jiraCollectionName("Jira Board", board.Name, strconv.Itoa(board.ID)), jiraBoardCollectionDescription(board, config, jql, unsupported, membershipComplete), ql, workspaceID, createdByUserID, metadata)
+			collectionID, ok = h.ensureJiraCollection(jobID, fmt.Sprintf("board:%d", board.ID), strconv.Itoa(board.ID), jiraCollectionName("Jira Board", board.Name, strconv.Itoa(board.ID)), jiraBoardCollectionDescription(board, config, jql, resolution), resolution.QL, resolution.Order, workspaceID, createdByUserID, metadata)
 			if !ok {
 				continue
 			}
@@ -282,7 +324,27 @@ func jiraCollectionName(prefix, name, fallbackID string) string {
 	return fmt.Sprintf("%s: %s", prefix, name)
 }
 
-func jiraFilterCollectionDescription(filter jira.JiraFilter, unsupported []string, membershipComplete bool) string {
+// jiraFilterMetadata records the import fidelity of a translated filter or
+// board. Membership loss and ordering loss are reported separately so a
+// correctly matched collection is never described as fully faithful when its
+// source order could not be reproduced.
+func jiraFilterMetadata(resolution jiraFilterResolution) map[string]any {
+	metadata := map[string]any{}
+	if len(resolution.Unsupported) > 0 {
+		metadata["unsupported_jql"] = resolution.Unsupported
+	}
+	if len(resolution.OrderingDiagnostics) > 0 {
+		metadata["unsupported_ordering"] = resolution.OrderingDiagnostics
+		metadata["ordering_needs_review"] = true
+	}
+	if !resolution.MembershipComplete {
+		metadata["needs_review"] = true
+		metadata["unsupported_membership"] = true
+	}
+	return metadata
+}
+
+func jiraFilterCollectionDescription(filter jira.JiraFilter, resolution jiraFilterResolution) string {
 	parts := []string{"Imported from Jira saved filter."}
 	if strings.TrimSpace(filter.Description) != "" {
 		parts = append(parts, strings.TrimSpace(filter.Description))
@@ -290,37 +352,57 @@ func jiraFilterCollectionDescription(filter jira.JiraFilter, unsupported []strin
 	if strings.TrimSpace(filter.JQL) != "" {
 		parts = append(parts, "Original JQL:\n```jql\n"+strings.TrimSpace(filter.JQL)+"\n```")
 	}
-	parts = appendJiraUnsupportedJQLNote(parts, unsupported, membershipComplete)
+	parts = appendJiraResolutionNotes(parts, resolution)
 	return strings.Join(parts, "\n\n")
 }
 
-func jiraBoardCollectionDescription(board jira.JiraBoard, config *jira.JiraBoardConfiguration, jql string, unsupported []string, membershipComplete bool) string {
+func jiraBoardCollectionDescription(board jira.JiraBoard, config *jira.JiraBoardConfiguration, jql string, resolution jiraFilterResolution) string {
 	parts := []string{fmt.Sprintf("Imported from Jira %s board %d.", strings.TrimSpace(board.Type), board.ID)}
 	if config != nil && config.SubQuery != nil && strings.TrimSpace(config.SubQuery.Query) != "" {
-		parts = append(parts, "Board sub-query preserved for reference:\n```jql\n"+strings.TrimSpace(config.SubQuery.Query)+"\n```")
+		parts = append(parts, "Board sub-query:\n```jql\n"+strings.TrimSpace(config.SubQuery.Query)+"\n```")
 	}
 	if strings.TrimSpace(jql) != "" {
 		parts = append(parts, "Original board/filter JQL:\n```jql\n"+strings.TrimSpace(jql)+"\n```")
 	}
-	parts = appendJiraUnsupportedJQLNote(parts, unsupported, membershipComplete)
+	parts = appendJiraResolutionNotes(parts, resolution)
 	return strings.Join(parts, "\n\n")
 }
 
-// appendJiraUnsupportedJQLNote records unsupported clauses and, when the
-// predicate tree is incomplete, that the imported collection is intentionally
-// non-executable until an administrator reviews it.
-func appendJiraUnsupportedJQLNote(parts, unsupported []string, membershipComplete bool) []string {
-	if len(unsupported) > 0 {
-		parts = append(parts, "Unsupported JQL clauses not translated into Windshift QL:\n- "+strings.Join(unsupported, "\n- "))
+// appendJiraResolutionNotes records unsupported membership clauses, an
+// unavailable source order, and the non-executable state of the collection.
+func appendJiraResolutionNotes(parts []string, resolution jiraFilterResolution) []string {
+	if len(resolution.Unsupported) > 0 {
+		parts = append(parts, "Unsupported JQL clauses not translated into Windshift QL:\n- "+strings.Join(resolution.Unsupported, "\n- "))
 	}
-	if !membershipComplete {
+	if len(resolution.OrderingDiagnostics) > 0 {
+		parts = append(parts, "The source ordering could not be reproduced, so this collection keeps the native order until an administrator reviews it:\n- "+strings.Join(resolution.OrderingDiagnostics, "\n- "))
+	}
+	if !resolution.MembershipComplete {
 		parts = append(parts, "This collection is intentionally empty and needs review: its Jira predicate tree could not be translated in full, so matching every workspace issue would be incorrect.")
 	}
 	return parts
 }
 
-func (h *JiraImportHandler) ensureJiraCollection(jobID, jiraID, jiraKey, name, description, ql string, workspaceID, createdByUserID int, metadata map[string]any) (int, bool) {
-	return h.imports.EnsureCollection(jobID, jiraID, jiraKey, name, description, ql, workspaceID, createdByUserID, metadata)
+func (h *JiraImportHandler) ensureJiraCollection(jobID, jiraID, jiraKey, name, description, ql string, defaultSort itemorder.Sort, workspaceID, createdByUserID int, metadata map[string]any) (int, bool) {
+	return h.imports.EnsureCollection(jobID, jiraID, jiraKey, name, description, ql, defaultSort, workspaceID, createdByUserID, metadata)
+}
+
+// recordJiraBoardFilterFinding makes an unreadable board filter explicit. The
+// board is imported empty, and the diagnostic names the source filter so an
+// administrator can restore the predicate.
+func (h *JiraImportHandler) recordJiraBoardFilterFinding(jobID string, boardID, workspaceID int, config *jira.JiraBoardConfiguration) {
+	filterID := ""
+	if config != nil && config.Filter != nil {
+		filterID = string(config.Filter.ID)
+	}
+	_ = h.recordMapping(jobID, "fidelity_finding", fmt.Sprintf("board-filter:%d:ws%d", boardID, workspaceID), "The board's saved filter could not be read, so its membership is unknown and the board was imported empty for review.", 0, map[string]any{
+		"code":           "jira_board_filter_unavailable",
+		"severity":       "warning",
+		"disposition":    "unavailable",
+		"jira_board_id":  boardID,
+		"jira_filter_id": filterID,
+		"workspace_id":   workspaceID,
+	})
 }
 
 func (h *JiraImportHandler) existingMappedEntity(jobID, entityType, jiraID string) int {

@@ -333,6 +333,8 @@ export default {
     groupByValue: 'Regrouper par : {name}',
     sortBy: 'Trier par',
     sortBubble: 'Tri : Remontée automatique',
+    collectionDefaultMode: 'Ordre par défaut de la collection',
+    collectionDefaultModeDescription: "Utiliser l'ordre enregistré de la collection",
     rankMode: 'Mode rang',
     rankModeDescription: 'Ordre manuel par glisser-déposer',
     bubbleMode: 'Mode remontée',

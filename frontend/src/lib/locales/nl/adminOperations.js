@@ -301,6 +301,8 @@ export default {
     groupByValue: 'Groeperen op: {name}',
     sortBy: 'Sorteren op',
     sortBubble: 'Sorteren: bubbel',
+    collectionDefaultMode: 'Collectiestandaard',
+    collectionDefaultModeDescription: 'De opgeslagen volgorde van de collectie gebruiken',
     rankMode: 'Rangmodus',
     rankModeDescription: 'Handmatige volgorde via slepen en neerzetten',
     bubbleMode: 'Bubbelmodus',

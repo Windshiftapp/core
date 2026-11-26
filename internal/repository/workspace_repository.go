@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"windshift/internal/database"
+	"windshift/internal/itemorder"
 	"windshift/internal/models"
 )
 
@@ -881,29 +882,32 @@ func (r *WorkspaceRepository) CountCollections(workspaceID int) (int, error) {
 
 // GetCollectionQuery retrieves the QL query and workspace ID for a collection
 func (r *WorkspaceRepository) GetCollectionQuery(collectionID int) (workspaceID *int64, qlQuery string, err error) {
-	return r.GetCollectionQueryContext(context.Background(), collectionID)
+	workspaceID, qlQuery, _, err = r.GetCollectionQueryContext(context.Background(), collectionID)
+	return
 }
 
-// GetCollectionQueryContext is the request-aware form of GetCollectionQuery.
-func (r *WorkspaceRepository) GetCollectionQueryContext(ctx context.Context, collectionID int) (workspaceID *int64, qlQuery string, err error) {
+// GetCollectionQueryContext is the request-aware form of GetCollectionQuery. It
+// also returns the collection's saved default sort so the caller can apply the
+// imported order before paging without a second read.
+func (r *WorkspaceRepository) GetCollectionQueryContext(ctx context.Context, collectionID int) (workspaceID *int64, qlQuery string, defaultSort itemorder.Sort, err error) {
 	var collectionWorkspaceID sql.NullInt64
-	var collectionQuery sql.NullString
+	var collectionQuery, collectionSort sql.NullString
 
-	err = r.db.QueryRowContext(ctx, `SELECT workspace_id, ql_query FROM collections WHERE id = ?`, collectionID).
-		Scan(&collectionWorkspaceID, &collectionQuery)
+	err = r.db.QueryRowContext(ctx, `SELECT workspace_id, ql_query, default_sort FROM collections WHERE id = ?`, collectionID).
+		Scan(&collectionWorkspaceID, &collectionQuery, &collectionSort)
 
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, "", ErrNotFound
+		return nil, "", nil, ErrNotFound
 	}
 	if err != nil {
-		return nil, "", err
+		return nil, "", nil, err
 	}
 
 	if collectionWorkspaceID.Valid {
 		workspaceID = &collectionWorkspaceID.Int64
 	}
 
-	return workspaceID, collectionQuery.String, nil
+	return workspaceID, collectionQuery.String, unmarshalCollectionSort(collectionSort.String), nil
 }
 
 // CreateItemSequence ensures the PostgreSQL item-number sequence exists.

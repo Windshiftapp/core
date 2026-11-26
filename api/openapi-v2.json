@@ -8074,6 +8074,28 @@
                 "description": "The creator name value.",
                 "type": "string"
               },
+              "default_sort": {
+                "description": "The default sort value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "direction": {
+                      "description": "The direction value.",
+                      "type": "string"
+                    },
+                    "field": {
+                      "description": "The field value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "direction",
+                    "field"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
               "description": {
                 "description": "The description value.",
                 "type": "string"
@@ -8434,6 +8456,28 @@
                 "creator_name": {
                   "description": "The creator name value.",
                   "type": "string"
+                },
+                "default_sort": {
+                  "description": "The default sort value.",
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "direction": {
+                        "description": "The direction value.",
+                        "type": "string"
+                      },
+                      "field": {
+                        "description": "The field value.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "direction",
+                      "field"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
                 },
                 "description": {
                   "description": "The description value.",
@@ -56886,6 +56930,28 @@
                 "description": "The creator name value.",
                 "type": "string"
               },
+              "default_sort": {
+                "description": "The default sort value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "direction": {
+                      "description": "The direction value.",
+                      "type": "string"
+                    },
+                    "field": {
+                      "description": "The field value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "direction",
+                    "field"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
               "description": {
                 "description": "The description value.",
                 "type": "string"
@@ -57054,6 +57120,28 @@
               "creator_name": {
                 "description": "The creator name value.",
                 "type": "string"
+              },
+              "default_sort": {
+                "description": "The default sort value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "direction": {
+                      "description": "The direction value.",
+                      "type": "string"
+                    },
+                    "field": {
+                      "description": "The field value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "direction",
+                    "field"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
               },
               "description": {
                 "description": "The description value.",
@@ -70734,6 +70822,28 @@
             "description": "The creator name value.",
             "type": "string"
           },
+          "default_sort": {
+            "description": "The default sort value.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "direction": {
+                  "description": "The direction value.",
+                  "type": "string"
+                },
+                "field": {
+                  "description": "The field value.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "direction",
+                "field"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
           "description": {
             "description": "The description value.",
             "type": "string"
@@ -70875,6 +70985,28 @@
               "creator_name": {
                 "description": "The creator name value.",
                 "type": "string"
+              },
+              "default_sort": {
+                "description": "The default sort value.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "direction": {
+                      "description": "The direction value.",
+                      "type": "string"
+                    },
+                    "field": {
+                      "description": "The field value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "direction",
+                    "field"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
               },
               "description": {
                 "description": "The description value.",

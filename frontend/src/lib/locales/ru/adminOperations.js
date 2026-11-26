@@ -335,6 +335,8 @@ export default {
     groupByValue: 'Группировка: {name}',
     sortBy: 'Сортировать',
     sortBubble: 'Сортировка: по активности',
+    collectionDefaultMode: 'По умолчанию коллекции',
+    collectionDefaultModeDescription: 'Использовать сохранённый порядок коллекции',
     rankMode: 'Ручной порядок',
     rankModeDescription: 'Карточки можно переставлять перетаскиванием',
     bubbleMode: 'По активности',

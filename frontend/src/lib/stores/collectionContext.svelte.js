@@ -1355,7 +1355,7 @@ class CollectionStore {
    * cannot be hidden on a later frac_index-ordered page.
    */
   setBoardSortMode(mode) {
-    const nextMode = mode === 'bubble' ? 'bubble' : 'rank';
+    const nextMode = mode === 'bubble' ? 'bubble' : mode === 'rank' ? 'rank' : 'default';
     if (nextMode === this.#boardSortMode) return;
 
     this.#boardSortMode = nextMode;
@@ -1785,7 +1785,12 @@ class CollectionStore {
       if (this.#boardSortMode === 'bubble') {
         return { order_by: 'last_active_at', sort_direction: 'desc' };
       }
-      return { order_by: 'frac_index', sort_direction: 'asc' };
+      if (this.#boardSortMode === 'rank') {
+        return { order_by: 'frac_index', sort_direction: 'asc' };
+      }
+      // Collection default: send no sort so the server applies the imported
+      // default sort before paging, falling back to native rank when absent.
+      return {};
     }
 
     if (LIST_VIEWS.has(this.#currentView)) {
