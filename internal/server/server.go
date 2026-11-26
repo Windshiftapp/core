@@ -431,11 +431,17 @@ func (s *Server) initialize() error {
 	// is set, otherwise NAT deployments would lose brute-force protection.
 	ipKey := ratelimit.ByIP(ipExtractor)
 	userKey := ratelimit.ByUserOrIP(ipExtractor)
+	// Login is unauthenticated, so IP is the only key it can use. Behind NAT or
+	// a shared egress every client draws from one 5/min bucket and the first
+	// few attempts lock the rest out, so the flag has to cover it too: a nil
+	// key makes the limiter a passthrough.
+	loginKey := ipKey
 	if cfg.DisableIPRateLimit {
 		userKey = ratelimit.ByUser()
+		loginKey = nil
 	}
 
-	s.loginRateLimiter = ratelimit.New(5.0/60.0, 10, ipKey)
+	s.loginRateLimiter = ratelimit.New(5.0/60.0, 10, loginKey)
 	s.runnerRegisterLimiter = ratelimit.New(5.0/60.0, 10, ipKey)
 	s.fidoRateLimiter = ratelimit.New(10.0/60.0, 15, ipKey)
 	s.scimRateLimiter = ratelimit.New(10.0, 100, ipKey)
