@@ -391,30 +391,15 @@ func (r *ApprovalSetRepository) FindDriversForTransition(ctx context.Context, tr
 	return out, nil
 }
 
-// IsWorkspacePersonal reports whether a workspace is the user's personal
-// space. Personal workspaces never get an approval set.
-func (r *ApprovalSetRepository) IsWorkspacePersonal(ctx context.Context, workspaceID int) (bool, error) {
-	resolved, err := NewConfigurationSetRepository(r.db).ResolveForWorkspace(ctx, workspaceID, nil)
-	if err != nil {
-		return false, err
-	}
-	if resolved == nil {
-		return false, nil
-	}
-	return resolved.IsPersonal, nil
-}
-
 // ResolveForWorkspace returns the effective approval set for a workspace and
-// optional item type via the canonical configuration resolution: item-type
+// optional item type via the narrow configuration resolution: item-type
 // override on the assigned config set (else the global default config set).
-// Returns (nil, nil) when no approval set is configured.
+// Returns (nil, nil) for personal workspaces or when no approval set is
+// configured.
 func (r *ApprovalSetRepository) ResolveForWorkspace(ctx context.Context, workspaceID int, itemTypeID *int) (*int, error) {
-	resolved, err := NewConfigurationSetRepository(r.db).ResolveEffective(ctx, workspaceID, itemTypeID)
-	if err != nil || resolved == nil {
+	resolved, err := NewConfigurationSetRepository(r.db).ResolveForWorkspace(ctx, workspaceID, itemTypeID)
+	if err != nil || resolved == nil || resolved.IsPersonal {
 		return nil, err
-	}
-	if resolved.IsPersonal {
-		return nil, nil
 	}
 	return resolved.ApprovalSetID, nil
 }

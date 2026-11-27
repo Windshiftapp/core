@@ -709,8 +709,11 @@ func (r *ConfigurationSetRepository) GetWorkspaceConfigSetID(workspaceID int) (*
 }
 
 // ResolveForWorkspace returns a workspace's effective configuration after
-// applying item-type overrides. A workspace without a configuration set still
-// returns its personal-workspace flag and nil configuration values.
+// applying item-type overrides. It resolves the workflow, condition-set and
+// approval-set IDs in one query, without loading screens, item-type catalogs,
+// priorities or workspace mappings. Callers that skip configuration for
+// personal workspaces must check IsPersonal. A workspace with neither an
+// assigned nor a default configuration set returns nil configuration values.
 func (r *ConfigurationSetRepository) ResolveForWorkspace(ctx context.Context, workspaceID int, itemTypeID *int) (*EffectiveConfiguration, error) {
 	var query string
 	args := []any{}
