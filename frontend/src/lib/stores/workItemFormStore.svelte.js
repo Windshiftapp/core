@@ -27,6 +27,7 @@ import {
   isSystemFieldConfigured,
   systemFieldIdentifiers,
 } from '../utils/screenFields.js';
+import { isUntouchedTemplateText } from '../utils/templateText.js';
 import { parseDuration } from '../utils/timeUtils.js';
 import { getSystemFieldName } from './fieldConfig.js';
 import { workspaceDataStore } from './workspaceDataStore.svelte.js';
@@ -38,6 +39,7 @@ const STORAGE_KEYS = {
 
 // System fields managed or rendered outside generated form sections.
 const EXCLUDED_SYSTEM_FIELDS = ['status'];
+
 const FIXED_SYSTEM_FIELDS = ['title', 'description'];
 
 /**
@@ -113,6 +115,11 @@ class WorkItemFormStore {
   selectedTemplateId = $state(null);
   templatesLoading = $state(false);
   templateApplyNonce = $state(0);
+  // Body of the template last written into the description, and whether it was
+  // a mandatory one. Lets a type change swap untouched template text for the
+  // new type's template without ever overwriting text the user wrote.
+  #appliedTemplateBody = null;
+  #appliedTemplateMandatory = false;
   // Deduplicates only the current template fetch.
   #templatesInFlightKey = null;
 
@@ -710,6 +717,19 @@ class WorkItemFormStore {
     this.loadTemplatesForCurrentType();
   }
 
+  // True when the description is empty or still holds the last applied
+  // template body exactly as applied (ignoring editor formatting).
+  #descriptionIsUntouchedTemplate() {
+    return isUntouchedTemplateText(this.formData.description, this.#appliedTemplateBody);
+  }
+
+  #setDescriptionFromTemplate(body, mandatory) {
+    this.formData.description = body;
+    this.#appliedTemplateBody = body || null;
+    this.#appliedTemplateMandatory = mandatory && !!body;
+    this.templateApplyNonce += 1;
+  }
+
   // Load selectable and mandatory templates for the current workspace and type.
   async loadTemplatesForCurrentType() {
     const generation = this.#generation;
@@ -752,13 +772,22 @@ class WorkItemFormStore {
       this.mandatoryTemplate = mandatory;
       if (mandatory) {
         this.selectedTemplateId = mandatory.id;
-        // Never overwrite description text entered during the async load.
-        if (!this.formData.description?.trim()) {
-          this.formData.description = mandatory.description_body || '';
-          this.templateApplyNonce += 1;
+        // Replace an empty description or untouched template text (e.g. the
+        // previous type's template); never overwrite text the user wrote.
+        if (this.#descriptionIsUntouchedTemplate()) {
+          this.#setDescriptionFromTemplate(mandatory.description_body || '', true);
         }
       } else {
         this.selectedTemplateId = null;
+        // The new type has no mandatory template: drop the previous type's
+        // untouched mandatory text instead of carrying it over.
+        if (
+          this.#appliedTemplateMandatory &&
+          this.formData.description?.trim() &&
+          this.#descriptionIsUntouchedTemplate()
+        ) {
+          this.#setDescriptionFromTemplate('', false);
+        }
       }
     } catch (err) {
       if (generation !== this.#generation) return;
@@ -779,9 +808,8 @@ class WorkItemFormStore {
   applyTemplate(templateId) {
     const tmpl = this.templateOptions.find((t) => t.id === templateId);
     if (!tmpl) return;
-    this.formData.description = tmpl.description_body || '';
     this.selectedTemplateId = templateId;
-    this.templateApplyNonce += 1;
+    this.#setDescriptionFromTemplate(tmpl.description_body || '', false);
   }
 
   /**
@@ -1075,6 +1103,8 @@ class WorkItemFormStore {
     this.mandatoryTemplate = null;
     this.selectedTemplateId = null;
     this.#templatesInFlightKey = null;
+    this.#appliedTemplateBody = null;
+    this.#appliedTemplateMandatory = false;
 
     // Keep loaded data (users, milestones, itemTypes, customFields, etc.)
   }
