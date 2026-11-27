@@ -262,6 +262,7 @@ func NewDB(dataSourceName string, readConns, writeConns int) (*DB, error) {
 	}
 
 	if err = db.Ping(); err != nil {
+		_ = db.Close()
 		_ = writeConn.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}

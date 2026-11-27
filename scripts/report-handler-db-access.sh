@@ -13,7 +13,7 @@ HANDLER_DIRS=(
 
 # Match direct DB methods while avoiding URL query parsing (`r.URL.Query()`).
 # Plain `.Query(...)` is only counted when it has at least one argument.
-PATTERN='\.(QueryRowContext|QueryContext|ExecWriteContext|ExecContext|QueryRow|ExecWrite|Exec|BeginTx|Begin)[[:space:]]*\(|\.Query[[:space:]]*\([[:space:]]*[^)]'
+PATTERN='\.(QueryWriteContext|QueryWrite|QueryRowWriteContext|QueryRowWrite|QueryReadContext|QueryRowReadContext|QueryRowContext|QueryContext|ExecWriteContext|ExecContext|QueryRow|ExecWrite|Exec|BeginTx|Begin)[[:space:]]*\(|\.Query[[:space:]]*\([[:space:]]*[^)]'
 
 total_files=0
 offending_files=0
