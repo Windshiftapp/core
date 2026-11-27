@@ -218,6 +218,11 @@ export default {
     "failedToTestFidoLogin": "تست ورود به سیستم FIDO انجام نشد",
     "enterTokenName": "لطفاً یک نام برای این توکن وارد کنید",
     "confirmRevokeToken": "آیا مطمئن هستید که می خواهید \"{name}\" را لغو کنید؟ این عمل قابل لغو نیست.",
+    "noApiTokens": "هنوز توکن API وجود ندارد.",
+    "tokenLastUsed": "آخرین استفاده: {date}",
+    "tokenNeverUsed": "هرگز استفاده نشده",
+    "tokenExpiresOn": "انقضا: {date}",
+    "tokenNoExpiry": "بدون انقضا",
     "securityKeyFido": "کلید امنیتی (FIDO2)",
     "authenticatorAppTotp": "برنامه Authenticator (TOTP)"
   },

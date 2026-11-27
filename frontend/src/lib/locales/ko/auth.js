@@ -213,6 +213,11 @@ export default {
     "failedToTestFidoLogin": "FIDO 로그인 테스트에 실패했습니다",
     "enterTokenName": "토큰 이름을 입력하세요",
     "confirmRevokeToken": "\"{name}\"을(를) 폐기하시겠습니까? 되돌릴 수 없습니다.",
+    "noApiTokens": "아직 API 토큰이 없습니다.",
+    "tokenLastUsed": "마지막 사용: {date}",
+    "tokenNeverUsed": "사용한 적 없음",
+    "tokenExpiresOn": "{date} 만료",
+    "tokenNoExpiry": "만료 없음",
     "securityKeyFido": "보안 키(FIDO2)",
     "authenticatorAppTotp": "인증 앱(TOTP)"
   },
