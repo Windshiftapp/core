@@ -181,6 +181,7 @@
 
   function statusLabel(status) {
     const known = new Set(['completed', 'running', 'failed', 'data_deleted', 'queued']);
+    if (status === 'completed_with_errors') return t('jiraImport.import.completeWithErrors');
     return known.has(status) ? t(`systemImport.statuses.${status}`) : status?.replaceAll('_', ' ');
   }
 
@@ -511,8 +512,8 @@
       {#if csvHistoryError}<AlertBox variant="warning" message={csvHistoryError} />{/if}
       {#each csvHistory as job (job.id)}
         <div class="flex items-center justify-between gap-3 border-t border-ds-border py-3">
-          <span>Jira CSV · {job.filename} · {job.status.replaceAll('_', ' ')}</span>
-          <Button size="small" dataTestid={`jira-csv-history-${job.id}`} onclick={() => openCsv(job.id)}>View results</Button>
+          <span>{t('systemImport.csv.fileSource')} · {job.filename} · {statusLabel(job.status)}</span>
+          <Button size="small" dataTestid={`jira-csv-history-${job.id}`} onclick={() => openCsv(job.id)}>{t('testing.viewResults')}</Button>
         </div>
       {/each}
     </div>
@@ -670,10 +671,10 @@
 <!-- Import Wizard Modal -->
 {#if sourcePicker}
   <Modal isOpen={true} onclose={() => sourcePicker = false}>
-    <ModalHeader title="New import" onClose={() => sourcePicker = false} />
+    <ModalHeader title={t('systemImport.newImport')} onClose={() => sourcePicker = false} />
     <div class="p-6 space-y-4">
-      <div><Button dataTestid="jira-import-connect-source" onclick={() => { sourcePicker = false; openWizard(); }}>Connect to Jira</Button><p>Import directly from Jira using a saved or new connection.</p></div>
-      {#if !csvRestricted}<div><Button dataTestid="jira-import-csv-source" onclick={() => openCsv()}>Jira CSV file</Button><p>Import issues from a project export. No Jira credentials required.</p></div>{/if}
+      <div><Button dataTestid="jira-import-connect-source" onclick={() => { sourcePicker = false; openWizard(); }}>{t('systemImport.csv.connect')}</Button><p>{t('systemImport.csv.connectHint')}</p></div>
+      {#if !csvRestricted}<div><Button dataTestid="jira-import-csv-source" onclick={() => openCsv()}>{t('systemImport.csv.fileSource')}</Button><p>{t('systemImport.csv.fileHint')}</p></div>{/if}
     </div>
   </Modal>
 {/if}

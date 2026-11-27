@@ -17,6 +17,12 @@ export function suggestColumns(headers, deployment, fields) {
     if (Object.hasOwn(aliases, name)) return aliases[name];
     if (deployment === 'cloud' && ['reporter id', 'assignee id'].includes(name))
       return name.split(' ')[0];
+    if (deployment === 'dc') {
+      for (const role of ['reporter', 'assignee']) {
+        if (name === `${role} id`) return `${role}-key`;
+        if (name === role) return `${role}-name`;
+      }
+    }
     const label = name.match(/^custom field \((.+)\)$/)?.[1];
     if (!label) return '';
     const matches = Object.entries(fields).filter(

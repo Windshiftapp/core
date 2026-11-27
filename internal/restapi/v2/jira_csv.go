@@ -21,6 +21,7 @@ type jiraCSVForm struct {
 
 func csvError(err error) error {
 	var denied *operatorcontrols.DeniedError
+	var input *csvimport.InputError
 	switch {
 	case err == nil:
 		return nil
@@ -30,11 +31,19 @@ func csvError(err error) error {
 		return newError(404, "not_found", "Upload or job not found")
 	case errors.Is(err, jiracsv.ErrKeyTaken), errors.Is(err, csvimport.ErrConfigConflict):
 		return newError(409, "conflict", err.Error())
-	default:
+	case errors.As(err, &input):
 		return newError(400, "invalid_request", err.Error())
+	default:
+		return internalError(err)
 	}
 }
 func registerJiraCSVRoutes(b *routeBuilder, d Deps) {
+	describe := func(summary string) {
+		r := &b.routes[len(b.routes)-1]
+		r.Tag = "Administration"
+		r.Summary = summary
+		r.Description = summary + ". Requires a system administrator session with imports enabled."
+	}
 	auth := func(r *http.Request) (*models.User, error) {
 		u, e := requireSystemAdmin(r, d)
 		if e != nil {
@@ -68,6 +77,7 @@ func registerJiraCSVRoutes(b *routeBuilder, d Deps) {
 			return writeDocument(w, 201, data)
 		})
 	})
+	describe("Stage a Jira CSV file")
 	b.SessionRead(jiraCSVBase+"/catalog", func(r *http.Request) (jiracsv.Catalog, error) {
 		if _, e := auth(r); e != nil {
 			return jiracsv.Catalog{}, e
@@ -80,14 +90,17 @@ func registerJiraCSVRoutes(b *routeBuilder, d Deps) {
 				return jiracsv.Catalog{}, newError(400, "invalid_request", "Invalid workspace")
 			}
 		}
-		return d.JiraCSV.Catalog(r.Context(), id)
+		c, e := d.JiraCSV.Catalog(r.Context(), id)
+		return c, csvError(e)
 	})
+	describe("List Jira CSV field mapping targets")
 	b.SessionRead(jiraCSVBase+"/key", func(r *http.Request) (bool, error) {
 		if _, e := auth(r); e != nil {
 			return false, e
 		}
 		return d.JiraCSV.KeyAvailable(r.URL.Query().Get("key"))
 	})
+	describe("Check destination workspace key availability")
 	b.SessionJSON("POST", jiraCSVBase+"/preview", 200, false, func(r *http.Request, c jiracsv.Config) (jiracsv.Preview, error) {
 		u, e := auth(r)
 		if e != nil {
@@ -96,6 +109,7 @@ func registerJiraCSVRoutes(b *routeBuilder, d Deps) {
 		result, e := d.JiraCSV.Preview(r.Context(), u.ID, c)
 		return result, csvError(e)
 	})
+	describe("Preview mapped Jira issues and comments")
 	b.SessionJSON("POST", jiraCSVBase+"/start", 202, false, func(r *http.Request, c jiracsv.Config) (string, error) {
 		u, e := auth(r)
 		if e != nil {
@@ -107,6 +121,7 @@ func registerJiraCSVRoutes(b *routeBuilder, d Deps) {
 		}
 		return id, csvError(e)
 	})
+	describe("Start an offline Jira issue import")
 	b.SessionRead(jiraCSVBase+"/jobs", func(r *http.Request) ([]jiracsv.Job, error) {
 		u, e := auth(r)
 		if e != nil {
@@ -114,6 +129,7 @@ func registerJiraCSVRoutes(b *routeBuilder, d Deps) {
 		}
 		return d.JiraCSV.History(r.Context(), u.ID)
 	})
+	describe("List recent Jira CSV imports")
 	b.SessionRead(jiraCSVBase+"/jobs/{job_id}", func(r *http.Request) (jiracsv.Job, error) {
 		u, e := auth(r)
 		if e != nil {
@@ -122,4 +138,5 @@ func registerJiraCSVRoutes(b *routeBuilder, d Deps) {
 		job, e := d.JiraCSV.Job(u.ID, r.PathValue("job_id"))
 		return job, csvError(e)
 	})
+	describe("Read Jira CSV import results")
 }

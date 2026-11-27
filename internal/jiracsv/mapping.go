@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +30,7 @@ type Config struct {
 	WorkspaceID int                       `json:"workspace_id"`
 	Name        string                    `json:"name"`
 	Key         string                    `json:"key"`
+	Headers     []string                  `json:"headers"`
 	Columns     []string                  `json:"columns"`
 	Values      map[string]map[string]int `json:"values"`
 	People      map[string]int            `json:"people"` // 0: unresolved; -1: create inactive.
@@ -165,10 +167,17 @@ func (m *mapper) choice(target, v string, f Field) (int, error) {
 	if explicit && selected == 0 {
 		return 0, nil
 	}
+	found := 0
 	for _, opt := range f.Options {
 		if explicit && opt.ID == selected || !explicit && strings.EqualFold(opt.Label, v) {
-			return opt.ID, nil
+			if found != 0 {
+				return 0, fmt.Errorf("ambiguous %s value %q: select a destination", f.Name, v)
+			}
+			found = opt.ID
 		}
+	}
+	if found != 0 {
+		return found, nil
 	}
 	if !explicit && target == "priority" {
 		if label, known := jira.PriorityMappingTarget(v); known {
@@ -256,27 +265,38 @@ func (m *mapper) row(record []string) (Row, error) {
 				}
 			}
 			k := identifier + v
-			m.person(k)
+			dest := &r.assignee
 			if strings.HasPrefix(target, "reporter") {
-				r.reporter = k
-			} else {
-				r.assignee = k
+				dest = &r.reporter
+			}
+			id := m.person(k)
+			previous := m.preview.People[*dest]
+			if *dest != "" && id != 0 && previous != 0 && (id != previous || id == -1) {
+				problem = fmt.Errorf("conflicting person mappings in column %d", i+1)
+				continue
+			}
+			if *dest == "" || id != 0 {
+				*dest = k
 			}
 		case "comments":
-			ts, rest, ok := strings.Cut(v, ";")
+			ts, rest, ok := strings.Cut(record[i], ";")
 			author, body, ok2 := strings.Cut(rest, ";")
 			t, err := m.date(ts)
 			if !ok || !ok2 || err != nil || strings.TrimSpace(body) == "" {
 				problem = fmt.Errorf("invalid comment in column %d: expected timestamp;author;body", i+1)
 				continue
 			}
-			k := m.cfg.AuthorKind + ":" + strings.TrimSpace(author)
+			author = strings.TrimSpace(author)
+			k := m.cfg.AuthorKind + ":" + author
 			if author != "" {
 				m.person(k)
 			} else {
 				k = ""
 			}
-			r.Comments = append(r.Comments, Comment{Author: k, Body: m.rich(body), Date: t})
+			// Wiki conversion strips boundary whitespace. Keep the CSV body's
+			// exact trailing whitespace, including Markdown hard breaks.
+			trimmed := strings.TrimRight(body, " \t\r\n")
+			r.Comments = append(r.Comments, Comment{Author: k, Body: m.rich(trimmed) + body[len(trimmed):], Date: t})
 		default:
 			f := m.fields[target]
 			val, err := m.convert(target, v, f)
@@ -289,7 +309,9 @@ func (m *mapper) row(record []string) (Row, error) {
 			}
 			if f.Type == "multiselect" {
 				list, _ := r.Fields[target].([]any)
-				r.Fields[target] = append(list, val)
+				if !slices.Contains(list, val) {
+					r.Fields[target] = append(list, val)
+				}
 			} else {
 				r.Fields[target] = val
 			}

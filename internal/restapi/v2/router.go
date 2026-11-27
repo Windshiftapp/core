@@ -1049,11 +1049,13 @@ func applyEmbeddedContractMetadata(routes []route, document []byte) {
 		raw := item[strings.ToLower(routes[index].Method)]
 		_ = json.Unmarshal(raw, &operation)
 		routes[index].OperationID = canonicalOperationID(routes[index].Method, routes[index].Path)
-		if len(operation.Tag) > 0 {
-			routes[index].Tag = operation.Tag[0]
+		if routes[index].Summary == "" {
+			if len(operation.Tag) > 0 {
+				routes[index].Tag = operation.Tag[0]
+			}
+			routes[index].Summary = operation.Summary
+			routes[index].Description = semanticRouteDescription(routes[index].Method, operation.Summary)
 		}
-		routes[index].Summary = operation.Summary
-		routes[index].Description = semanticRouteDescription(routes[index].Method, operation.Summary)
 		routes[index].Parameters = contractParameters(item["parameters"], operation.Parameters, spec.Components.Parameters)
 		if routes[index].Path == "/workspaces/{workspace_id}/actions/validate" && routes[index].Tag == "" {
 			routes[index].Tag = "Automation"
@@ -1119,9 +1121,6 @@ func appendUniqueParameter(parameters []ParameterMetadata, candidate ParameterMe
 
 func applyParameterCorrections(route *Route) {
 	if strings.HasPrefix(route.Path, jiraCSVBase+"/") {
-		route.Tag = "Administration"
-		route.Summary = map[string]string{"upload": "Stage a Jira CSV file", "catalog": "List Jira CSV field mapping targets", "key": "Check destination workspace key availability", "preview": "Preview mapped Jira issues and comments", "start": "Start an offline Jira issue import", "jobs": "List recent Jira CSV imports", "{job_id}": "Read Jira CSV import results"}[strings.TrimPrefix(strings.TrimPrefix(route.Path, jiraCSVBase+"/"), "jobs/")]
-		route.Description = route.Summary + ". Requires a system administrator session with imports enabled."
 		switch route.Path {
 		case jiraCSVBase + "/key":
 			upsertParameter(route, stringQuery("key", "Proposed new workspace key."))

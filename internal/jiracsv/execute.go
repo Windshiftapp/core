@@ -23,6 +23,7 @@ import (
 var ErrKeyTaken = errors.New("workspace key already in use; choose another key")
 
 func (s *Service) Start(ctx context.Context, actor services.AuditActor, c Config) (string, error) {
+	c.Key = strings.ToUpper(strings.TrimSpace(c.Key))
 	if err := s.Check(ctx); err != nil {
 		return "", err
 	}
@@ -47,7 +48,7 @@ func (s *Service) Start(ctx context.Context, actor services.AuditActor, c Config
 		return "", err
 	}
 	if m.preview.Ready == 0 {
-		return "", fmt.Errorf("no valid new issues to import")
+		return "", invalid("no valid new issues to import")
 	}
 	if c.WorkspaceID == 0 {
 		ok, e := s.KeyAvailable(c.Key)

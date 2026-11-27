@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +30,10 @@ type Service struct {
 	jira       *jiraimport.Service
 	workspaces *services.WorkspaceApplicationService
 	items      *services.ItemCreationService
+}
+
+func invalid(format string, args ...any) error {
+	return &csvimport.InputError{Message: fmt.Sprintf(format, args...)}
 }
 
 func New(db database.Database, root string, workspaces *services.WorkspaceApplicationService, items *services.ItemCreationService) *Service {
@@ -109,7 +114,7 @@ func (s *Service) Catalog(ctx context.Context, workspace int) (Catalog, error) {
 			return c, e
 		}
 		if valid == nil {
-			return c, fmt.Errorf("invalid destination workspace")
+			return c, invalid("invalid destination workspace")
 		}
 		effective, err = configs.ResolveForWorkspace(ctx, workspace, nil)
 	} else {
@@ -140,11 +145,13 @@ func (s *Service) Catalog(ctx context.Context, workspace int) (Catalog, error) {
 	}
 	c.Fields["priority"] = f
 	f = Field{Name: "Status", Type: "select"}
-	var workspaceIDs []int
+	statusRepo := repository.NewStatusRepository(s.db)
+	var statuses []models.Status
 	if workspace > 0 {
-		workspaceIDs = []int{workspace}
+		statuses, err = statusRepo.ListForWorkspaces([]int{workspace})
+	} else {
+		statuses, err = statusRepo.ListForDefaultConfiguration()
 	}
-	statuses, err := repository.NewStatusRepository(s.db).ListForWorkspaces(workspaceIDs)
 	if err != nil {
 		return c, err
 	}
@@ -172,6 +179,7 @@ func (s *Service) Catalog(ctx context.Context, workspace int) (Catalog, error) {
 		}
 		c.Fields["cf:"+strconv.Itoa(d.ID)] = f
 	}
+	// Only human accounts participate in historical person matching.
 	users, err := s.db.QueryContext(ctx, `SELECT id,username FROM users WHERE is_active=true AND COALESCE(is_agent,false)=false ORDER BY username,id`)
 	if err != nil {
 		return c, err
@@ -211,31 +219,31 @@ func (s *Service) prepare(ctx context.Context, c Config) (*mapper, error) {
 	switch c.Deployment {
 	case "cloud":
 		if c.AuthorKind != "cloud" {
-			return nil, fmt.Errorf("use account IDs for Cloud comment authors")
+			return nil, invalid("use account IDs for Cloud comment authors")
 		}
 	case "dc":
 		if c.AuthorKind != "name" && c.AuthorKind != "key" && c.AuthorKind != "unknown" {
-			return nil, fmt.Errorf("choose a Data Center author identifier kind")
+			return nil, invalid("choose a Data Center author identifier kind")
 		}
 	default:
-		return nil, fmt.Errorf("choose a source deployment")
+		return nil, invalid("choose a source deployment")
 	}
 	if strings.TrimSpace(c.Source) == "" || len(c.Source) > 200 {
-		return nil, fmt.Errorf("a source instance label is required")
+		return nil, invalid("a source instance label is required")
 	}
 	if c.WorkspaceID == 0 {
 		if !services.ValidWorkspaceKey(c.Key) || strings.TrimSpace(c.Name) == "" || len(c.Name) > 100 {
-			return nil, fmt.Errorf("valid workspace name and key are required")
+			return nil, invalid("valid workspace name and key are required")
 		}
 	} else if c.Key != "" || c.Name != "" {
-		return nil, fmt.Errorf("choose one destination")
+		return nil, invalid("choose one destination")
 	}
 	if dateLayouts[c.DateFormat] == "" || c.Timezone == "" {
-		return nil, fmt.Errorf("choose a date format and timezone")
+		return nil, invalid("choose a date format and timezone")
 	}
 	zone, err := time.LoadLocation(c.Timezone)
 	if err != nil {
-		return nil, fmt.Errorf("unknown timezone")
+		return nil, invalid("unknown timezone")
 	}
 	cat, err := s.Catalog(ctx, c.WorkspaceID)
 	if err != nil {
@@ -273,13 +281,13 @@ func (s *Service) prepare(ctx context.Context, c Config) (*mapper, error) {
 		return nil, err
 	}
 	for k, id := range c.People {
-		if id < -1 || id > 0 && m.users[id] == "" || id == -1 && strings.HasPrefix(k, "unknown:") {
-			return nil, fmt.Errorf("invalid identity mapping")
+		if strings.TrimSpace(k) == "" || id < -1 || id > 0 && m.users[id] == "" || id == -1 && strings.HasPrefix(k, "unknown:") {
+			return nil, invalid("invalid identity mapping")
 		}
 	}
 	for target, f := range c.NewFields {
 		if !strings.HasPrefix(target, "new:") || strings.TrimSpace(f.Name) == "" || len(f.Name) > 100 || !supportedTypes[f.Type] || jiraimport.ReservedIssueKeyName(f.Name) {
-			return nil, fmt.Errorf("invalid new field definition")
+			return nil, invalid("invalid new field definition")
 		}
 		if f.Type == "select" || f.Type == "multiselect" {
 			ids := map[int]bool{}
@@ -287,7 +295,7 @@ func (s *Service) prepare(ctx context.Context, c Config) (*mapper, error) {
 			for _, o := range f.Options {
 				label := strings.ToLower(strings.TrimSpace(o.Label))
 				if o.ID < 1 || label == "" || ids[o.ID] || labels[label] {
-					return nil, fmt.Errorf("provide distinct option labels and IDs for %s", f.Name)
+					return nil, invalid("provide distinct option labels and IDs for %s", f.Name)
 				}
 				ids[o.ID] = true
 				labels[label] = true
@@ -295,7 +303,7 @@ func (s *Service) prepare(ctx context.Context, c Config) (*mapper, error) {
 		}
 		for _, existing := range m.fields {
 			if strings.EqualFold(existing.Name, f.Name) {
-				return nil, fmt.Errorf("field %q already exists; map to it instead", f.Name)
+				return nil, invalid("field %q already exists; map to it instead", f.Name)
 			}
 		}
 		m.fields[target] = f
@@ -309,27 +317,25 @@ func (s *Service) prepare(ctx context.Context, c Config) (*mapper, error) {
 		case "key", "title", "description", "assignee", "reporter", "assignee-name", "reporter-name", "assignee-key", "reporter-key", "comments":
 		default:
 			if _, ok := m.fields[target]; !ok {
-				return nil, fmt.Errorf("invalid target field %q", target)
+				return nil, invalid("invalid target field %q", target)
 			}
 		}
-		base := target
-		if strings.HasPrefix(base, "reporter-") {
-			base = "reporter"
+		counts[target]++
+		if counts[target] > 1 && target != "comments" && m.fields[target].Type != "multiselect" {
+			return nil, invalid("multiple columns mapped to %s", target)
 		}
-		if strings.HasPrefix(base, "assignee-") {
-			base = "assignee"
-		}
-		counts[base]++
-		if counts[base] > 1 && target != "comments" && m.fields[target].Type != "multiselect" {
-			return nil, fmt.Errorf("multiple columns mapped to %s", base)
+	}
+	for _, role := range []string{"reporter", "assignee"} {
+		if counts[role+"-key"]+counts[role+"-name"] > 0 && (c.Deployment != "dc" || counts[role] > 0) {
+			return nil, invalid("incompatible identifiers for %s", role)
 		}
 	}
 	if counts["title"] != 1 || counts["key"] != 1 {
-		return nil, fmt.Errorf("map Issue key and Summary")
+		return nil, invalid("map Issue key and Summary")
 	}
 	for k := range c.NewFields {
 		if counts[k] == 0 {
-			return nil, fmt.Errorf("unused field definition")
+			return nil, invalid("unused field definition")
 		}
 	}
 	return m, nil
@@ -348,8 +354,8 @@ func (s *Service) walk(ctx context.Context, path string, m *mapper, fn func(Row,
 	if err != nil {
 		return err
 	}
-	if len(headers) != len(m.cfg.Columns) {
-		return fmt.Errorf("mapping does not match the file header")
+	if len(headers) != len(m.cfg.Columns) || !slices.Equal(headers, m.cfg.Headers) {
+		return invalid("mapping does not match the file header")
 	}
 	// Cloud exports often carry a name next to its opaque ID. The name
 	// describes the person in the picker; it is never a lookup key.
@@ -382,7 +388,7 @@ func (s *Service) walk(ctx context.Context, path string, m *mapper, fn func(Row,
 		}
 		for _, v := range rec {
 			if !utf8.ValidString(v) {
-				return fmt.Errorf("file must be UTF-8")
+				return invalid("file must be UTF-8")
 			}
 		}
 		row, e := m.row(rec)
@@ -393,7 +399,7 @@ func (s *Service) walk(ctx context.Context, path string, m *mapper, fn func(Row,
 		}
 		if parts := issueKey.FindStringSubmatch(row.Key); parts != nil {
 			if project != "" && project != parts[1] {
-				return fmt.Errorf("export a single Jira project per file")
+				return invalid("export a single Jira project per file")
 			}
 			project = parts[1]
 		}
@@ -422,9 +428,25 @@ func (s *Service) preflight(ctx context.Context, user int, c Config) (*mapper, s
 		}
 	}
 	seen := map[string]bool{}
+	workflows := services.NewWorkflowService(s.db)
+	statusChecks := map[[2]int]error{}
 	row := 1
 	err = s.walk(ctx, path, m, func(r Row, e error) error {
 		row++
+		if status, ok := r.Fields["status"].(int); e == nil && ok {
+			itemType, _ := r.Fields["type"].(int)
+			key := [2]int{itemType, status}
+			result, checked := statusChecks[key]
+			if !checked {
+				result = workflows.ValidateImportCreateStatus(ctx, c.WorkspaceID, itemType, status)
+				var rejected *services.TransitionRejection
+				if result != nil && !errors.As(result, &rejected) {
+					return result
+				}
+				statusChecks[key] = result
+			}
+			e = result
+		}
 		if e != nil {
 			m.preview.Invalid++
 			if len(m.preview.Errors) < 50 {
@@ -469,6 +491,7 @@ func (s *Service) importedRefs(ctx context.Context, workspaceID int) (map[string
 }
 
 func (s *Service) Preview(ctx context.Context, user int, c Config) (Preview, error) {
+	c.Key = strings.ToUpper(strings.TrimSpace(c.Key))
 	m, _, err := s.preflight(ctx, user, c)
 	if err != nil {
 		return Preview{}, err
@@ -486,6 +509,7 @@ type Job struct {
 	Created     []CreatedItem `json:"created,omitempty"`
 }
 
+// History and Job use the same uploader boundary as preview (including row errors and identities).
 func (s *Service) History(ctx context.Context, user int) ([]Job, error) {
 	if _, err := s.store.ReconcileExpired(kind, time.Now().UTC(), nil); err != nil {
 		return nil, err
