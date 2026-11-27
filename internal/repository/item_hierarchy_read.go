@@ -183,14 +183,11 @@ func (r *ItemRepository) HierarchyDescendantsContext(ctx context.Context, params
 		" COUNT(*) OVER (PARTITION BY t.root_id) AS root_total" +
 		" FROM tree t JOIN items i ON i.id = t.id" + ItemListFilterJoins() +
 		" WHERE t.depth > 0 AND i.workspace_id IN (" + wsPlaceholders + ")" + qlClause +
-		"), page AS (" +
-		" SELECT root_id, id, depth, root_total FROM ranked WHERE rn > ? AND rn <= ?" +
-		") " +
-		itemListSelectClause(params.OmitDescriptions) +
-		", page.root_id AS hierarchy_root_id, page.depth AS hierarchy_depth, page.root_total AS hierarchy_root_total " +
-		"FROM items i" + itemListHydrationJoins() +
-		" JOIN page ON page.id = i.id" +
-		" ORDER BY page.root_id, page.depth, i.frac_index"
+		"), page_items AS (" +
+		" SELECT id, root_id AS hierarchy_root_id, depth AS hierarchy_depth, root_total AS hierarchy_root_total" +
+		" FROM ranked WHERE rn > ? AND rn <= ?)" +
+		hydrateItemPage(r.groupPageContext(), params.OmitDescriptions, ", hierarchy_root_id, hierarchy_depth, hierarchy_root_total") +
+		" ORDER BY hierarchy_root_id, hierarchy_depth, i.frac_index"
 
 	rows, err := r.db.QueryReadContext(ctx, query, args...)
 	if err != nil {
