@@ -6,13 +6,16 @@
 import { customFields, screens } from '../api/configuration.js';
 import {
   isCreateRenderableCustomFieldType,
+  SCREEN_FIELD_HINT_MAX_LENGTH,
   supportsMainColumnPlacement,
+  supportsScreenHint,
 } from '../utils/customFieldTypes.js';
 import { createSearchFilteredFields } from '../utils/fieldSearchUtils.js';
 import {
   ALWAYS_VISIBLE_SYSTEM_FIELDS,
   canSystemFieldBeRequiredOnCreate,
   isAlwaysVisibleSystemField,
+  systemFieldSupportsHint,
 } from '../utils/screenFields.js';
 import { DragStateStore } from './DragStateStore.svelte.js';
 import { getSystemFieldName, SYSTEM_FIELDS } from './fieldConfig.js';
@@ -421,6 +424,35 @@ class ScreenEditorStore extends DragStateStore {
     // Allow moving a stale main-column field back, never into it.
     if (!isMain && !this.canFieldUseMainColumn(field)) return;
     field.placement = isMain ? 'sidebar' : 'main';
+    this.screenFields = [...this.screenFields];
+  }
+
+  /**
+   * Whether a screen field can carry a per-screen hint: the description, and
+   * text / multi-line / rich text custom fields. The server enforces the same rule.
+   */
+  canFieldHaveHint(field) {
+    if (field?.field_type === 'system') return systemFieldSupportsHint(field.field_identifier);
+    if (field?.field_type !== 'custom') return false;
+    return supportsScreenHint(this.getCustomFieldDefinition(field)?.field_type);
+  }
+
+  getCustomFieldDefinition(field) {
+    if (field?.field_type !== 'custom') return null;
+    return this.customFields.find((cf) => cf.id === parseInt(field.field_identifier, 10)) || null;
+  }
+
+  setFieldHint(index, hint) {
+    const field = this.screenFields[index];
+    if (!field) return;
+    // Cap by characters (code points), like the server, so an emoji is never split.
+    const value = Array.from((hint || '').replace(/\r\n/g, '\n').trim())
+      .slice(0, SCREEN_FIELD_HINT_MAX_LENGTH)
+      .join('')
+      .trim();
+    // Clearing a hint is always allowed, even on a field that no longer qualifies.
+    if (value && !this.canFieldHaveHint(field)) return;
+    field.hint = value;
     this.screenFields = [...this.screenFields];
   }
 

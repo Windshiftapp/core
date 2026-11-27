@@ -23,6 +23,7 @@
   import {
     isCreateSystemFieldAutoManaged,
     isCreateSystemFieldRenderable,
+    screenFieldHint,
     systemFieldIdentifiers,
   } from '../utils/screenFields.js';
   import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
@@ -761,7 +762,7 @@
         bind:value={description}
         bind:this={descriptionField}
         rows={4}
-        placeholder={t('mobile.item.descriptionPlaceholder')}
+        placeholder={(!isPersonal && screenFieldHint(screenFields, { system: 'description' })) || t('mobile.item.descriptionPlaceholder')}
         use:autoGrow={description}
         data-testid="create-description"
         readonly={templateLocked}
@@ -1047,6 +1048,7 @@
     <span>{entry.fieldDef.name} {#if required}<strong>*</strong>{/if}</span>
     <CustomFieldRenderer
       field={entry.fieldDef}
+      hint={entry.screenField?.hint}
       bind:value={customFieldValues[entry.fieldDef.id]}
       readonly={false}
       onChange={(val) => customFieldValues[entry.fieldDef.id] = val}

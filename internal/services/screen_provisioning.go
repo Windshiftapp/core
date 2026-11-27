@@ -321,6 +321,10 @@ func (s *ScreenProvisioningService) ReplaceScreenFields(actor AuditActor, screen
 	if err != nil {
 		return nil, err
 	}
+	fields, err = s.normalizeFieldHints(fields)
+	if err != nil {
+		return nil, err
+	}
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -333,9 +337,10 @@ func (s *ScreenProvisioningService) ReplaceScreenFields(actor AuditActor, screen
 	}
 	for _, field := range fields {
 		if _, err = tx.Exec(`
-			INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width, placement)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
-		`, screenID, field.FieldType, field.FieldIdentifier, field.DisplayOrder, field.IsRequired, field.FieldWidth, field.Placement); err != nil {
+			INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width, placement, hint)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`, screenID, field.FieldType, field.FieldIdentifier, field.DisplayOrder, field.IsRequired, field.FieldWidth, field.Placement,
+			sql.NullString{String: field.Hint, Valid: field.Hint != ""}); err != nil {
 			return nil, fmt.Errorf("update screen fields: %w", err)
 		}
 	}
@@ -386,8 +391,58 @@ func (s *ScreenProvisioningService) clearLinkingRequiredFlags(fields []models.Sc
 	return fields, nil
 }
 
+// normalizeHintText normalizes line endings, trims, and caps a hint at
+// models.ScreenFieldHintMaxLength runes. Line breaks are kept: multi-line
+// hints render as multi-line placeholders.
+func normalizeHintText(hint string) string {
+	hint = strings.ReplaceAll(hint, "\r\n", "\n")
+	return strings.TrimSpace(truncateRunes(strings.TrimSpace(hint), models.ScreenFieldHintMaxLength))
+}
+
+// normalizeFieldHints strips markup from screen field hints, caps them at
+// models.ScreenFieldHintMaxLength runes, and keeps them only on fields that
+// can show one (the description, and text / multi-line / rich text custom
+// fields). Anything else is cleared.
+func (s *ScreenProvisioningService) normalizeFieldHints(fields []models.ScreenField) ([]models.ScreenField, error) {
+	customTypes := map[int]string{}
+	for i := range fields {
+		hint := normalizeHintText(sanitize.PlainTextField.Sanitize(fields[i].Hint))
+		fields[i].Hint = ""
+		if hint == "" {
+			continue
+		}
+		identifier := strings.TrimSpace(fields[i].FieldIdentifier)
+		switch fields[i].FieldType {
+		case "system":
+			if models.SystemFieldSupportsHint(identifier) {
+				fields[i].Hint = hint
+			}
+		case "custom":
+			fieldID, err := strconv.Atoi(identifier)
+			if err != nil {
+				continue
+			}
+			fieldType, ok := customTypes[fieldID]
+			if !ok {
+				err = s.db.QueryRow("SELECT field_type FROM custom_field_definitions WHERE id = ?", fieldID).Scan(&fieldType)
+				if errors.Is(err, sql.ErrNoRows) {
+					continue
+				}
+				if err != nil {
+					return nil, fmt.Errorf("load custom field %d: %w", fieldID, err)
+				}
+				customTypes[fieldID] = fieldType
+			}
+			if models.CustomFieldTypeSupportsHint(fieldType) {
+				fields[i].Hint = hint
+			}
+		}
+	}
+	return fields, nil
+}
+
 // normalizeFieldPlacements keeps placement to its two values and allows the
-// main column only for long-form custom fields (multi-line and rich text).
+// main column only for free-text custom fields (text, multi-line and rich text).
 // Anything else falls back to the sidebar, so an API client cannot move a
 // picker or system field into the description column.
 func (s *ScreenProvisioningService) normalizeFieldPlacements(fields []models.ScreenField) ([]models.ScreenField, error) {
@@ -455,7 +510,7 @@ func (s *ScreenProvisioningService) logScreenUpdate(actor AuditActor, screenID i
 // Helper function to get screen fields with joined data
 func (s *ScreenProvisioningService) getScreenFields(screenID int) ([]models.ScreenField, error) {
 	rows, err := s.db.Query(`
-		SELECT sf.id, sf.screen_id, sf.field_type, sf.field_identifier, sf.display_order, sf.is_required, sf.field_width, COALESCE(sf.placement, 'sidebar'),
+		SELECT sf.id, sf.screen_id, sf.field_type, sf.field_identifier, sf.display_order, sf.is_required, sf.field_width, COALESCE(sf.placement, 'sidebar'), COALESCE(sf.hint, ''),
 		       CASE
 		           WHEN sf.field_type = 'custom' THEN cfd.name
 		           ELSE ''
@@ -485,7 +540,7 @@ func (s *ScreenProvisioningService) getScreenFields(screenID int) ([]models.Scre
 // list responses, grouped by screen ID in memory.
 func (s *ScreenProvisioningService) getAllScreenFields() (map[int][]models.ScreenField, error) {
 	rows, err := s.db.Query(`
-		SELECT sf.id, sf.screen_id, sf.field_type, sf.field_identifier, sf.display_order, sf.is_required, sf.field_width, COALESCE(sf.placement, 'sidebar'),
+		SELECT sf.id, sf.screen_id, sf.field_type, sf.field_identifier, sf.display_order, sf.is_required, sf.field_width, COALESCE(sf.placement, 'sidebar'), COALESCE(sf.hint, ''),
 		       CASE
 		           WHEN sf.field_type = 'custom' THEN cfd.name
 		           ELSE ''
@@ -527,7 +582,7 @@ func scanScreenFields(rows *sql.Rows) ([]models.ScreenField, error) {
 		var configStr sql.NullString
 
 		err := rows.Scan(&field.ID, &field.ScreenID, &field.FieldType, &field.FieldIdentifier,
-			&field.DisplayOrder, &field.IsRequired, &field.FieldWidth, &field.Placement,
+			&field.DisplayOrder, &field.IsRequired, &field.FieldWidth, &field.Placement, &field.Hint,
 			&field.FieldName, &field.FieldLabel, &configStr)
 		if err != nil {
 			return nil, err

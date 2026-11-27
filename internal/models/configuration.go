@@ -102,6 +102,10 @@ type ScreenField struct {
 	// Placement is where the item detail view renders the field: "sidebar"
 	// (default) or "main" (under the description; long-form custom fields only).
 	Placement string `json:"placement,omitempty"`
+	// Hint is optional per-screen input guidance shown as the
+	// placeholder of the description and of text, multi-line and rich text
+	// custom fields.
+	Hint string `json:"hint,omitempty"`
 	// Joined/computed fields for API responses
 	FieldName   string         `json:"field_name,omitempty"`
 	FieldLabel  string         `json:"field_label,omitempty"`
@@ -126,9 +130,25 @@ func NormalizeScreenFieldPlacement(placement string) string {
 }
 
 // CustomFieldTypeSupportsMainPlacement reports whether a custom field type is
-// long-form content that can render in the item detail main column.
+// free-text content that can render in the item detail main column.
 func CustomFieldTypeSupportsMainPlacement(fieldType string) bool {
-	return fieldType == "textarea" || fieldType == "richtext"
+	return fieldType == "text" || fieldType == "textarea" || fieldType == "richtext"
+}
+
+// ScreenFieldHintMaxLength caps a screen field hint, in runes. Hints render as
+// input placeholders, so they stay short.
+const ScreenFieldHintMaxLength = 250
+
+// SystemFieldSupportsHint reports whether a system field can show a screen
+// hint. Only the description qualifies; the title needs no guidance.
+func SystemFieldSupportsHint(identifier string) bool {
+	return identifier == "description"
+}
+
+// CustomFieldTypeSupportsHint reports whether a custom field type has a
+// free-text input that can show a screen hint.
+func CustomFieldTypeSupportsHint(fieldType string) bool {
+	return fieldType == "text" || fieldType == "textarea" || fieldType == "richtext"
 }
 
 // ItemType represents a type of work item

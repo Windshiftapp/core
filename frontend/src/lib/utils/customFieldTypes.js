@@ -12,6 +12,24 @@ export function canonicalCustomFieldType(fieldType) {
 // Field descriptions are short admin notes.
 export const CUSTOM_FIELD_DESCRIPTION_MAX_LENGTH = 250;
 
+// Free-text types that can show a per-screen hint as their input placeholder.
+// Mirrors models.CustomFieldTypeSupportsHint.
+const SCREEN_HINT_FIELD_TYPES = new Set(['text', 'textarea', 'richtext']);
+
+export function supportsScreenHint(fieldType) {
+  return SCREEN_HINT_FIELD_TYPES.has(fieldType);
+}
+
+// Hints render as placeholders, so they stay short (models.ScreenFieldHintMaxLength).
+export const SCREEN_FIELD_HINT_MAX_LENGTH = 250;
+
+// Placeholder for a free-text custom field: the screen's hint, else the
+// caller's default. Other field types always keep the default.
+export function customFieldPlaceholder(field, hint, fallback) {
+  if (!supportsScreenHint(field?.field_type)) return fallback;
+  return hint?.trim() || fallback;
+}
+
 // Linking fields attach to an existing item through item_links, so a create
 // form has no item id to link against and cannot satisfy them. They stay valid
 // on edit/view screens; create surfaces must exclude them.
@@ -35,10 +53,10 @@ export function isRichTextCustomFieldType(fieldType) {
   return fieldType === 'richtext';
 }
 
-// Long-form types a screen may place in the item detail main column, under the
+// Free-text types a screen may place in the item detail main column, under the
 // description. Mirrors models.CustomFieldTypeSupportsMainPlacement.
 export function supportsMainColumnPlacement(fieldType) {
-  return fieldType === 'textarea' || fieldType === 'richtext';
+  return fieldType === 'text' || fieldType === 'textarea' || fieldType === 'richtext';
 }
 
 // Money values are objects ({ amount, currency }) rather than bare numbers, so

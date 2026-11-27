@@ -120,6 +120,26 @@ export function isMainColumnScreenField(field) {
   return field?.field_type === 'custom' && field?.placement === 'main';
 }
 
+// System fields that can show a per-screen hint (only the description). Custom
+// fields qualify by type (text, multi-line, rich text; see supportsScreenHint).
+const HINT_SYSTEM_FIELDS = ['description'];
+
+export function systemFieldSupportsHint(identifier) {
+  return HINT_SYSTEM_FIELDS.includes(normalizeSystemFieldIdentifier(identifier));
+}
+
+// The per-screen hint for the description system field or a custom
+// field (by definition id), or '' when the screen sets none.
+export function screenFieldHint(screenFields, { system = null, customFieldId = null } = {}) {
+  const match = (screenFields || []).find((field) =>
+    system
+      ? field?.field_type === 'system' &&
+        normalizeSystemFieldIdentifier(field.field_identifier) === system
+      : field?.field_type === 'custom' && String(field.field_identifier) === String(customFieldId)
+  );
+  return match?.hint?.trim() || '';
+}
+
 export function customFieldDefinitionIdFromScreenField(field) {
   const id = parseInt(field?.field_identifier, 10);
   return Number.isFinite(id) ? id : null;
@@ -166,12 +186,17 @@ export function buildDetailScreenFieldConfig(editScreen, viewScreen = null) {
   const editCustom = customFieldsFromScreen(editScreen);
   const editSystem = systemFieldsFromScreen(editScreen);
 
+  // Per-screen description hint from the edit screen (system rows are not kept
+  // in visibleCustomFields, so it is carried separately).
+  const descriptionHint = screenFieldHint(editScreen?.fields, { system: 'description' });
+
   if (sameScreen) {
     return {
       visibleCustomFields: editCustom,
       visibleSystemFields: editSystem,
       editableCustomFieldIds: null,
       editableSystemFields: null,
+      descriptionHint,
     };
   }
 
@@ -185,5 +210,6 @@ export function buildDetailScreenFieldConfig(editScreen, viewScreen = null) {
       editCustom.map(customFieldDefinitionIdFromScreenField).filter((id) => id !== null)
     ),
     editableSystemFields: new Set(withAlwaysVisibleSystemFields(editSystem)),
+    descriptionHint,
   };
 }

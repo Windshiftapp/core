@@ -1706,13 +1706,30 @@
   /* Show the placeholder only for a truly empty document. `:only-child` ignores
      text nodes, so match the empty-paragraph trailing break by class — a hard
      break (`<br data-type="hardbreak">`) must not re-trigger the placeholder. */
+  /* While empty, the placeholder and the empty paragraph share one grid cell:
+     the caret stays on the first line and the editor grows to the placeholder's
+     full height, so long or multi-line placeholders are never clipped. */
+  :global(.milkdown-editor:not(.readonly) .ProseMirror[data-placeholder]:has(> p:first-child:last-child:empty)),
+  :global(.milkdown-editor:not(.readonly) .ProseMirror[data-placeholder]:has(> p:first-child:last-child > br.ProseMirror-trailingBreak:only-child)) {
+    display: grid;
+  }
+
+  :global(.milkdown-editor:not(.readonly) .ProseMirror[data-placeholder]:has(> p:first-child:last-child:empty) > p),
+  :global(.milkdown-editor:not(.readonly) .ProseMirror[data-placeholder]:has(> p:first-child:last-child > br.ProseMirror-trailingBreak:only-child) > p) {
+    grid-area: 1 / 1;
+  }
+
   :global(.milkdown-editor:not(.readonly) .ProseMirror[data-placeholder]:has(> p:first-child:last-child:empty)::before),
   :global(.milkdown-editor:not(.readonly) .ProseMirror[data-placeholder]:has(> p:first-child:last-child > br.ProseMirror-trailingBreak:only-child)::before) {
     content: attr(data-placeholder);
-    float: left;
+    grid-area: 1 / 1;
+    /* Same block margins as the paragraph, so the caret and the first line of
+       the placeholder line up. */
+    margin: 0.5rem 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
     color: var(--ds-text-subtlest, #9ca3af);
     pointer-events: none;
-    height: 0;
   }
 
   /* Basic typography styles */

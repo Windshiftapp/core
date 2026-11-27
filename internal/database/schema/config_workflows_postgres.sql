@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS screen_fields (
 	is_required BOOLEAN DEFAULT false,
 	field_width TEXT DEFAULT 'full',
 	placement TEXT NOT NULL DEFAULT 'sidebar',
+	hint TEXT,
 	FOREIGN KEY (screen_id) REFERENCES screens(id) ON DELETE CASCADE
 );
 

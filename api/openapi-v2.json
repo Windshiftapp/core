@@ -9719,6 +9719,10 @@
                             "description": "The field width value.",
                             "type": "string"
                           },
+                          "hint": {
+                            "description": "The hint value.",
+                            "type": "string"
+                          },
                           "is_required": {
                             "description": "The is required value.",
                             "type": "boolean"
@@ -20399,6 +20403,10 @@
                               "description": "The field width value.",
                               "type": "string"
                             },
+                            "hint": {
+                              "description": "The hint value.",
+                              "type": "string"
+                            },
                             "id": {
                               "description": "The id value.",
                               "type": "integer"
@@ -20520,6 +20528,10 @@
                             },
                             "field_width": {
                               "description": "The field width value.",
+                              "type": "string"
+                            },
+                            "hint": {
+                              "description": "The hint value.",
                               "type": "string"
                             },
                             "id": {
@@ -30321,6 +30333,10 @@
                         "description": "The field width value.",
                         "type": "string"
                       },
+                      "hint": {
+                        "description": "The hint value.",
+                        "type": "string"
+                      },
                       "id": {
                         "description": "The id value.",
                         "type": "integer"
@@ -30432,6 +30448,10 @@
                   "description": "The field width value.",
                   "type": "string"
                 },
+                "hint": {
+                  "description": "The hint value.",
+                  "type": "string"
+                },
                 "id": {
                   "description": "The id value.",
                   "type": "integer"
@@ -30530,6 +30550,10 @@
                     },
                     "field_width": {
                       "description": "The field width value.",
+                      "type": "string"
+                    },
+                    "hint": {
+                      "description": "The hint value.",
                       "type": "string"
                     },
                     "id": {
@@ -37049,6 +37073,10 @@
                           "description": "The field width value.",
                           "type": "string"
                         },
+                        "hint": {
+                          "description": "The hint value.",
+                          "type": "string"
+                        },
                         "id": {
                           "description": "The id value.",
                           "type": "integer"
@@ -37248,6 +37276,10 @@
                         },
                         "field_width": {
                           "description": "The field width value.",
+                          "type": "string"
+                        },
+                        "hint": {
+                          "description": "The hint value.",
                           "type": "string"
                         },
                         "id": {
@@ -37967,6 +37999,10 @@
                               },
                               "field_width": {
                                 "description": "The field width value.",
+                                "type": "string"
+                              },
+                              "hint": {
+                                "description": "The hint value.",
                                 "type": "string"
                               },
                               "is_required": {
@@ -51778,6 +51814,10 @@
                               "description": "The field width value.",
                               "type": "string"
                             },
+                            "hint": {
+                              "description": "The hint value.",
+                              "type": "string"
+                            },
                             "id": {
                               "description": "The id value.",
                               "type": "integer"
@@ -51899,6 +51939,10 @@
                             },
                             "field_width": {
                               "description": "The field width value.",
+                              "type": "string"
+                            },
+                            "hint": {
+                              "description": "The hint value.",
                               "type": "string"
                             },
                             "id": {
@@ -61576,6 +61620,10 @@
                     },
                     "field_width": {
                       "description": "The field width value.",
+                      "type": "string"
+                    },
+                    "hint": {
+                      "description": "The hint value.",
                       "type": "string"
                     },
                     "id": {
@@ -72357,6 +72405,10 @@
                             "description": "The field width value.",
                             "type": "string"
                           },
+                          "hint": {
+                            "description": "The hint value.",
+                            "type": "string"
+                          },
                           "is_required": {
                             "description": "The is required value.",
                             "type": "boolean"
@@ -73250,6 +73302,10 @@
                               },
                               "field_width": {
                                 "description": "The field width value.",
+                                "type": "string"
+                              },
+                              "hint": {
+                                "description": "The hint value.",
                                 "type": "string"
                               },
                               "is_required": {
@@ -74207,6 +74263,10 @@
                           },
                           "field_width": {
                             "description": "The field width value.",
+                            "type": "string"
+                          },
+                          "hint": {
+                            "description": "The hint value.",
                             "type": "string"
                           },
                           "is_required": {
@@ -92597,6 +92657,10 @@
                       "description": "The field width value.",
                       "type": "string"
                     },
+                    "hint": {
+                      "description": "The hint value.",
+                      "type": "string"
+                    },
                     "id": {
                       "description": "The id value.",
                       "type": "integer"
@@ -96091,6 +96155,10 @@
                               },
                               "field_width": {
                                 "description": "The field width value.",
+                                "type": "string"
+                              },
+                              "hint": {
+                                "description": "The hint value.",
                                 "type": "string"
                               },
                               "is_required": {
@@ -103388,6 +103456,10 @@
                   "description": "The field width value.",
                   "type": "string"
                 },
+                "hint": {
+                  "description": "The hint value.",
+                  "type": "string"
+                },
                 "id": {
                   "description": "The id value.",
                   "type": "integer"
@@ -103460,6 +103532,10 @@
                 },
                 "field_width": {
                   "description": "The field width value.",
+                  "type": "string"
+                },
+                "hint": {
+                  "description": "The hint value.",
                   "type": "string"
                 },
                 "id": {

@@ -630,6 +630,7 @@
               itemId={item?.id}
               workspaceId={item?.workspace_id}
               required={screenField.is_required}
+              hint={screenField.hint}
               onChange={(val) => {
                 editCustomFieldValues[screenField.field_identifier] = val;
               }}
@@ -651,6 +652,7 @@
           {iterations}
           itemId={item?.id}
           required={screenField.is_required}
+          hint={screenField.hint}
           onChange={(val) => {
             editCustomFieldValues[screenField.field_identifier] = val;
             if (!DEFERRED_SAVE_CUSTOM_FIELD_TYPES.has(fieldDef.field_type)) {

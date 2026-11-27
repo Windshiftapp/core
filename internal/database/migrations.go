@@ -4017,6 +4017,16 @@ END $$;
 			DROP INDEX IF EXISTS idx_items_workspace_frac_index_active;
 			ALTER INDEX idx_items_workspace_frac_index_active_new RENAME TO idx_items_workspace_frac_index_active;
 		`,
+	},
+	{
+		// Optional per-screen input guidance for free-text fields, shown as the
+		// field's placeholder. NULL keeps the existing behavior.
+		Version:       "20261213_screen_field_hint",
+		Name:          "Add per-screen field hints",
+		CheckSQLite:   sqliteColumnCheck("screen_fields", "hint"),
+		CheckPostgres: pgColumnCheck("screen_fields", "hint"),
+		SQLite:        `ALTER TABLE screen_fields ADD COLUMN hint TEXT`,
+		Postgres:      `ALTER TABLE screen_fields ADD COLUMN IF NOT EXISTS hint TEXT`,
 	}}
 
 const jiraCSVPeopleSQL = `CREATE TABLE IF NOT EXISTS jira_csv_people (

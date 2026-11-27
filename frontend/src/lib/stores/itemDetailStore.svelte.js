@@ -145,6 +145,8 @@ class ItemDetailStore {
   // Null editable fields preserve the legacy path: all visible fields are editable.
   customFieldDefinitions = $state([]);
   workspaceScreenFields = $state([]);
+  // Edit screen's per-screen hint for the description editor ('' when unset).
+  descriptionHint = $state('');
   workspaceScreenSystemFields = $state([]);
   // Recursive descendant story-point rollup from the detail summary (GH #256).
   storyPointsRollup = $state(null);
@@ -323,6 +325,7 @@ class ItemDetailStore {
         // it from the summary or the workspace cache.
         this.workspaceScreenFields = [];
         this.workspaceScreenSystemFields = [];
+        this.descriptionHint = '';
         this.editableScreenFieldIds = null;
         this.editableScreenSystemFields = null;
       }
@@ -836,6 +839,7 @@ class ItemDetailStore {
     this.workspaceScreenSystemFields = [];
     this.editableScreenFieldIds = null;
     this.editableScreenSystemFields = null;
+    this.descriptionHint = '';
 
     let fieldConfig = null;
     if (screenContext?.edit) {
@@ -856,6 +860,7 @@ class ItemDetailStore {
     this.workspaceScreenSystemFields = fieldConfig.visibleSystemFields;
     this.editableScreenFieldIds = fieldConfig.editableCustomFieldIds;
     this.editableScreenSystemFields = fieldConfig.editableSystemFields;
+    this.descriptionHint = fieldConfig.descriptionHint || '';
   }
 
   // === Editing Methods ===
@@ -1519,6 +1524,7 @@ class ItemDetailStore {
     this.customFieldDefinitions = [];
     this.workspaceScreenFields = [];
     this.workspaceScreenSystemFields = [];
+    this.descriptionHint = '';
     this.requestTypeFields = [];
     this.editableScreenFieldIds = null;
     this.editableScreenSystemFields = null;

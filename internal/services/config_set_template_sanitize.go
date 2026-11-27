@@ -101,6 +101,7 @@ func SanitizeConfigSetTemplate(tpl *ConfigSetTemplate) error {
 				sanitize.Pair{Target: &sc.Fields[j].CustomFieldName, Policy: sanitize.ShortIdentifier},
 				sanitize.Pair{Target: &sc.Fields[j].FieldWidth, Policy: sanitize.ShortIdentifier},
 				sanitize.Pair{Target: &sc.Fields[j].Placement, Policy: sanitize.ShortIdentifier},
+				sanitize.Pair{Target: &sc.Fields[j].Hint, Policy: sanitize.PlainTextField},
 			)
 		}
 		for j := range sc.SystemFields {

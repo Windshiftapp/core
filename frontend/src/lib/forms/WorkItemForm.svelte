@@ -23,6 +23,7 @@
   import ChipPicker from '../pickers/ChipPicker.svelte';
   import DatePicker from '../pickers/DatePicker.svelte';
   import CustomFieldRenderer from '../features/items/CustomFieldRenderer.svelte';
+  import { screenFieldHint } from '../utils/screenFields.js';
   import PriorityPicker from '../pickers/PriorityPicker.svelte';
   import MilestoneCombobox from '../pickers/MilestoneCombobox.svelte';
   import UserPicker from '../pickers/UserPicker.svelte';
@@ -220,7 +221,7 @@
     {#key store.templateApplyNonce}
       <MilkdownEditor
         bind:content={store.formData.description}
-        placeholder={t('createModal.addDescription')}
+        placeholder={screenFieldHint(store.screenFields, { system: 'description' }) || t('createModal.addDescription')}
         compact={true}
         showToolbar={false}
         readonly={false}
@@ -241,6 +242,7 @@
       </Label>
       <CustomFieldRenderer
         {field}
+        hint={screenField?.hint}
         bind:value={store.customFieldValues[field.id]}
         readonly={false}
         onChange={(val) => store.customFieldValues[field.id] = val}
@@ -643,6 +645,7 @@
           <Label color="default">{field.name}</Label>
           <CustomFieldRenderer
             {field}
+            hint={screenFieldHint(store.screenFields, { customFieldId: field.id })}
             bind:value={store.customFieldValues[field.id]}
             readonly={false}
             onChange={(val) => store.customFieldValues[field.id] = val}
@@ -841,6 +844,7 @@
           </Label>
           <CustomFieldRenderer
             {field}
+            hint={screenFieldHint(store.screenFields, { customFieldId: field.id })}
             bind:value={store.customFieldValues[field.id]}
             readonly={false}
             onChange={(val) => store.customFieldValues[field.id] = val}
