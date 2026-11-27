@@ -186,8 +186,8 @@ func (r *ItemRepository) HierarchyDescendantsContext(ctx context.Context, params
 		"), page_items AS (" +
 		" SELECT id, root_id AS hierarchy_root_id, depth AS hierarchy_depth, root_total AS hierarchy_root_total" +
 		" FROM ranked WHERE rn > ? AND rn <= ?)" +
-		hydrateItemPage(r.pageContextHint(), params.OmitDescriptions, ", hierarchy_root_id, hierarchy_depth, hierarchy_root_total") +
-		" ORDER BY i.hierarchy_root_id, i.hierarchy_depth, i.frac_index"
+		hydrateItemPage(r.groupPageContext(), params.OmitDescriptions, ", hierarchy_root_id, hierarchy_depth, hierarchy_root_total") +
+		" ORDER BY hierarchy_root_id, hierarchy_depth, i.frac_index"
 
 	rows, err := r.db.QueryReadContext(ctx, query, args...)
 	if err != nil {

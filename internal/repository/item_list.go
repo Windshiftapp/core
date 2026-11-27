@@ -186,7 +186,7 @@ const itemStatusPriorityJoins = `
 // itemListPagePlan keeps the count and page-selection SQL together so the
 // unfiltered workspace fast path cannot drift from filtered/collection lists.
 type itemListPagePlan struct {
-	contextHint      string
+	groupPageContext bool
 	countQuery       string
 	countArgs        []any
 	pageFromClause   string
@@ -274,35 +274,37 @@ func itemPageColumns(omitDescriptions bool) string {
 		i.story_points, i.estimate_minutes, i.frac_index, i.created_at, i.updated_at, i.last_active_at`
 }
 
-// Bound PostgreSQL's join-order search to two groups. SQLite can flatten the
-// same joined query, so it doesn't have to copy the page to a temporary table.
-func (r *ItemRepository) pageContextHint() string {
-	if database.IsPostgresDriver(r.db.GetDriverName()) {
-		return "MATERIALIZED "
-	}
-	return ""
+func (r *ItemRepository) groupPageContext() bool {
+	return database.IsPostgresDriver(r.db.GetDriverName())
 }
 
 // Both callers select the authorized page IDs first. Hierarchy pages also
 // carry their root, depth and total through to the end of the scan row.
-func hydrateItemPage(contextHint string, omitDescriptions bool, extraColumns string) string {
-	return `, page_context AS ` + contextHint + `(
-		SELECT ` + itemPageColumns(omitDescriptions) + `, i.team_id, i.incident_id, i.rank,
-		w.name as workspace_name, w.key as workspace_key, it.name as item_type_name, COALESCE(it.builtin_key, '') as item_type_builtin_key, COALESCE(it.icon, '') as item_type_icon, COALESCE(it.color, '') as item_type_color,
-		iter.name as iteration_name, COALESCE(CAST(iter.end_date AS TEXT), '') as iteration_end_date, proj.name as project_name, tp.name as time_project_name` + extraColumns + `
-		FROM page_items page JOIN items i ON i.id = page.id` + itemPageContextJoins + `
-	)
-	SELECT ` + itemPageColumns(false) + `,
-		i.workspace_name, i.workspace_key, i.item_type_name, i.item_type_builtin_key, i.item_type_icon, i.item_type_color,
-		p.title as parent_title, p.workspace_item_number as parent_workspace_item_number, i.iteration_name, i.iteration_end_date, i.project_name, i.time_project_name,
+func hydrateItemPage(groupContext, omitDescriptions bool, extraColumns string) string {
+	columns := itemPageColumns(omitDescriptions)
+	workspace := `w.name as workspace_name, w.key as workspace_key, it.name as item_type_name, COALESCE(it.builtin_key, '') as item_type_builtin_key, COALESCE(it.icon, '') as item_type_icon, COALESCE(it.color, '') as item_type_color`
+	projects := `iter.name as iteration_name, COALESCE(CAST(iter.end_date AS TEXT), '') as iteration_end_date, proj.name as project_name, tp.name as time_project_name`
+	from := ` FROM page_items page JOIN items i ON i.id = page.id` + itemPageContextJoins
+	var prefix string
+	if groupContext {
+		// Bound PostgreSQL's join-order search. SQLite prepares the flat joins
+		// faster even when it can flatten an equivalent page_context CTE.
+		prefix = `, page_context AS MATERIALIZED (SELECT ` + columns + `, i.team_id, i.incident_id, i.rank, ` +
+			workspace + `, ` + projects + extraColumns + from + `)`
+		columns = itemPageColumns(false)
+		workspace = `i.workspace_name, i.workspace_key, i.item_type_name, i.item_type_builtin_key, i.item_type_icon, i.item_type_color`
+		projects = `i.iteration_name, i.iteration_end_date, i.project_name, i.time_project_name`
+		from = ` FROM page_context i`
+	}
+	return prefix + ` SELECT ` + columns + `, ` + workspace + `,
+		p.title as parent_title, p.workspace_item_number as parent_workspace_item_number, ` + projects + `,
 		assignee.first_name || ' ' || assignee.last_name as assignee_name, assignee.email as assignee_email, assignee.avatar_url as assignee_avatar,
 		creator.first_name || ' ' || creator.last_name as creator_name, creator.email as creator_email,
 		st.name as status_name, COALESCE(st.builtin_key, '') as status_builtin_key, sc.color as status_color,
 		pri.name as priority_name, COALESCE(pri.builtin_key, '') as priority_builtin_key, pri.icon as priority_icon, pri.color as priority_color,
 		COALESCE(` + cql.CurrentStatusTransitionAtExpr("") + `, i.created_at) as status_since,
 		COALESCE(sc.is_completed, FALSE) as status_is_completed,
-		i.team_id, i.incident_id, team.name as team_name, team.color as team_color, team.avatar_url as team_avatar` + extraColumns + `
-		FROM page_context i` + itemStatusPriorityJoins + `
+		i.team_id, i.incident_id, team.name as team_name, team.color as team_color, team.avatar_url as team_avatar` + extraColumns + from + itemStatusPriorityJoins + `
 		LEFT JOIN items p ON i.parent_id = p.id
 		LEFT JOIN users assignee ON i.assignee_id = assignee.id
 		LEFT JOIN users creator ON i.creator_id = creator.id
@@ -432,7 +434,7 @@ func itemListPageIDQuery(plan itemListPagePlan, orderByClause string, limit, off
 
 func itemListHydratedPageQuery(plan itemListPagePlan, orderBy string, limit, offset int, omitDescriptions bool) string {
 	return "WITH page_items AS (" + itemListPageIDQuery(plan, orderBy, limit, offset) + ")" +
-		hydrateItemPage(plan.contextHint, omitDescriptions, "") + orderBy
+		hydrateItemPage(plan.groupPageContext, omitDescriptions, "") + orderBy
 }
 
 // FindIDPageContext returns one ordered item-ID page using the same filters,
@@ -619,12 +621,12 @@ func (r *ItemRepository) buildItemListPagePlan(
 	args []any,
 ) itemListPagePlan {
 	plan := itemListPagePlan{
-		contextHint:     r.pageContextHint(),
-		countQuery:      boundedItemListCountQuery(countFromClause, whereClause),
-		countArgs:       args,
-		pageFromClause:  countFromClause,
-		pageWhereClause: whereClause,
-		pageArgs:        args,
+		groupPageContext: r.groupPageContext(),
+		countQuery:       boundedItemListCountQuery(countFromClause, whereClause),
+		countArgs:        args,
+		pageFromClause:   countFromClause,
+		pageWhereClause:  whereClause,
+		pageArgs:         args,
 	}
 	if workspaceID, cacheable := unfilteredWorkspaceListWorkspaceID(params); cacheable {
 		// The explicit workspace filter is safe to use directly because the
