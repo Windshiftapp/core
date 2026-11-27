@@ -42,6 +42,8 @@ type ItemCreateInput struct {
 	InheritProject    bool
 	TimeProjectID     *int
 	AssigneeID        *int
+	ReporterID        *int
+	AfterRecorded     ItemCreateTransactionHook `json:"-"`
 	TeamID            *int
 	ParentID          *int
 	RelatedWorkItemID *int
@@ -213,36 +215,39 @@ func (s *ItemCreationService) create(
 	var mandatoryTemplate MandatoryTemplateInfo
 	metadata := mergeItemEventMetadata(input.EventMetadata, itemEventMetadata(actorUserID, "application", actionContext))
 	itemID, snapshot, err := createItemWithSnapshot(context.Background(), s.db, ItemCreationParams{
-		WorkspaceID:           input.WorkspaceID,
-		WorkspaceKey:          validationResult.WorkspaceKey,
-		Title:                 input.Title,
-		Description:           input.Description,
-		StatusID:              input.StatusID,
-		PriorityID:            input.PriorityID,
-		ItemTypeID:            input.ItemTypeID,
-		IsTask:                input.IsTask,
-		ParentID:              input.ParentID,
-		MilestoneIDs:          input.MilestoneIDs,
-		LabelIDs:              input.LabelIDs,
-		IterationID:           input.IterationID,
-		ProjectID:             input.ProjectID,
-		InheritProject:        input.InheritProject,
-		TimeProjectID:         input.TimeProjectID,
-		AssigneeID:            input.AssigneeID,
-		TeamID:                input.TeamID,
-		CreatorID:             &actorUserID,
-		DueDate:               input.DueDate,
-		StartDate:             input.StartDate,
-		EndDate:               input.EndDate,
-		RelatedWorkItemID:     input.RelatedWorkItemID,
-		StoryPoints:           input.StoryPoints,
-		EstimateMinutes:       input.EstimateMinutes,
-		CustomFieldValuesJSON: customFieldValuesJSON,
-		ValidatingUserID:      actorUserID,
-		PermService:           s.perm,
-		MandatoryTemplateOut:  &mandatoryTemplate,
-		EventMetadata:         metadata,
-		SkipAssigneeTrigger:   input.SkipAssigneeTrigger,
+		WorkspaceID:                 input.WorkspaceID,
+		WorkspaceKey:                validationResult.WorkspaceKey,
+		Title:                       input.Title,
+		Description:                 input.Description,
+		StatusID:                    input.StatusID,
+		PriorityID:                  input.PriorityID,
+		ItemTypeID:                  input.ItemTypeID,
+		IsTask:                      input.IsTask,
+		ParentID:                    input.ParentID,
+		MilestoneIDs:                input.MilestoneIDs,
+		LabelIDs:                    input.LabelIDs,
+		IterationID:                 input.IterationID,
+		ProjectID:                   input.ProjectID,
+		InheritProject:              input.InheritProject,
+		TimeProjectID:               input.TimeProjectID,
+		AssigneeID:                  input.AssigneeID,
+		ReporterID:                  input.ReporterID,
+		AfterRecorded:               input.AfterRecorded,
+		AllowInactiveImportAssignee: itemevents.IsImportOrigin(metadata.ActorKind, metadata.SourceKind),
+		TeamID:                      input.TeamID,
+		CreatorID:                   &actorUserID,
+		DueDate:                     input.DueDate,
+		StartDate:                   input.StartDate,
+		EndDate:                     input.EndDate,
+		RelatedWorkItemID:           input.RelatedWorkItemID,
+		StoryPoints:                 input.StoryPoints,
+		EstimateMinutes:             input.EstimateMinutes,
+		CustomFieldValuesJSON:       customFieldValuesJSON,
+		ValidatingUserID:            actorUserID,
+		PermService:                 s.perm,
+		MandatoryTemplateOut:        &mandatoryTemplate,
+		EventMetadata:               metadata,
+		SkipAssigneeTrigger:         input.SkipAssigneeTrigger,
 	})
 	if err != nil {
 		return nil, err

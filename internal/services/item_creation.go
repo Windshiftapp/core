@@ -115,6 +115,17 @@ func (c *itemCreation) validateAssignments() error {
 
 func (c *itemCreation) assigneeCanAct() (bool, error) {
 	params := c.params
+	// Historical attribution to a disabled account grants no access. Active
+	// assignees still pass the usual workspace check.
+	if params.AllowInactiveImportAssignee && itemevents.IsImportOrigin(params.EventMetadata.ActorKind, params.EventMetadata.SourceKind) {
+		user, err := repository.NewUserRepository(c.db).GetByID(*params.AssigneeID)
+		if err != nil {
+			return false, err
+		}
+		if !user.IsActive {
+			return true, nil
+		}
+	}
 	if params.PermService != nil {
 		return NewWorkspaceUserResolver(c.db, params.PermService).CanActInWorkspace(*params.AssigneeID, params.WorkspaceID)
 	}
@@ -271,6 +282,11 @@ func (c *itemCreation) insert() (int, error) {
 		}
 		if err := c.recordCreation(tx, itemID, itemNumber); err != nil {
 			return 0, err
+		}
+		if c.params.AfterRecorded != nil {
+			if err := c.params.AfterRecorded(c.ctx, tx, itemID); err != nil {
+				return 0, err
+			}
 		}
 		return itemID, nil
 	})

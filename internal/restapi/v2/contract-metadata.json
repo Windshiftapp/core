@@ -497,6 +497,160 @@
         ]
       }
     },
+    "/admin/jira-csv/catalog": {
+      "get": {
+        "description": "List Jira CSV field mapping targets. Requires a system administrator session with imports enabled.",
+        "parameters": [
+          {
+            "Name": "workspace_id",
+            "In": "query",
+            "Description": "Existing destination; omit for workspace creation defaults.",
+            "Required": false,
+            "Schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List Jira CSV field mapping targets",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/jira-csv/jobs": {
+      "get": {
+        "description": "List recent Jira CSV imports. Requires a system administrator session with imports enabled.",
+        "parameters": [],
+        "responses": {
+          "401": {},
+          "403": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List recent Jira CSV imports",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/jira-csv/jobs/{job_id}": {
+      "get": {
+        "description": "Read Jira CSV import results. Requires a system administrator session with imports enabled.",
+        "parameters": [
+          {
+            "Name": "job_id",
+            "In": "path",
+            "Description": "Owned CSV import job identifier.",
+            "Required": true,
+            "Schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "404": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Read Jira CSV import results",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/jira-csv/key": {
+      "get": {
+        "description": "Check destination workspace key availability. Requires a system administrator session with imports enabled.",
+        "parameters": [
+          {
+            "Name": "key",
+            "In": "query",
+            "Description": "Proposed new workspace key.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "401": {},
+          "403": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Check destination workspace key availability",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/jira-csv/preview": {
+      "post": {
+        "description": "Preview mapped Jira issues and comments. Requires a system administrator session with imports enabled.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Preview mapped Jira issues and comments",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/jira-csv/start": {
+      "post": {
+        "description": "Start an offline Jira issue import. Requires a system administrator session with imports enabled.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "409": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Start an offline Jira issue import",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
+    "/admin/jira-csv/upload": {
+      "post": {
+        "description": "Stage a Jira CSV file. Requires a system administrator session with imports enabled.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Stage a Jira CSV file",
+        "tags": [
+          "Administration"
+        ]
+      }
+    },
     "/admin/object-translations/canonical-differences": {
       "get": {
         "description": "Find canonical translation differences. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds. Requires system administrator permission and the declared bearer token scope. Responses use the standard v2 envelope. Writes and deletes affect instance translations only; shipped system translations are preserved.",

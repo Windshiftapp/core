@@ -235,13 +235,32 @@ func (s *WorkflowService) IsValidStatusTransition(workspaceID int, itemTypeID *i
 // may target the initial status itself, or a direct transition from the initial
 // status, but it must not bypass condition/validator rules or approval gates.
 func (s *WorkflowService) ValidateCreateStatusOverride(ctx context.Context, workspaceID int, itemTypeID *int, requestedStatusID int) error {
-	workflowID, err := s.GetWorkflowIDForItem(workspaceID, itemTypeID)
+	configs := repository.NewConfigurationSetRepository(s.db)
+	var config *repository.EffectiveConfiguration
+	var err error
+	if workspaceID == 0 {
+		config, err = configs.ResolveDefault(ctx, itemTypeID)
+	} else {
+		config, err = configs.ResolveForWorkspace(ctx, workspaceID, itemTypeID)
+	}
 	if err != nil {
 		return err
 	}
-	// Workspaces without a workflow keep the legacy behavior.
-	if workflowID == nil {
+	if config != nil && config.IsPersonal {
 		return nil
+	}
+	if config == nil {
+		config = &repository.EffectiveConfiguration{}
+	}
+	workflowID := config.WorkflowID
+	if workflowID == nil {
+		workflowID, err = s.GetDefaultWorkflowID()
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
 	}
 
 	initialStatusID, err := s.GetInitialStatusID(*workflowID)
@@ -267,10 +286,7 @@ func (s *WorkflowService) ValidateCreateStatusOverride(ctx context.Context, work
 		return fmt.Errorf("check create status transition: %w", err)
 	}
 
-	conditionSetID, err := NewConditionService(s.db, nil, nil).GetConditionSetIDForItem(workspaceID, itemTypeID)
-	if err != nil {
-		return err
-	}
+	conditionSetID := config.ConditionSetID
 	if conditionSetID != nil {
 		var conditionCount int
 		err = s.db.QueryRow(`
@@ -289,20 +305,15 @@ func (s *WorkflowService) ValidateCreateStatusOverride(ctx context.Context, work
 		}
 	}
 
-	approvalService := NewApprovalService(s.db, nil, s)
-	approvalSetStatus, err := approvalService.GetApprovalSetStatusForItem(ctx, workspaceID, itemTypeID, requestedStatusID)
-	if err != nil {
-		return err
-	}
-	if approvalSetStatus != nil {
-		return &TransitionRejection{Code: "approval_pending", Message: "requested status requires approval and cannot be set during creation"}
-	}
-
-	approvalSetID, err := approvalService.GetApprovalSetIDForItem(ctx, workspaceID, itemTypeID)
-	if err != nil {
-		return err
-	}
+	approvalSetID := config.ApprovalSetID
 	if approvalSetID != nil {
+		status, err := repository.NewApprovalSetRepository(s.db).FindActiveStatusBySetAndStatus(ctx, *approvalSetID, requestedStatusID)
+		if err != nil {
+			return err
+		}
+		if status != nil {
+			return &TransitionRejection{Code: "approval_pending", Message: "requested status requires approval and cannot be set during creation"}
+		}
 		var approvalTransitionCount int
 		err = s.db.QueryRow(`
 			SELECT COUNT(*)
@@ -320,6 +331,20 @@ func (s *WorkflowService) ValidateCreateStatusOverride(ctx context.Context, work
 	}
 
 	return nil
+}
+
+// ValidateImportCreateStatus resolves an omitted type the same way root-item
+// creation does. A zero workspace uses the future workspace's defaults.
+func (s *WorkflowService) ValidateImportCreateStatus(ctx context.Context, workspaceID, itemTypeID, statusID int) error {
+	t := &itemTypeID
+	if itemTypeID == 0 {
+		var err error
+		t, err = resolveItemTypeForCreation(s.db, workspaceID, nil)
+		if err != nil {
+			return err
+		}
+	}
+	return s.ValidateCreateStatusOverride(ctx, workspaceID, t, statusID)
 }
 
 // IsValidStatusTransitionForUser checks if a transition is allowed by workflow AND conditions.

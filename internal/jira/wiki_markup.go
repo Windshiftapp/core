@@ -44,6 +44,12 @@ var (
 // with the attachment filename so callers that index attachments by filename
 // get a real download link, otherwise the image keeps a filename reference.
 func ConvertWikiMarkupToMarkdown(value string, mediaResolver MediaResolver) string {
+	return ConvertWikiMarkupWithMentions(value, mediaResolver, nil)
+}
+
+// ConvertWikiMarkupWithMentions lets offline imports resolve a wiki reference
+// in its source namespace. The callback returns the rendered mention or label.
+func ConvertWikiMarkupWithMentions(value string, mediaResolver MediaResolver, mention func(string) string) string {
 	if strings.TrimSpace(value) == "" {
 		return ""
 	}
@@ -68,7 +74,7 @@ func ConvertWikiMarkupToMarkdown(value string, mediaResolver MediaResolver) stri
 				continue
 			}
 			body, next := wikiCollectBlock(lines, i+1, "{"+name+"}")
-			inner := ConvertWikiMarkupToMarkdown(strings.Join(body, "\n"), mediaResolver)
+			inner := ConvertWikiMarkupWithMentions(strings.Join(body, "\n"), mediaResolver, mention)
 			label := ""
 			switch name {
 			case "note":
@@ -96,7 +102,7 @@ func ConvertWikiMarkupToMarkdown(value string, mediaResolver MediaResolver) stri
 
 		if heading := wikiHeadingPattern.FindStringSubmatch(trimmed); heading != nil {
 			level := int(heading[1][0] - '0')
-			out.WriteString(strings.Repeat("#", level) + " " + convertWikiInline(heading[2], mediaResolver) + "\n\n")
+			out.WriteString(strings.Repeat("#", level) + " " + convertWikiInline(heading[2], mediaResolver, mention) + "\n\n")
 			i++
 			continue
 		}
@@ -108,7 +114,7 @@ func ConvertWikiMarkupToMarkdown(value string, mediaResolver MediaResolver) stri
 		}
 
 		if strings.HasPrefix(trimmed, "||") || (strings.HasPrefix(trimmed, "|") && strings.HasSuffix(trimmed, "|")) {
-			table, next := wikiConvertTable(lines, i, mediaResolver)
+			table, next := wikiConvertTable(lines, i, mediaResolver, mention)
 			out.WriteString(table)
 			i = next
 			continue
@@ -116,14 +122,14 @@ func ConvertWikiMarkupToMarkdown(value string, mediaResolver MediaResolver) stri
 
 		if item := wikiBulletPattern.FindStringSubmatch(trimmed); item != nil {
 			depth := len(item[1]) - 1
-			out.WriteString(strings.Repeat("  ", depth) + "- " + convertWikiInline(item[2], mediaResolver) + "\n")
+			out.WriteString(strings.Repeat("  ", depth) + "- " + convertWikiInline(item[2], mediaResolver, mention) + "\n")
 			i++
 			continue
 		}
 
 		if item := wikiOrderedPattern.FindStringSubmatch(trimmed); item != nil {
 			depth := len(item[1]) - 1
-			out.WriteString(strings.Repeat("  ", depth) + "1. " + convertWikiInline(item[2], mediaResolver) + "\n")
+			out.WriteString(strings.Repeat("  ", depth) + "1. " + convertWikiInline(item[2], mediaResolver, mention) + "\n")
 			i++
 			continue
 		}
@@ -134,7 +140,7 @@ func ConvertWikiMarkupToMarkdown(value string, mediaResolver MediaResolver) stri
 			continue
 		}
 
-		out.WriteString(convertWikiInline(trimmed, mediaResolver) + "\n")
+		out.WriteString(convertWikiInline(trimmed, mediaResolver, mention) + "\n")
 		i++
 	}
 
@@ -180,7 +186,7 @@ func wikiCollectBlock(lines []string, start int, closing string) (collected []st
 
 // wikiConvertTable renders consecutive `||header||` / `|cell|` lines as a
 // Markdown table and returns the text plus the index after the table.
-func wikiConvertTable(lines []string, start int, mediaResolver MediaResolver) (rendered string, next int) {
+func wikiConvertTable(lines []string, start int, mediaResolver MediaResolver, mention func(string) string) (rendered string, next int) {
 	var out strings.Builder
 	headerDone := false
 	i := start
@@ -193,11 +199,11 @@ func wikiConvertTable(lines []string, start int, mediaResolver MediaResolver) (r
 		var cells []string
 		if isHeader {
 			for _, cell := range strings.Split(strings.Trim(trimmed, "|"), "||") {
-				cells = append(cells, convertWikiInline(strings.TrimSpace(cell), mediaResolver))
+				cells = append(cells, convertWikiInline(strings.TrimSpace(cell), mediaResolver, mention))
 			}
 		} else {
 			for _, cell := range strings.Split(strings.Trim(trimmed, "|"), "|") {
-				cells = append(cells, convertWikiInline(strings.TrimSpace(cell), mediaResolver))
+				cells = append(cells, convertWikiInline(strings.TrimSpace(cell), mediaResolver, mention))
 			}
 		}
 		out.WriteString("| " + strings.Join(cells, " | ") + " |\n")
@@ -216,7 +222,7 @@ func wikiConvertTable(lines []string, start int, mediaResolver MediaResolver) (r
 }
 
 // convertWikiInline converts inline wiki markup within a single line.
-func convertWikiInline(value string, mediaResolver MediaResolver) string {
+func convertWikiInline(value string, mediaResolver MediaResolver, mention func(string) string) string {
 	if value == "" {
 		return ""
 	}
@@ -242,7 +248,17 @@ func convertWikiInline(value string, mediaResolver MediaResolver) string {
 	})
 	result = wikiNamedLinkPattern.ReplaceAllString(result, "[$1]($2)")
 	result = wikiURLLinkPattern.ReplaceAllString(result, "<$1>")
-	result = wikiMentionPattern.ReplaceAllString(result, "@$1")
+	if mention == nil {
+		result = wikiMentionPattern.ReplaceAllString(result, "@$1")
+	} else {
+		parts := strings.Split(result, "`")
+		for i := 0; i < len(parts); i += 2 {
+			parts[i] = wikiMentionPattern.ReplaceAllStringFunc(parts[i], func(token string) string {
+				return mention(token[2 : len(token)-1])
+			})
+		}
+		result = strings.Join(parts, "`")
+	}
 	result = wikiBoldPattern.ReplaceAllString(result, "**$1**")
 	result = wikiItalicPattern.ReplaceAllString(result, "*$1*")
 	result = wikiStrikePattern.ReplaceAllString(result, "$1~~$2~~$3")

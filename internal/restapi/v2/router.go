@@ -18,6 +18,7 @@ import (
 	tokenauth "windshift/internal/auth"
 	"windshift/internal/contextkeys"
 	"windshift/internal/handlers"
+	"windshift/internal/jiracsv"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/objecttranslation"
@@ -715,6 +716,7 @@ type Deps struct {
 	ItemDetail         *services.ItemDetailApplicationService
 	ItemLifecycle      *services.ItemLifecycleService
 	TicketImport       *services.TicketImportService
+	JiraCSV            *jiracsv.Service
 	// Diagnostics serves the admin proxy-trust read on the session contract.
 	Diagnostics       proxyTrustDiagnostics
 	SessionMiddleware func(http.Handler) http.Handler
@@ -1007,6 +1009,7 @@ func buildRoutes(deps Deps) []route {
 	registerSLATeamBindingRoutes(&builder, deps)
 	registerSLAMetricRoutes(&builder, deps)
 	registerTicketImportRoutes(&builder, deps.TicketImport)
+	registerJiraCSVRoutes(&builder, deps)
 	applyEmbeddedContractMetadata(builder.routes, contractMetadataJSON)
 	applyAuditSpecs(builder.routes)
 	return builder.routes
@@ -1046,11 +1049,13 @@ func applyEmbeddedContractMetadata(routes []route, document []byte) {
 		raw := item[strings.ToLower(routes[index].Method)]
 		_ = json.Unmarshal(raw, &operation)
 		routes[index].OperationID = canonicalOperationID(routes[index].Method, routes[index].Path)
-		if len(operation.Tag) > 0 {
-			routes[index].Tag = operation.Tag[0]
+		if routes[index].Summary == "" {
+			if len(operation.Tag) > 0 {
+				routes[index].Tag = operation.Tag[0]
+			}
+			routes[index].Summary = operation.Summary
+			routes[index].Description = semanticRouteDescription(routes[index].Method, operation.Summary)
 		}
-		routes[index].Summary = operation.Summary
-		routes[index].Description = semanticRouteDescription(routes[index].Method, operation.Summary)
 		routes[index].Parameters = contractParameters(item["parameters"], operation.Parameters, spec.Components.Parameters)
 		if routes[index].Path == "/workspaces/{workspace_id}/actions/validate" && routes[index].Tag == "" {
 			routes[index].Tag = "Automation"
@@ -1115,6 +1120,18 @@ func appendUniqueParameter(parameters []ParameterMetadata, candidate ParameterMe
 }
 
 func applyParameterCorrections(route *Route) {
+	if strings.HasPrefix(route.Path, jiraCSVBase+"/") {
+		switch route.Path {
+		case jiraCSVBase + "/key":
+			upsertParameter(route, stringQuery("key", "Proposed new workspace key."))
+		case jiraCSVBase + "/catalog":
+			upsertParameter(route, positiveIDQuery("workspace_id", "Existing destination; omit for workspace creation defaults."))
+		case jiraCSVBase + "/jobs/{job_id}":
+			upsertParameter(route, ParameterMetadata{Name: "job_id", In: "path", Required: true, Description: "Owned CSV import job identifier.", Schema: map[string]any{"type": "string"}})
+		case jiraCSVBase + "/start":
+			route.DocumentedErrors = append(route.DocumentedErrors, http.StatusConflict)
+		}
+	}
 	if route.Path == "/operator-controls" {
 		route.Description = "Read effective operator restrictions, current instance usage and blocked script definitions. Requires system administrator permission and admin:operator-controls:read for bearer tokens. Credentials and deployment paths are never returned. This read-only operation cannot modify operator policy."
 	}

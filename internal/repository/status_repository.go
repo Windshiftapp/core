@@ -76,6 +76,33 @@ func (r *StatusRepository) ListForWorkspaces(workspaceIDs []int) ([]models.Statu
 	return out, nil
 }
 
+// ListForDefaultConfiguration lists statuses of the workflows that a new
+// workspace can inherit, including per-type workflow overrides.
+func (r *StatusRepository) ListForDefaultConfiguration() ([]models.Status, error) {
+	rows, err := r.db.Query(statusJoinedSelect + ` WHERE s.id IN (
+		WITH config AS (SELECT id, workflow_id FROM configuration_sets WHERE is_default=true ORDER BY id LIMIT 1),
+		workflows_in_scope AS (
+			SELECT COALESCE((SELECT workflow_id FROM config),(SELECT id FROM workflows WHERE is_default=true ORDER BY id LIMIT 1)) AS id
+			UNION SELECT t.workflow_id FROM configuration_set_item_types t JOIN config ON config.id=t.configuration_set_id WHERE t.workflow_id IS NOT NULL
+		)
+		SELECT from_status_id FROM workflow_transitions WHERE workflow_id IN (SELECT id FROM workflows_in_scope)
+		UNION SELECT to_status_id FROM workflow_transitions WHERE workflow_id IN (SELECT id FROM workflows_in_scope)
+	) ORDER BY s.name,s.id`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []models.Status
+	for rows.Next() {
+		v, e := scanStatusJoined(rows)
+		if e != nil {
+			return nil, e
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}
+
 // StatusTransitionOption is a status option exposed by a workflow transition.
 type StatusTransitionOption struct {
 	TransitionID  int

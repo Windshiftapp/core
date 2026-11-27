@@ -25,7 +25,6 @@ import (
 
 const (
 	jiraIssueKeyFieldSourceID = "system:jira-issue-key"
-	jiraIssueKeyFieldName     = "Jira Key"
 )
 
 // executeImport runs the actual import process in the background.
@@ -2984,15 +2983,7 @@ func addJiraCustomFieldConfigurationMetadata(
 // backwards compatibility, but underscore metadata is not a declared custom
 // field and therefore is not addressable by name in QL.
 func (h *JiraImportHandler) ensureJiraIssueKeyCustomField(jobID string) (int, error) {
-	const description = "Original Jira issue key. Automatically populated by Jira import and queryable as `cf_Jira Key`."
-	names := []string{jiraIssueKeyFieldName, "Imported Jira Key"}
-	for suffix := 2; suffix <= 10; suffix++ {
-		names = append(names, fmt.Sprintf("Imported Jira Key %d", suffix))
-	}
-
-	fieldID, name, created, err := h.imports.EnsureIssueKeyField(
-		names, description, string(jira.FieldTypeText),
-	)
+	fieldID, name, created, err := h.imports.EnsureSearchableIssueKey()
 	if err != nil {
 		return 0, fmt.Errorf("ensure Jira Key custom field: %w", err)
 	}
