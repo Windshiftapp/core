@@ -290,6 +290,7 @@ export default {
     user: 'Gebruiker',
     selectUser: 'Selecteer een gebruiker…',
     selectRole: 'Selecteer een rol…',
+    selectRoles: 'Selecteer een of meer rollen…',
     addingMember: 'Lid toevoegen…',
     cancel: 'Annuleren',
     addGroupTitle: 'Groep aan werkruimte toevoegen',

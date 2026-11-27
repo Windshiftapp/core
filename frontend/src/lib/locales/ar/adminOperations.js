@@ -79,7 +79,7 @@ export default withEnglishAdminOperations({
     },
     memberCount: '{count} أعضاء', memberCount_one: '{count} عضو', memberCount_other: '{count} أعضاء', everyone: 'الجميع', noDirectAssignments: 'لا توجد تعيينات مباشرة',
     addMember: 'إضافة عضو', addGroup: 'إضافة مجموعة', searchPlaceholder: 'البحث عن أعضاء أو مجموعات بالاسم أو البريد…', loading: 'جارٍ تحميل الأعضاء…', empty: 'لا يوجد أعضاء أو مجموعات بعد. أضفهم لتهيئة الوصول إلى مساحة العمل.', noSearchResults: 'لم يتم العثور على أعضاء أو مجموعات لعبارة «{query}».',
-    unknownUser: 'مستخدم غير معروف', group: 'مجموعة', removeRoleAction: 'إزالة الدور: {role}', addMemberTitle: 'إضافة عضو إلى مساحة العمل', user: 'المستخدم', selectUser: 'اختر مستخدماً…', selectRole: 'اختر دوراً…', addingMember: 'جارٍ إضافة العضو…', cancel: 'إلغاء', addGroupTitle: 'إضافة مجموعة إلى مساحة العمل', selectGroup: 'اختر مجموعة…', addingGroup: 'جارٍ إضافة المجموعة…',
+    unknownUser: 'مستخدم غير معروف', group: 'مجموعة', removeRoleAction: 'إزالة الدور: {role}', addMemberTitle: 'إضافة عضو إلى مساحة العمل', user: 'المستخدم', selectUser: 'اختر مستخدماً…', selectRole: 'اختر دوراً…', selectRoles: 'اختر دوراً أو أكثر…', addingMember: 'جارٍ إضافة العضو…', cancel: 'إلغاء', addGroupTitle: 'إضافة مجموعة إلى مساحة العمل', selectGroup: 'اختر مجموعة…', addingGroup: 'جارٍ إضافة المجموعة…',
   },
   integrations: {
     directions: { outbound: 'صادرة', inbound: 'واردة', outboundDescription: 'التطبيقات التي يتصل بها Windshift. أضف بيانات OAuth لقراءة بيانات من خدمات خارجية مثل Notion أو Confluence.', inboundDescription: 'التطبيقات التي تتصل بـ Windshift نيابة عن المستخدم. سجّل التطبيق مرة واحدة ثم يفوضه المستخدمون عبر OAuth 2.0 وPKCE.' },

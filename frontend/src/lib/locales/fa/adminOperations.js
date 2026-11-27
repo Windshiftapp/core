@@ -289,6 +289,7 @@ export default {
     "user": "کاربر",
     "selectUser": "انتخاب کاربر…",
     "selectRole": "انتخاب نقش…",
+    "selectRoles": "یک یا چند نقش را انتخاب کنید…",
     "addingMember": "در حال افزودن عضو…",
     "cancel": "لغو کنید",
     "addGroupTitle": "گروه را به فضای کاری اضافه کنید",

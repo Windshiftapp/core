@@ -287,6 +287,7 @@ export default {
     "user": "사용자",
     "selectUser": "사용자 선택…",
     "selectRole": "역할 선택…",
+    "selectRoles": "하나 이상의 역할 선택…",
     "addingMember": "구성원 추가 중…",
     "cancel": "취소",
     "addGroupTitle": "워크스페이스에 그룹 추가",

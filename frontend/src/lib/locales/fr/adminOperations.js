@@ -290,6 +290,7 @@ export default {
     user: 'Utilisateur',
     selectUser: 'Sélectionner un utilisateur…',
     selectRole: 'Sélectionner un rôle…',
+    selectRoles: 'Sélectionner un ou plusieurs rôles…',
     addingMember: 'Ajout du membre…',
     cancel: 'Annuler',
     addGroupTitle: 'Ajouter un groupe à l’espace de travail',
