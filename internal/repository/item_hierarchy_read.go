@@ -188,7 +188,7 @@ func (r *ItemRepository) HierarchyDescendantsContext(ctx context.Context, params
 		") " +
 		itemListSelectClause(params.OmitDescriptions) +
 		", page.root_id AS hierarchy_root_id, page.depth AS hierarchy_depth, page.root_total AS hierarchy_root_total " +
-		itemListFromClause(false) +
+		"FROM items i" + itemListHydrationJoins() +
 		" JOIN page ON page.id = i.id" +
 		" ORDER BY page.root_id, page.depth, i.frac_index"
 

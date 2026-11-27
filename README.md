@@ -227,7 +227,7 @@ Windshift supports OIDC single sign-on with any standards-compliant provider. We
 
 - Backend: Go
 - Frontend: Svelte, Vite, and Tailwind CSS
-- Database: SQLite by default, with PostgreSQL 15+ support
+- Database: SQLite by default, with PostgreSQL 15+ support ([post-import maintenance](deploy/postgres-item-lists.md))
 
 ## Documentation
 
