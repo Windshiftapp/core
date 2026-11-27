@@ -10,6 +10,7 @@ import (
 
 type mappingStore interface {
 	QueryRow(query string, args ...any) *sql.Row
+	QueryRowWrite(query string, args ...any) *sql.Row
 	ExecWrite(query string, args ...any) (sql.Result, error)
 }
 

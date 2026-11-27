@@ -280,7 +280,7 @@ func (r *CustomerAccessRepository) StoreToken(ctx context.Context, token, purpos
 
 func (r *CustomerAccessRepository) ConsumeToken(ctx context.Context, token, purpose string, surface models.CustomerSurface, now time.Time) (int, error) {
 	var id sql.NullInt64
-	err := r.db.QueryRowContext(ctx, `DELETE FROM customer_resource_tokens WHERE token = ? AND purpose = ? AND resource_kind = ? AND resource_id = ? AND expires_at > ? RETURNING customer_id`, customerTokenHash(token), purpose, surface.Kind, surface.ID, now).Scan(&id)
+	err := r.db.QueryRowWriteContext(ctx, `DELETE FROM customer_resource_tokens WHERE token = ? AND purpose = ? AND resource_kind = ? AND resource_id = ? AND expires_at > ? RETURNING customer_id`, customerTokenHash(token), purpose, surface.Kind, surface.ID, now).Scan(&id)
 	return int(id.Int64), err
 }
 
@@ -292,6 +292,6 @@ func (r *CustomerAccessRepository) StoreChallenge(ctx context.Context, token str
 
 func (r *CustomerAccessRepository) ConsumeChallenge(ctx context.Context, token string, surface models.CustomerSurface, now time.Time) (string, error) {
 	var payload string
-	err := r.db.QueryRowContext(ctx, `DELETE FROM customer_resource_tokens WHERE token = ? AND purpose = 'passkey' AND resource_kind = ? AND resource_id = ? AND expires_at > ? RETURNING payload`, customerTokenHash(token), surface.Kind, surface.ID, now).Scan(&payload)
+	err := r.db.QueryRowWriteContext(ctx, `DELETE FROM customer_resource_tokens WHERE token = ? AND purpose = 'passkey' AND resource_kind = ? AND resource_id = ? AND expires_at > ? RETURNING payload`, customerTokenHash(token), surface.Kind, surface.ID, now).Scan(&payload)
 	return payload, err
 }

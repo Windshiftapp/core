@@ -529,7 +529,7 @@ func (r *ActionRepository) GetNodesByActionID(actionID int) ([]models.ActionNode
 // CreateNode creates a new action node
 func (r *ActionRepository) CreateNode(node *models.ActionNode) (int, error) {
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO action_nodes (action_id, node_type, node_config, position_x, position_y, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
@@ -604,7 +604,7 @@ func (r *ActionRepository) GetEdgesByActionID(actionID int) ([]models.ActionEdge
 // CreateEdge creates a new action edge
 func (r *ActionRepository) CreateEdge(edge *models.ActionEdge) (int, error) {
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO action_edges (action_id, source_node_id, target_node_id, edge_type, source_handle, target_handle, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,
@@ -641,7 +641,7 @@ func (r *ActionRepository) DeleteEdgesByActionID(actionID int) error {
 // CreateExecutionLog creates a new execution log entry
 func (r *ActionRepository) CreateExecutionLog(log *models.ActionExecutionLog) (int, error) {
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO action_execution_logs (
 			action_id, item_id, trigger_event, status,
 			trigger_user_id, effective_actor_user_id, started_at, durable_event_key, definition_revision_id
@@ -1249,6 +1249,7 @@ func (r *ActionRepository) SetCapabilityWorkspaces(capabilityID int, workspaceID
 
 type capabilityWriter interface {
 	QueryRow(query string, args ...any) *sql.Row
+	QueryRowWrite(query string, args ...any) *sql.Row
 	ExecWrite(query string, args ...any) (sql.Result, error)
 }
 
@@ -1272,7 +1273,7 @@ func (r *ActionRepository) CreateCapability(c *models.ActionCapability) (int, er
 func createCapability(writer capabilityWriter, c *models.ActionCapability) (int, error) {
 	var id int64
 	now := time.Now()
-	err := writer.QueryRow(`
+	err := writer.QueryRowWrite(`
 		INSERT INTO action_capabilities (name, capability_type, config, is_enabled, applies_to_all_workspaces, created_by, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`,

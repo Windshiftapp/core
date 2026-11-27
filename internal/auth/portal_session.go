@@ -138,7 +138,7 @@ func (sm *PortalSessionManager) CreatePortalSession(portalCustomerID, channelID 
 		RETURNING id
 	`
 	var sessionID int64
-	err = sm.db.QueryRow(query, portalCustomerID, hashSessionToken(token), channelID, expiresAt, ipAddress, userAgent, time.Now()).Scan(&sessionID)
+	err = sm.db.QueryRowWrite(query, portalCustomerID, hashSessionToken(token), channelID, expiresAt, ipAddress, userAgent, time.Now()).Scan(&sessionID)
 	if err != nil {
 		slog.Error("portal session db insert failed", slog.String("component", "portal_auth"), slog.Any("error", err))
 		return nil, fmt.Errorf("failed to create portal session: %w", err)

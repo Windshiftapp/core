@@ -251,7 +251,7 @@ func (h *LDAPHandler) CreateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var id int64
-	err = h.db.QueryRow(`
+	err = h.db.QueryRowWrite(`
 		INSERT INTO ldap_configs (
 			name, enabled, host, port, use_tls, use_ssl, skip_tls_verify,
 			bind_dn, bind_password_encrypted, base_dn, user_filter,

@@ -85,7 +85,7 @@ func (r *AgentRunRepository) Insert(ctx context.Context, run *models.AgentRun) (
 	}
 	// RETURNING id (not LastInsertId) for Postgres compatibility.
 	var id int64
-	err = r.db.QueryRowContext(ctx, `
+	err = r.db.QueryRowWriteContext(ctx, `
 		INSERT INTO agent_runs(
 			workspace_id, item_id, binding_id, target_pool_id, job_kind, job_image,
 			is_ephemeral, status, triggered_by_user_id, trigger_json, acting_user_id,

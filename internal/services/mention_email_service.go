@@ -239,7 +239,7 @@ func (s *MentionEmailService) deliverPendingMention(ctx context.Context, outboxI
 	// Atomically lease the row before crossing the SMTP boundary so two
 	// scheduler instances cannot both send the same mention.
 	leaseUntil := time.Now().Add(5 * time.Minute)
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowWrite(`
 		UPDATE mention_email_outbox
 		SET next_attempt_at = ?, lease_owner = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ? AND delivered_at IS NULL AND discarded_at IS NULL

@@ -86,7 +86,7 @@ func (s *Service) EnsureIssueKeyField(names []string, description, fieldType str
 		if !errors.Is(err, sql.ErrNoRows) {
 			return 0, "", false, err
 		}
-		err = s.db.QueryRow(`
+		err = s.db.QueryRowWrite(`
 			INSERT INTO custom_field_definitions
 				(name, field_type, description, required, options, display_order,
 				 applies_to_portal_customers, applies_to_customer_organisations, created_at, updated_at)

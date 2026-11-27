@@ -79,7 +79,7 @@ type CreateTimerInput struct {
 // service can resolve a concurrent start/start race as ErrTimerAlreadyRunning.
 func (r *ActiveTimerRepository) CreateTimer(in CreateTimerInput) (int, error) {
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO active_timers (workspace_id, item_id, project_id, user_id, description, start_time_utc, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, in.WorkspaceID, in.ItemID, in.ProjectID, in.UserID, in.Description, in.StartTimeUTC, in.StartTimeUTC).Scan(&id)

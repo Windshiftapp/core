@@ -196,7 +196,7 @@ func (sm *SessionManager) CreateSession(userID int, ipAddress, userAgent string,
 		RETURNING id
 	`
 	var sessionID int64
-	err = sm.db.QueryRow(query, userID, hashSessionToken(token), expiresAt, ipAddress, userAgent, time.Now(), rememberMe).Scan(&sessionID)
+	err = sm.db.QueryRowWrite(query, userID, hashSessionToken(token), expiresAt, ipAddress, userAgent, time.Now(), rememberMe).Scan(&sessionID)
 	if err != nil {
 		slog.Error("session db insert failed", slog.String("component", "sso"), slog.Any("error", err))
 		return nil, fmt.Errorf("failed to create session: %w", err)

@@ -480,7 +480,7 @@ func (s *PlanningService) CreateMilestone(params CreateMilestoneParams) (*Milest
 	position += milestonePositionStep
 
 	var id int64
-	err = s.db.QueryRow(`
+	err = s.db.QueryRowWrite(`
 		INSERT INTO milestones (name, description, target_date, status, category_id, is_global, workspace_id, external_key, position)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, params.Name, params.Description, params.TargetDate, params.Status, params.CategoryID, params.IsGlobal, params.WorkspaceID, params.ExternalKey, position).Scan(&id)

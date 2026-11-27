@@ -204,7 +204,7 @@ func (s *UserStore) CreateUser(claims *OIDCClaims, emailVerified bool) (*models.
 	`
 
 	var id int64
-	err := s.db.QueryRow(query,
+	err := s.db.QueryRowWrite(query,
 		claims.Email,
 		username,
 		firstName,

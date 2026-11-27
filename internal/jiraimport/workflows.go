@@ -168,7 +168,7 @@ func (s *Service) CreateWorkflowReviewConditionSet(workflowID int, workflowName 
 
 func createWorkflowReviewConditionSet(store mappingStore, workflowID int, workflowName string) (int, error) {
 	var conditionSetID int
-	err := store.QueryRow(`
+	err := store.QueryRowWrite(`
 		INSERT INTO condition_sets (name, description, workflow_id, created_at, updated_at)
 		VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		RETURNING id
@@ -200,7 +200,7 @@ func (s *Service) ApplyWorkflowGuards(conditionSetID, transitionID int, guards [
 
 func applyWorkflowGuards(store mappingStore, conditionSetID, transitionID int, guards []WorkflowGuard) error {
 	var linkID int
-	if err := store.QueryRow(`
+	if err := store.QueryRowWrite(`
 		INSERT INTO condition_set_transitions (condition_set_id, transition_id, logic_mode, created_at)
 		VALUES (?, ?, 'and', CURRENT_TIMESTAMP) RETURNING id
 	`, conditionSetID, transitionID).Scan(&linkID); err != nil {

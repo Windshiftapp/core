@@ -89,7 +89,7 @@ func (r *PortalCustomerRepository) FindOrCreateByEmail(ctx context.Context, name
 	}
 
 	var insertedID int64
-	err = r.db.QueryRowContext(ctx, `
+	err = r.db.QueryRowWriteContext(ctx, `
 		INSERT INTO portal_customers (name, email, created_via, created_at, updated_at)
 		VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		ON CONFLICT DO NOTHING
@@ -117,7 +117,7 @@ func (r *PortalCustomerRepository) CreateWithProvenance(name, email string, orga
 		createdVia = models.CustomerCreatedViaUnknown
 	}
 	var id int
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO portal_customers
 			(name, email, customer_organisation_id, created_via, created_at, updated_at)
 		VALUES (?, ?, NULLIF(?, 0), ?, ?, ?) RETURNING id

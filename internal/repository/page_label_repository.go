@@ -100,7 +100,7 @@ func (r *PageLabelRepository) NameExistsInWorkspace(workspaceID int, name string
 func (r *PageLabelRepository) Create(name, color string, workspaceID int) (int, time.Time, error) {
 	now := time.Now()
 	var id int
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO page_labels (name, color, workspace_id, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?) RETURNING id
 	`, name, color, workspaceID, now, now).Scan(&id)

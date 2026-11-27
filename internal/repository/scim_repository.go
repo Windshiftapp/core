@@ -159,7 +159,7 @@ func (r *SCIMRepository) AdoptUser(id int, username, externalID string, isActive
 // CreateUser inserts a new SCIM-managed user and returns its ID.
 func (r *SCIMRepository) CreateUser(email, username, firstName, lastName string, isActive bool, externalID string) (int, error) {
 	var userID int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO users (email, username, first_name, last_name, is_active,
 		                   scim_external_id, scim_managed, email_verified)
 		VALUES (?, ?, ?, ?, ?, ?, true, true) RETURNING id
@@ -406,7 +406,7 @@ func (r *SCIMRepository) GroupNameExists(name string) bool {
 // CreateGroup inserts a new SCIM-managed group and returns its ID.
 func (r *SCIMRepository) CreateGroup(name, externalID string) (int, error) {
 	var groupID int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO groups (name, description, scim_external_id, scim_managed, is_active)
 		VALUES (?, '', ?, true, true) RETURNING id
 	`, name, scimNullIfEmpty(externalID)).Scan(&groupID)

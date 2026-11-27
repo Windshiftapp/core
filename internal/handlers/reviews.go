@@ -240,7 +240,7 @@ func (h *ReviewHandler) CreateReview(w http.ResponseWriter, r *http.Request) {
 
 	// Insert review
 	var reviewID int64
-	err := h.db.QueryRow(`
+	err := h.db.QueryRowWrite(`
 		INSERT INTO reviews (user_id, review_date, review_type, review_data, created_at, updated_at)
 		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
 	`, userID, req.ReviewDate, req.ReviewType, req.ReviewData).Scan(&reviewID)

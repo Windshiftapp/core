@@ -214,7 +214,7 @@ func (r *CollectionRepository) FindByWorkspaceAndName(workspaceID int, name stri
 // CreateForImport inserts an optionally unowned collection.
 func (r *CollectionRepository) CreateForImport(collection *models.Collection, userID *int) error {
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO collections
 			(name, description, ql_query, filter_state, default_sort, is_public, is_private, public_milestone_swimlanes, workspace_id, category_id, created_by, public_slug, board_enabled, board_ever_published, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id

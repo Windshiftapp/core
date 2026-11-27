@@ -103,7 +103,7 @@ func (r *CredentialRepository) ListForUser(userID int) ([]models.UserCredential,
 // CreateSSH inserts an SSH credential and returns its id.
 func (r *CredentialRepository) CreateSSH(userID int, name, credentialJSON, fingerprint string) (int, error) {
 	var id int
-	if err := r.db.QueryRow(`
+	if err := r.db.QueryRowWrite(`
 		INSERT INTO user_credentials (user_id, credential_type, credential_name, credential_data, public_key_fingerprint)
 		VALUES (?, ?, ?, ?, ?) RETURNING id
 	`, userID, "ssh", name, credentialJSON, fingerprint).Scan(&id); err != nil {

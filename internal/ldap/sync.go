@@ -240,7 +240,7 @@ func (s *SyncService) createUser(configID int, ldapUser LDAPUser) error {
 
 	// Create user (no password - LDAP auth only)
 	var userID int64
-	err = s.db.QueryRow(`
+	err = s.db.QueryRowWrite(`
 		INSERT INTO users (email, username, first_name, last_name, is_active, password_hash,
 			requires_password_reset, timezone, language, email_verified, created_at, updated_at)
 		VALUES (?, ?, ?, ?, true, '', false, 'UTC', 'en', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
@@ -297,7 +297,7 @@ func (s *SyncService) ensureUniqueUsername(username string) string {
 // createSyncStatus creates a new sync status record.
 func (s *SyncService) createSyncStatus(configID int) (int, error) {
 	var id int64
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowWrite(`
 		INSERT INTO ldap_sync_status (config_id, status, started_at)
 		VALUES (?, 'pending', CURRENT_TIMESTAMP) RETURNING id
 	`, configID).Scan(&id)

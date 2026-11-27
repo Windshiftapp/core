@@ -206,7 +206,7 @@ func (h *SCMProviderHandler) CreateProvider(w http.ResponseWriter, r *http.Reque
 	}
 
 	var id int64
-	err = h.db.QueryRow(`
+	err = h.db.QueryRowWrite(`
 		INSERT INTO scm_providers (
 			slug, name, provider_type, auth_method, enabled, is_default,
 			base_url, oauth_client_id, oauth_client_secret_encrypted,

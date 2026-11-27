@@ -522,7 +522,7 @@ func (s *TimePermissionService) AddProjectManager(projectID int, managerType str
 	}
 
 	var id int64
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowWrite(`
 		INSERT INTO time_project_managers (project_id, manager_type, manager_id, granted_by)
 		VALUES (?, ?, ?, ?) RETURNING id
 	`, projectID, managerType, managerID, grantedBy).Scan(&id)
@@ -560,7 +560,7 @@ func (s *TimePermissionService) AddProjectMember(projectID int, memberType strin
 	}
 
 	var id int64
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowWrite(`
 		INSERT INTO time_project_members (project_id, member_type, member_id, granted_by)
 		VALUES (?, ?, ?, ?) RETURNING id
 	`, projectID, memberType, memberID, grantedBy).Scan(&id)

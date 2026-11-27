@@ -469,7 +469,7 @@ func (s *MentionService) getExistingMentions(sourceType string, sourceID int) ([
 // createMention inserts a new mention record and returns its id.
 func (s *MentionService) createMention(m *models.Mention) (int, error) {
 	var id int
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowWrite(`
 		INSERT INTO mentions (
 			source_type, source_id, mentioned_user_id, item_id, workspace_id,
 			created_by, mentioned_user_display_name, notification_sent, created_at

@@ -367,7 +367,7 @@ func (r *SLARepository) CreateCalendar(ctx context.Context, calendar *models.Wor
 		holidays = json.RawMessage("[]")
 	}
 	var id int
-	err := r.db.QueryRowContext(ctx, `INSERT INTO working_calendars
+	err := r.db.QueryRowWriteContext(ctx, `INSERT INTO working_calendars
 		(workspace_id, team_id, name, description, timezone, weekly_intervals, holidays, is_default, source, source_id, source_payload)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
 		nullableInt(calendar.WorkspaceID), nullableInt(calendar.TeamID), calendar.Name, calendar.Description,
@@ -456,7 +456,7 @@ func (r *SLARepository) DeleteCalendar(ctx context.Context, id int) error {
 // returns ErrDuplicateEntry when the two sides are already bound.
 func (r *SLARepository) CreateTeamWorkspaceBinding(ctx context.Context, binding *models.TeamWorkspaceBinding) (int, error) {
 	var id int
-	err := r.db.QueryRowContext(ctx, `INSERT INTO team_workspace_bindings (team_id, workspace_id, created_by)
+	err := r.db.QueryRowWriteContext(ctx, `INSERT INTO team_workspace_bindings (team_id, workspace_id, created_by)
 		VALUES (?, ?, ?) RETURNING id`, binding.TeamID, binding.WorkspaceID, nullableInt(binding.CreatedBy)).Scan(&id)
 	if err != nil {
 		if database.IsUniqueConstraintError(err) {
@@ -1636,7 +1636,7 @@ func (r *SLARepository) ClaimDueJobs(ctx context.Context, now time.Time, lease t
 	if database.IsPostgresDriver(r.db.GetDriverName()) {
 		candidates += ` FOR UPDATE SKIP LOCKED`
 	}
-	rows, err := r.db.QueryContext(ctx, `UPDATE sla_jobs
+	rows, err := r.db.QueryWriteContext(ctx, `UPDATE sla_jobs
 		SET due_at = ?, lease_owner = ?, attempts = attempts + 1
 		WHERE state = 'pending' AND due_at <= ? AND id IN (`+candidates+`)
 		RETURNING `+jobColumns, leaseUntil, owner, now, now, limit)
@@ -1707,7 +1707,7 @@ func (r *SLARepository) RenewJobsLease(ctx context.Context, jobIDs []int64, owne
 	for _, id := range jobIDs {
 		args = append(args, id)
 	}
-	rows, err := r.db.QueryContext(ctx, `UPDATE sla_jobs SET due_at = ?
+	rows, err := r.db.QueryWriteContext(ctx, `UPDATE sla_jobs SET due_at = ?
 		WHERE lease_owner = ? AND state = 'pending' AND id IN (`+placeholders+`) RETURNING id`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("renew SLA leases: %w", err)

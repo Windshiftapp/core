@@ -57,7 +57,7 @@ const insertDraftQuery = `
 // recover the existing draft.
 func (r *TimeWorklogDraftRepository) CreateDraft(in CreateDraftInput) (int, error) {
 	var id int64
-	err := r.db.QueryRow(insertDraftQuery,
+	err := r.db.QueryRowWrite(insertDraftQuery,
 		in.UserID, in.ProjectID, in.ItemID, in.WorkspaceID, in.Description, in.DateUnix,
 		in.StartTimeUnix, in.EndTimeUnix, in.DurationMinutes, in.Source, in.SourceTimerID,
 		in.NowUnix, in.NowUnix,

@@ -1307,7 +1307,7 @@ func (r *ConfigurationSetRepository) LookupNotificationSetting(notificationSetti
 // returning a conflict. Bughunt #6.
 func (r *ConfigurationSetRepository) AssignNotification(configSetID, notificationSettingID int) (int, error) {
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO configuration_set_notification_settings
 		(configuration_set_id, notification_setting_id, created_at)
 		VALUES (?, ?, CURRENT_TIMESTAMP)

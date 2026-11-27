@@ -150,7 +150,7 @@ func (r *TimeProjectRepository) ListDetailsFiltered(filter TimeProjectListFilter
 // Create inserts a project and populates its generated ID and timestamps.
 func (r *TimeProjectRepository) Create(project *models.TimeProject) error {
 	now := time.Now()
-	id, err := insertTimeProject(r.db.QueryRow, project, now)
+	id, err := insertTimeProject(r.db.QueryRowWrite, project, now)
 	if err != nil {
 		return err
 	}
@@ -164,7 +164,7 @@ func (r *TimeProjectRepository) CreateWithManager(project *models.TimeProject, c
 	var id int
 	err := database.WithTx(r.db, func(tx database.Tx) error {
 		var err error
-		id, err = insertTimeProject(tx.QueryRow, project, now)
+		id, err = insertTimeProject(tx.QueryRowWrite, project, now)
 		if err != nil {
 			return err
 		}

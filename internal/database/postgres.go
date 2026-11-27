@@ -472,6 +472,30 @@ func (p *PostgresDB) QueryRowContext(ctx context.Context, query string, args ...
 	return p.db.QueryRowContext(ctx, query, args...)
 }
 
+// QueryWrite executes a write statement that returns rows. PostgreSQL has a
+// single MVCC pool, so this matches Query.
+func (p *PostgresDB) QueryWrite(query string, args ...any) (*sql.Rows, error) {
+	return p.Query(query, args...)
+}
+
+// QueryRowWrite executes a write statement that returns at most one row. Same
+// single pool as QueryRow.
+func (p *PostgresDB) QueryRowWrite(query string, args ...any) *sql.Row {
+	return p.QueryRow(query, args...)
+}
+
+// QueryWriteContext executes a write statement that returns rows with context.
+// Same single pool as QueryContext.
+func (p *PostgresDB) QueryWriteContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return p.QueryContext(ctx, query, args...)
+}
+
+// QueryRowWriteContext executes a write statement that returns at most one row
+// with context. Same single pool as QueryRowContext.
+func (p *PostgresDB) QueryRowWriteContext(ctx context.Context, query string, args ...any) *sql.Row {
+	return p.QueryRowContext(ctx, query, args...)
+}
+
 // QueryReadContext executes a known read-only query with context. PostgreSQL
 // has a single MVCC pool, so this is the same as QueryContext.
 func (p *PostgresDB) QueryReadContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {

@@ -356,7 +356,7 @@ func (r *OnCallRepository) hydrateSchedulesForTeam(teamID int, schedules []model
 func (r *OnCallRepository) CreateSchedule(teamID int, name, description, timezone string, createdBy int) (int, error) {
 	now := time.Now()
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO on_call_schedules (team_id, name, description, timezone, is_active, created_by, created_at, updated_at)
 		VALUES (?, ?, ?, ?, true, ?, ?, ?) RETURNING id
 	`, teamID, name, description, timezone, createdBy, now, now).Scan(&id)
@@ -498,7 +498,7 @@ func (r *OnCallRepository) GetLayerByID(id int) (*models.OnCallScheduleLayer, er
 func (r *OnCallRepository) AddLayer(scheduleID int, name string, priority int, rotationType string, intervalDays int, handoffTime, startDate string, endDate *string) (int, error) {
 	now := time.Now()
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO on_call_schedule_layers (schedule_id, name, priority, rotation_type,
 			rotation_interval_days, handoff_time, start_date, end_date, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
@@ -585,7 +585,7 @@ func (r *OnCallRepository) SetLayerMembers(layerID int, userIDs []int) error {
 func (r *OnCallRepository) CreateOverride(scheduleID, userID, overrideUserID int, startTime, endTime time.Time, reason string, createdBy int) (int, error) {
 	now := time.Now()
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO on_call_schedule_overrides (schedule_id, user_id, override_user_id,
 			start_time, end_time, reason, created_by, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
@@ -773,7 +773,7 @@ func (r *OnCallRepository) ListPoliciesForTeam(teamID int) ([]models.OnCallEscal
 func (r *OnCallRepository) CreatePolicy(teamID int, name, description string, repeatCount, createdBy int) (int, error) {
 	now := time.Now()
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO on_call_escalation_policies (team_id, name, description, repeat_count, is_active, created_by, created_at, updated_at)
 		VALUES (?, ?, ?, ?, true, ?, ?, ?) RETURNING id
 	`, teamID, name, description, repeatCount, createdBy, now, now).Scan(&id)
@@ -885,7 +885,7 @@ func (r *OnCallRepository) SetEscalationRules(policyID int, rules []models.Escal
 	now := time.Now()
 	for _, rule := range rules {
 		var ruleID int64
-		err := r.db.QueryRow(`
+		err := r.db.QueryRowWrite(`
 			INSERT INTO on_call_escalation_rules (policy_id, step_order, escalation_delay_minutes, target_type, target_id, created_at)
 			VALUES (?, ?, ?, ?, ?, ?) RETURNING id
 		`, policyID, rule.StepOrder, rule.EscalationDelayMinutes, rule.TargetType, rule.TargetID, now).Scan(&ruleID)
@@ -946,7 +946,7 @@ func (r *OnCallRepository) GetNotificationRulesForStep(escalationRuleID int) ([]
 func (r *OnCallRepository) CreateSwapRequest(scheduleID, requesterUserID, targetUserID int, swapStart, swapEnd time.Time) (int, error) {
 	now := time.Now()
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO on_call_swap_requests (schedule_id, requester_user_id, target_user_id,
 			swap_start, swap_end, status, created_at)
 		VALUES (?, ?, ?, ?, ?, 'pending', ?) RETURNING id

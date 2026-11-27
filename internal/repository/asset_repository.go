@@ -1357,7 +1357,7 @@ func (r *AssetRepository) EnsureImportedDefaultStatus(setID int) (int, error) {
 	}
 	now := time.Now()
 	var id int
-	err = r.db.QueryRow(`
+	err = r.db.QueryRowWrite(`
 		INSERT INTO asset_statuses
 			(set_id, name, color, description, is_default, display_order, created_at, updated_at)
 		VALUES (?, 'Active', '#22c55e', 'Default status for imported Jira Assets', true, 0, ?, ?)
@@ -1472,7 +1472,7 @@ func (r *AssetRepository) GetAssetTypeSetAndCount(typeID int) (setID, assetCount
 
 func (r *AssetRepository) CreateAssetType(at *models.AssetType) (int, error) {
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO asset_types (set_id, name, description, icon, color, display_order, is_active, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 	`, at.SetID, at.Name, at.Description, at.Icon, at.Color, at.DisplayOrder, at.IsActive, at.CreatedAt, at.UpdatedAt).Scan(&id)

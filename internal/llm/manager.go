@@ -597,7 +597,7 @@ func (m *ConnectionManager) CreateConnection(req CreateConnectionRequest) (*Conn
 	}
 
 	var id int64
-	err := m.db.QueryRow(
+	err := m.db.QueryRowWrite(
 		`INSERT INTO llm_connections (name, provider_type, model, api_key_encrypted, base_url, provider_config, is_default, is_enabled)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
 		req.Name, string(req.ProviderType), req.Model, encryptedKey, baseURL, providerConfig, req.IsDefault, req.IsEnabled,

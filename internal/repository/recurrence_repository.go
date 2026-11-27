@@ -163,12 +163,12 @@ func (r *RecurrenceRepository) Create(rule *models.RecurrenceRule) (int, error) 
 }
 
 type recurrenceRuleCreator interface {
-	QueryRow(query string, args ...any) *sql.Row
+	QueryRowWrite(query string, args ...any) *sql.Row
 }
 
 func createRecurrenceRule(db recurrenceRuleCreator, rule *models.RecurrenceRule) (int, error) {
 	var id int64
-	err := db.QueryRow(`
+	err := db.QueryRowWrite(`
 		INSERT INTO recurrence_rules (
 			template_item_id, workspace_id, rrule, dtstart, dtend, timezone,
 			lead_time_days, copy_assignee, copy_priority, copy_custom_fields,

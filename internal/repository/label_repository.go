@@ -68,7 +68,7 @@ func (r *LabelRepository) FindIDByName(name string) (int, error) {
 func (r *LabelRepository) Create(name, color string) (int64, time.Time, error) {
 	now := time.Now()
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO labels (name, color, created_at, updated_at)
 		VALUES (?, ?, ?, ?) RETURNING id
 	`, name, color, now, now).Scan(&id)

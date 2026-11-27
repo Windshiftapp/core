@@ -204,7 +204,7 @@ func (s *ScreenProvisioningService) Create(actor AuditActor, screen *models.Scre
 
 	now := time.Now()
 	var id int64
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowWrite(`
 		INSERT INTO screens (name, description, created_at, updated_at)
 		VALUES (?, ?, ?, ?) RETURNING id
 	`, screen.Name, screen.Description, now, now).Scan(&id)

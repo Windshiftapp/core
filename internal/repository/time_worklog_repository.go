@@ -369,7 +369,7 @@ type ImportedWorklog struct {
 // CreateImported inserts a worklog with source-system timestamps.
 func (r *TimeWorklogRepository) CreateImported(in ImportedWorklog) (int64, error) {
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO time_worklogs
 			(project_id, user_id, item_id, description, date,
 			 start_time, end_time, duration_minutes, created_at, updated_at)
@@ -417,7 +417,7 @@ func (r *TimeWorklogRepository) Update(in UpdateWorklog) error {
 func (r *TimeWorklogRepository) Create(in NewWorklog) (int64, error) {
 	now := time.Now().Unix()
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO time_worklogs (project_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
 		in.ProjectID, in.UserID, in.ItemID, in.Description,

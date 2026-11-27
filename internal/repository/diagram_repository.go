@@ -101,7 +101,7 @@ func (r *DiagramRepository) GetByID(id int) (*models.ItemDiagram, error) {
 func (r *DiagramRepository) Create(itemID int, name, diagramData string, createdBy *int) (int64, time.Time, error) {
 	now := time.Now()
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO item_diagrams (item_id, name, diagram_data, created_by, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
 	`, itemID, name, diagramData, createdBy, now, now).Scan(&id)

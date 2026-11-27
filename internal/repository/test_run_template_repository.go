@@ -107,7 +107,7 @@ func (r *TestRunTemplateRepository) FindCore(id, workspaceID int) (*models.TestR
 func (r *TestRunTemplateRepository) Create(workspaceID int, template *models.TestRunTemplate) (int, time.Time, error) {
 	now := time.Now()
 	var id int64
-	err := r.db.QueryRow(`
+	err := r.db.QueryRowWrite(`
 		INSERT INTO test_run_templates (workspace_id, set_id, name, description, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?) RETURNING id
 	`, workspaceID, template.SetID, template.Name, template.Description, now, now).Scan(&id)
