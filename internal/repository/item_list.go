@@ -290,6 +290,91 @@ func itemListHydrationJoins() string {
 	`
 }
 
+// itemListLookupExpr renders one primary-key display lookup. A missing lookup
+// row yields NULL, matching the joined projection's LEFT JOIN semantics.
+func itemListLookupExpr(table, column, fk string) string {
+	return fmt.Sprintf("(SELECT item_list_lookup.%s FROM %s item_list_lookup WHERE item_list_lookup.id = %s)", column, table, fk)
+}
+
+// itemListScalarSelectClause is the small-page projection: the same columns as
+// itemListSelectClause, but each display value is a primary-key lookup instead
+// of a join, so planning stays flat instead of searching the lookup join
+// order. It is only used where itemListUsesScalarHydration says the probes are
+// cheaper than the joined plan; see that method for the crossover.
+func itemListScalarSelectClause(omitDescriptions bool) string {
+	descriptionExpr := "i.description"
+	if omitDescriptions {
+		descriptionExpr = "''"
+	}
+	trimmed := func(table, column, fk string) string {
+		return fmt.Sprintf("COALESCE(%s, '')", itemListLookupExpr(table, column, fk))
+	}
+	return fmt.Sprintf(`SELECT
+		i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, %s, i.status_id, i.priority_id, i.due_date, i.start_date, i.end_date, i.is_task,
+		i.iteration_id, i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values, i.calendar_data, i.parent_id,
+		i.story_points, i.estimate_minutes, i.frac_index, i.created_at, i.updated_at, i.last_active_at,
+		%s as workspace_name, %s as workspace_key,
+		%s as item_type_name, %s as item_type_builtin_key, %s as item_type_icon, %s as item_type_color,
+		%s as parent_title, %s as parent_workspace_item_number,
+		%s as iteration_name, COALESCE(CAST(%s AS TEXT), '') as iteration_end_date,
+		%s as project_name, %s as time_project_name,
+		(SELECT item_list_lookup.first_name || ' ' || item_list_lookup.last_name FROM users item_list_lookup WHERE item_list_lookup.id = i.assignee_id) as assignee_name,
+		%s as assignee_email, %s as assignee_avatar,
+		(SELECT item_list_lookup.first_name || ' ' || item_list_lookup.last_name FROM users item_list_lookup WHERE item_list_lookup.id = i.creator_id) as creator_name,
+		%s as creator_email,
+		%s as status_name, %s as status_builtin_key,
+		(SELECT item_list_lookup.color FROM status_categories item_list_lookup WHERE item_list_lookup.id = (SELECT item_list_status.category_id FROM statuses item_list_status WHERE item_list_status.id = i.status_id)) as status_color,
+		%s as priority_name, %s as priority_builtin_key, %s as priority_icon, %s as priority_color,
+		COALESCE(%s, i.created_at) as status_since,
+		COALESCE((SELECT item_list_lookup.is_completed FROM status_categories item_list_lookup WHERE item_list_lookup.id = (SELECT item_list_status.category_id FROM statuses item_list_status WHERE item_list_status.id = i.status_id)), FALSE) as status_is_completed,
+		i.team_id, i.incident_id, %s as team_name, %s as team_color, %s as team_avatar
+	`,
+		descriptionExpr,
+		itemListLookupExpr("workspaces", "name", "i.workspace_id"),
+		itemListLookupExpr("workspaces", "key", "i.workspace_id"),
+		itemListLookupExpr("item_types", "name", "i.item_type_id"),
+		trimmed("item_types", "builtin_key", "i.item_type_id"),
+		trimmed("item_types", "icon", "i.item_type_id"),
+		trimmed("item_types", "color", "i.item_type_id"),
+		itemListLookupExpr("items", "title", "i.parent_id"),
+		itemListLookupExpr("items", "workspace_item_number", "i.parent_id"),
+		itemListLookupExpr("iterations", "name", "i.iteration_id"),
+		itemListLookupExpr("iterations", "end_date", "i.iteration_id"),
+		itemListLookupExpr("time_projects", "name", "i.project_id"),
+		itemListLookupExpr("time_projects", "name", "i.time_project_id"),
+		itemListLookupExpr("users", "email", "i.assignee_id"),
+		itemListLookupExpr("users", "avatar_url", "i.assignee_id"),
+		itemListLookupExpr("users", "email", "i.creator_id"),
+		itemListLookupExpr("statuses", "name", "i.status_id"),
+		trimmed("statuses", "builtin_key", "i.status_id"),
+		itemListLookupExpr("priorities", "name", "i.priority_id"),
+		trimmed("priorities", "builtin_key", "i.priority_id"),
+		itemListLookupExpr("priorities", "icon", "i.priority_id"),
+		itemListLookupExpr("priorities", "color", "i.priority_id"),
+		cql.CurrentStatusTransitionAtExpr(""),
+		itemListLookupExpr("teams", "name", "i.team_id"),
+		itemListLookupExpr("teams", "color", "i.team_id"),
+		itemListLookupExpr("teams", "avatar_url", "i.team_id"),
+	)
+}
+
+// itemListScalarHydrationRowLimit bounds the per-column lookup projection.
+// PostgreSQL planning for the joined hydration dominates shallow requests,
+// while every probed row adds roughly 0.03 ms. The crossover measured at ~150
+// rows on a local PG15 fixture and near 700 on the RC1 fixtures, where joining
+// plans cost about 13 ms; 100 keeps the probe path a measured win on both and
+// leaves board-sized and multi-root pages on the joined path.
+const itemListScalarHydrationRowLimit = 100
+
+// itemListUsesScalarHydration reports whether a page should resolve display
+// columns with primary-key lookups. SQLite has no join-planning cost and its
+// joined hydration beats repeated probes, so it always joins. PostgreSQL pays
+// the planning cost, so small pages use probes and larger pages join.
+func (r *ItemRepository) itemListUsesScalarHydration(rows int) bool {
+	return database.IsPostgresDriver(r.db.GetDriverName()) &&
+		rows > 0 && rows <= itemListScalarHydrationRowLimit
+}
+
 func (r *ItemRepository) FindAllWithDetailsPageContext(ctx context.Context, params ItemListParams) (ItemListPage, error) {
 	cursorMode := itemListCursorEligible(params) &&
 		(params.Pagination.CursorMode || params.Pagination.Cursor != "")
@@ -373,6 +458,10 @@ func (r *ItemRepository) FindAllWithDetailsPageContext(ctx context.Context, para
 	}
 
 	fullQuery := itemListHydratedPageQuery(pagePlan, orderByClause, fetchLimit, offset, params.OmitDescriptions)
+	if r.itemListUsesScalarHydration(fetchLimit) {
+		fullQuery = itemListScalarHydratedPageQuery(pagePlan, orderByClause, fetchLimit, offset,
+			params.OmitDescriptions, itemListOrderNeedsPriorities(params))
+	}
 	rows, err := queryItemListPage(ctx, pageQueryer, fullQuery, pagePlan.pageArgs...)
 	if err != nil {
 		return ItemListPage{}, fmt.Errorf("failed to query items: %w", err)
@@ -413,9 +502,26 @@ func itemListPageIDQuery(plan itemListPagePlan, orderByClause string, limit, off
 func itemListHydratedPageQuery(plan itemListPagePlan, orderBy string, limit, offset int, omitDescriptions bool) string {
 	// Join the selected IDs first. With the page join after the display joins,
 	// PostgreSQL can exhaust its join reorder limit and hydrate the entire table.
+	return itemListHydratedPageQueryWith(plan, orderBy, limit, offset,
+		itemListSelectClause(omitDescriptions), itemListHydrationJoins())
+}
+
+// itemListScalarHydratedPageQuery is the small-page variant: the page stays the
+// only join input and display values come from itemListScalarSelectClause.
+// Priority ordering still needs its lookup joined because sort_order is not an
+// items column.
+func itemListScalarHydratedPageQuery(plan itemListPagePlan, orderBy string, limit, offset int, omitDescriptions, orderNeedsPriorities bool) string {
+	joins := ""
+	if orderNeedsPriorities {
+		joins = "\n\t\tLEFT JOIN priorities pri ON i.priority_id = pri.id"
+	}
+	return itemListHydratedPageQueryWith(plan, orderBy, limit, offset,
+		itemListScalarSelectClause(omitDescriptions), joins)
+}
+
+func itemListHydratedPageQueryWith(plan itemListPagePlan, orderBy string, limit, offset int, selectClause, hydrationJoins string) string {
 	return "WITH page_items AS (" + itemListPageIDQuery(plan, orderBy, limit, offset) + ") " +
-		itemListSelectClause(omitDescriptions) + "FROM page_items page JOIN items i ON i.id = page.id" +
-		itemListHydrationJoins() + orderBy
+		selectClause + "FROM page_items page JOIN items i ON i.id = page.id" + hydrationJoins + orderBy
 }
 
 // FindIDPageContext returns one ordered item-ID page using the same filters,
