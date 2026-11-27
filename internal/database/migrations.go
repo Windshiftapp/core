@@ -3997,6 +3997,19 @@ END $$;
 		CheckPostgres: pgColumnCheck("collections", "default_sort"),
 		SQLite:        "ALTER TABLE collections ADD COLUMN default_sort TEXT",
 		Postgres:      "ALTER TABLE collections ADD COLUMN IF NOT EXISTS default_sort TEXT",
+	},
+	{
+		Version: "20261212_postgres_cover_ranked_item_page",
+		Name:    "Cover ranked workspace page IDs on PostgreSQL (WI-2382)",
+		CheckPostgres: `SELECT COUNT(*) FROM pg_indexes WHERE schemaname = current_schema()
+			AND tablename = 'items' AND indexname = 'idx_items_workspace_frac_index_active'
+			AND indexdef LIKE '%(workspace_id, frac_index) INCLUDE (id) WHERE (merged_into_item_id IS NULL)'`,
+		Postgres: `
+			CREATE INDEX idx_items_workspace_frac_index_active_new ON items(workspace_id, frac_index)
+				INCLUDE (id) WHERE merged_into_item_id IS NULL;
+			DROP INDEX IF EXISTS idx_items_workspace_frac_index_active;
+			ALTER INDEX idx_items_workspace_frac_index_active_new RENAME TO idx_items_workspace_frac_index_active;
+		`,
 	}}
 
 // boardConfigurationReconcileSQL normalizes board configurations to exactly one
