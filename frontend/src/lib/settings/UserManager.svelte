@@ -823,14 +823,23 @@
 	{/if}
 
 	<!-- Mint API token for agent -->
-	<Modal isOpen={showTokenModal} onclose={closeTokenModal} maxWidth="max-w-md">
+	<!-- The token list grows with the agent's tokens, so the dialog owns a
+	     capped height with a scrolling body: header and footer stay put. -->
+	<Modal
+		isOpen={showTokenModal}
+		onclose={closeTokenModal}
+		onSubmit={mintedToken ? closeTokenModal : createTokenForUser}
+		submitDisabled={creatingToken || (!mintedToken && newTokenScopes.length === 0)}
+		maxWidth="max-w-lg"
+		maxHeight="calc(100vh - 4rem)"
+	>
 		<ModalHeader
 			title={tokenTargetUser ? `Mint API token for ${tokenTargetUser.full_name || tokenTargetUser.username}` : 'Mint API token'}
 			icon={Key}
 			onClose={closeTokenModal}
 		/>
 
-		<div class="px-6 py-4 space-y-4">
+		<div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
 			{#if mintedToken}
 				<div class="space-y-2">
 					<p class="text-sm" style="color: var(--ds-text);">
@@ -868,20 +877,24 @@
 										</div>
 									</div>
 									<Button
-										variant="default"
+										variant="danger-ghost"
 										size="small"
 										icon={Trash2}
+										title={t('security.revokeToken')}
 										disabled={revokingTokenId === token.id}
 										onclick={() => revokeExistingToken(token)}
 										dataTestid={`agent-token-revoke-${token.id}`}
-									>
-										{t('security.revokeToken')}
-									</Button>
+									></Button>
 								</li>
 							{/each}
 						</ul>
 					{/if}
 				</div>
+				<!-- Errors sit above the form: the dialog body scrolls, so a
+				     failure reported under the scope list can stay off-screen. -->
+				{#if mintedTokenError}
+					<AlertBox message={mintedTokenError} />
+				{/if}
 				<div>
 					<TextField
 						label={"Token name"}
@@ -917,9 +930,6 @@
 						{/each}
 					</div>
 				</div>
-				{#if mintedTokenError}
-					<AlertBox message={mintedTokenError} />
-				{/if}
 			{/if}
 		</div>
 

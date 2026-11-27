@@ -611,13 +611,6 @@
       "message": "Modal contains a confirming DialogFooter but does not pass onSubmit, so Enter/Cmd+Enter will not submit."
     },
     {
-      "signature": "src/lib/settings/UserManager.svelte:modal-confirm-without-submit-shortcut:<Modal isOpen={showTokenModal} onclose={closeTokenModal} maxWidth=\"max-w-md\">",
-      "count": 1,
-      "file": "src/lib/settings/UserManager.svelte",
-      "rule": "modal-confirm-without-submit-shortcut",
-      "message": "Modal contains a confirming DialogFooter but does not pass onSubmit, so Enter/Cmd+Enter will not submit."
-    },
-    {
       "signature": "src/lib/teams/LayerEditor.svelte:add-create-button-without-shortcut:<Button variant=\"ghost\" size=\"sm\" icon={IconPlus} onclick={startCreate} dataTestid=\"layer-add\" > {t('teams.oncall.addLayer')}",
       "count": 1,
       "file": "src/lib/teams/LayerEditor.svelte",
