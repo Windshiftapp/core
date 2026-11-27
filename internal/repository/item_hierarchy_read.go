@@ -172,14 +172,15 @@ func (r *ItemRepository) HierarchyDescendantsContext(ctx context.Context, params
 	args = append(args, perRootOffset, perRootOffset+perRoot)
 
 	// A hierarchy page can span many roots. Estimate its upper bound and pick
-	// the same hydration shape the list uses; the joined form stays anchored on
-	// the page CTE so a multi-root read cannot wander into a full item scan.
-	hydrationSelect := itemListSelectClause(params.OmitDescriptions)
-	hydrationFrom := "\n\t\tFROM page JOIN items i ON i.id = page.id" + itemListHydrationJoins()
-	if r.itemListUsesScalarHydration(len(params.RootIDs) * perRoot) {
-		hydrationSelect = itemListScalarSelectClause(params.OmitDescriptions)
-		hydrationFrom = "\n\t\tFROM page JOIN items i ON i.id = page.id"
+	// the same hydration shape the list uses; hydration stays anchored on the
+	// page CTE so a multi-root read cannot wander into a full item scan.
+	probeLookups := r.itemListUsesScalarHydration(len(params.RootIDs) * perRoot)
+	hydrationJoins := itemListHydrationJoins()
+	if probeLookups {
+		hydrationJoins = ""
 	}
+	hydrationSelect := itemListSelectClause(params.OmitDescriptions, probeLookups)
+	hydrationFrom := "\n\t\tFROM page JOIN items i ON i.id = page.id" + hydrationJoins
 
 	query := "WITH RECURSIVE tree(root_id, id, depth) AS (" +
 		" SELECT i.id, i.id, 0 FROM items i WHERE i.id IN (" + rootPlaceholders +

@@ -258,29 +258,21 @@ func (r *ItemRepository) FindAllWithDetailsContext(ctx context.Context, params I
 	return page.Items, page.Total, err
 }
 
-// itemListSelectClause is the hydrated projection for an item row. List and
-// hierarchy reads share it so their column sets cannot drift.
-func itemListSelectClause(omitDescriptions bool) string {
-	descriptionExpr := "i.description"
-	if omitDescriptions {
-		descriptionExpr = "''"
-	}
-	return fmt.Sprintf(`SELECT
-		i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, %s, i.status_id, i.priority_id, i.due_date, i.start_date, i.end_date, i.is_task,
-		i.iteration_id, i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values, i.calendar_data, i.parent_id,
-		i.story_points, i.estimate_minutes, i.frac_index, i.created_at, i.updated_at, i.last_active_at,
-		w.name as workspace_name, w.key as workspace_key, it.name as item_type_name, COALESCE(it.builtin_key, '') as item_type_builtin_key, COALESCE(it.icon, '') as item_type_icon, COALESCE(it.color, '') as item_type_color,
-		p.title as parent_title, p.workspace_item_number as parent_workspace_item_number, iter.name as iteration_name, COALESCE(CAST(iter.end_date AS TEXT), '') as iteration_end_date, proj.name as project_name, tp.name as time_project_name,
-		assignee.first_name || ' ' || assignee.last_name as assignee_name, assignee.email as assignee_email, assignee.avatar_url as assignee_avatar,
-		creator.first_name || ' ' || creator.last_name as creator_name, creator.email as creator_email,
-		st.name as status_name, COALESCE(st.builtin_key, '') as status_builtin_key, sc.color as status_color,
-		pri.name as priority_name, COALESCE(pri.builtin_key, '') as priority_builtin_key, pri.icon as priority_icon, pri.color as priority_color,
-		COALESCE(%s, i.created_at) as status_since,
-		COALESCE(sc.is_completed, FALSE) as status_is_completed,
-		i.team_id, i.incident_id, team.name as team_name, team.color as team_color, team.avatar_url as team_avatar
-	`, descriptionExpr, cql.CurrentStatusTransitionAtExpr(""))
+// itemListLookupExpr renders one primary-key display lookup. A missing lookup
+// row yields NULL, matching the joined projection's LEFT JOIN semantics.
+func itemListLookupExpr(table, column, fk string) string {
+	return fmt.Sprintf("(SELECT item_list_lookup.%s FROM %s item_list_lookup WHERE item_list_lookup.id = %s)", column, table, fk)
 }
 
+// itemListStatusCategoryExpr resolves a status-category column through the
+// item's status, matching the joined st -> sc lookup.
+func itemListStatusCategoryExpr(column string) string {
+	return fmt.Sprintf("(SELECT item_list_lookup.%s FROM status_categories item_list_lookup WHERE item_list_lookup.id = (SELECT item_list_status.category_id FROM statuses item_list_status WHERE item_list_status.id = i.status_id))", column)
+}
+
+// itemListHydrationJoins supplies the joined display lookups. The page join is
+// emitted before this suffix so PostgreSQL hydrates the selected rows instead
+// of scanning items to find them.
 func itemListHydrationJoins() string {
 	return ItemListFilterJoins() + `
 		LEFT JOIN items p ON i.parent_id = p.id
@@ -290,72 +282,72 @@ func itemListHydrationJoins() string {
 	`
 }
 
-// itemListLookupExpr renders one primary-key display lookup. A missing lookup
-// row yields NULL, matching the joined projection's LEFT JOIN semantics.
-func itemListLookupExpr(table, column, fk string) string {
-	return fmt.Sprintf("(SELECT item_list_lookup.%s FROM %s item_list_lookup WHERE item_list_lookup.id = %s)", column, table, fk)
+// itemListDisplayColumns is the ordered display projection shared by both
+// hydration shapes. Each alias stays beside the expression that produces it,
+// and only the expression source changes: a joined alias for the joined
+// shape, a primary-key probe for the probe shape. Keeping one list in scanner
+// order prevents the two paths from drifting.
+var itemListDisplayColumns = []struct {
+	alias  string
+	joined string
+	probe  string
+}{
+	{"workspace_name", "w.name", itemListLookupExpr("workspaces", "name", "i.workspace_id")},
+	{"workspace_key", "w.key", itemListLookupExpr("workspaces", "key", "i.workspace_id")},
+	{"item_type_name", "it.name", itemListLookupExpr("item_types", "name", "i.item_type_id")},
+	{"item_type_builtin_key", "COALESCE(it.builtin_key, '')", "COALESCE(" + itemListLookupExpr("item_types", "builtin_key", "i.item_type_id") + ", '')"},
+	{"item_type_icon", "COALESCE(it.icon, '')", "COALESCE(" + itemListLookupExpr("item_types", "icon", "i.item_type_id") + ", '')"},
+	{"item_type_color", "COALESCE(it.color, '')", "COALESCE(" + itemListLookupExpr("item_types", "color", "i.item_type_id") + ", '')"},
+	{"parent_title", "p.title", itemListLookupExpr("items", "title", "i.parent_id")},
+	{"parent_workspace_item_number", "p.workspace_item_number", itemListLookupExpr("items", "workspace_item_number", "i.parent_id")},
+	{"iteration_name", "iter.name", itemListLookupExpr("iterations", "name", "i.iteration_id")},
+	{"iteration_end_date", "COALESCE(CAST(iter.end_date AS TEXT), '')", "COALESCE(CAST(" + itemListLookupExpr("iterations", "end_date", "i.iteration_id") + " AS TEXT), '')"},
+	{"project_name", "proj.name", itemListLookupExpr("time_projects", "name", "i.project_id")},
+	{"time_project_name", "tp.name", itemListLookupExpr("time_projects", "name", "i.time_project_id")},
+	{"assignee_name", "assignee.first_name || ' ' || assignee.last_name", "(SELECT item_list_lookup.first_name || ' ' || item_list_lookup.last_name FROM users item_list_lookup WHERE item_list_lookup.id = i.assignee_id)"},
+	{"assignee_email", "assignee.email", itemListLookupExpr("users", "email", "i.assignee_id")},
+	{"assignee_avatar", "assignee.avatar_url", itemListLookupExpr("users", "avatar_url", "i.assignee_id")},
+	{"creator_name", "creator.first_name || ' ' || creator.last_name", "(SELECT item_list_lookup.first_name || ' ' || item_list_lookup.last_name FROM users item_list_lookup WHERE item_list_lookup.id = i.creator_id)"},
+	{"creator_email", "creator.email", itemListLookupExpr("users", "email", "i.creator_id")},
+	{"status_name", "st.name", itemListLookupExpr("statuses", "name", "i.status_id")},
+	{"status_builtin_key", "COALESCE(st.builtin_key, '')", "COALESCE(" + itemListLookupExpr("statuses", "builtin_key", "i.status_id") + ", '')"},
+	{"status_color", "sc.color", itemListStatusCategoryExpr("color")},
+	{"priority_name", "pri.name", itemListLookupExpr("priorities", "name", "i.priority_id")},
+	{"priority_builtin_key", "COALESCE(pri.builtin_key, '')", "COALESCE(" + itemListLookupExpr("priorities", "builtin_key", "i.priority_id") + ", '')"},
+	{"priority_icon", "pri.icon", itemListLookupExpr("priorities", "icon", "i.priority_id")},
+	{"priority_color", "pri.color", itemListLookupExpr("priorities", "color", "i.priority_id")},
+	{"status_since", "COALESCE(" + cql.CurrentStatusTransitionAtExpr("") + ", i.created_at)", "COALESCE(" + cql.CurrentStatusTransitionAtExpr("") + ", i.created_at)"},
+	{"status_is_completed", "COALESCE(sc.is_completed, FALSE)", "COALESCE(" + itemListStatusCategoryExpr("is_completed") + ", FALSE)"},
+	{"team_id", "i.team_id", "i.team_id"},
+	{"incident_id", "i.incident_id", "i.incident_id"},
+	{"team_name", "team.name", itemListLookupExpr("teams", "name", "i.team_id")},
+	{"team_color", "team.color", itemListLookupExpr("teams", "color", "i.team_id")},
+	{"team_avatar", "team.avatar_url", itemListLookupExpr("teams", "avatar_url", "i.team_id")},
 }
 
-// itemListScalarSelectClause is the small-page projection: the same columns as
-// itemListSelectClause, but each display value is a primary-key lookup instead
-// of a join, so planning stays flat instead of searching the lookup join
-// order. It is only used where itemListUsesScalarHydration says the probes are
-// cheaper than the joined plan; see that method for the crossover.
-func itemListScalarSelectClause(omitDescriptions bool) string {
+// itemListSelectClause is the hydrated projection for an item row. List and
+// hierarchy reads share it, and both hydration shapes share one ordered
+// column list, so the scan order cannot drift between them.
+func itemListSelectClause(omitDescriptions, probeLookups bool) string {
 	descriptionExpr := "i.description"
 	if omitDescriptions {
 		descriptionExpr = "''"
 	}
-	trimmed := func(table, column, fk string) string {
-		return fmt.Sprintf("COALESCE(%s, '')", itemListLookupExpr(table, column, fk))
-	}
-	return fmt.Sprintf(`SELECT
-		i.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, %s, i.status_id, i.priority_id, i.due_date, i.start_date, i.end_date, i.is_task,
+	var projection strings.Builder
+	projection.WriteString("SELECT\n\t\ti.id, i.workspace_id, i.workspace_item_number, i.item_type_id, i.title, ")
+	projection.WriteString(descriptionExpr)
+	projection.WriteString(`,
+		i.status_id, i.priority_id, i.due_date, i.start_date, i.end_date, i.is_task,
 		i.iteration_id, i.project_id, i.inherit_project, i.time_project_id, i.assignee_id, i.creator_id, i.custom_field_values, i.calendar_data, i.parent_id,
-		i.story_points, i.estimate_minutes, i.frac_index, i.created_at, i.updated_at, i.last_active_at,
-		%s as workspace_name, %s as workspace_key,
-		%s as item_type_name, %s as item_type_builtin_key, %s as item_type_icon, %s as item_type_color,
-		%s as parent_title, %s as parent_workspace_item_number,
-		%s as iteration_name, COALESCE(CAST(%s AS TEXT), '') as iteration_end_date,
-		%s as project_name, %s as time_project_name,
-		(SELECT item_list_lookup.first_name || ' ' || item_list_lookup.last_name FROM users item_list_lookup WHERE item_list_lookup.id = i.assignee_id) as assignee_name,
-		%s as assignee_email, %s as assignee_avatar,
-		(SELECT item_list_lookup.first_name || ' ' || item_list_lookup.last_name FROM users item_list_lookup WHERE item_list_lookup.id = i.creator_id) as creator_name,
-		%s as creator_email,
-		%s as status_name, %s as status_builtin_key,
-		(SELECT item_list_lookup.color FROM status_categories item_list_lookup WHERE item_list_lookup.id = (SELECT item_list_status.category_id FROM statuses item_list_status WHERE item_list_status.id = i.status_id)) as status_color,
-		%s as priority_name, %s as priority_builtin_key, %s as priority_icon, %s as priority_color,
-		COALESCE(%s, i.created_at) as status_since,
-		COALESCE((SELECT item_list_lookup.is_completed FROM status_categories item_list_lookup WHERE item_list_lookup.id = (SELECT item_list_status.category_id FROM statuses item_list_status WHERE item_list_status.id = i.status_id)), FALSE) as status_is_completed,
-		i.team_id, i.incident_id, %s as team_name, %s as team_color, %s as team_avatar
-	`,
-		descriptionExpr,
-		itemListLookupExpr("workspaces", "name", "i.workspace_id"),
-		itemListLookupExpr("workspaces", "key", "i.workspace_id"),
-		itemListLookupExpr("item_types", "name", "i.item_type_id"),
-		trimmed("item_types", "builtin_key", "i.item_type_id"),
-		trimmed("item_types", "icon", "i.item_type_id"),
-		trimmed("item_types", "color", "i.item_type_id"),
-		itemListLookupExpr("items", "title", "i.parent_id"),
-		itemListLookupExpr("items", "workspace_item_number", "i.parent_id"),
-		itemListLookupExpr("iterations", "name", "i.iteration_id"),
-		itemListLookupExpr("iterations", "end_date", "i.iteration_id"),
-		itemListLookupExpr("time_projects", "name", "i.project_id"),
-		itemListLookupExpr("time_projects", "name", "i.time_project_id"),
-		itemListLookupExpr("users", "email", "i.assignee_id"),
-		itemListLookupExpr("users", "avatar_url", "i.assignee_id"),
-		itemListLookupExpr("users", "email", "i.creator_id"),
-		itemListLookupExpr("statuses", "name", "i.status_id"),
-		trimmed("statuses", "builtin_key", "i.status_id"),
-		itemListLookupExpr("priorities", "name", "i.priority_id"),
-		trimmed("priorities", "builtin_key", "i.priority_id"),
-		itemListLookupExpr("priorities", "icon", "i.priority_id"),
-		itemListLookupExpr("priorities", "color", "i.priority_id"),
-		cql.CurrentStatusTransitionAtExpr(""),
-		itemListLookupExpr("teams", "name", "i.team_id"),
-		itemListLookupExpr("teams", "color", "i.team_id"),
-		itemListLookupExpr("teams", "avatar_url", "i.team_id"),
-	)
+		i.story_points, i.estimate_minutes, i.frac_index, i.created_at, i.updated_at, i.last_active_at`)
+	for _, column := range itemListDisplayColumns {
+		expr := column.joined
+		if probeLookups {
+			expr = column.probe
+		}
+		projection.WriteString(",\n\t\t" + expr + " as " + column.alias)
+	}
+	return projection.String() + "\n\t"
 }
 
 // itemListScalarHydrationRowLimit bounds the per-column lookup projection.
@@ -457,11 +449,11 @@ func (r *ItemRepository) FindAllWithDetailsPageContext(ctx context.Context, para
 		fetchLimit++
 	}
 
-	fullQuery := itemListHydratedPageQuery(pagePlan, orderByClause, fetchLimit, offset, params.OmitDescriptions)
-	if r.itemListUsesScalarHydration(fetchLimit) {
-		fullQuery = itemListScalarHydratedPageQuery(pagePlan, orderByClause, fetchLimit, offset,
-			params.OmitDescriptions, itemListOrderNeedsPriorities(params))
+	hydration := itemListHydration{
+		probeLookups:         r.itemListUsesScalarHydration(fetchLimit),
+		orderNeedsPriorities: itemListOrderNeedsPriorities(params),
 	}
+	fullQuery := itemListHydratedPageQuery(pagePlan, orderByClause, fetchLimit, offset, params.OmitDescriptions, hydration)
 	rows, err := queryItemListPage(ctx, pageQueryer, fullQuery, pagePlan.pageArgs...)
 	if err != nil {
 		return ItemListPage{}, fmt.Errorf("failed to query items: %w", err)
@@ -499,29 +491,30 @@ func itemListPageIDQuery(plan itemListPagePlan, orderByClause string, limit, off
 	return "SELECT i.id " + plan.pageFromClause + plan.pageWhereClause + orderByClause + fmt.Sprintf(" LIMIT %d OFFSET %d", limit, offset)
 }
 
-func itemListHydratedPageQuery(plan itemListPagePlan, orderBy string, limit, offset int, omitDescriptions bool) string {
-	// Join the selected IDs first. With the page join after the display joins,
-	// PostgreSQL can exhaust its join reorder limit and hydrate the entire table.
-	return itemListHydratedPageQueryWith(plan, orderBy, limit, offset,
-		itemListSelectClause(omitDescriptions), itemListHydrationJoins())
+// itemListHydration selects the hydrated page shape once, before any SQL is
+// built. probeLookups keeps the page as the only join input; otherwise the
+// joined display lookups apply.
+type itemListHydration struct {
+	probeLookups         bool
+	orderNeedsPriorities bool
 }
 
-// itemListScalarHydratedPageQuery is the small-page variant: the page stays the
-// only join input and display values come from itemListScalarSelectClause.
-// Priority ordering still needs its lookup joined because sort_order is not an
-// items column.
-func itemListScalarHydratedPageQuery(plan itemListPagePlan, orderBy string, limit, offset int, omitDescriptions, orderNeedsPriorities bool) string {
-	joins := ""
-	if orderNeedsPriorities {
-		joins = "\n\t\tLEFT JOIN priorities pri ON i.priority_id = pri.id"
+// itemListHydratedPageQuery builds one hydrated page statement for the chosen
+// shape. The page join comes first so PostgreSQL hydrates the selected rows
+// instead of scanning items to find them. The probe shape still joins the
+// priorities lookup when ordering needs sort_order, which is not an items
+// column.
+func itemListHydratedPageQuery(plan itemListPagePlan, orderBy string, limit, offset int, omitDescriptions bool, hydration itemListHydration) string {
+	hydrationJoins := itemListHydrationJoins()
+	if hydration.probeLookups {
+		hydrationJoins = ""
+		if hydration.orderNeedsPriorities {
+			hydrationJoins = "\n\t\tLEFT JOIN priorities pri ON i.priority_id = pri.id"
+		}
 	}
-	return itemListHydratedPageQueryWith(plan, orderBy, limit, offset,
-		itemListScalarSelectClause(omitDescriptions), joins)
-}
-
-func itemListHydratedPageQueryWith(plan itemListPagePlan, orderBy string, limit, offset int, selectClause, hydrationJoins string) string {
 	return "WITH page_items AS (" + itemListPageIDQuery(plan, orderBy, limit, offset) + ") " +
-		selectClause + "FROM page_items page JOIN items i ON i.id = page.id" + hydrationJoins + orderBy
+		itemListSelectClause(omitDescriptions, hydration.probeLookups) +
+		"FROM page_items page JOIN items i ON i.id = page.id" + hydrationJoins + orderBy
 }
 
 // FindIDPageContext returns one ordered item-ID page using the same filters,
