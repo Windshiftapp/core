@@ -155,6 +155,7 @@ export default {
     fieldName: 'Veldnaam',
     fieldType: 'Veldtype',
     fieldDescription: 'Beschrijving',
+    descriptionHelper: 'Wordt als hint in het veld getoond zolang het leeg is.',
     defaultValue: 'Standaardwaarde',
     placeholder: 'Placeholder',
     helpText: 'Helptekst',

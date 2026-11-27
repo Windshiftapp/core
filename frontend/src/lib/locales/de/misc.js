@@ -650,6 +650,7 @@ export default {
     fieldName: 'Feldname',
     fieldType: 'Feldtyp',
     fieldDescription: 'Beschreibung',
+    descriptionHelper: 'Wird als Hinweis im Feld angezeigt, solange es leer ist.',
     defaultValue: 'Standardwert',
     placeholder: 'Platzhalter',
     helpText: 'Hilfetext',

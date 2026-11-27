@@ -142,6 +142,7 @@ export default {
     "fieldName": "نام فیلد",
     "fieldType": "نوع فیلد",
     "fieldDescription": "توضیحات",
+    "descriptionHelper": "تا زمانی که فیلد خالی است، به‌عنوان راهنما داخل آن نمایش داده می‌شود.",
     "defaultValue": "مقدار پیش فرض",
     "placeholder": "جای‌نگهدار",
     "helpText": "متن راهنما",

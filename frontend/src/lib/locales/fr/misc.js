@@ -152,6 +152,7 @@ export default {
     fieldName: 'Nom du champ',
     fieldType: 'Type de champ',
     fieldDescription: 'Description',
+    descriptionHelper: 'Affiché comme indication dans le champ tant qu’il est vide.',
     defaultValue: 'Valeur par défaut',
     placeholder: 'Espace réservé',
     helpText: 'Texte d’aide',

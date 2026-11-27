@@ -155,6 +155,7 @@ export default {
     fieldName: 'Field Name',
     fieldType: 'Field Type',
     fieldDescription: 'Description',
+    descriptionHelper: 'Shown as a hint inside the field while it is empty.',
     defaultValue: 'Default Value',
     placeholder: 'Placeholder',
     helpText: 'Help Text',

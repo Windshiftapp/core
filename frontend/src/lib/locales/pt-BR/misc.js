@@ -146,6 +146,7 @@ export default {
     fieldName: 'Nome do Campo',
     fieldType: 'Tipo do Campo',
     fieldDescription: 'Descrição',
+    descriptionHelper: 'Exibido como dica dentro do campo enquanto estiver vazio.',
     defaultValue: 'Valor Padrão',
     placeholder: 'Texto de Exemplo',
     helpText: 'Texto de Ajuda',

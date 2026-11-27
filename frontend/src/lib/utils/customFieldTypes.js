@@ -9,6 +9,17 @@ export function canonicalCustomFieldType(fieldType) {
   return isBooleanCustomFieldType(fieldType) ? BOOLEAN_CUSTOM_FIELD_TYPE : fieldType;
 }
 
+// Free-text types whose description is shown as the input's hint while the
+// field is empty. Other types keep their own picker/format placeholders.
+const DESCRIPTION_HINT_FIELD_TYPES = new Set(['text', 'textarea', 'richtext']);
+
+export function usesDescriptionHint(fieldType) {
+  return DESCRIPTION_HINT_FIELD_TYPES.has(fieldType);
+}
+
+// Kept short so it still reads as a hint inside a single-line input.
+export const CUSTOM_FIELD_DESCRIPTION_MAX_LENGTH = 250;
+
 // Linking fields attach to an existing item through item_links, so a create
 // form has no item id to link against and cannot satisfy them. They stay valid
 // on edit/view screens; create surfaces must exclude them.

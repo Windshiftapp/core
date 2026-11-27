@@ -159,6 +159,7 @@ export default {
     fieldName: 'Nazwa pola',
     fieldType: 'Typ pola',
     fieldDescription: 'Opis',
+    descriptionHelper: 'Wyświetlany jako podpowiedź w polu, dopóki jest puste.',
     defaultValue: 'Wartość domyślna',
     placeholder: 'Symbol zastępczy',
     helpText: 'Tekst pomocy',

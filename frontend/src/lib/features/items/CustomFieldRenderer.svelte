@@ -30,7 +30,7 @@
   import { fieldOptionsObject, parseFieldOptions, resolveOptionLabel, resolveOptionLabels } from '../../utils/optionUtils.js';
   import { safeHref } from '../../utils/sanitize';
   import { customFieldLinkHref } from '../../utils/customFieldLinks.js';
-  import { booleanCustomFieldChecked, isBooleanCustomFieldType } from '../../utils/customFieldTypes.js';
+  import { booleanCustomFieldChecked, isBooleanCustomFieldType, usesDescriptionHint } from '../../utils/customFieldTypes.js';
   import { DEFAULT_CURRENCY, currencyOptions, formatMoney } from '../../utils/money.js';
   import { brandStore } from '../../stores/brand.svelte.js';
   import LazyMilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
@@ -95,6 +95,12 @@
   onDestroy(() => displayHydration.abort());
 
   const isRequired = $derived(required || field.required || field.is_required);
+  // Text, multi-line and rich text fields show their description as the input
+  // hint; everything else keeps "Enter <field>".
+  const textPlaceholder = $derived(
+    (usesDescriptionHint(field.field_type) && field.description?.trim()) ||
+      t('items.enterField', { field: field.name.toLowerCase() })
+  );
 
   // Custom-field dates are calendar days, not moments in time — keep them as
   // YYYY-MM-DD strings end-to-end to avoid timezone drift.
@@ -897,7 +903,7 @@
         data-testid={`custom-field-input-${field.id}`}
         oninput={(e) => handleEditorInput(e.target.value)}
         class="w-full px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-ds-background-input border border-ds-border rounded text-ds-text"
-        placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
+        placeholder={textPlaceholder}
         rows={3}
         {disabled}
         required={isRequired}
@@ -925,7 +931,7 @@
         dataTestid={`custom-field-input-${field.id}`}
         oninput={(e) => handleEditorInput(e.target.value)}
         class="w-full px-3 py-2 text-sm hover:bg-ds-background-neutral-hovered focus:outline-none transition-colors bg-ds-background-input border border-ds-border rounded text-ds-text{numeric ? ' tabular-nums' : ''}"
-        placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
+        placeholder={textPlaceholder}
         onkeydown={handleKeydown}
         onblur={handleCommitBlur}
         {disabled}
@@ -991,7 +997,7 @@
     <LazyMilkdownEditor
       bind:this={richtextEditorRef}
       content={editorValue}
-      placeholder={t('items.enterField', { field: field.name.toLowerCase() })}
+      placeholder={textPlaceholder}
       readonly={false}
       showToolbar={true}
       compact={true}
