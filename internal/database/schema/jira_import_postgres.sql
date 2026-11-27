@@ -81,3 +81,8 @@ CREATE TABLE IF NOT EXISTS jira_import_user_mappings (
 
 CREATE INDEX IF NOT EXISTS idx_jira_user_mappings_job ON jira_import_user_mappings(job_id);
 CREATE INDEX IF NOT EXISTS idx_jira_user_mappings_windshift ON jira_import_user_mappings(windshift_user_id);
+-- migration: 20261212_jira_csv_people
+CREATE TABLE IF NOT EXISTS jira_csv_people (
+    source_ref TEXT PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+);

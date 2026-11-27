@@ -397,15 +397,12 @@ func (s *ConditionService) evaluateScript(ctx context.Context, configJSON string
 
 // GetConditionSetIDForItem returns the condition set ID for an item's workspace/item type
 // using the canonical configuration resolution: item type override → assigned config set
-// (else global default) → nil when unconfigured.
+// (else global default) → nil when unconfigured. It uses the narrow ID resolution so
+// transition checks do not load the full configuration bundle.
 func (s *ConditionService) GetConditionSetIDForItem(workspaceID int, itemTypeID *int) (*int, error) {
-	repo := repository.NewConfigurationSetRepository(s.db)
-	resolved, err := repo.ResolveEffective(context.Background(), workspaceID, itemTypeID)
-	if err != nil || resolved == nil {
+	resolved, err := repository.NewConfigurationSetRepository(s.db).ResolveForWorkspace(context.Background(), workspaceID, itemTypeID)
+	if err != nil || resolved == nil || resolved.IsPersonal {
 		return nil, err
-	}
-	if resolved.IsPersonal {
-		return nil, nil
 	}
 	return resolved.ConditionSetID, nil
 }

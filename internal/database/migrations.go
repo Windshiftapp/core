@@ -3997,6 +3997,13 @@ END $$;
 		CheckPostgres: pgColumnCheck("collections", "default_sort"),
 		SQLite:        "ALTER TABLE collections ADD COLUMN default_sort TEXT",
 		Postgres:      "ALTER TABLE collections ADD COLUMN IF NOT EXISTS default_sort TEXT",
+	}, {
+		Version:       "20261212_jira_csv_people",
+		Name:          "Remember source-qualified identity decisions for Jira CSV imports",
+		CheckSQLite:   sqliteTableCheck("jira_csv_people"),
+		CheckPostgres: pgTableCheck("jira_csv_people"),
+		SQLite:        jiraCSVPeopleSQL,
+		Postgres:      jiraCSVPeopleSQL,
 	},
 	{
 		Version: "20261212_postgres_cover_ranked_item_page",
@@ -4011,6 +4018,11 @@ END $$;
 			ALTER INDEX idx_items_workspace_frac_index_active_new RENAME TO idx_items_workspace_frac_index_active;
 		`,
 	}}
+
+const jiraCSVPeopleSQL = `CREATE TABLE IF NOT EXISTS jira_csv_people (
+	source_ref TEXT PRIMARY KEY,
+	user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+)`
 
 // boardConfigurationReconcileSQL normalizes board configurations to exactly one
 // owner, merges duplicates onto the lowest-id survivor, and deletes unreachable

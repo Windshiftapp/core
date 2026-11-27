@@ -11,6 +11,11 @@ import (
 	"strings"
 )
 
+// InputError identifies an invalid upload rather than a staging/storage failure.
+type InputError struct{ Message string }
+
+func (e *InputError) Error() string { return e.Message }
+
 // ParseDelimiter maps a client-supplied delimiter name to its rune. Comma is
 // the default; an unknown name falls back to comma rather than erroring.
 func ParseDelimiter(name string) rune {
@@ -128,7 +133,7 @@ func StageUpload(store *Store, storageRoot, kind string, scopeID, userID int, fi
 func StageUploadContext(ctx context.Context, store *Store, storageRoot, kind string, scopeID, userID int, filename string, hasHeader bool, delimiterName string, source io.Reader, maxBytes int64) (staged *StagedUpload, path string, err error) {
 	ext := strings.ToLower(filepath.Ext(filename))
 	if ext != ".csv" && ext != ".tsv" {
-		return nil, "", fmt.Errorf("only CSV and TSV files are accepted")
+		return nil, "", &InputError{"only CSV and TSV files are accepted"}
 	}
 
 	uploadID, err := newUploadID()
@@ -152,7 +157,7 @@ func StageUploadContext(ctx context.Context, store *Store, storageRoot, kind str
 	if copyErr != nil || closeErr != nil || written > maxBytes {
 		_ = os.RemoveAll(dir)
 		if written > maxBytes {
-			return nil, "", fmt.Errorf("CSV upload exceeds %d MiB", maxBytes>>20)
+			return nil, "", &InputError{fmt.Sprintf("CSV upload exceeds %d MiB", maxBytes>>20)}
 		}
 		return nil, "", errors.Join(copyErr, closeErr)
 	}
@@ -164,7 +169,11 @@ func StageUploadContext(ctx context.Context, store *Store, storageRoot, kind str
 	headers, rows, total, err := ParsePreview(path, delimiter, hasHeader, 5)
 	if err != nil {
 		_ = os.RemoveAll(dir)
-		return nil, "", fmt.Errorf("parse CSV: %v", err)
+		var parse *csv.ParseError
+		if errors.As(err, &parse) || errors.Is(err, io.EOF) {
+			return nil, "", &InputError{fmt.Sprintf("parse CSV: %v", err)}
+		}
+		return nil, "", err
 	}
 	if err := store.CreateUploadContext(ctx, kind, scopeID, userID, uploadID, nowUTC()); err != nil {
 		_ = os.RemoveAll(dir)
