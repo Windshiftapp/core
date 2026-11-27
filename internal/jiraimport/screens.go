@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"windshift/internal/database"
 	"windshift/internal/repository"
@@ -69,6 +70,27 @@ func (s *Service) UpdateChoiceFieldOptions(fieldID int, options string) error {
 		UPDATE custom_field_definitions SET options = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
 	`, options, fieldID)
 	return err
+}
+
+func issueKeyNames() []string {
+	names := []string{"Jira Key", "Imported Jira Key"}
+	for suffix := 2; suffix <= 10; suffix++ {
+		names = append(names, fmt.Sprintf("Imported Jira Key %d", suffix))
+	}
+	return names
+}
+
+func ReservedIssueKeyName(name string) bool {
+	for _, n := range issueKeyNames() {
+		if strings.EqualFold(n, strings.TrimSpace(name)) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) EnsureSearchableIssueKey() (fieldID int, name string, created bool, err error) {
+	return s.EnsureIssueKeyField(issueKeyNames(), "Original Jira issue key. Automatically populated by Jira import and queryable as `cf_Jira Key`.", "text")
 }
 
 func (s *Service) EnsureIssueKeyField(names []string, description, fieldType string) (fieldID int, name string, created bool, err error) {

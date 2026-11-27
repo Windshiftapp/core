@@ -34,6 +34,7 @@ import (
 	"windshift/internal/health"
 	"windshift/internal/integrations/docmost"
 	"windshift/internal/itemevents"
+	"windshift/internal/jiracsv"
 	"windshift/internal/ldap"
 	"windshift/internal/llm"
 	"windshift/internal/logger"
@@ -2161,6 +2162,7 @@ func (s *Server) initialize() error {
 		ItemDetail:                   itemDetailApplication,
 		ItemLifecycle:                services.NewItemLifecycleService(s.db, permService),
 		TicketImport:                 services.NewTicketImportService(s.db, permService, importScratch),
+		JiraCSV:                      jiracsv.New(s.db, importScratch, workspaceAppService, itemHandler.ItemCreationService()),
 		OperatorControls:             services.NewOperatorControlsService(s.db, attachmentStorage),
 		Diagnostics:                  diagnosticsHandler,
 		SessionMiddleware:            authMiddleware.OptionalAuth,

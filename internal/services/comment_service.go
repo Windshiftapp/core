@@ -422,13 +422,22 @@ func (s *CommentService) CreateInTx(ctx context.Context, tx database.Tx, itemID,
 // comment-created fact with side effects suppressed. authorID == 0 inserts a
 // system (NULL author) comment.
 func (s *CommentService) CreateImportedInTx(ctx context.Context, tx database.Tx, itemID, authorID int, content string, createdAt, updatedAt time.Time, eventMetadata ...itemevents.Metadata) (int64, error) {
+	return s.createHistoricalComment(ctx, tx, itemID, authorID, content, createdAt, updatedAt, false, eventMetadata...)
+}
+
+// CreateInternalImportedInTx preserves a historical comment without publishing it to customers.
+func (s *CommentService) CreateInternalImportedInTx(ctx context.Context, tx database.Tx, itemID, authorID int, content string, createdAt time.Time, metadata itemevents.Metadata) (int64, error) {
+	return s.createHistoricalComment(ctx, tx, itemID, authorID, content, createdAt, createdAt, true, metadata)
+}
+
+func (s *CommentService) createHistoricalComment(ctx context.Context, tx database.Tx, itemID, authorID int, content string, createdAt, updatedAt time.Time, private bool, eventMetadata ...itemevents.Metadata) (int64, error) {
 	content = normalizeImportedCommentSource(content)
 	var author any
 	if authorID != 0 {
 		author = authorID
 	}
 	var id int64
-	err := tx.QueryRowContext(ctx, insertCommentAuthorSQL, itemID, author, content, false, createdAt, updatedAt).Scan(&id)
+	err := tx.QueryRowContext(ctx, insertCommentAuthorSQL, itemID, author, content, private, createdAt, updatedAt).Scan(&id)
 	if err != nil {
 		return 0, err
 	}
@@ -452,9 +461,9 @@ func (s *CommentService) CreateImportedInTx(ctx context.Context, tx database.Tx,
 		authorIDPtr = &authorID
 	}
 	_, err = itemevents.NewRecorder(s.db).CommentCreated(ctx, tx, workspaceID, itemevents.CommentCreatedV1{
-		ItemID: itemID, CommentID: id, AuthorID: authorIDPtr, SuppressSideEffects: true,
+		ItemID: itemID, CommentID: id, AuthorID: authorIDPtr, IsPrivate: private, SuppressSideEffects: true,
 	}, metadata)
-	if err == nil && authorID > 0 {
+	if err == nil && authorID > 0 && !private {
 		err = repository.NewItemSupportEventRepository(s.db).RecordFirstResponse(tx, itemID, createdAt)
 	}
 	return id, err

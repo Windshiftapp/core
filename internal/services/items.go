@@ -143,6 +143,9 @@ type ItemCreationParams struct {
 	// AfterCreate extends the canonical creation transaction with source-owned
 	// records that must commit atomically with the item and its milestones.
 	AfterCreate ItemCreateTransactionHook
+	// AfterRecorded appends historical subresources after the item-created fact in the same transaction.
+	AfterRecorded               ItemCreateTransactionHook
+	AllowInactiveImportAssignee bool
 	// AllowUnparentedGenericSubtask permits the Jira importer's two-phase
 	// insert-then-link flow to stage a level -1 item before its source parent
 	// has been imported. No interactive or automation caller should set it.

@@ -4,6 +4,8 @@
   import { jiraImport } from './JiraImportStore.svelte.js';
   import { toHotkeyString, getShortcutDisplay } from '../utils/keyboardShortcuts.js';
   import JiraImportWizard from './JiraImportWizard.svelte';
+  import JiraCsvWizard from './JiraCsvWizard.svelte';
+  import { jiraCsv } from '../api/jiraCsv.js';
   import Button from '../components/Button.svelte';
   import AlertBox from '../components/AlertBox.svelte';
   import Input from '../components/Input.svelte';
@@ -37,6 +39,22 @@
 
   // State
   let showWizard = $state(false);
+  let sourcePicker = $state(false);
+  let csvOpen = $state(false);
+  let csvJob = $state('');
+  let csvHistory = $state([]);
+  let csvHistoryError = $state('');
+  let csvRestricted = $state(false);
+
+  async function refreshCsv() {
+    try { csvHistory = await jiraCsv.history(); csvHistoryError = ''; csvRestricted = false; }
+    catch (e) { csvRestricted = e.body?.error?.code === 'operator_restricted'; csvHistoryError = csvRestricted ? '' : e.message; }
+  }
+  function openCsv(id = '') {
+    sourcePicker = false;
+    csvJob = id;
+    csvOpen = true;
+  }
   let selectedConnectionId = $state(null);
   let deleteJob = $state(null);
   let deleteConfirmation = $state('');
@@ -59,6 +77,7 @@
   );
 
   onMount(() => {
+    refreshCsv();
     jiraImport.loadSavedConnections();
     jiraImport.loadImportJobs();
   });
@@ -273,7 +292,7 @@
   <PageHeader title={t('systemImport.title')} subtitle={t('systemImport.subtitle')} icon={Cloud}>
     {#snippet actions()}
       <!-- shortcut-guard-exempt: the configured systemImport.add hotkey and its visible hint are declared on this button -->
-      <Button dataTestid="jira-import-new" variant="primary" onclick={() => openWizard()} keyboardHint={getShortcutDisplay('systemImport', 'add')} hotkeyConfig={{ key: toHotkeyString('systemImport', 'add'), guard: () => !showWizard }}>
+      <Button dataTestid="jira-import-new" variant="primary" onclick={() => sourcePicker = true} keyboardHint={getShortcutDisplay('systemImport', 'add')} hotkeyConfig={{ key: toHotkeyString('systemImport', 'add'), guard: () => !showWizard && !sourcePicker && !csvOpen }}>
         <Plus size={16} class="mr-2" />
         {t('systemImport.newImport')}
       </Button>
@@ -379,14 +398,14 @@
         <StateDisplay type="loading" />
       {:else if importJobs.error}
         <AlertBox variant="error" message={importJobs.error} />
-      {:else if importJobs.items.length === 0}
+      {:else if importJobs.items.length === 0 && csvHistory.length === 0}
         <div class="text-center py-8">
           <Clock class="w-12 h-12 mx-auto opacity-50" style="color: var(--ds-text-subtle);" />
           <p class="mt-4 text-sm" style="color: var(--ds-text-subtle);">
             {t('systemImport.noImports')}
           </p>
         </div>
-      {:else}
+      {:else if importJobs.items.length}
         <div class="overflow-x-auto">
           <table class="w-full">
             <thead>
@@ -489,6 +508,13 @@
           </table>
         </div>
       {/if}
+      {#if csvHistoryError}<AlertBox variant="warning" message={csvHistoryError} />{/if}
+      {#each csvHistory as job (job.id)}
+        <div class="flex items-center justify-between gap-3 border-t border-ds-border py-3">
+          <span>Jira CSV · {job.filename} · {job.status.replaceAll('_', ' ')}</span>
+          <Button size="small" dataTestid={`jira-csv-history-${job.id}`} onclick={() => openCsv(job.id)}>View results</Button>
+        </div>
+      {/each}
     </div>
   </div>
 </div>
@@ -642,6 +668,18 @@
 {/if}
 
 <!-- Import Wizard Modal -->
+{#if sourcePicker}
+  <Modal isOpen={true} onclose={() => sourcePicker = false}>
+    <ModalHeader title="New import" onClose={() => sourcePicker = false} />
+    <div class="p-6 space-y-4">
+      <div><Button dataTestid="jira-import-connect-source" onclick={() => { sourcePicker = false; openWizard(); }}>Connect to Jira</Button><p>Import directly from Jira using a saved or new connection.</p></div>
+      {#if !csvRestricted}<div><Button dataTestid="jira-import-csv-source" onclick={() => openCsv()}>Jira CSV file</Button><p>Import issues from a project export. No Jira credentials required.</p></div>{/if}
+    </div>
+  </Modal>
+{/if}
+{#if csvOpen}
+  <JiraCsvWizard jobId={csvJob} onClose={() => { csvOpen = false; refreshCsv(); }} />
+{/if}
 <JiraImportWizard
   bind:isOpen={showWizard}
   onClose={closeWizard}

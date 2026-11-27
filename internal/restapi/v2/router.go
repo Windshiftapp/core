@@ -18,6 +18,7 @@ import (
 	tokenauth "windshift/internal/auth"
 	"windshift/internal/contextkeys"
 	"windshift/internal/handlers"
+	"windshift/internal/jiracsv"
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/objecttranslation"
@@ -715,6 +716,7 @@ type Deps struct {
 	ItemDetail         *services.ItemDetailApplicationService
 	ItemLifecycle      *services.ItemLifecycleService
 	TicketImport       *services.TicketImportService
+	JiraCSV            *jiracsv.Service
 	// Diagnostics serves the admin proxy-trust read on the session contract.
 	Diagnostics       proxyTrustDiagnostics
 	SessionMiddleware func(http.Handler) http.Handler
@@ -1007,6 +1009,7 @@ func buildRoutes(deps Deps) []route {
 	registerSLATeamBindingRoutes(&builder, deps)
 	registerSLAMetricRoutes(&builder, deps)
 	registerTicketImportRoutes(&builder, deps.TicketImport)
+	registerJiraCSVRoutes(&builder, deps)
 	applyEmbeddedContractMetadata(builder.routes, contractMetadataJSON)
 	applyAuditSpecs(builder.routes)
 	return builder.routes
@@ -1115,6 +1118,21 @@ func appendUniqueParameter(parameters []ParameterMetadata, candidate ParameterMe
 }
 
 func applyParameterCorrections(route *Route) {
+	if strings.HasPrefix(route.Path, jiraCSVBase+"/") {
+		route.Tag = "Administration"
+		route.Summary = map[string]string{"upload": "Stage a Jira CSV file", "catalog": "List Jira CSV field mapping targets", "key": "Check destination workspace key availability", "preview": "Preview mapped Jira issues and comments", "start": "Start an offline Jira issue import", "jobs": "List recent Jira CSV imports", "{job_id}": "Read Jira CSV import results"}[strings.TrimPrefix(strings.TrimPrefix(route.Path, jiraCSVBase+"/"), "jobs/")]
+		route.Description = route.Summary + ". Requires a system administrator session with imports enabled."
+		switch route.Path {
+		case jiraCSVBase + "/key":
+			upsertParameter(route, stringQuery("key", "Proposed new workspace key."))
+		case jiraCSVBase + "/catalog":
+			upsertParameter(route, positiveIDQuery("workspace_id", "Existing destination; omit for workspace creation defaults."))
+		case jiraCSVBase + "/jobs/{job_id}":
+			upsertParameter(route, ParameterMetadata{Name: "job_id", In: "path", Required: true, Description: "Owned CSV import job identifier.", Schema: map[string]any{"type": "string"}})
+		case jiraCSVBase + "/start":
+			route.DocumentedErrors = append(route.DocumentedErrors, http.StatusConflict)
+		}
+	}
 	if route.Path == "/operator-controls" {
 		route.Description = "Read effective operator restrictions, current instance usage and blocked script definitions. Requires system administrator permission and admin:operator-controls:read for bearer tokens. Credentials and deployment paths are never returned. This read-only operation cannot modify operator policy."
 	}
