@@ -171,17 +171,6 @@ func (r *ItemRepository) HierarchyDescendantsContext(ctx context.Context, params
 	}
 	args = append(args, perRootOffset, perRootOffset+perRoot)
 
-	// A hierarchy page can span many roots. Estimate its upper bound and pick
-	// the same hydration shape the list uses; hydration stays anchored on the
-	// page CTE so a multi-root read cannot wander into a full item scan.
-	probeLookups := r.itemListUsesScalarHydration(len(params.RootIDs) * perRoot)
-	hydrationJoins := itemListHydrationJoins()
-	if probeLookups {
-		hydrationJoins = ""
-	}
-	hydrationSelect := itemListSelectClause(params.OmitDescriptions, probeLookups)
-	hydrationFrom := "\n\t\tFROM page JOIN items i ON i.id = page.id" + hydrationJoins
-
 	query := "WITH RECURSIVE tree(root_id, id, depth) AS (" +
 		" SELECT i.id, i.id, 0 FROM items i WHERE i.id IN (" + rootPlaceholders +
 		") AND i.workspace_id IN (" + wsPlaceholders + ") AND i.merged_into_item_id IS NULL" +
@@ -194,13 +183,11 @@ func (r *ItemRepository) HierarchyDescendantsContext(ctx context.Context, params
 		" COUNT(*) OVER (PARTITION BY t.root_id) AS root_total" +
 		" FROM tree t JOIN items i ON i.id = t.id" + ItemListFilterJoins() +
 		" WHERE t.depth > 0 AND i.workspace_id IN (" + wsPlaceholders + ")" + qlClause +
-		"), page AS (" +
-		" SELECT root_id, id, depth, root_total FROM ranked WHERE rn > ? AND rn <= ?" +
-		") " +
-		hydrationSelect +
-		", page.root_id AS hierarchy_root_id, page.depth AS hierarchy_depth, page.root_total AS hierarchy_root_total " +
-		hydrationFrom +
-		" ORDER BY page.root_id, page.depth, i.frac_index"
+		"), page_items AS (" +
+		" SELECT id, root_id AS hierarchy_root_id, depth AS hierarchy_depth, root_total AS hierarchy_root_total" +
+		" FROM ranked WHERE rn > ? AND rn <= ?)" +
+		hydrateItemPage(r.pageContextHint(), params.OmitDescriptions, ", hierarchy_root_id, hierarchy_depth, hierarchy_root_total") +
+		" ORDER BY i.hierarchy_root_id, i.hierarchy_depth, i.frac_index"
 
 	rows, err := r.db.QueryReadContext(ctx, query, args...)
 	if err != nil {
