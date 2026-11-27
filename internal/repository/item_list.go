@@ -258,10 +258,6 @@ func (r *ItemRepository) FindAllWithDetailsContext(ctx context.Context, params I
 	return page.Items, page.Total, err
 }
 
-// FindAllWithDetailsPageContext is the cursor-aware form of the item list
-// query. Cursor mode is deliberately limited to the direct, unfiltered
-// workspace path; collection and filtered lists continue through the same
-// joined page plan and offset semantics as before.
 // itemListSelectClause is the hydrated projection for an item row. List and
 // hierarchy reads share it so their column sets cannot drift.
 func itemListSelectClause(omitDescriptions bool) string {
@@ -285,9 +281,8 @@ func itemListSelectClause(omitDescriptions bool) string {
 	`, descriptionExpr, cql.CurrentStatusTransitionAtExpr(""))
 }
 
-// itemListFromClause is the display join set for a hydrated item row.
-func itemListFromClause() string {
-	return ItemListFilterFromClause() + `
+func itemListHydrationJoins() string {
+	return ItemListFilterJoins() + `
 		LEFT JOIN items p ON i.parent_id = p.id
 		LEFT JOIN users assignee ON i.assignee_id = assignee.id
 		LEFT JOIN users creator ON i.creator_id = creator.id
@@ -306,12 +301,6 @@ func (r *ItemRepository) FindAllWithDetailsPageContext(ctx context.Context, para
 			return ItemListPage{}, err
 		}
 	}
-
-	// Build the SELECT clause. Collection/list surfaces can opt out of the
-	// heavy description payload; detail endpoints still fetch full descriptions.
-	selectClause := itemListSelectClause(params.OmitDescriptions)
-
-	fromClause := itemListFromClause()
 
 	whereClause, args := r.buildWhereClause(params)
 
@@ -383,13 +372,7 @@ func (r *ItemRepository) FindAllWithDetailsPageContext(ctx context.Context, para
 		fetchLimit++
 	}
 
-	// Execute the page selection against the narrow filtering joins first. The
-	// old query hydrated every display join before OFFSET discarded deep-page
-	// rows. Keeping the page IDs in a CTE means only the requested rows pay for
-	// descriptions, hierarchy/status enrichment, and the correlated status
-	// transition lookup.
-	pageQuery := "WITH page_items AS (" + itemListPageIDQuery(pagePlan, orderByClause, fetchLimit, offset) + ") "
-	fullQuery := pageQuery + selectClause + fromClause + " JOIN page_items page ON page.id = i.id" + orderByClause
+	fullQuery := itemListHydratedPageQuery(pagePlan, orderByClause, fetchLimit, offset, params.OmitDescriptions)
 	rows, err := queryItemListPage(ctx, pageQueryer, fullQuery, pagePlan.pageArgs...)
 	if err != nil {
 		return ItemListPage{}, fmt.Errorf("failed to query items: %w", err)
@@ -425,6 +408,14 @@ func (r *ItemRepository) FindAllWithDetailsPageContext(ctx context.Context, para
 // runs.
 func itemListPageIDQuery(plan itemListPagePlan, orderByClause string, limit, offset int) string {
 	return "SELECT i.id " + plan.pageFromClause + plan.pageWhereClause + orderByClause + fmt.Sprintf(" LIMIT %d OFFSET %d", limit, offset)
+}
+
+func itemListHydratedPageQuery(plan itemListPagePlan, orderBy string, limit, offset int, omitDescriptions bool) string {
+	// Join the selected IDs first. With the page join after the display joins,
+	// PostgreSQL can exhaust its join reorder limit and hydrate the entire table.
+	return "WITH page_items AS (" + itemListPageIDQuery(plan, orderBy, limit, offset) + ") " +
+		itemListSelectClause(omitDescriptions) + "FROM page_items page JOIN items i ON i.id = page.id" +
+		itemListHydrationJoins() + orderBy
 }
 
 // FindIDPageContext returns one ordered item-ID page using the same filters,
