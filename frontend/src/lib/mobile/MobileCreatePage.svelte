@@ -28,6 +28,7 @@
   import { workspaceDataStore } from '../stores/workspaceDataStore.svelte.js';
   import { dateInputToISOString } from '../utils/dateFormatter.js';
   import { parseDuration } from '../utils/timeUtils.js';
+  import { isUntouchedTemplateText } from '../utils/templateText.js';
   import {
     defaultCustomFieldValue,
     isBooleanCustomFieldType,
@@ -115,6 +116,11 @@
   // selectable templates.
   let templateOptions = $state([]);
   let mandatoryTemplate = $state(null);
+  // Body of the template last written into the description, and whether it was
+  // mandatory, so a type change can swap untouched template text (never text
+  // the user wrote) for the new type's template.
+  let appliedTemplateBody = null;
+  let appliedTemplateMandatory = false;
   let selectedTemplateId = $state(null);
   let templatesLoading = $state(false);
   // Non-reactive sync guards: read (and written) inside the template-loading
@@ -505,14 +511,23 @@
       mandatoryTemplate = mandatory;
       if (mandatory) {
         selectedTemplateId = mandatory.id;
-        // Only fill an empty description — mirrors the server's "apply only when
-        // empty" rule (services.CreateItem) so an async load can't clobber text
-        // the user already typed. The picker stays locked.
-        if (!description?.trim()) {
-          description = mandatory.description_body || '';
+        // Fill an empty description or replace untouched template text (e.g.
+        // the previous type's template); never clobber text the user typed.
+        // The picker stays locked.
+        if (isUntouchedTemplateText(description, appliedTemplateBody)) {
+          setDescriptionFromTemplate(mandatory.description_body || '', true);
         }
       } else {
         selectedTemplateId = null;
+        // No mandatory template for the new type: drop the previous type's
+        // untouched mandatory text instead of carrying it over.
+        if (
+          appliedTemplateMandatory &&
+          description?.trim() &&
+          isUntouchedTemplateText(description, appliedTemplateBody)
+        ) {
+          setDescriptionFromTemplate('', false);
+        }
       }
     } catch (err) {
       console.error('Failed to load item templates:', err);
@@ -524,11 +539,17 @@
     }
   }
 
+  function setDescriptionFromTemplate(body, mandatory) {
+    description = body;
+    appliedTemplateBody = body || null;
+    appliedTemplateMandatory = mandatory && !!body;
+  }
+
   // Apply a selectable template's body into the description (from the picker).
   function applyTemplate(templateId) {
     const tmpl = templateOptions.find((t) => t.id === templateId);
     if (!tmpl) return;
-    description = tmpl.description_body || '';
+    setDescriptionFromTemplate(tmpl.description_body || '', false);
     selectedTemplateId = templateId;
   }
 
