@@ -152,7 +152,6 @@ export default {
     fieldName: 'Nome del campo',
     fieldType: 'Tipo di campo',
     fieldDescription: 'Descrizione',
-    descriptionHelper: 'Mostrato come suggerimento nel campo finché è vuoto.',
     defaultValue: 'Valore predefinito',
     placeholder: 'Segnaposto',
     helpText: 'Testo di aiuto',

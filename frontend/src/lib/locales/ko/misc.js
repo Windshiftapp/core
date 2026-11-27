@@ -140,7 +140,6 @@ export default {
     "fieldName": "필드 이름",
     "fieldType": "필드 유형",
     "fieldDescription": "설명",
-    "descriptionHelper": "필드가 비어 있는 동안 필드 안에 힌트로 표시됩니다.",
     "defaultValue": "기본값",
     "placeholder": "입력 안내 문구",
     "helpText": "도움말",

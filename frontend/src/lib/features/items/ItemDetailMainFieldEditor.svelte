@@ -9,7 +9,7 @@
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { getDisplayString, getShortcut, matchesShortcut } from '../../utils/keyboardShortcuts.js';
-  import { isRichTextCustomFieldType, usesDescriptionHint } from '../../utils/customFieldTypes.js';
+  import { isRichTextCustomFieldType } from '../../utils/customFieldTypes.js';
 
   let {
     field,
@@ -32,12 +32,7 @@
   let submitting = $state(false);
 
   const isRichText = $derived(isRichTextCustomFieldType(field.field_type));
-  // Text, multi-line and rich text fields show their description as the input
-  // hint; fall back to "Enter <field>".
-  const placeholder = $derived(
-    (usesDescriptionHint(field.field_type) && field.description?.trim()) ||
-      t('items.enterField', { field: field.name.toLowerCase() })
-  );
+  const placeholder = $derived(t('items.enterField', { field: field.name.toLowerCase() }));
 
   async function save() {
     // Same lock as the Save button, so the keyboard shortcut cannot submit

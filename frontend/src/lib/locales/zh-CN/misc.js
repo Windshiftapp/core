@@ -141,7 +141,6 @@ export default {
     fieldName: '字段名称',
     fieldType: '字段类型',
     fieldDescription: '描述',
-    descriptionHelper: '字段为空时，作为提示显示在字段内。',
     defaultValue: '默认值',
     placeholder: '占位符',
     helpText: '帮助文本',

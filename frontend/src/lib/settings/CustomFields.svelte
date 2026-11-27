@@ -35,7 +35,7 @@
   import XIcon from '@lucide/svelte/icons/x';
   import DescriptionText from '../components/DescriptionText.svelte';
   import { customFieldFormData, customFieldUpdatePayload, linkingFieldOptions, loadCustomFieldsOverview } from './customFieldsData.js';
-  import { CUSTOM_FIELD_DESCRIPTION_MAX_LENGTH, canonicalCustomFieldType, isBooleanCustomFieldType, usesDescriptionHint } from '../utils/customFieldTypes.js';
+  import { canonicalCustomFieldType, isBooleanCustomFieldType } from '../utils/customFieldTypes.js';
   import { CUSTOM_FIELD_TYPES } from '../utils/fieldTypeMeta.js';
   import { currencyOptions } from '../utils/money.js';
 	import TextField from '../components/TextField.svelte';
@@ -810,11 +810,6 @@
           id="field-description"
           labelColor="default"
           rows={2}
-          maxlength={CUSTOM_FIELD_DESCRIPTION_MAX_LENGTH}
-          helper={[
-            usesDescriptionHint(formData.field_type) ? t('fields.descriptionHelper') : '',
-            `${(formData.description || '').length}/${CUSTOM_FIELD_DESCRIPTION_MAX_LENGTH}`
-          ].filter(Boolean).join(' · ')}
           dataTestid="custom-field-description"
           bind:value={formData.description}
         />

@@ -153,7 +153,6 @@ export default {
     fieldName: 'اسم الحقل',
     fieldType: 'نوع الحقل',
     fieldDescription: 'الوصف',
-    descriptionHelper: 'يظهر كتلميح داخل الحقل طالما كان فارغًا.',
     defaultValue: 'القيمة الافتراضية',
     placeholder: 'نص توضيحي',
     helpText: 'نص المساعدة',

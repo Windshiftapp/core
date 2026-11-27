@@ -16,7 +16,6 @@
    *   autofocus?: boolean,
    *   spellcheck?: boolean,
    *   rows?: number,
-   *   maxlength?: number,
    *   id?: string,
    *   size?: string,
    *   labelColor?: 'default' | 'subtle',
@@ -40,7 +39,6 @@
     autofocus = false,
     spellcheck = undefined,
     rows = 3,
-    maxlength = undefined,
     id = undefined,
     size = 'medium',
     labelColor = 'subtle',
@@ -65,7 +63,6 @@
     {autofocus}
     {spellcheck}
     {rows}
-    {maxlength}
     {size}
     data-testid={dataTestid}
     {oninput}
