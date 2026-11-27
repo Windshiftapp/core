@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import Avatar from '../components/Avatar.svelte';
-	import { activateUser as activateUserApi, createApiToken, createUser, deactivateUser as deactivateUserApi, deleteUser as deleteUserApi, getAdminUsers, inviteUser, resetUserPassword as resetUserPasswordApi, updateUser } from '../api/users.js';
+	import { activateUser as activateUserApi, createApiToken, createUser, deactivateUser as deactivateUserApi, deleteUser as deleteUserApi, getAdminUsers, getApiTokens, inviteUser, resetUserPassword as resetUserPasswordApi, revokeApiToken, updateUser } from '../api/users.js';
 	import { authStore } from '../stores/auth.svelte.js';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Edit from '@lucide/svelte/icons/edit';
@@ -78,6 +78,15 @@
 	let creatingToken = $state(false);
 	let mintedToken = $state('');
 	let mintedTokenError = $state('');
+	// The agent's existing tokens, listed above the mint form so admins can see
+	// and revoke them (same permission rule as minting: GET/DELETE /api-tokens).
+	let existingTokens = $state([]);
+	let existingTokensLoading = $state(false);
+	let existingTokensError = $state('');
+	let revokingTokenId = $state(null);
+	// Bumped on every load and on close, so a late response from an earlier
+	// modal session can't overwrite the current one.
+	let existingTokensRequest = 0;
 
 	// Grantable scopes come from the server catalog (auth.ScopeCatalog) rather
 	// than a list maintained here, which had silently fallen behind and left
@@ -387,6 +396,47 @@
 		mintedToken = '';
 		mintedTokenError = '';
 		showTokenModal = true;
+		loadExistingTokens(user.id);
+	}
+
+	async function loadExistingTokens(userId) {
+		const request = ++existingTokensRequest;
+		existingTokens = [];
+		existingTokensError = '';
+		existingTokensLoading = true;
+		try {
+			const tokens = await getApiTokens(userId);
+			if (request === existingTokensRequest) {
+				existingTokens = (tokens || []).filter(token => !token.is_temporary);
+			}
+		} catch (err) {
+			if (request === existingTokensRequest) {
+				existingTokensError = err?.message || t('errors.failedToLoad');
+			}
+		} finally {
+			if (request === existingTokensRequest) {
+				existingTokensLoading = false;
+			}
+		}
+	}
+
+	async function revokeExistingToken(token) {
+		const ok = await confirm({
+			title: t('security.revokeToken'),
+			message: t('security.confirmRevokeToken', { name: token.name }),
+			confirmText: t('security.revokeToken'),
+			variant: 'danger'
+		});
+		if (!ok) return;
+		revokingTokenId = token.id;
+		try {
+			await revokeApiToken(token.id);
+			existingTokens = existingTokens.filter(existing => existing.id !== token.id);
+		} catch (err) {
+			errorToast(err?.message || 'Failed to revoke token');
+		} finally {
+			revokingTokenId = null;
+		}
 	}
 
 	function closeTokenModal() {
@@ -396,6 +446,10 @@
 		newTokenScopes = [];
 		mintedToken = '';
 		mintedTokenError = '';
+		existingTokensRequest++;
+		existingTokens = [];
+		existingTokensError = '';
+		existingTokensLoading = false;
 	}
 
 	function toggleAgentTokenScope(scope, checked) {
@@ -769,14 +823,23 @@
 	{/if}
 
 	<!-- Mint API token for agent -->
-	<Modal isOpen={showTokenModal} onclose={closeTokenModal} maxWidth="max-w-md">
+	<!-- The token list grows with the agent's tokens, so the dialog owns a
+	     capped height with a scrolling body: header and footer stay put. -->
+	<Modal
+		isOpen={showTokenModal}
+		onclose={closeTokenModal}
+		onSubmit={mintedToken ? closeTokenModal : createTokenForUser}
+		submitDisabled={creatingToken || (!mintedToken && newTokenScopes.length === 0)}
+		maxWidth="max-w-lg"
+		maxHeight="calc(100vh - 4rem)"
+	>
 		<ModalHeader
 			title={tokenTargetUser ? `Mint API token for ${tokenTargetUser.full_name || tokenTargetUser.username}` : 'Mint API token'}
 			icon={Key}
 			onClose={closeTokenModal}
 		/>
 
-		<div class="px-6 py-4 space-y-4">
+		<div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
 			{#if mintedToken}
 				<div class="space-y-2">
 					<p class="text-sm" style="color: var(--ds-text);">
@@ -790,6 +853,50 @@
 					</div>
 				</div>
 			{:else}
+				<div class="space-y-2" data-testid="agent-existing-tokens">
+					<Label color="default">{t('security.apiTokens')}</Label>
+					{#if existingTokensLoading}
+						<p class="text-sm text-ds-text-subtle">{t('common.loading')}</p>
+					{:else if existingTokensError}
+						<AlertBox message={existingTokensError} />
+					{:else if existingTokens.length === 0}
+						<p class="text-sm text-ds-text-subtle">{t('security.noApiTokens')}</p>
+					{:else}
+						<ul class="border border-ds-border rounded divide-y divide-ds-border">
+							{#each existingTokens as token (token.id)}
+								<li class="flex items-center justify-between gap-3 px-3 py-2" data-testid={`agent-token-${token.id}`}>
+									<div class="min-w-0">
+										<div class="text-sm font-medium truncate text-ds-text">
+											{token.name}
+											<!-- token_prefix already ends in an ellipsis (auth.GetTokenPrefix), so
+											     it is rendered verbatim. -->
+											{#if token.token_prefix}<code class="ml-1 text-xs text-ds-text-subtle">{token.token_prefix}</code>{/if}
+										</div>
+										<div class="text-xs text-ds-text-subtle">
+											{token.last_used_at ? t('security.tokenLastUsed', { date: formatDateSimple(token.last_used_at) }) : t('security.tokenNeverUsed')}
+											·
+											{token.expires_at ? t('security.tokenExpiresOn', { date: formatDateSimple(token.expires_at) }) : t('security.tokenNoExpiry')}
+										</div>
+									</div>
+									<Button
+										variant="danger-ghost"
+										size="small"
+										icon={Trash2}
+										title={t('security.revokeToken')}
+										disabled={revokingTokenId === token.id}
+										onclick={() => revokeExistingToken(token)}
+										dataTestid={`agent-token-revoke-${token.id}`}
+									></Button>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</div>
+				<!-- Errors sit above the form: the dialog body scrolls, so a
+				     failure reported under the scope list can stay off-screen. -->
+				{#if mintedTokenError}
+					<AlertBox message={mintedTokenError} />
+				{/if}
 				<div>
 					<TextField
 						label={"Token name"}
@@ -825,9 +932,6 @@
 						{/each}
 					</div>
 				</div>
-				{#if mintedTokenError}
-					<AlertBox message={mintedTokenError} />
-				{/if}
 			{/if}
 		</div>
 
