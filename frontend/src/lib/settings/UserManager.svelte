@@ -868,7 +868,9 @@
 									<div class="min-w-0">
 										<div class="text-sm font-medium truncate text-ds-text">
 											{token.name}
-											{#if token.token_prefix}<code class="ml-1 text-xs text-ds-text-subtle">{token.token_prefix}…</code>{/if}
+											<!-- token_prefix already ends in an ellipsis (auth.GetTokenPrefix), so
+											     it is rendered verbatim. -->
+											{#if token.token_prefix}<code class="ml-1 text-xs text-ds-text-subtle">{token.token_prefix}</code>{/if}
 										</div>
 										<div class="text-xs text-ds-text-subtle">
 											{token.last_used_at ? t('security.tokenLastUsed', { date: formatDateSimple(token.last_used_at) }) : t('security.tokenNeverUsed')}
