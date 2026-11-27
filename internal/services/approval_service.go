@@ -55,13 +55,6 @@ func (s *ApprovalService) GetApprovalSetIDForItem(ctx context.Context, workspace
 	if s == nil {
 		return nil, nil
 	}
-	isPersonal, err := s.templateRepo.IsWorkspacePersonal(ctx, workspaceID)
-	if err != nil {
-		return nil, err
-	}
-	if isPersonal {
-		return nil, nil
-	}
 	return s.templateRepo.ResolveForWorkspace(ctx, workspaceID, itemTypeID)
 }
 
