@@ -1,5 +1,9 @@
 # PostgreSQL maintenance after a bulk item import
 
+The upgrade builds a wider active-item rank index before dropping the old
+one. On large installations, allow space for both indexes and schedule the
+upgrade when writes to `items` can pause during the build.
+
 After a large import or logical restore commits, run this in the Windshift
 database as the table owner, outside a transaction:
 
