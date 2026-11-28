@@ -310,8 +310,9 @@ func (s *ItemUpdateApplicationService) UpdateWithMetadata(
 	itemID int,
 	updateData map[string]any,
 	metadata itemevents.Metadata,
+	expected ...time.Time,
 ) (*UpdateItemResult, error) {
-	return s.updateItemWithMetadata(actorUserID, actorUsername, itemID, updateData, nil, metadata)
+	return s.updateItemWithMetadata(actorUserID, actorUsername, itemID, updateData, nil, metadata, expected...)
 }
 
 func (s *ItemUpdateApplicationService) updateItemWithMetadata(
@@ -321,6 +322,7 @@ func (s *ItemUpdateApplicationService) updateItemWithMetadata(
 	updateData map[string]any,
 	actionContext *ActionContext,
 	metadata itemevents.Metadata,
+	expected ...time.Time,
 ) (*UpdateItemResult, error) {
 	if s.activityTracker != nil {
 		if err := s.activityTracker.TrackItemActivity(actorUserID, itemID, ActivityEdit); err != nil {
@@ -328,12 +330,16 @@ func (s *ItemUpdateApplicationService) updateItemWithMetadata(
 		}
 	}
 
-	result, err := s.update.UpdateItem(UpdateItemRequest{
+	request := UpdateItemRequest{
 		ItemID:        itemID,
 		UpdateData:    updateData,
 		UserID:        actorUserID,
 		EventMetadata: metadata,
-	})
+	}
+	if len(expected) > 0 {
+		request.ExpectedUpdatedAt = &expected[0]
+	}
+	result, err := s.update.UpdateItem(request)
 	if err != nil {
 		return nil, err
 	}

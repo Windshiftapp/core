@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"time"
@@ -11,6 +12,88 @@ import (
 type TestQARepository struct{ db database.Database }
 
 func NewTestQARepository(db database.Database) *TestQARepository { return &TestQARepository{db: db} }
+
+type LinkedItemTestResult struct {
+	ID            int
+	RunID         int
+	RunName       string
+	CaseID        int
+	CaseTitle     string
+	Status        string
+	ExecutedAt    *time.Time
+	ActualResult  string
+	Notes         string
+	TextTruncated bool
+}
+
+func (r *TestQARepository) LinkedItemResults(ctx context.Context, workspaceID, itemID, limit int) ([]LinkedItemTestResult, error) {
+	return r.linkedItemResults(ctx, LinkedItemTestResultFilter{WorkspaceID: workspaceID, ItemID: itemID, Limit: limit}, false)
+}
+
+type LinkedItemTestResultFilter struct {
+	WorkspaceID int
+	ItemID      int
+	ResultID    int
+	Status      string
+	Limit       int
+	Offset      int
+}
+
+func (r *TestQARepository) LinkedItemResultDetails(ctx context.Context, filter LinkedItemTestResultFilter) ([]LinkedItemTestResult, error) {
+	return r.linkedItemResults(ctx, filter, true)
+}
+
+func (r *TestQARepository) linkedItemResults(ctx context.Context, filter LinkedItemTestResultFilter, includeDetails bool) ([]LinkedItemTestResult, error) {
+	const textLimit = 1000
+	query := `SELECT result.id, result.run_id, run.name, tc.id, tc.title, result.status, result.executed_at`
+	args := []any{}
+	if includeDetails {
+		query += `, SUBSTR(COALESCE(result.actual_result, ''), 1, ?), SUBSTR(COALESCE(result.notes, ''), 1, ?)`
+		args = append(args, textLimit+1, textLimit+1)
+	}
+	query += ` FROM test_result_items link JOIN test_results result ON result.id = link.test_result_id
+		JOIN test_runs run ON run.id = result.run_id JOIN test_sets plan ON plan.id = run.set_id
+		JOIN test_cases tc ON tc.id = result.test_case_id
+		WHERE link.item_id = ? AND run.workspace_id = ? AND plan.workspace_id = ? AND tc.workspace_id = ?
+		AND result.status IN ('passed', 'failed', 'blocked', 'skipped')`
+	args = append(args, filter.ItemID, filter.WorkspaceID, filter.WorkspaceID, filter.WorkspaceID)
+	if filter.ResultID > 0 {
+		query += " AND result.id = ?"
+		args = append(args, filter.ResultID)
+	}
+	if filter.Status != "" {
+		query += " AND result.status = ?"
+		args = append(args, filter.Status)
+	}
+	query += " ORDER BY result.executed_at DESC NULLS LAST, result.id DESC LIMIT ? OFFSET ?"
+	args = append(args, filter.Limit, filter.Offset)
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var results []LinkedItemTestResult
+	for rows.Next() {
+		var result LinkedItemTestResult
+		fields := []any{&result.ID, &result.RunID, &result.RunName, &result.CaseID, &result.CaseTitle, &result.Status, &result.ExecutedAt}
+		if includeDetails {
+			fields = append(fields, &result.ActualResult, &result.Notes)
+		}
+		if err := rows.Scan(fields...); err != nil {
+			return nil, err
+		}
+		if includeDetails {
+			actual, notes := []rune(result.ActualResult), []rune(result.Notes)
+			result.TextTruncated = len(actual) > textLimit || len(notes) > textLimit
+			if result.TextTruncated {
+				result.ActualResult = string(actual[:min(textLimit, len(actual))])
+				result.Notes = string(notes[:min(textLimit, len(notes))])
+			}
+		}
+		results = append(results, result)
+	}
+	return results, rows.Err()
+}
 
 type TestCoverageCase struct {
 	ID     int    `json:"id"`

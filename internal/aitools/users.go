@@ -15,8 +15,9 @@ import (
 const findUsersMaxResults = 20
 
 type findUsersArgs struct {
-	Query       string `json:"query" jsonschema:"Case-insensitive substring matched against user names and emails"`
-	WorkspaceID *int   `json:"workspace_id,omitempty" jsonschema:"Optional workspace ID. If set, only that workspace's members are searched and their workspace roles are included."`
+	Query          string `json:"query" jsonschema:"Case-insensitive substring matched against user names and emails"`
+	WorkspaceID    *int   `json:"workspace_id,omitempty" jsonschema:"Optional workspace ID. If set, only that workspace's members are searched and their workspace roles are included."`
+	AssignableOnly bool   `json:"assignable_only,omitempty" jsonschema:"Search the workspace's assignee-picker roster; requires workspace_id"`
 }
 
 type foundUserDTO struct {
@@ -39,7 +40,7 @@ func init() {
 		Risk:        RiskLow,
 		Scopes:      []string{auth.ScopeUsersRead},
 		Description: "Find users by name (case-insensitive substring match; system admins can also match on email). Pass workspace_id to restrict the search to that workspace's members. Returns at most 20 matches — narrow the query if the person you want is missing.",
-		Run: func(_ context.Context, env *Env, args findUsersArgs) (any, error) {
+		Run: func(ctx context.Context, env *Env, args findUsersArgs) (any, error) {
 			query := strings.ToLower(strings.TrimSpace(args.Query))
 			if query == "" {
 				return map[string]string{"error": "query is required"}, nil
@@ -53,7 +54,19 @@ func init() {
 			isAdmin, _ := env.PermService.IsSystemAdmin(env.UserID) //nolint:errcheck // fail closed: lookup error means non-admin masking
 
 			var candidates []foundUserDTO
-			if args.WorkspaceID != nil {
+			switch {
+			case args.AssignableOnly:
+				if args.WorkspaceID == nil || !env.HasWorkspaceAccess(*args.WorkspaceID) {
+					return map[string]string{"error": "assignable_only requires an available workspace"}, nil
+				}
+				roster, err := services.NewWorkspaceUserResolver(env.DB, env.PermService).List(ctx, *args.WorkspaceID)
+				if err != nil {
+					return nil, err
+				}
+				for _, user := range roster {
+					candidates = append(candidates, foundUserDTO{ID: user.ID, Name: displayName(user.FirstName, user.LastName, user.Username), Username: user.Username})
+				}
+			case args.WorkspaceID != nil:
 				if !env.HasWorkspaceAccess(*args.WorkspaceID) {
 					return map[string]string{"error": "workspace not found"}, nil
 				}
@@ -88,7 +101,7 @@ func init() {
 				for _, id := range order {
 					candidates = append(candidates, *byID[id])
 				}
-			} else {
+			default:
 				users, err := services.NewUserReadService(env.DB).ListAll()
 				if err != nil {
 					return nil, err

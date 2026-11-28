@@ -55,10 +55,11 @@ func (s *ItemUpdateService) WithPermissionService(permService *PermissionService
 
 // UpdateItemRequest contains the data needed to update an item
 type UpdateItemRequest struct {
-	ItemID        int
-	UpdateData    map[string]any
-	UserID        int
-	EventMetadata itemevents.Metadata
+	ExpectedUpdatedAt *time.Time
+	ItemID            int
+	UpdateData        map[string]any
+	UserID            int
+	EventMetadata     itemevents.Metadata
 }
 
 // FindItem loads an item through the item repository for pre-update

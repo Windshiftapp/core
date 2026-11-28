@@ -42,6 +42,10 @@ func (ms *MCPServer) registerAITools() {
 			if err != nil {
 				return errInternal("build env", err), nil
 			}
+			token := apiTokenFromContext(ctx)
+			env.ScopeAllowed = func(scope string) bool {
+				return ms.deps.TokenManager.CheckTokenPermissions(token, []string{scope})
+			}
 			parsed := entry.NewArgs()
 			if len(req.Params.Arguments) > 0 {
 				if err := json.Unmarshal(req.Params.Arguments, parsed); err != nil {
@@ -56,26 +60,23 @@ func (ms *MCPServer) registerAITools() {
 			if err != nil {
 				return toolErrorf("marshal result: %v", err), nil
 			}
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{&mcp.TextContent{Text: string(b)}},
-			}, nil
+			result := &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(b)}}}
+			var structured map[string]any
+			if json.Unmarshal(b, &structured) == nil && structured != nil {
+				result.StructuredContent = json.RawMessage(b)
+				if message, ok := structured["error"].(string); ok && message != "" {
+					result.IsError = true
+				}
+			}
+			return result, nil
 		})
 	}
 }
 
 func toolAnnotations(entry aitools.Entry) *mcp.ToolAnnotations {
-	readOnly := true
-	destructive := false
-	for _, scope := range entry.Scopes {
-		if !strings.HasSuffix(scope, ":read") {
-			readOnly = false
-		}
-		if strings.HasSuffix(scope, ":delete") {
-			destructive = true
-		}
-	}
+	destructive := entry.Access == aitools.AccessDestructive || entry.Access == aitools.AccessAdmin
 	return &mcp.ToolAnnotations{
-		ReadOnlyHint:    readOnly,
+		ReadOnlyHint:    entry.Access == aitools.AccessRead,
 		DestructiveHint: &destructive,
 	}
 }
@@ -129,6 +130,7 @@ func (ms *MCPServer) buildEnv(user *models.User) (*aitools.Env, error) {
 		ItemDeletionService:    ms.deps.ItemDeletionService,
 		ItemApplication:        ms.deps.ItemApplicationService,
 		TimeWorklogService:     ms.deps.TimeWorklogService,
+		ReadServices:           ms.deps.ReadServices,
 		PageApplicationService: ms.deps.PageApplicationService,
 		PageDiagramService:     ms.deps.PageDiagramService,
 		ActionService:          ms.deps.ActionService,

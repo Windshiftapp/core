@@ -918,6 +918,7 @@ func (s *ItemApplicationService) UpdateFieldsWithMetadata(
 	itemID int,
 	fields map[string]any,
 	metadata itemevents.Metadata,
+	expected ...time.Time,
 ) (*models.Item, error) {
 	allowed, err := s.update.CanUserEditItem(actor.UserID, itemID)
 	if err != nil {
@@ -926,7 +927,7 @@ func (s *ItemApplicationService) UpdateFieldsWithMetadata(
 	if !allowed {
 		return nil, ErrItemForbidden
 	}
-	result, err := s.update.UpdateWithMetadata(actor.UserID, actor.Username, itemID, fields, metadata)
+	result, err := s.update.UpdateWithMetadata(actor.UserID, actor.Username, itemID, fields, metadata, expected...)
 	if err != nil {
 		return nil, err
 	}

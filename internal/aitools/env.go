@@ -73,6 +73,8 @@ type Env struct {
 	// InvalidateWorkspaceCache so they degrade to "next periodic refresh"
 	// when the adapter (chat handler / MCP server) wasn't wired with one.
 	ActionService *services.ActionService
+	ReadServices  *ReadServices
+	ScopeAllowed  func(string) bool
 }
 
 // Audit resource types for entities internal/logger doesn't define a
@@ -171,6 +173,10 @@ func (e *Env) HasWorkspaceAccess(workspaceID int) bool {
 		}
 	}
 	return false
+}
+
+func (e *Env) allowScope(scope string) bool {
+	return e.Source == SourceAIChat || (e.ScopeAllowed != nil && e.ScopeAllowed(scope))
 }
 
 // eventMetadata describes this adapter's writes as agent-actor provenance, so

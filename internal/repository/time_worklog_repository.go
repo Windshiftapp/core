@@ -171,16 +171,19 @@ type WorklogDetailFilter struct {
 	AccessibleProjectIDs []int
 	CustomerID           *int
 	ProjectID            *int
+	UserID               *int // Optional logger filter in addition to viewer access.
 	ItemID               *int
+	ItemIDs              []int
 	DateFromUnix         *int64
 	DateToExclusiveUnix  *int64
+	ClipToDateRange      bool
 	Limit                int
 	Offset               int
 }
 
-// WorklogAggregateInput is the slim projection feeding server-side report
-// aggregation: no description, item, or label columns.
+// WorklogAggregateInput is the slim projection feeding server-side report aggregation.
 type WorklogAggregateInput struct {
+	ItemID             int
 	StartTimeUnix      int64
 	EndTimeUnix        int64
 	DurationMinutes    int
@@ -202,8 +205,8 @@ func (r *TimeWorklogRepository) StreamAggregateInputs(ctx context.Context, filte
 		return nil
 	}
 	where, args := worklogDetailWhere(filter)
-	query := `SELECT w.start_time, w.end_time, w.duration_minutes,
-	       w.user_id, COALESCE(u.first_name || ' ' || u.last_name, ''),
+	query := `SELECT COALESCE(w.item_id, 0), w.start_time, w.end_time, w.duration_minutes,
+	       COALESCE(w.user_id, 0), COALESCE(NULLIF(TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')), ''), u.username, ''),
 	       w.project_id, p.name, c.id, c.name, COALESCE(c.builtin_key, '')
 	FROM time_worklogs w
 	JOIN time_projects p ON w.project_id = p.id
@@ -219,7 +222,7 @@ func (r *TimeWorklogRepository) StreamAggregateInputs(ctx context.Context, filte
 
 	for rows.Next() {
 		var item WorklogAggregateInput
-		if scanErr := rows.Scan(&item.StartTimeUnix, &item.EndTimeUnix, &item.DurationMinutes,
+		if scanErr := rows.Scan(&item.ItemID, &item.StartTimeUnix, &item.EndTimeUnix, &item.DurationMinutes,
 			&item.UserID, &item.UserName, &item.ProjectID, &item.ProjectName,
 			&item.CustomerID, &item.CustomerName, &item.CustomerBuiltinKey); scanErr != nil {
 			return fmt.Errorf("scan worklog aggregate input: %w", scanErr)
@@ -229,6 +232,32 @@ func (r *TimeWorklogRepository) StreamAggregateInputs(ctx context.Context, filte
 		}
 	}
 	return rows.Err()
+}
+
+// ItemLifetimeMinutes returns stored booked minutes for the supplied items.
+// A missing key means no worklogs matched the project and reader filters.
+func (r *TimeWorklogRepository) ItemLifetimeMinutes(ctx context.Context, filter WorklogDetailFilter) (map[int]int64, error) {
+	totals := make(map[int]int64)
+	if len(filter.ItemIDs) == 0 || (filter.AccessibleProjectIDs != nil && len(filter.AccessibleProjectIDs) == 0) {
+		return totals, nil
+	}
+	filter.DateFromUnix, filter.DateToExclusiveUnix = nil, nil
+	where, args := worklogDetailWhere(filter)
+	rows, err := r.db.QueryContext(ctx, `SELECT w.item_id, SUM(w.duration_minutes)
+		FROM time_worklogs w JOIN time_projects p ON p.id = w.project_id `+where+` GROUP BY w.item_id`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("sum item worklogs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var id int
+		var minutes int64
+		if err := rows.Scan(&id, &minutes); err != nil {
+			return nil, fmt.Errorf("read item worklog sum: %w", err)
+		}
+		totals[id] = minutes
+	}
+	return totals, rows.Err()
 }
 
 // ListDetails returns joined worklogs ordered newest-first.
@@ -312,9 +341,19 @@ func worklogDetailWhere(filter WorklogDetailFilter) (query string, args []any) {
 		query += " AND w.project_id = ?"
 		args = append(args, *filter.ProjectID)
 	}
+	if filter.UserID != nil {
+		query += " AND w.user_id = ?"
+		args = append(args, *filter.UserID)
+	}
 	if filter.ItemID != nil {
 		query += " AND w.item_id = ?"
 		args = append(args, *filter.ItemID)
+	}
+	if len(filter.ItemIDs) > 0 {
+		query += " AND w.item_id IN (" + strings.TrimSuffix(strings.Repeat("?,", len(filter.ItemIDs)), ",") + ")"
+		for _, id := range filter.ItemIDs {
+			args = append(args, id)
+		}
 	}
 	if filter.DateFromUnix != nil {
 		query += " AND w.end_time > ?"
@@ -342,6 +381,7 @@ func (r *TimeWorklogRepository) GetDetail(worklogID int) (*models.Worklog, error
 // NewWorklog captures the fields needed to insert a worklog row. Date and
 // start/end times are unix seconds, matching the table's storage format.
 type NewWorklog struct {
+	RequestKey      string
 	ProjectID       int
 	UserID          int
 	ItemID          *int // nil when the worklog isn't linked to a work item
@@ -385,6 +425,7 @@ func (r *TimeWorklogRepository) CreateImported(in ImportedWorklog) (int64, error
 
 // UpdateWorklog captures the mutable fields of an existing worklog.
 type UpdateWorklog struct {
+	Expected        *models.Worklog
 	ID              int
 	ProjectID       int
 	ItemID          *int
@@ -397,15 +438,31 @@ type UpdateWorklog struct {
 
 // Update replaces a worklog's editable fields and stamps updated_at.
 func (r *TimeWorklogRepository) Update(in UpdateWorklog) error {
-	_, err := r.db.ExecWrite(`
+	query := `
 		UPDATE time_worklogs
 		SET project_id = ?, item_id = ?, description = ?, date = ?,
 		    start_time = ?, end_time = ?, duration_minutes = ?, updated_at = ?
 		WHERE id = ?
-	`, in.ProjectID, in.ItemID, in.Description, in.DateUnix,
-		in.StartTimeUnix, in.EndTimeUnix, in.DurationMinutes, time.Now().Unix(), in.ID)
+	`
+	args := []any{in.ProjectID, in.ItemID, in.Description, in.DateUnix,
+		in.StartTimeUnix, in.EndTimeUnix, in.DurationMinutes, time.Now().Unix(), in.ID}
+	if old := in.Expected; old != nil {
+		query += ` AND user_id = ? AND project_id = ? AND item_id IS NOT DISTINCT FROM ?
+			AND description = ? AND date = ? AND start_time = ? AND end_time = ? AND duration_minutes = ? AND updated_at = ?`
+		args = append(args, old.UserID, old.ProjectID, old.ItemID, old.Description, old.Date, old.StartTime, old.EndTime, old.DurationMins, old.UpdatedAt)
+	}
+	res, err := r.db.ExecWrite(query, args...)
 	if err != nil {
 		return fmt.Errorf("update worklog: %w", err)
+	}
+	if in.Expected != nil {
+		updated, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if updated != 1 {
+			return errors.New("worklog changed since it was read")
+		}
 	}
 	return nil
 }
@@ -437,17 +494,33 @@ func (r *TimeWorklogRepository) CreateDetail(in NewWorklog) (*models.Worklog, er
 	var worklog models.Worklog
 	err := database.WithTx(r.db, func(tx database.Tx) error {
 		var id int64
-		if err := tx.QueryRow(`
+		query := `
 			INSERT INTO time_worklogs (project_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-			in.ProjectID, in.UserID, in.ItemID, in.Description,
-			in.DateUnix, in.StartTimeUnix, in.EndTimeUnix, in.DurationMinutes, now, now,
-		).Scan(&id); err != nil {
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+		args := []any{in.ProjectID, in.UserID, in.ItemID, in.Description, in.DateUnix, in.StartTimeUnix, in.EndTimeUnix, in.DurationMinutes, now, now}
+		if in.RequestKey != "" {
+			query = `INSERT INTO time_worklogs (project_id, user_id, item_id, description, date, start_time, end_time, duration_minutes, created_at, updated_at, agent_request_key)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (user_id, agent_request_key) DO NOTHING RETURNING id`
+			args = append(args, in.RequestKey)
+		}
+		err := tx.QueryRow(query, args...).Scan(&id)
+		replayed := errors.Is(err, sql.ErrNoRows) && in.RequestKey != ""
+		if replayed {
+			err = tx.QueryRow("SELECT id FROM time_worklogs WHERE user_id=? AND agent_request_key=?", in.UserID, in.RequestKey).Scan(&id)
+		}
+		if err != nil {
 			return fmt.Errorf("create worklog: %w", err)
 		}
 		row, err := scanWorklogDetail(tx.QueryRow(worklogDetailSelect+"\nWHERE w.id = ?", id))
 		if err != nil {
 			return fmt.Errorf("read created worklog: %w", err)
+		}
+		if replayed {
+			sameItem := row.ItemID == nil && in.ItemID == nil || row.ItemID != nil && in.ItemID != nil && *row.ItemID == *in.ItemID
+			if !sameItem || row.ProjectID != in.ProjectID || row.Description != in.Description || row.Date != in.DateUnix ||
+				row.StartTime != in.StartTimeUnix || row.EndTime != in.EndTimeUnix || row.DurationMins != in.DurationMinutes {
+				return errors.New("worklog request key already used for a different entry")
+			}
 		}
 		worklog = row
 		return nil
@@ -462,12 +535,14 @@ func (r *TimeWorklogRepository) CreateDetail(in NewWorklog) (*models.Worklog, er
 // the corresponding filter. Date bounds are interval overlaps against the
 // stored start/end timestamps; the upper bound is exclusive.
 type WorklogListFilter struct {
-	UserID              int
-	DateFromUnix        *int64
-	DateToExclusiveUnix *int64
-	ProjectID           *int
-	Limit               int
-	Offset              int
+	UnlinkedOnly         bool
+	UserID               int
+	AccessibleProjectIDs []int
+	DateFromUnix         *int64
+	DateToExclusiveUnix  *int64
+	ProjectID            *int
+	Limit                int
+	Offset               int
 }
 
 // ListForUser returns a page of the user's worklogs, newest first, with the
@@ -475,6 +550,9 @@ type WorklogListFilter struct {
 // project budget figures) populated. The second return value is the total
 // match count before pagination.
 func (r *TimeWorklogRepository) ListForUser(f WorklogListFilter) ([]models.Worklog, int, error) {
+	if f.AccessibleProjectIDs != nil && len(f.AccessibleProjectIDs) == 0 {
+		return []models.Worklog{}, 0, nil
+	}
 	query := `SELECT w.id, w.project_id, c.id, w.item_id, w.description, w.date, w.start_time,
 	       w.end_time, w.duration_minutes, w.created_at, w.updated_at,
 	       c.name, COALESCE(c.builtin_key, ''), p.name, i.title, ws.id, ws.key, i.workspace_item_number,
@@ -499,6 +577,15 @@ func (r *TimeWorklogRepository) ListForUser(f WorklogListFilter) ([]models.Workl
 	if f.ProjectID != nil {
 		query += " AND w.project_id = ?"
 		qa = append(qa, *f.ProjectID)
+	}
+	if f.AccessibleProjectIDs != nil {
+		query += " AND w.project_id IN (" + strings.TrimSuffix(strings.Repeat("?,", len(f.AccessibleProjectIDs)), ",") + ")"
+		for _, id := range f.AccessibleProjectIDs {
+			qa = append(qa, id)
+		}
+	}
+	if f.UnlinkedOnly {
+		query += " AND w.item_id IS NULL"
 	}
 	query += " ORDER BY w.start_time DESC, w.id DESC"
 

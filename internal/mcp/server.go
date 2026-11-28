@@ -9,6 +9,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"windshift/internal/aitools"
 	"windshift/internal/auth"
 	"windshift/internal/database"
 	"windshift/internal/services"
@@ -26,6 +27,7 @@ type Deps struct {
 	ItemDeletionService    *services.ItemDeletionApplicationService
 	ItemApplicationService *services.ItemApplicationService
 	TimeWorklogService     *services.TimeWorklogService
+	ReadServices           *aitools.ReadServices
 	PageApplicationService *services.PageApplicationService
 	PageDiagramService     *services.PageDiagramService
 	// ActionService is the optional cache-invalidation hook used by the

@@ -2,6 +2,8 @@ package aitools
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -16,7 +18,9 @@ import (
 // ----------------------------------------------------------------------------
 
 type listTimeProjectsArgs struct {
-	Status string `json:"status,omitempty" jsonschema:"Filter by project status (e.g. 'Active', 'Archived')"`
+	Status       string `json:"status,omitempty" jsonschema:"Filter by project status (e.g. 'Active', 'Archived')"`
+	WorkspaceID  int    `json:"workspace_id,omitempty"`
+	BookableOnly bool   `json:"bookable_only,omitempty"`
 }
 
 type timeProjectDTO struct {
@@ -39,10 +43,12 @@ type listTimeProjectsOut struct {
 // ----------------------------------------------------------------------------
 
 type listWorklogsArgs struct {
-	DateFrom  string `json:"date_from,omitempty" jsonschema:"Start date (YYYY-MM-DD)"`
-	DateTo    string `json:"date_to,omitempty" jsonschema:"End date (YYYY-MM-DD)"`
-	ProjectID *int   `json:"project_id,omitempty" jsonschema:"Filter by project ID"`
-	Limit     int    `json:"limit,omitempty" jsonschema:"Max results (default 50)"`
+	UnlinkedOnly bool   `json:"unlinked_only,omitempty" jsonschema:"Return only entries without a linked task"`
+	Offset       int    `json:"offset,omitempty"`
+	DateFrom     string `json:"date_from,omitempty" jsonschema:"Start date (YYYY-MM-DD)"`
+	DateTo       string `json:"date_to,omitempty" jsonschema:"End date (YYYY-MM-DD)"`
+	ProjectID    *int   `json:"project_id,omitempty" jsonschema:"Filter by project ID"`
+	Limit        int    `json:"limit,omitempty" jsonschema:"Max results (default 50)"`
 }
 
 type worklogDTO struct {
@@ -58,7 +64,9 @@ type worklogDTO struct {
 }
 
 type listWorklogsOut struct {
-	Worklogs []worklogDTO `json:"worklogs"`
+	Worklogs   []worklogDTO `json:"worklogs"`
+	Total      int          `json:"total"`
+	NextOffset *int         `json:"next_offset,omitempty"`
 }
 
 type temporalContextArgs struct {
@@ -80,6 +88,7 @@ type temporalContextOut struct {
 // or explicit start_time/end_time, or numeric DurationMinutes). Exactly one
 // of those three options must be provided.
 type logTimeArgs struct {
+	IdempotencyKey  string `json:"idempotency_key,omitempty" jsonschema:"Reuse the same stable key when retrying the same booking"`
 	ProjectID       int    `json:"project_id" jsonschema:"Time project ID"`
 	Description     string `json:"description" jsonschema:"Description of the work done"`
 	Date            string `json:"date" jsonschema:"Date in YYYY-MM-DD format"`
@@ -93,6 +102,9 @@ type logTimeArgs struct {
 }
 
 type logTimeOut struct {
+	ItemID          *int   `json:"item_id,omitempty"`
+	ItemKey         string `json:"item_key,omitempty"`
+	URL             string `json:"url"`
 	ID              int64  `json:"id"`
 	ProjectID       int    `json:"project_id"`
 	ProjectName     string `json:"project_name,omitempty"`
@@ -184,12 +196,39 @@ func init() {
 			if accessibleIDs != nil && len(accessibleIDs) == 0 {
 				return listTimeProjectsOut{Projects: []timeProjectDTO{}}, nil
 			}
-			projects, err := repository.NewTimeProjectRepository(env.DB).ListDetails(accessibleIDs, args.Status)
+			var projects []repository.TimeProjectDetail
+			if args.WorkspaceID > 0 {
+				if !env.HasWorkspaceAccess(args.WorkspaceID) {
+					return nil, errors.New("workspace time projects are unavailable")
+				}
+				categories, err := repository.NewTimeProjectCategoryRepository(env.DB).ListIDsForWorkspace(args.WorkspaceID)
+				if err != nil {
+					return nil, err
+				}
+				workspaceProjects, err := repository.NewTimeProjectRepository(env.DB).ListDetailsFiltered(repository.TimeProjectListFilter{
+					AccessibleIDs: accessibleIDs, CategoryIDs: categories, Status: args.Status,
+				})
+				if err != nil {
+					return nil, err
+				}
+				projects = workspaceProjects
+			} else {
+				projects, err = repository.NewTimeProjectRepository(env.DB).ListDetails(accessibleIDs, args.Status)
+			}
 			if err != nil {
 				return nil, err
 			}
 			out := listTimeProjectsOut{Projects: []timeProjectDTO{}}
 			for _, project := range projects {
+				if args.BookableOnly {
+					bookable, err := env.timePermission().CanBookTimeOnProject(env.UserID, project.ID)
+					if err != nil {
+						return nil, err
+					}
+					if project.Status != "Active" || !bookable {
+						continue
+					}
+				}
 				out.Projects = append(out.Projects, timeProjectDTO{
 					ID: project.ID, Name: project.Name, Status: project.Status,
 					Description: project.Description, CustomerName: project.CustomerName,
@@ -208,14 +247,20 @@ func init() {
 		Risk:        RiskLow,
 		Description: "List the current user's time tracking worklogs with optional date and project filters.",
 		Scopes:      []string{auth.ScopeTimeRead},
-		Run: func(_ context.Context, env *Env, args listWorklogsArgs) (any, error) {
+		Run: func(ctx context.Context, env *Env, args listWorklogsArgs) (any, error) {
 			limit := args.Limit
 			if limit <= 0 || limit > 200 {
 				limit = 50
 			}
-			filter := repository.WorklogListFilter{UserID: env.UserID, ProjectID: args.ProjectID, Limit: limit}
+			projects, err := env.timePermission().GetAccessibleProjectsContext(ctx, env.UserID)
+			if err != nil {
+				return nil, err
+			}
+			filter := repository.WorklogListFilter{UserID: env.UserID, ProjectID: args.ProjectID, AccessibleProjectIDs: projects,
+				Limit: limit, Offset: max(args.Offset, 0), UnlinkedOnly: args.UnlinkedOnly}
+			_, loc := services.ResolveTimezoneOrUTC(env.Timezone)
 			if args.DateFrom != "" {
-				start, _, err := services.CivilDateRangeUTC(args.DateFrom, args.DateFrom, time.UTC)
+				start, _, err := services.CivilDateRangeUTC(args.DateFrom, args.DateFrom, loc)
 				if err != nil {
 					return map[string]string{"error": "invalid date_from format, use YYYY-MM-DD"}, nil //nolint:nilerr // Tool validation errors use response payloads.
 				}
@@ -223,18 +268,24 @@ func init() {
 				filter.DateFromUnix = &from
 			}
 			if args.DateTo != "" {
-				_, endExclusive, err := services.CivilDateRangeUTC(args.DateTo, args.DateTo, time.UTC)
+				_, endExclusive, err := services.CivilDateRangeUTC(args.DateTo, args.DateTo, loc)
 				if err != nil {
 					return map[string]string{"error": "invalid date_to format, use YYYY-MM-DD"}, nil //nolint:nilerr // Tool validation errors use response payloads.
 				}
 				to := endExclusive.Unix()
 				filter.DateToExclusiveUnix = &to
 			}
-			worklogs, _, err := repository.NewTimeWorklogRepository(env.DB).ListForUser(filter)
+			if filter.DateFromUnix != nil && filter.DateToExclusiveUnix != nil && *filter.DateFromUnix >= *filter.DateToExclusiveUnix {
+				return map[string]string{"error": "date_from must be on or before date_to"}, nil
+			}
+			worklogs, total, err := repository.NewTimeWorklogRepository(env.DB).ListForUser(filter)
 			if err != nil {
 				return nil, err
 			}
-			out := listWorklogsOut{Worklogs: []worklogDTO{}}
+			out := listWorklogsOut{Worklogs: []worklogDTO{}, Total: total}
+			if next := filter.Offset + len(worklogs); len(worklogs) > 0 && next < total {
+				out.NextOffset = &next
+			}
 			for _, worklog := range worklogs {
 				result := worklogDTO{
 					ID: worklog.ID, ProjectID: worklog.ProjectID, ProjectName: worklog.ProjectName,
@@ -301,10 +352,19 @@ func init() {
 			if toolErr != nil {
 				return toolErr, nil
 			}
+			requestKey := args.IdempotencyKey
+			if len(requestKey) > 200 {
+				return nil, errors.New("idempotency_key may not exceed 200 bytes")
+			}
+			if requestKey == "" && env.RunID > 0 {
+				body, _ := json.Marshal(args)
+				requestKey = fmt.Sprintf("chat-run/%d/%x", env.RunID, sha256.Sum256(body))
+			}
 			// Route through the shared worklog service so the description policy and
 			// warnings match the HTTP surfaces. PreserveStored keeps the interval
 			// already parsed above instead of re-deriving it.
 			result, err := env.timeWorklogService().Create(env.UserID, services.WorklogMutationInput{
+				RequestKey:      requestKey,
 				ProjectID:       args.ProjectID,
 				ItemID:          itemID,
 				Description:     args.Description,
@@ -321,6 +381,9 @@ func init() {
 			}
 			env.AuditWrite(resourceTimeWorklog, result.Worklog.ID, "log_time", result.Worklog.Description)
 			return logTimeOut{
+				ItemID:          result.Worklog.ItemID,
+				ItemKey:         itemKeyFromWorklog(result.Worklog),
+				URL:             worklogURL(result.Worklog.ID),
 				ID:              int64(result.Worklog.ID),
 				ProjectID:       args.ProjectID,
 				ProjectName:     project.Name,

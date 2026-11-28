@@ -138,8 +138,10 @@ const (
 
 	// Approvals. Workflow configuration uses workflows:*; these scopes cover
 	// live approval requests and decisions.
-	ScopeApprovalsRead  = "approvals:read"
-	ScopeApprovalsWrite = "approvals:write"
+	ScopeApprovalsRead     = "approvals:read"
+	ScopeApprovalsWrite    = "approvals:write"
+	ScopeNotificationsRead = "notifications:read"
+	ScopeReviewsRead       = "reviews:read"
 
 	// Work item templates (WI-438): workspace-defined reusable bodies that
 	// pre-fill a new item's description. :read covers list/get (agents discover
@@ -266,6 +268,8 @@ var scopeCatalog = []ScopeInfo{
 
 	{Scope: ScopeApprovalsRead, Resource: "approvals", ResourceLabel: "Approvals", Action: "read", Label: "Read approvals", Description: "Read approval requests visible to the token owner."},
 	{Scope: ScopeApprovalsWrite, Resource: "approvals", ResourceLabel: "Approvals", Action: "write", Label: "Act on approvals", Description: "Decide, cancel, delegate, refresh, or escalate approval requests."},
+	{Scope: ScopeNotificationsRead, Resource: "notifications", ResourceLabel: "Notifications", Action: "read", Label: "Read your notifications", Description: "Read the token owner's notification inbox."},
+	{Scope: ScopeReviewsRead, Resource: "reviews", ResourceLabel: "Personal reviews", Action: "read", Label: "Read your reviews", Description: "Read the token owner's daily and weekly review notes."},
 
 	{Scope: ScopeMCPAccess, Resource: "mcp", ResourceLabel: "MCP server", Action: "access", Label: "Connect to the MCP server", Description: "Open the MCP transport. Each tool still requires the resource scopes above.", AgentDefault: true},
 

@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
 	"windshift/internal/aitooladapter"
 	"windshift/internal/aitools"
-	"windshift/internal/auth"
 	"windshift/internal/itemevents"
 	"windshift/internal/llm"
 	"windshift/internal/models"
@@ -537,12 +537,23 @@ type ChatMessage struct {
 // an authorization input — workspace access is re-checked inside each tool
 // from the authenticated user's accessibleWorkspaceIDs.
 type ChatContext struct {
-	View        string `json:"view,omitempty"`
-	WorkspaceID int    `json:"workspace_id,omitempty"`
-	ActionID    int    `json:"action_id,omitempty"`
-	PageID      int    `json:"page_id,omitempty"`
-	ItemID      int    `json:"item_id,omitempty"`
-	ItemKey     string `json:"item_key,omitempty"`
+	View           string `json:"view,omitempty"`
+	WorkspaceID    int    `json:"workspace_id,omitempty"`
+	ActionID       int    `json:"action_id,omitempty"`
+	PageID         int    `json:"page_id,omitempty"`
+	ItemID         int    `json:"item_id,omitempty"`
+	ItemKey        string `json:"item_key,omitempty"`
+	CollectionID   int    `json:"collection_id,omitempty"`
+	IterationID    int    `json:"iteration_id,omitempty"`
+	MilestoneID    int    `json:"milestone_id,omitempty"`
+	TestRunID      int    `json:"test_run_id,omitempty"`
+	QueueID        int    `json:"queue_id,omitempty"`
+	QueueKey       string `json:"queue_key,omitempty"`
+	TimeProjectID  int    `json:"project_id,omitempty"`
+	TimeCustomerID int    `json:"customer_id,omitempty"`
+	TimeMineOnly   bool   `json:"mine_only,omitempty"`
+	DateFrom       string `json:"date_from,omitempty"`
+	DateTo         string `json:"date_to,omitempty"`
 }
 
 // ChatRequest is the request body for the agentic chat endpoint.
@@ -558,6 +569,9 @@ type ChatRequest struct {
 	History []ChatMessage `json:"history,omitempty"`
 	Context *ChatContext  `json:"context,omitempty"`
 }
+
+var chatItemKeyPattern = regexp.MustCompile(`^[A-Za-z0-9]{2,10}-\d{1,19}$`)
+var chatQueueKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,49}$`)
 
 // buildChatContextHint returns the extra system-prompt text for the caller's
 // current location, or "" when no surface-specific nudge applies. Kept as a
@@ -594,58 +608,61 @@ func buildChatContextHint(ctx *ChatContext) string {
 			)
 		}
 	case "item-detail":
-		if ctx.ItemKey != "" {
+		if chatItemKeyPattern.MatchString(ctx.ItemKey) {
 			return fmt.Sprintf(
-				"\n\nThe user is currently viewing work item %s. If they ask you to read, summarize, or change the current item, call get_item with item_key=%q before answering or mutating. Use update_item with item_key=%q for field changes, transition_item with item_key=%q for status changes, add_comment with item_key=%q for comments, and get_item_children if they ask about sub-tasks. After a mutating tool succeeds, do not call it again; summarize the completed change to the user.",
-				ctx.ItemKey, ctx.ItemKey, ctx.ItemKey, ctx.ItemKey, ctx.ItemKey,
+				"\n\nThe user is currently viewing work item %s. For effort or outcome questions call get_task_delivery_summary with item_keys=[%q]. For other item details or before an edit, call get_item with item_key=%q. Use update_item with item_key=%q for field changes, transition_item with item_key=%q for status changes, add_comment with item_key=%q for comments, and get_item_hierarchy for subtasks.",
+				ctx.ItemKey, ctx.ItemKey, ctx.ItemKey, ctx.ItemKey, ctx.ItemKey, ctx.ItemKey,
 			)
 		}
 		if ctx.ItemID > 0 {
 			location := fmt.Sprintf("work item %d", ctx.ItemID)
 			if ctx.WorkspaceID > 0 {
-				location = fmt.Sprintf("work item %d in workspace %d", ctx.ItemID, ctx.WorkspaceID)
+				location += fmt.Sprintf(" in workspace %d", ctx.WorkspaceID)
 			}
 			return fmt.Sprintf(
-				"\n\nThe user is currently viewing %s. If they ask you to read, summarize, or change the current item, call get_item with item_id=%d before answering or mutating. Use update_item with item_id=%d for field changes, transition_item with item_id=%d for status changes, add_comment with item_id=%d for comments, and get_item_children if they ask about sub-tasks. After a mutating tool succeeds, do not call it again; summarize the completed change to the user.",
-				location, ctx.ItemID, ctx.ItemID, ctx.ItemID, ctx.ItemID,
+				"\n\nThe user is currently viewing %s. For effort or outcome questions call get_task_delivery_summary with item_ids=[%d]. For other item details or before an edit, call get_item with item_id=%d. Use update_item with item_id=%d for field changes, transition_item with item_id=%d for status changes, add_comment with item_id=%d for comments, and get_item_hierarchy for subtasks.",
+				location, ctx.ItemID, ctx.ItemID, ctx.ItemID, ctx.ItemID, ctx.ItemID,
 			)
 		}
+	case "workspace-board", "collection-board", "workspace-backlog", "collection-backlog", "workspace-list", "collection-list", "workspace-roadmap", "collection-roadmap":
+		if ctx.CollectionID > 0 {
+			return fmt.Sprintf("\n\nThe current view uses collection_id=%d. Use list_collection_items for its items, and get_delivery_effort_report for booked effort on the view.", ctx.CollectionID)
+		}
+		if ctx.WorkspaceID > 0 {
+			return fmt.Sprintf("\n\nThe current planning view is in workspace_id=%d. Use it for questions about this view.", ctx.WorkspaceID)
+		}
+	case "workspace-queue":
+		key := ctx.QueueKey
+		if !chatQueueKeyPattern.MatchString(key) {
+			key = ""
+		}
+		return fmt.Sprintf("\n\nThe user is on the support queue (workspace_id=%d, collection_id=%d, queue_id=%d, queue_key=%q). Omit zero/empty identifiers. Resolve the visible queue with list_queues before using list_queue_items.", ctx.WorkspaceID, ctx.CollectionID, ctx.QueueID, key)
+	case "iteration-detail", "iteration-dependencies":
+		if ctx.IterationID > 0 {
+			return fmt.Sprintf("\n\nThe current sprint/iteration has iteration_id=%d. Use get_iteration_progress for progress and get_delivery_effort_report for booked effort.", ctx.IterationID)
+		}
+	case "milestone-detail":
+		if ctx.MilestoneID > 0 {
+			return fmt.Sprintf("\n\nThe current milestone has milestone_id=%d. Use get_milestone_progress for progress.", ctx.MilestoneID)
+		}
+	case "test-run-detail", "test-run-summary-print", "test-execution":
+		if ctx.TestRunID > 0 && ctx.WorkspaceID > 0 {
+			return fmt.Sprintf("\n\nThe current QA run has run_id=%d in workspace_id=%d. Use get_test_run for its recorded results.", ctx.TestRunID, ctx.WorkspaceID)
+		}
+	case "test-reports":
+		if ctx.WorkspaceID > 0 {
+			return fmt.Sprintf("\n\nThe current QA reports are in workspace_id=%d. Use get_test_reports_summary for recorded test results and trends.", ctx.WorkspaceID)
+		}
+	case "time", "time-report-print":
+		from, fromErr := time.Parse(time.DateOnly, ctx.DateFrom)
+		to, toErr := time.Parse(time.DateOnly, ctx.DateTo)
+		if fromErr != nil || toErr != nil || from.After(to) {
+			return "\n\nThe user is in time tracking. Use get_active_timer for the current timer. Resolve the date range before running get_worklog_totals."
+		}
+		return fmt.Sprintf("\n\nThe user is in time tracking. For totals matching this report, use get_worklog_totals with project_id=%d, customer_id=%d, mine_only=%t, from=%q, and to=%q. Omit unset IDs and resolve missing dates before running the report.",
+			ctx.TimeProjectID, ctx.TimeCustomerID, ctx.TimeMineOnly, from.Format(time.DateOnly), to.Format(time.DateOnly))
 	}
 	return ""
-}
-
-func chatTerminalTools() map[string]bool {
-	return map[string]bool{
-		"add_comment":            true,
-		"add_link":               true,
-		"archive_page":           true,
-		"create_action":          true,
-		"create_diagram":         true,
-		"create_item":            true,
-		"create_page":            true,
-		"delete_comment":         true,
-		"delete_diagram":         true,
-		"delete_item":            true,
-		"end_test_run":           true,
-		"grant_page_permission":  true,
-		"log_time":               true,
-		"move_page":              true,
-		"record_test_result":     true,
-		"remove_link":            true,
-		"restore_page_revision":  true,
-		"revoke_page_permission": true,
-		"set_item_labels":        true,
-		"set_page_inheritance":   true,
-		"start_test_run":         true,
-		"start_timer":            true,
-		"stop_timer":             true,
-		"transition_item":        true,
-		"update_action":          true,
-		"update_comment":         true,
-		"update_diagram":         true,
-		"update_item":            true,
-		"update_page":            true,
-	}
 }
 
 // ChatResponse is the response from the agentic chat endpoint.
@@ -902,6 +919,7 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		ActionService:          h.actionService,
 		ItemApplication:        h.itemApplication,
 		TimeWorklogService:     h.timeWorklogService,
+		ReadServices:           h.toolReads,
 		PageApplicationService: h.pageApplicationService,
 		PageDiagramService:     h.pageDiagramService,
 	}
@@ -1113,13 +1131,7 @@ func (h *AIHandler) prepareChatMode(ctx context.Context, user *models.User, sess
 			}
 			runWorkspaceID = chatCtx.WorkspaceID
 		}
-		// The chat runs on the caller's cookie session, not an API token, so
-		// there is no scope set to read off a credential. Gate it on
-		// DefaultAgentScopes anyway (WI-962) so one agent surface can't quietly
-		// do more than another: what chat can reach now matches what a `ws` CLI
-		// or MCP token reaches by default. Per-workspace permission checks
-		// inside each tool still apply on top.
-		entries := aitooladapter.EntriesForScopes(aitools.Default, auth.DefaultAgentScopes)
+		entries := aitooladapter.EntriesForGeneralChat(aitools.Default)
 		toolNames := make([]string, 0, len(entries))
 		for _, entry := range entries {
 			toolNames = append(toolNames, entry.Name)
@@ -1138,7 +1150,7 @@ func (h *AIHandler) prepareChatMode(ctx context.Context, user *models.User, sess
 			source:                 aitools.SourceAIChat,
 			accessibleWorkspaceIDs: append([]int(nil), accessibleWSIDs...),
 			entries:                entries,
-			terminalTools:          chatTerminalTools(),
+			terminalTools:          aitooladapter.TerminalTools(entries),
 		}, nil
 	}
 	if session.SessionType != models.AgentSessionStandard ||

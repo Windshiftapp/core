@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"time"
 
@@ -26,6 +27,8 @@ func (e worklogInputError) Unwrap() error { return ErrWorklogInvalidInput }
 
 // WorklogMutationInput is the common create/full-update worklog contract.
 type WorklogMutationInput struct {
+	RequestKey      string
+	Expected        *models.Worklog
 	ProjectID       int
 	ItemID          *int
 	Description     string
@@ -73,7 +76,8 @@ func (s *TimeWorklogService) Create(userID int, input WorklogMutationInput) (*Wo
 		return nil, err
 	}
 	worklog, err := s.worklogs.CreateDetail(repository.NewWorklog{
-		ProjectID: input.ProjectID, UserID: userID,
+		RequestKey: input.RequestKey,
+		ProjectID:  input.ProjectID, UserID: userID,
 		ItemID: input.ItemID, Description: prepared.description, DateUnix: WorklogDateUnix(prepared.date),
 		StartTimeUnix: prepared.startUnix, EndTimeUnix: prepared.endUnix, DurationMinutes: prepared.durationMinutes,
 	})
@@ -90,7 +94,8 @@ func (s *TimeWorklogService) Update(userID, worklogID int, input WorklogMutation
 		return nil, err
 	}
 	if err := s.worklogs.Update(repository.UpdateWorklog{
-		ID: worklogID, ProjectID: input.ProjectID,
+		Expected: input.Expected,
+		ID:       worklogID, ProjectID: input.ProjectID,
 		ItemID: input.ItemID, Description: prepared.description, DateUnix: WorklogDateUnix(prepared.date),
 		StartTimeUnix: prepared.startUnix, EndTimeUnix: prepared.endUnix, DurationMinutes: prepared.durationMinutes,
 	}); err != nil {
@@ -172,15 +177,19 @@ type WorklogAggregate struct {
 // key (YYYY-MM-DD) in the location. It mirrors the frontend utility
 // (splitWorklogMinutesByDay) exactly — including midnight splitting and
 // half-open boundaries — so server aggregates and legacy client math agree.
-func SplitWorklogMinutesByDay(start, end int64, location *time.Location) []struct {
+func SplitWorklogMinutesByDay(start, end int64, location *time.Location) []worklogDayMinutes {
+	return splitWorklogMinutesByDay(start, end, location, func(from, to int64) int64 {
+		return (to - from + 30) / 60
+	})
+}
+
+type worklogDayMinutes = struct {
 	Day     string
 	Minutes int64
-} {
-	type daySlice = struct {
-		Day     string
-		Minutes int64
-	}
-	slices := []daySlice{}
+}
+
+func splitWorklogMinutesByDay(start, end int64, location *time.Location, booked func(from, to int64) int64) []worklogDayMinutes {
+	slices := []worklogDayMinutes{}
 	if end <= start {
 		return slices
 	}
@@ -196,18 +205,29 @@ func SplitWorklogMinutesByDay(start, end int64, location *time.Location) []struc
 		if endT.Before(sliceEnd) {
 			sliceEnd = endT
 		}
-		minutes := int64(sliceEnd.Sub(cursor).Minutes() + 0.5)
+		minutes := booked(cursor.Unix(), sliceEnd.Unix())
 		if minutes > 0 {
-			slices = append(slices, daySlice{Day: cursor.Format("2006-01-02"), Minutes: minutes})
+			slices = append(slices, worklogDayMinutes{Day: cursor.Format(time.DateOnly), Minutes: minutes})
 		}
 		cursor = sliceEnd
 	}
 	return slices
 }
 
-// Aggregate reduces the filtered worklogs to (day, user, project, customer)
-// split-minute groups and (user, project, customer) duration/entry totals so
-// reports render without fetching every raw row.
+// BookedMinutesInRange apportions stored minutes by elapsed time. Rounding
+// cumulative positions gives adjacent ranges consistent shares of a worklog.
+func BookedMinutesInRange(start, end int64, minutes int, from, to int64) int64 {
+	if end <= start || minutes <= 0 || from >= to {
+		return 0
+	}
+	elapsed := end - start
+	portion := func(bound int64) int64 {
+		seconds := min(max(bound, start), end) - start
+		return int64(math.Round(float64(seconds) * float64(minutes) / float64(elapsed)))
+	}
+	return portion(to) - portion(from)
+}
+
 // Aggregate reduces the filtered worklogs to (day, user, project, customer)
 // split-minute groups and (user, project, customer) duration/entry totals so
 // reports render without fetching every raw row. Rows stream from the
@@ -225,7 +245,25 @@ func (s *TimeWorklogService) Aggregate(ctx context.Context, filter repository.Wo
 	totals := make([]WorklogTotalAggregate, 0)
 
 	reduce := func(input *repository.WorklogAggregateInput) error {
-		for _, slice := range SplitWorklogMinutesByDay(input.StartTimeUnix, input.EndTimeUnix, location) {
+		start, end := input.StartTimeUnix, input.EndTimeUnix
+		minutes := int64(input.DurationMinutes)
+		var days []worklogDayMinutes
+		if filter.ClipToDateRange {
+			if filter.DateFromUnix != nil {
+				start = max(start, *filter.DateFromUnix)
+			}
+			if filter.DateToExclusiveUnix != nil {
+				end = min(end, *filter.DateToExclusiveUnix)
+			}
+			booked := func(from, to int64) int64 {
+				return BookedMinutesInRange(input.StartTimeUnix, input.EndTimeUnix, input.DurationMinutes, from, to)
+			}
+			minutes = booked(start, end)
+			days = splitWorklogMinutesByDay(start, end, location, booked)
+		} else {
+			days = SplitWorklogMinutesByDay(start, end, location)
+		}
+		for _, slice := range days {
 			key := WorklogDailyAggregate{
 				Day: slice.Day, UserID: input.UserID, UserName: input.UserName,
 				ProjectID: input.ProjectID, ProjectName: input.ProjectName,
@@ -251,11 +289,11 @@ func (s *TimeWorklogService) Aggregate(ctx context.Context, filter repository.Wo
 		idx, ok := totalIndex[key]
 		if !ok {
 			totalIndex[key] = len(totals)
-			key.DurationMinutes = int64(input.DurationMinutes)
+			key.DurationMinutes = minutes
 			key.Entries = 1
 			totals = append(totals, key)
 		} else {
-			totals[idx].DurationMinutes += int64(input.DurationMinutes)
+			totals[idx].DurationMinutes += minutes
 			totals[idx].Entries++
 		}
 		return nil
