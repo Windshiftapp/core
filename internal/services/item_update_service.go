@@ -184,7 +184,7 @@ func (s *ItemUpdateService) AddMilestone(req UpdateItemRequest, milestoneID int)
 	}
 
 	now := time.Now()
-	inserted, err := insertItemMilestone(tx, req.ItemID, milestoneID, now)
+	inserted, err := repository.NewMilestoneAttachRepository(s.db).AddItemMilestoneTx(tx, req.ItemID, milestoneID)
 	if err != nil {
 		return nil, false, err
 	}
@@ -258,22 +258,6 @@ func (s *ItemUpdateService) finishUnchangedMilestoneUpdate(
 		return nil, false, fmt.Errorf("failed to load %s item: %w", loadKind, err)
 	}
 	return &UpdateItemResult{OriginalItem: originalItem, Item: current}, false, nil
-}
-
-func insertItemMilestone(tx database.Tx, itemID, milestoneID int, now time.Time) (bool, error) {
-	result, err := tx.Exec(`
-		INSERT INTO item_milestones (item_id, milestone_id, created_at)
-		VALUES (?, ?, ?)
-		ON CONFLICT(item_id, milestone_id) DO NOTHING
-	`, itemID, milestoneID, now)
-	if err != nil {
-		return false, fmt.Errorf("failed to attach milestone %d: %w", milestoneID, err)
-	}
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return false, fmt.Errorf("failed to inspect milestone attachment: %w", err)
-	}
-	return rowsAffected > 0, nil
 }
 
 func (s *ItemUpdateService) recordMilestoneAddition(
