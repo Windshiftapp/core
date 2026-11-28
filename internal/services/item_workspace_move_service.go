@@ -647,7 +647,7 @@ func (s *ItemWorkspaceMoveService) MoveContext(ctx context.Context, itemID, acto
 	if err != nil {
 		return nil, err
 	}
-	oldMilestoneIDs, newMilestoneIDs, err := dropMoveWorkspaceMilestones(tx, itemID)
+	oldMilestoneIDs, newMilestoneIDs, err := s.dropMoveWorkspaceMilestones(ctx, tx, itemID)
 	if err != nil {
 		return nil, err
 	}
@@ -835,16 +835,13 @@ func (s *ItemWorkspaceMoveService) validateWorkflowGuards(ctx context.Context, i
 // dropMoveWorkspaceMilestones removes the item from its workspace milestones,
 // which belong to the workspace it leaves. Global milestone memberships stay.
 // It returns the item's sorted milestone IDs before and after.
-func dropMoveWorkspaceMilestones(tx database.Tx, itemID int) (before, after []int, err error) {
+func (s *ItemWorkspaceMoveService) dropMoveWorkspaceMilestones(ctx context.Context, tx database.Tx, itemID int) (before, after []int, err error) {
 	before, err = readItemMilestoneIDsForHistory(tx, itemID)
 	if err != nil {
 		return nil, nil, err
 	}
-	if _, err := tx.Exec(`
-		DELETE FROM item_milestones
-		WHERE item_id = ? AND milestone_id IN (SELECT id FROM milestones WHERE is_global = false)
-	`, itemID); err != nil {
-		return nil, nil, fmt.Errorf("clear workspace milestones: %w", err)
+	if err := repository.NewMilestoneAttachRepository(s.db).RemoveWorkspaceMilestonesTx(ctx, tx, itemID); err != nil {
+		return nil, nil, err
 	}
 	after, err = readItemMilestoneIDsForHistory(tx, itemID)
 	if err != nil {

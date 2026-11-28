@@ -124,19 +124,13 @@ func (u *itemUpdateOperation) replaceMilestones() error {
 		return err
 	}
 	u.milestoneOldIDs = oldIDs
-	if _, err := u.tx.Exec("DELETE FROM item_milestones WHERE item_id = ?", u.req.ItemID); err != nil {
-		return fmt.Errorf("failed to clear item_milestones: %w", err)
-	}
+	newIDs := make([]int, 0, len(u.updated.Milestones))
 	for _, milestone := range u.updated.Milestones {
-		u.milestoneNewIDs = append(u.milestoneNewIDs, milestone.ID)
-		if _, err := u.tx.Exec(
-			"INSERT INTO item_milestones (item_id, milestone_id, created_at) VALUES (?, ?, ?)",
-			u.req.ItemID,
-			milestone.ID,
-			u.now,
-		); err != nil {
-			return fmt.Errorf("failed to attach milestone %d: %w", milestone.ID, err)
-		}
+		newIDs = append(newIDs, milestone.ID)
+	}
+	u.milestoneNewIDs = newIDs
+	if err := repository.NewMilestoneAttachRepository(u.service.db).ReplaceItemMilestonesTx(u.ctx, u.tx, u.req.ItemID, newIDs); err != nil {
+		return err
 	}
 	u.milestonesChanged = joinIntsCSV(u.milestoneOldIDs) != joinIntsCSV(u.milestoneNewIDs)
 	return nil

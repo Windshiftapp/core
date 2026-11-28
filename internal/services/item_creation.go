@@ -345,14 +345,9 @@ func (c *itemCreation) insertRow(tx database.Tx, itemNumber int, fracIndex strin
 }
 
 func (c *itemCreation) extendTransaction(tx database.Tx, itemID int) error {
-	for _, milestoneID := range c.params.MilestoneIDs {
-		if _, err := tx.Exec(
-			"INSERT INTO item_milestones (item_id, milestone_id, created_at) VALUES (?, ?, ?)",
-			itemID,
-			milestoneID,
-			c.now,
-		); err != nil {
-			return fmt.Errorf("failed to attach milestone %d to new item: %w", milestoneID, err)
+	if len(c.params.MilestoneIDs) > 0 {
+		if err := repository.NewMilestoneAttachRepository(c.db).ReplaceItemMilestonesTx(c.ctx, tx, itemID, c.params.MilestoneIDs); err != nil {
+			return err
 		}
 	}
 	if len(c.params.LabelIDs) > 0 {

@@ -64,18 +64,8 @@ func (r *MilestoneAttachRepository) ReplaceItemMilestones(itemID int, milestoneI
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if _, err := tx.Exec("DELETE FROM item_milestones WHERE item_id = ?", itemID); err != nil {
-		return fmt.Errorf("delete existing item_milestones for item %d: %w", itemID, err)
-	}
-
-	now := time.Now()
-	for _, milestoneID := range milestoneIDs {
-		if _, err := tx.Exec(
-			"INSERT INTO item_milestones (item_id, milestone_id, created_at) VALUES (?, ?, ?)",
-			itemID, milestoneID, now,
-		); err != nil {
-			return fmt.Errorf("add milestone %d to item %d: %w", milestoneID, itemID, err)
-		}
+	if err := r.ReplaceItemMilestonesTx(context.Background(), tx, itemID, milestoneIDs); err != nil {
+		return err
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit replace item milestones: %w", err)
@@ -88,10 +78,11 @@ func (r *MilestoneAttachRepository) ReplaceItemMilestonesTx(ctx context.Context,
 	if _, err := tx.ExecContext(ctx, "DELETE FROM item_milestones WHERE item_id = ?", itemID); err != nil {
 		return fmt.Errorf("delete milestones for item %d: %w", itemID, err)
 	}
+	now := time.Now()
 	for _, milestoneID := range milestoneIDs {
 		if _, err := tx.ExecContext(ctx,
 			"INSERT INTO item_milestones (item_id, milestone_id, created_at) VALUES (?, ?, ?)",
-			itemID, milestoneID, time.Now()); err != nil {
+			itemID, milestoneID, now); err != nil {
 			return fmt.Errorf("attach milestone %d to item %d: %w", milestoneID, itemID, err)
 		}
 	}
@@ -101,27 +92,87 @@ func (r *MilestoneAttachRepository) ReplaceItemMilestonesTx(ctx context.Context,
 // AddItemMilestone attaches a milestone to an item. Returns ErrDuplicateEntry
 // when the pair already exists (the table has a unique constraint).
 func (r *MilestoneAttachRepository) AddItemMilestone(itemID, milestoneID int) error {
-	_, err := r.db.ExecWrite(
-		"INSERT INTO item_milestones (item_id, milestone_id, created_at) VALUES (?, ?, ?)",
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin add item milestone: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	inserted, err := r.AddItemMilestoneTx(tx, itemID, milestoneID)
+	if err != nil {
+		return err
+	}
+	if !inserted {
+		return ErrDuplicateEntry
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit add milestone %d to item %d: %w", milestoneID, itemID, err)
+	}
+	return nil
+}
+
+// AddItemMilestoneTx attaches one milestone inside the caller's transaction and
+// reports whether it inserted a row. An existing pair is a no-op instead of an
+// error so the caller's transaction stays usable on PostgreSQL.
+func (r *MilestoneAttachRepository) AddItemMilestoneTx(tx database.Tx, itemID, milestoneID int) (bool, error) {
+	result, err := tx.Exec(
+		"INSERT INTO item_milestones (item_id, milestone_id, created_at) VALUES (?, ?, ?) ON CONFLICT(item_id, milestone_id) DO NOTHING",
 		itemID, milestoneID, time.Now(),
 	)
 	if err != nil {
-		if database.IsUniqueConstraintError(err) {
-			return ErrDuplicateEntry
-		}
-		return fmt.Errorf("add milestone %d to item %d: %w", milestoneID, itemID, err)
+		return false, fmt.Errorf("add milestone %d to item %d: %w", milestoneID, itemID, err)
 	}
-	return nil
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("read attached milestone count for item %d: %w", itemID, err)
+	}
+	return rows > 0, nil
 }
 
 // RemoveItemMilestone detaches a milestone from an item. No-ops silently when
 // the pair isn't there.
 func (r *MilestoneAttachRepository) RemoveItemMilestone(itemID, milestoneID int) error {
-	if _, err := r.db.ExecWrite(
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin remove item milestone: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := r.RemoveItemMilestoneTx(tx, itemID, milestoneID); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit remove milestone %d from item %d: %w", milestoneID, itemID, err)
+	}
+	return nil
+}
+
+// RemoveItemMilestoneTx detaches one milestone inside the caller's transaction
+// and reports whether it removed a row.
+func (r *MilestoneAttachRepository) RemoveItemMilestoneTx(tx database.Tx, itemID, milestoneID int) (bool, error) {
+	result, err := tx.Exec(
 		"DELETE FROM item_milestones WHERE item_id = ? AND milestone_id = ?",
 		itemID, milestoneID,
-	); err != nil {
-		return fmt.Errorf("remove milestone %d from item %d: %w", milestoneID, itemID, err)
+	)
+	if err != nil {
+		return false, fmt.Errorf("remove milestone %d from item %d: %w", milestoneID, itemID, err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("read removed milestone count for item %d: %w", itemID, err)
+	}
+	return rows > 0, nil
+}
+
+// RemoveWorkspaceMilestonesTx detaches the workspace-owned milestones from an
+// item inside the caller's transaction. Global milestone memberships stay: a
+// workspace move only leaves the milestones of the workspace it migrates from.
+func (r *MilestoneAttachRepository) RemoveWorkspaceMilestonesTx(ctx context.Context, tx database.Tx, itemID int) error {
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM item_milestones
+		WHERE item_id = ? AND milestone_id IN (SELECT id FROM milestones WHERE is_global = false)
+	`, itemID); err != nil {
+		return fmt.Errorf("remove workspace milestones from item %d: %w", itemID, err)
 	}
 	return nil
 }
