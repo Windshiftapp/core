@@ -2078,6 +2078,9 @@ func (s *Server) initialize() error {
 		routeDeps.AuthMiddleware.RequireAuth(http.HandlerFunc(customWidgetDataHandler.ResolveCustomWidgetData)))
 	catalogMutations := services.NewCatalogMutationService(s.db, permService, workflowService)
 	governanceApplication := services.NewGovernanceApplicationService(s.db, permService, approvalSetService, approvalService)
+	itemAttachments := services.NewItemAttachmentService(s.db, attachmentStorage, permService)
+	timeProjectApplication := services.NewTimeProjectApplicationService(s.db, timePermissionService, v2Access)
+	catalogApplication := services.NewCatalogReadService(s.db, permService, v2Access, s.activityTracker)
 	v2Deps := v2.Deps{
 		PasskeyLoginLimiter: s.fidoRateLimiter,
 		CustomerAccess:      customerAccessHandler,
@@ -2094,7 +2097,7 @@ func (s *Server) initialize() error {
 		Workflows:           workflowService,
 		Configuration:       services.NewConfigReadService(s.db),
 		ObjectTranslations:  objectTranslationService,
-		Catalog:             services.NewCatalogReadService(s.db, permService, v2Access, s.activityTracker),
+		Catalog:             catalogApplication,
 		CatalogMutations:    catalogMutations,
 		CustomFieldProvisioning: services.NewCustomFieldProvisioningService(s.db, services.CustomFieldProvisioningHooks{
 			EnqueueOptionRemoval:     scheduler.EnqueueOptionRemoval,
@@ -2130,7 +2133,7 @@ func (s *Server) initialize() error {
 		PagePublication:              knowledgePublication,
 		Worklogs:                     timeWorklogService,
 		TimeAccess:                   timePermissionService,
-		TimeProjects:                 services.NewTimeProjectApplicationService(s.db, timePermissionService, v2Access),
+		TimeProjects:                 timeProjectApplication,
 		Timers:                       timerService,
 		SystemAdmins:                 permService,
 		GlobalPermission:             permService,
@@ -2143,7 +2146,7 @@ func (s *Server) initialize() error {
 		AdminTranslations:            objectTranslationService,
 		Comments:                     commentService,
 		CommentAccess:                permService,
-		Attachments:                  services.NewItemAttachmentService(s.db, attachmentStorage, permService),
+		Attachments:                  itemAttachments,
 		PageAttachments:              services.NewPageAttachmentUploadService(s.db, attachmentStorage, permService, pagePermissionService),
 		Collections:                  services.NewCollectionApplicationService(s.db, permService, securitySettingsHandler).WithSharingNotifications(s.notificationService),
 		Planning:                     planningApplication,
@@ -2179,6 +2182,24 @@ func (s *Server) initialize() error {
 	if err := v2.RegisterRoutes(v2Deps); err != nil {
 		return fmt.Errorf("register REST API v2: %w", err)
 	}
+	toolReads := &aitools.ReadServices{
+		Planning: planningApplication, Actions: actionApplication, Attachments: itemAttachments,
+		Assets: assetApplication, Governance: governanceApplication, Runs: agentRunApplication,
+		MilestoneActivity: milestoneActivityService, ItemDetail: itemDetailApplication, Participants: participantService,
+		TimeProjects: timeProjectApplication, Catalog: catalogApplication, Links: itemLinkService,
+		LoadScreen: screenHandler.LoadScreen,
+		Notifications: func(ctx context.Context, userID int, unreadOnly bool, limit, offset int) ([]models.Notification, error) {
+			snapshot, err := notificationAuthorizer.Snapshot(userID)
+			if err != nil {
+				return nil, err
+			}
+			return s.notificationManager.GetVisibleUserNotificationsContext(ctx, userID, snapshot, unreadOnly, limit, offset)
+		},
+	}
+	if s.slaEngine != nil {
+		toolReads.ItemSLA = s.slaEngine.ItemSLA
+	}
+	aiHandler.SetToolReads(toolReads)
 
 	// execute_script runs author-supplied JavaScript as the effective action
 	// executor. REST calls from the script go through the mounted v2 handler
@@ -2205,6 +2226,7 @@ func (s *Server) initialize() error {
 			ItemDeletionService:    itemHandler.ItemDeletionApplicationService(),
 			ItemApplicationService: itemApplication,
 			TimeWorklogService:     timeWorklogService,
+			ReadServices:           toolReads,
 			PageApplicationService: pageApplication,
 			PageDiagramService:     pageDiagramService,
 			ActionService:          s.actionService,

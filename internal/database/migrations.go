@@ -4027,7 +4027,18 @@ END $$;
 		CheckPostgres: pgColumnCheck("screen_fields", "hint"),
 		SQLite:        `ALTER TABLE screen_fields ADD COLUMN hint TEXT`,
 		Postgres:      `ALTER TABLE screen_fields ADD COLUMN IF NOT EXISTS hint TEXT`,
-	}}
+	},
+	{
+		Version:       "20261213_time_worklog_request_keys",
+		Name:          "Make agent worklog retries idempotent",
+		CheckSQLite:   sqliteIndexCheck("uq_time_worklogs_request_key"),
+		CheckPostgres: pgIndexCheck("uq_time_worklogs_request_key"),
+		SQLite: `ALTER TABLE time_worklogs ADD COLUMN agent_request_key TEXT;
+			CREATE UNIQUE INDEX uq_time_worklogs_request_key ON time_worklogs(user_id, agent_request_key);`,
+		Postgres: `ALTER TABLE time_worklogs ADD COLUMN IF NOT EXISTS agent_request_key TEXT;
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_time_worklogs_request_key ON time_worklogs(user_id, agent_request_key);`,
+	},
+}
 
 const jiraCSVPeopleSQL = `CREATE TABLE IF NOT EXISTS jira_csv_people (
 	source_ref TEXT PRIMARY KEY,

@@ -36,15 +36,19 @@ type itemSummaryDTO struct {
 	IterationEndDate string   `json:"iteration_end_date,omitempty"`
 	WorkspaceID      int      `json:"workspace_id"`
 	Labels           []string `json:"labels,omitempty"`
+	URL              string   `json:"url"`
 }
 
 // itemDetailDTO is the richer shape for get_item.
 type itemDetailDTO struct {
 	itemSummaryDTO
-	Description string `json:"description,omitempty"`
-	Creator     string `json:"creator,omitempty"`
-	Workspace   string `json:"workspace,omitempty"`
-	ParentID    *int   `json:"parent_id,omitempty"`
+	Description       string         `json:"description,omitempty"`
+	Creator           string         `json:"creator,omitempty"`
+	Workspace         string         `json:"workspace,omitempty"`
+	ParentID          *int           `json:"parent_id,omitempty"`
+	CustomFieldValues map[string]any `json:"custom_field_values,omitempty"`
+	EstimateMinutes   *int           `json:"estimate_minutes,omitempty"`
+	UpdatedAt         time.Time      `json:"updated_at"`
 }
 
 func itemToSummary(item *models.Item) itemSummaryDTO {
@@ -61,6 +65,7 @@ func itemToSummary(item *models.Item) itemSummaryDTO {
 		IterationName:    item.IterationName,
 		IterationEndDate: item.IterationEndDate,
 		WorkspaceID:      item.WorkspaceID,
+		URL:              itemURL(item),
 	}
 	if len(item.Milestones) > 0 {
 		names := make([]string, 0, len(item.Milestones))
@@ -98,6 +103,12 @@ type listItemsArgs struct {
 	Limit       int    `json:"limit,omitempty" jsonschema:"Max items to return (default 20, max 200)"`
 	Offset      int    `json:"offset,omitempty" jsonschema:"Offset for pagination"`
 	Filter      string `json:"filter,omitempty" jsonschema:"CQL filter expression. Supported fields: status, priority, assignee, creator, due_date, label, milestone, iteration, project, itemtype, cf_<name> (or the bare custom field name). Operators: =, !=, <, <=, >, >=, ~ (contains), IN, NOT IN. Logical: AND, OR, NOT. Functions: currentUser(), now(), startOfDay(), endOfDay()."`
+	DueFrom     string `json:"due_from,omitempty" jsonschema:"Earliest due date YYYY-MM-DD"`
+	DueTo       string `json:"due_to,omitempty" jsonschema:"Latest due date YYYY-MM-DD, inclusive"`
+	UpdatedFrom string `json:"updated_from,omitempty" jsonschema:"Earliest update date YYYY-MM-DD"`
+	UpdatedTo   string `json:"updated_to,omitempty" jsonschema:"Latest update date YYYY-MM-DD, inclusive"`
+	SortBy      string `json:"sort_by,omitempty" jsonschema:"created_at, updated_at, due_date, or title"`
+	Ascending   bool   `json:"ascending,omitempty"`
 }
 
 type listItemsOut struct {
@@ -153,6 +164,31 @@ func init() {
 				qlParts = append(qlParts, "st.name = ?")
 				qlArgs = append(qlArgs, args.Status)
 			}
+			for _, bound := range []struct {
+				value, expression string
+				exclusive         bool
+			}{
+				{args.DueFrom, "due_date >=", false}, {args.DueTo, "due_date <", true},
+				{args.UpdatedFrom, "updated_at >=", false}, {args.UpdatedTo, "updated_at <", true},
+			} {
+				if bound.value == "" {
+					continue
+				}
+				date, err := time.Parse(time.DateOnly, bound.value)
+				if err != nil {
+					return nil, errors.New("date filters must be YYYY-MM-DD")
+				}
+				if bound.exclusive {
+					date = date.AddDate(0, 0, 1)
+				}
+				args.Filter = strings.TrimSpace(args.Filter)
+				clause := fmt.Sprintf("%s '%s'", bound.expression, date.Format(time.DateOnly))
+				if args.Filter == "" {
+					args.Filter = clause
+				} else {
+					args.Filter = "(" + args.Filter + ") AND " + clause
+				}
+			}
 			if args.Filter != "" {
 				wsMap := workspaceLookupMap(env.DB)
 				customFieldMap, cfErr := repository.NewItemRepository(env.DB).GetCQLCustomFieldMap()
@@ -175,11 +211,19 @@ func init() {
 				filters.QLArgs = qlArgs
 			}
 
+			if args.SortBy == "" {
+				args.SortBy = "created_at"
+			}
+			switch args.SortBy {
+			case "created_at", "updated_at", "due_date", "title":
+			default:
+				return nil, errors.New("unsupported sort_by")
+			}
 			items, total, err := services.NewItemCRUDService(env.DB).List(services.ItemListParams{
 				WorkspaceIDs: wsIDs,
 				Filters:      filters,
-				SortBy:       "created_at",
-				SortAsc:      false,
+				SortBy:       args.SortBy,
+				SortAsc:      args.Ascending,
 				Pagination:   services.PaginationParams{Limit: limit, Offset: args.Offset},
 			})
 			if err != nil {
@@ -207,28 +251,19 @@ func init() {
 		Risk:        RiskLow,
 		Description: "Get details of a single work item by numeric ID or key (e.g. PROJ-42). Long descriptions are truncated to 500 characters with an explicit marker unless full_description=true.",
 		Scopes:      []string{auth.ScopeItemsRead},
-		Run: func(_ context.Context, env *Env, args getItemArgs) (any, error) {
-			itemID, err := resolveItemID(env.DB, args.ItemID, args.ItemKey)
-			if err != nil {
-				return map[string]string{"error": err.Error()}, nil //nolint:nilerr // surface as a tool error in JSON, not as a protocol error
-			}
-			crudSvc := services.NewItemCRUDService(env.DB)
-			wsID, err := crudSvc.GetWorkspaceID(itemID)
-			if err != nil {
-				return map[string]string{"error": "item not found"}, nil //nolint:nilerr // surface as a tool error in JSON, not as a protocol error
-			}
-			if !env.HasWorkspaceAccess(wsID) {
-				return map[string]string{"error": "item not found"}, nil
-			}
-			item, err := crudSvc.GetByID(itemID)
+		Run: func(ctx context.Context, env *Env, args getItemArgs) (any, error) {
+			item, err := (itemRef{ItemID: args.ItemID, ItemKey: args.ItemKey}).read(ctx, env)
 			if err != nil {
 				return map[string]string{"error": "item not found"}, nil //nolint:nilerr // surface as a tool error in JSON, not as a protocol error
 			}
 			d := itemDetailDTO{
-				itemSummaryDTO: itemToSummary(item),
-				Creator:        item.CreatorName,
-				Workspace:      item.WorkspaceName,
-				ParentID:       item.ParentID,
+				itemSummaryDTO:    itemToSummary(item),
+				Creator:           item.CreatorName,
+				Workspace:         item.WorkspaceName,
+				ParentID:          item.ParentID,
+				CustomFieldValues: item.CustomFieldValues,
+				EstimateMinutes:   item.EstimateMinutes,
+				UpdatedAt:         item.UpdatedAt,
 			}
 			if item.Description != "" {
 				desc := item.Description
@@ -282,6 +317,9 @@ func init() {
 			limit := args.Limit
 			if limit <= 0 || limit > 100 {
 				limit = 20
+			}
+			if args.Discussions {
+				return searchDiscussions(ctx, env, searchWS, args.Query, limit)
 			}
 			items, total, err := services.NewItemCRUDService(env.DB).Search(args.Query, searchWS, services.PaginationParams{Limit: limit})
 			if err != nil {
@@ -412,9 +450,13 @@ func init() {
 			if len(updateData) == 0 {
 				return map[string]string{"error": "no fields to update"}, nil
 			}
+			var expected []time.Time
+			if args.ExpectedUpdatedAt != nil {
+				expected = append(expected, *args.ExpectedUpdatedAt)
+			}
 			result, err := env.itemApplication().UpdateFieldsWithMetadata(ctx, services.AuditActor{
 				UserID: env.UserID, Username: env.Username,
-			}, itemID, updateData, env.eventMetadata())
+			}, itemID, updateData, env.eventMetadata(), expected...)
 			if err != nil {
 				if errors.Is(err, services.ErrItemForbidden) {
 					return map[string]string{"error": "permission denied"}, nil
@@ -597,6 +639,7 @@ type getItemArgs struct {
 }
 
 type searchItemsArgs struct {
+	Discussions  bool   `json:"discussions,omitempty" jsonschema:"Search visible ticket comments instead of item titles and descriptions"`
 	Query        string `json:"query" jsonschema:"Search query (full-text on title/description)"`
 	WorkspaceID  *int   `json:"workspace_id,omitempty" jsonschema:"Limit search to a specific workspace"`
 	WorkspaceIDs []int  `json:"workspace_ids,omitempty" jsonschema:"Limit to a list of workspaces"`
@@ -616,6 +659,8 @@ type createItemArgs struct {
 }
 
 type updateItemArgs struct {
+	EstimateMinutes   *int           `json:"estimate_minutes,omitempty" jsonschema:"New time estimate in minutes"`
+	ExpectedUpdatedAt *time.Time     `json:"expected_updated_at,omitempty" jsonschema:"RFC3339 value from get_item; reject the edit if the item has changed"`
 	ItemID            int            `json:"item_id,omitempty" jsonschema:"Item ID"`
 	ItemKey           string         `json:"item_key,omitempty" jsonschema:"Item key like PROJ-42"`
 	Title             *string        `json:"title,omitempty" jsonschema:"New title"`
@@ -757,6 +802,10 @@ func buildUpdateData(env *Env, args updateItemArgs, wsID int) (data map[string]a
 			out["parent_id"] = *args.ParentID
 		}
 		changed = append(changed, "parent")
+	}
+	if args.EstimateMinutes != nil {
+		out["estimate_minutes"] = *args.EstimateMinutes
+		changed = append(changed, "estimate_minutes")
 	}
 	if args.CustomFieldValues != nil {
 		// The update pipeline merges custom_field_values per field server-side,

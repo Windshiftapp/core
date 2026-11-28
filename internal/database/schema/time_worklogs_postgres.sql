@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS time_worklogs (
 	duration_minutes INTEGER NOT NULL,
 	created_at INTEGER NOT NULL,
 	updated_at INTEGER NOT NULL,
+	agent_request_key TEXT,
 	FOREIGN KEY (project_id) REFERENCES time_projects(id) ON DELETE CASCADE
 );
 
@@ -18,6 +19,7 @@ CREATE INDEX IF NOT EXISTS idx_time_worklogs_project_id ON time_worklogs(project
 CREATE INDEX IF NOT EXISTS idx_time_worklogs_date ON time_worklogs(date);
 CREATE INDEX IF NOT EXISTS idx_time_worklogs_item_id ON time_worklogs(item_id);
 CREATE INDEX IF NOT EXISTS idx_time_worklogs_user_id ON time_worklogs(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_time_worklogs_request_key ON time_worklogs(user_id, agent_request_key);
 -- Draft worklogs: persisted, user-owned incomplete time entries produced when a
 -- timer stops without complete booking information (project/description). They
 -- are intentionally separate from time_worklogs so reporting, briefings, item

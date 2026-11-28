@@ -663,19 +663,17 @@ func (s *TimerService) BookDraft(userID, id, expectedVersion int, idempotencyKey
 	// A replay of a completed booking must resolve before the draft-existence
 	// check: the draft is gone once booked, but the recorded key still maps to
 	// the original worklog.
-	if idempotencyKey != "" {
-		booking, err := s.draftRepo.GetBooking(userID, idempotencyKey)
-		if err == nil {
-			return s.bookingWorklog(id, booking)
-		}
-		if !errors.Is(err, repository.ErrNotFound) {
-			return nil, err
-		}
+	if worklog, err := s.replayDraftBooking(userID, id, idempotencyKey); worklog != nil || err != nil {
+		return worklog, err
 	}
 	// Ownership and existence are checked before validation so a foreign or
 	// missing draft keeps its not-found contract regardless of the payload.
 	if _, err := s.draftRepo.GetDraft(id, userID); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
+			// A simultaneous booking can consume the draft between the two reads.
+			if worklog, err := s.replayDraftBooking(userID, id, idempotencyKey); worklog != nil || err != nil {
+				return worklog, err
+			}
 			return nil, ErrTimerDraftNotFound
 		}
 		return nil, err
@@ -717,6 +715,20 @@ func (s *TimerService) BookDraft(userID, id, expectedVersion int, idempotencyKey
 		return nil, err
 	}
 	return s.bookingWorklog(id, booking)
+}
+
+func (s *TimerService) replayDraftBooking(userID, draftID int, key string) (*models.Worklog, error) {
+	if key == "" {
+		return nil, nil
+	}
+	booking, err := s.draftRepo.GetBooking(userID, key)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return s.bookingWorklog(draftID, booking)
 }
 
 // bookingWorklog resolves a recorded booking to its worklog. It is the single

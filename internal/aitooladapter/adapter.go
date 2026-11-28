@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 
 	"windshift/internal/aitools"
 	"windshift/internal/auth"
@@ -69,11 +70,7 @@ func EntriesForStandard(registry *aitools.Registry, selected []string) []aitools
 	return out
 }
 
-// EntriesForScopes returns the registry entries whose declared token scopes
-// are all satisfied by the given scope set. The in-product chat authenticates
-// with a cookie rather than a token, so passing auth.DefaultAgentScopes here
-// is what keeps its capability surface equal to the one a `ws` CLI or MCP
-// token gets by default instead of the entire registry (WI-962).
+// EntriesForScopes returns the chat entries covered by the supplied scopes.
 func EntriesForScopes(registry *aitools.Registry, scopes []string) []aitools.Entry {
 	all := registry.All()
 	out := make([]aitools.Entry, 0, len(all))
@@ -84,6 +81,13 @@ func EntriesForScopes(registry *aitools.Registry, scopes []string) []aitools.Ent
 		out = append(out, entry)
 	}
 	return out
+}
+
+// EntriesForGeneralChat admits these permission-checked reads for cookie-authenticated chat.
+func EntriesForGeneralChat(registry *aitools.Registry) []aitools.Entry {
+	scopes := append(slices.Clone(auth.DefaultAgentScopes),
+		auth.ScopeCollectionsRead, auth.ScopeApprovalsRead, auth.ScopeNotificationsRead, auth.ScopeReviewsRead)
+	return EntriesForScopes(registry, scopes)
 }
 
 func BuildTools(entries []aitools.Entry) []llm.ToolDefinition {
@@ -104,7 +108,7 @@ func BuildTools(entries []aitools.Entry) []llm.ToolDefinition {
 func TerminalTools(entries []aitools.Entry) map[string]bool {
 	out := make(map[string]bool)
 	for _, entry := range entries {
-		if entry.Access == aitools.AccessWrite {
+		if entry.Access != aitools.AccessRead {
 			out[entry.Name] = true
 		}
 	}

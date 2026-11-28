@@ -315,12 +315,13 @@ func (s *ItemApplicationService) resolveQueues(ctx context.Context, userID int, 
 }
 
 // fillQueueCounts evaluates every visible queue in one batched COUNT
-// statement, so adding custom queues does not add a round trip per queue. A
-// scope with no single workspace (a collection that spans workspaces) counts
-// across every workspace the caller can access.
+// statement. Collection counts use the same saved CQL and accessible workspace
+// scope as the item list shown when a member opens the queue.
 func (s *ItemApplicationService) fillQueueCounts(ctx context.Context, userID int, scope QueueScope, views []QueueView) error {
 	workspaceIDs := []int{scope.WorkspaceID}
-	if scope.WorkspaceID <= 0 {
+	collectionID := 0
+	if scope.CollectionID != nil {
+		collectionID = *scope.CollectionID
 		ids, err := s.perm.AccessibleWorkspaceIDs(userID)
 		if err != nil {
 			return err
@@ -336,7 +337,7 @@ func (s *ItemApplicationService) fillQueueCounts(ctx context.Context, userID int
 
 	queries := make([]repository.QueueCountQuery, 0, len(views))
 	for i := range views {
-		resolved, err := s.crud.resolveItemListQLContext(ctx, views[i].QL, 0, "", userID)
+		resolved, err := s.crud.resolveItemListQLContext(ctx, "", collectionID, views[i].QL, userID)
 		if err != nil {
 			return err
 		}

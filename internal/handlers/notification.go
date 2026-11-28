@@ -814,16 +814,22 @@ func (nm *NotificationManager) queryNotifications(userID, limit, offset int) ([]
 // GetVisibleUserNotifications applies current authorization before paginating
 // tray results. Legacy, unknown, and incomplete scopes fail closed.
 func (nm *NotificationManager) GetVisibleUserNotifications(userID int, snapshot *services.NotificationAuthorizationSnapshot, limit, offset int) ([]models.Notification, error) {
+	return nm.GetVisibleUserNotificationsContext(context.Background(), userID, snapshot, false, limit, offset)
+}
+
+// GetVisibleUserNotificationsContext can restrict the tray to unread notices
+// before applying the authorization-aware offset.
+func (nm *NotificationManager) GetVisibleUserNotificationsContext(ctx context.Context, userID int, snapshot *services.NotificationAuthorizationSnapshot, unreadOnly bool, limit, offset int) ([]models.Notification, error) {
 	query := `
 		SELECT id, user_id, title, message, type, timestamp, read, seen_at, avatar, action_url, metadata,
 		       authorization_scope, workspace_id, item_id, source_type, source_id,
 		       referenced_entity_type, referenced_entity_id, referenced_workspace_id, referenced_workspace_permission,
 		       created_at, updated_at
 		FROM notifications
-		WHERE user_id = ? AND timestamp >= ?
+		WHERE user_id = ? AND timestamp >= ? AND (? = FALSE OR read = FALSE)
 		ORDER BY timestamp DESC, id DESC
 	`
-	rows, err := nm.db.Query(query, userID, time.Now().Add(-notificationTrayRetention))
+	rows, err := nm.db.QueryContext(ctx, query, userID, time.Now().Add(-notificationTrayRetention), unreadOnly)
 	if err != nil {
 		return nil, err
 	}

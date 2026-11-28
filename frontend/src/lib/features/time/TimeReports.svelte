@@ -30,6 +30,7 @@
   import { openMarkdownPrintView } from '../print/markdownPrintWindow.js';
   import { buildTimeReportMarkdown } from './timeReportMarkdown.js';
   import { buildSummary, buildMemberBreakdown, buildDailyChartData } from './timeReportAggregates.js';
+  import { timeReportChatContext } from '../chat/chatContext.js';
 
   // Reports group and label worklogs by civil date in the reporting timezone,
   // derived from the stored timestamps and split at local midnight.
@@ -66,6 +67,22 @@
   let projectDateTo = $state('');
   let projectAggregate = $state({ daily: [], totals: [] });
   let projectLoading = $state(false);
+
+  $effect(() => {
+    const context = mode === 'project'
+      ? { project_id: selectedProjectId, date_from: projectDateFrom, date_to: projectDateTo }
+      : {
+          project_id: filters.project_id,
+          customer_id: filters.customer_id,
+          mine_only: true,
+          date_from: filters.date_from,
+          date_to: filters.date_to
+        };
+    timeReportChatContext.current = context;
+    return () => {
+      if (timeReportChatContext.current === context) timeReportChatContext.current = null;
+    };
+  });
 
   // Summary data (personal mode)
   let summary = $state({

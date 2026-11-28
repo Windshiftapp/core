@@ -16,7 +16,7 @@
   import Select from '../../components/Select.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
-  import { buildChatContext } from './chatContext.js';
+  import { buildChatContext, timeReportChatContext } from './chatContext.js';
   import { buildConversationOptions } from './conversationOptions.js';
   import { workspacesStore } from '../../stores/workspaces.svelte.js';
 
@@ -189,7 +189,7 @@
   // surface-specific hint only on supported object surfaces, so everywhere
   // else the chat stays unaware of the user's location to keep the prompt clean.
   function buildContext() {
-    return buildChatContext($currentRoute);
+    return buildChatContext($currentRoute, window.location.search, timeReportChatContext.current);
   }
 
   function send() {

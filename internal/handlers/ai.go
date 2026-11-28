@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"windshift/internal/aitools"
 	"windshift/internal/database"
 	"windshift/internal/llm"
 	"windshift/internal/models"
@@ -37,6 +38,7 @@ type AIHandler struct {
 	itemApplication *services.ItemApplicationService
 	// timeWorklogService is the shared worklog boundary used by log_time.
 	timeWorklogService *services.TimeWorklogService
+	toolReads          *aitools.ReadServices
 	conversations      *repository.AgentConversationRepository
 	agentBindings      *repository.WorkspaceAgentBindingRepository
 	commentService     *services.CommentService
@@ -97,6 +99,10 @@ func (h *AIHandler) SetConversationDependencies(comments *services.CommentServic
 func (h *AIHandler) SetMutationServices(itemApplication *services.ItemApplicationService, worklogs *services.TimeWorklogService) {
 	h.itemApplication = itemApplication
 	h.timeWorklogService = worklogs
+}
+
+func (h *AIHandler) SetToolReads(reads *aitools.ReadServices) {
+	h.toolReads = reads
 }
 
 // PlanMyDayResponse is the response for the Plan My Day endpoint.

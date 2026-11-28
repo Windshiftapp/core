@@ -60,6 +60,9 @@ func (u *itemUpdateOperation) apply() error {
 		return fmt.Errorf("failed to load item: %w", err)
 	}
 	u.original = original
+	if expected := u.req.ExpectedUpdatedAt; expected != nil && !original.UpdatedAt.Equal(*expected) {
+		return fmt.Errorf("item changed since it was read")
+	}
 	u.updated = *original
 	validator, closeValidator, err := u.service.transactionValidator(u.ctx, u.tx, u.req.UpdateData)
 	if err != nil {

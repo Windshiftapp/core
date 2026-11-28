@@ -67,10 +67,9 @@ type Tool[Args any] struct {
 	// invoke this tool from a token-authenticated adapter — i.e. the MCP
 	// server, which gates each call on the bearer token's scope set. All
 	// listed scopes must be present (write implies read, per
-	// auth.TokenManager.CheckTokenPermissions). The cookie-authenticated
-	// in-product chat has no token and ignores this field entirely; the
-	// per-user workspace permission checks inside Run remain the only gate
-	// on that surface.
+	// auth.TokenManager.CheckTokenPermissions). Cookie-authenticated General
+	// chat also uses these declarations to select its tool catalog. All callers
+	// still need to pass the resource permission checks inside Run.
 	Scopes []string
 	// Sources restricts adapters when the tool needs a runtime-specific context. Empty permits all.
 	Sources []string
@@ -246,7 +245,7 @@ var capabilityGroupLabels = map[CapabilityGroup]string{
 func StandardCapabilityGroups(r *Registry) []CapabilityGroupDefinition {
 	byGroup := make(map[CapabilityGroup][]ToolSummary)
 	for _, entry := range r.All() {
-		if entry.Access == AccessDestructive || entry.Access == AccessAdmin {
+		if !entry.AvailableFor(SourceStandardAgent) || entry.Access == AccessDestructive || entry.Access == AccessAdmin {
 			continue
 		}
 		byGroup[entry.Group] = append(byGroup[entry.Group], ToolSummary{
