@@ -26,7 +26,7 @@ export default withEnglishAdminOperations({
     },
     memberCount: '{count} 名成员', memberCount_one: '{count} 名成员', memberCount_other: '{count} 名成员', everyone: '所有人', noDirectAssignments: '无直接分配',
     addMember: '添加成员', addGroup: '添加用户组', searchPlaceholder: '按姓名或邮箱搜索成员或用户组…', loading: '正在加载成员…', empty: '尚无成员或用户组。请添加成员或用户组以配置此工作区的访问权限。', noSearchResults: '未找到与“{query}”匹配的成员或用户组。',
-    unknownUser: '未知用户', group: '用户组', removeRoleAction: '移除角色：{role}', addMemberTitle: '添加工作区成员', user: '用户', selectUser: '选择用户…', selectRole: '选择角色…', addingMember: '正在添加成员…', cancel: '取消', addGroupTitle: '向工作区添加用户组', selectGroup: '选择用户组…', addingGroup: '正在添加用户组…',
+    unknownUser: '未知用户', group: '用户组', removeRoleAction: '移除角色：{role}', addMemberTitle: '添加工作区成员', user: '用户', selectUser: '选择用户…', selectRole: '选择角色…', selectRoles: '选择一个或多个角色…', addingMember: '正在添加成员…', cancel: '取消', addGroupTitle: '向工作区添加用户组', selectGroup: '选择用户组…', addingGroup: '正在添加用户组…',
   },
   integrations: {
     directions: { outbound: '出站', inbound: '入站', outboundDescription: 'Windshift 主动连接的应用。添加 OAuth 凭据以读取 Notion 或 Confluence 等外部服务的数据。', inboundDescription: '代表用户连接 Windshift 的应用。只需注册一次第三方应用，用户随后通过 OAuth 2.0 和 PKCE 授权。' },

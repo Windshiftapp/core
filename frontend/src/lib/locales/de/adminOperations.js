@@ -147,7 +147,7 @@ export default withEnglishAdminOperations({
     },
     memberCount: '{count} Mitglieder', memberCount_one: '{count} Mitglied', memberCount_other: '{count} Mitglieder', everyone: 'Alle', noDirectAssignments: 'Keine direkten Zuweisungen',
     addMember: 'Mitglied hinzufügen', addGroup: 'Gruppe hinzufügen', searchPlaceholder: 'Mitglieder oder Gruppen nach Name oder E-Mail suchen…', loading: 'Mitglieder werden geladen…', empty: 'Noch keine Mitglieder oder Gruppen. Fügen Sie sie hinzu, um den Zugriff auf diesen Arbeitsbereich einzurichten.', noSearchResults: 'Keine Mitglieder oder Gruppen für „{query}“ gefunden.',
-    unknownUser: 'Unbekannter Benutzer', group: 'Gruppe', removeRoleAction: 'Rolle entfernen: {role}', addMemberTitle: 'Mitglied zum Arbeitsbereich hinzufügen', user: 'Benutzer', selectUser: 'Benutzer auswählen…', selectRole: 'Rolle auswählen…', addingMember: 'Mitglied wird hinzugefügt…', cancel: 'Abbrechen', addGroupTitle: 'Gruppe zum Arbeitsbereich hinzufügen', selectGroup: 'Gruppe auswählen…', addingGroup: 'Gruppe wird hinzugefügt…',
+    unknownUser: 'Unbekannter Benutzer', group: 'Gruppe', removeRoleAction: 'Rolle entfernen: {role}', addMemberTitle: 'Mitglied zum Arbeitsbereich hinzufügen', user: 'Benutzer', selectUser: 'Benutzer auswählen…', selectRole: 'Rolle auswählen…', selectRoles: 'Eine oder mehrere Rollen auswählen…', addingMember: 'Mitglied wird hinzugefügt…', cancel: 'Abbrechen', addGroupTitle: 'Gruppe zum Arbeitsbereich hinzufügen', selectGroup: 'Gruppe auswählen…', addingGroup: 'Gruppe wird hinzugefügt…',
   },
   cannedResponses: {
     title: 'Vorgefertigte Antworten',

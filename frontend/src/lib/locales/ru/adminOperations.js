@@ -292,6 +292,7 @@ export default {
     user: 'Пользователь',
     selectUser: 'Выберите пользователя…',
     selectRole: 'Выберите роль…',
+    selectRoles: 'Выберите одну или несколько ролей…',
     addingMember: 'Добавление участника…',
     cancel: 'Отмена',
     addGroupTitle: 'Добавление группы',

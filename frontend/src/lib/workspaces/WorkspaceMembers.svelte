@@ -23,7 +23,7 @@
   import { t } from '../stores/i18n.svelte.js';
   import { toHotkeyString } from '../utils/keyboardShortcuts.js';
   import { objectDisplayDescription, objectDisplayName } from '../utils/systemLabels.js';
-	import SelectField from '../components/SelectField.svelte';
+  import RolePicker from '../pickers/RolePicker.svelte';
 
   let { workspaceId } = $props();
 
@@ -36,13 +36,13 @@
   // Add member modal state
   let showModal = $state(false);
   let selectedUserId = $state(null);
-  let selectedRoleId = $state(null);
+  let selectedRoleIds = $state([]);
   let adding = $state(false);
 
   // Add group modal state
   let showGroupModal = $state(false);
   let selectedGroupId = $state(null);
-  let selectedGroupRoleId = $state(null);
+  let selectedGroupRoleIds = $state([]);
   let addingGroup = $state(false);
 
   // Search and pagination state
@@ -103,25 +103,33 @@
     }
   }
 
+  // Assign each selected role in turn. Assignments are idempotent, so roles the
+  // member or group already holds are simply refreshed.
+  async function assignRoles(roleIds, assign) {
+    for (const roleId of roleIds) {
+      await assign(Number(roleId));
+    }
+  }
+
   async function handleSubmit() {
-    const roleId = selectedRoleId ? Number(selectedRoleId) : null;
+    const roleIds = selectedRoleIds || [];
     const userId = selectedUserId ? Number(selectedUserId) : null;
     const workspaceIdNum = Number(workspaceId);
-    if (!userId || !roleId) {
+    if (!userId || roleIds.length === 0) {
       return;
     }
 
     try {
       adding = true;
-      await workspaceRoles.assignToUser({
+      await assignRoles(roleIds, roleId => workspaceRoles.assignToUser({
         user_id: userId,
         workspace_id: workspaceIdNum,
         role_id: roleId
-      });
+      }));
 
       // Reset form
       selectedUserId = null;
-      selectedRoleId = null;
+      selectedRoleIds = [];
       showModal = false;
 
       // Reload data
@@ -129,6 +137,8 @@
     } catch (err) {
       console.error('Failed to add member:', err);
       errorToast(t('workspaceMembers.addMemberFailed', { error: err.message }));
+      // Show any roles that were assigned before the failure.
+      await loadData();
     } finally {
       adding = false;
     }
@@ -159,29 +169,31 @@
   }
 
   async function handleSubmitGroup() {
-    const roleId = selectedGroupRoleId ? Number(selectedGroupRoleId) : null;
+    const roleIds = selectedGroupRoleIds || [];
     const groupId = selectedGroupId ? Number(selectedGroupId) : null;
     const workspaceIdNum = Number(workspaceId);
-    if (!groupId || !roleId) {
+    if (!groupId || roleIds.length === 0) {
       return;
     }
 
     try {
       addingGroup = true;
-      await workspaceRoles.assignToGroup({
+      await assignRoles(roleIds, roleId => workspaceRoles.assignToGroup({
         group_id: groupId,
         workspace_id: workspaceIdNum,
         role_id: roleId
-      });
+      }));
 
       selectedGroupId = null;
-      selectedGroupRoleId = null;
+      selectedGroupRoleIds = [];
       showGroupModal = false;
 
       await loadData();
     } catch (err) {
       console.error('Failed to add group:', err);
       errorToast(t('workspaceMembers.addGroupFailed', { error: err.message }));
+      // Show any roles that were assigned before the failure.
+      await loadData();
     } finally {
       addingGroup = false;
     }
@@ -219,7 +231,7 @@
   function handleCancelGroup() {
     showGroupModal = false;
     selectedGroupId = null;
-    selectedGroupRoleId = null;
+    selectedGroupRoleIds = [];
   }
 
   function getRoleBadgeStyle(roleId) {
@@ -242,7 +254,7 @@
   function handleCancel() {
     showModal = false;
     selectedUserId = null;
-    selectedRoleId = null;
+    selectedRoleIds = [];
   }
 
   // Derive effective access from member assignments using the hierarchy:
@@ -549,7 +561,7 @@
 <Modal
   isOpen={showModal}
   onSubmit={handleSubmit}
-  submitDisabled={!selectedUserId || !selectedRoleId || adding}
+  submitDisabled={!selectedUserId || selectedRoleIds.length === 0 || adding}
   maxWidth="max-w-2xl"
   onclose={handleCancel}
 >
@@ -568,14 +580,16 @@
       </div>
 
       <div>
-        <SelectField
-          label={t('workspaceMembers.role')}
-          required
-          labelColor="default"
-          onchange={(value) => selectedRoleId = value ? Number(value) : null}
-          options={[{ value: null, label: t('workspaceMembers.selectRole') }, ...roles.map(role => ({ value: role.id, label: `${getRoleName(role)} — ${getRoleDescription(role)}` }))]}
-          bind:value={selectedRoleId}
+        <FormField class="contents" requiredMark>
+        <Label color="default" required class="mb-2">{t('workspaceMembers.rolesLabel')}</Label>
+        <RolePicker
+          {roles}
+          multiple={true}
+          bind:value={selectedRoleIds}
+          placeholder={t('workspaceMembers.selectRoles')}
+          onChange={(roleIds) => { selectedRoleIds = roleIds; }}
         />
+        </FormField>
       </div>
     </div>
 
@@ -584,7 +598,7 @@
         variant="primary"
         size="medium"
         onclick={handleSubmit}
-        disabled={!selectedUserId || !selectedRoleId || adding}
+        disabled={!selectedUserId || selectedRoleIds.length === 0 || adding}
         keyboardHint={submitHint}
       >
         {adding ? t('workspaceMembers.addingMember') : t('workspaceMembers.addMember')}
@@ -607,7 +621,7 @@
 <Modal
   isOpen={showGroupModal}
   onSubmit={handleSubmitGroup}
-  submitDisabled={!selectedGroupId || !selectedGroupRoleId || addingGroup}
+  submitDisabled={!selectedGroupId || selectedGroupRoleIds.length === 0 || addingGroup}
   maxWidth="max-w-2xl"
   onclose={handleCancelGroup}
 >
@@ -626,14 +640,16 @@
       </div>
 
       <div>
-        <SelectField
-          label={t('workspaceMembers.role')}
-          required
-          labelColor="default"
-          onchange={(value) => selectedGroupRoleId = value ? Number(value) : null}
-          options={[{ value: null, label: t('workspaceMembers.selectRole') }, ...roles.map(role => ({ value: role.id, label: `${getRoleName(role)} — ${getRoleDescription(role)}` }))]}
-          bind:value={selectedGroupRoleId}
+        <FormField class="contents" requiredMark>
+        <Label color="default" required class="mb-2">{t('workspaceMembers.rolesLabel')}</Label>
+        <RolePicker
+          {roles}
+          multiple={true}
+          bind:value={selectedGroupRoleIds}
+          placeholder={t('workspaceMembers.selectRoles')}
+          onChange={(roleIds) => { selectedGroupRoleIds = roleIds; }}
         />
+        </FormField>
       </div>
     </div>
 
@@ -642,7 +658,7 @@
         variant="primary"
         size="medium"
         onclick={handleSubmitGroup}
-        disabled={!selectedGroupId || !selectedGroupRoleId || addingGroup}
+        disabled={!selectedGroupId || selectedGroupRoleIds.length === 0 || addingGroup}
         keyboardHint={submitHint}
       >
         {addingGroup ? t('workspaceMembers.addingGroup') : t('workspaceMembers.addGroup')}

@@ -293,6 +293,7 @@ export default withEnglishAdminOperations({
     user: 'Użytkownik',
     selectUser: 'Wybierz użytkownika…',
     selectRole: 'Wybierz rolę…',
+    selectRoles: 'Wybierz jedną lub więcej ról…',
     addingMember: 'Dodawanie członka…',
     cancel: 'Anuluj',
     addGroupTitle: 'Dodaj grupę do przestrzeni roboczej',

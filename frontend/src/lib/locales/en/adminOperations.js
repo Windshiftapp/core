@@ -290,6 +290,7 @@ export default {
     user: 'User',
     selectUser: 'Select a user…',
     selectRole: 'Select a role…',
+    selectRoles: 'Select one or more roles…',
     addingMember: 'Adding member…',
     cancel: 'Cancel',
     addGroupTitle: 'Add group to workspace',
