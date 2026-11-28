@@ -391,52 +391,33 @@ func (s *ScreenProvisioningService) clearLinkingRequiredFlags(fields []models.Sc
 	return fields, nil
 }
 
-// normalizeHintText normalizes line endings, trims, and caps a hint at
-// models.ScreenFieldHintMaxLength runes. Line breaks are kept: multi-line
-// hints render as multi-line placeholders.
-func normalizeHintText(hint string) string {
-	hint = strings.ReplaceAll(hint, "\r\n", "\n")
-	return strings.TrimSpace(truncateRunes(strings.TrimSpace(hint), models.ScreenFieldHintMaxLength))
-}
-
-// normalizeFieldHints strips markup from screen field hints, caps them at
-// models.ScreenFieldHintMaxLength runes, and keeps them only on fields that
-// can show one (the description, and text / multi-line / rich text custom
-// fields). Anything else is cleared.
+// normalizeFieldHints stores hints in their normalized form and keeps them
+// only on fields that can show one (the description, and text / multi-line /
+// rich text custom fields). Anything else is cleared.
 func (s *ScreenProvisioningService) normalizeFieldHints(fields []models.ScreenField) ([]models.ScreenField, error) {
 	customTypes := map[int]string{}
 	for i := range fields {
-		hint := normalizeHintText(sanitize.PlainTextField.Sanitize(fields[i].Hint))
-		fields[i].Hint = ""
-		if hint == "" {
-			continue
-		}
-		identifier := strings.TrimSpace(fields[i].FieldIdentifier)
-		switch fields[i].FieldType {
-		case "system":
-			if models.SystemFieldSupportsHint(identifier) {
-				fields[i].Hint = hint
-			}
-		case "custom":
-			fieldID, err := strconv.Atoi(identifier)
+		customType := ""
+		if fields[i].FieldType == "custom" {
+			fieldID, err := strconv.Atoi(strings.TrimSpace(fields[i].FieldIdentifier))
 			if err != nil {
+				fields[i].Hint = ""
 				continue
 			}
-			fieldType, ok := customTypes[fieldID]
-			if !ok {
-				err = s.db.QueryRow("SELECT field_type FROM custom_field_definitions WHERE id = ?", fieldID).Scan(&fieldType)
+			customType, _ = customTypes[fieldID]
+			if customType == "" {
+				err = s.db.QueryRow("SELECT field_type FROM custom_field_definitions WHERE id = ?", fieldID).Scan(&customType)
 				if errors.Is(err, sql.ErrNoRows) {
+					fields[i].Hint = ""
 					continue
 				}
 				if err != nil {
 					return nil, fmt.Errorf("load custom field %d: %w", fieldID, err)
 				}
-				customTypes[fieldID] = fieldType
-			}
-			if models.CustomFieldTypeSupportsHint(fieldType) {
-				fields[i].Hint = hint
+				customTypes[fieldID] = customType
 			}
 		}
+		fields[i].Hint = normalizeScreenFieldHint(fields[i].FieldType, fields[i].FieldIdentifier, customType, fields[i].Hint)
 	}
 	return fields, nil
 }

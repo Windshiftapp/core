@@ -100,7 +100,7 @@ type ScreenField struct {
 	IsRequired      bool   `json:"is_required"`
 	FieldWidth      string `json:"field_width"`
 	// Placement is where the item detail view renders the field: "sidebar"
-	// (default) or "main" (under the description; long-form custom fields only).
+	// (default) or "main" (under the description; free-text custom fields only).
 	Placement string `json:"placement,omitempty"`
 	// Hint is optional per-screen input guidance shown as the
 	// placeholder of the description and of text, multi-line and rich text

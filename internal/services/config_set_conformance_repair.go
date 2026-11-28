@@ -580,6 +580,7 @@ func (r *conformanceRepairer) repairScreens(entity *conformanceEntityPlan) error
 		}
 		for _, f := range want.Fields {
 			ident := f.FieldIdentifier
+			customFieldType := ""
 			if f.FieldKind == "custom" {
 				cfID, err := r.lookupID("custom_field_definitions", "name", f.CustomFieldName)
 				if err != nil {
@@ -589,12 +590,15 @@ func (r *conformanceRepairer) repairScreens(entity *conformanceEntityPlan) error
 					return fmt.Errorf("custom field %q not found", f.CustomFieldName)
 				}
 				ident = strconv.Itoa(cfID)
+				if err := r.tx.QueryRowContext(r.ctx, `SELECT field_type FROM custom_field_definitions WHERE id = ?`, cfID).Scan(&customFieldType); err != nil {
+					return fmt.Errorf("load custom field %q: %w", f.CustomFieldName, err)
+				}
 			}
 			if err := r.exec(`
 				INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width, placement, hint)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 			`, screenID, f.FieldKind, ident, f.DisplayOrder, f.IsRequired, f.FieldWidth, models.NormalizeScreenFieldPlacement(f.Placement),
-				screenFieldHintValue(f.Hint)); err != nil {
+				screenFieldHintValue(f.FieldKind, ident, customFieldType, f.Hint)); err != nil {
 				return fmt.Errorf("restore screen fields: %w", err)
 			}
 		}

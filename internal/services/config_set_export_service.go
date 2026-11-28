@@ -1116,10 +1116,3 @@ func templatePlacement(placement string) string {
 	}
 	return ""
 }
-
-// screenFieldHintValue is the stored form of a template screen field hint:
-// trimmed, capped at models.ScreenFieldHintMaxLength runes, NULL when empty.
-func screenFieldHintValue(hint string) sql.NullString {
-	hint = normalizeHintText(hint)
-	return sql.NullString{String: hint, Valid: hint != ""}
-}

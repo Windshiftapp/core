@@ -105,7 +105,7 @@ func DiffConformanceTemplates(canonical, live *ConfigSetTemplate) []ConfigSetCon
 
 	drifts = append(drifts, diffStatusSections(c.Statuses, l.Statuses)...)
 	drifts = append(drifts, diffWorkflowSections(c.Workflows, l.Workflows)...)
-	drifts = append(drifts, diffScreenSections(c.Screens, l.Screens)...)
+	drifts = append(drifts, diffScreenSections(c.Screens, l.Screens, templateCustomFieldTypes(c.CustomFields), templateCustomFieldTypes(l.CustomFields))...)
 	drifts = append(drifts, diffCustomFieldSections(c.CustomFields, l.CustomFields)...)
 	drifts = append(drifts, diffPrioritySections(c.Priorities, l.Priorities)...)
 	drifts = append(drifts, diffItemTypeSections(c.ItemTypes, l.ItemTypes)...)
@@ -262,7 +262,28 @@ func screenFieldKeyOf(f ConfigSetTplScreenField) screenFieldKey {
 	return screenFieldKey{kind: f.FieldKind, key: lowerStr(f.FieldIdentifier)}
 }
 
-func diffScreenSections(canonical, live []ConfigSetTplScreen) []ConfigSetConformanceDrift {
+// templateCustomFieldTypes indexes a template's custom fields by lowercased
+// name so screen hints can be resolved to their field type.
+func templateCustomFieldTypes(fields []ConfigSetTplCustomField) map[string]string {
+	types := make(map[string]string, len(fields))
+	for _, f := range fields {
+		types[lowerStr(f.Name)] = f.FieldType
+	}
+	return types
+}
+
+// templateScreenFieldHint is the hint a template field stores: normalized and
+// cleared for fields that cannot show one. Both conformance sides use it, so a
+// hint on a picker or title never reports as drift the repair cannot clear.
+func templateScreenFieldHint(f ConfigSetTplScreenField, customTypes map[string]string) string {
+	customFieldType := ""
+	if f.FieldKind == "custom" {
+		customFieldType = customTypes[lowerStr(f.CustomFieldName)]
+	}
+	return normalizeScreenFieldHint(f.FieldKind, f.FieldIdentifier, customFieldType, f.Hint)
+}
+
+func diffScreenSections(canonical, live []ConfigSetTplScreen, canonicalCustomTypes, liveCustomTypes map[string]string) []ConfigSetConformanceDrift {
 	liveByName := map[string]ConfigSetTplScreen{}
 	for _, sc := range live {
 		liveByName[lowerStr(sc.Name)] = sc
@@ -292,7 +313,7 @@ func diffScreenSections(canonical, live []ConfigSetTplScreen) []ConfigSetConform
 			}
 			if liveF.DisplayOrder != wf.DisplayOrder || liveF.IsRequired != wf.IsRequired || liveF.FieldWidth != wf.FieldWidth ||
 				templatePlacement(liveF.Placement) != templatePlacement(wf.Placement) ||
-				strings.TrimSpace(liveF.Hint) != strings.TrimSpace(wf.Hint) {
+				templateScreenFieldHint(liveF, liveCustomTypes) != templateScreenFieldHint(wf, canonicalCustomTypes) {
 				drifts = append(drifts, drift("screens", ConformanceKindDiffering, want.Name+"/field/"+key.kind+":"+key.key,
 					fmt.Sprintf("screen %q field %q differs (order/required/width/placement/hint changed)", want.Name, key.key), true))
 			}
