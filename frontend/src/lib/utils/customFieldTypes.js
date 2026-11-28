@@ -9,6 +9,9 @@ export function canonicalCustomFieldType(fieldType) {
   return isBooleanCustomFieldType(fieldType) ? BOOLEAN_CUSTOM_FIELD_TYPE : fieldType;
 }
 
+// Field descriptions are short admin notes.
+export const CUSTOM_FIELD_DESCRIPTION_MAX_LENGTH = 250;
+
 // Linking fields attach to an existing item through item_links, so a create
 // form has no item id to link against and cannot satisfy them. They stay valid
 // on edit/view screens; create surfaces must exclude them.

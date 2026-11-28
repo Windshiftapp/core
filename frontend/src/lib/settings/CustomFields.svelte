@@ -35,7 +35,7 @@
   import XIcon from '@lucide/svelte/icons/x';
   import DescriptionText from '../components/DescriptionText.svelte';
   import { customFieldFormData, customFieldUpdatePayload, linkingFieldOptions, loadCustomFieldsOverview } from './customFieldsData.js';
-  import { canonicalCustomFieldType, isBooleanCustomFieldType } from '../utils/customFieldTypes.js';
+  import { CUSTOM_FIELD_DESCRIPTION_MAX_LENGTH, canonicalCustomFieldType, isBooleanCustomFieldType } from '../utils/customFieldTypes.js';
   import { CUSTOM_FIELD_TYPES } from '../utils/fieldTypeMeta.js';
   import { currencyOptions } from '../utils/money.js';
 	import TextField from '../components/TextField.svelte';
@@ -802,6 +802,19 @@
             </p>
           {/if}
         </div>
+      </div>
+
+      <div class="mt-4">
+        <TextareaField
+          label={t('fields.fieldDescription')}
+          id="field-description"
+          labelColor="default"
+          rows={2}
+          maxlength={CUSTOM_FIELD_DESCRIPTION_MAX_LENGTH}
+          helper={`${(formData.description || '').length}/${CUSTOM_FIELD_DESCRIPTION_MAX_LENGTH}`}
+          dataTestid="custom-field-description"
+          bind:value={formData.description}
+        />
       </div>
 
       {#if !hideAppliesToSection}
