@@ -85,6 +85,16 @@
   let hintEditorIndex = $state(null);
   let hintDraft = $state('');
   const hintEditorField = $derived(hintEditorIndex === null ? null : screenFields[hintEditorIndex]);
+  const hintLength = $derived(Array.from(hintDraft).length);
+
+  // Cap by code points rather than UTF-16 units, matching the server, so an
+  // emoji is never split and the counter matches what will be stored.
+  function clampHintDraft() {
+    const chars = Array.from(hintDraft);
+    if (chars.length > SCREEN_FIELD_HINT_MAX_LENGTH) {
+      hintDraft = chars.slice(0, SCREEN_FIELD_HINT_MAX_LENGTH).join('');
+    }
+  }
 
   function openHintEditor(index) {
     hintEditorIndex = index;
@@ -258,9 +268,9 @@
       id="screen-field-hint"
       labelColor="default"
       rows={4}
-      maxlength={SCREEN_FIELD_HINT_MAX_LENGTH}
-      helper={`${t('screensPage.hintHelper')} · ${hintDraft.length}/${SCREEN_FIELD_HINT_MAX_LENGTH}`}
+      helper={`${t('screensPage.hintHelper')} · ${hintLength}/${SCREEN_FIELD_HINT_MAX_LENGTH}`}
       dataTestid="screen-field-hint-input"
+      oninput={clampHintDraft}
       bind:value={hintDraft}
     />
     {#if hintDraft}
