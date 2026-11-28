@@ -37,6 +37,8 @@ deadline, per-user admission, polling and outbox limits. This policy does not
 replace those controls or turn workspaces into isolation boundaries. Each
 customer instance retains its own application, database and storage boundary.
 
+For MCP startup options and client workflows, see the [MCP tools guide](../../README.md#mcp-tools).
+
 ## Authority matrix
 
 | Operation | Authority when restricted |
