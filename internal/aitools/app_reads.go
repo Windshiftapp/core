@@ -152,12 +152,12 @@ func summarizeItems(items []models.Item) []itemSummaryDTO {
 	return rows
 }
 
-func (env *Env) listScopeItems(ctx context.Context, workspaceID, collectionID int, ql string, p toolPage) (any, error) {
-	if len(env.AccessibleWorkspaceIDs) == 0 || (workspaceID > 0 && !env.HasWorkspaceAccess(workspaceID)) {
+func (e *Env) listScopeItems(ctx context.Context, workspaceID, collectionID int, ql string, p toolPage) (any, error) {
+	if len(e.AccessibleWorkspaceIDs) == 0 || (workspaceID > 0 && !e.HasWorkspaceAccess(workspaceID)) {
 		return nil, errors.New("scope not found")
 	}
 	limit, offset := p.bounds()
-	result, err := env.itemApplication().List(ctx, services.ItemListRequest{UserID: env.UserID, WorkspaceIDs: env.AccessibleWorkspaceIDs,
+	result, err := e.itemApplication().List(ctx, services.ItemListRequest{UserID: e.UserID, WorkspaceIDs: e.AccessibleWorkspaceIDs,
 		WorkspaceID: workspaceID, CollectionID: collectionID, SubQL: ql, OmitDescriptions: true,
 		Pagination: services.PaginationParams{Limit: limit, Offset: offset}})
 	if err != nil {
