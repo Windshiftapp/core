@@ -56,6 +56,8 @@
     ondeleteDiagram = undefined,
     onexecuteAction = undefined,
     onaiaction = undefined,
+    // Optional per-screen hint shown as the description editor's placeholder.
+    descriptionHint = '',
     // Optional section label. The item detail sets it when long-form custom
     // fields share the main column, so every section there is labelled alike.
     label = null,
@@ -204,7 +206,7 @@
       <PluginEditorHost
         bind:this={milkdownEditor}
         bind:content={editorContent}
-        placeholder={t('items.enterDescription')}
+        placeholder={descriptionHint || t('items.enterDescription')}
         showToolbar={true}
         itemId={item.id}
         entityType="item"

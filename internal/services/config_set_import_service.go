@@ -802,17 +802,22 @@ func (s *ConfigSetImportService) findOrCreateScreen(ctx context.Context, tx data
 	}
 	for _, f := range sc.Fields {
 		ident := f.FieldIdentifier
+		customFieldType := ""
 		if f.FieldKind == "custom" {
 			cfID, ok := customFieldNameToID[lowerStr(f.CustomFieldName)]
 			if !ok {
 				return 0, false, fmt.Errorf("screen %q: custom field %q not found", sc.Name, f.CustomFieldName)
 			}
 			ident = strconv.Itoa(cfID)
+			if err := tx.QueryRowContext(ctx, `SELECT field_type FROM custom_field_definitions WHERE id = ?`, cfID).Scan(&customFieldType); err != nil {
+				return 0, false, fmt.Errorf("screen %q: load custom field %q: %w", sc.Name, f.CustomFieldName, err)
+			}
 		}
 		_, err := tx.ExecContext(ctx, `
-			INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width, placement)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
-		`, id, f.FieldKind, ident, f.DisplayOrder, f.IsRequired, f.FieldWidth, models.NormalizeScreenFieldPlacement(f.Placement))
+			INSERT INTO screen_fields (screen_id, field_type, field_identifier, display_order, is_required, field_width, placement, hint)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`, id, f.FieldKind, ident, f.DisplayOrder, f.IsRequired, f.FieldWidth, models.NormalizeScreenFieldPlacement(f.Placement),
+			screenFieldHintValue(f.FieldKind, ident, customFieldType, f.Hint))
 		if err != nil {
 			return 0, false, err
 		}

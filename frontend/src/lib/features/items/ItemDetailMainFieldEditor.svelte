@@ -5,11 +5,12 @@
   // neighbouring sections never end the edit, and the draft is never pushed
   // back into the editor while the user types.
   import Button from '../../components/Button.svelte';
+  import Input from '../../components/Input.svelte';
   import Textarea from '../../components/Textarea.svelte';
   import MilkdownEditor from '../../editors/LazyMilkdownEditor.svelte';
   import { t } from '../../stores/i18n.svelte.js';
   import { getDisplayString, getShortcut, matchesShortcut } from '../../utils/keyboardShortcuts.js';
-  import { isRichTextCustomFieldType } from '../../utils/customFieldTypes.js';
+  import { customFieldPlaceholder, isRichTextCustomFieldType } from '../../utils/customFieldTypes.js';
 
   let {
     field,
@@ -18,6 +19,8 @@
     saving = false,
     onsave = undefined,
     oncancel = undefined,
+    // Optional per-screen hint; overrides the field description as placeholder.
+    hint = '',
   } = $props();
 
   const saveShortcut = getShortcut('description', 'save');
@@ -32,7 +35,11 @@
   let submitting = $state(false);
 
   const isRichText = $derived(isRichTextCustomFieldType(field.field_type));
-  const placeholder = $derived(t('items.enterField', { field: field.name.toLowerCase() }));
+  const isSingleLine = $derived(field.field_type === 'text');
+  // The screen's hint, else "Enter <field>".
+  const placeholder = $derived(
+    customFieldPlaceholder(field, hint, t('items.enterField', { field: field.name.toLowerCase() }))
+  );
 
   async function save() {
     // Same lock as the Save button, so the keyboard shortcut cannot submit
@@ -76,6 +83,13 @@
         allowImageUpload={false}
         {workspaceId}
         testId={`item-main-custom-field-input-${field.id}`}
+      />
+    {:else if isSingleLine}
+      <Input
+        bind:value={draft}
+        {placeholder}
+        autofocus
+        dataTestid={`item-main-custom-field-input-${field.id}`}
       />
     {:else}
       <Textarea

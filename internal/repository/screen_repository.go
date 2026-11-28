@@ -270,8 +270,8 @@ func (r *ScreenRepository) ensureImportedFieldScreen(
 		if sourceScreenID > 0 {
 			if _, err := r.db.ExecWrite(`
 				INSERT INTO screen_fields
-					(screen_id, field_type, field_identifier, display_order, is_required, field_width, placement)
-				SELECT ?, field_type, field_identifier, display_order, is_required, field_width, placement
+					(screen_id, field_type, field_identifier, display_order, is_required, field_width, placement, hint)
+				SELECT ?, field_type, field_identifier, display_order, is_required, field_width, placement, hint
 				FROM screen_fields WHERE screen_id = ?
 			`, screenID, sourceScreenID); err != nil {
 				return 0, fmt.Errorf("copy Jira import screen fields: %w", err)

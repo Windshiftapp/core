@@ -1427,6 +1427,7 @@ import NativeSelect from '../../components/NativeSelect.svelte';
     editingCustomFields={itemDetailStore.editing.customFields.active}
     editCustomFieldValues={itemDetailStore.editing.customFields.values}
     workspaceScreenFields={itemDetailStore.workspaceScreenFields}
+    descriptionHint={itemDetailStore.descriptionHint}
     workspaceScreenSystemFields={itemDetailStore.workspaceScreenSystemFields}
     editableScreenFieldIds={itemDetailStore.editableScreenFieldIds}
     editableScreenSystemFields={itemDetailStore.editableScreenSystemFields}

@@ -98,7 +98,7 @@
         <Label color="default">{t('common.description') || 'Description'}{#if isRequired(field)}<span style="color: var(--ds-text-danger, #ef4444);"> *</span>{/if}</Label>
         <MilkdownEditor
           bind:content={values.description}
-          placeholder={t('createModal.addDescription')}
+          placeholder={field.hint || t('createModal.addDescription')}
           readonly={disabled}
           showToolbar={false}
           compact={true}
@@ -173,6 +173,7 @@
           {milestones}
           {iterations}
           onChange={(val) => setCustomValue(def.id, val)}
+          hint={field.hint}
         />
       </div>
     {/if}

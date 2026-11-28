@@ -58,6 +58,7 @@
     editingMilestone = false,
     editingIteration = false,
     workspaceScreenFields = [],
+    descriptionHint = '',
     workspaceScreenSystemFields = [],
     editableScreenFieldIds = null,
     editableScreenSystemFields = null,
@@ -386,6 +387,7 @@
           {/snippet}
           <ItemDetailDescription
             bind:this={descriptionComponent}
+            {descriptionHint}
             {item}
             {editingDescription}
             {editDescription}

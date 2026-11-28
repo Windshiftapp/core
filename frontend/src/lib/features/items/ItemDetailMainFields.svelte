@@ -75,6 +75,7 @@
         {saving}
         onsave={(value) => onsaveField?.({ field: `custom_field_${identifier}`, value })}
         oncancel={() => oncancelEdit?.({ field: `custom_field_${identifier}` })}
+        hint={screenField.hint}
       />
     {:else if isEmpty(storedValue)}
       {#if fieldEditable}

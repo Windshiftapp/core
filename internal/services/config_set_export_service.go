@@ -795,7 +795,7 @@ func (s *ConfigSetExportService) exportScreens(ctx context.Context, screenIDs []
 	for _, sr := range screens {
 		s2 := ConfigSetTplScreen{Name: sr.Name, Description: sr.Desc}
 		fieldRows, err := s.db.QueryContext(ctx, `
-			SELECT field_type, field_identifier, display_order, COALESCE(is_required, false), COALESCE(field_width, ''), COALESCE(placement, 'sidebar')
+			SELECT field_type, field_identifier, display_order, COALESCE(is_required, false), COALESCE(field_width, ''), COALESCE(placement, 'sidebar'), COALESCE(hint, '')
 			FROM screen_fields
 			WHERE screen_id = ?
 			ORDER BY display_order, id
@@ -809,11 +809,12 @@ func (s *ConfigSetExportService) exportScreens(ctx context.Context, screenIDs []
 			required  bool
 			width     string
 			placement string
+			hint      string
 		}
 		var rawFields []rawField
 		for fieldRows.Next() {
 			var rf rawField
-			if scanErr := fieldRows.Scan(&rf.ft, &rf.ident, &rf.order, &rf.required, &rf.width, &rf.placement); scanErr != nil {
+			if scanErr := fieldRows.Scan(&rf.ft, &rf.ident, &rf.order, &rf.required, &rf.width, &rf.placement, &rf.hint); scanErr != nil {
 				_ = fieldRows.Close()
 				return nil, scanErr
 			}
@@ -835,6 +836,7 @@ func (s *ConfigSetExportService) exportScreens(ctx context.Context, screenIDs []
 				IsRequired:   rf.required,
 				FieldWidth:   rf.width,
 				Placement:    templatePlacement(rf.placement),
+				Hint:         rf.hint,
 			}
 			if rf.ft == "custom" {
 				if id, ok := parseIntish(rf.ident); ok && id > 0 {

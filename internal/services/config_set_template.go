@@ -124,6 +124,8 @@ type ConfigSetTplScreenField struct {
 	// Placement is omitted for the sidebar default, so templates exported
 	// before placement existed stay byte-identical and import unchanged.
 	Placement string `json:"placement,omitempty"`
+	// Hint is the optional per-screen input guidance; omitted when empty.
+	Hint string `json:"hint,omitempty"`
 }
 
 type ConfigSetTplWorkflow struct {

@@ -13,6 +13,13 @@
   import DraggableFieldRow from '../components/DraggableFieldRow.svelte';
   import FieldRemovalAction from '../components/FieldRemovalAction.svelte';
   import FieldTypeIcon from '../components/FieldTypeIcon.svelte';
+  import Button from '../components/Button.svelte';
+  import TextareaField from '../components/TextareaField.svelte';
+  import Modal from '../dialogs/Modal.svelte';
+  import ModalHeader from '../dialogs/ModalHeader.svelte';
+  import DialogFooter from '../dialogs/DialogFooter.svelte';
+  import MessageSquareText from '@lucide/svelte/icons/message-square-text';
+  import { SCREEN_FIELD_HINT_MAX_LENGTH } from '../utils/customFieldTypes.js';
   import { createFieldLayoutDrag, dragAvailableField } from './fieldLayoutDrag.js';
 
   let { screen } = $props();
@@ -73,14 +80,46 @@
     screenEditorStore.removeField(index);
   }
 
+  // Per-screen hint editor: edits a draft and writes it to the field on Save;
+  // the screen itself is persisted by the parent's Save, like Required.
+  let hintEditorIndex = $state(null);
+  let hintDraft = $state('');
+  const hintEditorField = $derived(hintEditorIndex === null ? null : screenFields[hintEditorIndex]);
+  const hintLength = $derived(Array.from(hintDraft).length);
+
+  // Cap by code points rather than UTF-16 units, matching the server, so an
+  // emoji is never split and the counter matches what will be stored.
+  function clampHintDraft() {
+    const chars = Array.from(hintDraft);
+    if (chars.length > SCREEN_FIELD_HINT_MAX_LENGTH) {
+      hintDraft = chars.slice(0, SCREEN_FIELD_HINT_MAX_LENGTH).join('');
+    }
+  }
+
+  function openHintEditor(index) {
+    hintEditorIndex = index;
+    hintDraft = screenFields[index]?.hint || '';
+  }
+
+  function closeHintEditor() {
+    hintEditorIndex = null;
+    hintDraft = '';
+  }
+
+  function saveHint() {
+    if (hintEditorIndex !== null) screenEditorStore.setFieldHint(hintEditorIndex, hintDraft);
+    closeHintEditor();
+  }
+
   function setFieldSearchQuery(value) {
     screenEditorStore.fieldSearchQuery = value;
   }
 </script>
 
-<div class="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 mb-8" data-testid="screen-field-layout-editor">
-  <!-- Screen Fields Configuration -->
-  <div class="rounded-xl p-6 border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
+<div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-6 mb-8" data-testid="screen-field-layout-editor">
+  <!-- Screen Fields Configuration (min-w-0 so long field names and hint
+       previews truncate instead of widening the column) -->
+  <div class="min-w-0 rounded-xl p-6 border" style="background-color: var(--ds-surface-raised); border-color: var(--ds-border);">
     <h3 class="text-lg font-semibold mb-4" style="color: var(--ds-text);">{t('screensPage.screenFields')} ({screenFields.length})</h3>
     <p class="text-sm mb-4" style="color: var(--ds-text-subtle);">{t('screensPage.dragToReorder')}</p>
 
@@ -116,6 +155,16 @@
             </div>
 
             <div class="flex items-center gap-3 flex-shrink-0">
+              {#if field.hint || screenEditorStore.canFieldHaveHint(field)}
+                <Button
+                  variant={field.hint ? 'secondary' : 'ghost'}
+                  size="small"
+                  icon={MessageSquareText}
+                  title={t('screensPage.editHint')}
+                  onclick={() => openHintEditor(index)}
+                  dataTestid={`screen-field-hint-${field.field_identifier}`}
+                />
+              {/if}
               {#if field.placement === 'main' || screenEditorStore.canFieldUseMainColumn(field)}
                 <span title={t('screensPage.mainColumnHint')} data-testid={`screen-field-main-column-${field.field_identifier}`}>
                   <Checkbox
@@ -203,6 +252,41 @@
     </div>
   </div>
 </div>
+
+
+<!-- Per-screen hint editor -->
+<Modal isOpen={hintEditorIndex !== null} onclose={closeHintEditor} onSubmit={saveHint} maxWidth="max-w-lg">
+  {#snippet children()}
+  <ModalHeader
+    title={t('screensPage.hintTitle', { field: hintEditorField ? screenEditorStore.getFieldDisplayName(hintEditorField) : '' })}
+    showCloseButton={true}
+    onclose={closeHintEditor}
+  />
+  <div class="px-6 py-4 space-y-2">
+    <TextareaField
+      label={t('screensPage.hintLabel')}
+      id="screen-field-hint"
+      labelColor="default"
+      rows={4}
+      helper={`${t('screensPage.hintHelper')} · ${hintLength}/${SCREEN_FIELD_HINT_MAX_LENGTH}`}
+      dataTestid="screen-field-hint-input"
+      oninput={clampHintDraft}
+      bind:value={hintDraft}
+    />
+    {#if hintDraft}
+      <Button variant="link" size="small" onclick={() => (hintDraft = '')} dataTestid="screen-field-hint-clear">
+        {t('screensPage.clearHint')}
+      </Button>
+    {/if}
+  </div>
+  <DialogFooter
+    onCancel={closeHintEditor}
+    onConfirm={saveHint}
+    confirmLabel={t('common.save')}
+    showKeyboardHint={true}
+  />
+  {/snippet}
+</Modal>
 
 <style>
   .available-field:hover {
